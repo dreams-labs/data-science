@@ -9,8 +9,8 @@ This project aims to predict cryptocurrency price movements using wallet transac
 Data will be segmented into four sets:
 * **Training set:** used to train the model
 * **Validation set:** used to tune model parameters
-* **Test set:** used to assess whether model generalizes within the same time period as the validation set
-* **Future set:** used to assess whether the model generalizes within a different time period from the training, validation, and test sets. 
+* **Test set:** used to assess whether model generalizes within the same time period as the Training and Validation sets
+* **Future set:** used to assess whether the model generalizes within a different time period from the Training, Validation, and Test sets. 
 
 ## Time Periods
 
@@ -23,7 +23,7 @@ As such, price movements will be split into three periods:
 
 2. **Modeling Period** (e.g. 3/1/24–5/1/24):
    - Price movements during this period will generate the target variables in the Training, Validation, and Test sets. 
-   - Price movements during this period will also be used to build features for the future set, since the future set will be trained up until the start of the future period. 
+   - Price movements during this period will also be used to build features for the Future set since it will have access to all transactions up until the start of the Future period. 
 
 3. **Future Period** (e.g. 5/1/24-7/1/24):
    - Price movements during this period will generate the target variables in the Future set to assess whether the model can generalize beyond the original time frame, particularly in future market conditions that may be significantly different from the past.
