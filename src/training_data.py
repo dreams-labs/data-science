@@ -1,3 +1,4 @@
+import time
 import pandas as pd
 from dreams_core.googlecloud import GoogleCloud as dgc
 from dreams_core import core as dc
