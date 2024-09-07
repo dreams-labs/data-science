@@ -410,7 +410,7 @@ def clean_profits_df(profits_df, profitability_filter=10000000):
 
 
 
-def classify_sharks(profits_df, profitability_threshold, modeling_period_start, balance_threshold):
+def classify_sharks(profits_df, *, profitability_threshold, modeling_period_start, balance_threshold):
     """
     Classify wallets as sharks based on lifetime profitability during the progeny period and USD balance thresholds.
     
