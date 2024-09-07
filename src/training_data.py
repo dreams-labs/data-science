@@ -42,7 +42,7 @@ def retrieve_prices_data():
 
 
 
-def fill_prices_gaps(prices_df, max_gap_days=3):
+def fill_prices_gaps(prices_df, max_gap_days):
     """
     Forward-fills small gaps in price data for each coin_id.
     Parameters:
@@ -410,23 +410,26 @@ def clean_profits_df(profits_df, profitability_filter=10000000):
 
 
 
-def classify_sharks(profits_df, *, profitability_threshold, modeling_period_start, balance_threshold):
+def classify_sharks(profits_df, modeling_config):
     """
     Classify wallets as sharks based on lifetime profitability during the progeny period and USD balance thresholds.
     
     Parameters:
     - profits_df: DataFrame with columns ['coin_id', 'wallet_address', 'date', 'profitability_cumulative', 'balance', 'price']
-    - profitability_threshold: Threshold to classify a wallet as a shark based on lifetime profitability at the end of the progeny period
-    - modeling_period_start: Date after which data should be excluded from the training set (format: 'YYYY-MM-DD')
-    - balance_threshold: Minimum USD balance required to be considered a shark
+    - modeling_config: Configuration dictionary containing the following:
+        - profitability_threshold: Threshold to classify a wallet as a shark based on lifetime profitability at the end of the progeny period
+        - modeling_period_start: Date after which data should be excluded from the training set (format: 'YYYY-MM-DD')
+        - balance_threshold: Minimum USD balance required to be considered a shark
     
     Returns:
     - DataFrame with an additional column 'is_shark' indicating if the wallet is classified as a shark.
     """
     logger.info('identifying shark wallets...')
 
-    # Filter out data from the period
-    modeling_period_start = pd.to_datetime(modeling_period_start)
+    # Retrieve necessary parameters from modeling_config
+    modeling_period_start = pd.to_datetime(modeling_config['modeling_period_start'])
+    profitability_threshold = modeling_config['profitability_threshold']
+    balance_threshold = modeling_config['balance_threshold']
     filtered_profits_df = profits_df[profits_df['date'] < modeling_period_start].copy()
 
     # Calculate USD transfers and balances
