@@ -1,3 +1,9 @@
+"""
+functions used in generating training data for the models
+"""
+# pylint: disable=C0301 
+# pylint: disable=W1203
+
 import time
 import pandas as pd
 from dreams_core.googlecloud import GoogleCloud as dgc
@@ -321,7 +327,7 @@ def calculate_wallet_profitability(transfers_df, prices_df):
     3a. Calculate daily profitability based on price changes and previous balances.
     3b. Compute the cumulative profitability for each wallet-coin pair using `cumsum()`.
     """
-    logger.info(f"Starting generation of profits_df...")
+    logger.info("Starting generation of profits_df...")
     start_time = time.time()
 
     # 1. Merge transfers and prices data on 'coin_id' and 'date'
@@ -356,7 +362,7 @@ def calculate_wallet_profitability(transfers_df, prices_df):
 
     # Drop helper columns
     profits_df.drop(columns=['first_price_date', 'previous_price', 'previous_balance'], inplace=True)
-    
+
     total_time = time.time() - start_time
     logger.info(f"Generated profits df after {total_time:.2f} seconds")
 
@@ -376,12 +382,12 @@ def clean_profits_df(profits_df, profitability_filter=10000000):
     Returns:
     - Cleaned DataFrame with records for coin_id-wallet_address pairs filtered out.
     """
-    logger.info(f"Starting generation of profits_cleaned_df...")
+    logger.info("Starting generation of profits_cleaned_df...")
     start_time = time.time()
-    
+
     # Identify coin_id-wallet_address pairs where any single day's profitability exceeds the threshold
     exclusions_profits_df = profits_df[
-        (profits_df['profitability_cumulative'] > profitability_filter) | 
+        (profits_df['profitability_cumulative'] > profitability_filter) |
         (profits_df['profitability_cumulative'] < -profitability_filter)
     ][['coin_id', 'wallet_address']].drop_duplicates()
 
@@ -393,7 +399,7 @@ def clean_profits_df(profits_df, profitability_filter=10000000):
 
     # Drop the merge indicator column
     profits_cleaned_df.drop(columns=['_merge'], inplace=True)
-    
+
     total_time = time.time() - start_time
     logger.info("Finished cleaning profits_df after %.2f seconds. Removed %s coin-wallet pairs that breached profit or loss threshold of $%s",
         total_time, exclusions_profits_df.shape[0], dc.human_format(profitability_filter))
@@ -443,4 +449,3 @@ def classify_sharks(profits_df, profitability_threshold, modeling_period_start, 
     logger.info('creation of sharks_df complete.')
 
     return sharks_df
-
