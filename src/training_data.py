@@ -18,13 +18,7 @@ def retrieve_prices_data():
         select cmd.coin_id
         ,date
         ,cast(cmd.price as float64) as price
-        ,case when cwt.coin_id is not null then true else false end as has_transfers_data
         from core.coin_market_data cmd
-        left join (
-            select coin_id
-            from core.coin_wallet_transfers cwt 
-            group by 1
-        ) cwt on cwt.coin_id = cmd.coin_id
         order by 1,2
     '''
 
@@ -203,3 +197,249 @@ def create_target_variable(prices_df, modeling_period_start, modeling_period_end
     )
 
     return target_variables_df,outcomes_df
+
+
+
+def retrieve_transfers_data(modeling_period_start):
+    """
+    Retrieves wallet transfers data from the core.coin_wallet_transfers table and converts 
+    columns to categorical for calculation efficiency. 
+
+    Params:
+    - modeling_period_start: String with format 'YYYY-MM-DD'
+        Date after which data should be used to create target variables instead of training data. 
+        In this function it is used to create transfer rows for all coin_id-wallet pairs so that 
+        we can accurately calculate profitability as of the training period end. 
+
+    Returns:
+    - transfers_df: DataFrame with columns ['coin_id', 'wallet_address', 'date', 'net_transfers', 'balance']
+    """
+    # SQL query to retrieve prices data
+    query_sql = f'''
+        with transfers_base as (
+            -- start with the same query that generates transfers_df
+            select cwt.coin_id
+            ,cwt.wallet_address
+            ,cwt.date
+            ,cast(cwt.net_transfers as float64) as net_transfers
+            ,cast(cwt.balance as float64) as balance
+            from `core.coin_wallet_transfers` cwt
+            join (
+                select coin_id
+                from `core.coin_market_data`
+                group by 1
+            ) cmd on cmd.coin_id = cwt.coin_id
+            
+            -- remove some of the largest coins that add many records and aren't altcoins
+            where cwt.coin_id not in (
+                '06b54bc2-8688-43e7-a49a-755300a4f995' -- SHIB
+                ,'eb52375e-f394-4632-a9cf-3a9291a8ebf7' -- COMP
+                ,'88779ad0-f8c3-448c-bc6c-699c2a692514' -- CRV
+            )
+        ),
+
+        existing_rows as (
+            -- identify coin-wallet pairs that already have a balance as of the training period end
+            select *
+            from transfers_base
+            where date = '{modeling_period_start}'
+        ),
+
+        needs_rows as (
+            -- for coin-wallet pairs that don't have existing records, identify the row closest to the period end date
+            select t.*
+            ,row_number() over (partition by t.coin_id,t.wallet_address order by t.date desc) as rn
+            from transfers_base t
+            left join existing_rows e on e.coin_id = t.coin_id 
+                and e.wallet_address = t.wallet_address
+            where t.date < '{modeling_period_start}'
+            and e.coin_id is null
+        ),
+
+        transfers_new_rows as (
+            -- create a new row for the period end date by carrying the balance from the closest existing record
+            select coin_id
+            ,wallet_address
+            ,date_sub('{modeling_period_start}', interval 1 day) as date
+            ,0 as net_transfers
+            ,cast(balance as float64) as balance
+            from needs_rows
+            where rn=1
+        ) 
+
+        select * from transfers_base
+        union all
+        select * from transfers_new_rows
+        order by coin_id, wallet_address, date
+    '''
+
+    # Run the SQL query using dgc's run_sql method
+    start_time = time.time()
+    logger.info('retrieving transfers data...')
+    transfers_df = dgc().run_sql(query_sql)
+
+    # Convert column types
+    transfers_df['coin_id'] = transfers_df['coin_id'].astype('category')
+    transfers_df['date'] = pd.to_datetime(transfers_df['date'])
+
+    logger.info('retrieved transfers_df with shape %s after %s seconds.',
+                transfers_df.shape, round(time.time()-start_time,1))
+
+    return transfers_df
+
+
+
+def calculate_wallet_profitability(transfers_df, prices_df):
+    """
+    Calculate the profitability of wallets by merging transaction (transfers) data with price data 
+    and computing daily and cumulative profitability for each wallet-coin pair. The balance as of 
+    the first price record is treated as an initial "transfer in" for calculating profitability.
+
+    Parameters:
+    - transfers_df (pd.DataFrame): 
+        - coin_id: The ID of the coin/token.
+        - wallet_address: The unique identifier of the wallet.
+        - date: The date of the transaction.
+        - net_transfers: The net tokens transferred in or out of the wallet on that date.
+        - balance: The token balance in the wallet at the end of the day.
+    - prices_df (pd.DataFrame): 
+        - coin_id: The ID of the coin/token.
+        - date: The date for the price record.
+        - price: The price of the coin/token on that date.
+
+    Returns:
+    - pd.DataFrame: 
+        A DataFrame with profitability metrics, including:
+        - profitability_change: The change in profitability for each transaction, calculated as the 
+          difference between the current price and the previous price, multiplied by the previous balance.
+        - profitability_cumulative: The cumulative profitability for each wallet-coin pair over time.
+    
+    Process:
+    1. Merge the `transfers_df` and `prices_df` on 'coin_id' and 'date'.
+    2. Remove any transaction records earlier than the first available price date for each coin.
+    3a. Calculate daily profitability based on price changes and previous balances.
+    3b. Compute the cumulative profitability for each wallet-coin pair using `cumsum()`.
+    """
+    logger.info(f"Starting generation of profits_df...")
+    start_time = time.time()
+
+    # 1. Merge transfers and prices data on 'coin_id' and 'date'
+    # ----------------------------------------------------------
+    profits_df = pd.merge(transfers_df, prices_df, on=['coin_id', 'date'], how='left')
+    logger.debug(f"<Step 1> (Merge transfers and prices): {time.time() - start_time:.2f} seconds")
+    step_time = time.time()
+
+    # 2. Remove transfers history earlier than the first pricing data
+    # ---------------------------------------------------------------
+    # identify the earliest pricing data for each coin
+    first_prices_df = prices_df.groupby('coin_id')['date'].min().reset_index()
+    first_prices_df.columns = ['coin_id', 'first_price_date']
+
+    # remove transfer data that occurred when we don't know the coin price
+    profits_df = pd.merge(profits_df, first_prices_df, on='coin_id', how='left')
+    profits_df = profits_df[profits_df['date'] >= profits_df['first_price_date']]
+    logger.debug(f"<Step 2> (Remove records before first price date): {time.time() - step_time:.2f} seconds")
+    step_time = time.time()
+
+    # 3. Calculate profitability
+    # --------------------------
+    # create offset price and balance rows to easily calculate changes between periods
+    profits_df['previous_price'] = profits_df.groupby(['coin_id', 'wallet_address'])['price'].shift(1)
+    profits_df['previous_price'].fillna(profits_df['price'], inplace=True)
+    profits_df['previous_balance'] = profits_df.groupby(['coin_id', 'wallet_address'])['balance'].shift(1).fillna(0)
+
+    # calculate the profitability change in each period and sum them to get cumulative profitability
+    profits_df['profitability_change'] = (profits_df['price'] - profits_df['previous_price']) * profits_df['previous_balance']
+    profits_df['profitability_cumulative'] = profits_df.groupby(['coin_id', 'wallet_address'])['profitability_change'].cumsum()
+    logger.debug(f"<Step 3> Calculate profitability: {time.time() - step_time:.2f} seconds")
+
+    # Drop helper columns
+    profits_df.drop(columns=['first_price_date', 'previous_price', 'previous_balance'], inplace=True)
+    
+    total_time = time.time() - start_time
+    logger.info(f"Generated profits df after {total_time:.2f} seconds")
+
+    return profits_df
+
+
+
+def clean_profits_df(profits_df, profitability_filter=10000000):
+    """
+    Clean the profits DataFrame by excluding all records for any coin_id-wallet_address pair
+    if any single day's profitability exceeds the profitability_filter (positive or negative).
+    
+    Parameters:
+    - profits_df: DataFrame with columns ['coin_id', 'wallet_address', 'date', 'profitability_cumulative']
+    - profitability_filter: Threshold value to exclude pairs with profits or losses exceeding this value
+    
+    Returns:
+    - Cleaned DataFrame with records for coin_id-wallet_address pairs filtered out.
+    """
+    logger.info(f"Starting generation of profits_cleaned_df...")
+    start_time = time.time()
+    
+    # Identify coin_id-wallet_address pairs where any single day's profitability exceeds the threshold
+    exclusions_profits_df = profits_df[
+        (profits_df['profitability_cumulative'] > profitability_filter) | 
+        (profits_df['profitability_cumulative'] < -profitability_filter)
+    ][['coin_id', 'wallet_address']].drop_duplicates()
+
+    # Merge to filter out the records with those pairs
+    profits_cleaned_df = profits_df.merge(exclusions_profits_df, on=['coin_id', 'wallet_address'], how='left', indicator=True)
+
+    # Keep only the records where the pair was not in the exclusion list
+    profits_cleaned_df = profits_cleaned_df[profits_cleaned_df['_merge'] == 'left_only']
+
+    # Drop the merge indicator column
+    profits_cleaned_df.drop(columns=['_merge'], inplace=True)
+    
+    total_time = time.time() - start_time
+    logger.info("Finished cleaning profits_df after %.2f seconds. Removed %s coin-wallet pairs that breached profit or loss threshold of $%s",
+        total_time, exclusions_profits_df.shape[0], dc.human_format(profitability_filter))
+
+    return profits_cleaned_df,exclusions_profits_df
+
+
+
+def classify_sharks(profits_df, profitability_threshold, modeling_period_start, balance_threshold):
+    """
+    Classify wallets as sharks based on lifetime profitability during the progeny period and USD balance thresholds.
+    
+    Parameters:
+    - profits_df: DataFrame with columns ['coin_id', 'wallet_address', 'date', 'profitability_cumulative', 'balance', 'price']
+    - profitability_threshold: Threshold to classify a wallet as a shark based on lifetime profitability at the end of the progeny period
+    - modeling_period_start: Date after which data should be excluded from the training set (format: 'YYYY-MM-DD')
+    - balance_threshold: Minimum USD balance required to be considered a shark
+    
+    Returns:
+    - DataFrame with an additional column 'is_shark' indicating if the wallet is classified as a shark.
+    """
+    logger.info('identifying shark wallets...')
+
+    # Filter out data from the period
+    modeling_period_start = pd.to_datetime(modeling_period_start)
+    filtered_profits_df = profits_df[profits_df['date'] < modeling_period_start].copy()
+
+    # Calculate USD transfers and balances
+    filtered_profits_df['usd_balance'] = filtered_profits_df['balance'] * filtered_profits_df['price']
+    filtered_profits_df['usd_net_transfers'] = filtered_profits_df['net_transfers'] * filtered_profits_df['price']
+
+    # Filter out wallets that have never reached the minimum USD balance_threshold for a coin_id
+    eligible_wallets_df = filtered_profits_df.groupby(['coin_id', 'wallet_address'])['usd_balance'].max().reset_index()
+    eligible_wallets_df = eligible_wallets_df[eligible_wallets_df['usd_balance'] >= balance_threshold]
+
+    # Get the last profitability for each wallet-coin pair before the modeling period start
+    last_profitability = filtered_profits_df.sort_values('date').groupby(['coin_id', 'wallet_address']).last()['profitability_cumulative'].reset_index()
+
+    # Calculate rate of return
+    filtered_profits_df['usd_total_inflows'] = filtered_profits_df['net_transfers'].where(filtered_profits_df['net_transfers'] > 0, 0)
+    filtered_profits_df['rate_of_return'] = filtered_profits_df['profitability_cumulative'] / filtered_profits_df['usd_total_inflows']
+
+    # Classify wallets as sharks based on lifetime profitability and eligibility
+    sharks_df = eligible_wallets_df.merge(last_profitability, on=['coin_id', 'wallet_address'])
+    sharks_df['is_shark'] = sharks_df['profitability_cumulative'] >= profitability_threshold
+
+    logger.info('creation of sharks_df complete.')
+
+    return sharks_df
+
