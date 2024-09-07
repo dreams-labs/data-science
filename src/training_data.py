@@ -1,7 +1,7 @@
 """
 functions used in generating training data for the models
 """
-# pylint: disable=C0301 
+# pylint: disable=C0301
 # pylint: disable=W1203
 
 import time
@@ -332,6 +332,8 @@ def calculate_wallet_profitability(transfers_df, prices_df):
 
     # 1. Merge transfers and prices data on 'coin_id' and 'date'
     # ----------------------------------------------------------
+    transfers_df['date'] = pd.to_datetime(transfers_df['date'])
+    prices_df['date'] = pd.to_datetime(prices_df['date'])
     profits_df = pd.merge(transfers_df, prices_df, on=['coin_id', 'date'], how='left')
     logger.debug(f"<Step 1> (Merge transfers and prices): {time.time() - start_time:.2f} seconds")
     step_time = time.time()
