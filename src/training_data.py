@@ -97,8 +97,6 @@ def fill_prices_gaps(prices_df, max_gap_days):
         # Remove rows with larger gaps that shouldn't be filled (already handled by check above)
         coin_df = coin_df[coin_df['missing_gap'] <= max_gap_days]
 
-        # Drop the temporary 'missing_gap' column
-        coin_df = coin_df.drop(columns=['missing_gap'])
 
         # Append to the result list
         filled_results.append(coin_df)
@@ -109,6 +107,9 @@ def fill_prices_gaps(prices_df, max_gap_days):
         prices_filled_df = pd.concat(filled_results).reset_index(drop=True)
     else:
         prices_filled_df = pd.DataFrame()  # Handle case where no coins were filled
+
+    # Drop the temporary 'missing_gap' column
+    prices_filled_df = prices_filled_df.drop(columns=['missing_gap'])
 
     # Convert outcomes to DataFrame
     outcomes_df = pd.DataFrame(outcomes)
@@ -372,11 +373,19 @@ def calculate_wallet_profitability(transfers_df, prices_df):
     profits_df['previous_price'] = profits_df.groupby(['coin_id', 'wallet_address'])['price'].shift(1)
     profits_df['previous_price'].fillna(profits_df['price'], inplace=True)
     profits_df['previous_balance'] = profits_df.groupby(['coin_id', 'wallet_address'])['balance'].shift(1).fillna(0)
+    logger.debug(f"<Step 3> Offset prices and balances for profitability logic: {time.time() - step_time:.2f} seconds")
 
     # calculate the profitability change in each period and sum them to get cumulative profitability
     profits_df['profitability_change'] = (profits_df['price'] - profits_df['previous_price']) * profits_df['previous_balance']
     profits_df['profitability_cumulative'] = profits_df.groupby(['coin_id', 'wallet_address'])['profitability_change'].cumsum()
     logger.debug(f"<Step 3> Calculate profitability: {time.time() - step_time:.2f} seconds")
+
+    # Calculate USD inflows, balances, and rate of return
+    profits_df['usd_inflows'] = profits_df['net_transfers'].where(profits_df['net_transfers'] > 0, 0)
+    profits_df['usd_cumulative_inflows'] = profits_df['usd_inflows'].cumsum()
+    profits_df['usd_balance'] = profits_df['balance'] * profits_df['price']
+    profits_df['rate_of_return'] = profits_df['profitability_cumulative'] / profits_df['usd_cumulative_inflows']
+    logger.debug(f"<Step 3> Calculate rate of return {time.time() - step_time:.2f} seconds")
 
     # Drop helper columns
     profits_df.drop(columns=['first_price_date', 'previous_price', 'previous_balance'], inplace=True)
@@ -442,7 +451,7 @@ def classify_sharks(profits_df, modeling_config):
     """
     logger.info('identifying shark wallets...')
 
-    # Retrieve necessary parameters from modeling_config
+    # Retrieve parameters from modeling_config
     modeling_period_start = pd.to_datetime(modeling_config['modeling_period_start'])
     profitability_threshold = modeling_config['profitability_threshold']
     balance_threshold = modeling_config['balance_threshold']
@@ -450,20 +459,12 @@ def classify_sharks(profits_df, modeling_config):
     # filter out transfers that occured after the end of the training period
     filtered_profits_df = profits_df[profits_df['date'] < modeling_period_start].copy()
 
-    # Calculate USD transfers and balances
-    filtered_profits_df['usd_balance'] = filtered_profits_df['balance'] * filtered_profits_df['price']
-    filtered_profits_df['usd_net_transfers'] = filtered_profits_df['net_transfers'] * filtered_profits_df['price']
-
     # Filter out wallets that have never reached the minimum USD balance_threshold for a coin_id
     eligible_wallets_df = filtered_profits_df.groupby(['coin_id', 'wallet_address'])['usd_balance'].max().reset_index()
     eligible_wallets_df = eligible_wallets_df[eligible_wallets_df['usd_balance'] >= balance_threshold]
 
-    # Get the last profitability for each wallet-coin pair before the modeling period start
+    # Get the profitability for each wallet-coin pair at the end of the training period
     last_profitability = filtered_profits_df.sort_values('date').groupby(['coin_id', 'wallet_address']).last()['profitability_cumulative'].reset_index()
-
-    # Calculate rate of return
-    filtered_profits_df['usd_total_inflows'] = filtered_profits_df['net_transfers'].where(filtered_profits_df['net_transfers'] > 0, 0)
-    filtered_profits_df['rate_of_return'] = filtered_profits_df['profitability_cumulative'] / filtered_profits_df['usd_total_inflows']
 
     # Classify wallets as sharks based on lifetime profitability and eligibility
     sharks_df = eligible_wallets_df.merge(last_profitability, on=['coin_id', 'wallet_address'])
