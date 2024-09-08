@@ -456,7 +456,7 @@ def classify_sharks(profits_df, modeling_config):
         profits_df (DataFrame): A DataFrame containing wallet transactions and profits data.
         modeling_config (dict): A configuration object containing modeling parameters, including:
             - 'modeling_period_start': Start date for filtering data.
-            - 'shark_balance_threshold': Minimum total USD inflow to be eligible as a shark.
+            - 'shark_minimum_inflows': Minimum total USD inflow to be eligible as a shark.
             - 'shark_total_profits_threshold': Minimum total profits to be considered a profits shark.
             - 'shark_total_return_threshold': Minimum total return to be considered a returns shark.
 
@@ -473,7 +473,7 @@ def classify_sharks(profits_df, modeling_config):
 
     # Identify coin-wallet pairs that have deposited enough total USD to be considered sharks
     eligible_wallets_df = filtered_profits_df.groupby(['coin_id', 'wallet_address'])['usd_total_inflows'].max().reset_index()
-    eligible_wallets_df = eligible_wallets_df[eligible_wallets_df['usd_total_inflows'] >= modeling_config['shark_balance_threshold']]
+    eligible_wallets_df = eligible_wallets_df[eligible_wallets_df['usd_total_inflows'] >= modeling_config['shark_minimum_inflows']]
 
     # Filter profits_df to only include eligble wallets
     filtered_profits_df = filtered_profits_df.merge(eligible_wallets_df[['coin_id', 'wallet_address']],

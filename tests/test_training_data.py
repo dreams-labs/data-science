@@ -7,19 +7,16 @@ tests used to audit the files in the data-science/src folder
 
 import sys
 import os
-import warnings
-from datetime import datetime
 import pandas as pd
-import numpy as np
 from dotenv import load_dotenv
 import pytest
 from dreams_core import core as dc
 
+# import training_data python functions
 # pylint: disable=E0401 # can't find import
 # pylint: disable=C0413 # import not at top of doc
-# import training_data python functions
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
-import training_data as td
+import training_data as td # type: ignore[reportMissingImports]
 
 load_dotenv()
 logger = dc.setup_logger()
@@ -183,6 +180,7 @@ def test_calculate_wallet_profitability_profitability(sample_transfers_df, sampl
     assert wallet3_myro.loc[wallet3_myro['date'] == '2023-04-01', 'profits_change'].values[0] == pytest.approx(-3000)  # (8 - 12) * 750
     assert wallet3_myro.loc[wallet3_myro['date'] == '2023-04-01', 'profits_total'].values[0] == pytest.approx(-2500)  # 500 - 3000
 
+# pylint: disable=R0914 # too many local variables
 def test_calculate_wallet_profitability_usd_calculations(sample_transfers_df, sample_prices_df):
     """
     Test USD-related calculations (inflows, balances, total return).

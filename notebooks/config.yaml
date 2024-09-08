@@ -10,7 +10,7 @@ modeling:
   dump_threshold: -0.2  # 20% decrease
 
   # shark identification parameters
-  shark_balance_threshold: 10000  # Minimum balance to be considered a shark
+  shark_minimum_inflows: 5000  # Minimum amount of USD inflows to be considered a shark
   shark_total_profits_threshold: 20000  # Lifetime absolute USD return threshold for sharks
   shark_total_return_threshold: 0.4  # Lifetime percentage return threshold for sharks
 
