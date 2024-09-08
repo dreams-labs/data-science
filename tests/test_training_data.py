@@ -36,6 +36,7 @@ def test_transfers_data_quality():
     # Example modeling period start date
     modeling_period_start = '2024-03-01'
     modeling_period_end = '2024-03-31'
+    training_period_end = pd.to_datetime(modeling_period_start) - pd.Timedelta(1, 'day')
 
     # Retrieve transfers_df
     transfers_df = td.retrieve_transfers_data(modeling_period_start,modeling_period_end)
@@ -50,7 +51,6 @@ def test_transfers_data_quality():
     # ----------------------------------------------------------------------------
     transfers_df_filtered = transfers_df[transfers_df['date'] < modeling_period_start]
     pairs_in_training_period = transfers_df_filtered[['coin_id', 'wallet_address']].drop_duplicates()
-    training_period_end = pd.to_datetime(modeling_period_start) - pd.Timedelta(1, 'day')
     period_end_df = transfers_df[transfers_df['date'] == training_period_end]
 
     logger.info(f"Found {len(pairs_in_training_period)} total pairs in training period with {len(period_end_df)} having data at period end.")
@@ -107,25 +107,31 @@ def test_transfers_data_quality():
     # This allows the test to pass while still alerting us to potential issues
     assert len(inconsistent_balances) == 0, f"Found {len(inconsistent_balances)} records with potentially inconsistent balance changes. Check logs for details."
 
-    # Test 7: Ensure all wallets have records as of modeling_period_start and modeling_period_end
+    # Test 7: Ensure all applicable wallets have records as of the training_period_end
     # ------------------------------------------------------------------------------------------
-    wallets_df = transfers_df[['coin_id', 'wallet_address']].drop_duplicates()
+    # get a list of all coin-wallet pairs as of the training_period_end
+    training_transfers_df = transfers_df[transfers_df['date'] <= training_period_end]
+    training_wallets_df = training_transfers_df[['coin_id', 'wallet_address']].drop_duplicates()
 
-    # Filter records for modeling_period_start and modeling_period_end
-    start_df = transfers_df[transfers_df['date'] == modeling_period_start]
-    end_df = transfers_df[transfers_df['date'] == modeling_period_end]
+    # get a list of all coin-wallet pairs on the training_transfers_df
+    training_end_df = transfers_df[transfers_df['date'] == training_transfers_df]
+    training_end_df = training_end_df[['coin_id', 'wallet_address']].drop_duplicates()
 
-    # Find any wallets missing from either period
-    missing_start = wallets_df[~wallets_df.set_index(['coin_id', 'wallet_address'])
-                               .index.isin(start_df.set_index(['coin_id', 'wallet_address']).index)]
-    missing_end = wallets_df[~wallets_df.set_index(['coin_id', 'wallet_address'])
-                             .index.isin(end_df.set_index(['coin_id', 'wallet_address']).index)]
+    # confirm that they are the same length
+    assert len(training_wallets_df) == len(training_end_df), "Some wallets are missing a record as of the training_period_end"
 
-    logger.info(f"Missing from modeling_period_start: {len(missing_start)}")
-    logger.info(f"Missing from modeling_period_end: {len(missing_end)}")
+    # Test 8: Ensure all wallets have records as of the modeling_period_end
+    # ------------------------------------------------------------------------------------------
+    # get a list of all coin-wallet pairs
+    all_wallets_df = transfers_df[['coin_id', 'wallet_address']].drop_duplicates()
 
-    assert len(missing_start) == 0, "Some wallets are missing a record as of the modeling_period_start"
-    assert len(missing_end) == 0, "Some wallets are missing a record as of the modeling_period_end"
+    # get a list of all coin-wallet pairs on the modeling_period_end
+    modeling_end_df = transfers_df[transfers_df['date'] == modeling_period_end]
+    modeling_end_df = modeling_end_df[['coin_id', 'wallet_address']].drop_duplicates()
+
+    # confirm that they are the same length
+    assert len(all_wallets_df) == len(modeling_end_df), "Some wallets are missing a record as of the modeling_period_end"
+
 
     logger.info("All transfers_df data quality checks passed successfully.")
 
@@ -178,7 +184,7 @@ def test_calculate_wallet_profitability_profitability(sample_transfers_df, sampl
     Test profitability calculations for multiple wallets and coins.
     """
     result = td.calculate_wallet_profitability(sample_transfers_df, sample_prices_df)
-    
+
     # Check profitability for wallet1, BTC
     wallet1_btc = result[(result['wallet_address'] == 'wallet1') & (result['coin_id'] == 'BTC')]
     assert wallet1_btc.loc[wallet1_btc['date'] == '2023-02-01', 'profits_change'].values[0] == pytest.approx(10000)  # (21000 - 20000) * 10
