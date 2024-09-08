@@ -67,7 +67,7 @@ def test_transfers_data_quality():
     # ------------------------
     min_date = transfers_df['date'].min()
     max_date = transfers_df['date'].max()
-    expected_max_date = pd.to_datetime(modeling_period_start) - pd.Timedelta(1, 'day')
+    expected_max_date = pd.to_datetime(modeling_period_end)
     logger.info(f"Date range: {min_date} to {max_date}")
     assert max_date == expected_max_date, f"The last date in the dataset should be {expected_max_date}"
 
@@ -107,7 +107,27 @@ def test_transfers_data_quality():
     # This allows the test to pass while still alerting us to potential issues
     assert len(inconsistent_balances) == 0, f"Found {len(inconsistent_balances)} records with potentially inconsistent balance changes. Check logs for details."
 
-    logger.info("All data quality checks passed successfully.")
+    # Test 7: Ensure all wallets have records as of modeling_period_start and modeling_period_end
+    # ------------------------------------------------------------------------------------------
+    wallets_df = transfers_df[['coin_id', 'wallet_address']].drop_duplicates()
+
+    # Filter records for modeling_period_start and modeling_period_end
+    start_df = transfers_df[transfers_df['date'] == modeling_period_start]
+    end_df = transfers_df[transfers_df['date'] == modeling_period_end]
+
+    # Find any wallets missing from either period
+    missing_start = wallets_df[~wallets_df.set_index(['coin_id', 'wallet_address'])
+                               .index.isin(start_df.set_index(['coin_id', 'wallet_address']).index)]
+    missing_end = wallets_df[~wallets_df.set_index(['coin_id', 'wallet_address'])
+                             .index.isin(end_df.set_index(['coin_id', 'wallet_address']).index)]
+
+    logger.info(f"Missing from modeling_period_start: {len(missing_start)}")
+    logger.info(f"Missing from modeling_period_end: {len(missing_end)}")
+
+    assert len(missing_start) == 0, "Some wallets are missing a record as of the modeling_period_start"
+    assert len(missing_end) == 0, "Some wallets are missing a record as of the modeling_period_end"
+
+    logger.info("All transfers_df data quality checks passed successfully.")
 
 
 
