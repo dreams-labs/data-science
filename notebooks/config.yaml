@@ -10,8 +10,9 @@ modeling:
   dump_threshold: -0.2  # 20% decrease
 
   # shark identification parameters
-  balance_threshold: 10000  # Minimum balance to be considered a shark
-  profitability_threshold: 50000  # Lifetime profitability threshold for sharks
+  shark_balance_threshold: 10000  # Minimum balance to be considered a shark
+  shark_total_profits_threshold: 20000  # Lifetime absolute USD return threshold for sharks
+  shark_total_return_threshold: 0.4  # Lifetime percentage return threshold for sharks
 
 data_cleaning:
 # variables used to clean and filter raw data before training data is built

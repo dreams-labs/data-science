@@ -385,8 +385,8 @@ def calculate_wallet_profitability(transfers_df, prices_df):
     profits_df['usd_balance'] = profits_df['balance'] * profits_df['price']
     profits_df['usd_net_transfers'] = profits_df['net_transfers'] * profits_df['price']
     profits_df['usd_inflows'] = profits_df['usd_net_transfers'].where(profits_df['usd_net_transfers'] > 0, 0)
-    profits_df['usd_cumulative_inflows'] = profits_df.groupby(['coin_id', 'wallet_address'])['usd_inflows'].cumsum()
-    profits_df['total_return'] = profits_df['profits_total'] / profits_df['usd_cumulative_inflows'].where(profits_df['usd_cumulative_inflows'] != 0, np.nan)
+    profits_df['usd_total_inflows'] = profits_df.groupby(['coin_id', 'wallet_address'])['usd_inflows'].cumsum()
+    profits_df['total_return'] = profits_df['profits_total'] / profits_df['usd_total_inflows'].where(profits_df['usd_total_inflows'] != 0, np.nan)
     logger.debug(f"<Step 3> Calculate rate of return {time.time() - step_time:.2f} seconds")
 
     # Drop helper columns
@@ -439,38 +439,61 @@ def clean_profits_df(profits_df, profitability_filter=10000000):
 
 def classify_sharks(profits_df, modeling_config):
     """
-    Classify wallets as sharks based on lifetime profitability during the progeny period and USD balance thresholds.
-    
+    Classify wallets as sharks based on their profitability and return performance.
+
+    This function filters a DataFrame of wallet profits to include only those wallets that meet the 
+    shark eligibility criteria. It then determines which wallets are considered sharks based on two 
+    criteria: total profits and total return.
+
+    Steps:
+    1. Filter wallets that have inflows above a predefined threshold (shark eligibility).
+    2. Identify wallets as sharks based on either:
+    a. Total profits exceeding a configured threshold.
+    b. Total return exceeding a configured threshold.
+    3. Add a combined 'is_shark' column for wallets that meet either profits or returns criteria.
+
     Parameters:
-    - profits_df: DataFrame with columns ['coin_id', 'wallet_address', 'date', 'profits_total', 'balance', 'price']
-    - modeling_config: Configuration dictionary containing the following:
-        - profitability_threshold: Threshold to classify a wallet as a shark based on lifetime profitability at the end of the progeny period
-        - modeling_period_start: Date after which data should be excluded from the training set (format: 'YYYY-MM-DD')
-        - balance_threshold: Minimum USD balance required to be considered a shark
-    
+        profits_df (DataFrame): A DataFrame containing wallet transactions and profits data.
+        modeling_config (dict): A configuration object containing modeling parameters, including:
+            - 'modeling_period_start': Start date for filtering data.
+            - 'shark_balance_threshold': Minimum total USD inflow to be eligible as a shark.
+            - 'shark_total_profits_threshold': Minimum total profits to be considered a profits shark.
+            - 'shark_total_return_threshold': Minimum total return to be considered a returns shark.
+
     Returns:
-    - DataFrame with an additional column 'is_shark' indicating if the wallet is classified as a shark.
+        sharks_df (DataFrame): A DataFrame of wallets classified as sharks, including flags for 
+        whether the wallet meets the profits or return criteria.
     """
     logger.info('identifying shark wallets...')
 
-    # Retrieve parameters from modeling_config
-    modeling_period_start = pd.to_datetime(modeling_config['modeling_period_start'])
-    profitability_threshold = modeling_config['profitability_threshold']
-    balance_threshold = modeling_config['balance_threshold']
+    # Step 1. Filter the df to remove wallets that do not meet shark eligibility criteria
+    # -----------------------------------------------------------------------------------
+    # Filter out transfers that occured after the end of the training period
+    filtered_profits_df = profits_df[profits_df['date'] < modeling_config['modeling_period_start']].copy()
 
-    # filter out transfers that occured after the end of the training period
-    filtered_profits_df = profits_df[profits_df['date'] < modeling_period_start].copy()
+    # Identify coin-wallet pairs that have deposited enough total USD to be considered sharks
+    eligible_wallets_df = filtered_profits_df.groupby(['coin_id', 'wallet_address'])['usd_total_inflows'].max().reset_index()
+    eligible_wallets_df = eligible_wallets_df[eligible_wallets_df['usd_total_inflows'] >= modeling_config['shark_balance_threshold']]
 
-    # Filter out wallets that have never reached the minimum USD balance_threshold for a coin_id
-    eligible_wallets_df = filtered_profits_df.groupby(['coin_id', 'wallet_address'])['usd_balance'].max().reset_index()
-    eligible_wallets_df = eligible_wallets_df[eligible_wallets_df['usd_balance'] >= balance_threshold]
+    # Filter profits_df to only include eligble wallets
+    filtered_profits_df = filtered_profits_df.merge(eligible_wallets_df[['coin_id', 'wallet_address']],
+                                                    on=['coin_id', 'wallet_address'],
+                                                    how='inner')
 
-    # Get the profitability for each wallet-coin pair at the end of the training period
-    last_profitability = filtered_profits_df.sort_values('date').groupby(['coin_id', 'wallet_address']).last()['profits_total'].reset_index()
+    # Step 2. Determine which eligible wallets are classified as sharks
+    # -----------------------------------------------------------------------------------
+    # identify sharks based on absolute balance of profits
+    total_profits_df = filtered_profits_df.sort_values('date').groupby(['coin_id', 'wallet_address']).last()['profits_total'].reset_index()
+    sharks_df = eligible_wallets_df.merge(total_profits_df, on=['coin_id', 'wallet_address'])
+    sharks_df['is_profits_shark'] = sharks_df['profits_total'] >= modeling_config['shark_total_profits_threshold']
 
-    # Classify wallets as sharks based on lifetime profitability and eligibility
-    sharks_df = eligible_wallets_df.merge(last_profitability, on=['coin_id', 'wallet_address'])
-    sharks_df['is_shark'] = sharks_df['profits_total'] >= profitability_threshold
+    # identify sharks based on percentage return
+    total_returns_df = filtered_profits_df.sort_values('date').groupby(['coin_id', 'wallet_address']).last()['total_return'].reset_index()
+    sharks_df = sharks_df.merge(total_returns_df, on=['coin_id', 'wallet_address'])
+    sharks_df['is_returns_shark'] = sharks_df['total_return'] >= modeling_config['shark_total_return_threshold']
+
+    # add a combined column for wallets that meet either criteria
+    sharks_df['is_shark'] = sharks_df['is_profits_shark'] | sharks_df['is_returns_shark']
 
     logger.info('creation of sharks_df complete.')
 
