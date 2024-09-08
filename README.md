@@ -1,4 +1,4 @@
-## Modeling Strategy
+# Modeling Strategy
 
 ### Overview
 
@@ -32,3 +32,14 @@ As such, price movements will be split into three periods:
 
 - **Validation and Test Sets**: These sets assess whether the model can generalize within the training period. Strong performance here would indicate that the model is able to learn meaningful patterns without overfitting.
 - **Future Set**: Performance on this set will determine if the model can generalize to other time periods, particularly when market conditions change.
+
+
+# Testing
+
+Tests are built in the tests/ directory and configured with pytest.ini. 
+
+## Running Tests
+
+Tests can be initiated from the main data-science directory with the standard command >`pytest`. 
+
+There is a `slow` flag applied to slow tests that involve large dataframes or queries. To ignore these but run other tests, use the command >`pytest -m "not slow"`. 
