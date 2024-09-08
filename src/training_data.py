@@ -209,22 +209,22 @@ def create_target_variable(prices_df, modeling_period_start, modeling_period_end
 
 
 
-def retrieve_transfers_data(modeling_period_start):
+def retrieve_transfers_data(modeling_period_start,modeling_period_end):
     """
     Retrieves wallet transfers data from the core.coin_wallet_transfers table and converts 
     columns to categorical for calculation efficiency. 
 
     Params:
     - modeling_period_start: String with format 'YYYY-MM-DD'
-        Date after which data should be used to create target variables instead of training data. 
-        In this function it is used to create transfer rows for all coin_id-wallet pairs so that 
-        we can accurately calculate profitability as of the training period end. 
+    - modeling_period_end: String with format 'YYYY-MM-DD'
 
     Returns:
     - transfers_df: DataFrame with columns ['coin_id', 'wallet_address', 'date', 'net_transfers', 'balance']
     """
     # SQL query to retrieve prices data
     query_sql = f'''
+        -- STEP 1: retrieve transfers data for the training+modeling periods
+        --------------------------------------------------------------------
         with transfers_base as (
             -- start with the same query that generates transfers_df
             select cwt.coin_id
@@ -248,43 +248,79 @@ def retrieve_transfers_data(modeling_period_start):
                 ,'88779ad0-f8c3-448c-bc6c-699c2a692514' -- CRV
             )
 
-            -- since we are pulling a training data set we don't need transfers after the training period
-            and cwt.date < '{modeling_period_start}'
+            -- retrieve transfers through the end of the modeling period
+            and cwt.date <= '{modeling_period_end}'
         ),
 
-        existing_rows as (
-            -- identify coin-wallet pairs that already have a balance as of the training period end
+
+        -- STEP 2: create new records for all coin-wallet pairs as of the end of the training period
+        --------------------------------------------------------------------
+        training_end_existing_rows as (
+            -- identify coin-wallet pairs that already have a balance as of the period end
             select *
             from transfers_base
             where date = date_sub('{modeling_period_start}', interval 1 day)
         ),
-
-        needs_rows as (
+        training_end_needs_rows as (
             -- for coin-wallet pairs that don't have existing records, identify the row closest to the period end date
             select t.*
             ,row_number() over (partition by t.coin_id,t.wallet_address order by t.date desc) as rn
             from transfers_base t
-            left join existing_rows e on e.coin_id = t.coin_id 
+            left join training_end_existing_rows e on e.coin_id = t.coin_id 
                 and e.wallet_address = t.wallet_address
-            where t.date < '{modeling_period_start}'
+            where t.date < date_sub('{modeling_period_start}', interval 1 day)
             and e.coin_id is null
         ),
-
-        transfers_new_rows as (
+        training_end_new_rows as (
             -- create a new row for the period end date by carrying the balance from the closest existing record
             select coin_id
             ,wallet_address
             ,date_sub('{modeling_period_start}', interval 1 day) as date
             ,0 as net_transfers
             ,cast(balance as float64) as balance
-            from needs_rows
+            from training_end_needs_rows
             where rn=1
-        ) 
+        ),
 
+
+        -- STEP 3: create new records for all coin-wallet pairs as of the end of the modeling period
+        --------------------------------------------------------------------
+        modeling_end_existing_rows as (
+            -- identify coin-wallet pairs that already have a balance as of the period end
+            select *
+            from transfers_base
+            where date = '{modeling_period_end}'
+        ),
+        modeling_end_needs_rows as (
+            -- for coin-wallet pairs that don't have existing records, identify the row closest to the period end date
+            select t.*
+            ,row_number() over (partition by t.coin_id,t.wallet_address order by t.date desc) as rn
+            from transfers_base t
+            left join modeling_end_existing_rows e on e.coin_id = t.coin_id 
+                and e.wallet_address = t.wallet_address
+            where t.date < '{modeling_period_end}'
+            and e.coin_id is null
+        ),
+        modeling_end_new_rows as (
+            -- create a new row for the period end date by carrying the balance from the closest existing record
+            select coin_id
+            ,wallet_address
+            ,cast('{modeling_period_end}' as date) as date
+            ,0 as net_transfers
+            ,cast(balance as float64) as balance
+            from modeling_end_needs_rows
+            where rn=1
+        )
+
+        -- STEP 4: merge all rows together
+        --------------------------------------------------------------------
         select * from transfers_base
         union all
-        select * from transfers_new_rows
+        select * from training_end_new_rows
+        union all
+        select * from modeling_end_new_rows
         order by coin_id, wallet_address, date
+
     '''
 
     # Run the SQL query using dgc's run_sql method

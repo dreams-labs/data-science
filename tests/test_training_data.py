@@ -35,9 +35,10 @@ def test_transfers_data_quality():
 
     # Example modeling period start date
     modeling_period_start = '2024-03-01'
+    modeling_period_end = '2024-03-31'
 
     # Retrieve transfers_df
-    transfers_df = td.retrieve_transfers_data(modeling_period_start)
+    transfers_df = td.retrieve_transfers_data(modeling_period_start,modeling_period_end)
 
     # Test 1: No duplicate records
     # ----------------------------
