@@ -1,8 +1,8 @@
 """
 functions used in generating training data for the models
 """
-# pylint: disable=C0301
-# pylint: disable=W1203
+# pylint: disable=W1203 # fstrings in logs
+# pylint: disable=C0301 # line over 100 chars
 
 import time
 import pandas as pd
@@ -231,6 +231,8 @@ def retrieve_transfers_data(modeling_period_start):
             ,cast(cwt.net_transfers as float64) as net_transfers
             ,cast(cwt.balance as float64) as balance
             from `core.coin_wallet_transfers` cwt
+
+            -- inner join to filter onto only coins with price data
             join (
                 select coin_id
                 from `core.coin_market_data`
@@ -243,6 +245,9 @@ def retrieve_transfers_data(modeling_period_start):
                 ,'eb52375e-f394-4632-a9cf-3a9291a8ebf7' -- COMP
                 ,'88779ad0-f8c3-448c-bc6c-699c2a692514' -- CRV
             )
+
+            -- since we are pulling a training data set we don't need transfers after the training period
+            and cwt.date < '{modeling_period_start}'
         ),
 
         existing_rows as (
@@ -302,6 +307,12 @@ def calculate_wallet_profitability(transfers_df, prices_df):
     and computing daily and cumulative profitability for each wallet-coin pair. The balance as of 
     the first price record is treated as an initial "transfer in" for calculating profitability.
 
+    Process Summary:
+    1. Merge the `transfers_df` and `prices_df` on 'coin_id' and 'date'.
+    2. Remove any transaction records earlier than the first available price date for each coin.
+    3a. Calculate daily profitability based on price changes and previous balances.
+    3b. Compute the cumulative profitability for each wallet-coin pair using `cumsum()`.
+
     Parameters:
     - transfers_df (pd.DataFrame): 
         - coin_id: The ID of the coin/token.
@@ -320,15 +331,16 @@ def calculate_wallet_profitability(transfers_df, prices_df):
         - profitability_change: The change in profitability for each transaction, calculated as the 
           difference between the current price and the previous price, multiplied by the previous balance.
         - profitability_cumulative: The cumulative profitability for each wallet-coin pair over time.
-    
-    Process:
-    1. Merge the `transfers_df` and `prices_df` on 'coin_id' and 'date'.
-    2. Remove any transaction records earlier than the first available price date for each coin.
-    3a. Calculate daily profitability based on price changes and previous balances.
-    3b. Compute the cumulative profitability for each wallet-coin pair using `cumsum()`.
+
+    Raises:
+    - ValueError: If either input DataFrame is empty
     """
     logger.info("Starting generation of profits_df...")
     start_time = time.time()
+
+    # Raise an error if either df is empty
+    if transfers_df.empty or prices_df.empty:
+        raise ValueError("Input DataFrames cannot be empty. This likely indicates a serious issue earlier in the data pipeline.")
 
     # 1. Merge transfers and prices data on 'coin_id' and 'date'
     # ----------------------------------------------------------
@@ -337,6 +349,11 @@ def calculate_wallet_profitability(transfers_df, prices_df):
     profits_df = pd.merge(transfers_df, prices_df, on=['coin_id', 'date'], how='left')
     logger.debug(f"<Step 1> (Merge transfers and prices): {time.time() - start_time:.2f} seconds")
     step_time = time.time()
+
+    # Raise an error if there are any missing prices
+    if profits_df['price'].isnull().any():
+        raise ValueError("Missing prices found for some transfer dates. This indicates an issue with the price data generation.")
+
 
     # 2. Remove transfers history earlier than the first pricing data
     # ---------------------------------------------------------------
