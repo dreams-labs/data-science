@@ -113,8 +113,8 @@ def test_transfers_data_quality():
     training_transfers_df = transfers_df[transfers_df['date'] <= training_period_end]
     training_wallets_df = training_transfers_df[['coin_id', 'wallet_address']].drop_duplicates()
 
-    # get a list of all coin-wallet pairs on the training_transfers_df
-    training_end_df = transfers_df[transfers_df['date'] == training_transfers_df]
+    # get a list of all coin-wallet pairs on the training_transfers_end date
+    training_end_df = transfers_df[transfers_df['date'] == training_period_end]
     training_end_df = training_end_df[['coin_id', 'wallet_address']].drop_duplicates()
 
     # confirm that they are the same length
@@ -123,14 +123,15 @@ def test_transfers_data_quality():
     # Test 8: Ensure all wallets have records as of the modeling_period_end
     # ------------------------------------------------------------------------------------------
     # get a list of all coin-wallet pairs
-    all_wallets_df = transfers_df[['coin_id', 'wallet_address']].drop_duplicates()
+    modeling_transfers_df = transfers_df[transfers_df['date'] <= modeling_period_end]
+    modeling_wallets_df = modeling_transfers_df[['coin_id', 'wallet_address']].drop_duplicates()
 
     # get a list of all coin-wallet pairs on the modeling_period_end
     modeling_end_df = transfers_df[transfers_df['date'] == modeling_period_end]
     modeling_end_df = modeling_end_df[['coin_id', 'wallet_address']].drop_duplicates()
 
     # confirm that they are the same length
-    assert len(all_wallets_df) == len(modeling_end_df), "Some wallets are missing a record as of the modeling_period_end"
+    assert len(modeling_wallets_df) == len(modeling_end_df), "Some wallets are missing a record as of the modeling_period_end"
 
 
     logger.info("All transfers_df data quality checks passed successfully.")
