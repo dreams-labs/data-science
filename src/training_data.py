@@ -249,7 +249,7 @@ def retrieve_transfers_data(modeling_period_start):
             -- identify coin-wallet pairs that already have a balance as of the training period end
             select *
             from transfers_base
-            where date = '{modeling_period_start}'
+            where date = date_sub('{modeling_period_start}', interval 1 day)
         ),
 
         needs_rows as (
@@ -430,6 +430,8 @@ def classify_sharks(profits_df, modeling_config):
     modeling_period_start = pd.to_datetime(modeling_config['modeling_period_start'])
     profitability_threshold = modeling_config['profitability_threshold']
     balance_threshold = modeling_config['balance_threshold']
+
+    # filter out transfers that occured after the end of the training period
     filtered_profits_df = profits_df[profits_df['date'] < modeling_period_start].copy()
 
     # Calculate USD transfers and balances
