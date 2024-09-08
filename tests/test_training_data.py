@@ -1,8 +1,8 @@
 """
 tests used to audit the files in the data-science/src folder
 """
-# pylint: disable=E0401
-# pylint: disable=C0413
+# pylint: disable=W1203 # fstrings in logs
+# pylint: disable=C0301 # line over 100 chars
 
 import sys
 import os
@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 import pytest
 from dreams_core import core as dc
 
+# pylint: disable=E0401 # can't find import
+# pylint: disable=C0413 # import not at top of doc
 # import training_data python functions
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 import training_data as td
