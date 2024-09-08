@@ -6,6 +6,7 @@ functions used in generating training data for the models
 
 import time
 import pandas as pd
+import numpy as np
 from dreams_core.googlecloud import GoogleCloud as dgc
 from dreams_core import core as dc
 
@@ -329,9 +330,9 @@ def calculate_wallet_profitability(transfers_df, prices_df):
     Returns:
     - pd.DataFrame: 
         A DataFrame with profitability metrics, including:
-        - profitability_change: The change in profitability for each transaction, calculated as the 
+        - profits_change: The change in profitability for each transaction, calculated as the 
           difference between the current price and the previous price, multiplied by the previous balance.
-        - profitability_cumulative: The cumulative profitability for each wallet-coin pair over time.
+        - profits_total: The cumulative profitability for each wallet-coin pair over time.
 
     Raises:
     - ValueError: If either input DataFrame is empty
@@ -351,7 +352,7 @@ def calculate_wallet_profitability(transfers_df, prices_df):
     logger.debug(f"<Step 1> (Merge transfers and prices): {time.time() - start_time:.2f} seconds")
     step_time = time.time()
 
-    # 2. Remove transfers history earlier than the first pricing data
+    # 2. Remove transfers earlier than each coin's first pricing data
     # ---------------------------------------------------------------
     # identify the earliest pricing data for each coin
     first_prices_df = prices_df.groupby('coin_id')['date'].min().reset_index()
@@ -376,15 +377,16 @@ def calculate_wallet_profitability(transfers_df, prices_df):
     logger.debug(f"<Step 3> Offset prices and balances for profitability logic: {time.time() - step_time:.2f} seconds")
 
     # calculate the profitability change in each period and sum them to get cumulative profitability
-    profits_df['profitability_change'] = (profits_df['price'] - profits_df['previous_price']) * profits_df['previous_balance']
-    profits_df['profitability_cumulative'] = profits_df.groupby(['coin_id', 'wallet_address'])['profitability_change'].cumsum()
+    profits_df['profits_change'] = (profits_df['price'] - profits_df['previous_price']) * profits_df['previous_balance']
+    profits_df['profits_total'] = profits_df.groupby(['coin_id', 'wallet_address'])['profits_change'].cumsum()
     logger.debug(f"<Step 3> Calculate profitability: {time.time() - step_time:.2f} seconds")
 
     # Calculate USD inflows, balances, and rate of return
-    profits_df['usd_inflows'] = profits_df['net_transfers'].where(profits_df['net_transfers'] > 0, 0)
-    profits_df['usd_cumulative_inflows'] = profits_df['usd_inflows'].cumsum()
     profits_df['usd_balance'] = profits_df['balance'] * profits_df['price']
-    profits_df['rate_of_return'] = profits_df['profitability_cumulative'] / profits_df['usd_cumulative_inflows']
+    profits_df['usd_net_transfers'] = profits_df['net_transfers'] * profits_df['price']
+    profits_df['usd_inflows'] = profits_df['usd_net_transfers'].where(profits_df['usd_net_transfers'] > 0, 0)
+    profits_df['usd_cumulative_inflows'] = profits_df.groupby(['coin_id', 'wallet_address'])['usd_inflows'].cumsum()
+    profits_df['total_return'] = profits_df['profits_total'] / profits_df['usd_cumulative_inflows'].where(profits_df['usd_cumulative_inflows'] != 0, np.nan)
     logger.debug(f"<Step 3> Calculate rate of return {time.time() - step_time:.2f} seconds")
 
     # Drop helper columns
@@ -403,7 +405,7 @@ def clean_profits_df(profits_df, profitability_filter=10000000):
     if any single day's profitability exceeds the profitability_filter (positive or negative).
     
     Parameters:
-    - profits_df: DataFrame with columns ['coin_id', 'wallet_address', 'date', 'profitability_cumulative']
+    - profits_df: DataFrame with columns ['coin_id', 'wallet_address', 'date', 'profits_total']
     - profitability_filter: Threshold value to exclude pairs with profits or losses exceeding this value
     
     Returns:
@@ -414,8 +416,8 @@ def clean_profits_df(profits_df, profitability_filter=10000000):
 
     # Identify coin_id-wallet_address pairs where any single day's profitability exceeds the threshold
     exclusions_profits_df = profits_df[
-        (profits_df['profitability_cumulative'] > profitability_filter) |
-        (profits_df['profitability_cumulative'] < -profitability_filter)
+        (profits_df['profits_total'] > profitability_filter) |
+        (profits_df['profits_total'] < -profitability_filter)
     ][['coin_id', 'wallet_address']].drop_duplicates()
 
     # Merge to filter out the records with those pairs
@@ -440,7 +442,7 @@ def classify_sharks(profits_df, modeling_config):
     Classify wallets as sharks based on lifetime profitability during the progeny period and USD balance thresholds.
     
     Parameters:
-    - profits_df: DataFrame with columns ['coin_id', 'wallet_address', 'date', 'profitability_cumulative', 'balance', 'price']
+    - profits_df: DataFrame with columns ['coin_id', 'wallet_address', 'date', 'profits_total', 'balance', 'price']
     - modeling_config: Configuration dictionary containing the following:
         - profitability_threshold: Threshold to classify a wallet as a shark based on lifetime profitability at the end of the progeny period
         - modeling_period_start: Date after which data should be excluded from the training set (format: 'YYYY-MM-DD')
@@ -464,11 +466,11 @@ def classify_sharks(profits_df, modeling_config):
     eligible_wallets_df = eligible_wallets_df[eligible_wallets_df['usd_balance'] >= balance_threshold]
 
     # Get the profitability for each wallet-coin pair at the end of the training period
-    last_profitability = filtered_profits_df.sort_values('date').groupby(['coin_id', 'wallet_address']).last()['profitability_cumulative'].reset_index()
+    last_profitability = filtered_profits_df.sort_values('date').groupby(['coin_id', 'wallet_address']).last()['profits_total'].reset_index()
 
     # Classify wallets as sharks based on lifetime profitability and eligibility
     sharks_df = eligible_wallets_df.merge(last_profitability, on=['coin_id', 'wallet_address'])
-    sharks_df['is_shark'] = sharks_df['profitability_cumulative'] >= profitability_threshold
+    sharks_df['is_shark'] = sharks_df['profits_total'] >= profitability_threshold
 
     logger.info('creation of sharks_df complete.')
 

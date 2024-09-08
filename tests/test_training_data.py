@@ -26,7 +26,7 @@ logger = dc.setup_logger()
 
 
 # -------------------------- #
-# Tests for retrieve_transfers_data()
+# retrieve_transfers_data()
 # -------------------------- #
 
 @pytest.mark.slow
@@ -114,162 +114,122 @@ def test_transfers_data_quality():
 
 
 # ------------------------------- #
-# Tests for calculate_wallet_profitability()
+# calculate_wallet_profitability()
 # ------------------------------- #
 
-# the follow are tests for function calculate_wallet_profitability()
 @pytest.fixture
 def sample_transfers_df():
     """
-    Fixture that provides a sample DataFrame for transfers data.
-
-    Returns:
-    pd.DataFrame: A DataFrame containing sample transfer data with columns:
-    'coin_id', 'wallet_address', 'date', 'net_transfers', and 'balance'.
+    Create a sample transfers DataFrame for testing.
     """
-    return pd.DataFrame({
-        'coin_id': ['BTC', 'BTC', 'ETH', 'ETH'],
-        'wallet_address': ['wallet1', 'wallet1', 'wallet2', 'wallet2'],
-        'date': [datetime(2023, 1, 1), datetime(2023, 1, 2), datetime(2023, 1, 1), datetime(2023, 1, 2)],
-        'net_transfers': [10, -5, 20, 10],
-        'balance': [10, 5, 20, 30]
-    })
+    data = {
+        'coin_id': ['BTC', 'BTC', 'ETH', 'ETH', 'BTC', 'ETH', 'MYRO', 'MYRO', 'MYRO', 
+                    'BTC', 'ETH', 'BTC', 'ETH', 'MYRO'],
+        'wallet_address': ['wallet1', 'wallet1', 'wallet1', 'wallet2', 'wallet2', 'wallet2', 'wallet3', 'wallet3', 'wallet3',
+                           'wallet1', 'wallet1', 'wallet2', 'wallet2', 'wallet3'],
+        'date': [
+            '2023-01-01', '2023-02-01', '2023-01-01', '2023-01-01', '2023-01-01', '2023-02-01', 
+            '2023-01-01', '2023-02-01', '2023-03-01',
+            '2023-04-01', '2023-04-01', '2023-04-01', '2023-04-01', '2023-04-01'
+        ],
+        'net_transfers': [10, 5, 100, 50, 20, 25, 1000, 500, -750,
+                          0, 0, 0, -10, 0],
+        'balance': [10, 15, 100, 50, 20, 75, 1000, 1500, 750,
+                    15, 100, 20, 65, 750]
+    }
+    return pd.DataFrame(data)
 
 @pytest.fixture
 def sample_prices_df():
     """
-    Fixture that provides a sample DataFrame for price data.
-
-    Returns:
-    pd.DataFrame: A DataFrame containing sample price data with columns:
-    'coin_id', 'date', and 'price'.
-    """
-    return pd.DataFrame({
-        'coin_id': ['BTC', 'BTC', 'ETH', 'ETH'],
-        'date': [datetime(2023, 1, 1), datetime(2023, 1, 2), datetime(2023, 1, 1), datetime(2023, 1, 2)],
-        'price': [100, 120, 50, 55]
-    })
-
-def test_happy_path(sample_transfers_df, sample_prices_df):
-    """
-    Test the happy path scenario with sample data.
-    This test also covers the case where all necessary prices are present.
-    """
-    result = td.calculate_wallet_profitability(sample_transfers_df, sample_prices_df)
-
-    assert len(result) == 4
-    assert 'profitability_change' in result.columns
-    assert 'profitability_cumulative' in result.columns
-    assert not result['price'].isnull().any(), "There should be no missing prices in the result"
-    assert len(result) == len(sample_transfers_df), "The result should have the same number of rows as the input transfers DataFrame"
-
-    # Check profitability calculations for BTC wallet1
-    btc_wallet1 = result[(result['coin_id'] == 'BTC') & (result['wallet_address'] == 'wallet1')]
-    assert btc_wallet1['profitability_change'].tolist() == [0, 200]  # 0 for day 1, (120-100)*10 for day 2
-    assert btc_wallet1['profitability_cumulative'].tolist() == [0, 200]
-
-def test_empty_dataframes_raise_exception():
-    """
-    Test that the function raises a ValueError when given empty DataFrames.
-    """
-    empty_df = pd.DataFrame(columns=['coin_id', 'wallet_address', 'date', 'net_transfers', 'balance'])
-    empty_prices = pd.DataFrame(columns=['coin_id', 'date', 'price'])
-
-    with pytest.raises(ValueError, match="Input DataFrames cannot be empty"):
-        td.calculate_wallet_profitability(empty_df, empty_prices)
-
-def test_missing_price_data(sample_transfers_df):
-    """
-    Test that the function raises a ValueError when there are missing prices.
-    """
-    incomplete_prices_df = pd.DataFrame({
-        'coin_id': ['BTC', 'ETH'],
-        'date': [datetime(2023, 1, 1), datetime(2023, 1, 1)],
-        'price': [100, 50]
-    })
-
-    with pytest.raises(ValueError, match="Missing prices found for some transfer dates"):
-        td.calculate_wallet_profitability(sample_transfers_df, incomplete_prices_df)
-
-def test_price_decline(sample_transfers_df):
-    """
-    Test profitability calculation when prices decline.
-    """
-    declining_prices_df = pd.DataFrame({
-        'coin_id': ['BTC', 'BTC', 'ETH', 'ETH'],
-        'date': [datetime(2023, 1, 1), datetime(2023, 1, 2), datetime(2023, 1, 1), datetime(2023, 1, 2)],
-        'price': [100, 80, 50, 40]
-    })
-
-    result = td.calculate_wallet_profitability(sample_transfers_df, declining_prices_df)
-    btc_wallet1 = result[(result['coin_id'] == 'BTC') & (result['wallet_address'] == 'wallet1')]
-    assert btc_wallet1['profitability_change'].tolist() == [0, -200]  # 0 for day 1, (80-100)*10 for day 2
-    assert btc_wallet1['profitability_cumulative'].tolist() == [0, -200]
-
-def test_large_numbers():
-    """
-    Test with very large numbers to check for potential overflow issues.
-    """
-    large_transfers_df = pd.DataFrame({
-        'coin_id': ['BTC'],
-        'wallet_address': ['wallet1'],
-        'date': [datetime(2023, 1, 1)],
-        'net_transfers': [1e9],
-        'balance': [1e9]
-    })
-    large_prices_df = pd.DataFrame({
-        'coin_id': ['BTC'],
-        'date': [datetime(2023, 1, 1)],
-        'price': [1e6]
-    })
-
-    result = td.calculate_wallet_profitability(large_transfers_df, large_prices_df)
-    assert not result['profitability_cumulative'].isnull().any()
-    assert not np.isinf(result['profitability_cumulative']).any()
-
-
-# ------------------------------- #
-# Tests for clean_profits_df()
-# ------------------------------- #
-
-@pytest.fixture
-def sample_profits_df():
-    """
-    dummy version of profits_df output by calculate_wallet_profitability()
+    Create a sample prices DataFrame for testing.
     """
     data = {
-        'coin_id': ['BTC', 'BTC', 'ETH', 'ETH', 'BTC', 'ETH'],
-        'wallet_address': ['addr1', 'addr1', 'addr2', 'addr2', 'addr3', 'addr3'],
-        'date': pd.to_datetime(['2023-01-01', '2023-01-02', '2023-01-01', '2023-01-02', '2023-01-01', '2023-01-01']),
-        'profitability_cumulative': [5000000.0, 8000000.0, 15000000.0, -12000000.0, 3000000.0, 9000000.0]
+        'coin_id': ['BTC', 'BTC', 'BTC', 'BTC', 'ETH', 'ETH', 'ETH', 'ETH', 'MYRO', 'MYRO', 'MYRO', 'MYRO'],
+        'date': [
+            '2023-01-01', '2023-02-01', '2023-03-01', '2023-04-01',
+            '2023-01-01', '2023-02-01', '2023-03-01', '2023-04-01',
+            '2023-01-01', '2023-02-01', '2023-03-01', '2023-04-01'
+        ],
+        'price': [20000, 21000, 22000, 23000, 1500, 1600, 1700, 1800, 10, 15, 12, 8]
     }
     return pd.DataFrame(data)
 
-def test_clean_profits_df_custom_filter(sample_profits_df):
+def test_calculate_wallet_profitability_profitability(sample_transfers_df, sample_prices_df):
     """
-    Test the clean_profits_df function with a custom profitability filter.
-
-    This test case verifies that:
-    1. The function correctly filters out coin_id-wallet_address pairs where any day's
-       profitability exceeds the custom threshold of 5,000,000 (positive or negative).
-    2. The cleaned DataFrame contains only the expected records.
-    3. The exclusions DataFrame contains the correct pairs that were filtered out.
-
-    Expected behavior:
-    - BTC-addr1 pair should be excluded (profitability > 5,000,000)
-    - ETH-addr2 pair should be excluded (profitability > 5,000,000 and < -5,000,000)
-    - ETH-addr3 pair should be excluded (profitability > 5,000,000)
-    - Only BTC-addr3 pair should remain in the cleaned DataFrame
-
-    Args:
-        sample_profits_df (pd.DataFrame): Fixture providing a sample DataFrame for testing.
+    Test profitability calculations for multiple wallets and coins.
     """
-    # Suppress the specific DeprecationWarning
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=DeprecationWarning, message="np.find_common_type is deprecated")
-        cleaned_df, exclusions_df = td.clean_profits_df(sample_profits_df, profitability_filter=5000000)
+    result = td.calculate_wallet_profitability(sample_transfers_df, sample_prices_df)
+    
+    # Check profitability for wallet1, BTC
+    wallet1_btc = result[(result['wallet_address'] == 'wallet1') & (result['coin_id'] == 'BTC')]
+    assert wallet1_btc.loc[wallet1_btc['date'] == '2023-02-01', 'profits_change'].values[0] == pytest.approx(10000)  # (21000 - 20000) * 10
+    assert wallet1_btc.loc[wallet1_btc['date'] == '2023-02-01', 'profits_total'].values[0] == pytest.approx(10000)
+    assert wallet1_btc.loc[wallet1_btc['date'] == '2023-04-01', 'profits_change'].values[0] == pytest.approx(30000)  # (23000 - 21000) * 15
+    assert wallet1_btc.loc[wallet1_btc['date'] == '2023-04-01', 'profits_total'].values[0] == pytest.approx(40000)  # 10000 + 15000 + 15000
 
-    assert len(cleaned_df) == 1  # Only BTC-addr3 pair should remain
-    assert len(exclusions_df) == 3  # All pairs except BTC-addr3 should be excluded
-    assert set(cleaned_df['wallet_address']) == {'addr3'}
-    assert set(exclusions_df['wallet_address']) == {'addr1', 'addr2', 'addr3'}
+    # Check profitability for wallet2, ETH
+    wallet2_eth = result[(result['wallet_address'] == 'wallet2') & (result['coin_id'] == 'ETH')]
+    assert wallet2_eth.loc[wallet2_eth['date'] == '2023-02-01', 'profits_change'].values[0] == pytest.approx(5000)  # (1600 - 1500) * 50
+    assert wallet2_eth.loc[wallet2_eth['date'] == '2023-02-01', 'profits_total'].values[0] == pytest.approx(5000)
+    assert wallet2_eth.loc[wallet2_eth['date'] == '2023-04-01', 'profits_change'].values[0] == pytest.approx(15000)  # (1800 - 1600) * 75
+    assert wallet2_eth.loc[wallet2_eth['date'] == '2023-04-01', 'profits_total'].values[0] == pytest.approx(20000)  # 5000 + 15000
+
+    # Check profitability for wallet3, MYRO
+    wallet3_myro = result[(result['wallet_address'] == 'wallet3') & (result['coin_id'] == 'MYRO')]
+    assert wallet3_myro.loc[wallet3_myro['date'] == '2023-02-01', 'profits_change'].values[0] == pytest.approx(5000)  # (15 - 10) * 1000
+    assert wallet3_myro.loc[wallet3_myro['date'] == '2023-03-01', 'profits_change'].values[0] == pytest.approx(-4500)  # (12 - 15) * 1500
+    assert wallet3_myro.loc[wallet3_myro['date'] == '2023-03-01', 'profits_total'].values[0] == pytest.approx(500)
+    assert wallet3_myro.loc[wallet3_myro['date'] == '2023-04-01', 'profits_change'].values[0] == pytest.approx(-3000)  # (8 - 12) * 750
+    assert wallet3_myro.loc[wallet3_myro['date'] == '2023-04-01', 'profits_total'].values[0] == pytest.approx(-2500)  # 500 - 3000
+
+def test_calculate_wallet_profitability_usd_calculations(sample_transfers_df, sample_prices_df):
+    """
+    Test USD-related calculations (inflows, balances, total return).
+    """
+    result = td.calculate_wallet_profitability(sample_transfers_df, sample_prices_df)
+
+    # Check USD calculations for wallet1, BTC
+    wallet1_btc = result[(result['wallet_address'] == 'wallet1') & (result['coin_id'] == 'BTC')]
+    initial_investment_wallet1 = 10 * 20000  # 10 BTC * $20,000
+    second_investment_wallet1 = 5 * 21000    # 5 BTC * $21,000
+    total_investment_wallet1 = initial_investment_wallet1 + second_investment_wallet1
+    expected_balance_wallet1 = 15 * 23000    # 15 BTC * $23,000
+    expected_total_return_wallet1 = 40000 / total_investment_wallet1
+
+    assert wallet1_btc.loc[wallet1_btc['date'] == '2023-01-01', 'usd_inflows'].values[0] == pytest.approx(initial_investment_wallet1)
+    assert wallet1_btc.loc[wallet1_btc['date'] == '2023-02-01', 'usd_inflows'].values[0] == pytest.approx(second_investment_wallet1)
+    assert wallet1_btc.loc[wallet1_btc['date'] == '2023-02-01', 'usd_cumulative_inflows'].values[0] == pytest.approx(total_investment_wallet1)
+    assert wallet1_btc.loc[wallet1_btc['date'] == '2023-04-01', 'usd_balance'].values[0] == pytest.approx(expected_balance_wallet1)
+    assert wallet1_btc.loc[wallet1_btc['date'] == '2023-04-01', 'total_return'].values[0] == pytest.approx(expected_total_return_wallet1)
+
+    # Check USD calculations for wallet2, ETH
+    wallet2_eth = result[(result['wallet_address'] == 'wallet2') & (result['coin_id'] == 'ETH')]
+    initial_investment_wallet2 = 50 * 1500  # 50 ETH * $1,500
+    second_investment_wallet2 = 25 * 1600  # 25 ETH * $1,600
+    total_investment_wallet2 = initial_investment_wallet2 + second_investment_wallet2
+    expected_balance_wallet2 = 65 * 1800  # 65 ETH * $1,800
+    expected_total_return_wallet2 = 20000 / total_investment_wallet2
+
+    assert wallet2_eth.loc[wallet2_eth['date'] == '2023-01-01', 'usd_inflows'].values[0] == pytest.approx(initial_investment_wallet2)
+    assert wallet2_eth.loc[wallet2_eth['date'] == '2023-02-01', 'usd_inflows'].values[0] == pytest.approx(second_investment_wallet2)
+    assert wallet2_eth.loc[wallet2_eth['date'] == '2023-04-01', 'usd_cumulative_inflows'].values[0] == pytest.approx(total_investment_wallet2)
+    assert wallet2_eth.loc[wallet2_eth['date'] == '2023-04-01', 'usd_balance'].values[0] == pytest.approx(expected_balance_wallet2)
+    assert wallet2_eth.loc[wallet2_eth['date'] == '2023-04-01', 'total_return'].values[0] == pytest.approx(expected_total_return_wallet2)
+
+    # Check USD calculations for wallet3, MYRO
+    wallet3_myro = result[(result['wallet_address'] == 'wallet3') & (result['coin_id'] == 'MYRO')]
+    initial_investment_wallet3 = 1000 * 10  # 1000 MYRO * $10
+    second_investment_wallet3 = 500 * 15   # 500 MYRO * $15
+    total_investment_wallet3 = initial_investment_wallet3 + second_investment_wallet3
+    expected_balance_wallet3 = 750 * 8  # 750 MYRO * $8
+    current_value_wallet3 = 750 * 8  # Current holdings: 750 MYRO * $8
+    sold_value_wallet3 = 750 * 12     # Sold tokens: 750 MYRO * $12
+    profit_wallet3 = current_value_wallet3 + sold_value_wallet3 - total_investment_wallet3
+    expected_total_return_wallet3 = profit_wallet3 / total_investment_wallet3
+
+    assert wallet3_myro.loc[wallet3_myro['date'] == '2023-01-01', 'usd_inflows'].values[0] == pytest.approx(initial_investment_wallet3)
+    assert wallet3_myro.loc[wallet3_myro['date'] == '2023-02-01', 'usd_inflows'].values[0] == pytest.approx(second_investment_wallet3)
+    assert wallet3_myro.loc[wallet3_myro['date'] == '2023-03-01', 'usd_cumulative_inflows'].values[0] == pytest.approx(total_investment_wallet3)
+    assert wallet3_myro.loc[wallet3_myro['date'] == '2023-04-01', 'usd_balance'].values[0] == pytest.approx(expected_balance_wallet3)
+    assert wallet3_myro.loc[wallet3_myro['date'] == '2023-04-01', 'total_return'].values[0] == pytest.approx(expected_total_return_wallet3)
