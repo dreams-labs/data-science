@@ -350,11 +350,6 @@ def calculate_wallet_profitability(transfers_df, prices_df):
     logger.debug(f"<Step 1> (Merge transfers and prices): {time.time() - start_time:.2f} seconds")
     step_time = time.time()
 
-    # Raise an error if there are any missing prices
-    if profits_df['price'].isnull().any():
-        raise ValueError("Missing prices found for some transfer dates. This indicates an issue with the price data generation.")
-
-
     # 2. Remove transfers history earlier than the first pricing data
     # ---------------------------------------------------------------
     # identify the earliest pricing data for each coin
@@ -366,6 +361,10 @@ def calculate_wallet_profitability(transfers_df, prices_df):
     profits_df = profits_df[profits_df['date'] >= profits_df['first_price_date']]
     logger.debug(f"<Step 2> (Remove records before first price date): {time.time() - step_time:.2f} seconds")
     step_time = time.time()
+
+    # Raise an error if there are any missing prices
+    if profits_df['price'].isnull().any():
+        raise ValueError("Missing prices found for some transfer dates. This indicates an issue with the price data generation.")
 
     # 3. Calculate profitability
     # --------------------------

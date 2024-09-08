@@ -3,10 +3,12 @@ tests used to audit the files in the data-science/src folder
 """
 # pylint: disable=W1203 # fstrings in logs
 # pylint: disable=C0301 # line over 100 chars
+# pylint: disable=W0621 # redefining from outer scope triggering on pytest fixtures
 
 import sys
 import os
-from datetime import datetime, timedelta
+import warnings
+from datetime import datetime
 import pandas as pd
 import numpy as np
 from dotenv import load_dotenv
@@ -21,6 +23,11 @@ import training_data as td
 
 load_dotenv()
 logger = dc.setup_logger()
+
+
+# -------------------------- #
+# Tests for retrieve_transfers_data()
+# -------------------------- #
 
 @pytest.mark.slow
 def test_transfers_data_quality():
@@ -47,7 +54,7 @@ def test_transfers_data_quality():
     pairs_in_training_period = transfers_df_filtered[['coin_id', 'wallet_address']].drop_duplicates()
     training_period_end = pd.to_datetime(modeling_period_start) - pd.Timedelta(1, 'day')
     period_end_df = transfers_df[transfers_df['date'] == training_period_end]
-    
+
     logger.info(f"Found {len(pairs_in_training_period)} total pairs in training period with {len(period_end_df)} having data at period end.")
     assert len(pairs_in_training_period) == len(period_end_df), "Not all training data coin-wallet pairs have a record at the end of the training period"
 
@@ -105,6 +112,12 @@ def test_transfers_data_quality():
     logger.info("All data quality checks passed successfully.")
 
 
+
+# ------------------------------- #
+# Tests for calculate_wallet_profitability()
+# ------------------------------- #
+
+# the follow are tests for function calculate_wallet_profitability()
 @pytest.fixture
 def sample_transfers_df():
     """
@@ -137,7 +150,6 @@ def sample_prices_df():
         'price': [100, 120, 50, 55]
     })
 
-
 def test_happy_path(sample_transfers_df, sample_prices_df):
     """
     Test the happy path scenario with sample data.
@@ -156,7 +168,6 @@ def test_happy_path(sample_transfers_df, sample_prices_df):
     assert btc_wallet1['profitability_change'].tolist() == [0, 200]  # 0 for day 1, (120-100)*10 for day 2
     assert btc_wallet1['profitability_cumulative'].tolist() == [0, 200]
 
-
 def test_empty_dataframes_raise_exception():
     """
     Test that the function raises a ValueError when given empty DataFrames.
@@ -166,7 +177,6 @@ def test_empty_dataframes_raise_exception():
 
     with pytest.raises(ValueError, match="Input DataFrames cannot be empty"):
         td.calculate_wallet_profitability(empty_df, empty_prices)
-
 
 def test_missing_price_data(sample_transfers_df):
     """
@@ -180,7 +190,6 @@ def test_missing_price_data(sample_transfers_df):
 
     with pytest.raises(ValueError, match="Missing prices found for some transfer dates"):
         td.calculate_wallet_profitability(sample_transfers_df, incomplete_prices_df)
-
 
 def test_price_decline(sample_transfers_df):
     """
@@ -196,7 +205,6 @@ def test_price_decline(sample_transfers_df):
     btc_wallet1 = result[(result['coin_id'] == 'BTC') & (result['wallet_address'] == 'wallet1')]
     assert btc_wallet1['profitability_change'].tolist() == [0, -200]  # 0 for day 1, (80-100)*10 for day 2
     assert btc_wallet1['profitability_cumulative'].tolist() == [0, -200]
-
 
 def test_large_numbers():
     """
@@ -218,3 +226,50 @@ def test_large_numbers():
     result = td.calculate_wallet_profitability(large_transfers_df, large_prices_df)
     assert not result['profitability_cumulative'].isnull().any()
     assert not np.isinf(result['profitability_cumulative']).any()
+
+
+# ------------------------------- #
+# Tests for clean_profits_df()
+# ------------------------------- #
+
+@pytest.fixture
+def sample_profits_df():
+    """
+    dummy version of profits_df output by calculate_wallet_profitability()
+    """
+    data = {
+        'coin_id': ['BTC', 'BTC', 'ETH', 'ETH', 'BTC', 'ETH'],
+        'wallet_address': ['addr1', 'addr1', 'addr2', 'addr2', 'addr3', 'addr3'],
+        'date': pd.to_datetime(['2023-01-01', '2023-01-02', '2023-01-01', '2023-01-02', '2023-01-01', '2023-01-01']),
+        'profitability_cumulative': [5000000.0, 8000000.0, 15000000.0, -12000000.0, 3000000.0, 9000000.0]
+    }
+    return pd.DataFrame(data)
+
+def test_clean_profits_df_custom_filter(sample_profits_df):
+    """
+    Test the clean_profits_df function with a custom profitability filter.
+
+    This test case verifies that:
+    1. The function correctly filters out coin_id-wallet_address pairs where any day's
+       profitability exceeds the custom threshold of 5,000,000 (positive or negative).
+    2. The cleaned DataFrame contains only the expected records.
+    3. The exclusions DataFrame contains the correct pairs that were filtered out.
+
+    Expected behavior:
+    - BTC-addr1 pair should be excluded (profitability > 5,000,000)
+    - ETH-addr2 pair should be excluded (profitability > 5,000,000 and < -5,000,000)
+    - ETH-addr3 pair should be excluded (profitability > 5,000,000)
+    - Only BTC-addr3 pair should remain in the cleaned DataFrame
+
+    Args:
+        sample_profits_df (pd.DataFrame): Fixture providing a sample DataFrame for testing.
+    """
+    # Suppress the specific DeprecationWarning
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=DeprecationWarning, message="np.find_common_type is deprecated")
+        cleaned_df, exclusions_df = td.clean_profits_df(sample_profits_df, profitability_filter=5000000)
+
+    assert len(cleaned_df) == 1  # Only BTC-addr3 pair should remain
+    assert len(exclusions_df) == 3  # All pairs except BTC-addr3 should be excluded
+    assert set(cleaned_df['wallet_address']) == {'addr3'}
+    assert set(exclusions_df['wallet_address']) == {'addr1', 'addr2', 'addr3'}
