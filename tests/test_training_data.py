@@ -166,7 +166,9 @@ def profits_df(transfers_df):
 @pytest.mark.slow
 def test_modeling_period_end_wallet_completeness(profits_df):
     """
-    Test profitability calculations for multiple wallets and coins.
+    Checks if all of the coin-wallet pairs at the end of the training period
+    have data at the end of the modeling period to esnure they can be analyzed
+    for profitability. 
     """
     training_period_end = pd.to_datetime(MODELING_PERIOD_START) - pd.Timedelta(1, 'day')
     modeling_period_end = MODELING_PERIOD_END
