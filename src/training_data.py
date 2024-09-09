@@ -209,12 +209,13 @@ def create_target_variable(prices_df, modeling_period_start, modeling_period_end
 
 
 
-def retrieve_transfers_data(modeling_period_start,modeling_period_end):
+def retrieve_transfers_data(training_period_start,modeling_period_start,modeling_period_end):
     """
     Retrieves wallet transfers data from the core.coin_wallet_transfers table and converts 
     columns to categorical for calculation efficiency. 
 
     Params:
+    - training_period_start: String with format 'YYYY-MM-DD'
     - modeling_period_start: String with format 'YYYY-MM-DD'
     - modeling_period_end: String with format 'YYYY-MM-DD'
 
@@ -249,6 +250,7 @@ def retrieve_transfers_data(modeling_period_start,modeling_period_end):
             )
 
             -- retrieve transfers through the end of the modeling period
+            and cwt.date >= '{training_period_start}'
             and cwt.date <= '{modeling_period_end}'
         ),
 
@@ -336,6 +338,114 @@ def retrieve_transfers_data(modeling_period_start,modeling_period_end):
                 transfers_df.shape, round(time.time()-start_time,1))
 
     return transfers_df
+
+
+
+def prepare_profits_data(transfers_df, prices_df):
+    """
+    Prepares a DataFrame (profits_df) by merging wallet transfer data with coin price data,
+    ensuring valid pricing data is available for each transaction, and handling cases where
+    wallets had balances prior to the first available pricing data.
+
+    The function performs the following steps:
+    1. Merges the `transfers_df` and `prices_df` on 'coin_id' and 'date'.
+    2. Identifies wallets with transfer records before the first available price for each coin.
+    3. Creates new records for these wallets, treating the balance as a net transfer on the 
+       first price date.
+    4. Removes original records with missing price data.
+    5. Appends the newly created records and sorts the resulting DataFrame.
+
+    Parameters:
+    - transfers_df (pd.DataFrame): 
+        A DataFrame containing wallet transaction data with columns:
+        - coin_id: The ID of the coin/token.
+        - wallet_address: The unique identifier of the wallet.
+        - date: The date of the transaction.
+        - net_transfers: The net tokens transferred in or out of the wallet on that date.
+        - balance: The token balance in the wallet at the end of the day.
+
+    - prices_df (pd.DataFrame): 
+        A DataFrame containing price data with columns:
+        - coin_id: The ID of the coin/token.
+        - date: The date of the price record.
+        - price: The price of the coin/token on that date.
+
+    Returns:
+    - pd.DataFrame: 
+        A merged DataFrame containing profitability data, with new records added for wallets
+        that had balances prior to the first available price date for each coin.
+    """
+    logger.info("Preparing profits_df data...")
+    start_time = time.time()
+
+    # Raise an error if either df is empty
+    if transfers_df.empty or prices_df.empty:
+        raise ValueError("Input DataFrames cannot be empty.")
+
+    # 1. Merge transfers and prices data on 'coin_id' and 'date'
+    # ----------------------------------------------------------
+    # set dates to datetime and coin_ids to categorical
+    transfers_df['date'] = pd.to_datetime(transfers_df['date'])
+    prices_df['date'] = pd.to_datetime(prices_df['date'])
+    transfers_df['coin_id'] = transfers_df['coin_id'].astype('category')
+    prices_df['coin_id'] = prices_df['coin_id'].astype('category')
+
+    # merge datasets
+    profits_df = pd.merge(transfers_df, prices_df, on=['coin_id', 'date'], how='left')
+    logger.debug(f"<Step 1> merge transfers and prices: {time.time() - start_time:.2f} seconds")
+    step_time = time.time()
+
+
+    # 2. Attach data showing the first price record of all coins
+    # ----------------------------------------------------------
+    # Identify the earliest pricing data for each coin and merge to get the first price date
+    first_prices_df = prices_df.groupby('coin_id').agg({
+        'date': 'min',
+        'price': 'first'  # Assuming we want the first available price on the first_price_date
+    }).reset_index()
+    first_prices_df.columns = ['coin_id', 'first_price_date', 'first_price']
+
+    # Merge the first price data into profits_df
+    profits_df = profits_df.merge(first_prices_df, on='coin_id', how='left')
+    logger.debug(f"<Step 2> identify first prices of coins: {time.time() - step_time:.2f} seconds")
+    step_time = time.time()
+
+    # 3. Create new records for the first_price_date for each wallet-coin pair
+    # ------------------------------------------------------------------------
+    # Identify wallets with transfer data before first_price_date
+    pre_price_transfers = profits_df[profits_df['date'] < profits_df['first_price_date']]
+
+    # Group by coin_id and wallet_address to ensure only one record per pair
+    grouped_pre_price_transfers = pre_price_transfers.groupby(['coin_id', 'wallet_address']).agg({
+        'first_price_date': 'first',
+        'balance': 'last',  # Get the balance as of the latest transfer before first_price_date
+        'first_price': 'first'  # Retrieve the first price for this coin
+    }).reset_index()
+
+    # Create the new records to reflect transfer in of balance as of first_price_date
+    new_records = grouped_pre_price_transfers.copy()
+    new_records['date'] = new_records['first_price_date']
+    new_records['net_transfers'] = new_records['balance']  # Treat the balance as a net transfer
+    new_records['price'] = new_records['first_price']  # Use the first price on the first_price_date
+
+    # # Select necessary columns for new records
+    new_records = new_records[['coin_id', 'wallet_address', 'date', 'net_transfers', 'balance', 'price', 'first_price_date', 'first_price']]
+    logger.debug(f"<Step 3> created new records as of the first_price_date: {time.time() - step_time:.2f} seconds")
+    step_time = time.time()
+
+    # 4. Append new records to profits df and remove the rows prior to pricing data
+    # -----------------------------------------------------------------------------
+    # Remove original records with no price data (NaN in 'price' column)
+    profits_df = profits_df[profits_df['price'].notna()]
+
+    # Append new records to the original dataframe
+    profits_df = pd.concat([profits_df, new_records], ignore_index=True)
+
+    # Sort by coin_id, wallet_address, and date to maintain order
+    profits_df = profits_df.sort_values(by=['coin_id', 'wallet_address', 'date']).reset_index(drop=True)
+    logger.debug(f"<Step 4> merge new records into profits_df: {time.time() - step_time:.2f} seconds")
+
+    return profits_df
 
 
 

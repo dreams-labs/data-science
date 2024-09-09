@@ -24,6 +24,8 @@ logger = dc.setup_logger()
 # Module-level variables
 MODELING_PERIOD_START = '2024-03-01'
 MODELING_PERIOD_END = '2024-03-31'
+TRAINING_PERIOD_START = '2023-03-01'
+TRAINING_PERIOD_END = pd.to_datetime(MODELING_PERIOD_START) - pd.Timedelta(1, 'day')
 
 
 # -------------------------- #
@@ -35,7 +37,7 @@ def transfers_df():
     """
     retrieves transfers_df for data quality checks
     """
-    return td.retrieve_transfers_data(MODELING_PERIOD_START, MODELING_PERIOD_END)
+    return td.retrieve_transfers_data(TRAINING_PERIOD_START, MODELING_PERIOD_START, MODELING_PERIOD_END)
 
 @pytest.mark.slow
 def test_transfers_data_quality(transfers_df):
@@ -43,11 +45,6 @@ def test_transfers_data_quality(transfers_df):
     Retrieves transfers_df and performs comprehensive data quality checks.
     """
     logger.info("Testing transfers_df from retrieve_transfers_data()...")
-
-    # Example modeling period start date
-    modeling_period_start = MODELING_PERIOD_START
-    modeling_period_end = MODELING_PERIOD_END
-    training_period_end = pd.to_datetime(MODELING_PERIOD_START) - pd.Timedelta(1, 'day')
 
     # Test 1: No duplicate records
     # ----------------------------
@@ -57,9 +54,9 @@ def test_transfers_data_quality(transfers_df):
 
     # Test 2: All coin-wallet pairs have a record at the end of the training period
     # ----------------------------------------------------------------------------
-    transfers_df_filtered = transfers_df[transfers_df['date'] < modeling_period_start]
+    transfers_df_filtered = transfers_df[transfers_df['date'] < MODELING_PERIOD_START]
     pairs_in_training_period = transfers_df_filtered[['coin_id', 'wallet_address']].drop_duplicates()
-    period_end_df = transfers_df[transfers_df['date'] == training_period_end]
+    period_end_df = transfers_df[transfers_df['date'] == TRAINING_PERIOD_END]
 
     logger.info(f"Found {len(pairs_in_training_period)} total pairs in training period with {len(period_end_df)} having data at period end.")
     assert len(pairs_in_training_period) == len(period_end_df), "Not all training data coin-wallet pairs have a record at the end of the training period"
@@ -75,7 +72,7 @@ def test_transfers_data_quality(transfers_df):
     # ------------------------
     min_date = transfers_df['date'].min()
     max_date = transfers_df['date'].max()
-    expected_max_date = pd.to_datetime(modeling_period_end)
+    expected_max_date = pd.to_datetime(MODELING_PERIOD_END)
     logger.info(f"Date range: {min_date} to {max_date}")
     assert max_date == expected_max_date, f"The last date in the dataset should be {expected_max_date}"
 
@@ -118,11 +115,11 @@ def test_transfers_data_quality(transfers_df):
     # Test 7: Ensure all applicable wallets have records as of the training_period_end
     # ------------------------------------------------------------------------------------------
     # get a list of all coin-wallet pairs as of the training_period_end
-    training_transfers_df = transfers_df[transfers_df['date'] <= training_period_end]
+    training_transfers_df = transfers_df[transfers_df['date'] <= TRAINING_PERIOD_END]
     training_wallets_df = training_transfers_df[['coin_id', 'wallet_address']].drop_duplicates()
 
     # get a list of all coin-wallet pairs on the training_transfers_end date
-    training_end_df = transfers_df[transfers_df['date'] == training_period_end]
+    training_end_df = transfers_df[transfers_df['date'] == TRAINING_PERIOD_END]
     training_end_df = training_end_df[['coin_id', 'wallet_address']].drop_duplicates()
 
     # confirm that they are the same length
@@ -131,11 +128,11 @@ def test_transfers_data_quality(transfers_df):
     # Test 8: Ensure all wallets have records as of the modeling_period_end
     # ------------------------------------------------------------------------------------------
     # get a list of all coin-wallet pairs
-    modeling_transfers_df = transfers_df[transfers_df['date'] <= modeling_period_end]
+    modeling_transfers_df = transfers_df[transfers_df['date'] <= MODELING_PERIOD_END]
     modeling_wallets_df = modeling_transfers_df[['coin_id', 'wallet_address']].drop_duplicates()
 
     # get a list of all coin-wallet pairs on the modeling_period_end
-    modeling_end_df = transfers_df[transfers_df['date'] == modeling_period_end]
+    modeling_end_df = transfers_df[transfers_df['date'] == MODELING_PERIOD_END]
     modeling_end_df = modeling_end_df[['coin_id', 'wallet_address']].drop_duplicates()
 
     # confirm that they are the same length
