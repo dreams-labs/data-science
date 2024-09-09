@@ -31,13 +31,15 @@ def retrieve_prices_data():
     '''
 
     # Run the SQL query using dgc's run_sql method
-    logger.info('retrieving prices data...')
+    logger.debug('retrieving prices data...')
     prices_df = dgc().run_sql(query_sql)
 
     # Convert coin_id column to categorical to reduce memory usage
     prices_df['coin_id'] = prices_df['coin_id'].astype('category')
 
     prices_df['date'] = pd.to_datetime(prices_df['date'])
+
+    logger.info('retrieved prices data with shape %s',prices_df.shape)
 
     return prices_df
 
@@ -120,7 +122,7 @@ def fill_prices_gaps(prices_df, max_gap_days):
     gaps_below_threshold_count = len(outcomes_df[outcomes_df['outcome'] == 'gaps below threshold'])
     gaps_above_threshold_count = len(outcomes_df[outcomes_df['outcome'] == 'gaps above threshold'])
 
-    logger.info("retained %s coins.", no_gaps_count + gaps_below_threshold_count)
+    logger.debug("retained %s coins.", no_gaps_count + gaps_below_threshold_count)
     logger.info("%s coins had no gaps, %s coins had gaps filled, and %s coins were dropped due to large gaps.",
                 no_gaps_count, gaps_below_threshold_count, gaps_above_threshold_count)
 
@@ -368,7 +370,7 @@ def retrieve_transfers_data(training_period_start,modeling_period_start,modeling
 
     # Run the SQL query using dgc's run_sql method
     start_time = time.time()
-    logger.info('retrieving transfers data...')
+    logger.debug('retrieving transfers data...')
     transfers_df = dgc().run_sql(query_sql)
 
     # Convert column types
@@ -416,7 +418,7 @@ def prepare_profits_data(transfers_df, prices_df):
         A merged DataFrame containing profitability data, with new records added for wallets
         that had balances prior to the first available price date for each coin.
     """
-    logger.info("Preparing profits_df data...")
+    logger.debug("Preparing profits_df data...")
     start_time = time.time()
 
     # Raise an error if either df is empty
@@ -560,7 +562,7 @@ def calculate_wallet_profitability(profits_df):
     Raises:
     - ValueError: If any missing prices are found in the `profits_df`.
     """
-    logger.info("Starting generation of profits_df...")
+    logger.debug("Starting generation of profits_df...")
     start_time = time.time()
 
     # Raise an error if there are any missing prices
@@ -616,7 +618,7 @@ def clean_profits_df(profits_df, profitability_filter=10000000):
     Returns:
     - Cleaned DataFrame with records for coin_id-wallet_address pairs filtered out.
     """
-    logger.info("Starting generation of profits_cleaned_df...")
+    logger.debug("Starting generation of profits_cleaned_df...")
     start_time = time.time()
 
     # Identify coin_id-wallet_address pairs where any single day's profitability exceeds the threshold
@@ -667,7 +669,7 @@ def classify_shark_coins(profits_df, modeling_config):
         sharks_df (DataFrame): A DataFrame of wallets classified as sharks, including flags for 
         whether the wallet meets the profits or return criteria.
     """
-    logger.info('identifying shark wallets...')
+    logger.debug('identifying shark wallets...')
 
     # Step 1. Filter the df to remove wallets that do not meet shark eligibility criteria
     # -----------------------------------------------------------------------------------

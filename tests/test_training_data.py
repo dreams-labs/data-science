@@ -214,7 +214,7 @@ def test_price_data_interactions(price_data_transfers_df, price_data_prices_df):
     """
     profits_df = td.prepare_profits_data(price_data_transfers_df, price_data_prices_df)
     result = td.calculate_wallet_profitability(profits_df)
-    
+
     # Test scenario: Buy during training period before price data, sell after price data
     wallet1_btc = result[(result['wallet_address'] == 'wallet1') & (result['coin_id'] == 'BTC')]
     wallet1_btc_profits = (23000-22000) * 10
@@ -252,6 +252,7 @@ def test_transfers_data_quality(transfers_df):
     Retrieves transfers_df and performs comprehensive data quality checks.
     """
     logger.info("Testing transfers_df from retrieve_transfers_data()...")
+    transfers_df = transfers_df.copy(deep=False)  # Create a copy to avoid affecting subsequent tests
 
     # Test 1: No duplicate records
     # ----------------------------
@@ -285,7 +286,7 @@ def test_transfers_data_quality(transfers_df):
 
     # Test 5: No missing values
     # -------------------------
-    missing_values = transfers_df.isnull().sum()
+    missing_values = transfers_df.isna().sum()
     logger.info(f"Missing values:\n{missing_values}")
     assert missing_values.sum() == 0, "There are missing values in the dataset"
 
@@ -373,6 +374,17 @@ def profits_df(transfers_df):
     profits_df = td.calculate_wallet_profitability(profits_df)
 
     return profits_df
+
+
+@pytest.mark.integration
+def test_profits_df_completeness(profits_df):
+    """
+    Checks if there are any NaN values in profits_df. 
+    """
+    missing_values = profits_df.isna().sum()
+    logger.info(f"Missing values:\n{missing_values}")
+    assert missing_values.sum() == 0, "There are missing values in the dataset"
+
 
 @pytest.mark.integration
 def test_modeling_period_end_wallet_completeness(profits_df):
