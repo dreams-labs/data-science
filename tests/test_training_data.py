@@ -7,6 +7,7 @@ tests used to audit the files in the data-science/src folder
 
 import sys
 import os
+import yaml
 import pandas as pd
 from dotenv import load_dotenv
 import pytest
@@ -20,13 +21,6 @@ import training_data as td # type: ignore[reportMissingImports]
 
 load_dotenv()
 logger = dc.setup_logger()
-
-# Module-level variables
-TRAINING_PERIOD_START = '2023-06-01'
-TRAINING_PERIOD_END = '2024-02-29'
-MODELING_PERIOD_START = '2024-03-01'
-MODELING_PERIOD_END = '2024-03-31'
-
 
 # ===================================================== #
 #                                                       #
@@ -234,6 +228,27 @@ def test_price_data_interactions(price_data_transfers_df, price_data_prices_df):
 # ======================================================== #
 
 
+# ---------------------------------- #
+# set up config and module-level variables
+# ---------------------------------- #
+
+def load_test_config():
+    """
+    loads tests/test_config.yaml to mimic production config setup
+    """
+    config_path = os.path.join(os.path.dirname(__file__), 'test_config.yaml')
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
+    return config
+
+config = load_test_config()
+
+# Module-level variables
+TRAINING_PERIOD_START = config['modeling']['training_period_start']
+TRAINING_PERIOD_END = config['modeling']['training_period_end']
+MODELING_PERIOD_START = config['modeling']['modeling_period_start']
+MODELING_PERIOD_END = config['modeling']['modeling_period_end']
+
 
 # -------------------------- #
 # retrieve_transfers_data() production data quality checks
@@ -244,6 +259,7 @@ def transfers_df():
     """
     retrieves transfers_df for data quality checks
     """
+    logger.info("Beginning integration testing...")
     logger.info("Generating transfers_df fixture from production data...")
     return td.retrieve_transfers_data(TRAINING_PERIOD_START, MODELING_PERIOD_START, MODELING_PERIOD_END)
 
@@ -333,6 +349,19 @@ def test_transfers_data_quality(transfers_df):
     # confirm that they are the same length
     assert len(training_wallets_df) == len(training_end_df), "Some wallets are missing a record as of the training_period_end"
 
+    # Test 9: Ensure all wallets have records as of the modeling_period_start
+    # ------------------------------------------------------------------------------------------
+    # get a list of all coin-wallet pairs
+    modeling_transfers_df = transfers_df[transfers_df['date'] <= MODELING_PERIOD_START]
+    modeling_wallets_df = modeling_transfers_df[['coin_id', 'wallet_address']].drop_duplicates()
+
+    # get a list of all coin-wallet pairs on the modeling_period_start
+    modeling_start_df = transfers_df[transfers_df['date'] == MODELING_PERIOD_START]
+    modeling_start_df = modeling_start_df[['coin_id', 'wallet_address']].drop_duplicates()
+
+    # confirm that they are the same length
+    assert len(modeling_wallets_df) == len(modeling_start_df), "Some wallets are missing a record as of the modeling_period_start"
+
     # Test 9: Ensure all wallets have records as of the modeling_period_end
     # ------------------------------------------------------------------------------------------
     # get a list of all coin-wallet pairs
@@ -417,28 +446,42 @@ def test_modeling_period_end_wallet_completeness(profits_df):
 # ---------------------------------------- #
 # classify_shark_coins() tests
 # ---------------------------------------- #
-# tests the data quality and logic of shark identification
+
+@pytest.fixture(scope='session')
+def shark_coins_df(profits_df):
+    """
+    builds shark_coins_df from production data for data quality checks
+    """
+    shark_coins_df = td.classify_shark_coins(profits_df, config['modeling'])
+    return shark_coins_df
+
 
 @pytest.mark.integration
-def test_no_duplicate_coin_wallet_pairs(profits_df):
+def test_no_duplicate_coin_wallet_pairs(shark_coins_df):
     """
-    Test to assert there are no duplicate coin-wallet pairs in the sharks_df
-    returned by classify_sharks().
+    Test to assert there are no duplicate coin-wallet pairs in the shark_coins_df
+    returned by classify_shark_coins().
     """
-    modeling_config = {
-        'training_period_start': '2023-01-01',
-        'modeling_period_start': '2024-03-01',
-        'modeling_period_end': '2024-03-31',
-        'moon_threshold': 0.3,
-        'dump_threshold': -0.2,
-        'shark_minimum_inflows': 5000,
-        'shark_total_profits_threshold': 20000,
-        'shark_total_return_threshold': 0.4
-    }
-    sharks_df = td.classify_shark_coins(profits_df, modeling_config)
-
     # Group by coin_id and wallet_address and check for duplicates
-    duplicates = sharks_df.duplicated(subset=['coin_id', 'wallet_address'], keep=False)
+    duplicates = shark_coins_df.duplicated(subset=['coin_id', 'wallet_address'], keep=False)
+
+    # Assert that there are no duplicates in sharks_df
+    assert not duplicates.any(), "Duplicate coin-wallet pairs found in sharks_df"
+
+
+# ---------------------------------------- #
+# classify_shark_wallets() tests
+# ---------------------------------------- #
+
+@pytest.mark.integration
+def test_no_duplicate_wallets(shark_coins_df):
+    """
+    Test to assert there are no duplicate wallet pairs in the shark_wallets_df
+    returned by classify_shark_wallets().
+    """
+    shark_wallets_df = td.classify_shark_wallets(shark_coins_df,config['modeling'])
+    # Group by coin_id and wallet_address and check for duplicates
+    duplicates = shark_wallets_df.duplicated(subset=['wallet_address'], keep=False)
 
     # Assert that there are no duplicates in sharks_df
     assert not duplicates.any(), "Duplicate coin-wallet pairs found in sharks_df"
