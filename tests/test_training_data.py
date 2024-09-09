@@ -29,12 +29,11 @@ TRAINING_PERIOD_END = pd.to_datetime(MODELING_PERIOD_START) - pd.Timedelta(1, 'd
 
 
 
-# =====================================================
-#
-#                 U N I T   T E S T S
-#
-# =====================================================
-
+# ===================================================== #
+#                                                       #
+#                 U N I T   T E S T S                   #
+#                                                       #
+# ===================================================== #
 
 
 def test_calculate_wallet_profitability_profitability(sample_transfers_df, sample_prices_df):
@@ -124,11 +123,11 @@ def test_calculate_wallet_profitability_usd_calculations(sample_transfers_df, sa
 
 
 
-# ========================================================
-#
-#            I N T E G R A T I O N   T E S T S
-#
-# ========================================================
+# ======================================================== #
+#                                                          #
+#            I N T E G R A T I O N   T E S T S             #
+#                                                          #
+# ======================================================== #
 
 
 
@@ -245,6 +244,7 @@ def test_transfers_data_quality(transfers_df):
     logger.info("All transfers_df data quality checks passed successfully.")
 
 
+
 # ---------------------------------------- #
 # calculate_wallet_profitability() production data quality tests
 # ---------------------------------------- #
@@ -291,8 +291,10 @@ def test_modeling_period_end_wallet_completeness(profits_df):
     # Assert that no pairs are missing
     assert missing_pairs.empty, "Some coin-wallet pairs in training_profits_df are missing from modeling_profits_df"
 
+
+
 # ---------------------------------------- #
-# classify_sharks() tests
+# classify_shark_coins() tests
 # ---------------------------------------- #
 # tests the data quality and logic of shark identification
 
@@ -312,7 +314,7 @@ def test_no_duplicate_coin_wallet_pairs(profits_df):
         'shark_total_profits_threshold': 20000,
         'shark_total_return_threshold': 0.4
     }
-    sharks_df = td.classify_sharks(profits_df, modeling_config)
+    sharks_df = td.classify_shark_coins(profits_df, modeling_config)
 
     # Group by coin_id and wallet_address and check for duplicates
     duplicates = sharks_df.duplicated(subset=['coin_id', 'wallet_address'], keep=False)
