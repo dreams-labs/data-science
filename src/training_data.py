@@ -497,16 +497,16 @@ def calculate_wallet_profitability(profits_df):
         raise ValueError("Missing prices found for some transfer dates. This indicates an issue with the price data generation.")
 
     # create offset price and balance rows to easily calculate changes between periods
-    profits_df['previous_price'] = profits_df.groupby(['coin_id', 'wallet_address'])['price'].shift(1)
+    profits_df['previous_price'] = profits_df.groupby(['coin_id', 'wallet_address'],observed=True)['price'].shift(1)
     profits_df['previous_price'] = profits_df['previous_price'].fillna(profits_df['price'])
-    profits_df['previous_balance'] = profits_df.groupby(['coin_id', 'wallet_address'])['balance'].shift(1).fillna(0)
+    profits_df['previous_balance'] = profits_df.groupby(['coin_id', 'wallet_address'],observed=True)['balance'].shift(1).fillna(0)
 
     logger.debug(f"Offset prices and balances for profitability logic: {time.time() - start_time:.2f} seconds")
     step_time = time.time()
 
     # calculate the profitability change in each period and sum them to get cumulative profitability
     profits_df['profits_change'] = (profits_df['price'] - profits_df['previous_price']) * profits_df['previous_balance']
-    profits_df['profits_total'] = profits_df.groupby(['coin_id', 'wallet_address'])['profits_change'].cumsum()
+    profits_df['profits_total'] = profits_df.groupby(['coin_id', 'wallet_address'],observed=True)['profits_change'].cumsum()
 
     logger.debug(f"Calculate profitability: {time.time() - step_time:.2f} seconds")
     step_time = time.time()
@@ -515,7 +515,7 @@ def calculate_wallet_profitability(profits_df):
     profits_df['usd_balance'] = profits_df['balance'] * profits_df['price']
     profits_df['usd_net_transfers'] = profits_df['net_transfers'] * profits_df['price']
     profits_df['usd_inflows'] = profits_df['usd_net_transfers'].where(profits_df['usd_net_transfers'] > 0, 0)
-    profits_df['usd_total_inflows'] = profits_df.groupby(['coin_id', 'wallet_address'])['usd_inflows'].cumsum()
+    profits_df['usd_total_inflows'] = profits_df.groupby(['coin_id', 'wallet_address'],observed=True)['usd_inflows'].cumsum()
     profits_df['total_return'] = profits_df['profits_total'] / profits_df['usd_total_inflows'].where(profits_df['usd_total_inflows'] != 0, np.nan)
 
     logger.debug(f"Calculate rate of return {time.time() - step_time:.2f} seconds")
