@@ -42,4 +42,4 @@ Tests are built in the tests/ directory and configured with pytest.ini.
 
 Tests can be initiated from the main data-science directory with the standard command >`pytest`. 
 
-There is a `slow` flag applied to slow tests that involve large dataframes or queries. To ignore these but run other tests, use the command >`pytest -m "not slow"`. 
+There is a `integration` flag applied to slow tests that involve large dataframes or queries. To ignore these but run other tests, use the command >`pytest -m "not integration"`. 
