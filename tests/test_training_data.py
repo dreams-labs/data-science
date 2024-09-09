@@ -22,11 +22,10 @@ load_dotenv()
 logger = dc.setup_logger()
 
 # Module-level variables
+TRAINING_PERIOD_START = '2023-03-01'
+TRAINING_PERIOD_END = '2024-02-29'
 MODELING_PERIOD_START = '2024-03-01'
 MODELING_PERIOD_END = '2024-03-31'
-TRAINING_PERIOD_START = '2023-03-01'
-TRAINING_PERIOD_END = pd.to_datetime(MODELING_PERIOD_START) - pd.Timedelta(1, 'day')
-
 
 
 # ===================================================== #
@@ -34,6 +33,61 @@ TRAINING_PERIOD_END = pd.to_datetime(MODELING_PERIOD_START) - pd.Timedelta(1, 'd
 #                 U N I T   T E S T S                   #
 #                                                       #
 # ===================================================== #
+
+# ---------------------------------------- #
+# calculate_wallet_profitability() logic tests
+# ---------------------------------------- #
+# tests the logic of calculations using dummy data
+
+@pytest.fixture
+def sample_transfers_df():
+    """
+    Create a sample transfers DataFrame for testing.
+    """
+    data = {
+        'coin_id': ['BTC', 'BTC', 'ETH', 'ETH', 'BTC', 'ETH', 'MYRO', 'MYRO', 'MYRO', 
+                    'BTC', 'ETH', 'BTC', 'ETH', 'MYRO'],
+        'wallet_address': ['wallet1', 'wallet1', 'wallet1', 'wallet2', 'wallet2', 'wallet2', 'wallet3', 'wallet3', 'wallet3',
+                           'wallet1', 'wallet1', 'wallet2', 'wallet2', 'wallet3'],
+        'date': [
+            '2023-01-01', '2023-02-01', '2023-01-01', '2023-01-01', '2023-01-01', '2023-02-01', 
+            '2023-01-01', '2023-02-01', '2023-03-01',
+            '2023-04-01', '2023-04-01', '2023-04-01', '2023-04-01', '2023-04-01'
+        ],
+        'net_transfers': [10.0, 5, 100, 50, 20, 25, 1000, 500, -750,
+                          0, 0, 0, -10, 0],
+        'balance': [10.0, 15, 100, 50, 20, 75, 1000, 1500, 750,
+                    15, 100, 20, 65, 750]
+    }
+    df = pd.DataFrame(data)
+
+    # Convert coin_id to categorical and date to datetime
+    df['coin_id'] = df['coin_id'].astype('category')
+    df['date'] = pd.to_datetime(df['date'])
+
+    return df
+
+@pytest.fixture
+def sample_prices_df():
+    """
+    Create a sample prices DataFrame for testing.
+    """
+    data = {
+        'date': [
+            '2023-01-01', '2023-02-01', '2023-03-01', '2023-04-01',
+            '2023-01-01', '2023-02-01', '2023-03-01', '2023-04-01',
+            '2023-01-01', '2023-02-01', '2023-03-01', '2023-04-01'
+        ],
+        'coin_id': ['BTC', 'BTC', 'BTC', 'BTC', 'ETH', 'ETH', 'ETH', 'ETH', 'MYRO', 'MYRO', 'MYRO', 'MYRO'],
+        'price': [20000.0, 21000, 22000, 23000, 1500, 1600, 1700, 1800, 10, 15, 12, 8]
+    }
+    df = pd.DataFrame(data)
+
+    # Convert coin_id to categorical and date to datetime
+    df['coin_id'] = df['coin_id'].astype('category')
+    df['date'] = pd.to_datetime(df['date'])
+
+    return df
 
 
 def test_calculate_wallet_profitability_profitability(sample_transfers_df, sample_prices_df):
@@ -119,8 +173,58 @@ def test_calculate_wallet_profitability_usd_calculations(sample_transfers_df, sa
     assert wallet3_myro.loc[wallet3_myro['date'] == '2023-04-01', 'total_return'].values[0] == pytest.approx(expected_total_return_wallet3)
 
 
+@pytest.fixture
+def price_data_transfers_df():
+    """
+    Create a sample transfers DataFrame for testing interactions with price data.
+    """
+    data = {
+        'coin_id': ['BTC', 'BTC', 'MYRO', 'MYRO'],
+        'wallet_address': ['wallet1', 'wallet1', 'wallet2', 'wallet2'],
+        'date': [
+            '2023-03-01', '2023-04-01',  # BTC wallet1 buys during training period
+            '2023-02-20', '2023-03-10'   # MYRO wallet2 buys during training period (before price data)
+        ],
+        'net_transfers': [10.0, -10.0, 1000.0, -1000.0],  # Buys and sells
+        'balance': [10.0, 0.0, 1000.0, 0.0]  # Balance adjustments after buy and sell
+    }
+    df = pd.DataFrame(data)
+    df['coin_id'] = df['coin_id'].astype('category')
+    df['date'] = pd.to_datetime(df['date'])
+    return df
 
+@pytest.fixture
+def price_data_prices_df():
+    """
+    Create a sample prices DataFrame for testing interactions with price data.
+    """
+    data = {
+        'date': ['2023-03-15', '2023-04-01', '2023-03-15', '2023-04-01'],
+        'coin_id': ['BTC', 'BTC', 'MYRO', 'MYRO'],
+        'price': [22000.0, 23000, 12, 15]  # Price data available starting from 2023-03-15
+    }
+    df = pd.DataFrame(data)
+    df['coin_id'] = df['coin_id'].astype('category')
+    df['date'] = pd.to_datetime(df['date'])
+    return df
 
+def test_price_data_interactions(price_data_transfers_df, price_data_prices_df):
+    """
+    Test interactions between wallet transfers and available price data.
+    """
+    profits_df = td.prepare_profits_data(price_data_transfers_df, price_data_prices_df)
+    result = td.calculate_wallet_profitability(profits_df)
+    
+    # Test scenario: Buy during training period before price data, sell after price data
+    wallet1_btc = result[(result['wallet_address'] == 'wallet1') & (result['coin_id'] == 'BTC')]
+    wallet1_btc_profits = (23000-22000) * 10
+    assert wallet1_btc.iloc[0]['date'] == pd.Timestamp('2023-03-15')  # First row should reflect earliest price data
+    assert wallet1_btc.iloc[0]['profits_cumulative'] == 0  # No profit on initial transfer in
+    assert wallet1_btc.iloc[1]['profits_cumulative'] == wallet1_btc_profits  # Profitability calculation should be valid
+
+    # Test scenario: Buy and sell before price data is available
+    wallet2_myro = result[(result['wallet_address'] == 'wallet2') & (result['coin_id'] == 'MYRO')]
+    assert wallet2_myro.empty  # No rows should exist, as no price data was available for the transaction
 
 
 # ======================================================== #
@@ -142,7 +246,7 @@ def transfers_df():
     """
     return td.retrieve_transfers_data(TRAINING_PERIOD_START, MODELING_PERIOD_START, MODELING_PERIOD_END)
 
-@pytest.mark.slow
+@pytest.mark.integration
 def test_transfers_data_quality(transfers_df):
     """
     Retrieves transfers_df and performs comprehensive data quality checks.
@@ -215,7 +319,7 @@ def test_transfers_data_quality(transfers_df):
     # This allows the test to pass while still alerting us to potential issues
     assert len(inconsistent_balances) == 0, f"Found {len(inconsistent_balances)} records with potentially inconsistent balance changes. Check logs for details."
 
-    # Test 7: Ensure all applicable wallets have records as of the training_period_end
+    # Test 8: Ensure all applicable wallets have records as of the training_period_end
     # ------------------------------------------------------------------------------------------
     # get a list of all coin-wallet pairs as of the training_period_end
     training_transfers_df = transfers_df[transfers_df['date'] <= TRAINING_PERIOD_END]
@@ -228,7 +332,7 @@ def test_transfers_data_quality(transfers_df):
     # confirm that they are the same length
     assert len(training_wallets_df) == len(training_end_df), "Some wallets are missing a record as of the training_period_end"
 
-    # Test 8: Ensure all wallets have records as of the modeling_period_end
+    # Test 9: Ensure all wallets have records as of the modeling_period_end
     # ------------------------------------------------------------------------------------------
     # get a list of all coin-wallet pairs
     modeling_transfers_df = transfers_df[transfers_df['date'] <= MODELING_PERIOD_END]
@@ -240,6 +344,10 @@ def test_transfers_data_quality(transfers_df):
 
     # confirm that they are the same length
     assert len(modeling_wallets_df) == len(modeling_end_df), "Some wallets are missing a record as of the modeling_period_end"
+
+    # Test 10: Confirm no records exist prior to the training period start
+    # ------------------------------------------------------------------------------------------
+    assert len(transfers_df[transfers_df['date']<TRAINING_PERIOD_START]) == 0, "Records prior to training_period_start exist"
 
     logger.info("All transfers_df data quality checks passed successfully.")
 
@@ -266,7 +374,7 @@ def profits_df(transfers_df):
 
     return profits_df
 
-@pytest.mark.slow
+@pytest.mark.integration
 def test_modeling_period_end_wallet_completeness(profits_df):
     """
     Checks if all of the coin-wallet pairs at the end of the training period
@@ -298,7 +406,7 @@ def test_modeling_period_end_wallet_completeness(profits_df):
 # ---------------------------------------- #
 # tests the data quality and logic of shark identification
 
-@pytest.mark.slow
+@pytest.mark.integration
 def test_no_duplicate_coin_wallet_pairs(profits_df):
     """
     Test to assert there are no duplicate coin-wallet pairs in the sharks_df
@@ -321,59 +429,3 @@ def test_no_duplicate_coin_wallet_pairs(profits_df):
 
     # Assert that there are no duplicates in sharks_df
     assert not duplicates.any(), "Duplicate coin-wallet pairs found in sharks_df"
-
-
-# ---------------------------------------- #
-# calculate_wallet_profitability() logic tests
-# ---------------------------------------- #
-# tests the logic of calculations using dummy data
-
-@pytest.fixture
-def sample_transfers_df():
-    """
-    Create a sample transfers DataFrame for testing.
-    """
-    data = {
-        'coin_id': ['BTC', 'BTC', 'ETH', 'ETH', 'BTC', 'ETH', 'MYRO', 'MYRO', 'MYRO', 
-                    'BTC', 'ETH', 'BTC', 'ETH', 'MYRO'],
-        'wallet_address': ['wallet1', 'wallet1', 'wallet1', 'wallet2', 'wallet2', 'wallet2', 'wallet3', 'wallet3', 'wallet3',
-                           'wallet1', 'wallet1', 'wallet2', 'wallet2', 'wallet3'],
-        'date': [
-            '2023-01-01', '2023-02-01', '2023-01-01', '2023-01-01', '2023-01-01', '2023-02-01', 
-            '2023-01-01', '2023-02-01', '2023-03-01',
-            '2023-04-01', '2023-04-01', '2023-04-01', '2023-04-01', '2023-04-01'
-        ],
-        'net_transfers': [10.0, 5, 100, 50, 20, 25, 1000, 500, -750,
-                          0, 0, 0, -10, 0],
-        'balance': [10.0, 15, 100, 50, 20, 75, 1000, 1500, 750,
-                    15, 100, 20, 65, 750]
-    }
-    df = pd.DataFrame(data)
-
-    # Convert coin_id to categorical and date to datetime
-    df['coin_id'] = df['coin_id'].astype('category')
-    df['date'] = pd.to_datetime(df['date'])
-
-    return df
-
-@pytest.fixture
-def sample_prices_df():
-    """
-    Create a sample prices DataFrame for testing.
-    """
-    data = {
-        'date': [
-            '2023-01-01', '2023-02-01', '2023-03-01', '2023-04-01',
-            '2023-01-01', '2023-02-01', '2023-03-01', '2023-04-01',
-            '2023-01-01', '2023-02-01', '2023-03-01', '2023-04-01'
-        ],
-        'coin_id': ['BTC', 'BTC', 'BTC', 'BTC', 'ETH', 'ETH', 'ETH', 'ETH', 'MYRO', 'MYRO', 'MYRO', 'MYRO'],
-        'price': [20000.0, 21000, 22000, 23000, 1500, 1600, 1700, 1800, 10, 15, 12, 8]
-    }
-    df = pd.DataFrame(data)
-
-    # Convert coin_id to categorical and date to datetime
-    df['coin_id'] = df['coin_id'].astype('category')
-    df['date'] = pd.to_datetime(df['date'])
-
-    return df

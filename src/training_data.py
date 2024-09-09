@@ -224,8 +224,8 @@ def retrieve_transfers_data(training_period_start,modeling_period_start,modeling
     """
     # SQL query to retrieve prices data
     query_sql = f'''
-        -- STEP 1: retrieve transfers data for the training+modeling periods
-        --------------------------------------------------------------------
+        -- STEP 1: retrieve transfers data through the end of the modeling period
+        -------------------------------------------------------------------------
         with transfers_base as (
             -- start with the same query that generates transfers_df
             select cwt.coin_id
@@ -249,13 +249,45 @@ def retrieve_transfers_data(training_period_start,modeling_period_start,modeling
                 ,'88779ad0-f8c3-448c-bc6c-699c2a692514' -- CRV
             )
 
-            -- retrieve transfers through the end of the modeling period
-            and cwt.date >= '{training_period_start}'
+            -- don't retrieve transfers through after modeling period
             and cwt.date <= '{modeling_period_end}'
         ),
 
 
-        -- STEP 2: create new records for all coin-wallet pairs as of the end of the training period
+        -- STEP 2: create new records for all coin-wallet pairs as of the training_period_start
+        ---------------------------------------------------------------------------------------
+        -- any coins that had existing balances when the training period begins will have these
+        -- balances reflected as a transfer in in the net_transfers column
+
+        training_start_existing_rows as (
+            -- identify coin-wallet pairs that already have a balance as of the period end
+            select *
+            from transfers_base
+            where date = '{training_period_start}'
+        ),
+        training_start_needs_rows as (
+            -- for coin-wallet pairs that don't have existing records, identify the row closest to the period end date
+            select t.*
+            ,row_number() over (partition by t.coin_id,t.wallet_address order by t.date desc) as rn
+            from transfers_base t
+            left join training_start_existing_rows e on e.coin_id = t.coin_id 
+                and e.wallet_address = t.wallet_address
+            where t.date < '{training_period_start}'
+            and e.coin_id is null
+        ),
+        training_start_new_rows as (
+            -- create a new row for the period end date by carrying the balance from the closest existing record
+            select coin_id
+            ,wallet_address
+            ,cast('{training_period_start}' as date) as date
+            ,cast(balance as float64) as net_transfers -- treat starting balances as a transfer in
+            ,cast(balance as float64) as balance
+            from training_start_needs_rows
+            where rn=1
+        ),
+
+
+        -- STEP 3: create new records for all coin-wallet pairs as of the end of the training period
         --------------------------------------------------------------------
         training_end_existing_rows as (
             -- identify coin-wallet pairs that already have a balance as of the period end
@@ -285,7 +317,7 @@ def retrieve_transfers_data(training_period_start,modeling_period_start,modeling
         ),
 
 
-        -- STEP 3: create new records for all coin-wallet pairs as of the end of the modeling period
+        -- STEP 4: create new records for all coin-wallet pairs as of the end of the modeling period
         --------------------------------------------------------------------
         modeling_end_existing_rows as (
             -- identify coin-wallet pairs that already have a balance as of the period end
@@ -314,12 +346,21 @@ def retrieve_transfers_data(training_period_start,modeling_period_start,modeling
             where rn=1
         )
 
-        -- STEP 4: merge all rows together
+        -- STEP 5: merge all rows together
         --------------------------------------------------------------------
         select * from transfers_base
+        where date >= '{training_period_start}' -- transfers prior to the training period are summarized in training_start_new_rows
+
         union all
+
+        select * from training_start_new_rows
+
+        union all
+
         select * from training_end_new_rows
+
         union all
+
         select * from modeling_end_new_rows
         order by coin_id, wallet_address, date
 
@@ -413,6 +454,7 @@ def prepare_profits_data(transfers_df, prices_df):
     logger.debug(f"<Step 2> identify first prices of coins: {time.time() - step_time:.2f} seconds")
     step_time = time.time()
 
+
     # 3. Create new records for the first_price_date for each wallet-coin pair
     # ------------------------------------------------------------------------
     # Identify wallets with transfer data before first_price_date
@@ -436,20 +478,46 @@ def prepare_profits_data(transfers_df, prices_df):
     logger.debug(f"<Step 3> created new records as of the first_price_date: {time.time() - step_time:.2f} seconds")
     step_time = time.time()
 
-    # 4. Append new records to profits df and remove the rows prior to pricing data
-    # -----------------------------------------------------------------------------
+
+    # 4. Remove the rows prior to pricing data append the new records
+    # ---------------------------------------------------------------
     # Remove original records with no price data (NaN in 'price' column)
     profits_df = profits_df[profits_df['price'].notna()]
 
     # Append new records to the original dataframe
     profits_df = pd.concat([profits_df, new_records], ignore_index=True)
 
-    # remove helper columns
-    profits_df.drop(columns=['first_price_date', 'first_price'], inplace=True)
-
     # Sort by coin_id, wallet_address, and date to maintain order
     profits_df = profits_df.sort_values(by=['coin_id', 'wallet_address', 'date']).reset_index(drop=True)
     logger.debug(f"<Step 4> merge new records into profits_df: {time.time() - step_time:.2f} seconds")
+    step_time = time.time()
+
+
+    # 5. Remove all records before a coin-wallet pair has any tokens
+    # --------------------------------------------------------------
+    # these are artifacts resulting from activity prior to price data availability. if wallets purchased 
+    # and sold all coins in these pre-data eras, their first record will be of a zero-balance state.
+
+    # calculate cumulative token inflows
+    profits_df['token_inflows'] = profits_df['net_transfers'].where(profits_df['net_transfers'] > 0, 0)
+    profits_df['token_inflows_cumulative'] = profits_df.groupby(['coin_id', 'wallet_address'],observed=True)['token_inflows'].cumsum()
+
+    # remove records prior to positive token_inflows
+    profits_df = profits_df[profits_df['token_inflows_cumulative']>0]
+
+    logger.debug(f"<Step 5> removed records prior to each wallet's first token inflows: {time.time() - step_time:.2f} seconds")
+    step_time = time.time()
+
+
+    # 6. Tidy up and return profits_df
+    # ---------------------------------
+    # remove helper columns
+    profits_df.drop(columns=['first_price_date', 'first_price', 'token_inflows', 'token_inflows_cumulative'], inplace=True)
+
+    # Reset the index
+    profits_df = profits_df.reset_index(drop=True)
+
+    logger.debug(f"generated profits_df after {time.time() - start_time:.2f} total seconds")
 
     return profits_df
 
