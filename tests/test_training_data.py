@@ -21,25 +21,33 @@ import training_data as td # type: ignore[reportMissingImports]
 load_dotenv()
 logger = dc.setup_logger()
 
+# Module-level variables
+MODELING_PERIOD_START = '2024-03-01'
+MODELING_PERIOD_END = '2024-03-31'
+
 
 # -------------------------- #
-# retrieve_transfers_data()
+# retrieve_transfers_data() production data quality checks
 # -------------------------- #
+
+@pytest.fixture(scope='session')
+def transfers_df():
+    """
+    retrieves transfers_df for data quality checks
+    """
+    return td.retrieve_transfers_data(MODELING_PERIOD_START, MODELING_PERIOD_END)
 
 @pytest.mark.slow
-def test_transfers_data_quality():
+def test_transfers_data_quality(transfers_df):
     """
     Retrieves transfers_df and performs comprehensive data quality checks.
     """
     logger.info("Testing transfers_df from retrieve_transfers_data()...")
 
     # Example modeling period start date
-    modeling_period_start = '2024-03-01'
-    modeling_period_end = '2024-03-31'
-    training_period_end = pd.to_datetime(modeling_period_start) - pd.Timedelta(1, 'day')
-
-    # Retrieve transfers_df
-    transfers_df = td.retrieve_transfers_data(modeling_period_start,modeling_period_end)
+    modeling_period_start = MODELING_PERIOD_START
+    modeling_period_end = MODELING_PERIOD_END
+    training_period_end = pd.to_datetime(MODELING_PERIOD_START) - pd.Timedelta(1, 'day')
 
     # Test 1: No duplicate records
     # ----------------------------
@@ -137,10 +145,53 @@ def test_transfers_data_quality():
     logger.info("All transfers_df data quality checks passed successfully.")
 
 
+# ---------------------------------------- #
+# calculate_wallet_profitability() production data quality tests
+# ---------------------------------------- #
+# tests the data quality of the production data as calculated from the transfers_df() fixture
 
-# ------------------------------- #
-# calculate_wallet_profitability()
-# ------------------------------- #
+@pytest.fixture(scope='session')
+def profits_df(transfers_df):
+    """
+    builds profits_df from production data for data quality checks
+    """
+    # retrieve prices data
+    prices_df = td.retrieve_prices_data()
+
+    # fill gaps in prices data
+    prices_df,_ = td.fill_prices_gaps(prices_df,max_gap_days=2)
+
+    return td.calculate_wallet_profitability(transfers_df, prices_df)
+
+@pytest.mark.slow
+def test_modeling_period_end_wallet_completeness(profits_df):
+    """
+    Test profitability calculations for multiple wallets and coins.
+    """
+    training_period_end = pd.to_datetime(MODELING_PERIOD_START) - pd.Timedelta(1, 'day')
+    modeling_period_end = MODELING_PERIOD_END
+
+    # Get all coin-wallet pairs at the end of the training period
+    training_profits_df = profits_df[profits_df['date'] == training_period_end]
+    training_profits_df = training_profits_df[['coin_id', 'wallet_address']].drop_duplicates()
+
+    # Get all coin-wallet pairs at the end of the modeling period
+    modeling_profits_df = profits_df[profits_df['date']==modeling_period_end]
+    modeling_profits_df = modeling_profits_df[['coin_id', 'wallet_address']].drop_duplicates()
+
+    # Check if there are any pairs at the end of the training period without records at the end of the modeling period
+    missing_pairs = training_profits_df.merge(modeling_profits_df, on=['coin_id', 'wallet_address'], how='left', indicator=True)
+    missing_pairs = missing_pairs[missing_pairs['_merge'] == 'left_only']
+
+    # Assert that no pairs are missing
+    assert missing_pairs.empty, "Some coin-wallet pairs in training_profits_df are missing from modeling_profits_df"
+
+
+
+# ---------------------------------------- #
+# calculate_wallet_profitability() logic tests
+# ---------------------------------------- #
+# tests the logic of calculations using dummy data
 
 @pytest.fixture
 def sample_transfers_df():

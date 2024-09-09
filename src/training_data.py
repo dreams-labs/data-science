@@ -382,8 +382,13 @@ def calculate_wallet_profitability(transfers_df, prices_df):
 
     # 1. Merge transfers and prices data on 'coin_id' and 'date'
     # ----------------------------------------------------------
+    # set dates to datetime and coin_ids to categorical
     transfers_df['date'] = pd.to_datetime(transfers_df['date'])
     prices_df['date'] = pd.to_datetime(prices_df['date'])
+    transfers_df['coin_id'] = transfers_df['coin_id'].astype('category')
+    prices_df['coin_id'] = prices_df['coin_id'].astype('category')
+
+    # merge datasets
     profits_df = pd.merge(transfers_df, prices_df, on=['coin_id', 'date'], how='left')
     logger.debug(f"<Step 1> (Merge transfers and prices): {time.time() - start_time:.2f} seconds")
     step_time = time.time()
@@ -439,6 +444,8 @@ def clean_profits_df(profits_df, profitability_filter=10000000):
     """
     Clean the profits DataFrame by excluding all records for any coin_id-wallet_address pair
     if any single day's profitability exceeds the profitability_filter (positive or negative).
+    this catches outliers such as minting/burning addresses, contract addresses, etc and ensures
+    they are not included in the wallet behavior training data. 
     
     Parameters:
     - profits_df: DataFrame with columns ['coin_id', 'wallet_address', 'date', 'profits_total']
