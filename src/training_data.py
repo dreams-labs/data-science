@@ -93,7 +93,7 @@ def fill_prices_gaps(prices_df, max_gap_days):
             continue
 
         # Step 3: Forward-fill any gaps that are smaller than max_gap_days
-        coin_df['price'] = coin_df['price'].fillna(method='ffill', limit=max_gap_days)
+        coin_df['price'] = coin_df['price'].ffill(limit=max_gap_days)
 
         # Remove rows with larger gaps that shouldn't be filled (already handled by check above)
         coin_df = coin_df[coin_df['missing_gap'] <= max_gap_days]
@@ -498,7 +498,7 @@ def calculate_wallet_profitability(profits_df):
 
     # create offset price and balance rows to easily calculate changes between periods
     profits_df['previous_price'] = profits_df.groupby(['coin_id', 'wallet_address'])['price'].shift(1)
-    profits_df['previous_price'].fillna(profits_df['price'], inplace=True)
+    profits_df['previous_price'] = profits_df['previous_price'].fillna(profits_df['price'])
     profits_df['previous_balance'] = profits_df.groupby(['coin_id', 'wallet_address'])['balance'].shift(1).fillna(0)
 
     logger.debug(f"Offset prices and balances for profitability logic: {time.time() - start_time:.2f} seconds")
