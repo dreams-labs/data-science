@@ -83,7 +83,7 @@ def test_calculate_wallet_profitability_usd_calculations(sample_transfers_df, sa
 
     assert wallet1_btc.loc[wallet1_btc['date'] == '2023-01-01', 'usd_inflows'].values[0] == pytest.approx(initial_investment_wallet1)
     assert wallet1_btc.loc[wallet1_btc['date'] == '2023-02-01', 'usd_inflows'].values[0] == pytest.approx(second_investment_wallet1)
-    assert wallet1_btc.loc[wallet1_btc['date'] == '2023-02-01', 'usd_total_inflows'].values[0] == pytest.approx(total_investment_wallet1)
+    assert wallet1_btc.loc[wallet1_btc['date'] == '2023-02-01', 'usd_inflows_cumulative'].values[0] == pytest.approx(total_investment_wallet1)
     assert wallet1_btc.loc[wallet1_btc['date'] == '2023-04-01', 'usd_balance'].values[0] == pytest.approx(expected_balance_wallet1)
     assert wallet1_btc.loc[wallet1_btc['date'] == '2023-04-01', 'total_return'].values[0] == pytest.approx(expected_total_return_wallet1)
 
@@ -97,7 +97,7 @@ def test_calculate_wallet_profitability_usd_calculations(sample_transfers_df, sa
 
     assert wallet2_eth.loc[wallet2_eth['date'] == '2023-01-01', 'usd_inflows'].values[0] == pytest.approx(initial_investment_wallet2)
     assert wallet2_eth.loc[wallet2_eth['date'] == '2023-02-01', 'usd_inflows'].values[0] == pytest.approx(second_investment_wallet2)
-    assert wallet2_eth.loc[wallet2_eth['date'] == '2023-04-01', 'usd_total_inflows'].values[0] == pytest.approx(total_investment_wallet2)
+    assert wallet2_eth.loc[wallet2_eth['date'] == '2023-04-01', 'usd_inflows_cumulative'].values[0] == pytest.approx(total_investment_wallet2)
     assert wallet2_eth.loc[wallet2_eth['date'] == '2023-04-01', 'usd_balance'].values[0] == pytest.approx(expected_balance_wallet2)
     assert wallet2_eth.loc[wallet2_eth['date'] == '2023-04-01', 'total_return'].values[0] == pytest.approx(expected_total_return_wallet2)
 
@@ -114,7 +114,7 @@ def test_calculate_wallet_profitability_usd_calculations(sample_transfers_df, sa
 
     assert wallet3_myro.loc[wallet3_myro['date'] == '2023-01-01', 'usd_inflows'].values[0] == pytest.approx(initial_investment_wallet3)
     assert wallet3_myro.loc[wallet3_myro['date'] == '2023-02-01', 'usd_inflows'].values[0] == pytest.approx(second_investment_wallet3)
-    assert wallet3_myro.loc[wallet3_myro['date'] == '2023-03-01', 'usd_total_inflows'].values[0] == pytest.approx(total_investment_wallet3)
+    assert wallet3_myro.loc[wallet3_myro['date'] == '2023-03-01', 'usd_inflows_cumulative'].values[0] == pytest.approx(total_investment_wallet3)
     assert wallet3_myro.loc[wallet3_myro['date'] == '2023-04-01', 'usd_balance'].values[0] == pytest.approx(expected_balance_wallet3)
     assert wallet3_myro.loc[wallet3_myro['date'] == '2023-04-01', 'total_return'].values[0] == pytest.approx(expected_total_return_wallet3)
 

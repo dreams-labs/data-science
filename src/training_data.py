@@ -382,9 +382,12 @@ def prepare_profits_data(transfers_df, prices_df):
     if transfers_df.empty or prices_df.empty:
         raise ValueError("Input DataFrames cannot be empty.")
 
-    # 1. Merge transfers and prices data on 'coin_id' and 'date'
+    # 1. Format dataframes and merge on 'coin_id' and 'date'
     # ----------------------------------------------------------
     # set dates to datetime and coin_ids to categorical
+    transfers_df = transfers_df.copy()
+    prices_df = prices_df.copy()
+
     transfers_df['date'] = pd.to_datetime(transfers_df['date'])
     prices_df['date'] = pd.to_datetime(prices_df['date'])
     transfers_df['coin_id'] = transfers_df['coin_id'].astype('category')
@@ -483,7 +486,7 @@ def calculate_wallet_profitability(profits_df):
         - usd_balance: The USD value of the wallet's balance, based on the current price.
         - usd_net_transfers: The USD value of the net transfers on a given day.
         - usd_inflows: The USD value of net transfers into the wallet (positive transfers only).
-        - usd_total_inflows: The cumulative USD inflows for each wallet-coin pair.
+        - usd_inflows_cumulative: The cumulative USD inflows for each wallet-coin pair.
         - total_return: The total return, calculated as cumulative profits divided by total USD inflows.
 
     Raises:
@@ -515,8 +518,8 @@ def calculate_wallet_profitability(profits_df):
     profits_df['usd_balance'] = profits_df['balance'] * profits_df['price']
     profits_df['usd_net_transfers'] = profits_df['net_transfers'] * profits_df['price']
     profits_df['usd_inflows'] = profits_df['usd_net_transfers'].where(profits_df['usd_net_transfers'] > 0, 0)
-    profits_df['usd_total_inflows'] = profits_df.groupby(['coin_id', 'wallet_address'],observed=True)['usd_inflows'].cumsum()
-    profits_df['total_return'] = profits_df['profits_cumulative'] / profits_df['usd_total_inflows'].where(profits_df['usd_total_inflows'] != 0, np.nan)
+    profits_df['usd_inflows_cumulative'] = profits_df.groupby(['coin_id', 'wallet_address'],observed=True)['usd_inflows'].cumsum()
+    profits_df['total_return'] = profits_df['profits_cumulative'] / profits_df['usd_inflows_cumulative'].where(profits_df['usd_inflows_cumulative'] != 0, np.nan)
 
     logger.debug(f"Calculate rate of return {time.time() - step_time:.2f} seconds")
     step_time = time.time()
@@ -604,8 +607,8 @@ def classify_shark_coins(profits_df, modeling_config):
     filtered_profits_df = profits_df[profits_df['date'] < modeling_config['modeling_period_start']].copy()
 
     # Identify coin-wallet pairs that have deposited enough total USD to be considered sharks
-    eligible_wallets_df = filtered_profits_df.groupby(['coin_id', 'wallet_address'])['usd_total_inflows'].max().reset_index()
-    eligible_wallets_df = eligible_wallets_df[eligible_wallets_df['usd_total_inflows'] >= modeling_config['shark_minimum_inflows']]
+    eligible_wallets_df = filtered_profits_df.groupby(['coin_id', 'wallet_address'])['usd_inflows_cumulative'].max().reset_index()
+    eligible_wallets_df = eligible_wallets_df[eligible_wallets_df['usd_inflows_cumulative'] >= modeling_config['shark_minimum_inflows']]
 
     # Filter profits_df to only include eligble wallets
     filtered_profits_df = filtered_profits_df.merge(eligible_wallets_df[['coin_id', 'wallet_address']],
