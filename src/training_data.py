@@ -479,7 +479,7 @@ def calculate_wallet_profitability(profits_df):
         A DataFrame with the following additional columns:
         - profits_change: The daily change in profitability, calculated as the difference between 
           the current price and the previous price, multiplied by the previous balance.
-        - profits_total: The cumulative profitability for each wallet-coin pair over time.
+        - profits_cumulative: The cumulative profitability for each wallet-coin pair over time.
         - usd_balance: The USD value of the wallet's balance, based on the current price.
         - usd_net_transfers: The USD value of the net transfers on a given day.
         - usd_inflows: The USD value of net transfers into the wallet (positive transfers only).
@@ -506,7 +506,7 @@ def calculate_wallet_profitability(profits_df):
 
     # calculate the profitability change in each period and sum them to get cumulative profitability
     profits_df['profits_change'] = (profits_df['price'] - profits_df['previous_price']) * profits_df['previous_balance']
-    profits_df['profits_total'] = profits_df.groupby(['coin_id', 'wallet_address'],observed=True)['profits_change'].cumsum()
+    profits_df['profits_cumulative'] = profits_df.groupby(['coin_id', 'wallet_address'],observed=True)['profits_change'].cumsum()
 
     logger.debug(f"Calculate profitability: {time.time() - step_time:.2f} seconds")
     step_time = time.time()
@@ -516,7 +516,7 @@ def calculate_wallet_profitability(profits_df):
     profits_df['usd_net_transfers'] = profits_df['net_transfers'] * profits_df['price']
     profits_df['usd_inflows'] = profits_df['usd_net_transfers'].where(profits_df['usd_net_transfers'] > 0, 0)
     profits_df['usd_total_inflows'] = profits_df.groupby(['coin_id', 'wallet_address'],observed=True)['usd_inflows'].cumsum()
-    profits_df['total_return'] = profits_df['profits_total'] / profits_df['usd_total_inflows'].where(profits_df['usd_total_inflows'] != 0, np.nan)
+    profits_df['total_return'] = profits_df['profits_cumulative'] / profits_df['usd_total_inflows'].where(profits_df['usd_total_inflows'] != 0, np.nan)
 
     logger.debug(f"Calculate rate of return {time.time() - step_time:.2f} seconds")
     step_time = time.time()
@@ -539,7 +539,7 @@ def clean_profits_df(profits_df, profitability_filter=10000000):
     they are not included in the wallet behavior training data. 
     
     Parameters:
-    - profits_df: DataFrame with columns ['coin_id', 'wallet_address', 'date', 'profits_total']
+    - profits_df: DataFrame with columns ['coin_id', 'wallet_address', 'date', 'profits_cumulative']
     - profitability_filter: Threshold value to exclude pairs with profits or losses exceeding this value
     
     Returns:
@@ -550,8 +550,8 @@ def clean_profits_df(profits_df, profitability_filter=10000000):
 
     # Identify coin_id-wallet_address pairs where any single day's profitability exceeds the threshold
     exclusions_profits_df = profits_df[
-        (profits_df['profits_total'] > profitability_filter) |
-        (profits_df['profits_total'] < -profitability_filter)
+        (profits_df['profits_cumulative'] > profitability_filter) |
+        (profits_df['profits_cumulative'] < -profitability_filter)
     ][['coin_id', 'wallet_address']].drop_duplicates()
 
     # Merge to filter out the records with those pairs
@@ -571,13 +571,11 @@ def clean_profits_df(profits_df, profitability_filter=10000000):
 
 
 
-def classify_sharks(profits_df, modeling_config):
+def classify_shark_coins(profits_df, modeling_config):
     """
-    Classify wallets as sharks based on their profitability and return performance.
-
-    This function filters a DataFrame of wallet profits to include only those wallets that meet the 
-    shark eligibility criteria. It then determines which wallets are considered sharks based on two 
-    criteria: total profits and total return.
+    Classify wallet-coin pairs as sharks based on their profitability and return performance, filtered 
+    to the shark eligibility criteria. Pairs are classified either based on gross profits (is_profits_shark)
+    or based on return (is_returns_shark). Pairs that match either criteria are given is_shark=True. 
 
     Steps:
     1. Filter wallets that have inflows above a predefined threshold (shark eligibility).
@@ -617,9 +615,9 @@ def classify_sharks(profits_df, modeling_config):
     # Step 2. Determine which eligible wallets are classified as sharks
     # -----------------------------------------------------------------------------------
     # identify sharks based on absolute balance of profits
-    total_profits_df = filtered_profits_df.sort_values('date').groupby(['coin_id', 'wallet_address']).last()['profits_total'].reset_index()
+    total_profits_df = filtered_profits_df.sort_values('date').groupby(['coin_id', 'wallet_address']).last()['profits_cumulative'].reset_index()
     sharks_df = eligible_wallets_df.merge(total_profits_df, on=['coin_id', 'wallet_address'])
-    sharks_df['is_profits_shark'] = sharks_df['profits_total'] >= modeling_config['shark_total_profits_threshold']
+    sharks_df['is_profits_shark'] = sharks_df['profits_cumulative'] >= modeling_config['shark_total_profits_threshold']
 
     # identify sharks based on percentage return
     total_returns_df = filtered_profits_df.sort_values('date').groupby(['coin_id', 'wallet_address']).last()['total_return'].reset_index()
@@ -635,30 +633,30 @@ def classify_sharks(profits_df, modeling_config):
 
 
 
-def classify_megasharks(sharks_df, modeling_config):
+def classify_shark_wallets(sharks_df, modeling_config):
     """
-    Classifies wallets as megasharks based on their activity across multiple coins and shark rate.
+    Classifies wallets as sharks based on their activity across multiple coins.
 
     Parameters:
         sharks_df (DataFrame): A DataFrame containing wallet-coin records and shark classification.
         modeling_config (dict): A configuration object containing thresholds for megashark classification:
-            - 'megashark_type': Column indicating whether a wallet is a shark.
-            - 'megashark_min_coins': Minimum number of coins for megashark classification.
-            - 'megashark_min_shark_rate': Minimum shark rate for megashark classification.
+            - 'shark_wallet_type': Column indicating whether a wallet is a shark.
+            - 'shark_wallet_min_coins': Minimum number of coins for megashark classification.
+            - 'shark_wallet_min_shark_rate': Minimum shark rate for megashark classification.
 
     Returns:
         shark_wallets_df (DataFrame): A DataFrame containing wallets classified as megasharks.
     """
-    megashark_type = modeling_config['megashark_type']
-    megashark_min_coins = modeling_config['megashark_min_coins']
-    megashark_min_shark_rate = modeling_config['megashark_min_shark_rate']
+    shark_wallet_type = modeling_config['shark_wallet_type']
+    shark_wallet_min_coins = modeling_config['shark_wallet_min_coins']
+    shark_wallet_min_shark_rate = modeling_config['shark_wallet_min_shark_rate']
 
     # Calculate the total number of coins each wallet has records with
     all_coins_df = sharks_df.groupby('wallet_address')['coin_id'].count().reset_index()
     all_coins_df.columns = ['wallet_address', 'total_coins']
 
     # Calculate the number of coins each wallet is a shark on
-    shark_coins_df = sharks_df[sharks_df[megashark_type]].groupby('wallet_address')['coin_id'].count().reset_index()
+    shark_coins_df = sharks_df[sharks_df[shark_wallet_type]].groupby('wallet_address')['coin_id'].count().reset_index()
     shark_coins_df.columns = ['wallet_address', 'shark_coins']
 
     # Merge the two DataFrames to get total and shark coins for each wallet
@@ -669,9 +667,9 @@ def classify_megasharks(sharks_df, modeling_config):
     shark_wallets_df['shark_rate'] = shark_wallets_df['shark_coins'] / shark_wallets_df['total_coins']
 
     # Classify wallets as megasharks based on minimum coins and shark rate thresholds
-    shark_wallets_df['is_megashark'] = (
-        (shark_wallets_df['total_coins'] >= megashark_min_coins)
-        & (shark_wallets_df['shark_rate'] >= megashark_min_shark_rate)
+    shark_wallets_df['is_shark'] = (
+        (shark_wallets_df['total_coins'] >= shark_wallet_min_coins)
+        & (shark_wallets_df['shark_rate'] >= shark_wallet_min_shark_rate)
     )
 
     return shark_wallets_df

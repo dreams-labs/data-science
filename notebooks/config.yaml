@@ -3,6 +3,7 @@ modeling:
 
   # defining the modeling period
   training_period_start: '2023-01-01'
+  training_period_end: '2024-02-29'
   modeling_period_start: '2024-03-01'
   modeling_period_end: '2024-03-31'
 
@@ -16,9 +17,9 @@ modeling:
   shark_total_return_threshold: 0.4  # Lifetime percentage return threshold for sharks
 
   # megashark thresholds
-  megashark_type: 'is_returns_shark'
-  megashark_min_coins: 5
-  megashark_min_shark_rate: 0.4
+  shark_wallet_type: 'is_returns_shark'
+  shark_wallet_min_coins: 5
+  shark_wallet_min_shark_rate: 0.4
 
 data_cleaning:
 # variables used to clean and filter raw data before training data is built
