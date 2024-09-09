@@ -632,3 +632,46 @@ def classify_sharks(profits_df, modeling_config):
     logger.info('creation of sharks_df complete.')
 
     return sharks_df
+
+
+
+def classify_megasharks(sharks_df, modeling_config):
+    """
+    Classifies wallets as megasharks based on their activity across multiple coins and shark rate.
+
+    Parameters:
+        sharks_df (DataFrame): A DataFrame containing wallet-coin records and shark classification.
+        modeling_config (dict): A configuration object containing thresholds for megashark classification:
+            - 'megashark_type': Column indicating whether a wallet is a shark.
+            - 'megashark_min_coins': Minimum number of coins for megashark classification.
+            - 'megashark_min_shark_rate': Minimum shark rate for megashark classification.
+
+    Returns:
+        shark_wallets_df (DataFrame): A DataFrame containing wallets classified as megasharks.
+    """
+    megashark_type = modeling_config['megashark_type']
+    megashark_min_coins = modeling_config['megashark_min_coins']
+    megashark_min_shark_rate = modeling_config['megashark_min_shark_rate']
+
+    # Calculate the total number of coins each wallet has records with
+    all_coins_df = sharks_df.groupby('wallet_address')['coin_id'].count().reset_index()
+    all_coins_df.columns = ['wallet_address', 'total_coins']
+
+    # Calculate the number of coins each wallet is a shark on
+    shark_coins_df = sharks_df[sharks_df[megashark_type]].groupby('wallet_address')['coin_id'].count().reset_index()
+    shark_coins_df.columns = ['wallet_address', 'shark_coins']
+
+    # Merge the two DataFrames to get total and shark coins for each wallet
+    shark_wallets_df = all_coins_df.merge(shark_coins_df, on='wallet_address', how='left')
+    shark_wallets_df['shark_coins'] = shark_wallets_df['shark_coins'].fillna(0)
+
+    # Calculate the shark_rate for each wallet
+    shark_wallets_df['shark_rate'] = shark_wallets_df['shark_coins'] / shark_wallets_df['total_coins']
+
+    # Classify wallets as megasharks based on minimum coins and shark rate thresholds
+    shark_wallets_df['is_megashark'] = (
+        (shark_wallets_df['total_coins'] >= megashark_min_coins)
+        & (shark_wallets_df['shark_rate'] >= megashark_min_shark_rate)
+    )
+
+    return shark_wallets_df

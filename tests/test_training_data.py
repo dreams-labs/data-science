@@ -187,6 +187,34 @@ def test_modeling_period_end_wallet_completeness(profits_df):
     # Assert that no pairs are missing
     assert missing_pairs.empty, "Some coin-wallet pairs in training_profits_df are missing from modeling_profits_df"
 
+# ---------------------------------------- #
+# classify_sharks() tests
+# ---------------------------------------- #
+# tests the data quality and logic of shark identification
+
+@pytest.mark.slow
+def test_no_duplicate_coin_wallet_pairs(profits_df):
+    """
+    Test to assert there are no duplicate coin-wallet pairs in the sharks_df
+    returned by classify_sharks().
+    """
+    modeling_config = {
+        'training_period_start': '2023-01-01',
+        'modeling_period_start': '2024-03-01',
+        'modeling_period_end': '2024-03-31',
+        'moon_threshold': 0.3,
+        'dump_threshold': -0.2,
+        'shark_minimum_inflows': 5000,
+        'shark_total_profits_threshold': 20000,
+        'shark_total_return_threshold': 0.4
+    }
+    sharks_df = td.classify_sharks(profits_df, modeling_config)
+
+    # Group by coin_id and wallet_address and check for duplicates
+    duplicates = sharks_df.duplicated(subset=['coin_id', 'wallet_address'], keep=False)
+
+    # Assert that there are no duplicates in sharks_df
+    assert not duplicates.any(), "Duplicate coin-wallet pairs found in sharks_df"
 
 
 # ---------------------------------------- #
