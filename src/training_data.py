@@ -399,7 +399,7 @@ def prepare_profits_data(transfers_df, prices_df):
     # 2. Attach data showing the first price record of all coins
     # ----------------------------------------------------------
     # Identify the earliest pricing data for each coin and merge to get the first price date
-    first_prices_df = prices_df.groupby('coin_id').agg({
+    first_prices_df = prices_df.groupby('coin_id',observed=True).agg({
         'date': 'min',
         'price': 'first'  # Assuming we want the first available price on the first_price_date
     }).reset_index()
@@ -416,7 +416,7 @@ def prepare_profits_data(transfers_df, prices_df):
     pre_price_transfers = profits_df[profits_df['date'] < profits_df['first_price_date']]
 
     # Group by coin_id and wallet_address to ensure only one record per pair
-    grouped_pre_price_transfers = pre_price_transfers.groupby(['coin_id', 'wallet_address']).agg({
+    grouped_pre_price_transfers = pre_price_transfers.groupby(['coin_id', 'wallet_address'],observed=True).agg({
         'first_price_date': 'first',
         'balance': 'last',  # Get the balance as of the latest transfer before first_price_date
         'first_price': 'first'  # Retrieve the first price for this coin
@@ -441,6 +441,9 @@ def prepare_profits_data(transfers_df, prices_df):
     # Append new records to the original dataframe
     profits_df = pd.concat([profits_df, new_records], ignore_index=True)
 
+    # remove helper columns
+    profits_df.drop(columns=['first_price_date', 'first_price'], inplace=True)
+
     # Sort by coin_id, wallet_address, and date to maintain order
     profits_df = profits_df.sort_values(by=['coin_id', 'wallet_address', 'date']).reset_index(drop=True)
     logger.debug(f"<Step 4> merge new records into profits_df: {time.time() - step_time:.2f} seconds")
@@ -449,88 +452,64 @@ def prepare_profits_data(transfers_df, prices_df):
 
 
 
-def calculate_wallet_profitability(transfers_df, prices_df):
+def calculate_wallet_profitability(profits_df):
     """
-    Calculate the profitability of wallets by merging transaction (transfers) data with price data 
-    and computing daily and cumulative profitability for each wallet-coin pair. The balance as of 
-    the first price record is treated as an initial "transfer in" for calculating profitability.
+    Calculates the profitability metrics for each wallet-coin pair by analyzing changes in price 
+    and balance over time. The function computes both daily profitability changes and cumulative 
+    profitability, along with additional metrics such as USD inflows and returns.
 
     Process Summary:
-    1. Merge the `transfers_df` and `prices_df` on 'coin_id' and 'date'.
-    2. Remove any transaction records earlier than the first available price date for each coin.
-    3a. Calculate daily profitability based on price changes and previous balances.
-    3b. Compute the cumulative profitability for each wallet-coin pair using `cumsum()`.
+    1. Ensure there are no missing prices in the `profits_df`.
+    2. Calculate the daily profitability based on price changes and previous balances.
+    3. Compute the cumulative profitability for each wallet-coin pair using `cumsum()`.
+    4. Calculate USD balances, net transfers, inflows, and the overall rate of return.
 
     Parameters:
-    - transfers_df (pd.DataFrame): 
+    - profits_df (pd.DataFrame): 
+        A DataFrame containing merged wallet transaction and price data with columns:
         - coin_id: The ID of the coin/token.
         - wallet_address: The unique identifier of the wallet.
         - date: The date of the transaction.
         - net_transfers: The net tokens transferred in or out of the wallet on that date.
         - balance: The token balance in the wallet at the end of the day.
-    - prices_df (pd.DataFrame): 
-        - coin_id: The ID of the coin/token.
-        - date: The date for the price record.
         - price: The price of the coin/token on that date.
 
     Returns:
     - pd.DataFrame: 
-        A DataFrame with profitability metrics, including:
-        - profits_change: The change in profitability for each transaction, calculated as the 
-          difference between the current price and the previous price, multiplied by the previous balance.
+        A DataFrame with the following additional columns:
+        - profits_change: The daily change in profitability, calculated as the difference between 
+          the current price and the previous price, multiplied by the previous balance.
         - profits_total: The cumulative profitability for each wallet-coin pair over time.
+        - usd_balance: The USD value of the wallet's balance, based on the current price.
+        - usd_net_transfers: The USD value of the net transfers on a given day.
+        - usd_inflows: The USD value of net transfers into the wallet (positive transfers only).
+        - usd_total_inflows: The cumulative USD inflows for each wallet-coin pair.
+        - total_return: The total return, calculated as cumulative profits divided by total USD inflows.
 
     Raises:
-    - ValueError: If either input DataFrame is empty
+    - ValueError: If any missing prices are found in the `profits_df`.
     """
     logger.info("Starting generation of profits_df...")
     start_time = time.time()
-
-    # Raise an error if either df is empty
-    if transfers_df.empty or prices_df.empty:
-        raise ValueError("Input DataFrames cannot be empty. This likely indicates a serious issue earlier in the data pipeline.")
-
-    # 1. Merge transfers and prices data on 'coin_id' and 'date'
-    # ----------------------------------------------------------
-    # set dates to datetime and coin_ids to categorical
-    transfers_df['date'] = pd.to_datetime(transfers_df['date'])
-    prices_df['date'] = pd.to_datetime(prices_df['date'])
-    transfers_df['coin_id'] = transfers_df['coin_id'].astype('category')
-    prices_df['coin_id'] = prices_df['coin_id'].astype('category')
-
-    # merge datasets
-    profits_df = pd.merge(transfers_df, prices_df, on=['coin_id', 'date'], how='left')
-    logger.debug(f"<Step 1> (Merge transfers and prices): {time.time() - start_time:.2f} seconds")
-    step_time = time.time()
-
-    # 2. Remove transfers earlier than each coin's first pricing data
-    # ---------------------------------------------------------------
-    # identify the earliest pricing data for each coin
-    first_prices_df = prices_df.groupby('coin_id')['date'].min().reset_index()
-    first_prices_df.columns = ['coin_id', 'first_price_date']
-
-    # remove transfer data that occurred when we don't know the coin price
-    profits_df = pd.merge(profits_df, first_prices_df, on='coin_id', how='left')
-    profits_df = profits_df[profits_df['date'] >= profits_df['first_price_date']]
-    logger.debug(f"<Step 2> (Remove records before first price date): {time.time() - step_time:.2f} seconds")
-    step_time = time.time()
 
     # Raise an error if there are any missing prices
     if profits_df['price'].isnull().any():
         raise ValueError("Missing prices found for some transfer dates. This indicates an issue with the price data generation.")
 
-    # 3. Calculate profitability
-    # --------------------------
     # create offset price and balance rows to easily calculate changes between periods
     profits_df['previous_price'] = profits_df.groupby(['coin_id', 'wallet_address'])['price'].shift(1)
     profits_df['previous_price'].fillna(profits_df['price'], inplace=True)
     profits_df['previous_balance'] = profits_df.groupby(['coin_id', 'wallet_address'])['balance'].shift(1).fillna(0)
-    logger.debug(f"<Step 3> Offset prices and balances for profitability logic: {time.time() - step_time:.2f} seconds")
+
+    logger.debug(f"Offset prices and balances for profitability logic: {time.time() - start_time:.2f} seconds")
+    step_time = time.time()
 
     # calculate the profitability change in each period and sum them to get cumulative profitability
     profits_df['profits_change'] = (profits_df['price'] - profits_df['previous_price']) * profits_df['previous_balance']
     profits_df['profits_total'] = profits_df.groupby(['coin_id', 'wallet_address'])['profits_change'].cumsum()
-    logger.debug(f"<Step 3> Calculate profitability: {time.time() - step_time:.2f} seconds")
+
+    logger.debug(f"Calculate profitability: {time.time() - step_time:.2f} seconds")
+    step_time = time.time()
 
     # Calculate USD inflows, balances, and rate of return
     profits_df['usd_balance'] = profits_df['balance'] * profits_df['price']
@@ -538,10 +517,12 @@ def calculate_wallet_profitability(transfers_df, prices_df):
     profits_df['usd_inflows'] = profits_df['usd_net_transfers'].where(profits_df['usd_net_transfers'] > 0, 0)
     profits_df['usd_total_inflows'] = profits_df.groupby(['coin_id', 'wallet_address'])['usd_inflows'].cumsum()
     profits_df['total_return'] = profits_df['profits_total'] / profits_df['usd_total_inflows'].where(profits_df['usd_total_inflows'] != 0, np.nan)
-    logger.debug(f"<Step 3> Calculate rate of return {time.time() - step_time:.2f} seconds")
+
+    logger.debug(f"Calculate rate of return {time.time() - step_time:.2f} seconds")
+    step_time = time.time()
 
     # Drop helper columns
-    profits_df.drop(columns=['first_price_date', 'previous_price', 'previous_balance'], inplace=True)
+    profits_df.drop(columns=['previous_price', 'previous_balance'], inplace=True)
 
     total_time = time.time() - start_time
     logger.info(f"Generated profits df after {total_time:.2f} seconds")
