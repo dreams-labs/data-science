@@ -22,7 +22,7 @@ load_dotenv()
 logger = dc.setup_logger()
 
 # Module-level variables
-TRAINING_PERIOD_START = '2023-03-01'
+TRAINING_PERIOD_START = '2023-06-01'
 TRAINING_PERIOD_END = '2024-02-29'
 MODELING_PERIOD_START = '2024-03-01'
 MODELING_PERIOD_END = '2024-03-31'
@@ -244,6 +244,7 @@ def transfers_df():
     """
     retrieves transfers_df for data quality checks
     """
+    logger.info("Generating transfers_df fixture from production data...")
     return td.retrieve_transfers_data(TRAINING_PERIOD_START, MODELING_PERIOD_START, MODELING_PERIOD_END)
 
 @pytest.mark.integration
@@ -287,7 +288,6 @@ def test_transfers_data_quality(transfers_df):
     # Test 5: No missing values
     # -------------------------
     missing_values = transfers_df.isna().sum()
-    logger.info(f"Missing values:\n{missing_values}")
     assert missing_values.sum() == 0, "There are missing values in the dataset"
 
     # Test 6: Balance consistency
@@ -364,6 +364,8 @@ def profits_df(transfers_df):
     """
     builds profits_df from production data for data quality checks
     """
+    logger.info("Generating profits_df from production data...")
+
     # retrieve prices data
     prices_df = td.retrieve_prices_data()
 
@@ -382,7 +384,6 @@ def test_profits_df_completeness(profits_df):
     Checks if there are any NaN values in profits_df. 
     """
     missing_values = profits_df.isna().sum()
-    logger.info(f"Missing values:\n{missing_values}")
     assert missing_values.sum() == 0, "There are missing values in the dataset"
 
 

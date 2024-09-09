@@ -2,7 +2,7 @@ modeling:
 # variables expected to materially alter model performance
 
   # defining the modeling period
-  training_period_start: '2023-01-01'
+  training_period_start: '2023-06-01'
   training_period_end: '2024-02-29'
   modeling_period_start: '2024-03-01'
   modeling_period_end: '2024-03-31'
