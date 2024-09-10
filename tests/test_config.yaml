@@ -23,5 +23,11 @@ modeling:
 
 data_cleaning:
 # variables used to clean and filter raw data before training data is built
-  profitability_filter: 10000000  # Exclude wallets with more than $10m profits or losses
+
+  # profits_df filters
+  # the goal of these is to remove CEX wallets that don't belong in the dataset
+  profitability_filter: 5000000  # Exclude wallets with more than x profits or losses
+  inflows_filter: 10000000  # Exclude wallets with more than x inflows
+
+  # prices_df filters
   max_gap_days: 2  # Maximum consecutive missing days to fill in price gaps
