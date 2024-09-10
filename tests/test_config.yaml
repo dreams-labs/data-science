@@ -31,8 +31,8 @@ data_cleaning:
 
   # profits_df filters
   # the goal of these is to remove CEX/mint/contract/etc wallets that don't belong in the dataset
-  profitability_filter: 500000000000  # Exclude wallets with more than x profits or losses
-  inflows_filter: 10000000  # Exclude wallets with more than x inflows
+  profitability_filter: 10000000  # Exclude wallets with more than x profits or losses
+  inflows_filter: 5000000  # Exclude wallets with more than x inflows
 
   # prices_df filters
   max_gap_days: 2  # Maximum consecutive missing days to fill in price gaps

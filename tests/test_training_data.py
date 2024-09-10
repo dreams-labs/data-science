@@ -532,15 +532,16 @@ def test_shark_coins_modeling_period_filtering(sample_shark_coins_profits_df, sa
 # set up config and module-level variables
 # ---------------------------------- #
 
-def load_test_config():
+def load_config():
     """
-    loads tests/test_config.yaml to mimic production config setup
+    Fixture to load test config from test_config.yaml.
     """
     config_path = os.path.join(os.path.dirname(__file__), 'test_config.yaml')
     with open(config_path, 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
     return config
-config = load_test_config()
+
+config = load_config()
 
 # Module-level variables
 TRAINING_PERIOD_START = config['training_data']['training_period_start']
@@ -549,9 +550,9 @@ MODELING_PERIOD_START = config['training_data']['modeling_period_start']
 MODELING_PERIOD_END = config['training_data']['modeling_period_end']
 
 
-# -------------------------- #
-# retrieve_transfers_data() production data quality checks
-# -------------------------- #
+# ------------------------------------ #
+# retrieve_transfers_data() integration tests
+# ------------------------------------ #
 
 @pytest.fixture(scope='session')
 def transfers_df():
@@ -681,13 +682,6 @@ def test_transfers_data_quality(transfers_df):
     logger.info("All transfers_df data quality checks passed successfully.")
 
 
-
-# ---------------------------------------- #
-# clean_profits_df() integration tests
-# ---------------------------------------- #
-
-
-
 # ---------------------------------------- #
 # calculate_wallet_profitability() integration tests
 # ---------------------------------------- #
@@ -749,17 +743,106 @@ def test_modeling_period_end_wallet_completeness(profits_df):
 
 
 # ---------------------------------------- #
+# clean_profits_df() integration tests
+# ---------------------------------------- #
+
+@pytest.fixture(scope='session')
+def cleaned_profits_df(profits_df):
+    """
+    Fixture to run clean_profits_df() and return both the cleaned DataFrame and exclusions DataFrame.
+    Uses thresholds from the config file.
+    """
+    logger.info("Generating cleaned_profits_df from clean_profits_df()...")
+    cleaned_df, exclusions_df = td.clean_profits_df(profits_df, config['data_cleaning'])
+    return cleaned_df, exclusions_df
+
+@pytest.mark.integration
+def test_clean_profits_exclusions(cleaned_profits_df, profits_df):
+    """
+    Test that all excluded wallets breach either the profitability or inflows threshold.
+    Uses thresholds from the config file.
+    """
+    cleaned_df, exclusions_df = cleaned_profits_df
+
+    # Check that every excluded wallet breached at least one threshold
+    exclusions_with_breaches = exclusions_df.merge(profits_df, on='wallet_address', how='inner')
+
+    # Calculate the total profits and inflows per wallet
+    wallet_agg_df = exclusions_with_breaches.groupby('wallet_address').agg({
+        'profits_change': 'sum',
+        'usd_inflows': 'sum'
+    }).reset_index()
+
+    # Apply threshold check from the config
+    profitability_filter = config['data_cleaning']['profitability_filter']
+    inflows_filter = config['data_cleaning']['inflows_filter']
+
+    breaches_df = wallet_agg_df[
+        (wallet_agg_df['profits_change'] >= profitability_filter) |
+        (wallet_agg_df['profits_change'] <= -profitability_filter) |
+        (wallet_agg_df['usd_inflows'] >= inflows_filter)
+    ]
+
+    # Assert that all excluded wallets breached a threshold
+    assert len(exclusions_df) == len(breaches_df), "Some excluded wallets do not breach a threshold."
+
+@pytest.mark.integration
+def test_clean_profits_remaining_count(cleaned_profits_df, profits_df):
+    """
+    Test that the count of remaining records in the cleaned DataFrame matches the expected count.
+    """
+    cleaned_df, exclusions_df = cleaned_profits_df
+
+    # Get the total number of unique wallets before and after cleaning
+    input_wallet_count = profits_df['wallet_address'].nunique()
+    cleaned_wallet_count = cleaned_df['wallet_address'].nunique()
+    excluded_wallet_count = exclusions_df['wallet_address'].nunique()
+
+    # Assert that the remaining records equal the difference between the input and excluded records
+    assert input_wallet_count == cleaned_wallet_count + excluded_wallet_count, \
+        "The count of remaining wallets does not match the input minus excluded records."
+
+@pytest.mark.integration
+def test_clean_profits_aggregate_sums(cleaned_profits_df):
+    """
+    Test that the aggregation of profits and inflows for the remaining wallets stays within the configured thresholds.
+    Uses thresholds from the config file.
+    """
+    cleaned_df, exclusions_df = cleaned_profits_df
+
+    # Aggregate the profits and inflows for the remaining wallets
+    remaining_wallets_agg_df = cleaned_df.groupby('wallet_address').agg({
+        'profits_change': 'sum',
+        'usd_inflows': 'sum'
+    }).reset_index()
+
+    # Apply the thresholds from the config
+    profitability_filter = config['data_cleaning']['profitability_filter']
+    inflows_filter = config['data_cleaning']['inflows_filter']
+
+    # Ensure no remaining wallets exceed the thresholds
+    over_threshold_wallets = remaining_wallets_agg_df[
+        (remaining_wallets_agg_df['profits_change'] >= profitability_filter) |
+        (remaining_wallets_agg_df['profits_change'] <= -profitability_filter) |
+        (remaining_wallets_agg_df['usd_inflows'] >= inflows_filter)
+    ]
+
+    # Assert that no wallets in the cleaned DataFrame breach the thresholds
+    assert over_threshold_wallets.empty, "Some remaining wallets exceed the thresholds."
+
+
+# ---------------------------------------- #
 # classify_shark_coins() tests
 # ---------------------------------------- #
 
 @pytest.fixture(scope='session')
-def shark_coins_df(profits_df):
+def shark_coins_df(cleaned_profits_df):
     """
-    builds shark_coins_df from production data for data quality checks
+    Builds shark_coins_df from cleaned_profits_df for data quality checks.
     """
-    shark_coins_df = td.classify_shark_coins(profits_df, config['training_data'])
+    cleaned_df, _ = cleaned_profits_df  # Use the cleaned profits DataFrame
+    shark_coins_df = td.classify_shark_coins(cleaned_df, config['training_data'])
     return shark_coins_df
-
 
 @pytest.mark.integration
 def test_no_duplicate_coin_wallet_pairs(shark_coins_df):
