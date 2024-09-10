@@ -18,7 +18,7 @@ It will be very important to strictly segment price data into different periods,
 
 As such, price movements will be split into three periods:
 
-1. **Progeny Period** (e.g. price movements up to 3/1/24)
+1. **Training Period** (e.g. price movements up to 3/1/24)
    - Price movements during this period will be used for feature engineering. This ensures that the model only relies on information that was available at the time of the prediction.
 
 2. **Modeling Period** (e.g. 3/1/24–5/1/24):
