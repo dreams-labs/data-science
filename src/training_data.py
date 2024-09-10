@@ -710,9 +710,9 @@ def classify_shark_coins(profits_df, modeling_config):
         profits_df (DataFrame): A DataFrame containing wallet transactions and profits data.
         modeling_config (dict): A configuration object containing modeling parameters, including:
             - 'modeling_period_start': Start date for filtering data.
-            - 'shark_minimum_inflows': Minimum total USD inflow to be eligible as a shark.
-            - 'shark_total_profits_threshold': Minimum total profits to be considered a profits shark.
-            - 'shark_total_return_threshold': Minimum total return to be considered a returns shark.
+            - 'shark_coin_minimum_inflows': Minimum total USD inflow to be eligible as a shark.
+            - 'shark_coin_profits_threshold': Minimum total profits to be considered a profits shark.
+            - 'shark_coin_return_threshold': Minimum total return to be considered a returns shark.
 
     Returns:
         shark_coins_df (DataFrame): A DataFrame of coin-wallet pairs classified as sharks, including 
@@ -727,7 +727,7 @@ def classify_shark_coins(profits_df, modeling_config):
 
     # Identify coin-wallet pairs that have deposited enough total USD to be considered sharks
     eligible_wallets_df = filtered_profits_df.groupby(['coin_id', 'wallet_address'])['usd_inflows_cumulative'].max().reset_index()
-    eligible_wallets_df = eligible_wallets_df[eligible_wallets_df['usd_inflows_cumulative'] >= modeling_config['shark_minimum_inflows']]
+    eligible_wallets_df = eligible_wallets_df[eligible_wallets_df['usd_inflows_cumulative'] >= modeling_config['shark_coin_minimum_inflows']]
 
     # Filter profits_df to only include eligible wallets
     filtered_profits_df = filtered_profits_df.merge(eligible_wallets_df[['coin_id', 'wallet_address']],
@@ -739,12 +739,12 @@ def classify_shark_coins(profits_df, modeling_config):
     # identify sharks based on absolute balance of profits
     total_profits_df = filtered_profits_df.sort_values('date').groupby(['coin_id', 'wallet_address']).last()['profits_cumulative'].reset_index()
     shark_coins_df = eligible_wallets_df.merge(total_profits_df, on=['coin_id', 'wallet_address'])
-    shark_coins_df['is_profits_shark'] = shark_coins_df['profits_cumulative'] >= modeling_config['shark_total_profits_threshold']
+    shark_coins_df['is_profits_shark'] = shark_coins_df['profits_cumulative'] >= modeling_config['shark_coin_profits_threshold']
 
     # identify sharks based on percentage return
     total_returns_df = filtered_profits_df.sort_values('date').groupby(['coin_id', 'wallet_address']).last()['total_return'].reset_index()
     shark_coins_df = shark_coins_df.merge(total_returns_df, on=['coin_id', 'wallet_address'])
-    shark_coins_df['is_returns_shark'] = shark_coins_df['total_return'] >= modeling_config['shark_total_return_threshold']
+    shark_coins_df['is_returns_shark'] = shark_coins_df['total_return'] >= modeling_config['shark_coin_return_threshold']
 
     # add a combined column for wallets that meet either criteria
     shark_coins_df['is_shark'] = shark_coins_df['is_profits_shark'] | shark_coins_df['is_returns_shark']

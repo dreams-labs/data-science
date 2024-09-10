@@ -349,9 +349,9 @@ def sample_shark_coins_modeling_config():
     """
     return {
         'modeling_period_start': '2024-03-01',
-        'shark_minimum_inflows': 10000,
-        'shark_total_profits_threshold': 5000,
-        'shark_total_return_threshold': 0.5
+        'shark_coin_minimum_inflows': 10000,
+        'shark_coin_profits_threshold': 5000,
+        'shark_coin_return_threshold': 0.5
     }
 
 @pytest.mark.unit

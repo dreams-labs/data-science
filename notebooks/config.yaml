@@ -2,21 +2,21 @@ modeling:
 # variables expected to materially alter model performance
 
   # defining the modeling period
-  training_period_start: '2024-01-01'
-  training_period_end: '2024-06-30'
-  modeling_period_start: '2024-07-01'
-  modeling_period_end: '2024-7-31'
+  training_period_start: '2023-09-01'
+  training_period_end: '2024-03-31'
+  modeling_period_start: '2024-04-01'
+  modeling_period_end: '2024-4-30'
 
   # defining target variable thresholds
   moon_threshold: 0.3  # 30% increase
   dump_threshold: -0.2  # 20% decrease
 
-  # shark identification parameters
-  shark_minimum_inflows: 15000  # Minimum amount of USD inflows to be considered a shark
-  shark_total_profits_threshold: 20000  # Lifetime absolute USD return threshold for sharks
-  shark_total_return_threshold: 0.2  # Lifetime percentage return threshold for sharks
+  # shark coin thresholds
+  shark_coin_minimum_inflows: 15000  # Minimum amount of USD inflows to be considered a shark
+  shark_coin_profits_threshold: 20000  # Lifetime absolute USD return threshold for sharks
+  shark_coin_return_threshold: 0.2  # Lifetime percentage return threshold for sharks
 
-  # megashark thresholds
+  # shark wallet thresholds
   shark_wallet_type: 'is_returns_shark'
   shark_wallet_min_coins: 3
   shark_wallet_min_shark_rate: 0.4
