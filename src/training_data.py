@@ -640,8 +640,9 @@ def calculate_wallet_profitability(profits_df):
 
 def clean_profits_df(profits_df, data_cleaning_config):
     """
-    Clean the profits DataFrame by excluding all records for any coin_id-wallet_address pair
-    if any single day's profitability exceeds the profitability_filter (positive or negative).
+    Clean the profits DataFrame by excluding all records for any wallet_addresses that either have: 
+     - aggregate profitabiilty above profitability_filter (abs value of gains or losses).
+     - aggregate USD inflows above the inflows_filter
     this catches outliers such as minting/burning addresses, contract addresses, etc and ensures
     they are not included in the wallet behavior training data. 
     
@@ -649,7 +650,7 @@ def clean_profits_df(profits_df, data_cleaning_config):
     - profits_df: DataFrame with columns ['coin_id', 'wallet_address', 'date', 'profits_cumulative']
     - data_cleaning_config:
         - profitability_filter: Threshold value to exclude pairs with profits or losses exceeding this value
-        - profitability_filter: Threshold value to exclude pairs with profits or losses exceeding this value
+        - inflows_filter: Threshold value to exclude pairs with USD inflows
         
     Returns:
     - Cleaned DataFrame with records for coin_id-wallet_address pairs filtered out.
@@ -657,39 +658,58 @@ def clean_profits_df(profits_df, data_cleaning_config):
     logger.debug("Starting generation of profits_cleaned_df...")
     start_time = time.time()
 
-    # 1. Remove wallets with higher daily profitability than the profitability_filter
-    # -------------------------------------------------------------------------------
-    # Identify coin_id-wallet_address pairs with profitability that exceeds the threshold at any time
-    exclusions_profits_df = profits_df[
-        (profits_df['profits_cumulative'] > data_cleaning_config['profitability_filter']) |
-        (profits_df['profits_cumulative'] < -data_cleaning_config['profitability_filter'])
-    ][['coin_id', 'wallet_address']].drop_duplicates()
+    # 1. Remove wallets with higher or lower total profits than the profitability_filter
+    # ----------------------------------------------------------------------------------
+    # Group by wallet_address and calculate the total profitability
+    wallet_profits_agg_df = profits_df.groupby('wallet_address')['profits_change'].sum().reset_index()
 
-    # Merge to filter out the records with those pairs
-    profits_cleaned_df = profits_df.merge(exclusions_profits_df, on=['coin_id', 'wallet_address'], how='left', indicator=True)
+    # Identify wallet_addresses with total profitability that exceeds the threshold
+    exclusions_profits_df = wallet_profits_agg_df[
+        (wallet_profits_agg_df['profits_change'] >= data_cleaning_config['profitability_filter']) |
+        (wallet_profits_agg_df['profits_change'] <= -data_cleaning_config['profitability_filter'])
+    ][['wallet_address']]
+
+    # Merge to filter out the records with those wallet addresses
+    profits_cleaned_df = profits_df.merge(exclusions_profits_df, on='wallet_address', how='left', indicator=True)
     profits_cleaned_df = profits_cleaned_df[profits_cleaned_df['_merge'] == 'left_only']
     profits_cleaned_df.drop(columns=['_merge'], inplace=True)
 
     # 2. Remove wallets with higher total inflows than the inflows_filter
-    # -------------------------------------------------------------------------------
-    # Identify coin_id-wallet_address pairs where lifetime inflows exceed the threshold
-    exclusions_inflows_df = profits_cleaned_df[
-        profits_cleaned_df['usd_inflows_cumulative'] > data_cleaning_config['inflows_filter']
-    ][['coin_id', 'wallet_address']].drop_duplicates()
+    # -------------------------------------------------------------------
+    # Group by wallet_address and calculate the total inflows
+    wallet_inflows_agg_df = profits_df.groupby('wallet_address')['usd_inflows'].sum().reset_index()
 
-    # Merge to filter out the records with those pairs
-    profits_cleaned_df = profits_cleaned_df.merge(exclusions_inflows_df, on=['coin_id', 'wallet_address'], how='left', indicator=True)
+    # Identify wallet addresses where total inflows exceed the threshold
+    exclusions_inflows_df = wallet_inflows_agg_df[
+        wallet_inflows_agg_df['usd_inflows'] >= data_cleaning_config['inflows_filter']
+    ][['wallet_address']]
+
+    # Merge to filter out the records with those wallet addresses
+    profits_cleaned_df = profits_cleaned_df.merge(exclusions_inflows_df, on='wallet_address', how='left', indicator=True)
     profits_cleaned_df = profits_cleaned_df[profits_cleaned_df['_merge'] == 'left_only']
     profits_cleaned_df.drop(columns=['_merge'], inplace=True)
 
+
+    # 3. Prepare exclusions_df and output logs
+    # ----------------------------------------
+    # prepare exclusions_logs_df
+    exclusions_profits_df['profits_exclusion'] = True
+    exclusions_inflows_df['inflows_exclusion'] = True
+    exclusions_logs_df = exclusions_profits_df.merge(exclusions_inflows_df, on='wallet_address', how='outer')
+
+    # Fill NaN values with False for missing exclusions
+    exclusions_logs_df['profits_exclusion'] = exclusions_logs_df['profits_exclusion'].astype(bool).fillna(False)
+    exclusions_logs_df['inflows_exclusion'] = exclusions_logs_df['inflows_exclusion'].astype(bool).fillna(False)
+
+    # log outputs
     total_time = time.time() - start_time
     logger.info("Finished cleaning profits_df after %.2f seconds.",total_time)
-    logger.debug("Removed %s coin-wallet pairs beyond profit threshold of $%s and %s pairs beyond inflows filter of %s.",
+    logger.debug("Identified %s coin-wallet pairs beyond profit threshold of $%s and %s pairs beyond inflows filter of %s.",
         exclusions_profits_df.shape[0], dc.human_format(data_cleaning_config['profitability_filter']),
         exclusions_inflows_df.shape[0], dc.human_format(data_cleaning_config['inflows_filter'])
     )
 
-    return profits_cleaned_df,exclusions_profits_df
+    return profits_cleaned_df,exclusions_logs_df
 
 
 

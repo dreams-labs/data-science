@@ -229,6 +229,114 @@ def test_price_data_interactions(price_data_transfers_df, price_data_prices_df):
 
 
 # ---------------------------------------- #
+# clean_profits_df() unit tests
+# ---------------------------------------- #
+
+@pytest.fixture
+def sample_clean_profits_profits_df():
+    """
+    Fixture to create a sample DataFrame for testing td.clean_profits_df function.
+    """
+    data = {
+        'coin_id': ['coin_1', 'coin_2', 'coin_3', 'coin_1', 'coin_2', 'coin_3', 'coin_4', 'coin_1', 'coin_2', 'coin_3', 'coin_1', 'coin_2','coin_1'],
+        'wallet_address': ['wallet_1', 'wallet_1', 'wallet_2', 'wallet_2', 'wallet_3', 'wallet_3', 'wallet_4', 'wallet_4', 'wallet_5', 'wallet_5', 'wallet_6', 'wallet_6','wallet_7'],
+        'profits_change': [2000, 500, 18000, -7000, 5000, 12000, 16000, 1000, 18000, -7000, -10000, -8000, 15000],  # Updated profits for Wallet 4, 5, and added Wallet 6
+        'usd_inflows': [5000, 4000, 7000, 6000, 8000, 9000, 4000, 3000, 5000, 3000, 6000, 3000, 10000]  # Updated inflows and Wallet 6 with 10,000 inflows
+    }
+    return pd.DataFrame(data)
+
+@pytest.fixture
+def sample_clean_profits_data_cleaning_config():
+    """
+    Fixture for the data cleaning configuration.
+    """
+    return {
+        'profitability_filter': 15000,  # Updated profitability filter
+        'inflows_filter': 10000  # Updated inflows filter
+    }
+
+# Test Case 1: Basic functionality test
+@pytest.mark.unit
+def test_clean_profits_basic_functionality(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config):
+    """
+    Test basic functionality where some wallets exceed the thresholds and others do not.
+    """
+    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config)
+    assert cleaned_df['wallet_address'].nunique() == 2  # 2 wallets should be excluded: one for profits, one for inflows
+    assert 'wallet_1' in cleaned_df['wallet_address'].values  # wallet_1 stays within limits
+    assert 'wallet_3' not in cleaned_df['wallet_address'].values  # wallet_3 exceeds both thresholds
+
+# Test Case 2: Wallet with exactly the threshold profitability and inflows
+@pytest.mark.unit
+def test_clean_profits_exact_threshold(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config):
+    """
+    Test a wallet with exactly the threshold values for profitability and inflows.
+    """
+    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config)
+    assert not 'wallet_7' in cleaned_df['wallet_address'].values  # wallet_5 should not be excluded as it's exactly at the threshold
+
+
+# Test Case 3: Wallet with negative profitability exceeding the threshold
+@pytest.mark.unit
+def test_clean_profits_negative_profitability(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config):
+    """
+    Test exclusion of wallets with negative profitability exceeding the threshold.
+    """
+    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config)
+    assert 'wallet_6' not in cleaned_df['wallet_address'].values  # wallet_6 exceeds the negative profitability threshold
+
+# Test Case 4: Multiple wallets with profits and inflows exceeding thresholds
+@pytest.mark.unit
+def test_clean_profits_multiple_exceeding_thresholds(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config):
+    """
+    Test exclusion of wallets where either profits or inflows exceed thresholds.
+    """
+    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config)
+    assert len(exclusions_df) == 5  # 5 wallets should be excluded based on either profits or inflows
+
+# Test Case 5: Wallet with multiple transactions but total profits below thresholds
+@pytest.mark.unit
+def test_clean_profits_multiple_transactions_below_threshold(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config):
+    """
+    Test wallet with multiple transactions where total profits remain below thresholds.
+    """
+    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config)
+    assert 'wallet_1' in cleaned_df['wallet_address'].values  # wallet_1 remains below threshold and should not be excluded
+
+# Test Case 8: Wallet with extreme profits but inflows below the threshold
+@pytest.mark.unit
+def test_clean_profits_extreme_profits_but_low_inflows(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config):
+    """
+    Test exclusion of wallet with extreme profits but inflows below the threshold.
+    """
+    sample_clean_profits_profits_df.loc[sample_clean_profits_profits_df['wallet_address'] == 'wallet_4', 'profits_change'] = 16000
+    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config)
+    assert 'wallet_4' not in cleaned_df['wallet_address'].values  # wallet_4 should be excluded based on profits
+
+# Test Case 9: Wallet with extreme inflows but zero profits
+@pytest.mark.unit
+def test_clean_profits_extreme_inflows_but_zero_profits(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config):
+    """
+    Test exclusion of wallet with extreme inflows but no significant profits.
+    """
+    sample_clean_profits_profits_df.loc[sample_clean_profits_profits_df['wallet_address'] == 'wallet_3', 'profits_change'] = 0
+    sample_clean_profits_profits_df.loc[sample_clean_profits_profits_df['wallet_address'] == 'wallet_3', 'usd_inflows_cumulative'] = 17000
+    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config)
+    assert 'wallet_3' not in cleaned_df['wallet_address'].values  # wallet_3 should be excluded based on inflows
+
+# Test Case 11: Wallet with inflows/profits across multiple coins but aggregate exceeds threshold
+@pytest.mark.unit
+def test_clean_profits_aggregate_inflows_profits_across_coins(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config):
+    """
+    Test exclusion of wallet where aggregated inflows/profits across multiple coins exceed thresholds.
+    """
+    sample_clean_profits_profits_df.loc[sample_clean_profits_profits_df['wallet_address'] == 'wallet_5', 'profits_change'] = 18000
+    sample_clean_profits_profits_df.loc[sample_clean_profits_profits_df['wallet_address'] == 'wallet_5', 'usd_inflows_cumulative'] = 8000
+    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config)
+    assert 'wallet_5' not in cleaned_df['wallet_address'].values  # wallet_5 should be excluded based on aggregated profits
+
+
+# ---------------------------------------- #
 # classify_shark_wallets() unit tests
 # ---------------------------------------- #
 
@@ -574,7 +682,13 @@ def test_transfers_data_quality(transfers_df):
 
 
 # ---------------------------------------- #
-# calculate_wallet_profitability() production data quality tests
+# clean_profits_df() integration tests
+# ---------------------------------------- #
+
+
+
+# ---------------------------------------- #
+# calculate_wallet_profitability() integration tests
 # ---------------------------------------- #
 # tests the data quality of the production data as calculated from the transfers_df() fixture
 
