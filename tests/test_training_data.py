@@ -29,9 +29,8 @@ logger = dc.setup_logger()
 # ===================================================== #
 
 # ---------------------------------------- #
-# calculate_wallet_profitability() logic tests
+# calculate_wallet_profitability() unit tests
 # ---------------------------------------- #
-# tests the logic of calculations using dummy data
 
 @pytest.fixture
 def sample_transfers_df():
@@ -84,6 +83,7 @@ def sample_prices_df():
     return df
 
 
+@pytest.mark.unit
 def test_calculate_wallet_profitability_profitability(sample_transfers_df, sample_prices_df):
     """
     Test profitability calculations for multiple wallets and coins.
@@ -114,6 +114,7 @@ def test_calculate_wallet_profitability_profitability(sample_transfers_df, sampl
     assert wallet3_myro.loc[wallet3_myro['date'] == '2023-04-01', 'profits_cumulative'].values[0] == pytest.approx(-2500)  # 500 - 3000
 
 # pylint: disable=R0914 # too many local variables
+@pytest.mark.unit
 def test_calculate_wallet_profitability_usd_calculations(sample_transfers_df, sample_prices_df):
     """
     Test USD-related calculations (inflows, balances, total return).
@@ -202,6 +203,7 @@ def price_data_prices_df():
     df['date'] = pd.to_datetime(df['date'])
     return df
 
+@pytest.mark.unit
 def test_price_data_interactions(price_data_transfers_df, price_data_prices_df):
     """
     Test interactions between wallet transfers and available price data.
@@ -219,6 +221,101 @@ def test_price_data_interactions(price_data_transfers_df, price_data_prices_df):
     # Test scenario: Buy and sell before price data is available
     wallet2_myro = result[(result['wallet_address'] == 'wallet2') & (result['coin_id'] == 'MYRO')]
     assert wallet2_myro.empty  # No rows should exist, as no price data was available for the transaction
+
+
+
+# ---------------------------------------- #
+# classify_shark_wallets() unit tests
+# ---------------------------------------- #
+
+@pytest.fixture
+def sample_shark_coins_df():
+    """
+    mock version of shark_coins_df to test calculation logic
+    """
+    data = {
+        'wallet_address': ['wallet_1', 'wallet_1', 'wallet_2', 'wallet_2', 'wallet_3'],
+        'coin_id': ['coin_1', 'coin_2', 'coin_1', 'coin_3', 'coin_4'],
+        'is_shark': [True, False, True, True, False]
+    }
+    return pd.DataFrame(data)
+
+@pytest.fixture
+def sample_shark_wallets_modeling_config():
+    """
+    mock of config.yaml to test calculation logic
+    """
+    return {
+        'shark_wallet_type': 'is_shark',
+        'shark_wallet_min_coins': 2,
+        'shark_wallet_min_shark_rate': 0.5
+    }
+
+@pytest.mark.unit
+def test_total_coin_calculation(sample_shark_coins_df, sample_shark_wallets_modeling_config):
+    """
+    Test 2: Verify total coins calculation for each wallet.
+    """
+    shark_wallets_df = td.classify_shark_wallets(sample_shark_coins_df, sample_shark_wallets_modeling_config)
+    total_coins = shark_wallets_df[shark_wallets_df['wallet_address'] == 'wallet_1']['total_coins'].values[0]
+    assert total_coins == 2, f"Expected 2, got {total_coins}"
+
+@pytest.mark.unit
+def test_shark_coin_calculation(sample_shark_coins_df, sample_shark_wallets_modeling_config):
+    """
+    Test 3: Verify shark coins calculation for each wallet.
+    """
+    shark_wallets_df = td.classify_shark_wallets(sample_shark_coins_df, sample_shark_wallets_modeling_config)
+    shark_coins = shark_wallets_df[shark_wallets_df['wallet_address'] == 'wallet_2']['shark_coins'].values[0]
+    assert shark_coins == 2, f"Expected 2, got {shark_coins}"
+
+@pytest.mark.unit
+def test_shark_rate_calculation(sample_shark_coins_df, sample_shark_wallets_modeling_config):
+    """
+    Test 4: Verify shark rate calculation for each wallet.
+    """
+    shark_wallets_df = td.classify_shark_wallets(sample_shark_coins_df, sample_shark_wallets_modeling_config)
+    shark_rate = shark_wallets_df[shark_wallets_df['wallet_address'] == 'wallet_2']['shark_rate'].values[0]
+    assert shark_rate == 1.0, f"Expected 1.0, got {shark_rate}"
+
+@pytest.mark.unit
+def test_megashark_classification(sample_shark_coins_df, sample_shark_wallets_modeling_config):
+    """
+    Test 5: Verify megashark classification based on minimum coins and shark rate thresholds.
+    """
+    shark_wallets_df = td.classify_shark_wallets(sample_shark_coins_df, sample_shark_wallets_modeling_config)
+    is_shark = shark_wallets_df[shark_wallets_df['wallet_address'] == 'wallet_2']['is_shark'].values[0]
+    assert is_shark, "Expected wallet_2 to be classified as megashark"
+
+@pytest.mark.unit
+def test_non_shark_wallet_handling(sample_shark_coins_df, sample_shark_wallets_modeling_config):
+    """
+    Test 6: Verify handling of non-shark wallets (shark_coins = 0, shark_rate = 0).
+    """
+    shark_wallets_df = td.classify_shark_wallets(sample_shark_coins_df, sample_shark_wallets_modeling_config)
+    shark_coins = shark_wallets_df[shark_wallets_df['wallet_address'] == 'wallet_3']['shark_coins'].values[0]
+    shark_rate = shark_wallets_df[shark_wallets_df['wallet_address'] == 'wallet_3']['shark_rate'].values[0]
+    assert shark_coins == 0, f"Expected 0, got {shark_coins}"
+    assert shark_rate == 0, f"Expected 0, got {shark_rate}"
+
+@pytest.mark.parametrize("min_coins, min_shark_rate, expected_sharks", [
+    (2, 0.6, ['wallet_2']),  # Test case where wallet_2 is a megashark
+    (1, 0.5, ['wallet_1', 'wallet_2']),  # Test case where wallet_1 and wallet_2 are megasharks
+])
+@pytest.mark.unit
+def test_varying_inputs(sample_shark_coins_df, min_coins, min_shark_rate, expected_sharks):
+    """
+    Test 7: Verify classification with varying inputs for min_coins and min_shark_rate.
+    """
+    sample_shark_wallets_modeling_config = {
+        'shark_wallet_type': 'is_shark',
+        'shark_wallet_min_coins': min_coins,
+        'shark_wallet_min_shark_rate': min_shark_rate
+    }
+    shark_wallets_df = td.classify_shark_wallets(sample_shark_coins_df, sample_shark_wallets_modeling_config)
+    classified_sharks = shark_wallets_df[shark_wallets_df['is_shark']]['wallet_address'].tolist()
+    assert classified_sharks == expected_sharks, f"Expected {expected_sharks}, got {classified_sharks}"
+
 
 
 # ======================================================== #

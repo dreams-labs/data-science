@@ -906,21 +906,3 @@ def calculate_shark_performance(transfers_df, prices_df, shark_wallets_df, confi
     )
 
     return shark_agg_performance_df,shark_wallets_performance_df
-
-
-def assess_coin_shark_metrics_df(shark_coins_df):
-    """
-    creates a series of coin-keyed metrics based on shark behavior
-    """
-    # Step 1: Coin-Level Metrics - Counting the number of sharks per coin
-    coin_shark_count = shark_coins_df.groupby('coin_id')['is_shark'].sum().reset_index()
-    coin_shark_count.columns = ['coin_id', 'num_sharks']
-
-    # Step 2: Total inflows by sharks for each coin
-    coin_shark_inflows = shark_coins_df[shark_coins_df['is_shark']].groupby('coin_id')['usd_inflows_cumulative'].sum().reset_index()
-    coin_shark_inflows.columns = ['coin_id', 'total_shark_inflows']
-
-    # Step 3: Merge the coin-level shark metrics
-    coin_shark_metrics_df = pd.merge(coin_shark_count, coin_shark_inflows, on='coin_id', how='left')
-
-    return coin_shark_metrics_df
