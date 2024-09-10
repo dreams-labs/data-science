@@ -3,6 +3,9 @@ tests used to audit the files in the data-science/src folder
 """
 # pylint: disable=W1203 # fstrings in logs
 # pylint: disable=C0301 # line over 100 chars
+# pylint: disable=E0401 # can't find import (due to local import)
+# pylint: disable=C0413 # import not at top of doc (due to local import)
+# pylint: disable=W0612 # unused variables (due to test reusing functions with 2 outputs)
 # pylint: disable=W0621 # redefining from outer scope triggering on pytest fixtures
 
 import sys
@@ -13,9 +16,7 @@ from dotenv import load_dotenv
 import pytest
 from dreams_core import core as dc
 
-# import training_data python functions
-# pylint: disable=E0401 # can't find import
-# pylint: disable=C0413 # import not at top of doc
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 import training_data as td # type: ignore[reportMissingImports]
 
