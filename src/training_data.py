@@ -913,6 +913,8 @@ def calculate_shark_performance(transfers_df, prices_df, shark_wallets_df, confi
         percentile_75_inflows=('usd_inflows_cumulative', lambda x: np.percentile(x.dropna(), 75) if len(x) > 1 else np.nan),
         percentile_25_profits=('profits_cumulative', lambda x: np.percentile(x.dropna(), 25) if len(x) > 1 else np.nan),
         percentile_75_profits=('profits_cumulative', lambda x: np.percentile(x.dropna(), 75) if len(x) > 1 else np.nan),
+        total_inflows=('usd_inflows_cumulative', 'sum'),
+        total_profits=('profits_cumulative', 'sum')
     )
     # Calculate median return
     nonzero_shark_agg_performance_df['median_return'] = np.divide(
@@ -921,7 +923,13 @@ def calculate_shark_performance(transfers_df, prices_df, shark_wallets_df, confi
         out=np.zeros_like(nonzero_shark_agg_performance_df['median_profits']),
         where=nonzero_shark_agg_performance_df['median_inflows'] != 0
     )
-
+    # Calculate aggregate return
+    nonzero_shark_agg_performance_df['return_aggregate'] = np.divide(
+        nonzero_shark_agg_performance_df['total_profits'],
+        nonzero_shark_agg_performance_df['total_inflows'],
+        out=np.zeros_like(nonzero_shark_agg_performance_df['total_profits']),
+        where=nonzero_shark_agg_performance_df['total_inflows'] != 0
+    )
 
     # Prefix the nonzero DataFrame columns
     nonzero_shark_agg_performance_df = nonzero_shark_agg_performance_df.add_prefix('nonzero_')
@@ -930,5 +938,74 @@ def calculate_shark_performance(transfers_df, prices_df, shark_wallets_df, confi
     shark_agg_performance_df = shark_agg_performance_df.merge(
         nonzero_shark_agg_performance_df, on='is_shark', how='left'
     )
+
+
+
+    # non-zero midrange wallet analysis
+    # ---------------------------------
+    # Filter wallets between the 10th and 90th percentile of profits_cumulative
+    # Filter wallets between the 10th and 90th percentile of sharks and non-sharks
+    shark_profits_10th = np.percentile(nonzero_shark_wallets_performance_df[nonzero_shark_wallets_performance_df['is_shark']]['profits_cumulative'], 10)
+    shark_profits_90th = np.percentile(nonzero_shark_wallets_performance_df[nonzero_shark_wallets_performance_df['is_shark']]['profits_cumulative'], 90)
+
+    nonshark_profits_10th = np.percentile(nonzero_shark_wallets_performance_df[~nonzero_shark_wallets_performance_df['is_shark']]['profits_cumulative'], 10)
+    nonshark_profits_90th = np.percentile(nonzero_shark_wallets_performance_df[~nonzero_shark_wallets_performance_df['is_shark']]['profits_cumulative'], 90)
+
+    # Filter sharks and non-sharks within their respective 10th–90th percentiles
+    midrange_shark_wallets_performance_df = nonzero_shark_wallets_performance_df[
+        (nonzero_shark_wallets_performance_df['is_shark']) &
+        (nonzero_shark_wallets_performance_df['profits_cumulative'] >= shark_profits_10th) &
+        (nonzero_shark_wallets_performance_df['profits_cumulative'] <= shark_profits_90th)
+    ]
+
+    midrange_nonshark_wallets_performance_df = nonzero_shark_wallets_performance_df[
+        (~nonzero_shark_wallets_performance_df['is_shark']) &
+        (nonzero_shark_wallets_performance_df['profits_cumulative'] >= nonshark_profits_10th) &
+        (nonzero_shark_wallets_performance_df['profits_cumulative'] <= nonshark_profits_90th)
+    ]
+
+    # Combine midrange shark and non-shark wallets
+    midrange_wallets_performance_df = pd.concat([midrange_shark_wallets_performance_df, midrange_nonshark_wallets_performance_df])
+
+    # Calculate metrics for midrange wallets
+    midrange_shark_agg_performance_df = midrange_wallets_performance_df.groupby('is_shark').agg(
+        count_wallets=('wallet_address', 'size'),
+        median_inflows=('usd_inflows_cumulative', 'median'),
+        median_profits=('profits_cumulative', 'median'),
+        percentile_25_inflows=('usd_inflows_cumulative', lambda x: np.percentile(x.dropna(), 25) if len(x) > 1 else np.nan),
+        percentile_75_inflows=('usd_inflows_cumulative', lambda x: np.percentile(x.dropna(), 75) if len(x) > 1 else np.nan),
+        percentile_25_profits=('profits_cumulative', lambda x: np.percentile(x.dropna(), 25) if len(x) > 1 else np.nan),
+        percentile_75_profits=('profits_cumulative', lambda x: np.percentile(x.dropna(), 75) if len(x) > 1 else np.nan),
+        total_inflows=('usd_inflows_cumulative', 'sum'),
+        total_profits=('profits_cumulative', 'sum')
+    )
+    # calculate median return
+    midrange_shark_agg_performance_df['median_return'] = np.divide(
+        midrange_shark_agg_performance_df['median_profits'],
+        midrange_shark_agg_performance_df['median_inflows'],
+        out=np.zeros_like(midrange_shark_agg_performance_df['median_profits']),
+        where=midrange_shark_agg_performance_df['median_inflows'] != 0
+    )
+    # Calculate aggregate return
+    midrange_shark_agg_performance_df['return_aggregate'] = np.divide(
+        midrange_shark_agg_performance_df['total_profits'],
+        midrange_shark_agg_performance_df['total_inflows'],
+        out=np.zeros_like(midrange_shark_agg_performance_df['total_profits']),
+        where=midrange_shark_agg_performance_df['total_inflows'] != 0
+    )
+
+    # Prefix the nonzero and midrange DataFrame columns
+    nonzero_shark_agg_performance_df = nonzero_shark_agg_performance_df.add_prefix('nonzero_')
+    midrange_shark_agg_performance_df = midrange_shark_agg_performance_df.add_prefix('midrange_')
+
+    # Merge the three DataFrames on 'is_shark'
+    shark_agg_performance_df = shark_agg_performance_df.merge(
+        nonzero_shark_agg_performance_df, on='is_shark', how='left'
+    ).merge(
+        midrange_shark_agg_performance_df, on='is_shark', how='left'
+    )
+
+    # Pivot
+    shark_agg_performance_df = shark_agg_performance_df.T
 
     return shark_agg_performance_df,shark_wallets_performance_df

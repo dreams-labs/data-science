@@ -864,7 +864,7 @@ def test_no_duplicate_coin_wallet_pairs(shark_coins_df):
 @pytest.mark.integration
 def test_no_duplicate_wallets(shark_coins_df):
     """
-    Test to assert there are no duplicate wallet pairs in the shark_wallets_df
+    Test to assert there are no duplicate wallet addresses in the shark_wallets_df
     returned by classify_shark_wallets().
     """
     shark_wallets_df = td.classify_shark_wallets(shark_coins_df,config['training_data'])
@@ -872,4 +872,4 @@ def test_no_duplicate_wallets(shark_coins_df):
     duplicates = shark_wallets_df.duplicated(subset=['wallet_address'], keep=False)
 
     # Assert that there are no duplicates in sharks_df
-    assert not duplicates.any(), "Duplicate coin-wallet pairs found in sharks_df"
+    assert not duplicates.any(), "Duplicate wallet addresses found in sharks_df"

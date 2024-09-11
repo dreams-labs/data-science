@@ -11,9 +11,9 @@ training_data:
 
   # defining the modeling period
   training_period_start: '2024-01-01'
-  training_period_end: '2024-03-31'
-  modeling_period_start: '2024-04-01'
-  modeling_period_end: '2024-4-30'
+  training_period_end: '2024-04-30'
+  modeling_period_start: '2024-05-01'
+  modeling_period_end: '2024-5-31'
 
   # shark coin thresholds
   shark_coin_minimum_inflows: 10000  # Minimum amount of USD inflows to be considered a shark

@@ -14,19 +14,26 @@ from dreams_core import core as dc
 logger = dc.setup_logger()
 
 
-def build_shark_coin_features(shark_coins_df):
+def calculate_shark_wallet_concentration(profits_df, shark_wallet_addresses):
     """
-    creates a series of coin-keyed metrics based on shark behavior
+    Calculate the shark wallet concentration for each coin and date in the DataFrame.
+    
+    :param df: DataFrame containing wallet data (profits_df)
+    :param shark_wallets: Pandas Series of wallet addresses considered as shark wallets
+    :return: DataFrame with coin_id, shark_concentration
     """
-    # Step 1: Coin-Level Metrics - Counting the number of sharks per coin
-    coin_shark_count = shark_coins_df.groupby('coin_id')['is_shark'].sum().reset_index()
-    coin_shark_count.columns = ['coin_id', 'num_sharks']
+    # Create a boolean mask for shark wallets
+    profits_df = profits_df.reset_index().copy()
+    profits_df['is_shark'] = profits_df['wallet_address'].isin(shark_wallet_addresses)
 
-    # Step 2: Total inflows by sharks for each coin
-    coin_shark_inflows = shark_coins_df[shark_coins_df['is_shark']].groupby('coin_id')['usd_inflows_cumulative'].sum().reset_index()
-    coin_shark_inflows.columns = ['coin_id', 'total_shark_inflows']
+    # Group by coin_id and date, then calculate concentrations
+    grouped = profits_df.groupby(['coin_id','is_shark'])['balance'].sum().unstack().fillna(0)
+    grouped.columns = ['non_shark_balance', 'shark_balance']
 
-    # Step 3: Merge the coin-level shark metrics
-    coin_shark_metrics_df = pd.merge(coin_shark_count, coin_shark_inflows, on='coin_id', how='left')
+    # Calculate total balance and shark concentration
+    grouped['total_balance'] = grouped['non_shark_balance'] + grouped['shark_balance']
+    grouped['shark_concentration'] = grouped['shark_balance'] / grouped['total_balance']
 
-    return coin_shark_metrics_df
+    concentration_df = grouped['shark_concentration'].reset_index()
+
+    return concentration_df
