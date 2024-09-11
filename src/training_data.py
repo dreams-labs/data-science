@@ -1000,12 +1000,11 @@ def calculate_shark_performance(transfers_df, prices_df, shark_wallets_df, confi
 
     # Merge the three DataFrames on 'is_shark'
     shark_agg_performance_df = shark_agg_performance_df.merge(
-        nonzero_shark_agg_performance_df, on='is_shark', how='left'
-    ).merge(
         midrange_shark_agg_performance_df, on='is_shark', how='left'
     )
 
     # Pivot
-    shark_agg_performance_df = shark_agg_performance_df.T
+    shark_agg_performance_df = shark_agg_performance_df.T.reset_index()
+    shark_agg_performance_df.columns = ['metric','not_sharks','sharks']
 
     return shark_agg_performance_df,shark_wallets_performance_df

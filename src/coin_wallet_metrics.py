@@ -7,7 +7,6 @@ from datetime import datetime
 from pytz import utc
 import pandas as pd
 import numpy as np
-import functions_framework
 import pandas_gbq
 from dreams_core.googlecloud import GoogleCloud as dgc
 import dreams_core.core as dc
@@ -15,119 +14,112 @@ import dreams_core.core as dc
 # set up logger at the module level
 logger = dc.setup_logger()
 
-
-@functions_framework.http
-# pylint: disable=unused-argument
-def update_coin_wallet_metrics(request):
+def prepare_datasets(profits_df,cohort_wallets,cohort_coins):
     '''
-    HTTP-triggered Cloud Function that calculates and uploads metrics related to the 
-    distribution of coin ownership across wallets for all tracked coins.
+    Prepare datasets for analysis based on the given wallet cohort and coin list.
 
-    Steps:
-    1. Retrieves required datasets from BigQuery:
-       - Coin metadata (e.g., total supply, chain ID, token address)
-       - Daily wallet balances and transaction details for each coin.
-    2. For each coin, calculates several metrics:
-       - Wallet ownership distribution: Classifies wallets into bins based on percentage of total coin supply held.
-       - New vs. repeat buyers: Counts first-time and repeat buyers for each day.
-       - Gini coefficient: Measures wealth inequality among wallets.
-       - Gini coefficient excluding "mega whales": Filters out wallets holding more than 5% of total supply to refine inequality analysis.
-    3. Aggregates metrics for all coins into a single DataFrame.
-    4. Uploads the results to the BigQuery table `core.coin_wallet_metrics`.
-
-    Raises:
-    - May raise errors related to data retrieval, computation, or BigQuery upload if any step fails.
-    '''
-    # retrieve full sets of metadata and daily wallet balances
-    all_metadata_df,all_balances_df = prepare_datasets()
-
-    # filter unique_coin_ids to include only those that have corresponding metadata
-    metadata_coin_ids = all_metadata_df['coin_id'].unique().tolist()
-    balances_coin_ids = all_balances_df['coin_id'].drop_duplicates().tolist()
-    unique_coin_ids = [c for c in balances_coin_ids if c in metadata_coin_ids]
-
-    coin_metrics_df_list = []
-
-    logger.info('Starting generation of metrics for each coin...')
-    # generate metrics for all coins
-    for c in unique_coin_ids:
-        # retrieve coin-specific dfs; balances_df will be altered so it needs the slower .copy()
-        logger.debug('Filtering coin-specific data from all_balances_df...')
-        balances_df = all_balances_df.loc[all_balances_df['coin_id'] == c].copy()
-        metadata_df = all_metadata_df.loc[all_metadata_df['coin_id'] == c]
-
-        # skip the coin if we do not have total supply from metadata_df, we cannot calculate all metrics
-        if metadata_df.empty:
-            logger.debug("skipping coin_id %s as no matching metadata found.", c)
-            continue
-
-        # calculate and merge metrics
-        coin_metrics_df = calculate_coin_metrics(metadata_df,balances_df)
-        coin_metrics_df_list.append(coin_metrics_df)
-        logger.debug('Successfully retrieved coin_metrics_df.')
-
-
-    # fill zeros for missing dates (currently impacts buyer behavior and gini columns)
-    all_coin_metrics_df = pd.concat(coin_metrics_df_list, ignore_index=True)
-    all_coin_metrics_df.fillna(0, inplace=True)
-
-    # upload metrics to bigquery
-    upload_coin_metrics_data(all_coin_metrics_df)
-
-    return 'finished refreshing core.coin_wallet_metrics.'
-
-
-
-def prepare_datasets():
-    '''
     runs two bigquery queries to retrieve the dfs necessary for wallet metric calculation. 
     note that the all_balances_df is very large as it contains all transfer-days for all coins, 
     which is why metadata is stored in a separate much smaller table. 
 
-    coins without total supply data are excluded from both queries because total supply is 
-    required to calculate the relevant metrics. 
+    Parameters:
+    - cohort_wallets (array-like): List of wallet addresses to include.
+    - cohort_coins (array-like): List of coin IDs to include.
 
     returns:
     - metadata_df (df): metadata about each coin, with total supply necessary to calculate metrics
     - all_balances_df (df): daily wallet activity necessary to calculate relevant metrics
 
     '''
-    step_time = time.time()
-    logger.info('Retrieving datasets required for wallet balance metrics...')
+    start_time = time.time()
+    logger.info('Preparing cohort_profits_df...')
 
-    balances_sql = '''
-        select wt.coin_id
-        ,wt.wallet_address
-        ,wt.date
-        ,cast(wt.balance as float64) as balance
-        ,case when wt.net_transfers > 0 then wt.transfer_sequence end as buy_sequence
-        from `core.coin_wallet_transfers` wt
-        join `core.coins` c on c.coin_id = wt.coin_id
-        where c.total_supply is not null
-        order by wt.coin_id,wt.wallet_address,wt.date -- sorted for pandas df efficiency
-        '''
+        # Raise an error if either the wallet cohort or coin list is empty
+    if len(cohort_wallets) == 0:
+        raise ValueError("Wallet cohort is empty. Provide at least one wallet address.")
+    if len(cohort_coins) == 0:
+        raise ValueError("Coin list is empty. Provide at least one coin ID.")
 
-    metadata_sql = '''
+
+    cohort_profits_df = profits_df[
+        (profits_df['wallet_address'].isin(cohort_wallets)) &
+        (profits_df['coin_id'].isin(cohort_coins))
+    ]
+    cohort_profits_df = cohort_profits_df[['coin_id','wallet_address','date','balance','net_transfers']]
+
+    # Initialize the buy and sell sequence columns
+    cohort_profits_df['buy_sequence'] = np.where(cohort_profits_df['net_transfers'] > 0, 1, np.nan)
+    cohort_profits_df['sell_sequence'] = np.where(cohort_profits_df['net_transfers'] < 0, 1, np.nan)
+
+    # Calculate cumulative sum to simulate transfer sequence, skipping rows where net_transfers == 0
+    cohort_profits_df['buy_sequence'] = cohort_profits_df.groupby(['coin_id', 'wallet_address'])['buy_sequence'].cumsum()
+    cohort_profits_df['sell_sequence'] = cohort_profits_df.groupby(['coin_id', 'wallet_address'])['sell_sequence'].cumsum()
+
+    # Set buy_sequence and sell_sequence to null where net_transfers == 0
+    cohort_profits_df.loc[cohort_profits_df['net_transfers'] == 0, ['buy_sequence', 'sell_sequence']] = np.nan
+
+
+    # SQL query to retrieve metadata for the coins, filtered by the coin list
+    metadata_sql = f'''
         select c.coin_id
-        ,chain_id
-        ,c.address as token_address
         ,c.symbol
         ,c.total_supply
         from `core.coins` c
-        where c.total_supply is not null
-        '''
-
-    # run sql queries
-    all_balances_df = dgc().run_sql(balances_sql)
+        where c.coin_id in {tuple(cohort_coins)}  -- Filter on the coin list
+        and c.total_supply is not null
+    '''
     metadata_df = dgc().run_sql(metadata_sql)
-    logger.info('Wallet balance datasets retrieved after %.2f seconds.', time.time() - step_time)
+    logger.debug('Coin metadata retrieved after %.2f seconds.', time.time() - start_time)
     step_time = time.time()
 
     # convert coin_id string column to categorical to reduce memory usage
-    all_balances_df['coin_id'] = all_balances_df['coin_id'].astype('category')
+    cohort_profits_df['coin_id'] = cohort_profits_df['coin_id'].astype('category')
     logger.debug('Converted coin_ids column from string to categorical after %.2f seconds.', time.time() - step_time)
 
-    return metadata_df,all_balances_df
+    logger.info('Generated cohort_profits_df after %.2f seconds.', time.time() - start_time)
+
+    return metadata_df,cohort_profits_df
+
+
+
+def calculate_buyer_seller_counts(coin_cohort_profits_df):
+    '''
+    For a single coin_id, computes the number of first-time buyers and repeat buyers on \
+    each day. On the date that a wallet makes its first purchase of the token, it will add \
+    1 to the 'buyers_new', and on days where they make any subsequent purchases, it will \
+    add 1 to the 'buyers_repeat' column. The same process is repeated for sellers. 
+
+    params:
+    - coin_cohort_profits_df (dataframe): df showing profits data for a single coin_id
+    
+    returns:
+    - buysell_df (dataframe): df of the number of new and repeat buyers/sellers on each date
+    '''
+    start_time = time.time()
+
+    # Ensure 'date' column is of datetime type
+    coin_cohort_profits_df['date'] = pd.to_datetime(coin_cohort_profits_df['date'])
+
+    # Calculate buyer counts
+    buyers_df = coin_cohort_profits_df.groupby('date').agg(
+        buyers_new=('buy_sequence', lambda x: (x == 1).sum()),
+        buyers_repeat=('buy_sequence', lambda x: (x > 1).sum())
+    ).reset_index()
+
+    # Calculate seller counts (renaming the columns to avoid conflicts)
+    sellers_df = coin_cohort_profits_df.groupby('date').agg(
+        sellers_new=('sell_sequence', lambda x: (x == 1).sum()),
+        sellers_repeat=('sell_sequence', lambda x: (x > 1).sum())
+    ).reset_index()
+
+    # Merge buyers_df and sellers_df on the 'date' column with distinct column names
+    buysell_df = pd.merge(buyers_df, sellers_df, on='date', how='outer').fillna(0)
+
+    logger.debug('New vs repeat buyer/seller counts complete after %.2f seconds', time.time() - start_time)
+
+    return buysell_df
+
+
 
 
 
@@ -293,43 +285,6 @@ def generate_wallet_bins(total_supply):
 
 
 
-def calculate_buyer_counts(balances_df):
-    '''
-    computes the number of first time buyers and repeat buyers on each day. on the date that \
-        a wallet makes its first purchase of the token, it will add 1 ato the 'buyers_new' \
-        column, and on days where they make any subsequent purchases, it will add 1 to the \
-        'buyers_repeat' column. 
-
-    params:
-    - balances_df (dataframe): df showing daily wallet balances of a coin_id token that \
-        has been filtered to only include one coin_id. 
-    
-    returns:
-    - buyers_df (dataframe): df of the number of new and repeat buyers on each date
-    '''
-    start_time = time.time()
-
-    # Ensure 'date' column is of datetime type
-    balances_df['date'] = pd.to_datetime(balances_df['date'])
-
-    # Group by 'date' and calculate the counts
-    buyers_df = balances_df.groupby('date').agg(
-        buyers_new = ('buy_sequence', lambda x: (x == 1).sum()),
-        buyers_repeat = ('buy_sequence', lambda x: (x != 1).sum())
-    ).reset_index()
-
-    # Set 'date' as the index
-    buyers_df.set_index('date', inplace=True)
-
-    # Fill empty cells with 0s
-    buyers_df.fillna(0, inplace=True)
-
-    logger.debug('New vs repeat buyer counts complete after %.2f seconds', time.time() - start_time)
-
-    return buyers_df
-
-
-
 def calculate_daily_gini(balances_df):
     '''
     Calculates the Gini coefficient for the distribution of wallet balances for each date.
@@ -434,104 +389,58 @@ def efficient_gini(arr):
 
 
 
-def upload_coin_metrics_data(all_coin_metrics_df):
+def generate_coin_wallet_metrics(cohort_wallets,cohort_coins):
     '''
-    Appends the all_coin_metrics_df to the BigQuery table etl_pipelines.coin_metrics_data. 
+    HTTP-triggered Cloud Function that calculates and uploads metrics related to the 
+    distribution of coin ownership across wallets for all tracked coins.
 
     Steps:
-        1. Explicitly map datatypes onto new dataframe upload_df
-        2. Declare schema datatypes
-        3. Upload using pandas_gbq
+    1. Retrieves required datasets from BigQuery:
+       - Coin metadata (e.g., total supply, chain ID, token address)
+       - Daily wallet balances and transaction details for each coin.
+    2. For each coin, calculates several metrics:
+       - Wallet ownership distribution: Classifies wallets into bins based on percentage of total coin supply held.
+       - New vs. repeat buyers: Counts first-time and repeat buyers for each day.
+       - Gini coefficient: Measures wealth inequality among wallets.
+       - Gini coefficient excluding "mega whales": Filters out wallets holding more than 5% of total supply to refine inequality analysis.
+    3. Aggregates metrics for all coins into a single DataFrame.
+    4. Uploads the results to the BigQuery table `core.coin_wallet_metrics`.
 
-    Params:
-        all_coin_metrics_df (pandas.DataFrame): df of coin metrics data
-    Returns:
-        None
+    Raises:
+    - May raise errors related to data retrieval, computation, or BigQuery upload if any step fails.
     '''
-    try:
-        # Add metadata to upload_df
-        upload_df = all_coin_metrics_df.copy()
-        upload_df['updated_at'] = datetime.now(utc)
+    # retrieve full sets of metadata and daily wallet balances
+    all_metadata_df,all_balances_df = prepare_datasets(cohort_wallets,cohort_coins)
 
-        # Localize date column
-        upload_df['date'] = pd.to_datetime(upload_df['date']).dt.tz_localize(utc)
+    # filter unique_coin_ids to include only those that have corresponding metadata
+    metadata_coin_ids = all_metadata_df['coin_id'].unique().tolist()
+    balances_coin_ids = all_balances_df['coin_id'].drop_duplicates().tolist()
+    unique_coin_ids = [c for c in balances_coin_ids if c in metadata_coin_ids]
 
-        # Set df datatypes of upload df
-        dtype_mapping = {
-            'date': 'datetime64[us, UTC]',
-            'wallets_0p000001_pct': 'int64',
-            'wallets_0p00010_pct': 'int64',
-            'wallets_0p00018_pct': 'int64',
-            'wallets_0p00032_pct': 'int64',
-            'wallets_0p00056_pct': 'int64',
-            'wallets_0p0010_pct': 'int64',
-            'wallets_0p0018_pct': 'int64',
-            'wallets_0p0032_pct': 'int64',
-            'wallets_0p0056_pct': 'int64',
-            'wallets_0p010_pct': 'int64',
-            'wallets_0p018_pct': 'int64',
-            'wallets_0p032_pct': 'int64',
-            'wallets_0p056_pct': 'int64',
-            'wallets_0p10_pct': 'int64',
-            'wallets_0p18_pct': 'int64',
-            'wallets_0p32_pct': 'int64',
-            'wallets_0p56_pct': 'int64',
-            'wallets_1p0_pct': 'int64',
-            'buyers_new': 'int64',
-            'buyers_repeat': 'int64',
-            'gini_coefficient': 'float64',
-            'gini_coefficient_excl_mega_whales': 'float64',
-            'coin_id': 'object',
-            'updated_at': 'datetime64[us, UTC]'
-        }
-        upload_df = upload_df.astype(dtype_mapping)
-        logger.info('Prepared upload df with %s rows.', len(upload_df))
+    coin_metrics_df_list = []
 
-        # Reorder columns to have coin_id first
-        upload_df = upload_df[['coin_id'] + [col for col in upload_df.columns if col != 'coin_id']]
+    logger.info('Starting generation of metrics for each coin...')
+    # generate metrics for all coins
+    for c in unique_coin_ids:
+        # retrieve coin-specific dfs; balances_df will be altered so it needs the slower .copy()
+        logger.debug('Filtering coin-specific data from all_balances_df...')
+        balances_df = all_balances_df.loc[all_balances_df['coin_id'] == c].copy()
+        metadata_df = all_metadata_df.loc[all_metadata_df['coin_id'] == c]
 
-        # Upload df to BigQuery
-        logger.info('Initiating bigquery upload...')
-        project_id = 'western-verve-411004'
-        table_name = 'core.coin_wallet_metrics'
-        schema = [
-            {'name': 'coin_id', 'type': 'STRING'},
-            {'name': 'date', 'type': 'DATETIME'},
-            {'name': 'wallets_0p000001_pct', 'type': 'INT64'},
-            {'name': 'wallets_0p00010_pct', 'type': 'INT64'},
-            {'name': 'wallets_0p00018_pct', 'type': 'INT64'},
-            {'name': 'wallets_0p00032_pct', 'type': 'INT64'},
-            {'name': 'wallets_0p00056_pct', 'type': 'INT64'},
-            {'name': 'wallets_0p0010_pct', 'type': 'INT64'},
-            {'name': 'wallets_0p0018_pct', 'type': 'INT64'},
-            {'name': 'wallets_0p0032_pct', 'type': 'INT64'},
-            {'name': 'wallets_0p0056_pct', 'type': 'INT64'},
-            {'name': 'wallets_0p010_pct', 'type': 'INT64'},
-            {'name': 'wallets_0p018_pct', 'type': 'INT64'},
-            {'name': 'wallets_0p032_pct', 'type': 'INT64'},
-            {'name': 'wallets_0p056_pct', 'type': 'INT64'},
-            {'name': 'wallets_0p10_pct', 'type': 'INT64'},
-            {'name': 'wallets_0p18_pct', 'type': 'INT64'},
-            {'name': 'wallets_0p32_pct', 'type': 'INT64'},
-            {'name': 'wallets_0p56_pct', 'type': 'INT64'},
-            {'name': 'wallets_1p0_pct', 'type': 'INT64'},
-            {'name': 'buyers_new', 'type': 'INT64'},
-            {'name': 'buyers_repeat', 'type': 'INT64'},
-            {'name': 'gini_coefficient', 'type': 'FLOAT64'},
-            {'name': 'gini_coefficient_excl_mega_whales', 'type': 'FLOAT64'},
-            {'name': 'updated_at', 'type': 'DATETIME'}
-        ]
-        pandas_gbq.to_gbq(
-            upload_df,
-            table_name,
-            project_id=project_id,
-            if_exists='replace',
-            table_schema=schema,
-            progress_bar=False
-        )
-        logger.info('Replaced data in %s.', table_name)
+        # skip the coin if we do not have total supply from metadata_df, we cannot calculate all metrics
+        if metadata_df.empty:
+            logger.debug("skipping coin_id %s as no matching metadata found.", c)
+            continue
 
-    except ValueError as val_err:
-        logger.error('ValueError during upload process: %s', val_err)
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        logger.error('Unexpected error during BigQuery upload: %s', e)
+        # calculate and merge metrics
+        coin_metrics_df = calculate_coin_metrics(metadata_df,balances_df)
+        coin_metrics_df_list.append(coin_metrics_df)
+        logger.debug('Successfully retrieved coin_metrics_df.')
+
+
+    # fill zeros for missing dates (currently impacts buyer behavior and gini columns)
+    all_coin_metrics_df = pd.concat(coin_metrics_df_list, ignore_index=True)
+    all_coin_metrics_df.fillna(0, inplace=True)
+
+    return 'finished refreshing core.coin_wallet_metrics.'
+

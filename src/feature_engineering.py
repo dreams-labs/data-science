@@ -14,26 +14,28 @@ from dreams_core import core as dc
 logger = dc.setup_logger()
 
 
-def calculate_shark_wallet_concentration(profits_df, shark_wallet_addresses):
+def calculate_cohort_concentration(profits_df, cohort_wallet_addresses):
     """
-    Calculate the shark wallet concentration for each coin and date in the DataFrame.
+    Calculate the cohort concentration for each coin and date in the DataFrame.
     
     :param df: DataFrame containing wallet data (profits_df)
-    :param shark_wallets: Pandas Series of wallet addresses considered as shark wallets
-    :return: DataFrame with coin_id, shark_concentration
+    :param cohort_wallet_addresses: Pandas Series of wallet addresses representing the cohort
+    :return: DataFrame with coin_id, cohort_concentration
     """
-    # Create a boolean mask for shark wallets
+    # Create a boolean mask for cohort wallets
     profits_df = profits_df.reset_index().copy()
-    profits_df['is_shark'] = profits_df['wallet_address'].isin(shark_wallet_addresses)
+    profits_df['in_cohort'] = profits_df['wallet_address'].isin(cohort_wallet_addresses)
 
     # Group by coin_id and date, then calculate concentrations
-    grouped = profits_df.groupby(['coin_id','is_shark'])['balance'].sum().unstack().fillna(0)
-    grouped.columns = ['non_shark_balance', 'shark_balance']
+    grouped = profits_df.groupby(['coin_id','in_cohort'])['balance'].sum().unstack().fillna(0)
+    grouped.columns = ['non_cohort_balance', 'cohort_balance']
 
-    # Calculate total balance and shark concentration
-    grouped['total_balance'] = grouped['non_shark_balance'] + grouped['shark_balance']
-    grouped['shark_concentration'] = grouped['shark_balance'] / grouped['total_balance']
+    # Calculate total balance and cohort concentration
+    grouped['total_balance'] = grouped['non_cohort_balance'] + grouped['cohort_balance']
+    grouped['cohort_concentration'] = grouped['cohort_balance'] / grouped['total_balance']
 
-    concentration_df = grouped['shark_concentration'].reset_index()
+    concentration_df = grouped['cohort_concentration'].reset_index()
 
     return concentration_df
+
+
