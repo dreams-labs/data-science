@@ -58,7 +58,7 @@ coverage.xml
 cover/
 
 # Integration test fixtures
-tests/
+tests/fixtures
 
 # Translations
 *.mo
