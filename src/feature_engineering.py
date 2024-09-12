@@ -28,6 +28,9 @@ def calculate_stat(ts, stat):
 
     Returns:
     - The calculated statistic value.
+    
+    Raises:
+    - KeyError: If the statistic is not recognized.
     """
     if stat == 'sum':
         return ts.sum()
@@ -41,6 +44,8 @@ def calculate_stat(ts, stat):
         return ts.max()
     elif stat == 'min':
         return ts.min()
+    else:
+        raise KeyError(f"Invalid statistic: '{stat}'")
 
 
 def calculate_global_stats(ts, metric_name, config):
