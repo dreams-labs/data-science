@@ -754,6 +754,8 @@ def cleaned_profits_df(profits_df):
     cleaned_df, exclusions_df = td.clean_profits_df(profits_df, config['data_cleaning'])
     return cleaned_df, exclusions_df
 
+# Save cleaned_profits_df.csv in fixtures/
+# ----------------------------------------
 def test_save_cleaned_profits_df(cleaned_profits_df):
     """
     This is not a test! This function saves a cleaned_profits_df.csv in the fixtures folder so it can be \
@@ -856,6 +858,20 @@ def shark_coins_df(cleaned_profits_df):
     shark_coins_df = td.classify_shark_coins(cleaned_df, config['training_data'])
     return shark_coins_df
 
+# Save cleaned_profits_df.csv in fixtures/
+# ----------------------------------------
+def test_save_shark_coins_df(shark_coins_df):
+    """
+    This is not a test! This function saves a shark_coins_df.csv in the fixtures folder so it can be \
+    used for integration tests in other modules. 
+    """
+    # Save the cleaned DataFrame to the fixtures folder
+    shark_coins_df.to_csv('tests/fixtures/shark_coins_df.csv', index=False)
+
+    # Add some basic assertions to ensure the data was saved correctly
+    assert shark_coins_df is not None
+    assert len(shark_coins_df) > 0
+
 @pytest.mark.integration
 def test_no_duplicate_coin_wallet_pairs(shark_coins_df):
     """
@@ -873,13 +889,35 @@ def test_no_duplicate_coin_wallet_pairs(shark_coins_df):
 # classify_shark_wallets() tests
 # ---------------------------------------- #
 
+@pytest.fixture(scope='session')
+def shark_wallets_df(shark_coins_df):
+    """
+    Builds shark_wallets_df from shark_coins_df for data quality checks.
+    """
+    shark_wallets_df = td.classify_shark_wallets(shark_coins_df, config['training_data'])
+    return shark_wallets_df
+
+# Save shark_wallets_df.csv in fixtures/
+# ----------------------------------------
+def test_save_shark_wallets_df(shark_wallets_df):
+    """
+    This is not a test! This function saves a shark_wallets_df.csv in the fixtures folder 
+    so it can be used for integration tests in other modules. 
+    """
+    # Save the cleaned DataFrame to the fixtures folder
+    shark_wallets_df.to_csv('tests/fixtures/shark_wallets_df.csv', index=False)
+
+    # Add some basic assertions to ensure the data was saved correctly
+    assert shark_wallets_df is not None
+    assert len(shark_wallets_df) > 0
+
 @pytest.mark.integration
-def test_no_duplicate_wallets(shark_coins_df):
+def test_no_duplicate_wallets(shark_wallets_df):
     """
     Test to assert there are no duplicate wallet addresses in the shark_wallets_df
     returned by classify_shark_wallets().
     """
-    shark_wallets_df = td.classify_shark_wallets(shark_coins_df,config['training_data'])
+
     # Group by coin_id and wallet_address and check for duplicates
     duplicates = shark_wallets_df.duplicated(subset=['wallet_address'], keep=False)
 

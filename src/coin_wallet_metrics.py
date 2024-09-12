@@ -70,7 +70,8 @@ def prepare_feature_datasets(profits_df,cohort_wallets,cohort_coins):
 
 def resample_profits_df(cohort_profits_df, resampling_period=3):
     '''
-    Resamples the cohort_profits_df over a specified resampling period at the wallet-coin level.
+    Resamples the cohort_profits_df over a specified resampling time period by aggregating coin-wallet
+    pair activity within each resampling period. 
 
     Parameters:
     - cohort_profits_df (pd.DataFrame): DataFrame containing profits data for wallet-coin pairs.
@@ -79,6 +80,8 @@ def resample_profits_df(cohort_profits_df, resampling_period=3):
     Returns:
     - resampled_df (pd.DataFrame): DataFrame resampled over the specified period with balance and net_transfers.
     '''
+    start_time = time.time()
+    logger.info('Preparing resampled_profits_df...')
 
     # Ensure 'date' column is of datetime type
     cohort_profits_df['date'] = pd.to_datetime(cohort_profits_df['date'])
@@ -99,6 +102,7 @@ def resample_profits_df(cohort_profits_df, resampling_period=3):
     # Step 3: Exclude rows where net_transfers is exactly 0
     resampled_df = resampled_df[resampled_df['net_transfers'] != 0]
 
+    logger.info('Generated resampled_profits_df after %.2f seconds.', time.time() - start_time)
 
     return resampled_df
 

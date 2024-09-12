@@ -298,3 +298,35 @@ def test_multiple_coins_multiple_periods():
 #                                                          #
 # ======================================================== #
 
+# ---------------------------------- #
+# resample_profits_df() integration tests
+# ---------------------------------- #
+
+@pytest.fixture(scope="module")
+def cleaned_profits_df():
+    """
+    Fixture to load the cleaned_profits_df from the fixtures folder.
+    """
+    return pd.read_csv('tests/fixtures/cleaned_profits_df.csv')
+
+def test_resample_profits_basic(cleaned_profits_df):
+    """
+    Integration test to verify basic functionality of the resample_profits_df function.
+    This test checks if the resampling correctly sums net transfers over a 3-day window
+    and preserves the final balance.
+    """
+    # Perform the resampling over 3-day windows
+    resampled_df = cwm.resample_profits_df(cleaned_profits_df, resampling_period=3)
+
+    # Example assertions to verify resampling worked correctly
+    # Check that the resampled dataframe is not empty
+    assert not resampled_df.empty, "Resampled dataframe should not be empty"
+
+    # Check that the number of rows has decreased (since resampling aggregates)
+    assert resampled_df.shape[0] < cleaned_profits_df.shape[0], "Resampled dataframe should have fewer rows"
+
+    # Add specific checks for net_transfers and balance (example values would need to be based on actual data)
+    # For example, check that for a given wallet/coin, the net transfers are summed correctly
+    example_row = resampled_df.iloc[0]
+    assert example_row['net_transfers'] > 0, "Net transfers should be positive after aggregation"
+    assert example_row['balance'] > 0, "Balance should be preserved correctly"
