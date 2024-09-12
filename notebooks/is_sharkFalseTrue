@@ -1,0 +1,17 @@
+is_shark	False	True
+count_wallets	123289	359
+total_inflows	1382804065.36	18950255.3075
+total_profits	247707346.083	5704450.87418
+median_return	0	0
+return_aggregate	0.179134088689	0.301022375773
+nonzero_count_wallets	26418	158
+nonzero_median_inflows	6810.90570237	21675.2255129
+nonzero_median_profits	0.741017557654	0.0445887194115
+nonzero_median_return	0.00010879868112	2.05712828155e-06
+midrange_count_wallets	21134	126
+midrange_median_inflows	4708.37341584	17148.4900283
+midrange_median_profits	0.741017557654	0.0445887194115
+midrange_total_inflows	340138883.559	4816341.59081
+midrange_total_profits	18182130.7989	711195.688167
+midrange_median_return	0.000157382920216	2.60015426069e-06
+midrange_return_aggregate	0.0534550199281	0.147663049798

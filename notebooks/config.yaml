@@ -1,33 +1,40 @@
 modeling: 
-# variables expected to materially alter model performance
-
-  # defining the modeling period
-  training_period_start: '2024-01-01'
-  training_period_end: '2024-06-30'
-  modeling_period_start: '2024-07-01'
-  modeling_period_end: '2024-7-31'
+# variables related to model construction and tuning
 
   # defining target variable thresholds
   moon_threshold: 0.3  # 30% increase
   dump_threshold: -0.2  # 20% decrease
 
-  # shark identification parameters
-  shark_minimum_inflows: 15000  # Minimum amount of USD inflows to be considered a shark
-  shark_total_profits_threshold: 20000  # Lifetime absolute USD return threshold for sharks
-  shark_total_return_threshold: 0.2  # Lifetime percentage return threshold for sharks
+  # Time series feature settings
+  rolling_window_duration: 7    # Duration of each rolling window in days
+  rolling_lookback_periods: 8   # Number of lookback periods for rolling windows
 
-  # megashark thresholds
-  shark_wallet_type: 'is_returns_shark'
-  shark_wallet_min_coins: 3
+training_data:
+# variables used to define the training data
+
+  # defining the modeling period
+  training_period_start: '2024-01-01'
+  training_period_end: '2024-04-30'
+  modeling_period_start: '2024-05-01'
+  modeling_period_end: '2024-5-07'
+
+  # shark coin thresholds
+  shark_coin_minimum_inflows: 5000  # Minimum amount of USD inflows to be considered a shark
+  shark_coin_profits_threshold: 20000  # Lifetime absolute USD return threshold for sharks
+  shark_coin_return_threshold: 0.5  # Lifetime percentage return threshold for sharks
+
+  # shark wallet thresholds
+  shark_wallet_type: 'is_shark'
+  shark_wallet_min_coins: 4
   shark_wallet_min_shark_rate: 0.4
 
 data_cleaning:
 # variables used to clean and filter raw data before training data is built
 
   # profits_df filters
-  # the goal of these is to remove CEX wallets that don't belong in the dataset
-  profitability_filter: 500000000000  # Exclude wallets with more than x profits or losses
-  inflows_filter: 10000000  # Exclude wallets with more than x inflows
+  # the goal of these is to remove CEX/mint/contract/etc wallets that don't belong in the dataset
+  profitability_filter: 15000000  # Exclude wallets with at least x profits or losses
+  inflows_filter: 10000000  # Exclude wallets with at least x inflows
 
   # prices_df filters
   max_gap_days: 2  # Maximum consecutive missing days to fill in price gaps

@@ -640,8 +640,9 @@ def calculate_wallet_profitability(profits_df):
 
 def clean_profits_df(profits_df, data_cleaning_config):
     """
-    Clean the profits DataFrame by excluding all records for any coin_id-wallet_address pair
-    if any single day's profitability exceeds the profitability_filter (positive or negative).
+    Clean the profits DataFrame by excluding all records for any wallet_addresses that either have: 
+     - aggregate profitabiilty above profitability_filter (abs value of gains or losses).
+     - aggregate USD inflows above the inflows_filter
     this catches outliers such as minting/burning addresses, contract addresses, etc and ensures
     they are not included in the wallet behavior training data. 
     
@@ -649,7 +650,7 @@ def clean_profits_df(profits_df, data_cleaning_config):
     - profits_df: DataFrame with columns ['coin_id', 'wallet_address', 'date', 'profits_cumulative']
     - data_cleaning_config:
         - profitability_filter: Threshold value to exclude pairs with profits or losses exceeding this value
-        - profitability_filter: Threshold value to exclude pairs with profits or losses exceeding this value
+        - inflows_filter: Threshold value to exclude pairs with USD inflows
         
     Returns:
     - Cleaned DataFrame with records for coin_id-wallet_address pairs filtered out.
@@ -657,43 +658,62 @@ def clean_profits_df(profits_df, data_cleaning_config):
     logger.debug("Starting generation of profits_cleaned_df...")
     start_time = time.time()
 
-    # 1. Remove wallets with higher daily profitability than the profitability_filter
-    # -------------------------------------------------------------------------------
-    # Identify coin_id-wallet_address pairs with profitability that exceeds the threshold at any time
-    exclusions_profits_df = profits_df[
-        (profits_df['profits_cumulative'] > data_cleaning_config['profitability_filter']) |
-        (profits_df['profits_cumulative'] < -data_cleaning_config['profitability_filter'])
-    ][['coin_id', 'wallet_address']].drop_duplicates()
+    # 1. Remove wallets with higher or lower total profits than the profitability_filter
+    # ----------------------------------------------------------------------------------
+    # Group by wallet_address and calculate the total profitability
+    wallet_profits_agg_df = profits_df.groupby('wallet_address')['profits_change'].sum().reset_index()
 
-    # Merge to filter out the records with those pairs
-    profits_cleaned_df = profits_df.merge(exclusions_profits_df, on=['coin_id', 'wallet_address'], how='left', indicator=True)
+    # Identify wallet_addresses with total profitability that exceeds the threshold
+    exclusions_profits_df = wallet_profits_agg_df[
+        (wallet_profits_agg_df['profits_change'] >= data_cleaning_config['profitability_filter']) |
+        (wallet_profits_agg_df['profits_change'] <= -data_cleaning_config['profitability_filter'])
+    ][['wallet_address']]
+
+    # Merge to filter out the records with those wallet addresses
+    profits_cleaned_df = profits_df.merge(exclusions_profits_df, on='wallet_address', how='left', indicator=True)
     profits_cleaned_df = profits_cleaned_df[profits_cleaned_df['_merge'] == 'left_only']
     profits_cleaned_df.drop(columns=['_merge'], inplace=True)
 
     # 2. Remove wallets with higher total inflows than the inflows_filter
-    # -------------------------------------------------------------------------------
-    # Identify coin_id-wallet_address pairs where lifetime inflows exceed the threshold
-    exclusions_inflows_df = profits_cleaned_df[
-        profits_cleaned_df['usd_inflows_cumulative'] > data_cleaning_config['inflows_filter']
-    ][['coin_id', 'wallet_address']].drop_duplicates()
+    # -------------------------------------------------------------------
+    # Group by wallet_address and calculate the total inflows
+    wallet_inflows_agg_df = profits_df.groupby('wallet_address')['usd_inflows'].sum().reset_index()
 
-    # Merge to filter out the records with those pairs
-    profits_cleaned_df = profits_cleaned_df.merge(exclusions_inflows_df, on=['coin_id', 'wallet_address'], how='left', indicator=True)
+    # Identify wallet addresses where total inflows exceed the threshold
+    exclusions_inflows_df = wallet_inflows_agg_df[
+        wallet_inflows_agg_df['usd_inflows'] >= data_cleaning_config['inflows_filter']
+    ][['wallet_address']]
+
+    # Merge to filter out the records with those wallet addresses
+    profits_cleaned_df = profits_cleaned_df.merge(exclusions_inflows_df, on='wallet_address', how='left', indicator=True)
     profits_cleaned_df = profits_cleaned_df[profits_cleaned_df['_merge'] == 'left_only']
     profits_cleaned_df.drop(columns=['_merge'], inplace=True)
 
+
+    # 3. Prepare exclusions_df and output logs
+    # ----------------------------------------
+    # prepare exclusions_logs_df
+    exclusions_profits_df['profits_exclusion'] = True
+    exclusions_inflows_df['inflows_exclusion'] = True
+    exclusions_logs_df = exclusions_profits_df.merge(exclusions_inflows_df, on='wallet_address', how='outer')
+
+    # Fill NaN values with False for missing exclusions
+    exclusions_logs_df['profits_exclusion'] = exclusions_logs_df['profits_exclusion'].astype(bool).fillna(False)
+    exclusions_logs_df['inflows_exclusion'] = exclusions_logs_df['inflows_exclusion'].astype(bool).fillna(False)
+
+    # log outputs
     total_time = time.time() - start_time
     logger.info("Finished cleaning profits_df after %.2f seconds.",total_time)
-    logger.debug("Removed %s coin-wallet pairs beyond profit threshold of $%s and %s pairs beyond inflows filter of %s.",
+    logger.debug("Identified %s coin-wallet pairs beyond profit threshold of $%s and %s pairs beyond inflows filter of %s.",
         exclusions_profits_df.shape[0], dc.human_format(data_cleaning_config['profitability_filter']),
         exclusions_inflows_df.shape[0], dc.human_format(data_cleaning_config['inflows_filter'])
     )
 
-    return profits_cleaned_df,exclusions_profits_df
+    return profits_cleaned_df,exclusions_logs_df
 
 
 
-def classify_shark_coins(profits_df, modeling_config):
+def classify_shark_coins(profits_df, training_data_config):
     """
     Classify wallet-coin pairs as sharks based on their profitability and return performance, filtered 
     to the shark eligibility criteria. Pairs are classified either based on gross profits (is_profits_shark)
@@ -708,11 +728,11 @@ def classify_shark_coins(profits_df, modeling_config):
 
     Parameters:
         profits_df (DataFrame): A DataFrame containing wallet transactions and profits data.
-        modeling_config (dict): A configuration object containing modeling parameters, including:
+        training_data_config (dict): A configuration object containing modeling parameters, including:
             - 'modeling_period_start': Start date for filtering data.
-            - 'shark_minimum_inflows': Minimum total USD inflow to be eligible as a shark.
-            - 'shark_total_profits_threshold': Minimum total profits to be considered a profits shark.
-            - 'shark_total_return_threshold': Minimum total return to be considered a returns shark.
+            - 'shark_coin_minimum_inflows': Minimum total USD inflow to be eligible as a shark.
+            - 'shark_coin_profits_threshold': Minimum total profits to be considered a profits shark.
+            - 'shark_coin_return_threshold': Minimum total return to be considered a returns shark.
 
     Returns:
         shark_coins_df (DataFrame): A DataFrame of coin-wallet pairs classified as sharks, including 
@@ -723,11 +743,11 @@ def classify_shark_coins(profits_df, modeling_config):
     # Step 1. Remove modeling period data and wallets that do not meet shark eligibility
     # ----------------------------------------------------------------------------------
     # Filter out transfers that occured after the end of the training period
-    filtered_profits_df = profits_df[profits_df['date'] < modeling_config['modeling_period_start']].copy()
+    filtered_profits_df = profits_df[profits_df['date'] < training_data_config['modeling_period_start']].copy()
 
     # Identify coin-wallet pairs that have deposited enough total USD to be considered sharks
     eligible_wallets_df = filtered_profits_df.groupby(['coin_id', 'wallet_address'])['usd_inflows_cumulative'].max().reset_index()
-    eligible_wallets_df = eligible_wallets_df[eligible_wallets_df['usd_inflows_cumulative'] >= modeling_config['shark_minimum_inflows']]
+    eligible_wallets_df = eligible_wallets_df[eligible_wallets_df['usd_inflows_cumulative'] >= training_data_config['shark_coin_minimum_inflows']]
 
     # Filter profits_df to only include eligible wallets
     filtered_profits_df = filtered_profits_df.merge(eligible_wallets_df[['coin_id', 'wallet_address']],
@@ -739,12 +759,12 @@ def classify_shark_coins(profits_df, modeling_config):
     # identify sharks based on absolute balance of profits
     total_profits_df = filtered_profits_df.sort_values('date').groupby(['coin_id', 'wallet_address']).last()['profits_cumulative'].reset_index()
     shark_coins_df = eligible_wallets_df.merge(total_profits_df, on=['coin_id', 'wallet_address'])
-    shark_coins_df['is_profits_shark'] = shark_coins_df['profits_cumulative'] >= modeling_config['shark_total_profits_threshold']
+    shark_coins_df['is_profits_shark'] = shark_coins_df['profits_cumulative'] >= training_data_config['shark_coin_profits_threshold']
 
     # identify sharks based on percentage return
     total_returns_df = filtered_profits_df.sort_values('date').groupby(['coin_id', 'wallet_address']).last()['total_return'].reset_index()
     shark_coins_df = shark_coins_df.merge(total_returns_df, on=['coin_id', 'wallet_address'])
-    shark_coins_df['is_returns_shark'] = shark_coins_df['total_return'] >= modeling_config['shark_total_return_threshold']
+    shark_coins_df['is_returns_shark'] = shark_coins_df['total_return'] >= training_data_config['shark_coin_return_threshold']
 
     # add a combined column for wallets that meet either criteria
     shark_coins_df['is_shark'] = shark_coins_df['is_profits_shark'] | shark_coins_df['is_returns_shark']
@@ -755,13 +775,13 @@ def classify_shark_coins(profits_df, modeling_config):
 
 
 
-def classify_shark_wallets(shark_coins_df, modeling_config):
+def classify_shark_wallets(shark_coins_df, training_data_config):
     """
     Classifies wallets as sharks based on their activity across multiple coins.
 
     Parameters:
         shark_coins_df (DataFrame): A DataFrame containing wallet-coin records and shark classification.
-        modeling_config (dict): A configuration object containing thresholds for megashark classification:
+        training_data_config (dict): A configuration object containing thresholds for megashark classification:
             - 'shark_wallet_type': Column indicating whether a wallet is a shark.
             - 'shark_wallet_min_coins': Minimum number of coins for megashark classification.
             - 'shark_wallet_min_shark_rate': Minimum shark rate for megashark classification.
@@ -769,9 +789,9 @@ def classify_shark_wallets(shark_coins_df, modeling_config):
     Returns:
         shark_wallets_df (DataFrame): A DataFrame containing wallets classified as megasharks.
     """
-    shark_wallet_type = modeling_config['shark_wallet_type']
-    shark_wallet_min_coins = modeling_config['shark_wallet_min_coins']
-    shark_wallet_min_shark_rate = modeling_config['shark_wallet_min_shark_rate']
+    shark_wallet_type = training_data_config['shark_wallet_type']
+    shark_wallet_min_coins = training_data_config['shark_wallet_min_coins']
+    shark_wallet_min_shark_rate = training_data_config['shark_wallet_min_shark_rate']
 
     # Calculate the total number of coins each wallet has records with
     all_coins_df = shark_coins_df.groupby('wallet_address')['coin_id'].count().reset_index()
@@ -814,17 +834,18 @@ def calculate_shark_performance(transfers_df, prices_df, shark_wallets_df, confi
 
     # Filter transfers for the modeling period
     modeling_period_transfers_df = transfers_df[
-        (transfers_df['date'] >= config['modeling']['modeling_period_start']) &
-        (transfers_df['date'] <= config['modeling']['modeling_period_end'])
+        (transfers_df['date'] >= config['training_data']['modeling_period_start']) &
+        (transfers_df['date'] <= config['training_data']['modeling_period_end'])
     ]
 
     # Create profits_df for the modeling period
+    logger.info("Creating modeling period profits data...")
     modeling_period_profits_df = prepare_profits_data(modeling_period_transfers_df, prices_df)
     modeling_period_profits_df = calculate_wallet_profitability(modeling_period_profits_df)
 
     # Retrieve profit state at the end of the period for each coin-wallet pair
     modeling_end_profits_df = modeling_period_profits_df[
-        modeling_period_profits_df['date'] == config['modeling']['modeling_period_end']
+        modeling_period_profits_df['date'] == config['training_data']['modeling_period_end']
     ]
 
     # Aggregate wallet-level metrics by summing usd inflows and profits
@@ -832,8 +853,13 @@ def calculate_shark_performance(transfers_df, prices_df, shark_wallets_df, confi
         ['usd_inflows_cumulative', 'profits_cumulative']
     ].sum()
 
+    # Add prefix to the additional columns in shark_wallets_df
+    shark_wallets_df_prefixed = shark_wallets_df.add_prefix('training_period_')
+    shark_wallets_df_prefixed['wallet_address'] = shark_wallets_df['wallet_address']
+    shark_wallets_df_prefixed['is_shark'] = shark_wallets_df['is_shark']
+
     # Classify wallets by shark status and compare their performance
-    shark_wallets_performance_df = shark_wallets_df[['wallet_address', 'is_shark']].merge(
+    shark_wallets_performance_df = shark_wallets_df_prefixed.merge(
         modeling_end_wallet_profits_df,
         on='wallet_address',
         how='left'
@@ -843,9 +869,7 @@ def calculate_shark_performance(transfers_df, prices_df, shark_wallets_df, confi
     shark_wallets_performance_df['usd_inflows_cumulative'] = shark_wallets_performance_df['usd_inflows_cumulative'].fillna(0)
     shark_wallets_performance_df['profits_cumulative'] = shark_wallets_performance_df['profits_cumulative'].fillna(0)
 
-    nonzero_shark_wallets_performance_df = shark_wallets_performance_df[shark_wallets_performance_df['profits_cumulative']!=0]
-
-    # Remove wallet_address for aggregation
+    # aggregate metrics on is_shark
     shark_agg_performance_df = shark_wallets_performance_df.groupby('is_shark').agg(
         count_wallets=('wallet_address', 'size'),
         median_inflows=('usd_inflows_cumulative', 'median'),
@@ -878,6 +902,8 @@ def calculate_shark_performance(transfers_df, prices_df, shark_wallets_df, confi
         where=shark_agg_performance_df['total_inflows'] != 0
     )
 
+    # calculate separate metrics for wallets that had transactions during the modeling period
+    nonzero_shark_wallets_performance_df = shark_wallets_performance_df[shark_wallets_performance_df['profits_cumulative']!=0]
 
     nonzero_shark_agg_performance_df = nonzero_shark_wallets_performance_df.groupby('is_shark').agg(
         count_wallets=('wallet_address', 'size'),
@@ -887,6 +913,8 @@ def calculate_shark_performance(transfers_df, prices_df, shark_wallets_df, confi
         percentile_75_inflows=('usd_inflows_cumulative', lambda x: np.percentile(x.dropna(), 75) if len(x) > 1 else np.nan),
         percentile_25_profits=('profits_cumulative', lambda x: np.percentile(x.dropna(), 25) if len(x) > 1 else np.nan),
         percentile_75_profits=('profits_cumulative', lambda x: np.percentile(x.dropna(), 75) if len(x) > 1 else np.nan),
+        total_inflows=('usd_inflows_cumulative', 'sum'),
+        total_profits=('profits_cumulative', 'sum')
     )
     # Calculate median return
     nonzero_shark_agg_performance_df['median_return'] = np.divide(
@@ -895,7 +923,13 @@ def calculate_shark_performance(transfers_df, prices_df, shark_wallets_df, confi
         out=np.zeros_like(nonzero_shark_agg_performance_df['median_profits']),
         where=nonzero_shark_agg_performance_df['median_inflows'] != 0
     )
-
+    # Calculate aggregate return
+    nonzero_shark_agg_performance_df['return_aggregate'] = np.divide(
+        nonzero_shark_agg_performance_df['total_profits'],
+        nonzero_shark_agg_performance_df['total_inflows'],
+        out=np.zeros_like(nonzero_shark_agg_performance_df['total_profits']),
+        where=nonzero_shark_agg_performance_df['total_inflows'] != 0
+    )
 
     # Prefix the nonzero DataFrame columns
     nonzero_shark_agg_performance_df = nonzero_shark_agg_performance_df.add_prefix('nonzero_')
@@ -905,22 +939,72 @@ def calculate_shark_performance(transfers_df, prices_df, shark_wallets_df, confi
         nonzero_shark_agg_performance_df, on='is_shark', how='left'
     )
 
+
+
+    # non-zero midrange wallet analysis
+    # ---------------------------------
+    # Filter wallets between the 10th and 90th percentile of profits_cumulative
+    # Filter wallets between the 10th and 90th percentile of sharks and non-sharks
+    shark_profits_10th = np.percentile(nonzero_shark_wallets_performance_df[nonzero_shark_wallets_performance_df['is_shark']]['profits_cumulative'], 10)
+    shark_profits_90th = np.percentile(nonzero_shark_wallets_performance_df[nonzero_shark_wallets_performance_df['is_shark']]['profits_cumulative'], 90)
+
+    nonshark_profits_10th = np.percentile(nonzero_shark_wallets_performance_df[~nonzero_shark_wallets_performance_df['is_shark']]['profits_cumulative'], 10)
+    nonshark_profits_90th = np.percentile(nonzero_shark_wallets_performance_df[~nonzero_shark_wallets_performance_df['is_shark']]['profits_cumulative'], 90)
+
+    # Filter sharks and non-sharks within their respective 10th–90th percentiles
+    midrange_shark_wallets_performance_df = nonzero_shark_wallets_performance_df[
+        (nonzero_shark_wallets_performance_df['is_shark']) &
+        (nonzero_shark_wallets_performance_df['profits_cumulative'] >= shark_profits_10th) &
+        (nonzero_shark_wallets_performance_df['profits_cumulative'] <= shark_profits_90th)
+    ]
+
+    midrange_nonshark_wallets_performance_df = nonzero_shark_wallets_performance_df[
+        (~nonzero_shark_wallets_performance_df['is_shark']) &
+        (nonzero_shark_wallets_performance_df['profits_cumulative'] >= nonshark_profits_10th) &
+        (nonzero_shark_wallets_performance_df['profits_cumulative'] <= nonshark_profits_90th)
+    ]
+
+    # Combine midrange shark and non-shark wallets
+    midrange_wallets_performance_df = pd.concat([midrange_shark_wallets_performance_df, midrange_nonshark_wallets_performance_df])
+
+    # Calculate metrics for midrange wallets
+    midrange_shark_agg_performance_df = midrange_wallets_performance_df.groupby('is_shark').agg(
+        count_wallets=('wallet_address', 'size'),
+        median_inflows=('usd_inflows_cumulative', 'median'),
+        median_profits=('profits_cumulative', 'median'),
+        percentile_25_inflows=('usd_inflows_cumulative', lambda x: np.percentile(x.dropna(), 25) if len(x) > 1 else np.nan),
+        percentile_75_inflows=('usd_inflows_cumulative', lambda x: np.percentile(x.dropna(), 75) if len(x) > 1 else np.nan),
+        percentile_25_profits=('profits_cumulative', lambda x: np.percentile(x.dropna(), 25) if len(x) > 1 else np.nan),
+        percentile_75_profits=('profits_cumulative', lambda x: np.percentile(x.dropna(), 75) if len(x) > 1 else np.nan),
+        total_inflows=('usd_inflows_cumulative', 'sum'),
+        total_profits=('profits_cumulative', 'sum')
+    )
+    # calculate median return
+    midrange_shark_agg_performance_df['median_return'] = np.divide(
+        midrange_shark_agg_performance_df['median_profits'],
+        midrange_shark_agg_performance_df['median_inflows'],
+        out=np.zeros_like(midrange_shark_agg_performance_df['median_profits']),
+        where=midrange_shark_agg_performance_df['median_inflows'] != 0
+    )
+    # Calculate aggregate return
+    midrange_shark_agg_performance_df['return_aggregate'] = np.divide(
+        midrange_shark_agg_performance_df['total_profits'],
+        midrange_shark_agg_performance_df['total_inflows'],
+        out=np.zeros_like(midrange_shark_agg_performance_df['total_profits']),
+        where=midrange_shark_agg_performance_df['total_inflows'] != 0
+    )
+
+    # Prefix the nonzero and midrange DataFrame columns
+    nonzero_shark_agg_performance_df = nonzero_shark_agg_performance_df.add_prefix('nonzero_')
+    midrange_shark_agg_performance_df = midrange_shark_agg_performance_df.add_prefix('midrange_')
+
+    # Merge the three DataFrames on 'is_shark'
+    shark_agg_performance_df = shark_agg_performance_df.merge(
+        midrange_shark_agg_performance_df, on='is_shark', how='left'
+    )
+
+    # Pivot
+    shark_agg_performance_df = shark_agg_performance_df.T.reset_index()
+    shark_agg_performance_df.columns = ['metric','not_sharks','sharks']
+
     return shark_agg_performance_df,shark_wallets_performance_df
-
-
-def assess_coin_shark_metrics_df(shark_coins_df):
-    """
-    creates a series of coin-keyed metrics based on shark behavior
-    """
-    # Step 1: Coin-Level Metrics - Counting the number of sharks per coin
-    coin_shark_count = shark_coins_df.groupby('coin_id')['is_shark'].sum().reset_index()
-    coin_shark_count.columns = ['coin_id', 'num_sharks']
-
-    # Step 2: Total inflows by sharks for each coin
-    coin_shark_inflows = shark_coins_df[shark_coins_df['is_shark']].groupby('coin_id')['usd_inflows_cumulative'].sum().reset_index()
-    coin_shark_inflows.columns = ['coin_id', 'total_shark_inflows']
-
-    # Step 3: Merge the coin-level shark metrics
-    coin_shark_metrics_df = pd.merge(coin_shark_count, coin_shark_inflows, on='coin_id', how='left')
-
-    return coin_shark_metrics_df
