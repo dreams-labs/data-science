@@ -12,7 +12,7 @@ import dreams_core.core as dc
 logger = dc.setup_logger()
 
 
-def prepare_datasets(profits_df,cohort_wallets,cohort_coins):
+def prepare_feature_datasets(profits_df,cohort_wallets,cohort_coins):
     '''
     Prepare datasets for analysis based on the given wallet cohort and coin list.
 
@@ -45,18 +45,6 @@ def prepare_datasets(profits_df,cohort_wallets,cohort_coins):
     ]
     cohort_profits_df = cohort_profits_df[['coin_id','wallet_address','date','balance','net_transfers']]
 
-    # Initialize the buy and sell sequence columns
-    cohort_profits_df['buy_sequence'] = np.where(cohort_profits_df['net_transfers'] > 0, 1, np.nan)
-    cohort_profits_df['sell_sequence'] = np.where(cohort_profits_df['net_transfers'] < 0, 1, np.nan)
-
-    # Calculate cumulative sum to simulate transfer sequence, skipping rows where net_transfers == 0
-    cohort_profits_df['buy_sequence'] = cohort_profits_df.groupby(['coin_id', 'wallet_address'])['buy_sequence'].cumsum()
-    cohort_profits_df['sell_sequence'] = cohort_profits_df.groupby(['coin_id', 'wallet_address'])['sell_sequence'].cumsum()
-
-    # Set buy_sequence and sell_sequence to null where net_transfers == 0
-    cohort_profits_df.loc[cohort_profits_df['net_transfers'] == 0, ['buy_sequence', 'sell_sequence']] = np.nan
-
-
     # SQL query to retrieve metadata for the coins, filtered by the coin list
     metadata_sql = f'''
         select c.coin_id
@@ -76,13 +64,51 @@ def prepare_datasets(profits_df,cohort_wallets,cohort_coins):
 
     logger.info('Generated cohort_profits_df after %.2f seconds.', time.time() - start_time)
 
-    return metadata_df,cohort_profits_df
+    return cohort_profits_df,metadata_df
+
+
+
+def resample_profits_df(cohort_profits_df, resampling_period=3):
+    '''
+    Resamples the cohort_profits_df over a specified resampling period at the wallet-coin level.
+
+    Parameters:
+    - cohort_profits_df (pd.DataFrame): DataFrame containing profits data for wallet-coin pairs.
+    - resampling_period (int): Number of days to group for resampling (default is 3 days).
+
+    Returns:
+    - resampled_df (pd.DataFrame): DataFrame resampled over the specified period with balance and net_transfers.
+    '''
+
+    # Ensure 'date' column is of datetime type
+    cohort_profits_df['date'] = pd.to_datetime(cohort_profits_df['date'])
+
+    # Set 'date' as index for resampling
+    cohort_profits_df.set_index('date', inplace=True)
+
+    # Step 1: Group by wallet_address and coin_id
+    grouped_df = cohort_profits_df.groupby(['wallet_address', 'coin_id'])
+
+    # Step 2: Resample within each group over the specified period (e.g., 3 days)
+    # This will generate rows for periods without any data, so we need to handle this.
+    resampled_df = grouped_df.resample(f'{resampling_period}D').agg({
+        'balance': 'last',         # Retain the last balance for each period
+        'net_transfers': 'sum'     # Sum net transfers for each period
+    }).reset_index()
+
+    # Step 3: Exclude rows where net_transfers is exactly 0
+    resampled_df = resampled_df[resampled_df['net_transfers'] != 0]
+
+
+    return resampled_df
+
 
 
 
 def generate_buysell_metrics_df(cohort_profits_df):
     """
-    Generates features_df by looping through each coin_id and applying calculate_buysell_metrics().
+    Generates buysell metrics for all cohort coins by looping through each coin_id and applying 
+    calculate_buysell_coin_metrics_df().
 
     Params:
     - cohort_profits_df (pd.DataFrame): DataFrame containing profits data for a set of wallet-coin_id pairs
@@ -93,6 +119,17 @@ def generate_buysell_metrics_df(cohort_profits_df):
     start_time = time.time()
     logger.info('Preparing buysell_features_df...')
 
+    # Initialize the buy and sell sequence columns
+    cohort_profits_df['buy_sequence'] = np.where(cohort_profits_df['net_transfers'] > 0, 1, np.nan)
+    cohort_profits_df['sell_sequence'] = np.where(cohort_profits_df['net_transfers'] < 0, 1, np.nan)
+
+    # Calculate cumulative sum to simulate transfer sequence, skipping rows where net_transfers == 0
+    cohort_profits_df['buy_sequence'] = cohort_profits_df.groupby(['coin_id', 'wallet_address'])['buy_sequence'].cumsum()
+    cohort_profits_df['sell_sequence'] = cohort_profits_df.groupby(['coin_id', 'wallet_address'])['sell_sequence'].cumsum()
+
+    # Set buy_sequence and sell_sequence to null where net_transfers == 0
+    cohort_profits_df.loc[cohort_profits_df['net_transfers'] == 0, ['buy_sequence', 'sell_sequence']] = np.nan
+
     # Initialize an empty list to store DataFrames for each coin
     coin_features_list = []
 
@@ -102,7 +139,7 @@ def generate_buysell_metrics_df(cohort_profits_df):
         coin_cohort_profits_df = cohort_profits_df[cohort_profits_df['coin_id'] == c].copy()
 
         # Call the feature calculation function
-        coin_features_df = calculate_buysell_coin_metrics(coin_cohort_profits_df)
+        coin_features_df = calculate_coin_buysell_metrics_df(coin_cohort_profits_df)
 
         # Add coin_id back to the DataFrame to retain coin information
         coin_features_df['coin_id'] = c
@@ -119,7 +156,7 @@ def generate_buysell_metrics_df(cohort_profits_df):
 
 
 
-def calculate_buysell_coin_metrics(coin_cohort_profits_df):
+def calculate_coin_buysell_metrics_df(coin_cohort_profits_df):
     '''
     For a single coin_id, computes various buyer and seller metrics, including:
     - Number of new and repeat buyers/sellers
@@ -158,26 +195,28 @@ def calculate_buysell_coin_metrics(coin_cohort_profits_df):
     # Calculate total sellers
     sellers_df['total_sellers'] = sellers_df['sellers_new'] + sellers_df['sellers_repeat']
 
-    # Calculate total bought, total sold, and total net transfers
+    # Calculate total bought, total sold, total net transfers, and total volume
     transactions_df = coin_cohort_profits_df.groupby('date').agg(
         total_bought=('net_transfers', lambda x: x[x > 0].sum()),  # Sum of positive net transfers (buys)
         total_sold=('net_transfers', lambda x: abs(x[x < 0].sum())),  # Sum of negative net transfers (sells as positive)
-        total_net_transfers=('net_transfers', 'sum')  # Net of all transfers
+        total_net_transfers=('net_transfers', 'sum'),  # Net of all transfers
+        total_volume=('net_transfers', lambda x: x[x > 0].sum() + abs(x[x < 0].sum()))  # Total volume: buys + sells
     ).reset_index()
 
-    # Calculate ratios (handling division by zero)
-    transactions_df['buyers_to_sellers_ratio'] = buyers_df['total_buyers'] / sellers_df['total_sellers'].replace(0, float('nan'))
-    transactions_df['new_buyers_to_new_sellers_ratio'] = buyers_df['buyers_new'] / sellers_df['sellers_new'].replace(0, float('nan'))
+    # Calculate total holders and total balance
+    holders_df = coin_cohort_profits_df.groupby('date').agg(
+        total_holders=('wallet_address', 'nunique'),  # Number of unique holders
+        total_balance=('balance', 'sum')  # Sum of balances for all wallets
+    ).reset_index()
 
-    # Merge buyers, sellers, and transactions dataframes
+    # Merge buyers, sellers, transactions, and holders dataframes
     buysell_metrics_df = pd.merge(buyers_df, sellers_df, on='date', how='outer')
+    buysell_metrics_df = pd.merge(buysell_metrics_df, transactions_df, on='date', how='outer')
+    buysell_metrics_df = pd.merge(buysell_metrics_df, holders_df, on='date', how='outer')
 
-    logger.debug('New vs repeat buyer/seller counts and transaction totals complete after %.2f seconds', time.time() - start_time)
+    logger.debug('New vs repeat buyer/seller counts, transaction totals, and holder metrics complete after %.2f seconds', time.time() - start_time)
 
     return buysell_metrics_df
-
-
-
 
 
 # def calculate_coin_metrics(metadata_df,balances_df):

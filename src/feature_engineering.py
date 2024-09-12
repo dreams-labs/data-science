@@ -23,29 +23,29 @@ def calculate_global_stats(ts):
         'min': ts.min(),
         'max': ts.max(),
         'median': ts.median(),
-        'last_value': ts.iloc[-1],
-        'kurtosis': ts.kurtosis(),
-        'skewness': ts.skew(),
-        'autocorrelation': ts.autocorr(),
-        'z_score': (ts.iloc[-1] - ts.mean()) / ts.std() if ts.std() != 0 else np.nan,
-        'change': ts.iloc[-1] - ts.iloc[0],
-        'pct_change': (ts.iloc[-1] / ts.iloc[0] - 1) if ts.iloc[0] != 0 else np.nan
+        # 'last_value': ts.iloc[-1],
+        # 'kurtosis': ts.kurtosis(),
+        # 'skewness': ts.skew(),
+        # 'autocorrelation': ts.autocorr(),
+        # 'z_score': (ts.iloc[-1] - ts.mean()) / ts.std() if ts.std() != 0 else np.nan,
+        # 'change': ts.iloc[-1] - ts.iloc[0],
+        # 'pct_change': (ts.iloc[-1] / ts.iloc[0] - 1) if ts.iloc[0] != 0 else np.nan
     }
 
-# def calculate_rolling_window_features(ts, window_sizes):
-#     """Calculates rolling window features for specified window sizes."""
-#     features = {}
-#     for window in window_sizes:
-#         if len(ts) >= window:
-#             rolling_window = ts.rolling(window=window)
-#             features[f'mean_{window}d'] = rolling_window.mean().iloc[-1]
-#             features[f'std_{window}d'] = rolling_window.std().iloc[-1]
-#             features[f'min_{window}d'] = rolling_window.min().iloc[-1]
-#             features[f'max_{window}d'] = rolling_window.max().iloc[-1]
-#             features[f'median_{window}d'] = rolling_window.median().iloc[-1]
-#             features[f'last_{window}d_change'] = ts.iloc[-1] - ts.iloc[-window]
-#             features[f'last_{window}d_pct_change'] = (ts.iloc[-1] / ts.iloc[-window] - 1) if ts.iloc[-window] != 0 else np.nan
-#     return features
+def calculate_rolling_window_features(ts, window_sizes):
+    """Calculates rolling window features for specified window sizes."""
+    features = {}
+    for window in window_sizes:
+        if len(ts) >= window:
+            rolling_window = ts.rolling(window=window)
+            features[f'mean_{window}d'] = rolling_window.mean().iloc[-1]
+            features[f'std_{window}d'] = rolling_window.std().iloc[-1]
+            features[f'min_{window}d'] = rolling_window.min().iloc[-1]
+            features[f'max_{window}d'] = rolling_window.max().iloc[-1]
+            features[f'median_{window}d'] = rolling_window.median().iloc[-1]
+            features[f'last_{window}d_change'] = ts.iloc[-1] - ts.iloc[-window]
+            features[f'last_{window}d_pct_change'] = (ts.iloc[-1] / ts.iloc[-window] - 1) if ts.iloc[-window] != 0 else np.nan
+    return features
 
 # def calculate_bollinger_bands(ts, bollinger_window):
 #     """Calculates Bollinger Bands for a given time series and window."""

@@ -11,19 +11,22 @@ training_data:
 
   # defining the modeling period
   training_period_start: '2024-01-01'
-  training_period_end: '2024-03-31'
-  modeling_period_start: '2024-04-01'
-  modeling_period_end: '2024-4-30'
+  training_period_end: '2024-04-30'
+  modeling_period_start: '2024-05-01'
+  modeling_period_end: '2024-5-31'
 
   # shark coin thresholds
-  shark_coin_minimum_inflows: 10000  # Minimum amount of USD inflows to be considered a shark
+  shark_coin_minimum_inflows: 5000  # Minimum amount of USD inflows to be considered a shark
   shark_coin_profits_threshold: 20000  # Lifetime absolute USD return threshold for sharks
   shark_coin_return_threshold: 0.5  # Lifetime percentage return threshold for sharks
 
   # shark wallet thresholds
-  shark_wallet_type: 'is_returns_shark'
+  shark_wallet_type: 'is_shark'
   shark_wallet_min_coins: 4
   shark_wallet_min_shark_rate: 0.4
+
+  # resampling period for profits_df aggregation
+  resampling_period: 3
 
 
 data_cleaning:
@@ -31,8 +34,8 @@ data_cleaning:
 
   # profits_df filters
   # the goal of these is to remove CEX/mint/contract/etc wallets that don't belong in the dataset
-  profitability_filter: 10000000  # Exclude wallets with more than x profits or losses
-  inflows_filter: 5000000  # Exclude wallets with more than x inflows
+  profitability_filter: 15000000  # Exclude wallets with at least x profits or losses
+  inflows_filter: 10000000  # Exclude wallets with at least x inflows
 
   # prices_df filters
   max_gap_days: 2  # Maximum consecutive missing days to fill in price gaps

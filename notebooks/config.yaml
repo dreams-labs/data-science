@@ -16,14 +16,17 @@ training_data:
   modeling_period_end: '2024-5-31'
 
   # shark coin thresholds
-  shark_coin_minimum_inflows: 10000  # Minimum amount of USD inflows to be considered a shark
+  shark_coin_minimum_inflows: 5000  # Minimum amount of USD inflows to be considered a shark
   shark_coin_profits_threshold: 20000  # Lifetime absolute USD return threshold for sharks
   shark_coin_return_threshold: 0.5  # Lifetime percentage return threshold for sharks
 
   # shark wallet thresholds
-  shark_wallet_type: 'is_returns_shark'
+  shark_wallet_type: 'is_shark'
   shark_wallet_min_coins: 4
   shark_wallet_min_shark_rate: 0.4
+
+  # resampling period for profits_df aggregation
+  resampling_period: 3
 
 
 data_cleaning:

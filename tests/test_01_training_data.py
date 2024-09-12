@@ -24,6 +24,26 @@ load_dotenv()
 logger = dc.setup_logger()
 
 
+# ---------------------------------- #
+# set up config and module-level variables
+# ---------------------------------- #
+
+def load_config():
+    """
+    Fixture to load test config from test_config.yaml.
+    """
+    config_path = os.path.join(os.path.dirname(__file__), 'test_config.yaml')
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
+    return config
+
+config = load_config()
+
+# Module-level variables
+TRAINING_PERIOD_START = config['training_data']['training_period_start']
+TRAINING_PERIOD_END = config['training_data']['training_period_end']
+MODELING_PERIOD_START = config['training_data']['modeling_period_start']
+MODELING_PERIOD_END = config['training_data']['modeling_period_end']
 
 
 
@@ -528,28 +548,6 @@ def test_shark_coins_modeling_period_filtering(sample_shark_coins_profits_df, sa
 # ======================================================== #
 
 
-# ---------------------------------- #
-# set up config and module-level variables
-# ---------------------------------- #
-
-def load_config():
-    """
-    Fixture to load test config from test_config.yaml.
-    """
-    config_path = os.path.join(os.path.dirname(__file__), 'test_config.yaml')
-    with open(config_path, 'r', encoding='utf-8') as f:
-        config = yaml.safe_load(f)
-    return config
-
-config = load_config()
-
-# Module-level variables
-TRAINING_PERIOD_START = config['training_data']['training_period_start']
-TRAINING_PERIOD_END = config['training_data']['training_period_end']
-MODELING_PERIOD_START = config['training_data']['modeling_period_start']
-MODELING_PERIOD_END = config['training_data']['modeling_period_end']
-
-
 # ------------------------------------ #
 # retrieve_transfers_data() integration tests
 # ------------------------------------ #
@@ -755,6 +753,20 @@ def cleaned_profits_df(profits_df):
     logger.info("Generating cleaned_profits_df from clean_profits_df()...")
     cleaned_df, exclusions_df = td.clean_profits_df(profits_df, config['data_cleaning'])
     return cleaned_df, exclusions_df
+
+def test_save_cleaned_profits_df(cleaned_profits_df):
+    """
+    This is not a test! This function saves a cleaned_profits_df.csv in the fixtures folder so it can be \
+    used for integration tests in other modules. 
+    """
+    cleaned_df,_ = cleaned_profits_df
+
+    # Save the cleaned DataFrame to the fixtures folder
+    cleaned_df.to_csv('tests/fixtures/cleaned_profits_df.csv', index=False)
+
+    # Add some basic assertions to ensure the data was saved correctly
+    assert cleaned_df is not None
+    assert len(cleaned_df) > 0
 
 @pytest.mark.integration
 def test_clean_profits_exclusions(cleaned_profits_df, profits_df):
