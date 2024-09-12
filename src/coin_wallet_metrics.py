@@ -12,116 +12,35 @@ import dreams_core.core as dc
 logger = dc.setup_logger()
 
 
-def prepare_feature_datasets(profits_df,cohort_wallets,cohort_coins):
-    '''
-    Prepare datasets for analysis based on the given wallet cohort and coin list.
 
-    runs two bigquery queries to retrieve the dfs necessary for wallet metric calculation. 
-    note that the all_balances_df is very large as it contains all transfer-days for all coins, 
-    which is why metadata is stored in a separate much smaller table. 
-
-    Parameters:
-    - cohort_wallets (array-like): List of wallet addresses to include.
-    - cohort_coins (array-like): List of coin IDs to include.
-
-    returns:
-    - metadata_df (df): metadata about each coin, with total supply necessary to calculate metrics
-    - all_balances_df (df): daily wallet activity necessary to calculate relevant metrics
-
-    '''
-    start_time = time.time()
-    logger.info('Preparing cohort_profits_df...')
-
-        # Raise an error if either the wallet cohort or coin list is empty
-    if len(cohort_wallets) == 0:
-        raise ValueError("Wallet cohort is empty. Provide at least one wallet address.")
-    if len(cohort_coins) == 0:
-        raise ValueError("Coin list is empty. Provide at least one coin ID.")
-
-
-    cohort_profits_df = profits_df[
-        (profits_df['wallet_address'].isin(cohort_wallets)) &
-        (profits_df['coin_id'].isin(cohort_coins))
-    ]
-    cohort_profits_df = cohort_profits_df[['coin_id','wallet_address','date','balance','net_transfers']]
-
-    # SQL query to retrieve metadata for the coins, filtered by the coin list
-    metadata_sql = f'''
-        select c.coin_id
-        ,c.symbol
-        ,c.total_supply
-        from `core.coins` c
-        where c.coin_id in {tuple(cohort_coins)}  -- Filter on the coin list
-        and c.total_supply is not null
-    '''
-    metadata_df = dgc().run_sql(metadata_sql)
-    logger.debug('Coin metadata retrieved after %.2f seconds.', time.time() - start_time)
-    step_time = time.time()
-
-    # convert coin_id string column to categorical to reduce memory usage
-    cohort_profits_df['coin_id'] = cohort_profits_df['coin_id'].astype('category')
-    logger.debug('Converted coin_ids column from string to categorical after %.2f seconds.', time.time() - step_time)
-
-    logger.info('Generated cohort_profits_df after %.2f seconds.', time.time() - start_time)
-
-    return cohort_profits_df,metadata_df
-
-
-
-def resample_profits_df(cohort_profits_df, resampling_period=3):
-    '''
-    Resamples the cohort_profits_df over a specified resampling time period by aggregating coin-wallet
-    pair activity within each resampling period. 
-
-    Parameters:
-    - cohort_profits_df (pd.DataFrame): DataFrame containing profits data for wallet-coin pairs.
-    - resampling_period (int): Number of days to group for resampling (default is 3 days).
-
-    Returns:
-    - resampled_df (pd.DataFrame): DataFrame resampled over the specified period with balance and net_transfers.
-    '''
-    start_time = time.time()
-    logger.info('Preparing resampled_profits_df...')
-
-    # Ensure 'date' column is of datetime type
-    cohort_profits_df['date'] = pd.to_datetime(cohort_profits_df['date'])
-
-    # Set 'date' as index for resampling
-    cohort_profits_df.set_index('date', inplace=True)
-
-    # Step 1: Group by wallet_address and coin_id
-    grouped_df = cohort_profits_df.groupby(['wallet_address', 'coin_id'])
-
-    # Step 2: Resample within each group over the specified period (e.g., 3 days)
-    # This will generate rows for periods without any data, so we need to handle this.
-    resampled_df = grouped_df.resample(f'{resampling_period}D').agg({
-        'balance': 'last',         # Retain the last balance for each period
-        'net_transfers': 'sum'     # Sum net transfers for each period
-    }).reset_index()
-
-    # Step 3: Exclude rows where net_transfers is exactly 0
-    resampled_df = resampled_df[resampled_df['net_transfers'] != 0]
-
-    logger.info('Generated resampled_profits_df after %.2f seconds.', time.time() - start_time)
-
-    return resampled_df
-
-
-
-
-def generate_buysell_metrics_df(cohort_profits_df):
+def generate_buysell_metrics_df(profits_df,cohort_wallets,cohort_coins):
     """
     Generates buysell metrics for all cohort coins by looping through each coin_id and applying 
     calculate_buysell_coin_metrics_df().
 
-    Params:
-    - cohort_profits_df (pd.DataFrame): DataFrame containing profits data for a set of wallet-coin_id pairs
+    Parameters:
+    - profits_df (pd.DataFrame): DataFrame containing profits data
+    - cohort_wallets (array-like): List of wallet addresses to include.
+    - cohort_coins (array-like): List of coin IDs to include.
 
     Returns:
     - buysell_features_df (pd.DataFrame): DataFrame containing features for all coin_ids.
     """
     start_time = time.time()
     logger.info('Preparing buysell_features_df...')
+
+    # Raise an error if either the wallet cohort or coin list is empty
+    if len(cohort_wallets) == 0:
+        raise ValueError("Wallet cohort is empty. Provide at least one wallet address.")
+    if len(cohort_coins) == 0:
+        raise ValueError("Coin list is empty. Provide at least one coin ID.")
+
+    # Create cohort_profits_df by filtering projects_df to only include the cohort coins and wallets
+    cohort_profits_df = profits_df[
+        (profits_df['wallet_address'].isin(cohort_wallets)) &
+        (profits_df['coin_id'].isin(cohort_coins))
+    ]
+    cohort_profits_df = cohort_profits_df[['coin_id','wallet_address','date','balance','net_transfers']]
 
     # Initialize the buy and sell sequence columns
     cohort_profits_df['buy_sequence'] = np.where(cohort_profits_df['net_transfers'] > 0, 1, np.nan)
@@ -221,6 +140,104 @@ def calculate_coin_buysell_metrics_df(coin_cohort_profits_df):
     logger.debug('New vs repeat buyer/seller counts, transaction totals, and holder metrics complete after %.2f seconds', time.time() - start_time)
 
     return buysell_metrics_df
+
+
+
+
+# def prepare_cohort_profits_df(profits_df,cohort_wallets,cohort_coins):
+#     '''
+#     Prepare a simplified version of profits_df for analysis based on the given wallet cohort and coin list.
+
+#     runs two bigquery queries to retrieve the dfs necessary for wallet metric calculation. 
+#     note that the all_balances_df is very large as it contains all transfer-days for all coins, 
+#     which is why metadata is stored in a separate much smaller table. 
+
+#     Parameters:
+#     - cohort_wallets (array-like): List of wallet addresses to include.
+#     - cohort_coins (array-like): List of coin IDs to include.
+
+#     returns:
+#     - metadata_df (df): metadata about each coin, with total supply necessary to calculate metrics
+#     - all_balances_df (df): daily wallet activity necessary to calculate relevant metrics
+
+#     '''
+#     start_time = time.time()
+#     logger.info('Preparing cohort_profits_df...')
+
+#         # Raise an error if either the wallet cohort or coin list is empty
+#     if len(cohort_wallets) == 0:
+#         raise ValueError("Wallet cohort is empty. Provide at least one wallet address.")
+#     if len(cohort_coins) == 0:
+#         raise ValueError("Coin list is empty. Provide at least one coin ID.")
+
+
+#     cohort_profits_df = profits_df[
+#         (profits_df['wallet_address'].isin(cohort_wallets)) &
+#         (profits_df['coin_id'].isin(cohort_coins))
+#     ]
+#     cohort_profits_df = cohort_profits_df[['coin_id','wallet_address','date','balance','net_transfers']]
+
+#     # SQL query to retrieve metadata for the coins, filtered by the coin list
+#     metadata_sql = f'''
+#         select c.coin_id
+#         ,c.symbol
+#         ,c.total_supply
+#         from `core.coins` c
+#         where c.coin_id in {tuple(cohort_coins)}  -- Filter on the coin list
+#         and c.total_supply is not null
+#     '''
+#     metadata_df = dgc().run_sql(metadata_sql)
+#     logger.debug('Coin metadata retrieved after %.2f seconds.', time.time() - start_time)
+#     step_time = time.time()
+
+#     # convert coin_id string column to categorical to reduce memory usage
+#     cohort_profits_df['coin_id'] = cohort_profits_df['coin_id'].astype('category')
+#     logger.debug('Converted coin_ids column from string to categorical after %.2f seconds.', time.time() - step_time)
+
+#     logger.info('Generated cohort_profits_df after %.2f seconds.', time.time() - start_time)
+
+#     return cohort_profits_df,metadata_df
+
+
+
+# def resample_profits_df(cohort_profits_df, resampling_period=3):
+#     '''
+#     Resamples the cohort_profits_df over a specified resampling time period by aggregating coin-wallet
+#     pair activity within each resampling period. 
+
+#     Parameters:
+#     - cohort_profits_df (pd.DataFrame): DataFrame containing profits data for wallet-coin pairs.
+#     - resampling_period (int): Number of days to group for resampling (default is 3 days).
+
+#     Returns:
+#     - resampled_df (pd.DataFrame): DataFrame resampled over the specified period with balance and net_transfers.
+#     '''
+#     start_time = time.time()
+#     logger.info('Preparing resampled_profits_df...')
+
+#     # Ensure 'date' column is of datetime type
+#     cohort_profits_df['date'] = pd.to_datetime(cohort_profits_df['date'])
+
+#     # Set 'date' as index for resampling
+#     cohort_profits_df.set_index('date', inplace=True)
+
+#     # Step 1: Group by wallet_address and coin_id
+#     grouped_df = cohort_profits_df.groupby(['wallet_address', 'coin_id'])
+
+#     # Step 2: Resample within each group over the specified period (e.g., 3 days)
+#     # This will generate rows for periods without any data, so we need to handle this.
+#     resampled_df = grouped_df.resample(f'{resampling_period}D').agg({
+#         'balance': 'last',         # Retain the last balance for each period
+#         'net_transfers': 'sum'     # Sum net transfers for each period
+#     }).reset_index()
+
+#     # Step 3: Exclude rows where net_transfers is exactly 0
+#     resampled_df = resampled_df[resampled_df['net_transfers'] != 0]
+
+#     logger.info('Generated resampled_profits_df after %.2f seconds.', time.time() - start_time)
+
+#     return resampled_df
+
 
 
 # def calculate_coin_metrics(metadata_df,balances_df):
