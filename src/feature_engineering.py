@@ -82,21 +82,18 @@ def calculate_global_stats(ts, metric_name, config):
     return stats  # Return the dictionary of calculated statistics.
 
 
-def calculate_rolling_window_features(ts, window_duration, lookback_periods, rolling_stats, comparisons):
+def calculate_rolling_window_features(ts, window_duration, lookback_periods, rolling_stats, comparisons, metric_name):
     """
     Calculates rolling window features and comparisons for a given time series based on
     configurable window duration and lookback periods.
-
-    Adjusted logic: If the number of records is not divisible by the window_duration,
-    the function will disregard the extra days and only consider the most recent complete periods.
 
     Params:
     - ts (pd.Series): The time series data for the metric.
     - window_duration (int): The size of each rolling window (e.g., 7 for 7 days).
     - lookback_periods (int): The number of lookback periods to calculate (e.g., 2 for two periods).
     - rolling_stats (list): The statistics to calculate for each rolling window (e.g., ['sum', 'max']).
-    - comparisons (list): The comparisons to make between the first and last value in the window
-                          (e.g., ['change', 'pct_change']).
+    - comparisons (list): The comparisons to make between the first and last value in the window.
+    - metric_name (str): The name of the metric to include in the feature names.
 
     Returns:
     - features (dict): A dictionary containing calculated rolling window features.
@@ -123,17 +120,17 @@ def calculate_rolling_window_features(ts, window_duration, lookback_periods, rol
 
             # Loop through each statistic to calculate for the rolling window
             for stat in rolling_stats:
-                features[f'{stat}_{window_duration}d_period_{i+1}'] = calculate_stat(rolling_window, stat)
+                features[f'{metric_name}_{stat}_{window_duration}d_period_{i+1}'] = calculate_stat(rolling_window, stat)
 
             # If the rolling window has enough data, calculate comparisons
             if len(rolling_window) > 0:
                 for comparison in comparisons:
                     if comparison == 'change':
-                        features[f'change_{window_duration}d_period_{i+1}'] = rolling_window.iloc[-1] - rolling_window.iloc[0]
+                        features[f'{metric_name}_change_{window_duration}d_period_{i+1}'] = rolling_window.iloc[-1] - rolling_window.iloc[0]
                     elif comparison == 'pct_change':
                         start_value = rolling_window.iloc[0]
                         end_value = rolling_window.iloc[-1]
-                        features[f'pct_change_{window_duration}d_period_{i+1}'] = calculate_adj_pct_change(start_value, end_value)
+                        features[f'{metric_name}_pct_change_{window_duration}d_period_{i+1}'] = calculate_adj_pct_change(start_value, end_value)
 
     return features  # Return the dictionary of rolling window features
 
@@ -148,14 +145,25 @@ def flatten_coin_features(coin_df, metrics_config):
 
     Returns:
     - flat_features (dict): A dictionary of flattened features for the coin.
+
+    Raises:
+    - KeyError: If a metric in the DataFrame is not found in the configuration.
+    - ValueError: If an expected column (e.g., a metric) is missing from the DataFrame.
     """
+    # Check if the required 'coin_id' column is present
+    if 'coin_id' not in coin_df.columns:
+        raise ValueError("The input DataFrame is missing the required 'coin_id' column.")
+    
     flat_features = {'coin_id': coin_df['coin_id'].iloc[0]}  # Initialize with coin_id
 
     # Access the 'metrics' section directly from the config
-    metrics_section = metrics_config['metrics']
-
+    metrics_section = metrics_config.get('metrics', {})
+    
     # Apply global stats calculations for each metric
-    for metric, config in metrics_section.items():  # Loop directly over the 'metrics' section
+    for metric, config in metrics_section.items():
+        if metric not in coin_df.columns:
+            raise ValueError(f"Metric '{metric}' is missing from the input DataFrame.")
+
         ts = coin_df[metric].copy()  # Get the time series for this metric
 
         # Standard aggregations
@@ -169,8 +177,12 @@ def flatten_coin_features(coin_df, metrics_config):
                     flat_features[f'{metric}_median'] = ts.median()
                 elif agg == 'min':
                     flat_features[f'{metric}_min'] = ts.min()
+                elif agg == 'max':
+                    flat_features[f'{metric}_max'] = ts.max()
                 elif agg == 'std':
                     flat_features[f'{metric}_std'] = ts.std()
+                else:
+                    raise KeyError(f"Aggregation '{agg}' for metric '{metric}' is not recognized.")
 
         # Rolling window calculations
         rolling = config.get('rolling', False)
@@ -182,7 +194,7 @@ def flatten_coin_features(coin_df, metrics_config):
 
             # Calculate rolling metrics and update flat_features
             rolling_features = calculate_rolling_window_features(
-                ts, window_duration, lookback_periods, rolling_stats, comparisons)
+                ts, window_duration, lookback_periods, rolling_stats, comparisons, metric)
             flat_features.update(rolling_features)
 
     return flat_features
@@ -198,7 +210,14 @@ def flatten_coin_date_df(df, metrics_config):
 
     Returns:
     - result (pd.DataFrame): A DataFrame of flattened features for all coins.
+
+    Raises:
+    - ValueError: If the input DataFrame is empty.
     """
+    
+    if df.empty:
+        raise ValueError("Input DataFrame is empty. Check your data source and ensure it's populated correctly.")
+    
     all_flat_features = []
 
     # Loop through each unique coin_id
