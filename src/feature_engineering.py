@@ -2,6 +2,8 @@
 functions used to build coin-level features from training data
 """
 # pylint: disable=C0301
+# pylint: disable=C0303 trailing whitespace
+
 import time
 from datetime import datetime
 from pytz import utc
@@ -15,37 +17,98 @@ import dreams_core.core as dc
 # set up logger at the module level
 logger = dc.setup_logger()
 
-def calculate_global_stats(ts):
-    """Calculates basic statistics for a time series."""
-    return {
-        'mean': ts.mean(),
-        'std': ts.std(),
-        'min': ts.min(),
-        'max': ts.max(),
-        'median': ts.median(),
-        # 'last_value': ts.iloc[-1],
-        # 'kurtosis': ts.kurtosis(),
-        # 'skewness': ts.skew(),
-        # 'autocorrelation': ts.autocorr(),
-        # 'z_score': (ts.iloc[-1] - ts.mean()) / ts.std() if ts.std() != 0 else np.nan,
-        # 'change': ts.iloc[-1] - ts.iloc[0],
-        # 'pct_change': (ts.iloc[-1] / ts.iloc[0] - 1) if ts.iloc[0] != 0 else np.nan
-    }
+def calculate_global_stats(ts, metric_name, config):
+    """
+    Calculates statistics for a time series based on the configuration.
+    
+    Params:
+    - ts (pd.Series): Time series data for a particular metric.
+    - metric_name (str): The name of the metric (e.g., 'buyers_new').
+    - config (dict): The configuration object containing metric aggregation rules.
 
-def calculate_rolling_window_features(ts, window_sizes):
-    """Calculates rolling window features for specified window sizes."""
+    Returns:
+    - stats (dict): A dictionary containing calculated statistics.
+    """
+    stats = {}
+    metric_config = config['metrics'].get(metric_name, [])
+
+    for agg in metric_config:
+        if agg == 'sum':
+            stats[f'{metric_name}_sum'] = ts.sum()
+        elif agg == 'mean':
+            stats[f'{metric_name}_mean'] = ts.mean()
+        elif agg == 'median':
+            stats[f'{metric_name}_median'] = ts.median()
+        elif agg == 'std':
+            stats[f'{metric_name}_std'] = ts.std()
+        elif agg == 'max':
+            stats[f'{metric_name}_max'] = ts.max()
+        # Add any additional aggregation functions here
+
+    return stats
+
+
+def calculate_rolling_window_features(ts, window_duration, lookback_periods, rolling_stats, comparisons):
+    """
+    Calculates rolling window features and comparisons for a given time series based on 
+    configurable window duration and lookback periods.
+
+    Parameters:
+    - ts (pd.Series): The time series of metrics (e.g., total_bought for a coin_id).
+    - window_duration (int): The size of each rolling window (e.g., 7 for 7 days).
+    - lookback_periods (int): The number of lookback periods to calculate (e.g., 2 for 2 periods of 7-day windows).
+    - rolling_stats (list): The summary statistics to calculate (e.g., ['sum', 'max']).
+    - comparisons (list): The comparative metrics to calculate (e.g., ['change', 'pct_change']).
+
+    Returns:
+    - features (dict): A dictionary of calculated rolling window features for each lookback period.
+      The keys will include the rolling window stat and comparison names (e.g., 'sum_7d_period_1', 
+      'change_7d_period_2') and the values are the computed metrics.
+    
+    Example:
+    If rolling_stats includes 'sum' and 'max', and comparisons include 'change' and 'pct_change', 
+    the output will include features like:
+      - 'sum_7d_period_1', 'max_7d_period_1', 'change_7d_period_1', 'pct_change_7d_period_1'
+      - 'sum_7d_period_2', 'max_7d_period_2', 'change_7d_period_2', 'pct_change_7d_period_2'
+    
+    The rolling window is calculated over each lookback period, and comparisons assess changes 
+    between the first and last value in the window.
+    """
     features = {}
-    for window in window_sizes:
-        if len(ts) >= window:
-            rolling_window = ts.rolling(window=window)
-            features[f'mean_{window}d'] = rolling_window.mean().iloc[-1]
-            features[f'std_{window}d'] = rolling_window.std().iloc[-1]
-            features[f'min_{window}d'] = rolling_window.min().iloc[-1]
-            features[f'max_{window}d'] = rolling_window.max().iloc[-1]
-            features[f'median_{window}d'] = rolling_window.median().iloc[-1]
-            features[f'last_{window}d_change'] = ts.iloc[-1] - ts.iloc[-window]
-            features[f'last_{window}d_pct_change'] = (ts.iloc[-1] / ts.iloc[-window] - 1) if ts.iloc[-window] != 0 else np.nan
+    
+    # Loop through the lookback periods
+    for i in range(lookback_periods):
+        end_period = len(ts) - i * window_duration
+        start_period = end_period - window_duration
+        
+        if start_period >= 0:
+            rolling_window = ts.iloc[start_period:end_period]
+            
+            # Calculate rolling stats for this window
+            for stat in rolling_stats:
+                if stat == 'sum':
+                    features[f'sum_{window_duration}d_period_{i+1}'] = rolling_window.sum()
+                elif stat == 'max':
+                    features[f'max_{window_duration}d_period_{i+1}'] = rolling_window.max()
+                elif stat == 'min':
+                    features[f'min_{window_duration}d_period_{i+1}'] = rolling_window.min()
+                elif stat == 'mean':
+                    features[f'mean_{window_duration}d_period_{i+1}'] = rolling_window.mean()
+                elif stat == 'std':
+                    features[f'std_{window_duration}d_period_{i+1}'] = rolling_window.std()
+                elif stat == 'median':
+                    features[f'median_{window_duration}d_period_{i+1}'] = rolling_window.median()
+            
+            # Calculate comparisons (change, percentage change)
+            if len(rolling_window) > 0:
+                for comparison in comparisons:
+                    if comparison == 'change':
+                        features[f'change_{window_duration}d_period_{i+1}'] = rolling_window.iloc[-1] - rolling_window.iloc[0]
+                    elif comparison == 'pct_change' and rolling_window.iloc[0] != 0:
+                        features[f'pct_change_{window_duration}d_period_{i+1}'] = (rolling_window.iloc[-1] / rolling_window.iloc[0] - 1)
+
     return features
+
 
 # def calculate_bollinger_bands(ts, bollinger_window):
 #     """Calculates Bollinger Bands for a given time series and window."""
@@ -72,87 +135,64 @@ def calculate_rolling_window_features(ts, window_sizes):
 #         }
 #     return {}
 
-# Now, we refactor the main flatten_time_series function
-def flatten_time_series(ts, window_sizes=[7, 30], bollinger_window=20, decompose_model='additive', freq=None):
-    """
-    Convert a time series into a row of features using various window sizes, and also 
-    include time series decomposition metrics (trend, seasonal, residual).
-    
-    Params:
-    - ts (pd.Series): A single time series of numeric values (e.g., total_bought for a coin_id).
-    - window_sizes (list): List of rolling window sizes to compute features over (default: [7, 30]).
-    - bollinger_window (int): The window size for calculating Bollinger Bands (default: 20).
-    - decompose_model (str): 'additive' or 'multiplicative' decomposition (default: 'additive').
-    - freq (int): The frequency of the seasonality (e.g., 7 for weekly, 30 for monthly).
-    
-    Returns:
-    - features (dict): A dictionary of features for the time series, where keys are feature names.
-    """
-    features = {}
-    features.update(calculate_global_stats(ts))
-    features.update(calculate_rolling_window_features(ts, window_sizes))
-    # features.update(calculate_bollinger_bands(ts, bollinger_window))
-    # features.update(calculate_decomposition_features(ts, decompose_model, freq))
 
-    return features
-
-
-
-def flatten_coin_features(coin_df, metrics_dict, window_sizes=[7, 30], 
-                          bollinger_window=20, decompose_model='additive', freq=None):
+def flatten_coin_features(coin_df, metrics_config):
     """
     Flattens all relevant time series metrics for a single coin into a row of features.
 
     Params:
     - coin_df (pd.DataFrame): DataFrame with time series data for a single coin (coin_id-date).
-    - metrics_dict (dict): Dictionary where keys are metric names and values are aggregation types.
-    - window_sizes (list): List of rolling window sizes to compute features over.
-    - bollinger_window (int): The window size for calculating Bollinger Bands (default: 20).
-    - decompose_model (str): 'additive' or 'multiplicative' decomposition (default: 'additive').
-    - freq (int): The frequency of the seasonality (e.g., 7 for weekly, 30 for monthly).
+    - metrics_config (dict): Configuration object with metric rules from the metrics file.
 
     Returns:
     - flat_features (dict): A dictionary of flattened features for the coin.
     """
     flat_features = {'coin_id': coin_df['coin_id'].iloc[0]}  # Initialize with coin_id
 
-    # Apply flatten_time_series to each metric and its specified aggregation(s) from the dictionary
-    for metric, aggregations in metrics_dict.items():
-        ts = coin_df[metric].copy()
+    # Access the 'metrics' section directly from the config
+    metrics_section = metrics_config['metrics']
 
-        # Apply all specified aggregations (e.g., sum, mean)
-        for agg in aggregations:
-            if agg == 'sum':
-                flat_features[f'{metric}_sum'] = ts.sum()
-            elif agg == 'mean':
-                flat_features[f'{metric}_mean'] = ts.mean()
+    # Apply global stats calculations for each metric
+    for metric, config in metrics_section.items():  # Loop directly over the 'metrics' section
+        ts = coin_df[metric].copy()  # Get the time series for this metric
 
-            # Optionally, you can add more complex time-series-based aggregations like rolling windows:
-            # For example:
-            if agg == 'rolling':
-                ts_features = flatten_time_series(ts, window_sizes=window_sizes, 
-                                                  bollinger_window=bollinger_window, 
-                                                  decompose_model=decompose_model, 
-                                                  freq=freq)
-                # Prefix each feature name with the metric to avoid name clashes
-                for feature_name, feature_value in ts_features.items():
-                    flat_features[f'{metric}_{feature_name}'] = feature_value
+        # Standard aggregations
+        if 'aggregations' in config:
+            for agg in config['aggregations']:
+                if agg == 'sum':
+                    flat_features[f'{metric}_sum'] = ts.sum()
+                elif agg == 'mean':
+                    flat_features[f'{metric}_mean'] = ts.mean()
+                elif agg == 'median':
+                    flat_features[f'{metric}_median'] = ts.median()
+                elif agg == 'min':
+                    flat_features[f'{metric}_min'] = ts.min()
+                elif agg == 'std':
+                    flat_features[f'{metric}_std'] = ts.std()
+
+        # Rolling window calculations
+        rolling = config.get('rolling', False)
+        if rolling:
+            rolling_stats = config['rolling']['stats']  # Get rolling stats
+            comparisons = config['rolling'].get('comparisons', [])  # Get comparisons
+            window_duration = config['rolling']['window_duration']
+            lookback_periods = config['rolling']['lookback_periods']
+
+            # Calculate rolling metrics and update flat_features
+            rolling_features = calculate_rolling_window_features(
+                ts, window_duration, lookback_periods, rolling_stats, comparisons)
+            flat_features.update(rolling_features)
 
     return flat_features
 
 
-def flatten_coin_date_df(df, metrics_dict, window_sizes=[7, 30], 
-                      bollinger_window=20, decompose_model='additive', freq=None):
+def flatten_coin_date_df(df, metrics_config):
     """
     Processes all coins in the DataFrame and flattens relevant time series metrics for each coin.
 
     Params:
     - df (pd.DataFrame): DataFrame containing time series data for multiple coins (coin_id-date).
-    - metrics_dict (dict): Dictionary where keys are metric names and values are aggregation types.
-    - window_sizes (list): List of rolling window sizes to compute features over.
-    - bollinger_window (int): The window size for calculating Bollinger Bands.
-    - decompose_model (str): 'additive' or 'multiplicative' decomposition.
-    - freq (int): The frequency of the seasonality (e.g., 7 for weekly, 30 for monthly).
+    - metrics_config (dict): Configuration object with metric rules from the metrics file.
 
     Returns:
     - result (pd.DataFrame): A DataFrame of flattened features for all coins.
@@ -164,9 +204,8 @@ def flatten_coin_date_df(df, metrics_dict, window_sizes=[7, 30],
         # Filter the data for the current coin
         coin_df = df[df['coin_id'] == coin_id].copy()
 
-        # Flatten the features for this coin using the metrics dictionary
-        flat_features = flatten_coin_features(coin_df, metrics_dict, window_sizes, 
-                                              bollinger_window, decompose_model, freq)
+        # Flatten the features for this coin
+        flat_features = flatten_coin_features(coin_df, metrics_config)
         all_flat_features.append(flat_features)
     
     # Convert the list of feature dictionaries into a DataFrame
