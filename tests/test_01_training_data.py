@@ -10,7 +10,6 @@ tests used to audit the files in the data-science/src folder
 
 import sys
 import os
-import yaml
 import pandas as pd
 from dotenv import load_dotenv
 import pytest
@@ -19,32 +18,10 @@ from dreams_core import core as dc
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 import training_data as td # type: ignore[reportMissingImports]
+from utils import load_config # type: ignore[reportMissingImports]
 
 load_dotenv()
 logger = dc.setup_logger()
-
-
-# ---------------------------------- #
-# set up config and module-level variables
-# ---------------------------------- #
-
-def load_config():
-    """
-    Fixture to load test config from test_config.yaml.
-    """
-    config_path = os.path.join(os.path.dirname(__file__), 'test_config.yaml')
-    with open(config_path, 'r', encoding='utf-8') as f:
-        config = yaml.safe_load(f)
-    return config
-
-config = load_config()
-
-# Module-level variables
-TRAINING_PERIOD_START = config['training_data']['training_period_start']
-TRAINING_PERIOD_END = config['training_data']['training_period_end']
-MODELING_PERIOD_START = config['training_data']['modeling_period_start']
-MODELING_PERIOD_END = config['training_data']['modeling_period_end']
-
 
 
 # ===================================================== #
@@ -546,6 +523,20 @@ def test_shark_coins_modeling_period_filtering(sample_shark_coins_profits_df, sa
 #            I N T E G R A T I O N   T E S T S             #
 #                                                          #
 # ======================================================== #
+
+
+# ---------------------------------- #
+# set up config and module-level variables
+# ---------------------------------- #
+
+config_path = os.path.join(os.path.dirname(__file__), 'test_config.yaml')
+config = load_config(config_path)
+
+# Module-level variables
+TRAINING_PERIOD_START = config['training_data']['training_period_start']
+TRAINING_PERIOD_END = config['training_data']['training_period_end']
+MODELING_PERIOD_START = config['training_data']['modeling_period_start']
+MODELING_PERIOD_END = config['training_data']['modeling_period_end']
 
 
 # ------------------------------------ #

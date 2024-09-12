@@ -13,7 +13,7 @@ training_data:
   training_period_start: '2024-01-01'
   training_period_end: '2024-04-30'
   modeling_period_start: '2024-05-01'
-  modeling_period_end: '2024-5-31'
+  modeling_period_end: '2024-5-07'
 
   # shark coin thresholds
   shark_coin_minimum_inflows: 5000  # Minimum amount of USD inflows to be considered a shark
@@ -24,10 +24,6 @@ training_data:
   shark_wallet_type: 'is_shark'
   shark_wallet_min_coins: 4
   shark_wallet_min_shark_rate: 0.4
-
-  # resampling period for profits_df aggregation
-  resampling_period: 3
-
 
 data_cleaning:
 # variables used to clean and filter raw data before training data is built

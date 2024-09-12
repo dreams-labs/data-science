@@ -5,29 +5,28 @@ calculates metrics related to the distribution of coin ownership across wallets
 import time
 import pandas as pd
 import numpy as np
-from dreams_core.googlecloud import GoogleCloud as dgc
 import dreams_core.core as dc
 
 # set up logger at the module level
 logger = dc.setup_logger()
 
 
-
-def generate_buysell_metrics_df(profits_df,cohort_wallets,cohort_coins):
+def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets,cohort_coins):
     """
     Generates buysell metrics for all cohort coins by looping through each coin_id and applying 
     calculate_buysell_coin_metrics_df().
 
     Parameters:
     - profits_df (pd.DataFrame): DataFrame containing profits data
+    - training_period_end (string): Date on which the final metrics will be generated, formatted YYYY-MM-DD
     - cohort_wallets (array-like): List of wallet addresses to include.
     - cohort_coins (array-like): List of coin IDs to include.
 
     Returns:
-    - buysell_features_df (pd.DataFrame): DataFrame containing features for all coin_ids.
+    - buysell_metrics_df (pd.DataFrame): DataFrame containing metrics for all coin_ids.
     """
     start_time = time.time()
-    logger.info('Preparing buysell_features_df...')
+    logger.info('Preparing buysell_metrics_df...')
 
     # Raise an error if either the wallet cohort or coin list is empty
     if len(cohort_wallets) == 0:
@@ -35,7 +34,8 @@ def generate_buysell_metrics_df(profits_df,cohort_wallets,cohort_coins):
     if len(cohort_coins) == 0:
         raise ValueError("Coin list is empty. Provide at least one coin ID.")
 
-    # Create cohort_profits_df by filtering projects_df to only include the cohort coins and wallets
+    # Create cohort_profits_df by filtering projects_df to only include the cohort coins and wallets during the training period
+    profits_df = profits_df[profits_df['date']<=training_period_end]
     cohort_profits_df = profits_df[
         (profits_df['wallet_address'].isin(cohort_wallets)) &
         (profits_df['coin_id'].isin(cohort_coins))
@@ -62,7 +62,7 @@ def generate_buysell_metrics_df(profits_df,cohort_wallets,cohort_coins):
         coin_cohort_profits_df = cohort_profits_df[cohort_profits_df['coin_id'] == c].copy()
 
         # Call the feature calculation function
-        coin_features_df = calculate_coin_buysell_metrics_df(coin_cohort_profits_df)
+        coin_features_df = generate_coin_buysell_metrics_df(coin_cohort_profits_df)
 
         # Add coin_id back to the DataFrame to retain coin information
         coin_features_df['coin_id'] = c
@@ -71,15 +71,15 @@ def generate_buysell_metrics_df(profits_df,cohort_wallets,cohort_coins):
         coin_features_list.append(coin_features_df)
 
     # Concatenate all features DataFrames into a single DataFrame
-    buysell_features_df = pd.concat(coin_features_list, ignore_index=True)
+    buysell_metrics_df = pd.concat(coin_features_list, ignore_index=True)
 
-    logger.info('Generated buysell_features_df after %.2f seconds.', time.time() - start_time)
+    logger.info('Generated buysell_metrics_df after %.2f seconds.', time.time() - start_time)
 
-    return buysell_features_df
+    return buysell_metrics_df
 
 
 
-def calculate_coin_buysell_metrics_df(coin_cohort_profits_df):
+def generate_coin_buysell_metrics_df(coin_cohort_profits_df):
     '''
     For a single coin_id, computes various buyer and seller metrics, including:
     - Number of new and repeat buyers/sellers

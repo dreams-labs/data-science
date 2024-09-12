@@ -90,7 +90,7 @@ def flatten_time_series(ts, window_sizes=[7, 30], bollinger_window=20, decompose
     """
     features = {}
     features.update(calculate_global_stats(ts))
-    # features.update(calculate_rolling_window_features(ts, window_sizes))
+    features.update(calculate_rolling_window_features(ts, window_sizes))
     # features.update(calculate_bollinger_bands(ts, bollinger_window))
     # features.update(calculate_decomposition_features(ts, decompose_model, freq))
 
@@ -98,14 +98,14 @@ def flatten_time_series(ts, window_sizes=[7, 30], bollinger_window=20, decompose
 
 
 
-def flatten_coin_features(coin_df, metrics, window_sizes=[7, 30], 
+def flatten_coin_features(coin_df, metrics_dict, window_sizes=[7, 30], 
                           bollinger_window=20, decompose_model='additive', freq=None):
     """
     Flattens all relevant time series metrics for a single coin into a row of features.
-    
+
     Params:
     - coin_df (pd.DataFrame): DataFrame with time series data for a single coin (coin_id-date).
-    - metrics (list): List of time series column names to flatten into features.
+    - metrics_dict (dict): Dictionary where keys are metric names and values are aggregation types.
     - window_sizes (list): List of rolling window sizes to compute features over.
     - bollinger_window (int): The window size for calculating Bollinger Bands (default: 20).
     - decompose_model (str): 'additive' or 'multiplicative' decomposition (default: 'additive').
@@ -116,35 +116,44 @@ def flatten_coin_features(coin_df, metrics, window_sizes=[7, 30],
     """
     flat_features = {'coin_id': coin_df['coin_id'].iloc[0]}  # Initialize with coin_id
 
-    # Apply flatten_time_series to each time series (metric) in the metrics list
-    for metric in metrics:
+    # Apply flatten_time_series to each metric and its specified aggregation(s) from the dictionary
+    for metric, aggregations in metrics_dict.items():
         ts = coin_df[metric].copy()
-        ts_features = flatten_time_series(ts, window_sizes=window_sizes, 
-                                          bollinger_window=bollinger_window, 
-                                          decompose_model=decompose_model, 
-                                          freq=freq)
-        
-        # Prefix each feature name with the metric to avoid name clashes
-        for feature_name, feature_value in ts_features.items():
-            flat_features[f'{metric}_{feature_name}'] = feature_value
-    
+
+        # Apply all specified aggregations (e.g., sum, mean)
+        for agg in aggregations:
+            if agg == 'sum':
+                flat_features[f'{metric}_sum'] = ts.sum()
+            elif agg == 'mean':
+                flat_features[f'{metric}_mean'] = ts.mean()
+
+            # Optionally, you can add more complex time-series-based aggregations like rolling windows:
+            # For example:
+            if agg == 'rolling':
+                ts_features = flatten_time_series(ts, window_sizes=window_sizes, 
+                                                  bollinger_window=bollinger_window, 
+                                                  decompose_model=decompose_model, 
+                                                  freq=freq)
+                # Prefix each feature name with the metric to avoid name clashes
+                for feature_name, feature_value in ts_features.items():
+                    flat_features[f'{metric}_{feature_name}'] = feature_value
+
     return flat_features
 
 
-
-def process_all_coins(df, metrics, window_sizes=[7, 30], 
+def flatten_coin_date_df(df, metrics_dict, window_sizes=[7, 30], 
                       bollinger_window=20, decompose_model='additive', freq=None):
     """
     Processes all coins in the DataFrame and flattens relevant time series metrics for each coin.
-    
+
     Params:
     - df (pd.DataFrame): DataFrame containing time series data for multiple coins (coin_id-date).
-    - metrics (list): List of time series column names to flatten into features.
+    - metrics_dict (dict): Dictionary where keys are metric names and values are aggregation types.
     - window_sizes (list): List of rolling window sizes to compute features over.
     - bollinger_window (int): The window size for calculating Bollinger Bands.
     - decompose_model (str): 'additive' or 'multiplicative' decomposition.
     - freq (int): The frequency of the seasonality (e.g., 7 for weekly, 30 for monthly).
-    
+
     Returns:
     - result (pd.DataFrame): A DataFrame of flattened features for all coins.
     """
@@ -155,8 +164,8 @@ def process_all_coins(df, metrics, window_sizes=[7, 30],
         # Filter the data for the current coin
         coin_df = df[df['coin_id'] == coin_id].copy()
 
-        # Flatten the features for this coin
-        flat_features = flatten_coin_features(coin_df, metrics, window_sizes, 
+        # Flatten the features for this coin using the metrics dictionary
+        flat_features = flatten_coin_features(coin_df, metrics_dict, window_sizes, 
                                               bollinger_window, decompose_model, freq)
         all_flat_features.append(flat_features)
     

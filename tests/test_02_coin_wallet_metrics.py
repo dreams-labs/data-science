@@ -11,7 +11,6 @@ tests used to audit the files in the data-science/src folder
 
 import sys
 import os
-import yaml
 import pandas as pd
 from dotenv import load_dotenv
 import pytest
@@ -20,24 +19,10 @@ from dreams_core import core as dc
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 import coin_wallet_metrics as cwm # type: ignore[reportMissingImports]
+from utils import load_config # type: ignore[reportMissingImports]
 
 load_dotenv()
 logger = dc.setup_logger()
-
-# ---------------------------------- #
-# set up config and module-level variables
-# ---------------------------------- #
-
-def load_config():
-    """
-    Fixture to load test config from test_config.yaml.
-    """
-    config_path = os.path.join(os.path.dirname(__file__), 'test_config.yaml')
-    with open(config_path, 'r', encoding='utf-8') as f:
-        config = yaml.safe_load(f)
-    return config
-
-config = load_config()
 
 
 # ===================================================== #
@@ -45,6 +30,112 @@ config = load_config()
 #                 U N I T   T E S T S                   #
 #                                                       #
 # ===================================================== #
+
+# ------------------------------------------ #
+# test_generate_buysell_metrics_df() unit tests
+# ------------------------------------------ #
+
+# Updated mock data fixture for profits_df with wallet5 included
+@pytest.fixture
+def mock_profits_df():
+    data = {
+        'wallet_address': [
+            'wallet1', 'wallet1', 'wallet1', 'wallet1', 'wallet1',  # wallet1 transactions (coin1)
+            'wallet2', 'wallet2', 'wallet2', 'wallet2', 'wallet2',  # wallet2 transactions (coin2)
+            'wallet3', 'wallet3', 'wallet3', 'wallet3', 'wallet3',  # wallet3 transactions (coin3)
+            'wallet1', 'wallet1',  # wallet1 transactions (coin4 - outside cohort)
+            'wallet4', 'wallet4',  # wallet4 transactions (coin1 - outside cohort)
+            'wallet5', 'wallet5', 'wallet5'  # wallet5 transactions (coin1 and coin2)
+        ],
+        'coin_id': [
+            'coin1', 'coin1', 'coin1', 'coin1', 'coin1',  # coin1 (wallet1)
+            'coin2', 'coin2', 'coin2', 'coin2', 'coin2',  # coin2 (wallet2)
+            'coin3', 'coin3', 'coin3', 'coin3', 'coin3',  # coin3 (wallet3)
+            'coin4', 'coin4',  # coin4 (wallet1 - outside cohort)
+            'coin1', 'coin1',  # wallet4 coin1 (outside cohort)
+            'coin1', 'coin2', 'coin2'  # wallet5 purchases: coin1 (1/1/24), coin2 (1/2/24 and 1/3/24)
+        ],
+        'date': [
+            '2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05',  # wallet1 coin1
+            '2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05',  # wallet2 coin2
+            '2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05',  # wallet3 coin3
+            '2024-01-01', '2024-01-02',  # wallet1 coin4
+            '2024-01-01', '2024-01-02',  # wallet4 coin1 (outside cohort)
+            '2024-01-01', '2024-01-02', '2024-01-03'  # wallet5 transactions
+        ],
+        'balance': [
+            100, 130, 230, 230, 220,  # wallet1 (coin1)
+            200, 180, 230, 190, 190,  # wallet2 (coin2)
+            50, 60, 40, 60, 60,  # wallet3 (coin3)
+            400, 425,  # wallet1 (coin4 - outside cohort)
+            600, 620,  # wallet4 coin1 (outside cohort)
+            100, 200, 200  # wallet5 coin1 and coin2 purchases
+        ],
+        'net_transfers': [
+            100, +30, +100, 0, -10,  # wallet1 (coin1)
+            200, -20, +50, -40, 0,  # wallet2 (coin2)
+            50, +10, -20, +20, 0,  # wallet3 (coin3)
+            400, +25,  # wallet1 (coin4 - outside cohort)
+            600, +20,  # wallet4 coin1 (outside cohort)
+            100, 200, 200  # wallet5 transactions
+        ]
+    }
+
+    return pd.DataFrame(data)
+
+def test_unit_generate_buysell_metrics_df(mock_profits_df):
+    """
+    tests the generation of buysell metrics for a wallet-coin cohort
+    """
+    cohort_wallets = ['wallet1', 'wallet2', 'wallet3', 'wallet5']  # Include wallet5
+    cohort_coins = ['coin1', 'coin2', 'coin3']  # Cohort coins
+    training_period_end = '2024-01-05'  # Set a training period end date
+
+    # Call the function
+    result_df = cwm.generate_buysell_metrics_df(mock_profits_df, training_period_end, cohort_wallets, cohort_coins)
+
+    # Test the output structure
+    expected_columns = [
+        'date', 'buyers_new', 'buyers_repeat', 'total_buyers', 'sellers_new', 'sellers_repeat',
+        'total_sellers', 'total_bought', 'total_sold', 'total_net_transfers', 'total_volume',
+        'total_holders', 'total_balance', 'coin_id'
+    ]
+
+    for col in expected_columns:
+        assert col in result_df.columns, f"Missing column: {col}"
+
+    # Assertions for wallet5:
+    # buyers_new for coin1 on 1/1/24 should be 2 (wallet1 and wallet5)
+    assert result_df[(result_df['coin_id'] == 'coin1') & (result_df['date'] == '2024-01-01')]['buyers_new'].iloc[0] == 2
+
+    # buyers_new for coin2 on 1/2/24 should be 1 (wallet5)
+    assert result_df[(result_df['coin_id'] == 'coin2') & (result_df['date'] == '2024-01-02')]['buyers_new'].iloc[0] == 1
+
+    # buyers_repeat for coin2 on 1/3/24 should be 2 (wallet2 and wallet5)
+    assert result_df[(result_df['coin_id'] == 'coin2') & (result_df['date'] == '2024-01-03')]['buyers_repeat'].iloc[0] == 2
+
+    # Filter mock_profits_df to only include cohort wallets and coins
+    cohort_profits_df = mock_profits_df[
+        (mock_profits_df['wallet_address'].isin(cohort_wallets)) & 
+        (mock_profits_df['coin_id'].isin(cohort_coins))
+    ]
+
+    # total_bought should match the sum of positive net_transfers in cohort_profits_df
+    total_bought_mock = cohort_profits_df[cohort_profits_df['net_transfers'] > 0]['net_transfers'].sum()
+    total_bought_result = result_df['total_bought'].sum()
+    assert total_bought_mock == total_bought_result, f"Total bought does not match: {total_bought_mock} != {total_bought_result}"
+
+    # total_sold should match the sum of absolute values of negative net_transfers in cohort_profits_df
+    total_sold_mock = abs(cohort_profits_df[cohort_profits_df['net_transfers'] < 0]['net_transfers'].sum())
+    total_sold_result = result_df['total_sold'].sum()
+    assert total_sold_mock == total_sold_result, f"Total sold does not match: {total_sold_mock} != {total_sold_result}"
+
+    # Assertions for total_balance of coin2 on all 5 days
+    coin2_balances = mock_profits_df[mock_profits_df['coin_id'] == 'coin2'].groupby('date')['balance'].sum()
+    for date, expected_balance in coin2_balances.items():
+        result_balance = result_df[(result_df['coin_id'] == 'coin2') & (result_df['date'] == date)]['total_balance'].iloc[0]
+        assert expected_balance == result_balance, f"Balance mismatch for coin2 on {date}: {expected_balance} != {result_balance}"
+
 
 # # ---------------------------------- #
 # # resample_profits_df() unit tests
@@ -298,35 +389,109 @@ config = load_config()
 #                                                          #
 # ======================================================== #
 
-# # ---------------------------------- #
-# # resample_profits_df() integration tests
-# # ---------------------------------- #
 
-# @pytest.fixture(scope="module")
-# def cleaned_profits_df():
-#     """
-#     Fixture to load the cleaned_profits_df from the fixtures folder.
-#     """
-#     return pd.read_csv('tests/fixtures/cleaned_profits_df.csv')
+# ---------------------------------- #
+# set up config and module-level fixtures
+# ---------------------------------- #
 
-# def test_resample_profits_basic(cleaned_profits_df):
-#     """
-#     Integration test to verify basic functionality of the resample_profits_df function.
-#     This test checks if the resampling correctly sums net transfers over a 3-day window
-#     and preserves the final balance.
-#     """
-#     # Perform the resampling over 3-day windows
-#     resampled_df = cwm.resample_profits_df(cleaned_profits_df, resampling_period=3)
+@pytest.fixture(scope="session")
+def config():
+    """
+    Fixture to load the configuration from the YAML file.
+    """
+    config_path = os.path.join(os.path.dirname(__file__), 'test_config.yaml')
+    return load_config(config_path)
 
-#     # Example assertions to verify resampling worked correctly
-#     # Check that the resampled dataframe is not empty
-#     assert not resampled_df.empty, "Resampled dataframe should not be empty"
+@pytest.fixture(scope="session")
+def cleaned_profits_df():
+    """
+    Fixture to load the cleaned_profits_df from the fixtures folder.
+    """
+    return pd.read_csv('tests/fixtures/cleaned_profits_df.csv')
 
-#     # Check that the number of rows has decreased (since resampling aggregates)
-#     assert resampled_df.shape[0] < cleaned_profits_df.shape[0], "Resampled dataframe should have fewer rows"
+@pytest.fixture(scope="session")
+def shark_wallets_df():
+    """
+    Fixture to load the shark_wallets_df from the fixtures folder.
+    """
+    return pd.read_csv('tests/fixtures/shark_wallets_df.csv')
 
-#     # Add specific checks for net_transfers and balance (example values would need to be based on actual data)
-#     # For example, check that for a given wallet/coin, the net transfers are summed correctly
-#     example_row = resampled_df.iloc[0]
-#     assert example_row['net_transfers'] > 0, "Net transfers should be positive after aggregation"
-#     assert example_row['balance'] > 0, "Balance should be preserved correctly"
+@pytest.fixture(scope="session")
+def shark_coins_df():
+    """
+    Fixture to load the shark_coins_df from the fixtures folder.
+    """
+    return pd.read_csv('tests/fixtures/shark_coins_df.csv')
+
+
+# ---------------------------------- #
+# generate_buysell_metrics_df() integration tests
+# ---------------------------------- #
+
+@pytest.fixture(scope="session")
+def buysell_metrics_df(cleaned_profits_df, shark_wallets_df, shark_coins_df, config):
+    """
+    Fixture to generate the buysell_metrics_df from the cleaned_profits_df, shark_wallets_df, and shark_coins_df.
+    """
+    # Generate inputs for generate_buysell_metrics_df
+    cohort_wallets = shark_wallets_df[shark_wallets_df['is_shark']]['wallet_address'].unique()
+    cohort_coins = shark_coins_df['coin_id'].unique()
+
+    # Generate the buysell_metrics_df
+    return cwm.generate_buysell_metrics_df(
+        cleaned_profits_df,
+        config['training_data']['training_period_end'],
+        cohort_wallets,
+        cohort_coins
+    )
+
+@pytest.mark.integration
+def test_integration_buysell_metrics_df(buysell_metrics_df, cleaned_profits_df, shark_wallets_df, shark_coins_df, config):
+    """
+    Integration test for the buysell_metrics_df fixture.
+    Validates the structure and key calculations in the final DataFrame.
+    """
+
+    # 1. Validate Structure: Check for expected columns in buysell_metrics_df
+    expected_columns = [
+        'date', 'buyers_new', 'buyers_repeat', 'total_buyers', 'sellers_new', 'sellers_repeat',
+        'total_sellers', 'total_bought', 'total_sold', 'total_net_transfers', 'total_volume',
+        'total_holders', 'total_balance', 'coin_id'
+    ]
+    assert set(expected_columns).issubset(buysell_metrics_df.columns), "Missing expected columns in buysell_metrics_df"
+
+    # 2. Validate Key Feature Calculations
+
+    # Filter the cleaned_profits_df to only include cohort wallets and coins
+    cohort_wallets = shark_wallets_df[shark_wallets_df['is_shark']]['wallet_address'].unique()
+    cohort_coins = shark_coins_df['coin_id'].unique()
+
+    cohort_profits_df = cleaned_profits_df[
+        (cleaned_profits_df['wallet_address'].isin(cohort_wallets)) &
+        (cleaned_profits_df['coin_id'].isin(cohort_coins)) &
+        (cleaned_profits_df['date'] <= config['training_data']['training_period_end'])  # Add date filtering
+    ]
+
+    # Check that total_bought matches the sum of positive net_transfers in cohort_profits_df
+    total_bought_mock = cohort_profits_df[cohort_profits_df['net_transfers'] > 0]['net_transfers'].sum()
+    total_bought_result = buysell_metrics_df['total_bought'].sum()
+    assert total_bought_mock == pytest.approx(total_bought_result, rel=1e-9), f"Total bought mismatch: {total_bought_mock} != {total_bought_result}"
+
+    # Check that total_sold matches the sum of negative net_transfers in cohort_profits_df
+    total_sold_mock = abs(cohort_profits_df[cohort_profits_df['net_transfers'] < 0]['net_transfers'].sum())
+    total_sold_result = buysell_metrics_df['total_sold'].sum()
+    assert total_sold_mock == pytest.approx(total_sold_result, rel=1e-9), f"Total sold mismatch: {total_sold_mock} != {total_sold_result}"
+
+    # Check that total_net_transfers matches the net of all net_transfers in cohort_profits_df
+    total_net_transfers_mock = cohort_profits_df['net_transfers'].sum()
+    total_net_transfers_result = buysell_metrics_df['total_net_transfers'].sum()
+    assert total_net_transfers_mock == pytest.approx(total_net_transfers_result, rel=1e-9), f"Total net transfers mismatch: {total_net_transfers_mock} != {total_net_transfers_result}"
+    # 3. Data Quality Checks
+
+    # Ensure there are no NaN values in critical columns
+    critical_columns = ['total_bought', 'total_sold', 'total_net_transfers', 'total_balance']
+    for col in critical_columns:
+        assert buysell_metrics_df[col].isnull().sum() == 0, f"Found NaN values in {col}"
+
+    # Ensure non-cohort wallets and coins are excluded
+    assert set(buysell_metrics_df['coin_id']).issubset(cohort_coins), "Non-cohort coins found in buysell_metrics_df"

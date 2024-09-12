@@ -5,6 +5,53 @@ modeling:
   moon_threshold: 0.3  # 30% increase
   dump_threshold: -0.2  # 20% decrease
 
+metrics:
+# metrics dictionary for defining how each metric is summarized as a coin-level feature
+
+  # Buyer-related metrics
+  buyers_new: 
+    - "sum"      # Total number of new buyers for each coin
+    - "mean"     # Average number of new buyers per day for each coin
+  buyers_repeat: 
+    - "sum"      # Total number of repeat buyers for each coin
+    - "mean"     # Average number of repeat buyers per day for each coin
+  total_buyers: 
+    - "sum"      # Total number of buyers (new + repeat) for each coin
+    - "mean"     # Average number of buyers per day for each coin
+
+  # Seller-related metrics
+  sellers_new: 
+    - "sum"      # Total number of new sellers for each coin
+    - "mean"     # Average number of new sellers per day for each coin
+  sellers_repeat: 
+    - "sum"      # Total number of repeat sellers for each coin
+    - "mean"     # Average number of repeat sellers per day for each coin
+  total_sellers: 
+    - "sum"      # Total number of sellers (new + repeat) for each coin
+    - "mean"     # Average number of sellers per day for each coin
+
+  # Buy/Sell Volume and Net Transfers
+  total_bought: 
+    - "sum"      # Total volume bought for each coin
+    - "mean"     # Average volume bought per day for each coin
+  total_sold: 
+    - "sum"      # Total volume sold for each coin
+    - "mean"     # Average volume sold per day for each coin
+  total_net_transfers: 
+    - "sum"      # Net transfers (bought - sold) for each coin
+    - "mean"     # Average net transfers per day for each coin
+  total_volume: 
+    - "sum"      # Total trading volume (bought + sold) for each coin
+    - "mean"     # Average trading volume per day for each coin
+
+  # Holders and Balance
+  total_holders: 
+    - "mean"     # Average number of holders for each coin
+    - "max"      # Maximum number of holders for each coin
+  total_balance: 
+    - "sum"      # Total balance held by wallets for each coin
+    - "mean"     # Average balance held per wallet for each coin
+
 
 training_data:
 # variables used to define the training data
@@ -13,7 +60,7 @@ training_data:
   training_period_start: '2024-01-01'
   training_period_end: '2024-04-30'
   modeling_period_start: '2024-05-01'
-  modeling_period_end: '2024-5-31'
+  modeling_period_end: '2024-5-07'
 
   # shark coin thresholds
   shark_coin_minimum_inflows: 5000  # Minimum amount of USD inflows to be considered a shark
@@ -24,10 +71,6 @@ training_data:
   shark_wallet_type: 'is_shark'
   shark_wallet_min_coins: 4
   shark_wallet_min_shark_rate: 0.4
-
-  # resampling period for profits_df aggregation
-  resampling_period: 3
-
 
 data_cleaning:
 # variables used to clean and filter raw data before training data is built
