@@ -87,9 +87,8 @@ def calculate_rolling_window_features(ts, window_duration, lookback_periods, rol
     Calculates rolling window features and comparisons for a given time series based on
     configurable window duration and lookback periods.
 
-    Assumptions (Version 0.1):
-    - The maximum percentage change is capped at 1000%.
-    - When the start_value is 0, an impute_value of 1 is used.
+    Adjusted logic: If the number of records is not divisible by the window_duration,
+    the function will disregard the extra days and only consider the most recent complete periods.
 
     Params:
     - ts (pd.Series): The time series data for the metric.
@@ -100,42 +99,43 @@ def calculate_rolling_window_features(ts, window_duration, lookback_periods, rol
                           (e.g., ['change', 'pct_change']).
 
     Returns:
-    - features (dict): A dictionary containing calculated rolling window features. Keys include
-                       rolling window stats and comparisons, such as 'sum_7d_period_1', 'change_7d_period_2'.
+    - features (dict): A dictionary containing calculated rolling window features.
     """
+
+    features = {}  # Initialize an empty dictionary to store the rolling window features
     
-    features = {}  # Initialize an empty dictionary to store the rolling window features.
+    # Calculate the total number of complete periods that fit within the time series
+    num_complete_periods = len(ts) // window_duration
     
-    # Loop through each lookback period to calculate rolling window features.
-    for i in range(lookback_periods):
-        # Define the start and end of the current rolling window.
+    # Ensure we're not calculating more periods than we have data for
+    actual_lookback_periods = min(lookback_periods, num_complete_periods)
+
+    # Start processing from the last complete period, moving backwards
+    for i in range(actual_lookback_periods):
+        # Define the start and end of the current rolling window
         end_period = len(ts) - i * window_duration
         start_period = end_period - window_duration
-        
-        # Ensure that the start index is not out of bounds.
+
+        # Ensure that the start index is not out of bounds
         if start_period >= 0:
-            # Slice the time series to get the data for the current rolling window.
+            # Slice the time series to get the data for the current rolling window
             rolling_window = ts.iloc[start_period:end_period]
-            
-            # Loop through each statistic to calculate for the rolling window.
+
+            # Loop through each statistic to calculate for the rolling window
             for stat in rolling_stats:
-                # Use a helper function (calculate_stat) to calculate the desired statistic for this window.
                 features[f'{stat}_{window_duration}d_period_{i+1}'] = calculate_stat(rolling_window, stat)
-            
-            # If the rolling window has enough data, calculate comparisons.
+
+            # If the rolling window has enough data, calculate comparisons
             if len(rolling_window) > 0:
-                # Loop through each comparison (e.g., 'change', 'pct_change').
                 for comparison in comparisons:
                     if comparison == 'change':
-                        # Calculate the absolute change between the first and last value in the window.
                         features[f'change_{window_duration}d_period_{i+1}'] = rolling_window.iloc[-1] - rolling_window.iloc[0]
                     elif comparison == 'pct_change':
-                        # Use the calculate_adj_pct_change function for percentage change
                         start_value = rolling_window.iloc[0]
                         end_value = rolling_window.iloc[-1]
                         features[f'pct_change_{window_duration}d_period_{i+1}'] = calculate_adj_pct_change(start_value, end_value)
 
-    return features  # Return the dictionary of rolling window features.
+    return features  # Return the dictionary of rolling window features
 
 
 def flatten_coin_features(coin_df, metrics_config):

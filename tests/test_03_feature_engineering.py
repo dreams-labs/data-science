@@ -39,6 +39,10 @@ logger = dc.setup_logger()
 
 @pytest.mark.unit
 def test_fe_calculate_stat():
+    """
+    basic tests for calculation, ensuring that the inputs map to the correct
+    functions and that an invalid input raises an error. 
+    """
     # Sample data for testing
     sample_series = pd.Series([1, 2, 3, 4, 5])
     empty_series = pd.Series([])
@@ -192,6 +196,103 @@ def test_fe_calculate_global_stats():
     
     no_stats = fe.calculate_global_stats(sample_ts, 'buyers_new', no_stats_config)
     assert no_stats == {}  # Should return an empty dictionary since no stats are defined
+
+
+
+# ------------------------------------------ #
+# calculate_rolling_window_features() unit tests
+# ------------------------------------------ #
+
+@pytest.mark.unit
+def test_fe_calculate_rolling_window_features():
+    """
+    Unit tests for fe.calculate_rolling_window_features().
+
+    Test Cases:
+    1. **Multiple periods with complete windows**:
+    - Uses 10 records with a window duration of 3 and 3 lookback periods.
+    - Verifies that all requested statistics ('sum', 'max', 'min', 'median', 'std') are calculated correctly for complete periods.
+    - Also checks for valid 'change' and 'pct_change' calculations.
+
+    2. **Non-divisible records**:
+    - Uses 8 records with a window duration of 3.
+    - Verifies that only complete periods are processed and earlier incomplete data is disregarded.
+    - Ensures that 'period_3' is not calculated, and correct results for 'sum' and 'change' are returned for periods 1 and 2.
+
+    3. **Small dataset**:
+    - Uses only 2 records, which is smaller than the window size.
+    - Ensures that the function handles small datasets gracefully and returns an empty dictionary.
+
+    4. **Standard deviation and median checks**:
+    - Specifically tests the calculation of 'std' and 'median' over the last 3 periods for valid rolling windows.
+    - Verifies that these statistics are calculated accurately for both period 1 and period 2.
+
+    5. **Percentage change with impute_value logic**:
+    - Tests how the function handles a time series containing zeros.
+    - Ensures that the 'pct_change' is calculated correctly, handling cases where the start value is 0 using the impute logic, and verifies that large percentage changes are capped at 1000%.
+    """
+
+    # Sample data for testing
+    ts = pd.Series([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    ts_with_8_records = pd.Series([1, 2, 3, 4, 5, 6, 7, 8])
+    small_ts = pd.Series([1, 2])
+
+    # Configuration for window and lookback periods
+    window_duration = 3
+    lookback_periods = 3
+    rolling_stats = ['sum', 'max', 'min', 'median', 'std']
+    comparisons = ['change', 'pct_change']
+
+
+    # Test Case 1: Multiple periods with complete windows (10 records, 3 periods, window_duration=3)
+    rolling_features = fe.calculate_rolling_window_features(ts, window_duration, lookback_periods, rolling_stats, comparisons)
+
+    assert rolling_features['sum_3d_period_1'] == 27  # Last 3 records: 9+10+8 = 27
+    assert rolling_features['max_3d_period_1'] == 10
+    assert rolling_features['min_3d_period_1'] == 8
+    assert rolling_features['median_3d_period_1'] == 9
+    assert round(rolling_features['std_3d_period_1'], 5) == round(ts.iloc[-3:].std(), 5)
+
+    assert 'change_3d_period_1' in rolling_features
+    assert 'pct_change_3d_period_1' in rolling_features
+
+
+    # Test Case 2: Non-divisible records (8 records, window_duration=3)
+    rolling_features_partial_window = fe.calculate_rolling_window_features(ts_with_8_records, 3, 3, ['sum', 'max'], ['change', 'pct_change'])
+
+    # Only two full periods (6-8 and 3-5), so period 3 should not exist
+    assert rolling_features_partial_window['sum_3d_period_1'] == 21  # Last 3 records: 6+7+8
+    assert rolling_features_partial_window['sum_3d_period_2'] == 12  # Next 3 records: 3+4+5
+
+    # Ensure no period 3 is calculated
+    assert 'sum_3d_period_3' not in rolling_features_partial_window
+    assert 'change_3d_period_3' not in rolling_features_partial_window
+
+
+    # Test Case 3: Small dataset (2 records)
+    rolling_features_small_ts = fe.calculate_rolling_window_features(small_ts, window_duration, lookback_periods, rolling_stats, comparisons)
+
+    # No valid 3-period windows exist, so the function should handle it gracefully
+    assert rolling_features_small_ts == {}  # Expect empty dict since window is larger than available data
+
+
+    # Test Case 4: Check std and median specifically with window of 3 and valid lookback periods
+    rolling_features_std_median = fe.calculate_rolling_window_features(ts, window_duration, lookback_periods, ['std', 'median'], comparisons)
+
+    # Check for standard deviation and median over the last 3 periods
+    assert round(rolling_features_std_median['std_3d_period_1'], 5) == round(ts.iloc[-3:].std(), 5)
+    assert rolling_features_std_median['median_3d_period_1'] == 9
+    assert round(rolling_features_std_median['std_3d_period_2'], 5) == round(ts.iloc[-6:-3].std(), 5)
+    assert rolling_features_std_median['median_3d_period_2'] == 6
+
+
+    # Test Case 5: Handle pct_change with impute_value logic (start_value=0)
+    ts_with_zeros = pd.Series([0, 0, 5, 10, 15, 20])
+    rolling_features_zeros = fe.calculate_rolling_window_features(ts_with_zeros, window_duration, lookback_periods, ['sum'], comparisons)
+
+    assert 'pct_change_3d_period_1' in rolling_features_zeros
+    assert rolling_features_zeros['pct_change_3d_period_2'] <= 1000  # Ensure capping at 1000%
+
 
 
 # ======================================================== #
