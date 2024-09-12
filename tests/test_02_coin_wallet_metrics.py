@@ -2,6 +2,7 @@
 tests used to audit the files in the data-science/src folder
 """
 # pylint: disable=C0301 # line over 100 chars
+# pylint: disable=C0303 # trailing whitespace
 # pylint: disable=C0413 # import not at top of doc (due to local import)
 # pylint: disable=C0116 # missing docstring
 # pylint: disable=W1203 # fstrings in logs
@@ -83,6 +84,7 @@ def mock_profits_df():
 
     return pd.DataFrame(data)
 
+@pytest.mark.unit
 def test_unit_generate_buysell_metrics_df(mock_profits_df):
     """
     tests the generation of buysell metrics for a wallet-coin cohort
@@ -137,248 +139,76 @@ def test_unit_generate_buysell_metrics_df(mock_profits_df):
         assert expected_balance == result_balance, f"Balance mismatch for coin2 on {date}: {expected_balance} != {result_balance}"
 
 
-# # ---------------------------------- #
-# # resample_profits_df() unit tests
-# # ---------------------------------- #
+# ------------------------------------------ #
+# fill_buysell_metrics_df() unit tests
+# ------------------------------------------ #
 
+@pytest.mark.unit
+def test_fill_buysell_metrics_df():
+    """
+    Unit test for the fill_buysell_metrics_df function.
 
-# def test_single_buy_transfer():
-#     data = {
-#         'wallet_address': ['wallet1'],
-#         'coin_id': ['coinA'],
-#         'date': ['2024-09-01'],
-#         'balance': [600],
-#         'net_transfers': [200]
-#     }
-#     profits_df = pd.DataFrame(data)
-#     profits_df['date'] = pd.to_datetime(profits_df['date'])
+    This test checks the following:
+    
+    1. Missing dates within the input DataFrame's date range are correctly identified and filled.
+    2. Missing rows beyond the latest date (up to the training_period_end) are added with NaN values initially, then filled appropriately.
+    3. Forward-filling for 'total_balance' and 'total_holders' works as expected, ensuring that:
+       - Values are forward-filled correctly for each coin_id.
+       - Any missing dates earlier than the first record for 'total_balance' or 'total_holders' are filled with 0.
+    4. 'buyers_new' and other transaction-related columns (e.g., 'total_bought', 'total_sold') are correctly filled with 0 for missing dates.
+    
+    Test Case Summary:
+    - The test includes three coins: 'coin1', 'coin2', and 'coin3'.
+    - 'coin1' has two records: one on 2024-01-01 and one on 2024-01-04, and is missing values for 2024-01-02, 2024-01-03, and 2024-01-05.
+    - 'coin2' has two records: one on 2024-01-01 and one on 2024-01-03, and is missing values for 2024-01-02 and 2024-01-05.
+    - 'coin3' has a single record on 2024-01-03 and is missing values for 2024-01-04 and 2024-01-05.
+    
+    Expected Assertions:
+    - The 'total_balance' and 'buyers_new' columns are correctly forward-filled for each coin, ensuring no values leak across coin_ids.
+    - For each coin_id, records with missing 'total_balance' or 'total_holders' before the first non-null date are filled with 0.
+    - Transaction-related columns (e.g., 'buyers_new') are filled with 0 for any missing dates.
+    """
+    buysell_metrics_df = pd.DataFrame({
+        'coin_id': ['coin1', 'coin1', 'coin2', 'coin2', 'coin3'],
+        'date': [pd.Timestamp('2024-01-01'), pd.Timestamp('2024-01-04'), pd.Timestamp('2024-01-01'), pd.Timestamp('2024-01-03'), pd.Timestamp('2024-01-03')],
+        'total_balance': [100, 110, 200, None, 300],  # Added coin3 with balance 300 on 2024-01-03
+        'total_bought': [50, 20, 75, None, 60],
+        'total_sold': [10, 5, 15, None, 20],
+        'total_net_transfers': [40, 15, 60, None, 40],
+        'total_volume': [100, 35, 150, None, 80],
+        'total_holders': [10, 11, 20, None, 30],  # Added coin3 with holders 30 on 2024-01-03
+        'buyers_new': [1, 0, 2, None, 3],  # Added coin3 with 3 new buyers on 2024-01-03
+        'buyers_repeat': [0, 1, 0, None, 1],
+        'total_buyers': [1, 1, 2, None, 4],
+        'sellers_new': [0, 1, 1, None, 2],
+        'sellers_repeat': [1, 0, 1, None, 1],
+        'total_sellers': [1, 1, 2, None, 3]
+    })
 
-#     # Resample over 3 days
-#     resampled_df = cwm.resample_profits_df(profits_df, resampling_period=3)
+    training_period_end = pd.Timestamp('2024-01-05')
 
-#     # Expected output
-#     assert resampled_df['net_transfers'].iloc[0] == 200
-#     assert resampled_df['balance'].iloc[0] == 600
+    # Call the function to fill missing dates and values
+    result = cwm.fill_buysell_metrics_df(buysell_metrics_df, training_period_end)
 
-# def test_single_sell_transfer():
-#     data = {
-#         'wallet_address': ['wallet1'],
-#         'coin_id': ['coinA'],
-#         'date': ['2024-09-01'],
-#         'balance': [550],
-#         'net_transfers': [-50]
-#     }
-#     profits_df = pd.DataFrame(data)
-#     profits_df['date'] = pd.to_datetime(profits_df['date'])
+    # Assert total_balance for coin1 is filled correctly
+    expected_total_balance_coin1 = [100, 100, 100, 110, 110]
+    result_total_balance_coin1 = result[result['coin_id'] == 'coin1']['total_balance'].tolist()
+    assert result_total_balance_coin1 == expected_total_balance_coin1, f"Expected {expected_total_balance_coin1}, but got {result_total_balance_coin1}"
 
-#     # Resample over 3 days
-#     resampled_df = cwm.resample_profits_df(profits_df, resampling_period=3)
+    # Assert buyers_new for coin1 is filled correctly
+    expected_buyers_new_coin1 = [1, 0, 0, 0, 0]
+    result_buyers_new_coin1 = result[result['coin_id'] == 'coin1']['buyers_new'].tolist()
+    assert result_buyers_new_coin1 == expected_buyers_new_coin1, f"Expected {expected_buyers_new_coin1}, but got {result_buyers_new_coin1}"
 
-#     # Expected output
-#     assert resampled_df['net_transfers'].iloc[0] == -50
-#     assert resampled_df['balance'].iloc[0] == 550
+    # Assert total_balance for coin3 is filled correctly
+    expected_total_balance_coin3 = [0, 0, 300, 300, 300]
+    result_total_balance_coin3 = result[result['coin_id'] == 'coin3']['total_balance'].tolist()
+    assert result_total_balance_coin3 == expected_total_balance_coin3, f"Expected {expected_total_balance_coin3}, but got {result_total_balance_coin3}"
 
-# def test_offsetting_transfers():
-#     data = {
-#         'wallet_address': ['wallet1', 'wallet1'],
-#         'coin_id': ['coinA', 'coinA'],
-#         'date': ['2024-09-01', '2024-09-02'],
-#         'balance': [500, 400],
-#         'net_transfers': [100, -100]
-#     }
-#     profits_df = pd.DataFrame(data)
-#     profits_df['date'] = pd.to_datetime(profits_df['date'])
-
-#     # Resample over 3 days
-#     resampled_df = cwm.resample_profits_df(profits_df, resampling_period=3)
-
-#     # Expect no output row since net_transfers cancel out
-#     assert resampled_df.empty
-
-# def test_mixed_transactions():
-#     data = {
-#         'wallet_address': ['wallet1', 'wallet1'],
-#         'coin_id': ['coinA', 'coinA'],
-#         'date': ['2024-09-01', '2024-09-03'],
-#         'balance': [400, 350],
-#         'net_transfers': [100, -50]
-#     }
-#     profits_df = pd.DataFrame(data)
-#     profits_df['date'] = pd.to_datetime(profits_df['date'])
-
-#     # Resample over 3 days
-#     resampled_df = cwm.resample_profits_df(profits_df, resampling_period=3)
-
-#     # Expected output
-#     assert resampled_df['net_transfers'].iloc[0] == 50  # Sum of transfers
-#     assert resampled_df['balance'].iloc[0] == 350  # Last balance
-
-# def test_multiple_coins():
-#     data = {
-#         'wallet_address': ['wallet1', 'wallet1'],
-#         'coin_id': ['coinA', 'coinB'],
-#         'date': ['2024-09-01', '2024-09-01'],
-#         'balance': [300, 200],
-#         'net_transfers': [100, -50]
-#     }
-#     profits_df = pd.DataFrame(data)
-#     profits_df['date'] = pd.to_datetime(profits_df['date'])
-
-#     # Resample over 3 days
-#     resampled_df = cwm.resample_profits_df(profits_df, resampling_period=3)
-
-#     # Expected output: one row for each coin
-#     assert resampled_df.shape[0] == 2
-#     assert resampled_df['net_transfers'].iloc[0] == 100  # Coin A
-#     assert resampled_df['net_transfers'].iloc[1] == -50  # Coin B
-
-# def test_transactions_two_resampling_periods():
-#     data = {
-#         'wallet_address': ['wallet1', 'wallet1'],
-#         'coin_id': ['coinA', 'coinA'],
-#         'date': ['2024-09-01', '2024-09-05'],
-#         'balance': [200, 250],
-#         'net_transfers': [100, 50]
-#     }
-#     profits_df = pd.DataFrame(data)
-#     profits_df['date'] = pd.to_datetime(profits_df['date'])
-
-#     # Resample over 3 days
-#     resampled_df = cwm.resample_profits_df(profits_df, resampling_period=3)
-
-#     # Check for two distinct periods
-#     assert resampled_df.shape[0] == 2
-
-#     # Explicit checks for each period
-#     first_period = resampled_df[resampled_df['date'] == '2024-09-01']
-#     second_period = resampled_df[resampled_df['date'] == '2024-09-04']
-
-#     assert first_period['net_transfers'].values[0] == 100
-#     assert first_period['balance'].values[0] == 200
-#     assert second_period['net_transfers'].values[0] == 50
-#     assert second_period['balance'].values[0] == 250
-
-# def test_transactions_three_resampling_periods():
-#     data = {
-#         'wallet_address': ['wallet1', 'wallet1', 'wallet1'],
-#         'coin_id': ['coinA', 'coinA', 'coinA'],
-#         'date': ['2024-09-02', '2024-09-06', '2024-09-09'],
-#         'balance': [150, 250, 200],
-#         'net_transfers': [50, 100, -50]
-#     }
-#     profits_df = pd.DataFrame(data)
-#     profits_df['date'] = pd.to_datetime(profits_df['date'])
-
-#     # Resample over 3 days
-#     resampled_df = cwm.resample_profits_df(profits_df, resampling_period=3)
-
-#     # Check for three distinct periods
-#     assert resampled_df.shape[0] == 3
-
-#     # Explicit checks for each period
-#     period_1 = resampled_df[resampled_df['date'] == '2024-09-02']
-#     period_2 = resampled_df[resampled_df['date'] == '2024-09-05']
-#     period_3 = resampled_df[resampled_df['date'] == '2024-09-08']
-
-#     assert period_1['net_transfers'].values[0] == 50
-#     assert period_1['balance'].values[0] == 150
-#     assert period_2['net_transfers'].values[0] == 100
-#     assert period_2['balance'].values[0] == 250
-#     assert period_3['net_transfers'].values[0] == -50
-#     assert period_3['balance'].values[0] == 200
-
-# def test_no_transactions_in_some_periods():
-#     data = {
-#         'wallet_address': ['wallet1', 'wallet1'],
-#         'coin_id': ['coinA', 'coinA'],
-#         'date': ['2024-09-01', '2024-09-08'],
-#         'balance': [400, 500],
-#         'net_transfers': [200, 100]
-#     }
-#     profits_df = pd.DataFrame(data)
-#     profits_df['date'] = pd.to_datetime(profits_df['date'])
-
-#     # Resample over 3 days
-#     resampled_df = cwm.resample_profits_df(profits_df, resampling_period=3)
-
-#     # Check for two periods
-#     assert resampled_df.shape[0] == 2
-
-#     # Explicit checks for each period
-#     first_period = resampled_df[resampled_df['date'] == '2024-09-01']
-#     third_period = resampled_df[resampled_df['date'] == '2024-09-07']
-
-#     assert first_period['net_transfers'].values[0] == 200
-#     assert first_period['balance'].values[0] == 400
-#     assert third_period['net_transfers'].values[0] == 100
-#     assert third_period['balance'].values[0] == 500
-
-# def test_transactions_boundary_periods():
-#     # Updated data with an additional transaction on 2024-09-01
-#     data = {
-#         'wallet_address': ['wallet1', 'wallet1', 'wallet1'],
-#         'coin_id': ['coinA', 'coinA', 'coinA'],
-#         'date': ['2024-09-01', '2024-09-03', '2024-09-04'],
-#         'balance': [400, 300, 250],
-#         'net_transfers': [150, 100, -50]
-#     }
-#     profits_df = pd.DataFrame(data)
-#     profits_df['date'] = pd.to_datetime(profits_df['date'])
-
-#     # Resample over 3 days
-#     resampled_df = cwm.resample_profits_df(profits_df, resampling_period=3)
-
-#     # Check for two periods
-#     assert resampled_df.shape[0] == 2
-
-#     # Explicit checks for each period
-#     period_1 = resampled_df[resampled_df['date'] == '2024-09-01']
-#     period_2 = resampled_df[resampled_df['date'] == '2024-09-04']
-
-#     # First period should sum the net_transfers of the first two transactions
-#     assert period_1['net_transfers'].values[0] == 250  # 150 + 100
-#     assert period_1['balance'].values[0] == 300  # Last balance in the period
-
-#     # Second period should retain the third transaction
-#     assert period_2['net_transfers'].values[0] == -50
-#     assert period_2['balance'].values[0] == 250
-
-# def test_multiple_coins_multiple_periods():
-#     data = {
-#         'wallet_address': ['wallet1', 'wallet1', 'wallet1', 'wallet1'],
-#         'coin_id': ['coinA', 'coinA', 'coinB', 'coinB'],
-#         'date': ['2024-09-01', '2024-09-04', '2024-09-01', '2024-09-06'],
-#         'balance': [300, 350, 100, 200],
-#         'net_transfers': [100, 50, -50, 100]
-#     }
-#     profits_df = pd.DataFrame(data)
-#     profits_df['date'] = pd.to_datetime(profits_df['date'])
-
-#     # Resample over 3 days
-#     resampled_df = cwm.resample_profits_df(profits_df, resampling_period=3)
-
-#     # Check for four periods (2 for each coin)
-#     assert resampled_df.shape[0] == 4
-
-#     # Explicit checks for Coin A and Coin B
-#     coin_a_period_1 = resampled_df[(resampled_df['coin_id'] == 'coinA') & (resampled_df['date'] == '2024-09-01')]
-#     coin_a_period_2 = resampled_df[(resampled_df['coin_id'] == 'coinA') & (resampled_df['date'] == '2024-09-04')]
-#     coin_b_period_1 = resampled_df[(resampled_df['coin_id'] == 'coinB') & (resampled_df['date'] == '2024-09-01')]
-#     coin_b_period_2 = resampled_df[(resampled_df['coin_id'] == 'coinB') & (resampled_df['date'] == '2024-09-04')]
-
-#     # Coin A checks
-#     assert coin_a_period_1['net_transfers'].values[0] == 100
-#     assert coin_a_period_1['balance'].values[0] == 300
-#     assert coin_a_period_2['net_transfers'].values[0] == 50
-#     assert coin_a_period_2['balance'].values[0] == 350
-
-#     # Coin B checks
-#     assert coin_b_period_1['net_transfers'].values[0] == -50
-#     assert coin_b_period_1['balance'].values[0] == 100
-#     assert coin_b_period_2['net_transfers'].values[0] == 100
-#     assert coin_b_period_2['balance'].values[0] == 200
-
-
+    # Assert buyers_new for coin3 is filled correctly
+    expected_buyers_new_coin3 = [0, 0, 3, 0, 0]
+    result_buyers_new_coin3 = result[result['coin_id'] == 'coin3']['buyers_new'].tolist()
+    assert result_buyers_new_coin3 == expected_buyers_new_coin3, f"Expected {expected_buyers_new_coin3}, but got {result_buyers_new_coin3}"
 
 
 

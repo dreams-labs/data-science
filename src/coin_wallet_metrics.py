@@ -1,7 +1,9 @@
 '''
 calculates metrics related to the distribution of coin ownership across wallets
 '''
-# pylint: disable=C0301
+# pylint: disable=C0301 # line too long
+# pylint: disable=C0303 # trailing whitespace
+
 import time
 import pandas as pd
 import numpy as np
@@ -23,11 +25,16 @@ def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets,co
     - cohort_coins (array-like): List of coin IDs to include.
 
     Returns:
-    - buysell_metrics_df (pd.DataFrame): DataFrame containing metrics for all coin_ids.
+    - buysell_metrics_df (pd.DataFrame): DataFrame keyed date-coin_id that includes various metrics 
+        about the cohort's buying, selling, and holding behavior. This date is filled to have a row for 
+        every coin_id-date pair through the training_period_end. 
     """
     start_time = time.time()
     logger.info('Preparing buysell_metrics_df...')
 
+
+    # Step 1: Filter profits_df to cohort and conduct data quality checks
+    # -------------------------------------------------------------------
     # Raise an error if either the wallet cohort or coin list is empty
     if len(cohort_wallets) == 0:
         raise ValueError("Wallet cohort is empty. Provide at least one wallet address.")
@@ -42,6 +49,13 @@ def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets,co
     ]
     cohort_profits_df = cohort_profits_df[['coin_id','wallet_address','date','balance','net_transfers']]
 
+    # Raise an error if the filtered df is empty
+    if cohort_profits_df.empty:
+        raise ValueError("Cohort-filtered profits_df is empty. Please check input parameters")
+
+
+    # Step 2: Add buy_sequence and sell_sequence columns
+    # --------------------------------------------------
     # Initialize the buy and sell sequence columns
     cohort_profits_df['buy_sequence'] = np.where(cohort_profits_df['net_transfers'] > 0, 1, np.nan)
     cohort_profits_df['sell_sequence'] = np.where(cohort_profits_df['net_transfers'] < 0, 1, np.nan)
@@ -53,6 +67,9 @@ def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets,co
     # Set buy_sequence and sell_sequence to null where net_transfers == 0
     cohort_profits_df.loc[cohort_profits_df['net_transfers'] == 0, ['buy_sequence', 'sell_sequence']] = np.nan
 
+
+    # Step 3: Calculate coin metrics
+    # ------------------------------
     # Initialize an empty list to store DataFrames for each coin
     coin_features_list = []
 
@@ -70,8 +87,14 @@ def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets,co
         # Append the result to the list
         coin_features_list.append(coin_features_df)
 
+
+    # Step 4: Consolidate all metrics into a filled DataFrame
+    # -------------------------------------------------------
     # Concatenate all features DataFrames into a single DataFrame
     buysell_metrics_df = pd.concat(coin_features_list, ignore_index=True)
+
+    # Ensure full date range coverage through the training_period_end for each coin-wallet pair
+    buysell_metrics_df = fill_buysell_metrics_df(buysell_metrics_df, training_period_end)
 
     logger.info('Generated buysell_metrics_df after %.2f seconds.', time.time() - start_time)
 
@@ -142,6 +165,69 @@ def generate_coin_buysell_metrics_df(coin_cohort_profits_df):
     return buysell_metrics_df
 
 
+
+def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
+    """
+    Fills missing dates in buysell_metrics_df and applies appropriate logic to fill NaN values for each metric.
+    
+    This function:
+    - Adds rows with missing dates (if any) between the latest date in buysell_metrics_df and the training_period_end.
+    - Fills NaN values for buy/sell metrics, balances, and other key metrics according to the following rules:
+      - total_balance and total_holders: forward-filled (if no activity, assume balances/holders remain the same).
+      - total_bought, total_sold, total_net_transfers, total_volume, buyers_new, buyers_repeat, sellers_new, sellers_repeat: filled with 0 (if no activity, assume no transactions).
+    
+    Parameters:
+    - buysell_metrics_df: DataFrame containing buy/sell metrics keyed on coin_id-date
+    - training_period_end: The end of the training period (datetime)
+
+    Returns:
+    - buysell_metrics_df with missing dates and NaN values appropriately filled.
+    """
+    
+    # Identify the expected rows for all coin_id-date pairs
+    min_date = buysell_metrics_df['date'].min()
+    full_date_range = pd.date_range(start=min_date, end=training_period_end, freq='D')
+    all_combinations = pd.MultiIndex.from_product([buysell_metrics_df['coin_id'].unique(), full_date_range], names=['coin_id', 'date'])
+
+    # Identify missing rows by comparing the existing rows to the expected
+    existing_combinations = pd.MultiIndex.from_frame(buysell_metrics_df[['coin_id', 'date']])
+    missing_combinations = all_combinations.difference(existing_combinations)
+    missing_rows = pd.DataFrame(index=missing_combinations).reset_index()
+
+    # Add the missing rows to buysell_metrics_df and sort by coin_id,date to ensure correct fill logic
+    buysell_metrics_df = pd.concat([buysell_metrics_df, missing_rows], ignore_index=True)
+    buysell_metrics_df = buysell_metrics_df.sort_values(by=['coin_id', 'date']).reset_index(drop=True)
+
+
+    # Apply the appropriate fill logic per metric, with groupby to ensure correct forward-filling within each coin_id:
+    buysell_metrics_df = buysell_metrics_df.groupby('coin_id', group_keys=False).apply(
+        lambda group: group.assign(
+            # Preserve coin_id as an output column
+            coin_id=buysell_metrics_df['coin_id'],
+
+            # Forward-fill for balance and holders (each coin_id has independent forward-filling logic)
+            # After the forward-fill, fill 0 for dates earlier than the first balance/holders records
+            total_balance=buysell_metrics_df.groupby('coin_id')['total_balance'].ffill().fillna(0),
+            total_holders=buysell_metrics_df.groupby('coin_id')['total_holders'].ffill().fillna(0),
+            
+            # Fill 0 for metrics related to transactions (buying, selling) that should be 0 when there's no activity
+            total_bought=buysell_metrics_df['total_bought'].fillna(0),
+            total_sold=buysell_metrics_df['total_sold'].fillna(0),
+            total_net_transfers=buysell_metrics_df['total_net_transfers'].fillna(0),
+            total_volume=buysell_metrics_df['total_volume'].fillna(0),
+            
+            # Fill 0 for buyer/seller counts on days with no transactions
+            buyers_new=buysell_metrics_df['buyers_new'].fillna(0),
+            buyers_repeat=buysell_metrics_df['buyers_repeat'].fillna(0),
+            total_buyers=buysell_metrics_df['total_buyers'].fillna(0),
+            sellers_new=buysell_metrics_df['sellers_new'].fillna(0),
+            sellers_repeat=buysell_metrics_df['sellers_repeat'].fillna(0),
+            total_sellers=buysell_metrics_df['total_sellers'].fillna(0)
+        )
+        ,include_groups=False  # Exclude the grouping columns (coin_id) from the operation
+    ).reset_index(drop=True)
+    
+    return buysell_metrics_df
 
 
 # def prepare_cohort_profits_df(profits_df,cohort_wallets,cohort_coins):

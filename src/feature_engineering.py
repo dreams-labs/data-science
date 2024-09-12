@@ -200,24 +200,38 @@ def flatten_coin_features(coin_df, metrics_config):
     return flat_features
 
 
-def flatten_coin_date_df(df, metrics_config):
+def flatten_coin_date_df(df, metrics_config, training_period_end):
     """
     Processes all coins in the DataFrame and flattens relevant time series metrics for each coin.
 
     Params:
     - df (pd.DataFrame): DataFrame containing time series data for multiple coins (coin_id-date).
     - metrics_config (dict): Configuration object with metric rules from the metrics file.
+    - training_period_end (datetime): The end of the training period to ensure dates are filled until this date.
 
     Returns:
     - result (pd.DataFrame): A DataFrame of flattened features for all coins.
 
     Raises:
-    - ValueError: If the input DataFrame is empty.
+    - ValueError: 
+        - If the input DataFrame is empty.
+        - If the time series data contains missing dates or NaN values.
     """
     
     if df.empty:
         raise ValueError("Input DataFrame is empty. Check your data source and ensure it's populated correctly.")
     
+    # Check for missing dates in each coin-wallet pair up to the training_period_end
+    missing_dates = df.groupby('coin_id').apply(
+        lambda x: pd.date_range(start=x['date'].min(), end=training_period_end).difference(x['date'])
+    )
+    if any(len(missing) > 0 for missing in missing_dates):
+        raise ValueError("Timeseries contains missing dates. Ensure all dates are filled up to the training_period_end before calling flatten_coin_date_df().")
+    
+    # Check for NaN values
+    if df.isnull().values.any():
+        raise ValueError("Timeseries contains NaN values. Ensure imputation is done upstream before calling flatten_coin_date_df().")
+
     all_flat_features = []
 
     # Loop through each unique coin_id
