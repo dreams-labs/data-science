@@ -3,16 +3,14 @@ calculates metrics related to the distribution of coin ownership across wallets
 '''
 # pylint: disable=C0301
 import time
-from datetime import datetime
-from pytz import utc
 import pandas as pd
 import numpy as np
-import pandas_gbq
 from dreams_core.googlecloud import GoogleCloud as dgc
 import dreams_core.core as dc
 
 # set up logger at the module level
 logger = dc.setup_logger()
+
 
 def prepare_datasets(profits_df,cohort_wallets,cohort_coins):
     '''
@@ -82,7 +80,46 @@ def prepare_datasets(profits_df,cohort_wallets,cohort_coins):
 
 
 
-def calculate_buyer_seller_counts(coin_cohort_profits_df):
+def generate_buysell_metrics_df(cohort_profits_df):
+    """
+    Generates features_df by looping through each coin_id and applying calculate_buysell_metrics().
+
+    Params:
+    - cohort_profits_df (pd.DataFrame): DataFrame containing profits data for a set of wallet-coin_id pairs
+
+    Returns:
+    - buysell_features_df (pd.DataFrame): DataFrame containing features for all coin_ids.
+    """
+    start_time = time.time()
+    logger.info('Preparing buysell_features_df...')
+
+    # Initialize an empty list to store DataFrames for each coin
+    coin_features_list = []
+
+    # Loop through all unique coin_ids
+    for c in cohort_profits_df['coin_id'].unique():
+        # Filter cohort_profits_df for the current coin_id and create a copy
+        coin_cohort_profits_df = cohort_profits_df[cohort_profits_df['coin_id'] == c].copy()
+
+        # Call the feature calculation function
+        coin_features_df = calculate_buysell_coin_metrics(coin_cohort_profits_df)
+
+        # Add coin_id back to the DataFrame to retain coin information
+        coin_features_df['coin_id'] = c
+
+        # Append the result to the list
+        coin_features_list.append(coin_features_df)
+
+    # Concatenate all features DataFrames into a single DataFrame
+    buysell_features_df = pd.concat(coin_features_list, ignore_index=True)
+
+    logger.info('Generated buysell_features_df after %.2f seconds.', time.time() - start_time)
+
+    return buysell_features_df
+
+
+
+def calculate_buysell_coin_metrics(coin_cohort_profits_df):
     '''
     For a single coin_id, computes various buyer and seller metrics, including:
     - Number of new and repeat buyers/sellers
@@ -96,7 +133,7 @@ def calculate_buyer_seller_counts(coin_cohort_profits_df):
     - coin_cohort_profits_df (dataframe): df showing profits data for a single coin_id
     
     returns:
-    - buysell_df (dataframe): df of metrics on new/repeat buyers/sellers and transaction totals on each date
+    - buysell_metrics_df (dataframe): df of metrics on new/repeat buyers/sellers and transaction totals on each date
     '''
     start_time = time.time()
 
@@ -132,29 +169,12 @@ def calculate_buyer_seller_counts(coin_cohort_profits_df):
     transactions_df['buyers_to_sellers_ratio'] = buyers_df['total_buyers'] / sellers_df['total_sellers'].replace(0, float('nan'))
     transactions_df['new_buyers_to_new_sellers_ratio'] = buyers_df['buyers_new'] / sellers_df['sellers_new'].replace(0, float('nan'))
 
-    # New vs repeat activity ratio
-    buyers_df['new_vs_repeat_buy_ratio'] = buyers_df.apply(
-        lambda row: row['buyers_new'] / row['buyers_repeat'] if row['buyers_repeat'] > 0 else None,
-        axis=1
-    )
-    sellers_df['new_vs_repeat_sell_ratio'] = sellers_df.apply(
-        lambda row: row['sellers_new'] / row['sellers_repeat'] if row['sellers_repeat'] > 0 else None,
-        axis=1
-    )
-
-    # Market sentiment score
-    transactions_df['sentiment_score'] = transactions_df.apply(
-        lambda row: (row['total_bought'] - row['total_sold']) / row['total_net_transfers'] if row['total_net_transfers'] != 0 else None,
-        axis=1
-    )
-
     # Merge buyers, sellers, and transactions dataframes
-    buysell_df = pd.merge(buyers_df, sellers_df, on='date', how='outer')
-    buysell_df = pd.merge(buysell_df, transactions_df, on='date', how='outer').fillna(0)
+    buysell_metrics_df = pd.merge(buyers_df, sellers_df, on='date', how='outer')
 
     logger.debug('New vs repeat buyer/seller counts and transaction totals complete after %.2f seconds', time.time() - start_time)
 
-    return buysell_df
+    return buysell_metrics_df
 
 
 
@@ -223,7 +243,7 @@ def calculate_buyer_seller_counts(coin_cohort_profits_df):
 
 #     params:
 #     - balances_df (dataframe): df showing daily wallet balances of a coin_id token that \
-#         has been filtered to only include one coin_id. 
+#         has been filtered to only include one coin_id.
 #     - total_supply (float): the total supply of the coin
 
 #     returns:
@@ -356,12 +376,12 @@ def calculate_buyer_seller_counts(coin_cohort_profits_df):
 #     '''
 #     computes the gini coefficient while ignoring wallets that have ever held >5% of \
 #         the total supply. the hope is that this removes treasury accounts, burn addresses, \
-#         and other wallets that are not likely to be wallet owners. 
+#         and other wallets that are not likely to be wallet owners.
 
 
 #     params:
 #     - balances_df (dataframe): df showing daily wallet balances of a coin_id token that \
-#         has been filtered to only include one coin_id. 
+#         has been filtered to only include one coin_id.
 #     - total_supply (float): the total supply of the coin
 
 #     returns:
@@ -428,7 +448,7 @@ def calculate_buyer_seller_counts(coin_cohort_profits_df):
 
 # def generate_coin_wallet_metrics(cohort_wallets,cohort_coins):
 #     '''
-#     HTTP-triggered Cloud Function that calculates and uploads metrics related to the 
+#     HTTP-triggered Cloud Function that calculates and uploads metrics related to the
 #     distribution of coin ownership across wallets for all tracked coins.
 
 #     Steps:
@@ -480,4 +500,3 @@ def calculate_buyer_seller_counts(coin_cohort_profits_df):
 #     all_coin_metrics_df.fillna(0, inplace=True)
 
 #     return 'finished refreshing core.coin_wallet_metrics.'
-
