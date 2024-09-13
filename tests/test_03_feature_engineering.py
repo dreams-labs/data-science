@@ -301,6 +301,22 @@ def test_fe_calculate_rolling_window_features():
 
 @pytest.mark.unit
 def test_fe_flatten_coin_features():
+    """
+    Unit test for the flatten_coin_features function, which flattens metrics for a single coin.
+
+    Test Cases:
+    1. Basic functionality: Tests that the function correctly aggregates columns like 'buyers_new' 
+       and 'sellers_new' with specified aggregations (sum, mean, max, etc.) based on the sample data.
+    2. Missing metric column: Ensures that the function raises a ValueError if a required metric 
+       is missing from the input DataFrame.
+    3. Missing 'coin_id' column: Verifies that the function raises a ValueError if the input 
+       DataFrame does not contain a 'coin_id' column.
+    4. Invalid aggregation function: Tests that the function raises a KeyError if an unrecognized 
+       aggregation function is specified in the configuration.
+    5. Rolling window metrics: Tests the rolling window functionality, ensuring that the correct 
+       rolling stats (e.g., sum, max) and comparisons (change, pct_change) are calculated over 
+       specified windows.
+    """
     # Sample DataFrame for testing
     sample_coin_df = pd.DataFrame({
         'coin_id': [1] * 6,
@@ -379,6 +395,20 @@ def test_fe_flatten_coin_features():
 
 @pytest.mark.unit
 def test_fe_flatten_coin_date_df():
+    """
+    Unit test for the flatten_coin_date_df function, which flattens metrics over multiple coins and dates.
+
+    Test Cases:
+    1. Basic functionality with multiple coins: Tests that the function correctly aggregates metrics 
+       (e.g., 'buyers_new', 'sellers_new') for multiple coins across multiple dates, and that the 
+       output contains all expected columns.
+    2. Missing metric data: Ensures that the function raises a ValueError when a required metric 
+       (e.g., 'buyers_new') is missing from the input DataFrame.
+    3. Empty DataFrame: Verifies that the function raises a ValueError when an empty DataFrame 
+       is provided as input.
+    4. One coin in the dataset: Tests that the function correctly processes a dataset containing 
+       only one coin and generates the expected columns and values.
+    """
     # Sample data for testing
     sample_df = pd.DataFrame({
         'date': [pd.Timestamp('2024-01-01'), pd.Timestamp('2024-01-02'), pd.Timestamp('2024-01-03'), pd.Timestamp('2024-01-01'), pd.Timestamp('2024-01-02'), pd.Timestamp('2024-01-03')],
