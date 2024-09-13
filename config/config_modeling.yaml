@@ -1,5 +1,9 @@
-# Parameters that impact the target variable
+preprocessing:
+  drop_features:  # List of features to drop from the dataset before modeling
+    - "total_sellers_sum"
+    - "buyers_new_median"
+    - "total_buyers_max"
+
 target_variables: 
-  # Thresholds for defining target variable outcomes
   moon_threshold: 0.3  # Target for a 'moon' event, defined as a 30% price increase
   dump_threshold: -0.2  # Target for a 'dump' event, defined as a 20% price decrease

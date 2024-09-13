@@ -338,3 +338,43 @@ def save_flattened_outputs(coin_df, output_path, metric_description, modeling_pe
     coin_df.to_csv(full_path, index=False)
     
     return full_path
+
+
+
+def preprocess_coin_df(input_path, modeling_config):
+    """
+    Preprocess the flattened coin DataFrame by applying feature selection.
+    
+    Params:
+    - input_path (str): Path to the flattened CSV file.
+    - modeling_config (dict): Configuration with modeling-specific parameters.
+
+    Returns:
+    - full_path (str): The full path to the saved preprocessed CSV file.
+    """
+    # Step 1: Load the flattened data
+    df = pd.read_csv(input_path)
+
+    # Step 2: Check for missing values and raise an error if any are found
+    if df.isnull().values.any():
+        raise ValueError("Missing values detected in the DataFrame.")
+
+    # Step 3: Apply feature selection (using drop_features)
+    drop_features = modeling_config['preprocessing'].get('drop_features', [])
+    initial_columns = set(df.columns)
+    df = df.drop(columns=drop_features, errors='ignore')
+    dropped_columns = initial_columns - set(df.columns)
+
+    # Step 4: Generate output path and filename based on input
+    base_filename = os.path.basename(input_path).replace(".csv", "")
+    output_filename = f"{base_filename}_preprocessed.csv"
+    output_path = os.path.join(os.path.dirname(input_path).replace("flattened_outputs", "preprocessed_outputs"), output_filename)
+
+    # Step 5: Save the preprocessed data
+    df.to_csv(output_path, index=False)
+
+    # Log the changes made
+    logger.debug("Preprocessed file saved at: %s", output_path)
+    logger.debug("Dropped %s columns: %s", len(dropped_columns), ', '.join(dropped_columns))
+
+    return output_path

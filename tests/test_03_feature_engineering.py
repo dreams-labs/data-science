@@ -27,6 +27,10 @@ load_dotenv()
 logger = dc.setup_logger()
 
 
+
+
+
+
 # ===================================================== #
 #                                                       #
 #                 U N I T   T E S T S                   #
@@ -510,6 +514,51 @@ def test_save_flattened_outputs(mock_coin_df):
 
 
 
+# ------------------------------------------ #
+# preprocess_coin_df() unit tests
+# ------------------------------------------ #
+
+@pytest.fixture
+def mock_modeling_config():
+    return {
+        'preprocessing': {
+            'drop_features': ['feature_to_drop']
+        }
+    }
+
+@pytest.fixture
+def mock_input_df():
+    data = {
+        'feature_1': [1, 2, 3],
+        'feature_to_drop': [10, 20, 30],
+        'feature_3': [100, 200, 300]
+    }
+    df = pd.DataFrame(data)
+    input_path = 'tests/test_modeling/outputs/flattened_outputs/mock_input.csv'
+    df.to_csv(input_path, index=False)
+    return input_path, df
+
+@pytest.mark.unit
+def test_preprocess_coin_df_drops_columns(mock_modeling_config, mock_input_df):
+    input_path, original_df = mock_input_df
+    
+    # Call the function
+    output_path = fe.preprocess_coin_df(input_path, mock_modeling_config)
+    
+    # Check that the output file exists
+    assert os.path.exists(output_path), "Output CSV file was not created."
+    
+    # Load the output CSV and check the dropped column
+    output_df = pd.read_csv(output_path)
+    assert 'feature_to_drop' not in output_df.columns, "Column was not dropped."
+    assert len(output_df.columns) == len(original_df.columns) - 1, "Unexpected number of columns after preprocessing."
+    
+    # Cleanup (remove the test files)
+    os.remove(output_path)
+    os.remove(input_path)
+
+
+
 # ======================================================== #
 #                                                          #
 #            I N T E G R A T I O N   T E S T S             #
@@ -525,7 +574,7 @@ def config():
     """
     Fixture to load the configuration from the YAML file.
     """
-    return load_config('tests/test_config/tesft_config.yaml')
+    return load_config('tests/test_config/test_config.yaml')
 
 @pytest.fixture(scope="session")
 def metrics_config():

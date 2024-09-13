@@ -12,36 +12,49 @@
 
 metrics:
   buyers_new:
-    aggregations:   # Defines core aggregations
-      - "sum"
-      - "mean"
-      - "median"
-      - "std"
-    rolling:        # Rolling stats: combine them under one block for each metric
-      stats:        # Specify which summary stats need rolling
-        - "sum"
-        - "max"
-        - "median"  # Now available for rolling windows
+    aggregations:
+      sum:
+        scaling: "standard"    # Scaling applied to sums, which can vary significantly in range.
+      mean:
+        scaling: "minmax"      # Scaling for mean to normalize values between 0 and 1.
+      std:
+        scaling: "standard"    # Standard scaling for standard deviation to account for variability.
+    rolling:
+      stats:
+        sum:
+          scaling: "minmax"
+        max:
+          scaling: "standard"
       comparisons: 
-        - "change"
-        - "pct_change"
-      window_duration: 7    # Days per rolling window
-      lookback_periods: 8   # How many lookback periods
+        change:
+          scaling: "standard"
+        pct_change:
+          scaling: None        # No scaling for percentage change, as it's already normalized.
+      window_duration: 7
+      lookback_periods: 8
+      
   total_bought:
-    aggregations:   # Defines core aggregations
-      - "sum"
-      - "median"
-    rolling:        # Rolling stats: combine them under one block for each metric
-      stats:        # Specify which summary stats need rolling
-        - "sum"
-      window_duration: 7    # Days per rolling window
-      lookback_periods: 8   # How many lookback periods
+    aggregations:
+      sum:
+        scaling: "standard"    # Large sums of total bought should be scaled to avoid model distortion.
+      median:
+        scaling: None          # No scaling needed for median.
+    rolling:
+      stats:
+        sum:
+          scaling: "minmax"
+      comparisons:
+        change:
+          scaling: "standard"
+      window_duration: 7
+      lookback_periods: 8
+
   total_sold:
-    aggregations:   # Defines core aggregations
-      - "sum"
+    aggregations:
+      sum:
+        scaling: "standard"    # Total sold should also be scaled to account for high variance.
+
   total_buyers:
-    aggregations:   # Defines core aggregations
-      - "sum"
-  total_sellers:
-    aggregations:   # Defines core aggregations
-      - "sum"
+    aggregations:
+      sum:
+        scaling: None          # No scaling for sum of total buyers, as it's likely a more stable number.
