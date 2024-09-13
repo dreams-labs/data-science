@@ -7,6 +7,7 @@ functions used to build coin-level features from training data
 import os
 from datetime import datetime
 import time
+import re
 import pandas as pd
 import dreams_core.core as dc
 
@@ -313,13 +314,13 @@ def calculate_stat(ts, stat):
 
 
 
-def save_flattened_outputs(coin_df, output_path, metric_description, modeling_period_start, version=None):
+def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_period_start, version=None):
     """
     Saves the flattened DataFrame with descriptive metrics into a CSV file.
 
     Params:
     - coin_df (pd.DataFrame): The DataFrame containing flattened data.
-    - output_path (str): Directory where the CSV file will be saved.
+    - output_dir (str): Directory where the CSV file will be saved.
     - metric_description (str): Description of metrics (e.g., 'buysell_metrics').
     - modeling_period_start (str): Start of the modeling period (e.g., '2023-01-01').
     - version (str, optional): Version number of the file (e.g., 'v1').
@@ -327,17 +328,25 @@ def save_flattened_outputs(coin_df, output_path, metric_description, modeling_pe
     Returns:
     - full_path (str): The full path to the saved CSV file.
     """
-
+    
+    # Check if 'coin_id' exists and is fully unique
+    if 'coin_id' not in coin_df.columns:
+        raise ValueError("The DataFrame must contain a 'coin_id' column.")
+    
+    if not coin_df['coin_id'].is_unique:
+        raise ValueError("The 'coin_id' column must have fully unique values.")
+    
     # Define filename with metric description
     timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M')
     version_suffix = f"_v{version}" if version else ""
-    filename = f"{metric_description}_output_{timestamp}_modelstart_{modeling_period_start}{version_suffix}.csv"
+    filename = f"{metric_description}_{timestamp}_model_period_{modeling_period_start}{version_suffix}.csv"
 
     # Save file
-    full_path = os.path.join(output_path, filename)
+    full_path = os.path.join(output_dir, filename)
     coin_df.to_csv(full_path, index=False)
     
     return full_path
+
 
 
 
@@ -374,7 +383,173 @@ def preprocess_coin_df(input_path, modeling_config):
     df.to_csv(output_path, index=False)
 
     # Log the changes made
-    logger.debug("Preprocessed file saved at: %s", output_path)
-    logger.debug("Dropped %s columns: %s", len(dropped_columns), ', '.join(dropped_columns))
+    logger.debug(f"Preprocessed file saved at: {output_path}")
+    logger.debug(f"Dropped {len(dropped_columns)} columns: {', '.join(dropped_columns)}")
 
     return output_path
+
+
+
+def create_training_data_df(output_dir, input_filenames):
+    """
+    Merges specified preprocessed output CSVs into a single DataFrame and checks if all have 
+    identical coin_ids to ensure consistency. Adds suffixes to column names based on filename
+    components to avoid duplicates.
+
+    Params:
+    - output_dir (str): Directory containing preprocessed output CSVs.
+    - input_filenames (list): List of filenames to be merged (without directory path).
+
+    Returns:
+    - merged_df (pd.DataFrame): DataFrame with merged data from all specified preprocessed outputs.
+    """
+    # Initialize an empty list to hold DataFrames
+    df_list = []
+    missing_files = []
+    coin_id_sets = []
+    
+    # Regex to extract the date pattern %Y-%m-%d_%H-%M from the filename
+    date_pattern = re.compile(r'\d{4}-\d{2}-\d{2}_\d{2}-\d{2}')
+    metric_date_map = {}
+
+    # Loop through the input filenames and attempt to read each
+    for filename in input_filenames:
+        file_path = os.path.join(output_dir, filename)
+        if os.path.exists(file_path):
+            df = pd.read_csv(file_path)
+
+            # Extract the date string from the filename
+            match = date_pattern.search(filename)
+            if not match:
+                raise ValueError(f"No valid date string found in the filename: {filename}")
+            
+            date_string = match.group()  # e.g., '2024-09-13_14-44'
+            metric_string = filename.split(date_string)[0].rstrip('_')
+
+            # Add column suffixes to avoid duplicate column names
+            if metric_string not in metric_date_map:
+                metric_date_map[metric_string] = {date_string: 1}
+                suffix = metric_string
+            else:
+                if date_string not in metric_date_map[metric_string]:
+                    metric_date_map[metric_string][date_string] = 1
+                    suffix = f"{metric_string}_{date_string}"
+                else:
+                    metric_date_map[metric_string][date_string] += 1
+                    suffix = f"{metric_string}_{date_string}_{metric_date_map[metric_string][date_string]}"
+
+            # Add the suffix to all column names (except 'coin_id')
+            df = df.add_suffix(f"_{suffix}")
+            df = df.rename(columns={f"coin_id_{suffix}": "coin_id"})  # Keep 'coin_id' column unchanged
+            
+            df_list.append(df)
+            coin_id_sets.append(set(df['coin_id'].unique()))
+        else:
+            missing_files.append(filename)
+
+    # Merge all DataFrames iteratively on 'coin_id'
+    if df_list:
+        merged_df = df_list[0]
+        for df in df_list[1:]:
+            merged_df = pd.merge(merged_df, df, on='coin_id', how='inner')
+
+        # Ensure no duplicate columns after merging
+        merged_df = merged_df.loc[:, ~merged_df.columns.duplicated()]
+
+    else:
+        raise ValueError("No preprocessed output files found for the given filenames.")
+
+    # Check if all files have identical coin_ids
+    if not all(coin_id_set == coin_id_sets[0] for coin_id_set in coin_id_sets):
+        raise ValueError("Input files do not have identical coin_ids. All files must have the same set of coin_ids.")
+
+    # Log the results
+    logger.info("%d files were successfully merged.", len(df_list))
+    if missing_files:
+        logger.info("%d files could not be found: %s", len(missing_files), ', '.join(missing_files))
+    else:
+        logger.info("All specified files were found and merged successfully.")
+
+    return merged_df
+
+
+def create_target_variables(prices_df, config, config_modeling):
+    """
+    Creates a DataFrame with target variables 'is_moon' and 'is_dump' based on price performance 
+    during the modeling period, using the thresholds from config_modeling.
+
+    Parameters:
+    - prices_df: DataFrame containing price data with columns 'coin_id', 'date', and 'price'.
+    - config: General configuration file with modeling period dates.
+    - config_modeling: Configuration for modeling with target variable thresholds.
+
+    Returns:
+    - target_variable_df: DataFrame with columns 'coin_id', 'is_moon', and 'is_dump'.
+    - outcomes_df: DataFrame tracking outcomes for each coin.
+    """
+    # Retrieve the necessary values from config_modeling
+    modeling_period_start = pd.to_datetime(config['modeling_period_start'])
+    modeling_period_end = pd.to_datetime(config['modeling_period_end'])
+    moon_threshold = config_modeling['target_variables']['moon_threshold']
+    dump_threshold = config_modeling['target_variables']['dump_threshold']
+
+
+    # Filter for the modeling period and sort the DataFrame
+    modeling_period_df = prices_df[(prices_df['date'] >= modeling_period_start) & (prices_df['date'] <= modeling_period_end)]
+    modeling_period_df = modeling_period_df.sort_values(by=['coin_id', 'date'])
+
+    # Raise an exception if any coins are missing a price at the start or end date
+    missing_start_price = modeling_period_df[modeling_period_df['date'] == modeling_period_start]['coin_id'].unique()
+    missing_end_price = modeling_period_df[modeling_period_df['date'] == modeling_period_end]['coin_id'].unique()
+    all_coins = modeling_period_df['coin_id'].unique()
+    coins_missing_price = set(all_coins) - set(missing_start_price) - set(missing_end_price)
+    if coins_missing_price:
+        raise ValueError(f"Missing price for coins at start or end date: {', '.join(map(str, coins_missing_price))}")
+
+    # Process coins with data
+    target_data = []
+    outcomes = []
+    for coin_id, group in modeling_period_df.groupby('coin_id'):
+        # Get the price on the start and end dates
+        price_start = group[group['date'] == modeling_period_start]['price'].values
+        price_end = group[group['date'] == modeling_period_end]['price'].values
+
+        # Check if both start and end prices exist
+        if len(price_start) > 0 and len(price_end) > 0:
+            price_start = price_start[0]
+            price_end = price_end[0]
+            is_moon = int(price_end >= (1 + moon_threshold) * price_start)
+            is_dump = int(price_end <= (1 + dump_threshold) * price_start)
+            target_data.append({'coin_id': coin_id, 'is_moon': is_moon, 'is_dump': is_dump})
+            outcomes.append({'coin_id': coin_id, 'outcome': 'target variable created'})
+
+        else:
+            if len(price_start) == 0 and len(price_end) == 0:
+                outcomes.append({'coin_id': coin_id, 'outcome': 'missing both'})
+            elif len(price_start) == 0:
+                outcomes.append({'coin_id': coin_id, 'outcome': 'missing start price'})
+            else:
+                outcomes.append({'coin_id': coin_id, 'outcome': 'missing end price'})
+
+    # Log outcomes for coins with no data in the modeling period
+    coins_with_no_data = set(prices_df['coin_id'].unique()) - set(modeling_period_df['coin_id'].unique())
+    for coin_id in coins_with_no_data:
+        outcomes.append({'coin_id': coin_id, 'outcome': 'missing both'})
+
+    # Convert target data and outcomes to DataFrames
+    target_variables_df = pd.DataFrame(target_data)
+    outcomes_df = pd.DataFrame(outcomes)
+
+    # Log summary based on outcomes
+    target_variable_count = len(outcomes_df[outcomes_df['outcome'] == 'target variable created'])
+    moons = target_variables_df[target_variables_df['is_moon'] == 1].shape[0]
+    dumps = target_variables_df[target_variables_df['is_dump'] == 1].shape[0]
+    
+    logger.info(
+        "Target variables created for %s coins with %s/%s (%s) moons and %s/%s (%s) dumps.",
+        target_variable_count,
+        moons, target_variable_count, dc.human_format(100 * moons / target_variable_count) + '%',
+        dumps, target_variable_count, dc.human_format(100 * dumps / target_variable_count) + '%'
+    )
+
+    return target_variables_df, outcomes_df
