@@ -334,7 +334,7 @@ def test_integration_buysell_metrics_df(buysell_metrics_df, cleaned_profits_df, 
     
     # 3. Data Quality Checks
     # Ensure there are no NaN values in critical columns
-    critical_columns = ['total_bought', 'total_sold', 'total_net_transfers', 'total_balance']
+    critical_columns = buysell_metrics_df.columns
     for col in critical_columns:
         assert buysell_metrics_df[col].isnull().sum() == 0, f"Found NaN values in {col}"
 
