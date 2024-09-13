@@ -476,13 +476,45 @@ def test_fe_flatten_coin_date_df():
     assert result_one_coin['buyers_new_sum'].iloc[0] == 60  # Sum of buyers_new for coin 1
 
 
+# ------------------------------------------ #
+# save_flattened_outputs() unit tests
+# ------------------------------------------ #
+
+@pytest.fixture
+def mock_coin_df():
+    """
+    simmple mock flat file keyed on coin
+    """
+    data = {'coin': ['BTC', 'ETH'], 'buyers_new': [50000, 4000]}
+    return pd.DataFrame(data)
+
+@pytest.mark.unit
+def test_save_flattened_outputs(mock_coin_df):
+    """
+    confirms that the mock file saves correctly
+    """
+    # Hard-code test output location directly within the test function
+    test_output_path = os.path.join(os.getcwd(), "tests", "test_modeling", "outputs", "flattened_outputs")
+    metric_description = 'buysell'
+    modeling_period_start = '2024-04-01'
+    version = '0.1'
+
+    # Call the function to save the CSV
+    saved_file_path = fe.save_flattened_outputs(mock_coin_df, test_output_path, metric_description, modeling_period_start, version)
+    
+    # Assert that the file was created
+    assert os.path.exists(saved_file_path), f"File was not saved at {saved_file_path}"
+
+    # Cleanup (remove the test file after the test)
+    os.remove(saved_file_path)
+
+
 
 # ======================================================== #
 #                                                          #
 #            I N T E G R A T I O N   T E S T S             #
 #                                                          #
 # ======================================================== #
-
 
 # ---------------------------------- #
 # set up config and module-level fixtures
@@ -493,7 +525,7 @@ def config():
     """
     Fixture to load the configuration from the YAML file.
     """
-    return load_config('tests/test_config/test_config.yaml')
+    return load_config('tests/test_config/tesft_config.yaml')
 
 @pytest.fixture(scope="session")
 def metrics_config():

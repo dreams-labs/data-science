@@ -4,6 +4,8 @@ functions used to build coin-level features from training data
 # pylint: disable=C0301 # line over 100 chars
 # pylint: disable=C0303 # trailing whitespace
 
+import os
+from datetime import datetime
 import time
 import pandas as pd
 import dreams_core.core as dc
@@ -90,12 +92,12 @@ def flatten_coin_date_df(df, metrics_config, training_period_end):
         all_flat_features.append(flat_features)
     
     # Convert the list of feature dictionaries into a DataFrame
-    result = pd.DataFrame(all_flat_features)
+    flattened_df = pd.DataFrame(all_flat_features)
 
-    logger.info('Flattened input df into coin-level features with shape %s after %.2f seconds.', result.shape, time.time() - start_time)
+    logger.info('Flattened input df into coin-level features with shape %s after %.2f seconds.', flattened_df.shape, time.time() - start_time)
 
     
-    return result
+    return flattened_df
 
 
 
@@ -308,3 +310,31 @@ def calculate_stat(ts, stat):
         return ts.min()
     else:
         raise KeyError(f"Invalid statistic: '{stat}'")
+
+
+
+def save_flattened_outputs(coin_df, output_path, metric_description, modeling_period_start, version=None):
+    """
+    Saves the flattened DataFrame with descriptive metrics into a CSV file.
+
+    Params:
+    - coin_df (pd.DataFrame): The DataFrame containing flattened data.
+    - output_path (str): Directory where the CSV file will be saved.
+    - metric_description (str): Description of metrics (e.g., 'buysell_metrics').
+    - modeling_period_start (str): Start of the modeling period (e.g., '2023-01-01').
+    - version (str, optional): Version number of the file (e.g., 'v1').
+
+    Returns:
+    - full_path (str): The full path to the saved CSV file.
+    """
+
+    # Define filename with metric description
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M')
+    version_suffix = f"_v{version}" if version else ""
+    filename = f"{metric_description}_output_{timestamp}_modelstart_{modeling_period_start}{version_suffix}.csv"
+
+    # Save file
+    full_path = os.path.join(output_path, filename)
+    coin_df.to_csv(full_path, index=False)
+    
+    return full_path

@@ -1,3 +1,6 @@
+# modeling folder
+/modeling/
+
 # temp files
 temp/
 
@@ -59,6 +62,7 @@ cover/
 
 # Integration test fixtures
 tests/fixtures
+tests/test_modeling
 
 # Translations
 *.mo
