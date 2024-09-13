@@ -611,7 +611,10 @@ def test_preprocess_coin_df_drops_columns(mock_modeling_config, mock_input_df):
 # ------------------------------------------ #
 
 @pytest.fixture
-def mock_input_files(tmpdir):
+def mock_input_files_colnames(tmpdir):
+    """
+    unit test data for scenario with many duplicate columns and similar filenames
+    """
     # Create mock filenames and corresponding DataFrames
     filenames = [
         'buysell_metrics_2024-09-13_14-44_model_period_2024-05-01_v0.1.csv',
@@ -634,8 +637,11 @@ def mock_input_files(tmpdir):
 
     return tmpdir, filenames
 
-def test_create_training_data_df(mock_input_files):
-    tmpdir, filenames = mock_input_files
+def test_create_training_data_df(mock_input_files_colnames):
+    """
+    test column renaming logic for clarity
+    """
+    tmpdir, filenames = mock_input_files_colnames
 
     # Call the function
     merged_df = fe.create_training_data_df(tmpdir, filenames)
@@ -646,11 +652,83 @@ def test_create_training_data_df(mock_input_files):
         'buyers_new_buysell_metrics_2024-09-13_14-44',
         'buyers_new_buysell_metrics_2024-09-13_14-45',
         'buyers_new_buysell_metrics_megasharks_2024-09-13_14-45',
-        'buyers_new_buysell_metrics_megasharks_2024-09-13_14-45_1',
-        'buyers_new_price_metrics_2024-09-13_14-45'
+        'buyers_new_buysell_metrics_megasharks_2024-09-13_14-45_2',
+        'buyers_new_price_metrics'
     ]
 
     assert list(merged_df.columns) == expected_columns, f"Expected columns: {expected_columns}, but got: {list(merged_df.columns)}"
+
+@pytest.fixture
+def mock_input_files(tmpdir):
+    """
+    valid input filenames that will be combined with invalid files
+    """
+    # Create mock filenames and corresponding DataFrames with dummy date values
+    filenames = [
+        'file1_2024-09-13_14-44.csv',
+        'file2_2024-09-13_14-45.csv',
+        'file3_2024-09-13_14-46.csv'
+    ]
+    
+    # Create mock DataFrames
+    df1 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [100, 200]})
+    df2 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [150, 250]})
+    df3 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [110, 210]})
+
+    # Save each DataFrame as a CSV
+    for i, df in enumerate([df1, df2, df3]):
+        df.to_csv(os.path.join(tmpdir, filenames[i]), index=False)
+
+    return tmpdir, filenames
+
+# Test Scenario 1: One of the files cannot be found
+def test_file_not_found(mock_input_files):
+    """
+    confirms the error message when a input file does not exist
+    """
+    tmpdir, filenames = mock_input_files
+
+    # Simulate one of the files not existing
+    filenames = ['file4_nonexistent_2024-09-13_14-47.csv']
+    with pytest.raises(ValueError, match="No preprocessed output files found for the given filenames"):
+        fe.create_training_data_df(tmpdir, filenames)
+
+# Test Scenario 2: One of the files is missing a coin_id
+def test_missing_coin_id(mock_input_files):
+    """
+    confirms the error message when a input file does not have a coin_id column
+    """
+    tmpdir, filenames = mock_input_files
+
+    # Create a DataFrame missing the 'coin_id' column
+    df_missing_coin_id = pd.DataFrame({'buyers_new': [100, 200]})
+    df_missing_coin_id.to_csv(os.path.join(tmpdir, 'file_missing_coin_id_2024-09-13_14-47.csv'), index=False)
+
+    filenames.append('file_missing_coin_id_2024-09-13_14-47.csv')
+
+    with pytest.raises(ValueError, match="coin_id column is missing in file_missing_coin_id_2024-09-13_14-47.csv"):
+        fe.create_training_data_df(tmpdir, filenames)
+
+# Test Scenario 3: One of the files has a duplicate record for a coin_id
+def test_duplicate_coin_id(mock_input_files):
+    """
+    confirms the error message when a input file has duplicate coin_id rows
+    """
+    tmpdir, filenames = mock_input_files
+    bad_file = 'file_duplicate_coin_id_2024-09-13_14-47.csv'
+
+    # Create a DataFrame with duplicate 'coin_id' values
+    df_duplicate_coin_id = pd.DataFrame({'coin_id': [1, 1], 'buyers_new': [100, 200]})
+    df_duplicate_coin_id.to_csv(os.path.join(tmpdir, bad_file), index=False)
+
+    filenames.append(bad_file)
+
+    with pytest.raises(ValueError, match=f"Duplicate coin_ids found in file: {bad_file}"):
+        fe.create_training_data_df(tmpdir, filenames)
+
+
+
+
 
 
 

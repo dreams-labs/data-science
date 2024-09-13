@@ -383,8 +383,8 @@ def preprocess_coin_df(input_path, modeling_config):
     df.to_csv(output_path, index=False)
 
     # Log the changes made
-    logger.debug(f"Preprocessed file saved at: {output_path}")
-    logger.debug(f"Dropped {len(dropped_columns)} columns: {', '.join(dropped_columns)}")
+    logger.debug("Preprocessed file saved at: %s", output_path)
+    logger.debug("Dropped %d columns: %s", len(dropped_columns), ', '.join(dropped_columns))
 
     return output_path
 
@@ -396,12 +396,14 @@ def create_training_data_df(output_dir, input_filenames):
     identical coin_ids to ensure consistency. Adds suffixes to column names based on filename
     components to avoid duplicates.
 
+    Additionally, raises an error if any of the input files have duplicate coin_ids or are missing the coin_id column.
+
     Params:
     - output_dir (str): Directory containing preprocessed output CSVs.
     - input_filenames (list): List of filenames to be merged (without directory path).
 
     Returns:
-    - merged_df (pd.DataFrame): DataFrame with merged data from all specified preprocessed outputs.
+    - training_data_df (pd.DataFrame): DataFrame with merged data from all specified preprocessed outputs.
     """
     # Initialize an empty list to hold DataFrames
     df_list = []
@@ -410,13 +412,40 @@ def create_training_data_df(output_dir, input_filenames):
     
     # Regex to extract the date pattern %Y-%m-%d_%H-%M from the filename
     date_pattern = re.compile(r'\d{4}-\d{2}-\d{2}_\d{2}-\d{2}')
-    metric_date_map = {}
+    
+    # Dictionary to track how many times each column name has been used
+    column_suffix_count = {}
+
+    # Count occurrences of each metric_string
+    metric_string_count = {}
+
+    # First loop to count how often each metric_string appears
+    for filename in input_filenames:
+        match = date_pattern.search(filename)
+        if not match:
+            raise ValueError(f"No valid date string found in the filename: {filename}")
+        
+        date_string = match.group()
+        metric_string = filename.split(date_string)[0].rstrip('_')
+
+        if metric_string not in metric_string_count:
+            metric_string_count[metric_string] = 1
+        else:
+            metric_string_count[metric_string] += 1
 
     # Loop through the input filenames and attempt to read each
     for filename in input_filenames:
         file_path = os.path.join(output_dir, filename)
         if os.path.exists(file_path):
             df = pd.read_csv(file_path)
+
+            # Check if coin_id column exists; raise an error if missing
+            if 'coin_id' not in df.columns:
+                raise ValueError(f"coin_id column is missing in {filename}")
+
+            # Raise an error if there are duplicate coin_ids in the file
+            if df['coin_id'].duplicated().any():
+                raise ValueError(f"Duplicate coin_ids found in file: {filename}")
 
             # Extract the date string from the filename
             match = date_pattern.search(filename)
@@ -426,22 +455,24 @@ def create_training_data_df(output_dir, input_filenames):
             date_string = match.group()  # e.g., '2024-09-13_14-44'
             metric_string = filename.split(date_string)[0].rstrip('_')
 
-            # Add column suffixes to avoid duplicate column names
-            if metric_string not in metric_date_map:
-                metric_date_map[metric_string] = {date_string: 1}
-                suffix = metric_string
+            # Add column suffixes based on the count of metric_string
+            if metric_string_count[metric_string] > 1:
+                suffix = f"{metric_string}_{date_string}"
             else:
-                if date_string not in metric_date_map[metric_string]:
-                    metric_date_map[metric_string][date_string] = 1
-                    suffix = f"{metric_string}_{date_string}"
-                else:
-                    metric_date_map[metric_string][date_string] += 1
-                    suffix = f"{metric_string}_{date_string}_{metric_date_map[metric_string][date_string]}"
+                suffix = metric_string
 
-            # Add the suffix to all column names (except 'coin_id')
-            df = df.add_suffix(f"_{suffix}")
-            df = df.rename(columns={f"coin_id_{suffix}": "coin_id"})  # Keep 'coin_id' column unchanged
-            
+            # Check if this suffix has been used before and append a numerical suffix if necessary
+            for column in df.columns:
+                if column != 'coin_id':
+                    column_with_suffix = f"{column}_{suffix}"
+                    if column_with_suffix in column_suffix_count:
+                        column_suffix_count[column_with_suffix] += 1
+                        column_with_suffix = f"{column_with_suffix}_{column_suffix_count[column_with_suffix]}"
+                    else:
+                        column_suffix_count[column_with_suffix] = 1
+
+                    df = df.rename(columns={column: column_with_suffix})
+
             df_list.append(df)
             coin_id_sets.append(set(df['coin_id'].unique()))
         else:
@@ -449,12 +480,12 @@ def create_training_data_df(output_dir, input_filenames):
 
     # Merge all DataFrames iteratively on 'coin_id'
     if df_list:
-        merged_df = df_list[0]
+        training_data_df = df_list[0]
         for df in df_list[1:]:
-            merged_df = pd.merge(merged_df, df, on='coin_id', how='inner')
+            training_data_df = pd.merge(training_data_df, df, on='coin_id', how='inner')
 
         # Ensure no duplicate columns after merging
-        merged_df = merged_df.loc[:, ~merged_df.columns.duplicated()]
+        training_data_df = training_data_df.loc[:, ~training_data_df.columns.duplicated()]
 
     else:
         raise ValueError("No preprocessed output files found for the given filenames.")
@@ -470,7 +501,9 @@ def create_training_data_df(output_dir, input_filenames):
     else:
         logger.info("All specified files were found and merged successfully.")
 
-    return merged_df
+    return training_data_df
+
+
 
 
 def create_target_variables(prices_df, config, config_modeling):
