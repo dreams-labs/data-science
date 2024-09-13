@@ -58,7 +58,7 @@ def flatten_coin_date_df(df, metrics_config, training_period_end):
     # Convert to DataFrame for easier display
     missing_dates_df = pd.DataFrame(list(missing_dates_dict.items()), columns=['coin_id', 'missing_dates'])
     if any(len(missing_dates_df) > 0 for missing in missing_dates):
-        raise ValueError("Timeseries contains missing dates. Ensure all dates are filled up to the training_period_end for all coins. Missing dates found: %s", missing_dates)
+        raise ValueError(f"Timeseries contains missing dates. Ensure all dates are filled up to the training_period_end for all coins. Missing dates found: {missing_dates}")
     
     # Check for NaN values
     if df.isnull().values.any():
