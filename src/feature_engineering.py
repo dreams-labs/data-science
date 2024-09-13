@@ -1,11 +1,11 @@
 """
 functions used to build coin-level features from training data
 """
-# pylint: disable=C0301
-# pylint: disable=C0303 trailing whitespace
+# pylint: disable=C0301 # line over 100 chars
+# pylint: disable=C0303 # trailing whitespace
 
+import time
 import pandas as pd
-import numpy as np
 import dreams_core.core as dc
 
 # set up logger at the module level
@@ -19,7 +19,8 @@ def flatten_coin_date_df(df, metrics_config, training_period_end):
     Params:
     - df (pd.DataFrame): DataFrame containing time series data for multiple coins (coin_id-date).
     - metrics_config (dict): Configuration object with metric rules from the metrics file.
-    - training_period_end (datetime): The end of the training period to ensure dates are filled until this date.
+    - training_period_end (datetime): The end of the training period to ensure dates are filled until 
+        this date and that rolling windows end on the training_period_end
 
     Returns:
     - result (pd.DataFrame): A DataFrame of flattened features for all coins.
@@ -29,20 +30,37 @@ def flatten_coin_date_df(df, metrics_config, training_period_end):
         - If the input DataFrame is empty.
         - If the time series data contains missing dates or NaN values.
     """
-    
+
+    # Step 1: Data Quality Checks
+    # ---------------------------
+    # Check if df is empty
     if df.empty:
         raise ValueError("Input DataFrame is empty. Check your data source and ensure it's populated correctly.")
     
     # Check for missing dates in each coin-wallet pair up to the training_period_end
-    missing_dates = df.groupby('coin_id').apply(
-        lambda x: pd.date_range(start=x['date'].min(), end=training_period_end).difference(x['date'])
+    missing_dates = df.groupby('coin_id')['date'].apply(
+        lambda x: pd.date_range(start=x.min(), end=training_period_end).difference(x)
     )
     if any(len(missing) > 0 for missing in missing_dates):
-        raise ValueError("Timeseries contains missing dates. Ensure all dates are filled up to the training_period_end before calling flatten_coin_date_df().")
+        raise ValueError("Timeseries contains missing dates. Ensure all dates are filled up to the training_period_end for all coins. Missing dates found: %s", missing_dates)
     
     # Check for NaN values
     if df.isnull().values.any():
         raise ValueError("Timeseries contains NaN values. Ensure imputation is done upstream before calling flatten_coin_date_df().")
+
+    # Check if df columns have configurations in metrics_config
+    configured_metrics = []
+    for m in metrics_config['metrics'].keys():
+        if m in df.columns:
+            configured_metrics.append(m)
+    if len(configured_metrics) == 0:
+        raise ValueError("No configurations were found in metrics_config for any columns in the input df.")
+
+
+    # Step 2: Flatten the metrics
+    # ---------------------------    
+    start_time = time.time()
+    logger.info("Flattening columns %s into coin-level features...", configured_metrics)
 
     all_flat_features = []
 
@@ -57,6 +75,9 @@ def flatten_coin_date_df(df, metrics_config, training_period_end):
     
     # Convert the list of feature dictionaries into a DataFrame
     result = pd.DataFrame(all_flat_features)
+
+    logger.info('Flattened input df into coin-level features with shape %s after %.2f seconds.', result.shape, time.time() - start_time)
+
     
     return result
 
@@ -271,6 +292,3 @@ def calculate_stat(ts, stat):
         return ts.min()
     else:
         raise KeyError(f"Invalid statistic: '{stat}'")
-
-
-

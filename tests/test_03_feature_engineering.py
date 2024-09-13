@@ -3,7 +3,7 @@ tests used to audit the files in the data-science/src folder
 """
 # pylint: disable=C0301 # line over 100 chars
 # pylint: disable=C0413 # import not at top of doc (due to local import)
-# pylint: disable=C0303 trailing whitespace
+# pylint: disable=C0303 # trailing whitespace
 # pylint: disable=W1203 # fstrings in logs
 # pylint: disable=W0612 # unused variables (due to test reusing functions with 2 outputs)
 # pylint: disable=W0621 # redefining from outer scope triggering on pytest fixtures
@@ -381,6 +381,7 @@ def test_fe_flatten_coin_features():
 def test_fe_flatten_coin_date_df():
     # Sample data for testing
     sample_df = pd.DataFrame({
+        'date': [pd.Timestamp('2024-01-01'), pd.Timestamp('2024-01-02'), pd.Timestamp('2024-01-03'), pd.Timestamp('2024-01-01'), pd.Timestamp('2024-01-02'), pd.Timestamp('2024-01-03')],
         'coin_id': [1, 1, 1, 2, 2, 2],
         'buyers_new': [10, 20, 30, 40, 50, 60],
         'sellers_new': [5, 10, 15, 20, 25, 30]
@@ -398,8 +399,11 @@ def test_fe_flatten_coin_date_df():
         }
     }
 
+    # demo 
+    training_period_end = '2024-01-03'
+
     # Test Case 1: Basic functionality with multiple coins
-    result = fe.flatten_coin_date_df(sample_df, metrics_config)
+    result = fe.flatten_coin_date_df(sample_df, metrics_config, training_period_end)
 
     # Check that there are two coins in the output
     assert len(result['coin_id'].unique()) == 2
@@ -414,30 +418,33 @@ def test_fe_flatten_coin_date_df():
 
     # Test Case 2: One coin with missing metric data (buyers_new should raise ValueError)
     df_missing_metric = pd.DataFrame({
+        'date': [pd.Timestamp('2024-01-01'), pd.Timestamp('2024-01-02'), pd.Timestamp('2024-01-03')],
         'coin_id': [1, 1, 1],
         'sellers_new': [5, 10, 15]
     })
 
     with pytest.raises(ValueError, match="Metric 'buyers_new' is missing from the input DataFrame."):
-        fe.flatten_coin_date_df(df_missing_metric, metrics_config)
+        fe.flatten_coin_date_df(df_missing_metric, metrics_config, training_period_end)
 
     # Test Case 3: Empty DataFrame (should raise ValueError)
     df_empty = pd.DataFrame(columns=['coin_id', 'buyers_new', 'sellers_new'])
     with pytest.raises(ValueError, match="Input DataFrame is empty"):
-        fe.flatten_coin_date_df(df_empty, metrics_config)
+        fe.flatten_coin_date_df(df_empty, metrics_config, training_period_end)
 
     # Test Case 4: One coin in the dataset
     df_one_coin = pd.DataFrame({
+        'date': [pd.Timestamp('2024-01-01'), pd.Timestamp('2024-01-02'), pd.Timestamp('2024-01-03')],
         'coin_id': [1, 1, 1],
         'buyers_new': [10, 20, 30],
         'sellers_new': [5, 10, 15]
     })
-    result_one_coin = fe.flatten_coin_date_df(df_one_coin, metrics_config)
+    result_one_coin = fe.flatten_coin_date_df(df_one_coin, metrics_config, training_period_end)
 
     # Check that the single coin is processed correctly and the columns are as expected
     assert len(result_one_coin['coin_id'].unique()) == 1
     assert 'buyers_new_sum' in result_one_coin.columns
     assert result_one_coin['buyers_new_sum'].iloc[0] == 60  # Sum of buyers_new for coin 1
+
 
 
 # ======================================================== #
@@ -472,8 +479,99 @@ def buysell_metrics_df():
     """
     Fixture to load the buysell_metrics_df from the fixtures folder.
     """
-    return pd.read_csv('tests/fixtures/buysell_metrics_df.csv')
+    buysell_metrics_df = pd.read_csv('tests/fixtures/buysell_metrics_df.csv')
+    buysell_metrics_df['date'] = pd.to_datetime(buysell_metrics_df['date']).astype('datetime64[ns]')
+    return buysell_metrics_df
 
 # ---------------------------------- #
-# generate_buysell_metrics_df() integration tests
+# flatten_coin_date_df() integration tests
 # ---------------------------------- #
+
+@pytest.mark.integration
+def test_metrics_config_alignment(buysell_metrics_df, metrics_config):
+    """
+    Test that at least one metric from the buysell_metrics_df is configured in the metrics_config.
+
+    This test ensures that the buysell_metrics_df contains columns that are defined in the metrics
+    configuration file. It checks whether there is any overlap between the metrics from the DataFrame
+    and the metrics defined in the configuration, asserting that at least one match is found.
+    """
+
+    # Extract column names from the DataFrame
+    df_columns = buysell_metrics_df.columns
+
+    # Find the intersection of DataFrame columns and config metrics
+    matching_metrics = [metric for metric in df_columns if metric in metrics_config['metrics']]
+
+    # Assert that at least one metric in the config applies to the buysell_metrics_df
+    assert matching_metrics, "No matching metrics found between buysell_metrics_df and the metrics configuration"
+
+
+@pytest.mark.integration
+def test_aggregation_methods(buysell_metrics_df, metrics_config, config):
+    """
+    Test that the aggregation methods applied during flattening are correct.
+
+    This test verifies that the aggregation of metrics (such as total_bought) is handled correctly
+    by the flatten_coin_date_df function. It compares manually calculated sums for total_bought at 
+    the coin_id level with the corresponding values in the flattened DataFrame, ensuring that the 
+    sum matches the expected result.
+    """
+
+    # Flatten the buysell metrics DataFrame to the coin_id level
+    flattened_buysell_metrics_df = fe.flatten_coin_date_df(buysell_metrics_df, metrics_config, config['training_data']['training_period_end'])
+
+    # Example: Verify that total_bought_sum is aggregated correctly at the coin_id level
+    # Manually group the original buysell_metrics_df by coin_id to compute expected sums
+    expected_total_bought_sum = buysell_metrics_df.groupby('coin_id')['total_bought'].sum().reset_index(name='total_bought_sum')
+
+    # Extract the result from the flattened DataFrame
+    result_total_bought_sum = flattened_buysell_metrics_df[['coin_id', 'total_bought_sum']]
+
+    # Assert that the sums match between the manually calculated and flattened DataFrame
+    pd.testing.assert_frame_equal(expected_total_bought_sum, result_total_bought_sum, check_like=True)
+
+
+@pytest.mark.integration
+def test_outlier_handling(buysell_metrics_df, metrics_config, config):
+    """
+    Test that extreme values (outliers) are correctly handled by the flattening function.
+
+    This test introduces an extreme value (outlier) into the buysell_metrics_df and passes it through
+    the flatten_coin_date_df function. It asserts that the extreme value is properly included in the 
+    aggregated total_bought_sum column, ensuring that the function can handle large outliers without 
+    breaking or misrepresenting the data.
+    """
+
+    # Introduce an outlier in the buysell_metrics_df for total_bought
+    outlier_df = buysell_metrics_df.copy()
+    outlier_df.loc[0, 'total_bought'] = 1e12  # Extreme value
+
+    # Flatten the modified DataFrame
+    flattened_buysell_metrics_df = fe.flatten_coin_date_df(outlier_df, metrics_config, config['training_data']['training_period_end'])
+
+    # Ensure the extreme value is handled and aggregated correctly
+    assert flattened_buysell_metrics_df['total_bought_sum'].max() >= 1e12, "Outlier in total_bought not handled correctly"
+
+
+@pytest.mark.integration
+def test_all_coin_ids_present(buysell_metrics_df, metrics_config, config):
+    """
+    Test that all coin_ids from the original DataFrame are present in the flattened output.
+
+    This test ensures that every coin_id from the buysell_metrics_df is retained in the flattened
+    DataFrame after processing. It verifies that no coin_ids were lost during the flattening process 
+    by comparing the unique coin_ids in the input with those in the output.
+    """
+
+    # Flatten the buysell metrics DataFrame to the coin_id level
+    flattened_buysell_metrics_df = fe.flatten_coin_date_df(buysell_metrics_df, metrics_config, config['training_data']['training_period_end'])
+
+    # Get unique coin_ids from the original DataFrame
+    expected_coin_ids = buysell_metrics_df['coin_id'].unique()
+
+    # Get the coin_ids from the flattened DataFrame
+    result_coin_ids = flattened_buysell_metrics_df['coin_id'].unique()
+
+    # Assert that all expected coin_ids are present in the flattened result
+    assert set(expected_coin_ids) == set(result_coin_ids), "Some coin_ids are missing from the flattened DataFrame"

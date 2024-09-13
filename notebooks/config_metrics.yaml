@@ -14,3 +14,21 @@ metrics:
         - "pct_change"
       window_duration: 7    # Days per rolling window
       lookback_periods: 8   # How many lookback periods
+  total_bought:
+    aggregations:   # Defines core aggregations
+      - "sum"
+      - "median"
+    rolling:        # Rolling stats: combine them under one block for each metric
+      stats:        # Specify which summary stats need rolling
+        - "sum"
+      window_duration: 7    # Days per rolling window
+      lookback_periods: 8   # How many lookback periods
+  total_sold:
+    aggregations:   # Defines core aggregations
+      - "sum"
+  total_buyers:
+    aggregations:   # Defines core aggregations
+      - "sum"
+  total_sellers:
+    aggregations:   # Defines core aggregations
+      - "sum"
