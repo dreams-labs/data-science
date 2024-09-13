@@ -529,8 +529,7 @@ def test_shark_coins_modeling_period_filtering(sample_shark_coins_profits_df, sa
 # set up config and module-level variables
 # ---------------------------------- #
 
-config_path = os.path.join(os.path.dirname(__file__), 'test_config.yaml')
-config = load_config(config_path)
+config = load_config('tests/test_config/test_config.yaml')
 
 # Module-level variables
 TRAINING_PERIOD_START = config['training_data']['training_period_start']

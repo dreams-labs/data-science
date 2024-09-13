@@ -1,0 +1,47 @@
+# Available Commands:
+# aggregations:
+#   - "sum", "mean", "median", "min", "max", "std"
+# rolling stats:
+#   - "sum", "mean", "median", "max", "min", "std"
+# comparisons:
+#   - "change", "pct_change", "difference"
+# window_duration:
+#   - Specifies the number of days per rolling window (e.g., 7 means a 7-day rolling window)
+# lookback_periods:
+#   - Defines how many periods to look back when calculating rolling stats (e.g., 8 means calculate rolling stats over 8 previous periods)
+
+metrics:
+  buyers_new:
+    aggregations:   # Defines core aggregations
+      - "sum"
+      - "mean"
+      - "median"
+      - "std"
+    rolling:        # Rolling stats: combine them under one block for each metric
+      stats:        # Specify which summary stats need rolling
+        - "sum"
+        - "max"
+        - "median"  # Now available for rolling windows
+      comparisons: 
+        - "change"
+        - "pct_change"
+      window_duration: 7    # Days per rolling window
+      lookback_periods: 8   # How many lookback periods
+  total_bought:
+    aggregations:   # Defines core aggregations
+      - "sum"
+      - "median"
+    rolling:        # Rolling stats: combine them under one block for each metric
+      stats:        # Specify which summary stats need rolling
+        - "sum"
+      window_duration: 7    # Days per rolling window
+      lookback_periods: 8   # How many lookback periods
+  total_sold:
+    aggregations:   # Defines core aggregations
+      - "sum"
+  total_buyers:
+    aggregations:   # Defines core aggregations
+      - "sum"
+  total_sellers:
+    aggregations:   # Defines core aggregations
+      - "sum"
