@@ -605,6 +605,55 @@ def test_preprocess_coin_df_drops_columns(mock_modeling_config, mock_input_df):
 
 
 
+
+# ------------------------------------------ #
+# create_training_data_df() unit tests
+# ------------------------------------------ #
+
+@pytest.fixture
+def mock_input_files(tmpdir):
+    # Create mock filenames and corresponding DataFrames
+    filenames = [
+        'buysell_metrics_2024-09-13_14-44_model_period_2024-05-01_v0.1.csv',
+        'buysell_metrics_2024-09-13_14-45_model_period_2024-05-01_v0.1.csv',
+        'buysell_metrics_megasharks_2024-09-13_14-45_model_period_2024-05-01_v0.1.csv',
+        'buysell_metrics_megasharks_2024-09-13_14-45_model_period_2024-05-01_v0.2.csv',
+        'price_metrics_2024-09-13_14-45_model_period_2024-05-01_v0.1.csv'
+    ]
+    
+    # Create mock DataFrames for each file
+    df1 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [100, 200]})
+    df2 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [150, 250]})
+    df3 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [110, 210]})
+    df4 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [120, 220]})
+    df5 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [130, 230]})
+
+    # Save each DataFrame as a CSV
+    for i, df in enumerate([df1, df2, df3, df4, df5]):
+        df.to_csv(os.path.join(tmpdir, filenames[i]), index=False)
+
+    return tmpdir, filenames
+
+def test_create_training_data_df(mock_input_files):
+    tmpdir, filenames = mock_input_files
+
+    # Call the function
+    merged_df = fe.create_training_data_df(tmpdir, filenames)
+
+    # Check if the columns have the correct suffixes
+    expected_columns = [
+        'coin_id',
+        'buyers_new_buysell_metrics_2024-09-13_14-44',
+        'buyers_new_buysell_metrics_2024-09-13_14-45',
+        'buyers_new_buysell_metrics_megasharks_2024-09-13_14-45',
+        'buyers_new_buysell_metrics_megasharks_2024-09-13_14-45_1',
+        'buyers_new_price_metrics_2024-09-13_14-45'
+    ]
+
+    assert list(merged_df.columns) == expected_columns, f"Expected columns: {expected_columns}, but got: {list(merged_df.columns)}"
+
+
+
 # ======================================================== #
 #                                                          #
 #            I N T E G R A T I O N   T E S T S             #
