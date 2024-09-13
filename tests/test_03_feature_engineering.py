@@ -493,16 +493,14 @@ def config():
     """
     Fixture to load the configuration from the YAML file.
     """
-    config_path = os.path.join(os.path.dirname(__file__), 'test_config.yaml')
-    return load_config(config_path)
+    return load_config('tests/test_config/test_config.yaml')
 
 @pytest.fixture(scope="session")
 def metrics_config():
     """
     Fixture to load the configuration from the YAML file.
     """
-    config_path = os.path.join(os.path.dirname(__file__), 'test_config_metrics.yaml')
-    return load_config(config_path)
+    return load_config('tests/test_config/test_config_metrics.yaml')
 
 @pytest.fixture(scope="session")
 def buysell_metrics_df():

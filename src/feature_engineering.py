@@ -37,11 +37,27 @@ def flatten_coin_date_df(df, metrics_config, training_period_end):
     if df.empty:
         raise ValueError("Input DataFrame is empty. Check your data source and ensure it's populated correctly.")
     
-    # Check for missing dates in each coin-wallet pair up to the training_period_end
-    missing_dates = df.groupby('coin_id')['date'].apply(
-        lambda x: pd.date_range(start=x.min(), end=training_period_end).difference(x)
-    )
-    if any(len(missing) > 0 for missing in missing_dates):
+    # Check that all coin-date pairs are complete for the full df
+    missing_dates_dict = {}
+    for coin_id in df['coin_id'].unique():
+
+        coin_df = df[df['coin_id'] == coin_id]
+        
+        # Create the full date range for the coin, explicitly cast to pd.Timestamp
+        full_date_range = pd.to_datetime(pd.date_range(start=coin_df['date'].min(), end=training_period_end)).to_pydatetime()
+
+        # Get the existing dates for the coin, explicitly cast to pd.Timestamp
+        existing_dates = set(pd.to_datetime(coin_df['date'].unique()).to_pydatetime())
+        
+        # Find the missing dates by subtracting existing from full date range
+        missing_dates = set(full_date_range) - existing_dates
+        
+        # Store the missing dates for the current coin_id
+        missing_dates_dict[coin_id] = sorted(missing_dates)
+
+    # Convert to DataFrame for easier display
+    missing_dates_df = pd.DataFrame(list(missing_dates_dict.items()), columns=['coin_id', 'missing_dates'])
+    if any(len(missing_dates_df) > 0 for missing in missing_dates):
         raise ValueError("Timeseries contains missing dates. Ensure all dates are filled up to the training_period_end for all coins. Missing dates found: %s", missing_dates)
     
     # Check for NaN values

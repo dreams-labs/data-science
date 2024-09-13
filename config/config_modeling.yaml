@@ -1,0 +1,5 @@
+# Modeling-related parameters
+modeling: 
+  # Thresholds for defining target variable outcomes
+  moon_threshold: 0.3  # Target for a 'moon' event, defined as a 30% price increase
+  dump_threshold: -0.2  # Target for a 'dump' event, defined as a 20% price decrease
