@@ -508,7 +508,7 @@ def create_training_data_df(output_dir, input_filenames):
 
 def create_target_variables(prices_df, config, config_modeling):
     """
-    Creates a DataFrame with target variables 'is_moon' and 'is_dump' based on price performance 
+    Creates a DataFrame with target variables 'is_moon' and 'is_crater' based on price performance 
     during the modeling period, using the thresholds from config_modeling.
 
     Parameters:
@@ -517,14 +517,14 @@ def create_target_variables(prices_df, config, config_modeling):
     - config_modeling: Configuration for modeling with target variable thresholds.
 
     Returns:
-    - target_variable_df: DataFrame with columns 'coin_id', 'is_moon', and 'is_dump'.
+    - target_variable_df: DataFrame with columns 'coin_id', 'is_moon', and 'is_crater'.
     - outcomes_df: DataFrame tracking outcomes for each coin.
     """
     # Retrieve the necessary values from config_modeling
     modeling_period_start = pd.to_datetime(config['modeling_period_start'])
     modeling_period_end = pd.to_datetime(config['modeling_period_end'])
     moon_threshold = config_modeling['target_variables']['moon_threshold']
-    dump_threshold = config_modeling['target_variables']['dump_threshold']
+    crater_threshold = config_modeling['target_variables']['crater_threshold']
 
 
     # Filter for the modeling period and sort the DataFrame
@@ -552,8 +552,8 @@ def create_target_variables(prices_df, config, config_modeling):
             price_start = price_start[0]
             price_end = price_end[0]
             is_moon = int(price_end >= (1 + moon_threshold) * price_start)
-            is_dump = int(price_end <= (1 + dump_threshold) * price_start)
-            target_data.append({'coin_id': coin_id, 'is_moon': is_moon, 'is_dump': is_dump})
+            is_crater = int(price_end <= (1 + crater_threshold) * price_start)
+            target_data.append({'coin_id': coin_id, 'is_moon': is_moon, 'is_crater': is_crater})
             outcomes.append({'coin_id': coin_id, 'outcome': 'target variable created'})
 
         else:
@@ -576,13 +576,13 @@ def create_target_variables(prices_df, config, config_modeling):
     # Log summary based on outcomes
     target_variable_count = len(outcomes_df[outcomes_df['outcome'] == 'target variable created'])
     moons = target_variables_df[target_variables_df['is_moon'] == 1].shape[0]
-    dumps = target_variables_df[target_variables_df['is_dump'] == 1].shape[0]
+    craters = target_variables_df[target_variables_df['is_crater'] == 1].shape[0]
     
     logger.info(
-        "Target variables created for %s coins with %s/%s (%s) moons and %s/%s (%s) dumps.",
+        "Target variables created for %s coins with %s/%s (%s) moons and %s/%s (%s) craters.",
         target_variable_count,
         moons, target_variable_count, dc.human_format(100 * moons / target_variable_count) + '%',
-        dumps, target_variable_count, dc.human_format(100 * dumps / target_variable_count) + '%'
+        craters, target_variable_count, dc.human_format(100 * craters / target_variable_count) + '%'
     )
 
     return target_variables_df, outcomes_df

@@ -6,4 +6,4 @@ preprocessing:
 
 target_variables: 
   moon_threshold: 0.3  # Target for a 'moon' event, defined as a 30% price increase
-  dump_threshold: -0.2  # Target for a 'dump' event, defined as a 20% price decrease
+  crater_threshold: -0.2  # Target for a 'crater' event, defined as a 20% price decrease
