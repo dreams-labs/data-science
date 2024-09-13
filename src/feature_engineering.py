@@ -4,14 +4,8 @@ functions used to build coin-level features from training data
 # pylint: disable=C0301
 # pylint: disable=C0303 trailing whitespace
 
-import time
-from datetime import datetime
-from pytz import utc
 import pandas as pd
 import numpy as np
-import pandas_gbq
-from statsmodels.tsa.seasonal import seasonal_decompose
-from dreams_core.googlecloud import GoogleCloud as dgc
 import dreams_core.core as dc
 
 # set up logger at the module level

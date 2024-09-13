@@ -460,26 +460,19 @@ def config():
     return load_config(config_path)
 
 @pytest.fixture(scope="session")
-def cleaned_profits_df():
+def metrics_config():
     """
-    Fixture to load the cleaned_profits_df from the fixtures folder.
+    Fixture to load the configuration from the YAML file.
     """
-    return pd.read_csv('tests/fixtures/cleaned_profits_df.csv')
+    config_path = os.path.join(os.path.dirname(__file__), 'test_config_metrics.yaml')
+    return load_config(config_path)
 
 @pytest.fixture(scope="session")
-def shark_wallets_df():
+def buysell_metrics_df():
     """
-    Fixture to load the shark_wallets_df from the fixtures folder.
+    Fixture to load the buysell_metrics_df from the fixtures folder.
     """
-    return pd.read_csv('tests/fixtures/shark_wallets_df.csv')
-
-@pytest.fixture(scope="session")
-def shark_coins_df():
-    """
-    Fixture to load the shark_coins_df from the fixtures folder.
-    """
-    return pd.read_csv('tests/fixtures/shark_coins_df.csv')
-
+    return pd.read_csv('tests/fixtures/buysell_metrics_df.csv')
 
 # ---------------------------------- #
 # generate_buysell_metrics_df() integration tests

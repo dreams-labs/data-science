@@ -228,7 +228,7 @@ def test_fill_buysell_metrics_df():
 def config():
     """
     Fixture to load the configuration from the YAML file.
-    """
+    """    
     config_path = os.path.join(os.path.dirname(__file__), 'test_config.yaml')
     return load_config(config_path)
 
@@ -275,6 +275,22 @@ def buysell_metrics_df(cleaned_profits_df, shark_wallets_df, shark_coins_df, con
         cohort_coins
     )
 
+# Save buysell_metrics_df.csv in fixtures/
+# ----------------------------------------
+@pytest.mark.integration
+def test_save_buysell_metrics_df(buysell_metrics_df):
+    """
+    This is not a test! This function saves a buysell_metrics_df.csv in the fixtures folder 
+    so it can be used for integration tests in other modules. 
+    """
+    # Save the cleaned DataFrame to the fixtures folder
+    buysell_metrics_df.to_csv('tests/fixtures/buysell_metrics_df.csv', index=False)
+
+    # Add some basic assertions to ensure the data was saved correctly
+    assert buysell_metrics_df is not None
+    assert len(buysell_metrics_df) > 0
+
+
 @pytest.mark.integration
 def test_integration_buysell_metrics_df(buysell_metrics_df, cleaned_profits_df, shark_wallets_df, shark_coins_df, config):
     """
@@ -291,7 +307,6 @@ def test_integration_buysell_metrics_df(buysell_metrics_df, cleaned_profits_df, 
     assert set(expected_columns).issubset(buysell_metrics_df.columns), "Missing expected columns in buysell_metrics_df"
 
     # 2. Validate Key Feature Calculations
-
     # Filter the cleaned_profits_df to only include cohort wallets and coins
     cohort_wallets = shark_wallets_df[shark_wallets_df['is_shark']]['wallet_address'].unique()
     cohort_coins = shark_coins_df['coin_id'].unique()
@@ -316,8 +331,8 @@ def test_integration_buysell_metrics_df(buysell_metrics_df, cleaned_profits_df, 
     total_net_transfers_mock = cohort_profits_df['net_transfers'].sum()
     total_net_transfers_result = buysell_metrics_df['total_net_transfers'].sum()
     assert total_net_transfers_mock == pytest.approx(total_net_transfers_result, rel=1e-9), f"Total net transfers mismatch: {total_net_transfers_mock} != {total_net_transfers_result}"
+    
     # 3. Data Quality Checks
-
     # Ensure there are no NaN values in critical columns
     critical_columns = ['total_bought', 'total_sold', 'total_net_transfers', 'total_balance']
     for col in critical_columns:
@@ -325,3 +340,17 @@ def test_integration_buysell_metrics_df(buysell_metrics_df, cleaned_profits_df, 
 
     # Ensure non-cohort wallets and coins are excluded
     assert set(buysell_metrics_df['coin_id']).issubset(cohort_coins), "Non-cohort coins found in buysell_metrics_df"
+
+    # Check that all dates in buysell_metrics_df fall within the expected range
+    assert buysell_metrics_df['date'].max() <= pd.to_datetime(config['training_data']['training_period_end']), \
+        "Found data beyond the training period end date"
+    assert buysell_metrics_df['date'].min() >= pd.to_datetime(config['training_data']['training_period_start']), \
+        "Found data before the training period start date"
+
+    # Check for missing dates in each coin-wallet pair up to the training_period_end
+    missing_dates = buysell_metrics_df.groupby('coin_id').apply(
+        lambda x: pd.date_range(start=x['date'].min(), end=pd.to_datetime(config['training_data']['training_period_end'])).difference(x['date'])
+    ,include_groups=False)
+    if any(len(missing) > 0 for missing in missing_dates):
+        raise ValueError("Timeseries contains missing dates. Ensure all dates are filled up to the training_period_end before calling flatten_coin_date_df().")
+    
