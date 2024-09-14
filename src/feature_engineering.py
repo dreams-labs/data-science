@@ -316,7 +316,7 @@ def calculate_stat(ts, stat):
 
 
 
-def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_period_start, version=None):
+def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_period_start, description=None):
     """
     Saves the flattened DataFrame with descriptive metrics into a CSV file.
 
@@ -325,10 +325,11 @@ def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_per
     - output_dir (str): Directory where the CSV file will be saved.
     - metric_description (str): Description of metrics (e.g., 'buysell_metrics').
     - modeling_period_start (str): Start of the modeling period (e.g., '2023-01-01').
-    - version (str, optional): Version number of the file (e.g., 'v1').
+    - description (str, optional): A description to be added to the filename.
 
     Returns:
-    - full_path (str): The full path to the saved CSV file.
+    - coin_df (pd.DataFrame): The same DataFrame that was passed in.
+    - output_path (str): The full path to the saved CSV file.
     """
     
     # Check if 'coin_id' exists and is fully unique
@@ -338,18 +339,18 @@ def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_per
     if not coin_df['coin_id'].is_unique:
         raise ValueError("The 'coin_id' column must have fully unique values.")
     
-    # Define filename with metric description
+    # Define filename with metric description and optional description
     timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M')
-    version_suffix = f"_v{version}" if version else ""
-    filename = f"{metric_description}_{timestamp}_model_period_{modeling_period_start}{version_suffix}.csv"
+    description_suffix = f"_{description}" if description else ""
+    filename = f"{metric_description}{description_suffix}_{timestamp}_model_period_{modeling_period_start}.csv"
 
     # Save file
-    full_path = os.path.join(output_dir, filename)
-    coin_df.to_csv(full_path, index=False)
+    output_path = os.path.join(output_dir, filename)
+    coin_df.to_csv(output_path, index=False)
 
-    logger.debug("Saved flattened outputs to %s", full_path)
+    logger.debug("Saved flattened outputs to %s", output_path)
     
-    return full_path
+    return coin_df, output_path
 
 
 

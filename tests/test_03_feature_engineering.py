@@ -522,10 +522,10 @@ def test_save_flattened_outputs(mock_coin_df):
     test_output_path = os.path.join(os.getcwd(), "tests", "test_modeling", "outputs", "flattened_outputs")
     metric_description = 'buysell'
     modeling_period_start = '2024-04-01'
-    version = '0.1'
+    description = 'v0.1'
 
-    # Call the function to save the CSV
-    saved_file_path = fe.save_flattened_outputs(mock_coin_df, test_output_path, metric_description, modeling_period_start, version)
+    # Call the function to save the CSV and get the DataFrame and output path
+    _, saved_file_path = fe.save_flattened_outputs(mock_coin_df, test_output_path, metric_description, modeling_period_start, description)
     
     # Assert that the file was created
     assert os.path.exists(saved_file_path), f"File was not saved at {saved_file_path}"
@@ -558,7 +558,6 @@ def test_save_flattened_outputs_non_unique_coin_id(mock_non_unique_coin_id_df):
     # Check for the ValueError due to non-unique 'coin_id' values
     with pytest.raises(ValueError, match="The 'coin_id' column must have fully unique values."):
         fe.save_flattened_outputs(mock_non_unique_coin_id_df, test_output_path, metric_description, modeling_period_start)
-
 
 
 
