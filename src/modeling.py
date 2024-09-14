@@ -80,6 +80,9 @@ def split_model_input(model_input_df, target_column, test_size=0.2, random_state
         X, y, test_size=test_size, random_state=random_state
     )
 
+    # Log the size and number of positives for y_train and y_test
+    logger.info(f"y_train: {y_train.sum()}/{len(y_train)} positives, y_test: {y_test.sum()}/{len(y_test)} positives")
+
     # Check if y_train or y_test contains only one unique value
     if len(np.unique(y_train)) <= 1 or len(np.unique(y_test)) <= 1:
         raise ValueError("y_train or y_test contains only one class, which is not suitable for model training.")
