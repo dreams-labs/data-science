@@ -70,27 +70,6 @@ def validate_experiments_yaml(config_folder):
     return list(experiment_config.items())
 
 
-def flatten_dict(d, parent_key='', sep='.'):
-    """
-    Flattens a nested dictionary.
-    
-    Args:
-    - d (dict): The dictionary to flatten.
-    - parent_key (str): The base key (used during recursion).
-    - sep (str): Separator between keys.
-    
-    Returns:
-    - flat_dict (dict): Flattened dictionary.
-    """
-    items = []
-    for k, v in d.items():
-        new_key = f"{parent_key}{sep}{k}" if parent_key else k
-        if isinstance(v, dict):
-            items.extend(flatten_dict(v, new_key, sep=sep).items())
-        else:
-            items.append((new_key, v))
-    return dict(items)
-
 
 def generate_experiment_configurations(config_folder, method='grid', max_evals=50):
     """
@@ -126,3 +105,107 @@ def generate_experiment_configurations(config_folder, method='grid', max_evals=5
         raise ValueError(f"Invalid method: {method}. Must be 'grid' or 'random'.")
 
     return configurations
+
+def flatten_dict(d, parent_key='', sep='.'):
+    """
+    Helper function for generate_experiment_configurations(). 
+    Flattens a nested dictionary.
+    
+    Args:
+    - d (dict): The dictionary to flatten.
+    - parent_key (str): The base key (used during recursion).
+    - sep (str): Separator between keys.
+    
+    Returns:
+    - flat_dict (dict): Flattened dictionary.
+    """
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
+
+
+
+
+
+def prepare_configs(config_folder, override_params):
+    """
+    Loads config files from the config_folder using load_config and applies overrides specified in override_params.
+    Raises KeyError if any key from override_params does not match an existing key in the corresponding config.
+
+    Args:
+    - config_folder (str): Path to the folder containing the configuration files.
+    - override_params (dict): Dictionary of flattened parameters to override in the loaded configs.
+
+    Returns:
+    - config (dict): The main config file with overrides applied.
+    - metrics_config (dict): The metrics configuration with overrides applied.
+    - modeling_config (dict): The modeling configuration with overrides applied.
+    """
+    
+    # Load the main config files using load_config
+    config_path = os.path.join(config_folder, 'config.yaml')
+    metrics_config_path = os.path.join(config_folder, 'metrics_config.yaml')
+    modeling_config_path = os.path.join(config_folder, 'modeling_config.yaml')
+
+    config = load_config(config_path)
+    metrics_config = load_config(metrics_config_path)
+    modeling_config = load_config(modeling_config_path)
+
+    # Apply the flattened overrides to each config
+    for full_key, value in override_params.items():
+        if full_key.startswith('config.'):
+            # Validate the key exists before setting the value
+            validate_key_in_config(config, full_key[len('config.'):])
+            set_nested_value(config, full_key[len('config.'):], value)
+        elif full_key.startswith('metrics_config.'):
+            # Validate the key exists before setting the value
+            validate_key_in_config(metrics_config, full_key[len('metrics_config.'):])
+            set_nested_value(metrics_config, full_key[len('metrics_config.'):], value)
+        elif full_key.startswith('modeling_config.'):
+            # Validate the key exists before setting the value
+            validate_key_in_config(modeling_config, full_key[len('modeling_config.'):])
+            set_nested_value(modeling_config, full_key[len('modeling_config.'):], value)
+        else:
+            raise ValueError(f"Unknown config section in key: {full_key}")
+
+    return config, metrics_config, modeling_config
+
+def set_nested_value(config, key_path, value):
+    """
+    Sets a value in a nested dictionary based on a flattened key path.
+
+    Args:
+    - config (dict): The configuration dictionary to update.
+    - key_path (str): The flattened key path (e.g., 'config.data_cleaning.inflows_filter').
+    - value: The value to set at the given key path.
+    """
+    keys = key_path.split('.')
+    sub_dict = config
+    for key in keys[:-1]:  # Traverse down to the second-to-last key
+        sub_dict = sub_dict.setdefault(key, {})
+    sub_dict[keys[-1]] = value  # Set the value at the final key
+
+def validate_key_in_config(config, key_path):
+    """
+    Validates that a given key path exists in the nested configuration.
+
+    Args:
+    - config (dict): The configuration dictionary to validate.
+    - key_path (str): The flattened key path to check (e.g., 'config.data_cleaning.inflows_filter').
+
+    Raises:
+    - KeyError: If the key path does not exist in the config.
+    """
+    keys = key_path.split('.')
+    sub_dict = config
+    for key in keys[:-1]:  # Traverse down to the second-to-last key
+        if key not in sub_dict:
+            raise KeyError(f"Key '{key}' not found in config at level '{'.'.join(keys[:-1])}'")
+        sub_dict = sub_dict[key]
+    if keys[-1] not in sub_dict:
+        raise KeyError(f"Key '{keys[-1]}' not found in config at final level '{'.'.join(keys[:-1])}'")
