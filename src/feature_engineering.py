@@ -626,17 +626,19 @@ def create_target_variables_mooncrater(prices_df, training_data_config, config_m
 
 
 
-def prepare_model_input_df(training_data_df, target_variable_df):
+def prepare_model_input_df(training_data_df, target_variable_df, target_column):
     """
     Prepares the final model input DataFrame by merging the training data with the target variables 
-    on 'coin_id'. Checks for data quality issues like missing columns, duplicate coin_ids, and missing target variables.
+    on 'coin_id' and selects the specified target column. Checks for data quality issues like missing 
+    columns, duplicate coin_ids, and missing target variables.
 
     Parameters:
     - training_data_df: DataFrame containing the features for training the model.
     - target_variable_df: DataFrame containing target variables for each coin_id.
+    - target_column: The name of the target variable to train on (e.g., 'is_moon' or 'is_crater').
 
     Returns:
-    - model_input_df: Merged DataFrame with both features and target variables.
+    - model_input_df: Merged DataFrame with both features and the specified target variable.
     """
 
     # Step 1: Ensure that both DataFrames have 'coin_id' as a column
@@ -651,17 +653,22 @@ def prepare_model_input_df(training_data_df, target_variable_df):
     if target_variable_df['coin_id'].duplicated().any():
         raise ValueError("Duplicate 'coin_id' found in target_variable_df")
 
-    # Step 3: Merge the training data with the target variable DataFrame on 'coin_id'
-    model_input_df = pd.merge(training_data_df, target_variable_df, on='coin_id', how='inner')
+    # Step 3: Ensure that the target column exists in the target_variable_df
+    if target_column not in target_variable_df.columns:
+        raise ValueError(f"The target column '{target_column}' is missing in target_variable_df")
 
-    # Step 4: Check if any coin_id from training_data_df is missing a target variable
+    # Step 4: Merge the training data with the target variable DataFrame on 'coin_id'
+    model_input_df = pd.merge(training_data_df, target_variable_df[['coin_id', target_column]], 
+                              on='coin_id', how='inner')
+
+    # Step 5: Check if any coin_id from training_data_df is missing a target variable
     missing_targets = set(training_data_df['coin_id']) - set(target_variable_df['coin_id'])
     if missing_targets:
         logger.warning("Some 'coin_id's are missing target variables: %s", ', '.join(map(str, missing_targets)))
 
-    # Step 5: Perform final quality checks (e.g., no NaNs in important columns)
+    # Step 6: Perform final quality checks (e.g., no NaNs in important columns)
     if model_input_df.isnull().any().any():
         logger.warning("NaN values found in the merged DataFrame")
 
-    # Step 6: Return the final model input DataFrame
+    # Step 7: Return the final model input DataFrame
     return model_input_df
