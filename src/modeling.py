@@ -90,6 +90,7 @@ def split_model_input(model_input_df, target_column, test_size=0.2, random_state
     return X_train, X_test, y_train, y_test
 
 
+
 def train_model(X_train, y_train, modeling_folder, model_params=None):
     """
     Trains a model on the training data and saves the model, logs, and feature importance.

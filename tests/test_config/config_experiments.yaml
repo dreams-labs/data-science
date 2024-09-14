@@ -1,0 +1,60 @@
+# This experiment config file defines parameter variations for running experiments
+# across multiple configurations. It is linked to three main config files:
+# - config.yaml: Contains settings for training data and data cleaning.
+# - config_modeling.yaml: Contains preprocessing steps and modeling-related parameters.
+# - config_metrics.yaml: Defines metrics and their aggregations for evaluation.
+
+config:
+  # Alterations related to training data settings
+  training_data:
+    modeling_period_duration:
+      - 14  # 14 days modeling period
+      - 30  # 30 days modeling period
+    shark_wallet_min_coins:
+      - 3   # Minimum 3 coins
+      - 5   # Minimum 5 coins
+
+  # Alterations related to data cleaning settings
+  data_cleaning:
+    profitability_filter:
+      - 15000000
+      - 20000000  # Filter at a higher threshold for profitability
+    inflows_filter:
+      - 10000000
+      - 15000000  # Filter at a higher threshold for inflows
+
+config_modeling:
+  # Preprocessing settings
+  preprocessing:
+    drop_features:
+      - ['total_sellers_sum', 'buyers_new_median']  # Drop these two features
+      - ['total_sellers_sum']  # Drop only one feature for comparison
+
+  # Modeling-specific settings
+  target_variables:
+    moon_threshold:
+      - 0.3  # Moon threshold of 30%
+      - 0.5  # Moon threshold of 50%
+
+config_metrics:
+  # Metrics configuration
+  metrics:
+    buyers_new:
+      aggregations:
+        sum:
+          scaling:
+            - 'standard'  # Standard scaling
+            - 'minmax'    # Min-max scaling
+        mean:
+          scaling:
+            - 'standard'
+            - 'minmax'
+    total_bought:
+      aggregations:
+        sum:
+          scaling:
+            - 'standard'
+            - 'minmax'
+        median:
+          scaling:
+            - 'None'  # No scaling for the median
