@@ -43,31 +43,6 @@ logger = dc.setup_logger()
 
 
 def test_validate_experiments_yaml_success(tmpdir):
-    # Create the config folder and files
-    config_folder = tmpdir.mkdir("config_folder")
-    
-    # Make sure the config_experiments.yaml is being written to the correct path
-    experiment_config_path = config_folder.join("config_experiments.yaml")
-    
-    # Create the config_experiments.yaml file with the correct structure
-    experiment_config = """
-    config:
-      training_data:
-        modeling_period_duration:
-          - 14
-          - 30
-        shark_wallet_min_coins:
-          - 3
-          - 5
-    """
-    experiment_config_path.write(experiment_config)
-    
-    # Make sure you're loading from the correct path
-    experiments_config = load_config(experiment_config_path)
-    assert experiments_config is not None
-
-
-def test_validate_experiments_yaml_success(tmpdir):
     """Test the success case where 2 variables from 2 different config files are retrieved correctly."""
 
     # Create the config folder and files
