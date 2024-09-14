@@ -2,10 +2,11 @@ training_data:
   # Variables used to define the training data
 
   # Defining the modeling and training periods (dates must follow YYYY-MM-DD format)
-  training_period_start: '2024-01-01'  # Start date for the training period
-  training_period_end: '2024-04-30'    # End date for the training period
+  # The modeling period end date and training period start and end dates are automatically 
+  # imputed using utils.py function calculate_period_dates() when load_config() is run
   modeling_period_start: '2024-05-01'  # Start date for the modeling period
-  modeling_period_end: '2024-05-07'    # End date for the modeling period
+  modeling_period_duration: 14    # Duration of the modeling period in days
+  training_period_duration: 60    # Duration of the training period in days
 
   # Shark coin thresholds
   shark_coin_minimum_inflows: 5000  # Minimum USD inflows for a coin to be considered a 'shark' coin

@@ -344,6 +344,8 @@ def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_per
     # Save file
     full_path = os.path.join(output_dir, filename)
     coin_df.to_csv(full_path, index=False)
+
+    logger.debug("Saved flattened outputs to %s", full_path)
     
     return full_path
 
@@ -390,7 +392,7 @@ def preprocess_coin_df(input_path, modeling_config):
 
 
 
-def create_training_data_df(output_dir, input_filenames):
+def create_training_data_df(input_directory, input_filenames):
     """
     Merges specified preprocessed output CSVs into a single DataFrame and checks if all have 
     identical coin_ids to ensure consistency. Adds suffixes to column names based on filename
@@ -399,7 +401,7 @@ def create_training_data_df(output_dir, input_filenames):
     Additionally, raises an error if any of the input files have duplicate coin_ids or are missing the coin_id column.
 
     Params:
-    - output_dir (str): Directory containing preprocessed output CSVs.
+    - input_directory (str): Directory containing preprocessed output CSVs.
     - input_filenames (list): List of filenames to be merged (without directory path).
 
     Returns:
@@ -435,7 +437,7 @@ def create_training_data_df(output_dir, input_filenames):
 
     # Loop through the input filenames and attempt to read each
     for filename in input_filenames:
-        file_path = os.path.join(output_dir, filename)
+        file_path = os.path.join(input_directory, filename)
         if os.path.exists(file_path):
             df = pd.read_csv(file_path)
 
@@ -506,7 +508,7 @@ def create_training_data_df(output_dir, input_filenames):
 
 
 
-def create_target_variables(prices_df, config, config_modeling):
+def create_target_variables_mooncrater(prices_df, training_data_config, config_modeling):
     """
     Creates a DataFrame with target variables 'is_moon' and 'is_crater' based on price performance 
     during the modeling period, using the thresholds from config_modeling.
@@ -521,11 +523,10 @@ def create_target_variables(prices_df, config, config_modeling):
     - outcomes_df: DataFrame tracking outcomes for each coin.
     """
     # Retrieve the necessary values from config_modeling
-    modeling_period_start = pd.to_datetime(config['modeling_period_start'])
-    modeling_period_end = pd.to_datetime(config['modeling_period_end'])
+    modeling_period_start = pd.to_datetime(training_data_config['modeling_period_start'])
+    modeling_period_end = pd.to_datetime(training_data_config['modeling_period_end'])
     moon_threshold = config_modeling['target_variables']['moon_threshold']
     crater_threshold = config_modeling['target_variables']['crater_threshold']
-
 
     # Filter for the modeling period and sort the DataFrame
     modeling_period_df = prices_df[(prices_df['date'] >= modeling_period_start) & (prices_df['date'] <= modeling_period_end)]
@@ -586,3 +587,45 @@ def create_target_variables(prices_df, config, config_modeling):
     )
 
     return target_variables_df, outcomes_df
+
+
+
+def prepare_model_input_df(training_data_df, target_variable_df):
+    """
+    Prepares the final model input DataFrame by merging the training data with the target variables 
+    on 'coin_id'. Checks for data quality issues like missing columns, duplicate coin_ids, and missing target variables.
+
+    Parameters:
+    - training_data_df: DataFrame containing the features for training the model.
+    - target_variable_df: DataFrame containing target variables for each coin_id.
+
+    Returns:
+    - model_input_df: Merged DataFrame with both features and target variables.
+    """
+
+    # Step 1: Ensure that both DataFrames have 'coin_id' as a column
+    if 'coin_id' not in training_data_df.columns:
+        raise ValueError("The 'coin_id' column is missing in training_data_df")
+    if 'coin_id' not in target_variable_df.columns:
+        raise ValueError("The 'coin_id' column is missing in target_variable_df")
+
+    # Step 2: Check for duplicated coin_id entries in both DataFrames
+    if training_data_df['coin_id'].duplicated().any():
+        raise ValueError("Duplicate 'coin_id' found in training_data_df")
+    if target_variable_df['coin_id'].duplicated().any():
+        raise ValueError("Duplicate 'coin_id' found in target_variable_df")
+
+    # Step 3: Merge the training data with the target variable DataFrame on 'coin_id'
+    model_input_df = pd.merge(training_data_df, target_variable_df, on='coin_id', how='inner')
+
+    # Step 4: Check if any coin_id from training_data_df is missing a target variable
+    missing_targets = set(training_data_df['coin_id']) - set(target_variable_df['coin_id'])
+    if missing_targets:
+        logger.warning("Some 'coin_id's are missing target variables: %s", ', '.join(map(str, missing_targets)))
+
+    # Step 5: Perform final quality checks (e.g., no NaNs in important columns)
+    if model_input_df.isnull().any().any():
+        logger.warning("NaN values found in the merged DataFrame")
+
+    # Step 6: Return the final model input DataFrame
+    return model_input_df

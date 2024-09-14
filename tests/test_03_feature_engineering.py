@@ -637,6 +637,7 @@ def mock_input_files_colnames(tmpdir):
 
     return tmpdir, filenames
 
+@pytest.mark.unit
 def test_create_training_data_df(mock_input_files_colnames):
     """
     test column renaming logic for clarity
@@ -682,6 +683,7 @@ def mock_input_files(tmpdir):
     return tmpdir, filenames
 
 # Test Scenario 1: One of the files cannot be found
+@pytest.mark.unit
 def test_file_not_found(mock_input_files):
     """
     confirms the error message when a input file does not exist
@@ -694,6 +696,7 @@ def test_file_not_found(mock_input_files):
         fe.create_training_data_df(tmpdir, filenames)
 
 # Test Scenario 2: One of the files is missing a coin_id
+@pytest.mark.unit
 def test_missing_coin_id(mock_input_files):
     """
     confirms the error message when a input file does not have a coin_id column
@@ -710,6 +713,7 @@ def test_missing_coin_id(mock_input_files):
         fe.create_training_data_df(tmpdir, filenames)
 
 # Test Scenario 3: One of the files has a duplicate record for a coin_id
+@pytest.mark.unit
 def test_duplicate_coin_id(mock_input_files):
     """
     confirms the error message when a input file has duplicate coin_id rows
@@ -727,6 +731,56 @@ def test_duplicate_coin_id(mock_input_files):
         fe.create_training_data_df(tmpdir, filenames)
 
 
+# ------------------------------------------ #
+# create_target_variables_mooncrater() unit tests
+# ------------------------------------------ #
+
+@pytest.mark.unit
+def test_create_target_variables_mooncrater():
+    # Mock data
+    data = {
+        'coin_id': ['coin1', 'coin2', 'coin3', 'coin4', 'coin5', 'coin1', 'coin2', 'coin3', 'coin4', 'coin5'],
+        'date': [
+            '2024-01-01', '2024-01-01', '2024-01-01', '2024-01-01', '2024-01-01',
+            '2024-12-31', '2024-12-31', '2024-12-31', '2024-12-31', '2024-12-31'
+        ],
+        'price': [
+            100, 100, 100, 100, 100,   # Start prices
+            105, 150, 95, 50, 150      # End prices: slightly positive, >moon, slightly negative, <crater, at moon threshold
+        ]
+    }
+    prices_df = pd.DataFrame(data)
+    prices_df['date'] = pd.to_datetime(prices_df['date'])
+
+    # Mock configuration
+    training_data_config = {
+        'modeling_period_start': '2024-01-01',
+        'modeling_period_end': '2024-12-31',
+    }
+
+    config_modeling = {
+        'target_variables': {
+            'moon_threshold': 0.5,  # 50% increase
+            'crater_threshold': -0.5  # 50% decrease
+        }
+    }
+
+    # Call the function being tested
+    target_variables_df, outcomes_df = fe.create_target_variables_mooncrater(prices_df, training_data_config, config_modeling)
+
+    # Assertions for target variables
+    assert target_variables_df[target_variables_df['coin_id'] == 'coin1']['is_moon'].values[0] == 0
+    assert target_variables_df[target_variables_df['coin_id'] == 'coin2']['is_moon'].values[0] == 1
+    assert target_variables_df[target_variables_df['coin_id'] == 'coin3']['is_crater'].values[0] == 0
+    assert target_variables_df[target_variables_df['coin_id'] == 'coin4']['is_crater'].values[0] == 1
+    assert target_variables_df[target_variables_df['coin_id'] == 'coin5']['is_moon'].values[0] == 1  # Exactly at moon threshold
+
+    # Assertions for outcomes
+    assert outcomes_df[outcomes_df['coin_id'] == 'coin1']['outcome'].values[0] == 'target variable created'
+    assert outcomes_df[outcomes_df['coin_id'] == 'coin2']['outcome'].values[0] == 'target variable created'
+    assert outcomes_df[outcomes_df['coin_id'] == 'coin3']['outcome'].values[0] == 'target variable created'
+    assert outcomes_df[outcomes_df['coin_id'] == 'coin4']['outcome'].values[0] == 'target variable created'
+    assert outcomes_df[outcomes_df['coin_id'] == 'coin5']['outcome'].values[0] == 'target variable created'
 
 
 
