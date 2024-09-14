@@ -27,6 +27,10 @@ load_dotenv()
 logger = dc.setup_logger()
 
 
+
+
+
+
 # ===================================================== #
 #                                                       #
 #                 U N I T   T E S T S                   #
@@ -476,13 +480,376 @@ def test_fe_flatten_coin_date_df():
     assert result_one_coin['buyers_new_sum'].iloc[0] == 60  # Sum of buyers_new for coin 1
 
 
+# ------------------------------------------ #
+# save_flattened_outputs() unit tests
+# ------------------------------------------ #
+
+
+@pytest.fixture
+def mock_coin_df():
+    """
+    Simple mock flat file keyed on coin_id
+    """
+    data = {'coin_id': ['BTC', 'ETH'], 'buyers_new': [50000, 4000]}
+    return pd.DataFrame(data)
+
+@pytest.fixture
+def mock_no_coin_id_df():
+    """
+    Mock DataFrame without a 'coin_id' column
+    """
+    data = {'coin': ['BTC', 'ETH'], 'buyers_new': [50000, 4000]}
+    return pd.DataFrame(data)
+
+@pytest.fixture
+def mock_non_unique_coin_id_df():
+    """
+    Mock DataFrame with non-unique 'coin_id' values (keyed on coin_id-date)
+    """
+    data = {
+        'coin_id': ['BTC', 'BTC', 'ETH', 'ETH'],
+        'date': ['2024-01-01', '2024-01-02', '2024-01-01', '2024-01-02'],
+        'buyers_new': [50000, 51000, 4000, 4200]
+    }
+    return pd.DataFrame(data)
+
+@pytest.mark.unit
+def test_save_flattened_outputs(mock_coin_df):
+    """
+    Confirms that the mock file saves correctly
+    """
+    # Hard-code test output location directly within the test function
+    test_output_path = os.path.join(os.getcwd(), "tests", "test_modeling", "outputs", "flattened_outputs")
+    metric_description = 'buysell'
+    modeling_period_start = '2024-04-01'
+    description = 'v0.1'
+
+    # Call the function to save the CSV and get the DataFrame and output path
+    _, saved_file_path = fe.save_flattened_outputs(mock_coin_df, test_output_path, metric_description, modeling_period_start, description)
+    
+    # Assert that the file was created
+    assert os.path.exists(saved_file_path), f"File was not saved at {saved_file_path}"
+
+    # Cleanup (remove the test file after the test)
+    os.remove(saved_file_path)
+
+@pytest.mark.unit
+def test_save_flattened_outputs_no_coin_id(mock_no_coin_id_df):
+    """
+    Confirms that the function raises a ValueError if 'coin_id' column is missing
+    """
+    test_output_path = os.path.join(os.getcwd(), "tests", "test_modeling", "outputs", "flattened_outputs")
+    metric_description = 'buysell'
+    modeling_period_start = '2024-04-01'
+
+    # Check for the ValueError due to missing 'coin_id' column
+    with pytest.raises(ValueError, match="The DataFrame must contain a 'coin_id' column."):
+        fe.save_flattened_outputs(mock_no_coin_id_df, test_output_path, metric_description, modeling_period_start)
+
+@pytest.mark.unit
+def test_save_flattened_outputs_non_unique_coin_id(mock_non_unique_coin_id_df):
+    """
+    Confirms that the function raises a ValueError if 'coin_id' values are not unique
+    """
+    test_output_path = os.path.join(os.getcwd(), "tests", "test_modeling", "outputs", "flattened_outputs")
+    metric_description = 'buysell'
+    modeling_period_start = '2024-04-01'
+
+    # Check for the ValueError due to non-unique 'coin_id' values
+    with pytest.raises(ValueError, match="The 'coin_id' column must have fully unique values."):
+        fe.save_flattened_outputs(mock_non_unique_coin_id_df, test_output_path, metric_description, modeling_period_start)
+
+
+
+# ------------------------------------------ #
+# preprocess_coin_df() unit tests
+# ------------------------------------------ #
+@pytest.fixture
+def mock_modeling_config():
+    """
+    Returns a mock modeling configuration dictionary.
+    The configuration includes preprocessing options such as features to drop.
+    """
+    return {
+        'preprocessing': {
+            'drop_features': ['feature_to_drop']
+        }
+    }
+
+@pytest.fixture
+def mock_metrics_config():
+    """
+    Returns a mock metrics configuration dictionary.
+    This configuration includes settings for scaling different features.
+    """
+    return {
+        'metrics': {
+            'feature_1': {
+                'aggregations': {
+                    'sum': {'scaling': 'standard'}
+                }
+            }
+        }
+    }
+
+@pytest.fixture
+def mock_input_df():
+    """
+    Creates a mock DataFrame and saves it as a CSV for testing.
+    The CSV file is saved in the 'tests/test_modeling/outputs/flattened_outputs' directory.
+    
+    Returns:
+    - input_path: Path to the CSV file.
+    - df: Original mock DataFrame.
+    """
+    data = {
+        'feature_1_sum': [1, 2, 3],
+        'feature_to_drop': [10, 20, 30],
+        'feature_3': [100, 200, 300]
+    }
+    df = pd.DataFrame(data)
+    input_path = 'tests/test_modeling/outputs/flattened_outputs/mock_input.csv'
+    df.to_csv(input_path, index=False)
+    return input_path, df
+
+@pytest.mark.unit
+def test_preprocess_coin_df_drops_columns(mock_modeling_config, mock_metrics_config, mock_input_df):
+    """
+    Tests that the preprocess_coin_df function correctly drops the specified columns.
+    
+    Steps:
+    - Preprocesses the mock DataFrame by dropping the 'feature_to_drop' column.
+    - Asserts that the output CSV is created and the column was dropped.
+    - Cleans up the test files after execution.
+    """
+    input_path, original_df = mock_input_df
+    
+    # Call the function
+    output_df, output_path = fe.preprocess_coin_df(input_path, mock_modeling_config, mock_metrics_config)
+    
+    # Check that the output file exists
+    assert os.path.exists(output_path), "Output CSV file was not created."
+    
+    # Check that the 'feature_to_drop' column is missing in the output DataFrame
+    assert 'feature_to_drop' not in output_df.columns, "Column 'feature_to_drop' was not dropped."
+    assert len(output_df.columns) == len(original_df.columns) - 1, "Unexpected number of columns after preprocessing."
+    
+    # Cleanup (remove the test files)
+    os.remove(output_path)
+    os.remove(input_path)
+
+@pytest.mark.unit
+def test_preprocess_coin_df_scaling(mock_modeling_config, mock_metrics_config, mock_input_df):
+    """
+    Tests that the preprocess_coin_df function correctly applies scaling to the specified features.
+    
+    Steps:
+    - Preprocesses the mock DataFrame by applying standard scaling to 'feature_1'.
+    - Asserts that the column is scaled correctly.
+    - Cleans up the test files after execution.
+    """
+    input_path, original_df = mock_input_df
+    
+    # Call the function
+    output_df, output_path = fe.preprocess_coin_df(input_path, mock_modeling_config, mock_metrics_config)
+    
+    # Check that 'feature_1' is scaled (mean should be near 0 and std should be near 1)
+    scaled_column = output_df['feature_1_sum']
+    assert abs(scaled_column.mean()) < 1e-6, "Standard scaling not applied correctly to 'feature_1_sum'."
+    assert abs(np.std(scaled_column) - 1) < 1e-6, "Standard scaling not applied correctly to 'feature_1_sum'."
+    
+    # Cleanup (remove the test files)
+    os.remove(output_path)
+    os.remove(input_path)
+
+
+
+# ------------------------------------------ #
+# create_training_data_df() unit tests
+# ------------------------------------------ #
+
+@pytest.fixture
+def mock_input_files_colnames(tmpdir):
+    """
+    unit test data for scenario with many duplicate columns and similar filenames
+    """
+    # Create mock filenames and corresponding DataFrames
+    filenames = [
+        'buysell_metrics_2024-09-13_14-44_model_period_2024-05-01_v0.1.csv',
+        'buysell_metrics_2024-09-13_14-45_model_period_2024-05-01_v0.1.csv',
+        'buysell_metrics_megasharks_2024-09-13_14-45_model_period_2024-05-01_v0.1.csv',
+        'buysell_metrics_megasharks_2024-09-13_14-45_model_period_2024-05-01_v0.2.csv',
+        'price_metrics_2024-09-13_14-45_model_period_2024-05-01_v0.1.csv'
+    ]
+    
+    # Create mock DataFrames for each file
+    df1 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [100, 200]})
+    df2 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [150, 250]})
+    df3 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [110, 210]})
+    df4 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [120, 220]})
+    df5 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [130, 230]})
+
+    # Save each DataFrame as a CSV
+    for i, df in enumerate([df1, df2, df3, df4, df5]):
+        df.to_csv(os.path.join(tmpdir, filenames[i]), index=False)
+
+    return tmpdir, filenames
+
+@pytest.mark.unit
+def test_create_training_data_df(mock_input_files_colnames):
+    """
+    test column renaming logic for clarity
+    """
+    tmpdir, filenames = mock_input_files_colnames
+
+    # Call the function
+    merged_df = fe.create_training_data_df(tmpdir, filenames)
+
+    # Check if the columns have the correct suffixes
+    expected_columns = [
+        'coin_id',
+        'buyers_new_buysell_metrics_2024-09-13_14-44',
+        'buyers_new_buysell_metrics_2024-09-13_14-45',
+        'buyers_new_buysell_metrics_megasharks_2024-09-13_14-45',
+        'buyers_new_buysell_metrics_megasharks_2024-09-13_14-45_2',
+        'buyers_new_price_metrics'
+    ]
+
+    assert list(merged_df.columns) == expected_columns, f"Expected columns: {expected_columns}, but got: {list(merged_df.columns)}"
+
+@pytest.fixture
+def mock_input_files(tmpdir):
+    """
+    valid input filenames that will be combined with invalid files
+    """
+    # Create mock filenames and corresponding DataFrames with dummy date values
+    filenames = [
+        'file1_2024-09-13_14-44.csv',
+        'file2_2024-09-13_14-45.csv',
+        'file3_2024-09-13_14-46.csv'
+    ]
+    
+    # Create mock DataFrames
+    df1 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [100, 200]})
+    df2 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [150, 250]})
+    df3 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [110, 210]})
+
+    # Save each DataFrame as a CSV
+    for i, df in enumerate([df1, df2, df3]):
+        df.to_csv(os.path.join(tmpdir, filenames[i]), index=False)
+
+    return tmpdir, filenames
+
+# Test Scenario 1: One of the files cannot be found
+@pytest.mark.unit
+def test_file_not_found(mock_input_files):
+    """
+    confirms the error message when a input file does not exist
+    """
+    tmpdir, filenames = mock_input_files
+
+    # Simulate one of the files not existing
+    filenames = ['file4_nonexistent_2024-09-13_14-47.csv']
+    with pytest.raises(ValueError, match="No preprocessed output files found for the given filenames"):
+        fe.create_training_data_df(tmpdir, filenames)
+
+# Test Scenario 2: One of the files is missing a coin_id
+@pytest.mark.unit
+def test_missing_coin_id(mock_input_files):
+    """
+    confirms the error message when a input file does not have a coin_id column
+    """
+    tmpdir, filenames = mock_input_files
+
+    # Create a DataFrame missing the 'coin_id' column
+    df_missing_coin_id = pd.DataFrame({'buyers_new': [100, 200]})
+    df_missing_coin_id.to_csv(os.path.join(tmpdir, 'file_missing_coin_id_2024-09-13_14-47.csv'), index=False)
+
+    filenames.append('file_missing_coin_id_2024-09-13_14-47.csv')
+
+    with pytest.raises(ValueError, match="coin_id column is missing in file_missing_coin_id_2024-09-13_14-47.csv"):
+        fe.create_training_data_df(tmpdir, filenames)
+
+# Test Scenario 3: One of the files has a duplicate record for a coin_id
+@pytest.mark.unit
+def test_duplicate_coin_id(mock_input_files):
+    """
+    confirms the error message when a input file has duplicate coin_id rows
+    """
+    tmpdir, filenames = mock_input_files
+    bad_file = 'file_duplicate_coin_id_2024-09-13_14-47.csv'
+
+    # Create a DataFrame with duplicate 'coin_id' values
+    df_duplicate_coin_id = pd.DataFrame({'coin_id': [1, 1], 'buyers_new': [100, 200]})
+    df_duplicate_coin_id.to_csv(os.path.join(tmpdir, bad_file), index=False)
+
+    filenames.append(bad_file)
+
+    with pytest.raises(ValueError, match=f"Duplicate coin_ids found in file: {bad_file}"):
+        fe.create_training_data_df(tmpdir, filenames)
+
+
+
+# ------------------------------------------ #
+# create_target_variables_mooncrater() unit tests
+# ------------------------------------------ #
+
+@pytest.mark.unit
+def test_create_target_variables_mooncrater():
+    # Mock data
+    data = {
+        'coin_id': ['coin1', 'coin2', 'coin3', 'coin4', 'coin5', 'coin1', 'coin2', 'coin3', 'coin4', 'coin5'],
+        'date': [
+            '2024-01-01', '2024-01-01', '2024-01-01', '2024-01-01', '2024-01-01',
+            '2024-12-31', '2024-12-31', '2024-12-31', '2024-12-31', '2024-12-31'
+        ],
+        'price': [
+            100, 100, 100, 100, 100,   # Start prices
+            105, 150, 95, 50, 150      # End prices: slightly positive, >moon, slightly negative, <crater, at moon threshold
+        ]
+    }
+    prices_df = pd.DataFrame(data)
+    prices_df['date'] = pd.to_datetime(prices_df['date'])
+
+    # Mock configuration
+    training_data_config = {
+        'modeling_period_start': '2024-01-01',
+        'modeling_period_end': '2024-12-31',
+    }
+
+    config_modeling = {
+        'target_variables': {
+            'moon_threshold': 0.5,  # 50% increase
+            'crater_threshold': -0.5  # 50% decrease
+        }
+    }
+
+    # Call the function being tested
+    target_variables_df, outcomes_df = fe.create_target_variables_mooncrater(prices_df, training_data_config, config_modeling)
+
+    # Assertions for target variables
+    assert target_variables_df[target_variables_df['coin_id'] == 'coin1']['is_moon'].values[0] == 0
+    assert target_variables_df[target_variables_df['coin_id'] == 'coin2']['is_moon'].values[0] == 1
+    assert target_variables_df[target_variables_df['coin_id'] == 'coin3']['is_crater'].values[0] == 0
+    assert target_variables_df[target_variables_df['coin_id'] == 'coin4']['is_crater'].values[0] == 1
+    assert target_variables_df[target_variables_df['coin_id'] == 'coin5']['is_moon'].values[0] == 1  # Exactly at moon threshold
+
+    # Assertions for outcomes
+    assert outcomes_df[outcomes_df['coin_id'] == 'coin1']['outcome'].values[0] == 'target variable created'
+    assert outcomes_df[outcomes_df['coin_id'] == 'coin2']['outcome'].values[0] == 'target variable created'
+    assert outcomes_df[outcomes_df['coin_id'] == 'coin3']['outcome'].values[0] == 'target variable created'
+    assert outcomes_df[outcomes_df['coin_id'] == 'coin4']['outcome'].values[0] == 'target variable created'
+    assert outcomes_df[outcomes_df['coin_id'] == 'coin5']['outcome'].values[0] == 'target variable created'
+
+
+
+
 
 # ======================================================== #
 #                                                          #
 #            I N T E G R A T I O N   T E S T S             #
 #                                                          #
 # ======================================================== #
-
 
 # ---------------------------------- #
 # set up config and module-level fixtures

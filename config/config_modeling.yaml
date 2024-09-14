@@ -1,5 +1,13 @@
-# Modeling-related parameters
-modeling: 
-  # Thresholds for defining target variable outcomes
+preprocessing:
+  drop_features:  # List of features to drop from the dataset before modeling
+    - "total_sellers_sum"
+    - "buyers_new_median"
+    - "total_buyers_max"
+
+target_variables: 
   moon_threshold: 0.3  # Target for a 'moon' event, defined as a 30% price increase
-  dump_threshold: -0.2  # Target for a 'dump' event, defined as a 20% price decrease
+  crater_threshold: -0.2  # Target for a 'crater' event, defined as a 20% price decrease
+
+modeling:
+  target_column: "is_moon"  # or "is_crater" depending on the experiment
+  modeling_folder: "..//modeling"  # location of the modeling folder where outputs will be saved
