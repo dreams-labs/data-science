@@ -19,6 +19,7 @@ metrics:
         scaling: "minmax"      # Scaling for mean to normalize values between 0 and 1.
       std:
         scaling: "standard"    # Standard scaling for standard deviation to account for variability.
+      median:                  # No scaling specified here
     rolling:
       stats:
         sum:

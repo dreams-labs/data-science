@@ -560,12 +560,17 @@ def test_save_flattened_outputs_non_unique_coin_id(mock_non_unique_coin_id_df):
         fe.save_flattened_outputs(mock_non_unique_coin_id_df, test_output_path, metric_description, modeling_period_start)
 
 
+
+
 # ------------------------------------------ #
 # preprocess_coin_df() unit tests
 # ------------------------------------------ #
-
 @pytest.fixture
 def mock_modeling_config():
+    """
+    Returns a mock modeling configuration dictionary.
+    The configuration includes preprocessing options such as features to drop.
+    """
     return {
         'preprocessing': {
             'drop_features': ['feature_to_drop']
@@ -573,9 +578,33 @@ def mock_modeling_config():
     }
 
 @pytest.fixture
+def mock_metrics_config():
+    """
+    Returns a mock metrics configuration dictionary.
+    This configuration includes settings for scaling different features.
+    """
+    return {
+        'metrics': {
+            'feature_1': {
+                'aggregations': {
+                    'sum': {'scaling': 'standard'}
+                }
+            }
+        }
+    }
+
+@pytest.fixture
 def mock_input_df():
+    """
+    Creates a mock DataFrame and saves it as a CSV for testing.
+    The CSV file is saved in the 'tests/test_modeling/outputs/flattened_outputs' directory.
+    
+    Returns:
+    - input_path: Path to the CSV file.
+    - df: Original mock DataFrame.
+    """
     data = {
-        'feature_1': [1, 2, 3],
+        'feature_1_sum': [1, 2, 3],
         'feature_to_drop': [10, 20, 30],
         'feature_3': [100, 200, 300]
     }
@@ -585,24 +614,54 @@ def mock_input_df():
     return input_path, df
 
 @pytest.mark.unit
-def test_preprocess_coin_df_drops_columns(mock_modeling_config, mock_input_df):
+def test_preprocess_coin_df_drops_columns(mock_modeling_config, mock_metrics_config, mock_input_df):
+    """
+    Tests that the preprocess_coin_df function correctly drops the specified columns.
+    
+    Steps:
+    - Preprocesses the mock DataFrame by dropping the 'feature_to_drop' column.
+    - Asserts that the output CSV is created and the column was dropped.
+    - Cleans up the test files after execution.
+    """
     input_path, original_df = mock_input_df
     
     # Call the function
-    output_path = fe.preprocess_coin_df(input_path, mock_modeling_config)
+    output_df, output_path = fe.preprocess_coin_df(input_path, mock_modeling_config, mock_metrics_config)
     
     # Check that the output file exists
     assert os.path.exists(output_path), "Output CSV file was not created."
     
-    # Load the output CSV and check the dropped column
-    output_df = pd.read_csv(output_path)
-    assert 'feature_to_drop' not in output_df.columns, "Column was not dropped."
+    # Check that the 'feature_to_drop' column is missing in the output DataFrame
+    assert 'feature_to_drop' not in output_df.columns, "Column 'feature_to_drop' was not dropped."
     assert len(output_df.columns) == len(original_df.columns) - 1, "Unexpected number of columns after preprocessing."
     
     # Cleanup (remove the test files)
     os.remove(output_path)
     os.remove(input_path)
 
+@pytest.mark.unit
+def test_preprocess_coin_df_scaling(mock_modeling_config, mock_metrics_config, mock_input_df):
+    """
+    Tests that the preprocess_coin_df function correctly applies scaling to the specified features.
+    
+    Steps:
+    - Preprocesses the mock DataFrame by applying standard scaling to 'feature_1'.
+    - Asserts that the column is scaled correctly.
+    - Cleans up the test files after execution.
+    """
+    input_path, original_df = mock_input_df
+    
+    # Call the function
+    output_df, output_path = fe.preprocess_coin_df(input_path, mock_modeling_config, mock_metrics_config)
+    
+    # Check that 'feature_1' is scaled (mean should be near 0 and std should be near 1)
+    scaled_column = output_df['feature_1_sum']
+    assert abs(scaled_column.mean()) < 1e-6, "Standard scaling not applied correctly to 'feature_1_sum'."
+    assert abs(np.std(scaled_column) - 1) < 1e-6, "Standard scaling not applied correctly to 'feature_1_sum'."
+    
+    # Cleanup (remove the test files)
+    os.remove(output_path)
+    os.remove(input_path)
 
 
 
@@ -729,6 +788,7 @@ def test_duplicate_coin_id(mock_input_files):
 
     with pytest.raises(ValueError, match=f"Duplicate coin_ids found in file: {bad_file}"):
         fe.create_training_data_df(tmpdir, filenames)
+
 
 
 # ------------------------------------------ #

@@ -10,6 +10,8 @@ import time
 import re
 import pandas as pd
 import dreams_core.core as dc
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+
 
 # set up logger at the module level
 logger = dc.setup_logger()
@@ -351,17 +353,18 @@ def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_per
 
 
 
-
-def preprocess_coin_df(input_path, modeling_config):
+def preprocess_coin_df(input_path, modeling_config, metrics_config):
     """
-    Preprocess the flattened coin DataFrame by applying feature selection.
+    Preprocess the flattened coin DataFrame by applying feature selection and scaling based on the metrics config.
     
     Params:
     - input_path (str): Path to the flattened CSV file.
     - modeling_config (dict): Configuration with modeling-specific parameters.
+    - metrics_config (dict): Configuration with metrics and their associated scaling methods.
 
     Returns:
-    - full_path (str): The full path to the saved preprocessed CSV file.
+    - df (pd.DataFrame): The preprocessed DataFrame.
+    - output_path (str): The full path to the saved preprocessed CSV file.
     """
     # Step 1: Load the flattened data
     df = pd.read_csv(input_path)
@@ -376,19 +379,51 @@ def preprocess_coin_df(input_path, modeling_config):
     df = df.drop(columns=drop_features, errors='ignore')
     dropped_columns = initial_columns - set(df.columns)
 
-    # Step 4: Generate output path and filename based on input
+    # Step 4: Apply scaling to the relevant columns based on the metrics config
+    scalers = {
+        "standard": StandardScaler(),
+        "minmax": MinMaxScaler()
+    }
+
+    # Loop through each metric and its settings in the metrics_config
+    for metric, settings in metrics_config['metrics'].items():
+        # Loop through each aggregation (e.g., sum, mean) and its associated settings
+        for agg, agg_settings in settings['aggregations'].items():
+            # Construct the column name based on the metric and aggregation (e.g., 'buyers_new_sum')
+            column_name = f"{metric}_{agg}"
+            
+            # Check if the column exists in the DataFrame
+            if column_name in df.columns:
+                # Retrieve the scaling method from the configuration (e.g., 'standard', 'minmax')
+                scaling_method = agg_settings.get('scaling')
+                
+                # If a scaling method is specified
+                if scaling_method:
+                    # Check if the scaling method is recognized (exists in the 'scalers' dictionary)
+                    if scaling_method in scalers:
+                        # Retrieve the appropriate scaler (e.g., StandardScaler, MinMaxScaler)
+                        scaler = scalers[scaling_method]
+                        
+                        # Apply the scaling transformation to the specified column
+                        df[[column_name]] = scaler.fit_transform(df[[column_name]])
+                    else:
+                        # Log a warning if the scaling method specified is not recognized
+                        logger.warning("Unknown scaling method %s for column %s", scaling_method, column_name)
+
+    # Step 5: Generate output path and filename based on input
     base_filename = os.path.basename(input_path).replace(".csv", "")
     output_filename = f"{base_filename}_preprocessed.csv"
     output_path = os.path.join(os.path.dirname(input_path).replace("flattened_outputs", "preprocessed_outputs"), output_filename)
 
-    # Step 5: Save the preprocessed data
+    # Step 6: Save the preprocessed data
     df.to_csv(output_path, index=False)
 
-    # Log the changes made
-    logger.debug("Preprocessed file saved at: %s", output_path)
-    logger.debug("Dropped %d columns: %s", len(dropped_columns), ', '.join(dropped_columns))
+    # Step 7: Log the changes made
+    logger.info("Preprocessed file saved at: %s", output_path)
+    logger.info("Dropped %d columns: %s", len(dropped_columns), ', '.join(dropped_columns))
 
-    return output_path
+    return df, output_path
+
 
 
 
