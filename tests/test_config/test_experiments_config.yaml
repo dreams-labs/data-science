@@ -1,8 +1,8 @@
 # This experiment config file defines parameter variations for running experiments
 # across multiple configurations. It is linked to three main config files:
 # - config.yaml: Contains settings for training data and data cleaning.
-# - config_modeling.yaml: Contains preprocessing steps and modeling-related parameters.
-# - config_metrics.yaml: Defines metrics and their aggregations for evaluation.
+# - modeling_config.yaml: Contains preprocessing steps and modeling-related parameters.
+# - metrics_config.yaml: Defines metrics and their aggregations for evaluation.
 
 config:
   # Alterations related to training data settings
@@ -23,7 +23,7 @@ config:
       - 10000000
       - 15000000  # Filter at a higher threshold for inflows
 
-config_modeling:
+modeling_config:
   # Preprocessing settings
   preprocessing:
     drop_features:
@@ -36,7 +36,7 @@ config_modeling:
       - 0.3  # Moon threshold of 30%
       - 0.5  # Moon threshold of 50%
 
-config_metrics:
+metrics_config:
   # Metrics configuration
   metrics:
     buyers_new:

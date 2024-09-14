@@ -544,25 +544,25 @@ def create_training_data_df(input_directory, input_filenames):
 
 
 
-def create_target_variables_mooncrater(prices_df, training_data_config, config_modeling):
+def create_target_variables_mooncrater(prices_df, training_data_config, modeling_config):
     """
     Creates a DataFrame with target variables 'is_moon' and 'is_crater' based on price performance 
-    during the modeling period, using the thresholds from config_modeling.
+    during the modeling period, using the thresholds from modeling_config.
 
     Parameters:
     - prices_df: DataFrame containing price data with columns 'coin_id', 'date', and 'price'.
     - config: General configuration file with modeling period dates.
-    - config_modeling: Configuration for modeling with target variable thresholds.
+    - modeling_config: Configuration for modeling with target variable thresholds.
 
     Returns:
     - target_variable_df: DataFrame with columns 'coin_id', 'is_moon', and 'is_crater'.
     - outcomes_df: DataFrame tracking outcomes for each coin.
     """
-    # Retrieve the necessary values from config_modeling
+    # Retrieve the necessary values from modeling_config
     modeling_period_start = pd.to_datetime(training_data_config['modeling_period_start'])
     modeling_period_end = pd.to_datetime(training_data_config['modeling_period_end'])
-    moon_threshold = config_modeling['target_variables']['moon_threshold']
-    crater_threshold = config_modeling['target_variables']['crater_threshold']
+    moon_threshold = modeling_config['target_variables']['moon_threshold']
+    crater_threshold = modeling_config['target_variables']['crater_threshold']
 
     # Filter for the modeling period and sort the DataFrame
     modeling_period_df = prices_df[(prices_df['date'] >= modeling_period_start) & (prices_df['date'] <= modeling_period_end)]

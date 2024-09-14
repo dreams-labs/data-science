@@ -817,7 +817,7 @@ def test_create_target_variables_mooncrater():
         'modeling_period_end': '2024-12-31',
     }
 
-    config_modeling = {
+    modeling_config = {
         'target_variables': {
             'moon_threshold': 0.5,  # 50% increase
             'crater_threshold': -0.5  # 50% decrease
@@ -825,7 +825,7 @@ def test_create_target_variables_mooncrater():
     }
 
     # Call the function being tested
-    target_variables_df, outcomes_df = fe.create_target_variables_mooncrater(prices_df, training_data_config, config_modeling)
+    target_variables_df, outcomes_df = fe.create_target_variables_mooncrater(prices_df, training_data_config, modeling_config)
 
     # Assertions for target variables
     assert target_variables_df[target_variables_df['coin_id'] == 'coin1']['is_moon'].values[0] == 0
@@ -867,7 +867,7 @@ def metrics_config():
     """
     Fixture to load the configuration from the YAML file.
     """
-    return load_config('tests/test_config/test_config_metrics.yaml')
+    return load_config('tests/test_config/test_metrics_config.yaml')
 
 @pytest.fixture(scope="session")
 def buysell_metrics_df():

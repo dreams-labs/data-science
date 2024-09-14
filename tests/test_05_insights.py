@@ -56,13 +56,13 @@ def test_validate_experiments_yaml_success(tmpdir):
       feature_set:
         - basic
     
-    config_modeling:
+    modeling_config:
       learning_rate:
         - 0.001
       batch_size:
         - 16
     """
-    config_folder.join("config_experiments.yaml").write(experiment_config)
+    config_folder.join("experiments_config.yaml").write(experiment_config)
 
     # Create config.yaml
     config = """
@@ -73,18 +73,18 @@ def test_validate_experiments_yaml_success(tmpdir):
     """
     config_folder.join("config.yaml").write(config)
 
-    # Create config_modeling.yaml
-    config_modeling = """
+    # Create modeling_config.yaml
+    modeling_config = """
     learning_rate:
       - 0.001
     batch_size:
       - 16
     """
-    config_folder.join("config_modeling.yaml").write(config_modeling)
+    config_folder.join("modeling_config.yaml").write(modeling_config)
 
     # Run the function and verify no errors
     configurations = i.validate_experiments_yaml(str(config_folder))
-    assert len(configurations) == 2  # Two sections: config and config_modeling
+    assert len(configurations) == 2  # Two sections: config and modeling_config
 
 
 def test_validate_experiments_yaml_missing_file(tmpdir):
@@ -93,7 +93,7 @@ def test_validate_experiments_yaml_missing_file(tmpdir):
     # Create the config folder and files
     config_folder = tmpdir.mkdir("config_folder")
 
-    # Create config_experiments.yaml referencing a non-existent file
+    # Create experiments_config.yaml referencing a non-existent file
     experiment_config = """
     config:
       training_period:
@@ -103,7 +103,7 @@ def test_validate_experiments_yaml_missing_file(tmpdir):
       param_x:
         - value
     """
-    config_folder.join("config_experiments.yaml").write(experiment_config)
+    config_folder.join("experiments_config.yaml").write(experiment_config)
 
     # Create config.yaml
     config = """
@@ -123,7 +123,7 @@ def test_validate_experiments_yaml_invalid_key(tmpdir):
     # Create the config folder and files
     config_folder = tmpdir.mkdir("config_folder")
 
-    # Create config_experiments.yaml
+    # Create experiments_config.yaml
     experiment_config = """
     config:
       training_period:
@@ -131,7 +131,7 @@ def test_validate_experiments_yaml_invalid_key(tmpdir):
       invalid_key:
         - non_existent
     """
-    config_folder.join("config_experiments.yaml").write(experiment_config)
+    config_folder.join("experiments_config.yaml").write(experiment_config)
 
     # Create config.yaml
     config = """
@@ -141,7 +141,7 @@ def test_validate_experiments_yaml_invalid_key(tmpdir):
     config_folder.join("config.yaml").write(config)
 
     # Verify that it raises a ValueError for the invalid key
-    with pytest.raises(ValueError, match="Key 'invalid_key' in config_experiments.yaml not found in config.yaml"):
+    with pytest.raises(ValueError, match="Key 'invalid_key' in experiments_config.yaml not found in config.yaml"):
         i.validate_experiments_yaml(str(config_folder))
 
 
@@ -167,7 +167,7 @@ def test_validate_experiments_yaml_invalid_key(tmpdir):
 #     """
 #     Fixture to load the configuration from the YAML file.
 #     """
-#     return load_config('tests/test_config/test_config_metrics.yaml')
+#     return load_config('tests/test_config/test_metrics_config.yaml')
 
 # @pytest.fixture(scope="session")
 # def buysell_metrics_df():

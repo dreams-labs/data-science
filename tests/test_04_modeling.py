@@ -148,7 +148,7 @@ def metrics_config():
     """
     Fixture to load the configuration from the YAML file.
     """
-    return load_config('tests/test_config/test_config_metrics.yaml')
+    return load_config('tests/test_config/test_metrics_config.yaml')
 
 @pytest.fixture(scope="session")
 def buysell_metrics_df():

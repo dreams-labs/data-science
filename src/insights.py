@@ -24,16 +24,16 @@ def validate_experiments_yaml(config_folder):
     map correctly to the specified config files.
 
     Args:
-    - config_folder (str): Path to the folder containing all config files, including config_experiments.yaml.
+    - config_folder (str): Path to the folder containing all config files, including experiments_config.yaml.
 
     Returns:
     - configurations (list): List of valid configurations or raises an error if any issues are found.
     """
     
-    # Path to the config_experiments.yaml file
-    experiment_config_path = os.path.join(config_folder, 'config_experiments.yaml')
+    # Path to the experiments_config.yaml file
+    experiment_config_path = os.path.join(config_folder, 'experiments_config.yaml')
     
-    # Load the config_experiments.yaml file
+    # Load the experiments_config.yaml file
     experiment_config = load_config(experiment_config_path)
 
     # Dynamically generate the list of config files based on the experiment_config keys
@@ -51,7 +51,7 @@ def validate_experiments_yaml(config_folder):
     # Validate that each variable in experiment_config maps correctly to the loaded config files
     for section, section_values in experiment_config.items():
         if section not in loaded_configs:
-            raise ValueError(f"Section '{section}' in config_experiments.yaml not found in any loaded config file.")
+            raise ValueError(f"Section '{section}' in experiments_config.yaml not found in any loaded config file.")
 
         # Get the corresponding config file for this section
         corresponding_config = loaded_configs[section]
@@ -59,12 +59,12 @@ def validate_experiments_yaml(config_folder):
         # Validate that keys and values exist in the corresponding config
         for key, values in section_values.items():
             if key not in corresponding_config:
-                raise ValueError(f"Key '{key}' in config_experiments.yaml not found in {section}.yaml.")
+                raise ValueError(f"Key '{key}' in experiments_config.yaml not found in {section}.yaml.")
             
             # Ensure the values are valid in the corresponding config
             for value in values:
                 if value not in corresponding_config[key]:
-                    raise ValueError(f"Value '{value}' for key '{key}' in config_experiments.yaml is invalid.")
+                    raise ValueError(f"Value '{value}' for key '{key}' in experiments_config.yaml is invalid.")
 
     # If all checks pass, return configurations
     return list(experiment_config.items())
