@@ -10,19 +10,18 @@ import os
 import random
 import hashlib
 import json
-import pandas as pd
-import numpy as np
-import dreams_core.core as dc
 from sklearn.model_selection import ParameterGrid, ParameterSampler
+import dreams_core.core as dc
 
-# local files
+# project files
 from utils import load_config
 import training_data as td
+import feature_engineering as fe
+import coin_wallet_metrics as cwm
+import modeling as m
 
 # set up logger at the module level
 logger = dc.setup_logger()
-
-
 
 
 def generate_experiment_configurations(config_folder, method='grid', max_evals=50):
@@ -302,7 +301,91 @@ def handle_hash(config_hash, temp_folder, operation='load'):
     hash_file = os.path.join(temp_folder, 'config_hash.txt')
 
     if operation == 'load':
-        return open(hash_file).read() if os.path.exists(hash_file) else None
+        return open(hash_file, 'r', encoding='utf-8').read() if os.path.exists(hash_file) else None
     elif operation == 'save':
-        with open(hash_file, 'w') as f:
+        with open(hash_file, 'w', encoding='utf-8') as f:
             f.write(config_hash)
+
+
+def build_configured_model_input(profits_df, prices_df, config, metrics_config, modeling_config):
+    """
+    Build the model input data (train/test sets) based on the configuration settings.
+
+    Args:
+    - profits_df (DataFrame): DataFrame containing profits information for wallets.
+    - prices_df (DataFrame): DataFrame containing price data for coins.
+    - config (dict): Overall configuration containing details for wallet cohorts and training data periods.
+    - metrics_config (dict): Configuration for metric generation.
+    - modeling_config (dict): Configuration for model training parameters.
+
+    Returns:
+    - X_train (DataFrame): Training feature set.
+    - X_test (DataFrame): Testing feature set.
+    - y_train (Series): Training target variable.
+    - y_test (Series): Testing target variable.
+    """
+    
+    # 1. Identify cohort of wallets (e.g., sharks) based on the cohort classification logic
+    cohort_summary_df = td.classify_wallet_cohort(profits_df, config['wallet_cohorts']['sharks'])
+
+    # 2. Generate buysell metrics for wallets in the identified cohort
+    cohort_wallets = cohort_summary_df[cohort_summary_df['in_cohort']]['wallet_address']
+    buysell_metrics_df = cwm.generate_buysell_metrics_df(
+        profits_df,
+        config['training_data']['training_period_end'],
+        cohort_wallets
+    )
+
+    # 3. Flatten the buysell metrics DataFrame, save it, and preprocess it
+    flattened_output_directory = os.path.join(
+        modeling_config['modeling']['modeling_folder'],
+        'outputs/flattened_outputs/'
+    )
+    cohort_name = list(config['wallet_cohorts'].keys())[0]
+    metric_description = f"{cohort_name}_cohort"
+
+    flattened_buysell_metrics_df = fe.flatten_coin_date_df(
+        buysell_metrics_df,
+        metrics_config,
+        config['training_data']['training_period_end']
+    )
+    _, flattened_filepath = fe.save_flattened_outputs(
+        flattened_buysell_metrics_df,
+        flattened_output_directory,
+        metric_description,
+        config['training_data']['modeling_period_start']
+    )
+    _, preprocessed_filepath = fe.preprocess_coin_df(
+        flattened_filepath,
+        modeling_config,
+        metrics_config
+    )
+
+    # 4. Create training data from the preprocessed DataFrame
+    input_directory = f"{preprocessed_filepath.split('preprocessed_outputs/')[0]}preprocessed_outputs/"
+    input_filenames = [preprocessed_filepath.split('preprocessed_outputs/')[1]]
+    training_data_df = fe.create_training_data_df(input_directory, input_filenames)
+
+    # 5. Create the target variable DataFrame based on price changes
+    target_variable_df, _ = fe.create_target_variables_mooncrater(
+        prices_df,
+        config['training_data'],
+        modeling_config
+    )
+
+    # 6. Merge the training data with the target variables to create the model input DataFrame
+    model_input_df = fe.prepare_model_input_df(
+        training_data_df,
+        target_variable_df,
+        modeling_config['modeling']['target_column']
+    )
+
+    # 7. Split the data into train and test sets
+    X_train, X_test, y_train, y_test = m.split_model_input(
+        model_input_df,
+        modeling_config['modeling']['target_column'],
+        modeling_config['modeling']['train_test_split'],
+        modeling_config['modeling']['random_state']
+    )
+
+    return X_train, X_test, y_train, y_test

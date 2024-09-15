@@ -316,7 +316,7 @@ def calculate_stat(ts, stat):
 
 
 
-def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_period_start, description=None):
+def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_period_start):
     """
     Saves the flattened DataFrame with descriptive metrics into a CSV file.
 
@@ -341,8 +341,7 @@ def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_per
     
     # Define filename with metric description and optional description
     timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M')
-    description_suffix = f"_{description}" if description else ""
-    filename = f"{metric_description}{description_suffix}_{timestamp}_model_period_{modeling_period_start}.csv"
+    filename = f"{metric_description}_{timestamp}_model_period_{modeling_period_start}.csv"
 
     # Save file
     output_path = os.path.join(output_dir, filename)
@@ -396,7 +395,10 @@ def preprocess_coin_df(input_path, modeling_config, metrics_config):
             # Check if the column exists in the DataFrame
             if column_name in df.columns:
                 # Retrieve the scaling method from the configuration (e.g., 'standard', 'minmax')
-                scaling_method = agg_settings.get('scaling')
+                try:
+                    scaling_method = agg_settings.get('scaling')
+                except AttributeError:
+                    scaling_method = None
                 
                 # If a scaling method is specified
                 if scaling_method:
