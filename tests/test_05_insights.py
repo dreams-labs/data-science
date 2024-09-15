@@ -8,6 +8,7 @@ tests used to audit the files in the data-science/src folder
 # pylint: disable=W0612 # unused variables (due to test reusing functions with 2 outputs)
 # pylint: disable=W0621 # redefining from outer scope triggering on pytest fixtures
 # pylint: disable=E0401 # can't find import (due to local import)
+# pylint: disable=C0103 # X_train violates camelcase
 
 
 import sys
@@ -20,8 +21,12 @@ from dreams_core import core as dc
 
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
+from utils import load_config
+import training_data as td
+import feature_engineering as fe
+import coin_wallet_metrics as cwm
+import modeling as m
 import insights as i # type: ignore[reportMissingImports]
-from utils import load_config # type: ignore[reportMissingImports]
 
 load_dotenv()
 logger = dc.setup_logger()
@@ -268,7 +273,7 @@ def test_prepare_configs_failure(tmpdir):
 
 # Mock DataFrame to simulate profits_df
 @pytest.fixture
-def mock_profits_df():
+def mock_profits_df(): # pylint: disable=C0116 # docstring
     return pd.DataFrame({
         'wallet_address': ['wallet1', 'wallet2'],
         'profitability': [1000, 2000]
@@ -276,7 +281,7 @@ def mock_profits_df():
 
 # Mock Configuration
 @pytest.fixture
-def mock_config():
+def mock_config(): # pylint: disable=C0116 # docstring
     return {
         'training_data': {
             'training_period_start': '2023-01-01',
@@ -346,9 +351,10 @@ def test_return_cached_profits_df(mock_config, mock_profits_df, tmpdir):
     correct_hash = i.generate_config_hash({**mock_config['training_data'], **mock_config['data_cleaning']})
 
     # Create a hash file that matches the mock_config
-    with open(os.path.join(temp_folder, 'config_hash.txt'), 'w') as f:
+    with open(os.path.join(temp_folder, 'config_hash.txt'), 'w', encoding='utf-8') as f:
         f.write(correct_hash)
 
+    # pylint: disable=W0718
     # Call the function and verify the profits_df is returned from memory without rebuilding
     try:
         returned_profits_df = i.rebuild_profits_df_if_necessary(mock_config, str(temp_dir), profits_df=mock_profits_df)
@@ -366,3 +372,113 @@ def test_return_cached_profits_df(mock_config, mock_profits_df, tmpdir):
 # ---------------------------------- #
 # set up config and module-level fixtures
 # ---------------------------------- #
+
+@pytest.fixture(scope='session')
+def config():
+    """
+    Loads the base config file from the tests/test_config directory using load_config.
+    """
+    config_path = 'tests/test_config/test_config.yaml'
+    return load_config(config_path)
+
+@pytest.fixture(scope='session')
+def metrics_config():
+    """
+    Loads the metrics config file from the tests/test_config directory using load_config.
+    """
+    metrics_config_path = 'tests/test_config/test_metrics_config.yaml'
+    return load_config(metrics_config_path)
+
+@pytest.fixture(scope='session')
+def modeling_config():
+    """
+    Loads the modeling config file from the tests/test_config directory using load_config
+    and overrides drop_features and modeling_folder.
+    """
+    modeling_config_path = 'tests/test_config/test_modeling_config.yaml'
+    modeling_config = load_config(modeling_config_path)
+
+    # Override modeling_folder to point to tests/tests_modeling
+    modeling_config['modeling']['modeling_folder'] = 'tests/test_modeling'
+    
+    return modeling_config
+
+
+@pytest.fixture(scope='session')
+def target_config():
+    """
+    Loads the target variables config file from the tests/test_config directory using load_config.
+    """
+    target_config_path = 'tests/test_config/test_target_config.yaml'
+    return load_config(target_config_path)
+
+@pytest.fixture(scope='session')
+def prices_df():
+    """
+    Loads the prices_df from a saved CSV for integration testing.
+    """
+    logger.info("Loading prices_df from saved CSV...")
+    prices_df = pd.read_csv('tests/fixtures/prices_df.csv')
+    return prices_df
+
+
+@pytest.fixture(scope='session')
+def profits_df():
+    """
+    Loads the cleaned_profits_df from a saved CSV for integration testing.
+    """
+    logger.info("Loading cleaned_profits_df from saved CSV...")
+    cleaned_profits_df = pd.read_csv('tests/fixtures/cleaned_profits_df.csv')
+    return cleaned_profits_df
+
+# ---------------------------------------- #
+# Integration test for build_configured_model_input()
+# ---------------------------------------- #
+
+@pytest.mark.integration
+def test_build_configured_model_input(config, metrics_config, modeling_config, prices_df, profits_df):
+    """
+    Runs build_configured_model_input() with the provided config, metrics_config, modeling_config, prices_df,
+    and cleaned_profits_df, and ensures that no columns are inadvertently lost between the flattened
+    DataFrame and the final training feature set (X_train).
+    """
+
+    # Override preprocessing/drop_features to have no columns specified
+    modeling_config['preprocessing']['drop_features'] = []
+
+    # 1. Identify cohort of wallets (e.g., sharks) based on the cohort classification logic
+    cohort_summary_df = td.classify_wallet_cohort(profits_df, config['wallet_cohorts']['sharks'])
+
+    # 2. Generate buysell metrics for wallets in the identified cohort
+    cohort_wallets = cohort_summary_df[cohort_summary_df['in_cohort']]['wallet_address']
+    buysell_metrics_df = cwm.generate_buysell_metrics_df(
+        profits_df,
+        config['training_data']['training_period_end'],
+        cohort_wallets
+    )
+
+    # 3. Flatten the buysell metrics DataFrame, save it, and preprocess it
+    flattened_output_directory = os.path.join(
+        modeling_config['modeling']['modeling_folder'],
+        'outputs/flattened_outputs/'
+    )
+    cohort_name = list(config['wallet_cohorts'].keys())[0]
+    metric_description = f"{cohort_name}_cohort"
+
+    flattened_buysell_metrics_df = fe.flatten_coin_date_df(
+        buysell_metrics_df,
+        metrics_config,
+        config['training_data']['training_period_end']
+    )
+    logger.debug(f"Shape of flattened_buysell_metrics_df: {flattened_buysell_metrics_df.shape}")
+
+    # Run build_configured_model_input
+    X_train, X_test, y_train, y_test = i.build_configured_model_input(
+        profits_df, prices_df, config, metrics_config, modeling_config
+    )
+
+    # Assert that the column count in flattened_buysell_metrics_df is 1 more than X_train
+    assert flattened_buysell_metrics_df.shape[1] == X_train.shape[1] + 1, \
+        "Column count mismatch: flattened_buysell_metrics_df should have 1 more column than X_train"
+    
+    logger.debug(f"Shape of X_train: {X_train.shape}")

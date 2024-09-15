@@ -376,7 +376,6 @@ def preprocess_coin_df(input_path, modeling_config, metrics_config):
     # Step 3: Apply feature selection (using drop_features)
     drop_features = modeling_config['preprocessing'].get('drop_features', [])
     if drop_features is not None:
-        initial_columns = set(df.columns)
         df = df.drop(columns=drop_features, errors='ignore')
 
     # Step 4: Apply scaling to the relevant columns based on the metrics config
@@ -565,6 +564,7 @@ def create_target_variables_mooncrater(prices_df, training_data_config, modeling
     crater_threshold = modeling_config['target_variables']['crater_threshold']
 
     # Filter for the modeling period and sort the DataFrame
+    prices_df['date'] = pd.to_datetime(prices_df['date'])
     modeling_period_df = prices_df[(prices_df['date'] >= modeling_period_start) & (prices_df['date'] <= modeling_period_end)]
     modeling_period_df = modeling_period_df.sort_values(by=['coin_id', 'date'])
 

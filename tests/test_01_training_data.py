@@ -558,26 +558,47 @@ def test_transfers_data_quality(transfers_df):
 
 
 # ---------------------------------------- #
+# retrieve_prices_data() integration tests
+# ---------------------------------------- #
+
+@pytest.fixture(scope='session')
+def prices_df():
+    """
+    Retrieve and preprocess the prices_df, filling gaps as needed.
+    """
+    logger.info("Generating prices_df from production data...")
+    prices_df = td.retrieve_prices_data()
+    prices_df, _ = td.fill_prices_gaps(prices_df, max_gap_days=2)
+    return prices_df
+
+# Save prices_df.csv in fixtures/
+# ----------------------------------------
+def test_save_prices_df(prices_df):
+    """
+    This is not a test! This function saves a prices_df.csv in the fixtures folder so it can be
+    used for integration tests in other modules.
+    """
+    # Save the prices DataFrame to the fixtures folder
+    prices_df.to_csv('tests/fixtures/prices_df.csv', index=False)
+
+    # Add some basic assertions to ensure the data was saved correctly
+    assert prices_df is not None
+    assert len(prices_df) > 0
+
+
+# ---------------------------------------- #
 # calculate_wallet_profitability() integration tests
 # ---------------------------------------- #
 # tests the data quality of the production data as calculated from the transfers_df() fixture
 
 @pytest.fixture(scope='session')
-def profits_df(transfers_df):
+def profits_df(transfers_df, prices_df):
     """
-    builds profits_df from production data for data quality checks
+    Builds profits_df from production data for data quality checks.
     """
     logger.info("Generating profits_df from production data...")
-
-    # retrieve prices data
-    prices_df = td.retrieve_prices_data()
-
-    # fill gaps in prices data
-    prices_df,_ = td.fill_prices_gaps(prices_df,max_gap_days=2)
-
     profits_df = td.prepare_profits_data(transfers_df, prices_df)
     profits_df = td.calculate_wallet_profitability(profits_df)
-
     return profits_df
 
 

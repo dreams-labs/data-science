@@ -1,13 +1,16 @@
 preprocessing:
   drop_features:  # List of features to drop from the dataset before modeling
-    - "total_sellers_sum"
-    - "buyers_new_median"
-    - "total_buyers_max"
 
 target_variables: 
-  moon_threshold: 0.15  # Target for a 'moon' event, defined as a 30% price increase
+  moon_threshold: 0.15  # Target for a 'moon' event, defined as a 15% price increase
   crater_threshold: -0.2  # Target for a 'crater' event, defined as a 20% price decrease
 
 modeling:
   target_column: "is_moon"  # or "is_crater" depending on the experiment
   modeling_folder: "..//modeling"  # location of the modeling folder where outputs will be saved
+  train_test_split: 0.2  # Size of the test set as a proportion of the data
+  random_state: 42
+  
+  model_params: 
+    n_estimators: 100  # Number of trees in the model
+    random_state: 42  # Random seed for reproducibility

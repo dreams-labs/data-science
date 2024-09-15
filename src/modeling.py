@@ -19,6 +19,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from sklearn.metrics import roc_auc_score, confusion_matrix, log_loss
 import matplotlib.pyplot as plt
 import seaborn as sns
+import progressbar
 
 # set up logger at the module level
 logger = dc.setup_logger()
@@ -265,3 +266,63 @@ def log_experiment_results(modeling_folder, model_id):
         json.dump(experiment_log, experiment_log_file, indent=4)
 
     return experiment_log
+
+
+
+def run_experiments(method, config_folder, modeling_folder, max_evals=50):
+    """
+    Runs experiments using a specified search method (grid or random), builds models,
+    and logs the results of each experiment.
+
+    Args:
+    - method (str): 'grid' or 'random' to select the search method.
+    - config_folder (str): Path to the folder containing all configuration files.
+    - modeling_folder (str): Path to the folder where models, logs, and results will be saved.
+    - max_evals (int): Number of iterations for Random search (default is 50).
+    """
+
+    # 1. Generate the experiment configurations
+    experiment_configurations = i.generate_experiment_configurations(config_folder, method=method, max_evals=max_evals)
+
+    # Generate prices_df
+    config = load_config(os.path.join(config_folder,'config.yaml'))
+    prices_df = td.retrieve_prices_data()
+    prices_df,_ = td.fill_prices_gaps(prices_df, config['data_cleaning']['max_gap_days'])
+
+    # 2. Create the progress bar
+    total_experiments = len(experiment_configurations)
+    bar = progressbar.ProgressBar(maxval=total_experiments, widgets=[
+        ' [', progressbar.Percentage(), '] ',
+        progressbar.Bar(), ' (', progressbar.ETA(), ') '
+    ]).start()
+
+    # 3. Iterate through each configuration
+    for n, experiment in enumerate(experiment_configurations):
+        
+        # 3.1 Prepare the full configuration by applying overrides from the current experiment config
+        config, metrics_config, modeling_config = i.prepare_configs(config_folder, experiment)
+        
+        # 3.2 Retrieve or rebuild profits_df based on config changes
+        profits_df = i.rebuild_profits_df_if_necessary(config, modeling_folder)
+        
+        # 3.3 Build the configured model input data (train/test data)
+        X_train, X_test, y_train, y_test = i.build_configured_model_input(profits_df, prices_df, config, metrics_config, modeling_config)
+
+        # 3.4 Train the model using the current configuration and log the results
+        model, model_id = m.train_model(X_train, y_train, modeling_folder, modeling_config['modeling']['model_params'])
+        
+        # 3.5 Evaluate the model's performance on the test set
+        metrics = m.evaluate_model(model, X_test, y_test, model_id, modeling_folder)
+
+        # 3.6 Log the experiment results for this configuration
+        m.log_experiment_results(modeling_folder, model_id)
+
+        # Update the progress bar
+        bar.update(n + 1)
+
+    # Finish the progress bar
+    bar.finish()
+
+    # 4. Compare all experiments and analyze the best-performing configuration
+    i.analyze_experiments(modeling_folder)
+

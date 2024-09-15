@@ -307,6 +307,7 @@ def handle_hash(config_hash, temp_folder, operation='load'):
             f.write(config_hash)
 
 
+
 def build_configured_model_input(profits_df, prices_df, config, metrics_config, modeling_config):
     """
     Build the model input data (train/test sets) based on the configuration settings.
