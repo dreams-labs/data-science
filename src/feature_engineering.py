@@ -376,9 +376,9 @@ def preprocess_coin_df(input_path, modeling_config, metrics_config):
 
     # Step 3: Apply feature selection (using drop_features)
     drop_features = modeling_config['preprocessing'].get('drop_features', [])
-    initial_columns = set(df.columns)
-    df = df.drop(columns=drop_features, errors='ignore')
-    dropped_columns = initial_columns - set(df.columns)
+    if drop_features is not None:
+        initial_columns = set(df.columns)
+        df = df.drop(columns=drop_features, errors='ignore')
 
     # Step 4: Apply scaling to the relevant columns based on the metrics config
     scalers = {
@@ -421,8 +421,6 @@ def preprocess_coin_df(input_path, modeling_config, metrics_config):
 
     # Step 7: Log the changes made
     logger.info("Preprocessed file saved at: %s", output_path)
-    logger.info("Dropped %d columns: %s", len(dropped_columns), ', '.join(dropped_columns))
-
     return df, output_path
 
 

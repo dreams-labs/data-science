@@ -1,6 +1,6 @@
 # This experiment config file defines parameter variations for running experiments
 # across multiple configurations. It is linked to three main config files:
-# - config.yaml: Contains settings for training data and data cleaning.
+# - config.yaml: Contains settings for training data, wallet cohorts, and data cleaning.
 # - modeling_config.yaml: Contains preprocessing steps and modeling-related parameters.
 # - metrics_config.yaml: Defines metrics and their aggregations for evaluation.
 
@@ -10,10 +10,35 @@ config:
     modeling_period_duration:
       - 14  # 14 days modeling period
       - 30  # 30 days modeling period
-    wallet_min_coins:
-      - 3   # Minimum 3 coins
-      - 5   # Minimum 5 coins
+    training_period_duration:
+      - 180  # 180 days training period
+      - 365  # 365 days training period
 
+  # Alterations for wallet cohort configurations
+  wallet_cohorts:
+    sharks:
+      wallet_minimum_inflows:
+        - 10000  # Minimum USD inflows for a coin to be considered a 'shark' coin
+        - 20000  # More restrictive inflows filter
+      wallet_maximum_inflows:
+        - 50000  # Maximum USD inflows for a 'shark' coin
+        - 100000 # Allowing higher inflows for larger cohort sizes
+      coin_profits_win_threshold:
+        - 5000   # Lifetime absolute USD profit threshold for a 'shark' coin
+        - 10000  # More restrictive profit threshold
+      coin_return_win_threshold:
+        - 0.5    # 50% minimum lifetime return threshold
+        - 0.75   # 75% return threshold for more aggressive 'shark' classification
+      wallet_min_coin_wins:
+        - 2      # Wallets must have at least 2 winning coins to be part of the shark cohort
+        - 3      # More restrictive, requiring 3 winning coins
+
+  # Alterations for data cleaning settings
+  data_cleaning:
+    profitability_filter:
+      - 15000000  # Exclude wallets with profits or losses greater than or equal to this amount (USD)
+    inflows_filter:
+      - 10000000  # Exclude wallets with inflows greater than or equal to this amount (USD)
 
 modeling_config:
   # Preprocessing settings

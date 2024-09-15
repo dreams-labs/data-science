@@ -138,7 +138,6 @@ def validate_experiments_yaml(config_folder):
 
 
 
-
 def prepare_configs(config_folder, override_params):
     """
     Loads config files from the config_folder using load_config and applies overrides specified in override_params.

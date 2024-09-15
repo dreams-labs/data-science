@@ -1,8 +1,5 @@
 preprocessing:
   drop_features:  # List of features to drop from the dataset before modeling
-    - "total_sellers_sum"
-    - "buyers_new_median"
-    - "total_buyers_max"
 
 target_variables: 
   moon_threshold: 0.15  # Target for a 'moon' event, defined as a 30% price increase

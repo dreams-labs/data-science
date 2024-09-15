@@ -265,10 +265,6 @@ def test_prepare_configs_failure(tmpdir):
 # ---------------------------------------------- #
 # rebuild_profits_df_if_necessary() unit tests
 # ---------------------------------------------- #
-import pytest
-from unittest import mock
-import pandas as pd
-import os
 
 # Mock DataFrame to simulate profits_df
 @pytest.fixture
@@ -367,34 +363,6 @@ def test_return_cached_profits_df(mock_config, mock_profits_df, tmpdir):
 #                                                          #
 # ======================================================== #
 
-# # ---------------------------------- #
-# # set up config and module-level fixtures
-# # ---------------------------------- #
-
-# @pytest.fixture(scope="session")
-# def config():
-#     """
-#     Fixture to load the configuration from the YAML file.
-#     """
-#     return load_config('tests/test_config/test_config.yaml')
-
-# @pytest.fixture(scope="session")
-# def metrics_config():
-#     """
-#     Fixture to load the configuration from the YAML file.
-#     """
-#     return load_config('tests/test_config/test_metrics_config.yaml')
-
-# @pytest.fixture(scope="session")
-# def buysell_metrics_df():
-#     """
-#     Fixture to load the buysell_metrics_df from the fixtures folder.
-#     """
-#     buysell_metrics_df = pd.read_csv('tests/fixtures/buysell_metrics_df.csv')
-#     buysell_metrics_df['date'] = pd.to_datetime(buysell_metrics_df['date']).astype('datetime64[ns]')
-#     return buysell_metrics_df
-
-# # ---------------------------------- #
-# # flatten_coin_date_df() integration tests
-# # ---------------------------------- #
-
+# ---------------------------------- #
+# set up config and module-level fixtures
+# ---------------------------------- #
