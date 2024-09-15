@@ -12,8 +12,8 @@ tests used to audit the files in the data-science/src folder
 
 import sys
 import os
+from unittest import mock
 import pandas as pd
-import numpy as np
 from dotenv import load_dotenv
 import pytest
 from dreams_core import core as dc
@@ -260,6 +260,105 @@ def test_prepare_configs_failure(tmpdir):
     with pytest.raises(KeyError, match="Key 'non_existent_filter' not found"):
         i.prepare_configs(str(config_folder), override_params)
 
+
+
+# ---------------------------------------------- #
+# rebuild_profits_df_if_necessary() unit tests
+# ---------------------------------------------- #
+import pytest
+from unittest import mock
+import pandas as pd
+import os
+
+# Mock DataFrame to simulate profits_df
+@pytest.fixture
+def mock_profits_df():
+    return pd.DataFrame({
+        'wallet_address': ['wallet1', 'wallet2'],
+        'profitability': [1000, 2000]
+    })
+
+# Mock Configuration
+@pytest.fixture
+def mock_config():
+    return {
+        'training_data': {
+            'training_period_start': '2023-01-01',
+            'modeling_period_start': '2023-02-01',
+            'modeling_period_end': '2023-03-01'
+        },
+        'data_cleaning': {
+            'max_gap_days': 7
+        }
+    }
+@mock.patch('insights.td.retrieve_transfers_data')
+@mock.patch('insights.td.retrieve_prices_data')
+@mock.patch('insights.td.fill_prices_gaps')
+@mock.patch('insights.td.prepare_profits_data')
+@mock.patch('insights.td.calculate_wallet_profitability')
+@mock.patch('insights.td.clean_profits_df')
+# Correctly patch functions from the module where they are called
+def test_rebuild_profits_df_if_necessary(
+    mock_clean_profits_df, mock_calculate_wallet_profitability, 
+    mock_prepare_profits_data, mock_fill_prices_gaps, 
+    mock_retrieve_prices_data, mock_retrieve_transfers_data, 
+    mock_config, mock_profits_df, tmpdir):
+    """
+    Test the case where the config changes and profits_df is rebuilt by calling
+    the production functions (mocked to avoid time-consuming operations).
+    """
+        
+    # Set up the mock return values
+    mock_retrieve_transfers_data.return_value = pd.DataFrame({'transfers': [1, 2, 3]})
+    mock_retrieve_prices_data.return_value = pd.DataFrame({'prices': [100, 200, 300]})
+    mock_fill_prices_gaps.return_value = (pd.DataFrame({'prices': [100, 200, 300]}), None)
+    mock_prepare_profits_data.return_value = pd.DataFrame({'profits': [1000, 2000]})
+    mock_calculate_wallet_profitability.return_value = mock_profits_df
+    mock_clean_profits_df.return_value = (mock_profits_df, None)
+
+    # Create a temporary folder for hash checking
+    temp_dir = tmpdir.mkdir("modeling")
+    temp_folder = os.path.join(temp_dir, "outputs/temp")
+    os.makedirs(temp_folder)
+
+    # Call the function to trigger the rebuild
+    new_profits_df = i.rebuild_profits_df_if_necessary(mock_config, str(temp_dir), profits_df=None)
+
+    # Assertions
+    mock_retrieve_transfers_data.assert_called_once()
+    mock_retrieve_prices_data.assert_called_once()
+    mock_fill_prices_gaps.assert_called_once()
+    mock_prepare_profits_data.assert_called_once()
+    mock_calculate_wallet_profitability.assert_called_once()
+    mock_clean_profits_df.assert_called_once()
+
+    assert new_profits_df.equals(mock_profits_df)
+
+# Test using pytest timeout decorator
+@pytest.mark.timeout(1)  # Set timeout limit of 1 second
+def test_return_cached_profits_df(mock_config, mock_profits_df, tmpdir):
+    """
+    Test the case where the config has not changed and the cached profits_df is returned from memory.
+    """
+
+    # Create a temporary folder for hash checking
+    temp_dir = tmpdir.mkdir("modeling")
+    temp_folder = os.path.join(temp_dir, "outputs/temp")
+    os.makedirs(temp_folder)
+
+    # Generate the correct hash for the mock_config using i.generate_config_hash
+    correct_hash = i.generate_config_hash({**mock_config['training_data'], **mock_config['data_cleaning']})
+
+    # Create a hash file that matches the mock_config
+    with open(os.path.join(temp_folder, 'config_hash.txt'), 'w') as f:
+        f.write(correct_hash)
+
+    # Call the function and verify the profits_df is returned from memory without rebuilding
+    try:
+        returned_profits_df = i.rebuild_profits_df_if_necessary(mock_config, str(temp_dir), profits_df=mock_profits_df)
+        assert returned_profits_df.equals(mock_profits_df)
+    except Exception as e:
+        pytest.fail(f"Test failed due to timeout: {str(e)}")
 
 # ======================================================== #
 #                                                          #

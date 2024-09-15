@@ -8,16 +8,82 @@ functions used to build coin-level features from training data
 
 import os
 import random
+import hashlib
+import json
 import pandas as pd
 import numpy as np
 import dreams_core.core as dc
 from sklearn.model_selection import ParameterGrid, ParameterSampler
+
+# local files
 from utils import load_config
+import training_data as td
 
 # set up logger at the module level
 logger = dc.setup_logger()
 
 
+
+
+def generate_experiment_configurations(config_folder, method='grid', max_evals=50):
+    """
+    Generates experiment configurations based on the validated experiment config YAML file and the search method.
+
+    Args:
+    - config_folder (str): Path to the folder containing the config files.
+    - method (str): 'grid' or 'random' to select the search method.
+    - max_evals (int): Number of iterations for Random search (default is 50).
+
+    Returns:
+    - configurations (list): List of generated configurations.
+    """
+    
+    # Load and validate the experiment configuration
+    experiment_config = validate_experiments_yaml(config_folder)
+
+    # Flatten the experiment configuration into a dictionary that can be used for grid/random search
+    param_grid = {}
+    
+    # Flatten the config dictionary so it can be used for the search
+    for section, parameters in experiment_config:
+        param_grid.update(flatten_dict(parameters, section))
+
+    # Generate configurations based on the chosen method
+    if method == 'grid':
+        # Grid search: generate all possible combinations
+        configurations = list(ParameterGrid(param_grid))
+    elif method == 'random':
+        # Random search: sample a subset of combinations
+        configurations = list(ParameterSampler(param_grid, n_iter=max_evals, random_state=random.randint(1, 100)))
+    else:
+        raise ValueError(f"Invalid method: {method}. Must be 'grid' or 'random'.")
+
+    return configurations
+
+# helper function for generate_experiment_configurations()
+def flatten_dict(d, parent_key='', sep='.'):
+    """
+    Helper function for generate_experiment_configurations(). 
+    Flattens a nested dictionary.
+    
+    Args:
+    - d (dict): The dictionary to flatten.
+    - parent_key (str): The base key (used during recursion).
+    - sep (str): Separator between keys.
+    
+    Returns:
+    - flat_dict (dict): Flattened dictionary.
+    """
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
+
+# helper function for generate_experiment_configurations()
 def validate_experiments_yaml(config_folder):
     """
     Ingests the experiment configuration file and checks if all variables
@@ -71,65 +137,6 @@ def validate_experiments_yaml(config_folder):
 
 
 
-def generate_experiment_configurations(config_folder, method='grid', max_evals=50):
-    """
-    Generates experiment configurations based on the validated experiment config YAML file and the search method.
-
-    Args:
-    - config_folder (str): Path to the folder containing the config files.
-    - method (str): 'grid' or 'random' to select the search method.
-    - max_evals (int): Number of iterations for Random search (default is 50).
-
-    Returns:
-    - configurations (list): List of generated configurations.
-    """
-    
-    # Load and validate the experiment configuration
-    experiment_config = validate_experiments_yaml(config_folder)
-
-    # Flatten the experiment configuration into a dictionary that can be used for grid/random search
-    param_grid = {}
-    
-    # Flatten the config dictionary so it can be used for the search
-    for section, parameters in experiment_config:
-        param_grid.update(flatten_dict(parameters, section))
-
-    # Generate configurations based on the chosen method
-    if method == 'grid':
-        # Grid search: generate all possible combinations
-        configurations = list(ParameterGrid(param_grid))
-    elif method == 'random':
-        # Random search: sample a subset of combinations
-        configurations = list(ParameterSampler(param_grid, n_iter=max_evals, random_state=random.randint(1, 100)))
-    else:
-        raise ValueError(f"Invalid method: {method}. Must be 'grid' or 'random'.")
-
-    return configurations
-
-def flatten_dict(d, parent_key='', sep='.'):
-    """
-    Helper function for generate_experiment_configurations(). 
-    Flattens a nested dictionary.
-    
-    Args:
-    - d (dict): The dictionary to flatten.
-    - parent_key (str): The base key (used during recursion).
-    - sep (str): Separator between keys.
-    
-    Returns:
-    - flat_dict (dict): Flattened dictionary.
-    """
-    items = []
-    for k, v in d.items():
-        new_key = f"{parent_key}{sep}{k}" if parent_key else k
-        if isinstance(v, dict):
-            items.extend(flatten_dict(v, new_key, sep=sep).items())
-        else:
-            items.append((new_key, v))
-    return dict(items)
-
-
-
 
 
 def prepare_configs(config_folder, override_params):
@@ -175,6 +182,7 @@ def prepare_configs(config_folder, override_params):
 
     return config, metrics_config, modeling_config
 
+# helper function for prepare_configs()
 def set_nested_value(config, key_path, value):
     """
     Sets a value in a nested dictionary based on a flattened key path.
@@ -190,6 +198,7 @@ def set_nested_value(config, key_path, value):
         sub_dict = sub_dict.setdefault(key, {})
     sub_dict[keys[-1]] = value  # Set the value at the final key
 
+# helper function for prepare_configs
 def validate_key_in_config(config, key_path):
     """
     Validates that a given key path exists in the nested configuration.
@@ -209,3 +218,92 @@ def validate_key_in_config(config, key_path):
         sub_dict = sub_dict[key]
     if keys[-1] not in sub_dict:
         raise KeyError(f"Key '{keys[-1]}' not found in config at final level '{'.'.join(keys[:-1])}'")
+
+
+
+
+def rebuild_profits_df_if_necessary(config, modeling_folder, profits_df=None):
+    """
+    Checks if the config has changed and reruns time-intensive steps if needed.
+
+    Args:
+    - config (dict): The config containing training_data and data_cleaning.
+    - modeling_folder (str): Folder for outputs, including temp files.
+    - profits_df (DataFrame, optional): The profits dataframe passed in memory.
+
+    Returns:
+    - profits_df (DataFrame): The profits dataframe.
+    """
+
+    # Set up the temp folder inside the modeling folder and raise an error if it doesn't exist
+    temp_folder = os.path.join(modeling_folder, 'outputs/temp')
+    if not os.path.exists(temp_folder):
+        raise FileNotFoundError(f"Required temp folder '{temp_folder}' does not exist.")
+
+    # Combine 'training_data' and 'data_cleaning' for a single hash
+    relevant_config = {**config['training_data'], **config['data_cleaning']}
+    config_hash = generate_config_hash(relevant_config)
+
+    # Load the previous hash
+    previous_hash = handle_hash(config_hash, temp_folder, 'load')
+
+    # If the hash hasn't changed and profits_df is passed, skip rerun
+    if config_hash == previous_hash and profits_df is not None:
+        logger.debug("Using passed profits_df from memory.")
+        return profits_df
+    
+    # Otherwise, rerun time-intensive steps
+    logger.debug("Config changes detected or missing profits_df, rerunning time-intensive steps...")
+    
+    # Example time-intensive logic to regenerate profits_df
+    transfers_df = td.retrieve_transfers_data(
+        config['training_data']['training_period_start'],
+        config['training_data']['modeling_period_start'],
+        config['training_data']['modeling_period_end']
+    )
+    prices_df = td.retrieve_prices_data()
+    prices_df, _ = td.fill_prices_gaps(prices_df, config['data_cleaning']['max_gap_days'])
+    
+    profits_df = td.prepare_profits_data(transfers_df, prices_df)
+    profits_df = td.calculate_wallet_profitability(profits_df)
+    profits_df, _ = td.clean_profits_df(profits_df, config['data_cleaning'])
+
+    # Save the new hash for future runs
+    handle_hash(config_hash, temp_folder, 'save')
+
+    return profits_df
+
+# helper function for rebuild_profits_df_if_necessary()
+def generate_config_hash(config):
+    """
+    Generates a hash for a given config section.
+
+    Args:
+    - config (dict): The configuration section.
+
+    Returns:
+    - str: A hash representing the config state.
+    """
+    config_str = json.dumps(config, sort_keys=True)
+    return hashlib.md5(config_str.encode('utf-8')).hexdigest()
+
+# helper function for rebuild_profits_df_if_necessary()
+def handle_hash(config_hash, temp_folder, operation='load'):
+    """
+    Handles saving or loading the config hash for checking.
+
+    Args:
+    - config_hash (str): The generated hash to save or load.
+    - temp_folder (str): The folder where the hash file is stored.
+    - operation (str): Either 'save' or 'load' to perform the operation.
+
+    Returns:
+    - str: The loaded hash if operation is 'load', None if it doesn't exist.
+    """
+    hash_file = os.path.join(temp_folder, 'config_hash.txt')
+
+    if operation == 'load':
+        return open(hash_file).read() if os.path.exists(hash_file) else None
+    elif operation == 'save':
+        with open(hash_file, 'w') as f:
+            f.write(config_hash)
