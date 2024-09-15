@@ -19,14 +19,12 @@ from dotenv import load_dotenv
 import pytest
 from dreams_core import core as dc
 
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
-from utils import load_config
-import training_data as td
-import feature_engineering as fe
-import coin_wallet_metrics as cwm
-import modeling as m
-import insights as i # type: ignore[reportMissingImports]
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))  # type: ignore
+from utils import load_config  # type: ignore
+import training_data as td  # type: ignore
+import feature_engineering as fe  # type: ignore
+import coin_wallet_metrics as cwm  # type: ignore
+import insights as i  # type: ignore
 
 load_dotenv()
 logger = dc.setup_logger()

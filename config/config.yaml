@@ -13,10 +13,10 @@ wallet_cohorts:
 
   # Shark wallets
   sharks:
-    wallet_minimum_inflows: 10000  # Minimum USD inflows for a coin to be considered a 'shark' coin
-    wallet_maximum_inflows: 50000  # Minimum USD inflows for a coin to be considered a 'shark' coin
-    coin_profits_win_threshold: 5000  # Lifetime absolute USD profit threshold for a 'shark' coin
-    coin_return_win_threshold: 0.5  # Minimum lifetime percentage return threshold for a 'shark' coin (e.g., 50% ROI)
+    wallet_minimum_inflows: 10000  # Minimum USD inflows for a wallet to be considered a 'shark'
+    wallet_maximum_inflows: 50000  # Maximum USD inflows for a wallet to be considered a 'shark'
+    coin_profits_win_threshold: 5000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
+    coin_return_win_threshold: 0.5  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
     wallet_min_coin_wins: 3  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
 
 data_cleaning:
