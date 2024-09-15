@@ -10,7 +10,7 @@ config:
     modeling_period_duration:
       - 14  # 14 days modeling period
       - 30  # 30 days modeling period
-    shark_wallet_min_coins:
+    wallet_min_coins:
       - 3   # Minimum 3 coins
       - 5   # Minimum 5 coins
 

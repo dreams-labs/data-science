@@ -164,7 +164,7 @@ def test_prepare_configs_success(tmpdir):
       profitability_filter: 10000000
     training_data:
       modeling_period_duration: 30
-      shark_wallet_min_coins: 2
+      wallet_min_coins: 2
     """
     metrics_config_yaml = """
     metrics:
@@ -225,7 +225,7 @@ def test_prepare_configs_failure(tmpdir):
       profitability_filter: 10000000
     training_data:
       modeling_period_duration: 30
-      shark_wallet_min_coins: 2
+      wallet_min_coins: 2
     """
     metrics_config_yaml = """
     metrics:
@@ -359,6 +359,7 @@ def test_return_cached_profits_df(mock_config, mock_profits_df, tmpdir):
         assert returned_profits_df.equals(mock_profits_df)
     except Exception as e:
         pytest.fail(f"Test failed due to timeout: {str(e)}")
+
 
 # ======================================================== #
 #                                                          #

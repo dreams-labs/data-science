@@ -334,187 +334,74 @@ def test_clean_profits_aggregate_inflows_profits_across_coins(sample_clean_profi
     assert 'wallet_5' not in cleaned_df['wallet_address'].values  # wallet_5 should be excluded based on aggregated profits
 
 
+
 # ---------------------------------------- #
-# classify_shark_wallets() unit tests
+# classify_wallet_cohort() unit tests
 # ---------------------------------------- #
 
-@pytest.fixture
-def sample_shark_wallets_shark_coins_df():
+# Sample profits data
+def sample_wallet_cohort_profits_df():
     """
-    mock version of shark_coins_df to test calculation logic
+    Sample DataFrame for testing classify_wallet_cohort function
     """
     data = {
-        'wallet_address': ['wallet_1', 'wallet_1', 'wallet_2', 'wallet_2', 'wallet_3'],
-        'coin_id': ['coin_1', 'coin_2', 'coin_1', 'coin_3', 'coin_4'],
-        'is_shark': [True, False, True, True, False]
-    }
-    return pd.DataFrame(data)
-
-@pytest.fixture
-def sample_shark_wallets_training_data_config():
-    """
-    mock of config.yaml to test calculation logic
-    """
-    return {
-        'shark_wallet_type': 'is_shark',
-        'shark_wallet_min_coins': 2,
-        'shark_wallet_min_shark_rate': 0.5
+        'coin_id': ['coin_1', 'coin_1', 'coin_1', 'coin_2', 'coin_3', 'coin_1'],
+        'wallet_address': ['wallet_1', 'wallet_2', 'wallet_2', 'wallet_1', 'wallet_3', 'wallet_4'],
+        'date': ['2024-02-15', '2024-02-18', '2024-02-20', '2024-02-18', '2024-02-25', '2024-02-20'],
+        'usd_inflows': [5000, 7500, 7500, 8000, 20000, 1000],
+        'profits_cumulative': [3000, 2000, 8000, 6000, 9000, 500]
     }
 
-@pytest.mark.unit
-def test_total_coin_calculation(sample_shark_wallets_shark_coins_df, sample_shark_wallets_training_data_config):
-    """
-    Test 2: Verify total coins calculation for each wallet.
-    """
-    shark_wallets_df = td.classify_shark_wallets(sample_shark_wallets_shark_coins_df, sample_shark_wallets_training_data_config)
-    total_coins = shark_wallets_df[shark_wallets_df['wallet_address'] == 'wallet_1']['total_coins'].values[0]
-    assert total_coins == 2, f"Expected 2, got {total_coins}"
-
-@pytest.mark.unit
-def test_shark_coin_calculation(sample_shark_wallets_shark_coins_df, sample_shark_wallets_training_data_config):
-    """
-    Test 3: Verify shark coins calculation for each wallet.
-    """
-    shark_wallets_df = td.classify_shark_wallets(sample_shark_wallets_shark_coins_df, sample_shark_wallets_training_data_config)
-    shark_coins = shark_wallets_df[shark_wallets_df['wallet_address'] == 'wallet_2']['shark_coins'].values[0]
-    assert shark_coins == 2, f"Expected 2, got {shark_coins}"
-
-@pytest.mark.unit
-def test_shark_rate_calculation(sample_shark_wallets_shark_coins_df, sample_shark_wallets_training_data_config):
-    """
-    Test 4: Verify shark rate calculation for each wallet.
-    """
-    shark_wallets_df = td.classify_shark_wallets(sample_shark_wallets_shark_coins_df, sample_shark_wallets_training_data_config)
-    shark_rate = shark_wallets_df[shark_wallets_df['wallet_address'] == 'wallet_2']['shark_rate'].values[0]
-    assert shark_rate == 1.0, f"Expected 1.0, got {shark_rate}"
-
-@pytest.mark.unit
-def test_megashark_classification(sample_shark_wallets_shark_coins_df, sample_shark_wallets_training_data_config):
-    """
-    Test 5: Verify megashark classification based on minimum coins and shark rate thresholds.
-    """
-    shark_wallets_df = td.classify_shark_wallets(sample_shark_wallets_shark_coins_df, sample_shark_wallets_training_data_config)
-    is_shark = shark_wallets_df[shark_wallets_df['wallet_address'] == 'wallet_2']['is_shark'].values[0]
-    assert is_shark, "Expected wallet_2 to be classified as megashark"
-
-@pytest.mark.unit
-def test_non_shark_wallet_handling(sample_shark_wallets_shark_coins_df, sample_shark_wallets_training_data_config):
-    """
-    Test 6: Verify handling of non-shark wallets (shark_coins = 0, shark_rate = 0).
-    """
-    shark_wallets_df = td.classify_shark_wallets(sample_shark_wallets_shark_coins_df, sample_shark_wallets_training_data_config)
-    shark_coins = shark_wallets_df[shark_wallets_df['wallet_address'] == 'wallet_3']['shark_coins'].values[0]
-    shark_rate = shark_wallets_df[shark_wallets_df['wallet_address'] == 'wallet_3']['shark_rate'].values[0]
-    assert shark_coins == 0, f"Expected 0, got {shark_coins}"
-    assert shark_rate == 0, f"Expected 0, got {shark_rate}"
-
-@pytest.mark.parametrize("min_coins, min_shark_rate, expected_sharks", [
-    (2, 0.6, ['wallet_2']),  # Test case where wallet_2 is a megashark
-    (1, 0.5, ['wallet_1', 'wallet_2']),  # Test case where wallet_1 and wallet_2 are megasharks
-])
-@pytest.mark.unit
-def test_varying_inputs(sample_shark_wallets_shark_coins_df, min_coins, min_shark_rate, expected_sharks):
-    """
-    Test 7: Verify classification with varying inputs for min_coins and min_shark_rate.
-    """
-    sample_shark_wallets_training_data_config = {
-        'shark_wallet_type': 'is_shark',
-        'shark_wallet_min_coins': min_coins,
-        'shark_wallet_min_shark_rate': min_shark_rate
-    }
-    shark_wallets_df = td.classify_shark_wallets(sample_shark_wallets_shark_coins_df, sample_shark_wallets_training_data_config)
-    classified_sharks = shark_wallets_df[shark_wallets_df['is_shark']]['wallet_address'].tolist()
-    assert classified_sharks == expected_sharks, f"Expected {expected_sharks}, got {classified_sharks}"
-
-
-
-# ---------------------------------------- #
-# classify_shark_coins() unit tests
-# ---------------------------------------- #
-
-@pytest.fixture
-def sample_shark_coins_profits_df():
-    """
-    Sample DataFrame for testing classify_shark_coins function
-    """
-    data = {
-        'coin_id': ['coin_1', 'coin_1', 'coin_2', 'coin_2', 'coin_3'],
-        'wallet_address': ['wallet_1', 'wallet_2', 'wallet_1', 'wallet_3', 'wallet_2'],
-        'date': ['2024-02-15', '2024-02-20', '2024-02-18', '2024-02-25', '2024-02-22'],
-        'usd_inflows_cumulative': [5000, 15000, 8000, 20000, 5000],
-        'profits_cumulative': [3000, 8000, 6000, 9000, 4000],
-    }
+    # Recompute total return: total_return = profits_cumulative / usd_inflows
     df = pd.DataFrame(data)
-    df['total_return'] = df['profits_cumulative'] / df['usd_inflows_cumulative']
+    df['total_return'] = df['profits_cumulative'] / df['usd_inflows']
     return df
 
-@pytest.fixture
-def sample_shark_coins_training_data_config():
+# Sample config for wallet cohort
+def sample_wallet_cohort_config():
     """
-    Sample configuration for testing classify_shark_coins function    
+    Sample configuration for testing classify_wallet_cohort function
     """
     return {
-        'modeling_period_start': '2024-03-01',
-        'shark_coin_minimum_inflows': 10000,
-        'shark_coin_profits_threshold': 5000,
-        'shark_coin_return_threshold': 0.5
+        'wallet_minimum_inflows': 10000,
+        'wallet_maximum_inflows': 50000,
+        'coin_profits_win_threshold': 5000,  # Coin must have profits of at least 5000 USD to be a win
+        'coin_return_win_threshold': 0.5,  # Coin must have at least a 50% return to be a win
+        'wallet_min_coin_wins': 1  # Minimum of 1 coin must meet the "win" threshold for the wallet to join the cohort
     }
 
-@pytest.mark.unit
-def test_shark_coins_eligibility_filtering(sample_shark_coins_profits_df, sample_shark_coins_training_data_config):
+# Test case for classify_wallet_cohort
+def test_wallet_cohort_classification():
     """
-    Test 1: Ensure wallets are filtered correctly based on shark eligibility criteria (inflows).
+    Unit test for classify_wallet_cohort() function with assertions for specific items.
     """
-    shark_coins_df = td.classify_shark_coins(sample_shark_coins_profits_df, sample_shark_coins_training_data_config)
-    eligible_wallets = shark_coins_df['wallet_address'].unique()
-    assert 'wallet_1' not in eligible_wallets, "Wallet_1 should be excluded due to insufficient inflows."
+    sample_profits_df = sample_wallet_cohort_profits_df()
+    sample_config = sample_wallet_cohort_config()
+
+    # Run classification
+    cohort_wallets_df = td.classify_wallet_cohort(sample_profits_df, sample_config)
+
+    # Test 1: Ensure wallets are filtered correctly based on inflows eligibility criteria.
+    eligible_wallets = cohort_wallets_df['wallet_address'].unique()
+    assert 'wallet_4' not in eligible_wallets, "Wallet_4 should be excluded due to insufficient inflows."
     assert 'wallet_2' in eligible_wallets, "Wallet_2 should be included."
     assert 'wallet_3' in eligible_wallets, "Wallet_3 should be included."
 
-@pytest.mark.unit
-def test_shark_coins_profits_classification(sample_shark_coins_profits_df, sample_shark_coins_training_data_config):
-    """
-    Test 2: Verify that wallets are classified as profits sharks correctly.
-    """
-    shark_coins_df = td.classify_shark_coins(sample_shark_coins_profits_df, sample_shark_coins_training_data_config)
-    is_profits_shark = shark_coins_df[shark_coins_df['wallet_address'] == 'wallet_2']['is_profits_shark'].values[0]
-    assert is_profits_shark, "Wallet_2 should be classified as a profits shark."
+    # Test 2: Verify that wallets are classified based on profits win threshold.
+    wallet_1_wins = cohort_wallets_df[cohort_wallets_df['wallet_address'] == 'wallet_1']['winning_coins'].values[0]
+    wallet_2_wins = cohort_wallets_df[cohort_wallets_df['wallet_address'] == 'wallet_2']['winning_coins'].values[0]
+    assert wallet_1_wins == 1, f"Expected 1 winning coin for Wallet_1, got {wallet_1_wins}"
+    assert wallet_2_wins == 1, f"Expected 1 winning coin for Wallet_2, got {wallet_2_wins}"
 
-@pytest.mark.unit
-def test_shark_coins_returns_classification(sample_shark_coins_profits_df, sample_shark_coins_training_data_config):
-    """
-    Test 3: Verify that wallets are classified as returns sharks correctly.
-    """
-    shark_coins_df = td.classify_shark_coins(sample_shark_coins_profits_df, sample_shark_coins_training_data_config)
-    is_returns_shark_w2 = shark_coins_df[shark_coins_df['wallet_address'] == 'wallet_2']['is_returns_shark'].values[0]
-    is_returns_shark_w3 = shark_coins_df[shark_coins_df['wallet_address'] == 'wallet_3']['is_returns_shark'].values[0]
-    assert is_returns_shark_w2, "Wallet_2 should be classified as a returns shark."
-    assert not is_returns_shark_w3, "Wallet_3 should not be classified as a returns shark."
+    # Test 3: Ensure wallets are classified based on combined profits and return thresholds.
+    wallet_2_is_cohort = cohort_wallets_df[cohort_wallets_df['wallet_address'] == 'wallet_2']['in_cohort'].values[0]
+    assert wallet_2_is_cohort, "Wallet_2 should be classified as a cohort member."
 
-@pytest.mark.unit
-def test_shark_coins_combined_shark_classification(sample_shark_coins_profits_df, sample_shark_coins_training_data_config):
-    """
-    Test 4: Ensure wallets are classified as sharks if they meet either profits or returns criteria.
-    """
-    shark_coins_df = td.classify_shark_coins(sample_shark_coins_profits_df, sample_shark_coins_training_data_config)
-    is_shark = shark_coins_df[shark_coins_df['wallet_address'] == 'wallet_2']['is_shark'].values[0]
-    assert is_shark, "Wallet_2 should be classified as a shark."
-
-@pytest.mark.unit
-def test_shark_coins_modeling_period_filtering(sample_shark_coins_profits_df, sample_shark_coins_training_data_config):
-    """
-    Test 5: Verify that aggregates in shark_coins_df exclude data from the modeling period.
-    """
-    # Run the classify_shark_coins function
-    shark_coins_df = td.classify_shark_coins(sample_shark_coins_profits_df, sample_shark_coins_training_data_config)
-
-    # Manually calculate expected values for wallet_2 and wallet_3 (both should exclude modeling period data)
-    assert shark_coins_df[shark_coins_df['wallet_address'] == 'wallet_2']['profits_cumulative'].values[0] == 8000, "Profits for wallet_2 should be 8000"
-    assert shark_coins_df[shark_coins_df['wallet_address'] == 'wallet_3']['profits_cumulative'].values[0] == 9000, "Profits for wallet_3 should be 9000"
-    assert shark_coins_df[shark_coins_df['wallet_address'] == 'wallet_2']['total_return'].values[0] == 8000 / 15000, "Return for wallet_2 should be 0.6"
-    assert shark_coins_df[shark_coins_df['wallet_address'] == 'wallet_3']['total_return'].values[0] == 0.45, "Return for wallet_3 should be 0.45"
-
-
+    # Test 5: Check summary metrics for wallet_1
+    wallet_1_metrics = cohort_wallets_df[cohort_wallets_df['wallet_address'] == 'wallet_1']
+    assert wallet_1_metrics['usd_inflows'].values[0] == 13000, f"Expected total inflows for Wallet_1 to be 13000, got {wallet_1_metrics['usd_inflows'].values[0]}"
+    assert wallet_1_metrics['total_coins'].values[0] == 2, f"Expected total coins for Wallet_1 to be 2, got {wallet_1_metrics['total_coins'].values[0]}"
+    assert wallet_1_metrics['total_profits'].values[0] == 9000, f"Expected total profits for Wallet_1 to be 9000, got {wallet_1_metrics['total_profits'].values[0]}"
 
 
 

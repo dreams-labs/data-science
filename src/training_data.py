@@ -631,110 +631,84 @@ def clean_profits_df(profits_df, data_cleaning_config):
     return profits_cleaned_df,exclusions_logs_df
 
 
-
-def classify_shark_coins(profits_df, training_data_config):
+def classify_wallet_cohort(profits_df, wallet_cohort_config):
     """
-    Classify wallet-coin pairs as sharks based on their profitability and return performance, filtered 
-    to the shark eligibility criteria. Pairs are classified either based on gross profits (is_profits_shark)
-    or based on return (is_returns_shark). Pairs that match either criteria are given is_shark=True. 
-
-    Steps:
-    1. Filter wallets that have inflows above a predefined threshold (shark eligibility).
-    2. Identify wallets as sharks based on either:
-    a. Total profits exceeding a configured threshold.
-    b. Total return exceeding a configured threshold.
-    3. Add a combined 'is_shark' column for wallets that meet either profits or returns criteria.
+    Classifies wallets into a cohort based on their activity across multiple coins.
+    The function directly applies the inflows, profitability, and return thresholds at the wallet level.
+    Outputs a DataFrame with aggregated wallet-level metrics and cohort classification.
 
     Parameters:
-        profits_df (DataFrame): A DataFrame containing wallet transactions and profits data.
-        training_data_config (dict): A configuration object containing modeling parameters, including:
-            - 'modeling_period_start': Start date for filtering data.
-            - 'shark_coin_minimum_inflows': Minimum total USD inflow to be eligible as a shark.
-            - 'shark_coin_profits_threshold': Minimum total profits to be considered a profits shark.
-            - 'shark_coin_return_threshold': Minimum total return to be considered a returns shark.
+        profits_df (DataFrame): A DataFrame containing wallet-coin records with profits and returns data.
+        wallet_cohort_config (dict): A configuration object containing cohort parameters, including:
+            - 'wallet_minimum_inflows': Minimum total USD inflow to be eligible for the cohort.
+            - 'wallet_maximum_inflows': Maximum total USD inflow to be eligible for the cohort.
+            - 'coin_profits_win_threshold': Minimum total profits for a coin to be considered a "win".
+            - 'coin_return_win_threshold': Minimum total return for a coin to be considered a "win".
+            - 'wallet_min_coin_wins': Minimum number of coins that meet the "win" threshold for a wallet to join the cohort.
 
     Returns:
-        shark_coins_df (DataFrame): A DataFrame of coin-wallet pairs classified as sharks, including 
-        flags for whether the wallet meets the profits or return criteria.
+        cohort_summary_df (DataFrame): A DataFrame containing wallets and summary metrics, including:
+            - total inflows, total coins, total wins, win rate, and whether the wallet is in the cohort.
     """
-    logger.debug('identifying coin-level sharks...')
+    logger.debug('Classifying wallet cohort based on coin-level thresholds...')
 
-    # Step 1. Remove modeling period data and wallets that do not meet shark eligibility
-    # ----------------------------------------------------------------------------------
-    # Filter out transfers that occured after the end of the training period
-    filtered_profits_df = profits_df[profits_df['date'] < training_data_config['modeling_period_start']].copy()
+    # Step 1: Aggregate wallet-level inflows and filter eligible wallets
+    wallet_inflows_df = profits_df.groupby('wallet_address')['usd_inflows'].sum().reset_index()
+    eligible_wallets_df = wallet_inflows_df[
+        (wallet_inflows_df['usd_inflows'] >= wallet_cohort_config['wallet_minimum_inflows']) &
+        (wallet_inflows_df['usd_inflows'] <= wallet_cohort_config['wallet_maximum_inflows'])
+    ]
 
-    # Identify coin-wallet pairs that have deposited enough total USD to be considered sharks
-    eligible_wallets_df = filtered_profits_df.groupby(['coin_id', 'wallet_address'])['usd_inflows_cumulative'].max().reset_index()
-    eligible_wallets_df = eligible_wallets_df[eligible_wallets_df['usd_inflows_cumulative'] >= training_data_config['shark_coin_minimum_inflows']]
+    # Step 2: Group by wallet and coin to aggregate profits and return
+    # filter profits_df for only eligible wallets
+    eligible_wallets_profits_df = profits_df[profits_df['wallet_address'].isin(eligible_wallets_df['wallet_address'])].copy()
+    eligible_wallets_profits_df = eligible_wallets_profits_df.sort_values(by=['wallet_address', 'coin_id', 'date'])
 
-    # Filter profits_df to only include eligible wallets
-    filtered_profits_df = filtered_profits_df.merge(eligible_wallets_df[['coin_id', 'wallet_address']],
-                                                    on=['coin_id', 'wallet_address'],
-                                                    how='inner')
+    # compute wallet-coin level metrics
+    eligible_wallets_coins_df = eligible_wallets_profits_df.groupby(['wallet_address', 'coin_id']).agg({
+        'profits_cumulative': 'last',  # Use the last record for cumulative profits
+        'total_return': 'last'  # Use the last record for total return
+    }).reset_index()
 
-    # Step 2. Determine which eligible wallets are classified as sharks
-    # -----------------------------------------------------------------------------------
-    # identify sharks based on absolute balance of profits
-    total_profits_df = filtered_profits_df.sort_values('date').groupby(['coin_id', 'wallet_address']).last()['profits_cumulative'].reset_index()
-    shark_coins_df = eligible_wallets_df.merge(total_profits_df, on=['coin_id', 'wallet_address'])
-    shark_coins_df['is_profits_shark'] = shark_coins_df['profits_cumulative'] >= training_data_config['shark_coin_profits_threshold']
+    # Step 3: Apply wallet-coin-level thresholds (profits AND return) to each wallet and classify "win"s
+    eligible_wallets_coins_df['is_profits_win'] = eligible_wallets_coins_df['profits_cumulative'] >= wallet_cohort_config['coin_profits_win_threshold']
+    eligible_wallets_coins_df['is_returns_win'] = eligible_wallets_coins_df['total_return'] >= wallet_cohort_config['coin_return_win_threshold']
 
-    # identify sharks based on percentage return
-    total_returns_df = filtered_profits_df.sort_values('date').groupby(['coin_id', 'wallet_address']).last()['total_return'].reset_index()
-    shark_coins_df = shark_coins_df.merge(total_returns_df, on=['coin_id', 'wallet_address'])
-    shark_coins_df['is_returns_shark'] = shark_coins_df['total_return'] >= training_data_config['shark_coin_return_threshold']
+    # A coin is classified as a "win" if it meets both the profits AND returns threshold
+    eligible_wallets_coins_df['is_coin_win'] = eligible_wallets_coins_df['is_profits_win'] & eligible_wallets_coins_df['is_returns_win']
 
-    # add a combined column for wallets that meet either criteria
-    shark_coins_df['is_shark'] = shark_coins_df['is_profits_shark'] | shark_coins_df['is_returns_shark']
+    # Step 4: Aggregate at the wallet level to count the number of "winning" coins and total coins
+    wallet_wins_df = eligible_wallets_coins_df.groupby('wallet_address')['is_coin_win'].sum().reset_index()
+    wallet_wins_df.columns = ['wallet_address', 'winning_coins']
 
-    logger.info('creation of shark_coins_df complete.')
+    wallet_coins_df = eligible_wallets_coins_df.groupby('wallet_address')['coin_id'].nunique().reset_index()
+    wallet_coins_df.columns = ['wallet_address', 'total_coins']
 
-    return shark_coins_df
-
+    # Step 5: Classify wallets into the cohort based on minimum number of coin wins
+    wallet_wins_df['in_cohort'] = wallet_wins_df['winning_coins'] >= wallet_cohort_config['wallet_min_coin_wins']
 
 
-def classify_shark_wallets(shark_coins_df, training_data_config):
-    """
-    Classifies wallets as sharks based on their activity across multiple coins.
+    # Step 6: Compute wallet-level metrics for output
+    # Merge wallet inflows, wins, total coins, profits, and return rate
+    cohort_summary_df = wallet_inflows_df.merge(wallet_coins_df, on='wallet_address')
+    cohort_summary_df = cohort_summary_df.merge(wallet_wins_df, on='wallet_address', how='left')
+    cohort_summary_df['winning_coins'] = cohort_summary_df['winning_coins'].fillna(0)
 
-    Parameters:
-        shark_coins_df (DataFrame): A DataFrame containing wallet-coin records and shark classification.
-        training_data_config (dict): A configuration object containing thresholds for megashark classification:
-            - 'shark_wallet_type': Column indicating whether a wallet is a shark.
-            - 'shark_wallet_min_coins': Minimum number of coins for megashark classification.
-            - 'shark_wallet_min_shark_rate': Minimum shark rate for megashark classification.
+    # Calculate total profits (USD value)
+    wallet_profits_df = profits_df.groupby('wallet_address')['profits_cumulative'].sum().reset_index()
+    wallet_profits_df.columns = ['wallet_address', 'total_profits']
 
-    Returns:
-        shark_wallets_df (DataFrame): A DataFrame containing wallets classified as megasharks.
-    """
-    shark_wallet_type = training_data_config['shark_wallet_type']
-    shark_wallet_min_coins = training_data_config['shark_wallet_min_coins']
-    shark_wallet_min_shark_rate = training_data_config['shark_wallet_min_shark_rate']
+    # Calculate return rate: total profits / total inflows
+    wallet_return_rate_df = wallet_profits_df.merge(wallet_inflows_df, on='wallet_address')
+    wallet_return_rate_df['return_rate'] = wallet_return_rate_df['total_profits'] / wallet_return_rate_df['usd_inflows']
 
-    # Calculate the total number of coins each wallet has records with
-    all_coins_df = shark_coins_df.groupby('wallet_address')['coin_id'].count().reset_index()
-    all_coins_df.columns = ['wallet_address', 'total_coins']
+    # Merge profits and return rate into the cohort summary
+    cohort_summary_df = cohort_summary_df.merge(wallet_profits_df, on='wallet_address', how='left')
+    cohort_summary_df = cohort_summary_df.merge(wallet_return_rate_df[['wallet_address', 'return_rate']], on='wallet_address', how='left')
 
-    # Calculate the number of coins each wallet is a shark on
-    shark_coins_df = shark_coins_df[shark_coins_df[shark_wallet_type]].groupby('wallet_address')['coin_id'].count().reset_index()
-    shark_coins_df.columns = ['wallet_address', 'shark_coins']
+    logger.info('Wallet cohort classification complete.')
 
-    # Merge the two DataFrames to get total and shark coins for each wallet
-    shark_wallets_df = all_coins_df.merge(shark_coins_df, on='wallet_address', how='left')
-    shark_wallets_df['shark_coins'] = shark_wallets_df['shark_coins'].fillna(0)
-
-    # Calculate the shark_rate for each wallet
-    shark_wallets_df['shark_rate'] = shark_wallets_df['shark_coins'] / shark_wallets_df['total_coins']
-
-    # Classify wallets as megasharks based on minimum coins and shark rate thresholds
-    shark_wallets_df['is_shark'] = (
-        (shark_wallets_df['total_coins'] >= shark_wallet_min_coins)
-        & (shark_wallets_df['shark_rate'] >= shark_wallet_min_shark_rate)
-    )
-
-    return shark_wallets_df
-
+    return cohort_summary_df
 
 
 def calculate_shark_performance(transfers_df, prices_df, shark_wallets_df, config):
