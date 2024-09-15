@@ -51,8 +51,8 @@ def split_model_input(model_input_df, target_column, test_size=0.2, random_state
         raise ValueError("'coin_id' column is required in the DataFrame.")
     
     # Separate the features and the target
-    X = model_input_df.drop(columns=[target_column])  # Keep 'coin_id' in X for indexing
-    y = model_input_df[target_column]  # The target column
+    X = model_input_df.drop(columns=[target_column]).set_index('coin_id')  # Set 'coin_id' as index for X
+    y = model_input_df[target_column]  # Extract target as Series, it will retain the index from model_input_df
 
     # Check for missing values in features or target
     if X.isnull().values.any():
@@ -69,12 +69,12 @@ def split_model_input(model_input_df, target_column, test_size=0.2, random_state
         raise ValueError("Target is heavily imbalanced. Consider rebalancing or using specialized techniques.")
 
     # Check for non-numeric features
-    if not all(np.issubdtype(dtype, np.number) for dtype in X.drop(columns=['coin_id']).dtypes):
+    if not all(np.issubdtype(dtype, np.number) for dtype in X.dtypes):
         raise ValueError("Features contain non-numeric data. Consider encoding categorical features.")
 
-    # Split into train and test sets, keeping 'coin_id' as the index
+    # Split into train and test sets
     X_train, X_test, y_train, y_test = train_test_split(
-        X.set_index('coin_id'), y.set_index('coin_id'), test_size=test_size, random_state=random_state
+        X, y, test_size=test_size, random_state=random_state
     )
 
     # Log the size and number of positives for y_train and y_test
@@ -207,7 +207,7 @@ def evaluate_model(model, X_test, y_test, model_id, modeling_folder):
 
 
 
-def log_experiment_results(modeling_folder, model_id):
+def log_experiment_results(modeling_folder, model_id, experiment_id):
     """
     Logs the results of a modeling experiment by pulling data from saved files 
     and storing the combined results in the experiment tracking folder.
@@ -215,6 +215,7 @@ def log_experiment_results(modeling_folder, model_id):
     Args:
     - modeling_folder (str): The base folder where models, logs, and outputs are saved.
     - model_id (str): The unique ID of the model being evaluated.
+    - experiment_id (str): The unique ID of the experiment.
     
     Returns:
     - experiment_log (dict): A dictionary with the logged experiment details.
@@ -223,14 +224,15 @@ def log_experiment_results(modeling_folder, model_id):
     logs_path = os.path.join(modeling_folder, "logs")
     performance_metrics_path = os.path.join(modeling_folder, "outputs", "performance_metrics")
     feature_importance_path = os.path.join(modeling_folder, "outputs", "feature_importance")
-    experiment_tracking_path = os.path.join(modeling_folder, "experiment_tracking")
+    predictions_path = os.path.join(modeling_folder, "outputs", "predictions")
+    experiment_tracking_path = os.path.join(modeling_folder, "outputs", "experiment_tracking")
     
     # Step 1: Ensure the experiment_tracking folder exists
     if not os.path.exists(experiment_tracking_path):
         raise FileNotFoundError(f"The folder '{experiment_tracking_path}' does not exist.")
 
     # Initialize an empty dictionary to collect all the results
-    experiment_log = {}
+    experiment_log = {"experiment_id": experiment_id}
 
     # Step 2: Read the model training log in JSON format
     log_filename = os.path.join(logs_path, f"log_{model_id}.json")
@@ -249,14 +251,25 @@ def log_experiment_results(modeling_folder, model_id):
     else:
         raise FileNotFoundError(f"Performance metrics not found for model {model_id}.")
 
-    # Step 4: Read the feature importance if available
+    # Step 4: Read the feature importance if available and store as a dict
     feature_importance_filename = os.path.join(feature_importance_path, f"feature_importance_{model_id}.csv")
     if os.path.exists(feature_importance_filename):
-        experiment_log["feature_importance"] = feature_importance_filename
+        feature_importance_df = pd.read_csv(feature_importance_filename)
+        feature_importance_dict = dict(zip(feature_importance_df['feature'], feature_importance_df['importance']))
+        experiment_log["feature_importance"] = feature_importance_dict
     else:
-        experiment_log["feature_importance"] = "N/A"  # Optional, in case feature importance isn't available
+        experiment_log["feature_importance"] = "N/A"
 
-    # Step 5: Save the experiment log as a JSON file
+    # Step 5: Read the predictions from CSV and store as a dict
+    predictions_filename = os.path.join(predictions_path, f"predictions_{model_id}.csv")
+    if os.path.exists(predictions_filename):
+        predictions_df = pd.read_csv(predictions_filename)
+        predictions_dict = predictions_df.to_dict(orient='list')
+        experiment_log["predictions"] = predictions_dict
+    else:
+        experiment_log["predictions"] = "N/A"
+
+    # Step 6: Save the experiment log as a JSON file
     experiment_log_filename = os.path.join(experiment_tracking_path, f"experiment_log_{model_id}.json")
     with open(experiment_log_filename, 'w', encoding='utf-8') as experiment_log_file:
         json.dump(experiment_log, experiment_log_file, indent=4)

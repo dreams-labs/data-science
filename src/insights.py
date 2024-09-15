@@ -7,6 +7,8 @@ functions used to build coin-level features from training data
 # pylint: disable=E0401 # can't find utils import
 
 import os
+import time
+from datetime import datetime
 import random
 import hashlib
 import json
@@ -395,25 +397,36 @@ def build_configured_model_input(profits_df, prices_df, config, metrics_config, 
 
 
 
-def run_experiments(method, config_folder, modeling_folder, max_evals=50):
+def run_experiments(search_method, modeling_config, experiment_name, experiment_metadata={}, max_evals=50):
     """
     Runs experiments using a specified search method (grid or random), builds models,
     and logs the results of each experiment.
 
     Args:
-    - method (str): 'grid' or 'random' to select the search method.
-    - config_folder (str): Path to the folder containing all configuration files.
-    - modeling_folder (str): Path to the folder where models, logs, and results will be saved.
+    - search_method (str): 'grid' or 'random' to select the search method.
+    - modeling_config (dict): Configuration dictionary containing paths, model params, etc.
+    - experiment_name (str): The base name for the experiment.
+    - experiment_metadata (dict): Metadata for the experiment, can be expanded over time.
     - max_evals (int): Number of iterations for Random search (default is 50).
     """
 
+    # Extract folder paths from modeling_config
+    modeling_folder = modeling_config['modeling']['modeling_folder']
+    config_folder = modeling_config['modeling']['config_folder']
+
+    # Add a UUID to the experiment name for uniqueness
+    experiment_id = f"{experiment_name}_{uuid.uuid4()}"
+
+    # Add a timestamp to the metadata
+    experiment_metadata['start_time'] = datetime.now().isoformat()
+
     # 1. Generate the experiment configurations
-    experiment_configurations = generate_experiment_configurations(config_folder, method=method, max_evals=max_evals)
+    experiment_configurations = generate_experiment_configurations(config_folder, method=search_method, max_evals=max_evals)
 
     # Generate prices_df
-    config = load_config(os.path.join(config_folder,'config.yaml'))
+    config = load_config(os.path.join(config_folder, 'config.yaml'))
     prices_df = td.retrieve_prices_data()
-    prices_df,_ = td.fill_prices_gaps(prices_df, config['data_cleaning']['max_gap_days'])
+    prices_df, _ = td.fill_prices_gaps(prices_df, config['data_cleaning']['max_gap_days'])
 
     # 2. Create the progress bar
     total_experiments = len(experiment_configurations)
@@ -441,13 +454,18 @@ def run_experiments(method, config_folder, modeling_folder, max_evals=50):
         _ = m.evaluate_model(model, X_test, y_test, model_id, modeling_folder)
 
         # 3.6 Log the experiment results for this configuration
-        m.log_experiment_results(modeling_folder, model_id)
+        # Include the experiment name, metadata, and other relevant details
+        m.log_experiment_results(modeling_folder, model_id, experiment_id=experiment_id, experiment_metadata=experiment_metadata)
 
         # Update the progress bar
         experiments_bar.update(n + 1)
 
     # Finish the progress bar
     experiments_bar.finish()
+
+    # Add the experiment end time and calculate the duration
+    experiment_metadata['end_time'] = datetime.now().isoformat()
+    experiment_metadata['duration'] = time
 
     # # 4. Compare all experiments and analyze the best-performing configuration
     # analyze_experiments(modeling_folder)

@@ -4,6 +4,8 @@ utility functions use in data science notebooks
 
 from datetime import datetime, timedelta
 import yaml
+import progressbar
+
 
 def load_config(file_path='../notebooks/config.yaml'):
     """
@@ -69,6 +71,24 @@ def calculate_period_dates(config):
         'training_period_end': training_period_end.strftime('%Y-%m-%d'),
         'modeling_period_end': modeling_period_end.strftime('%Y-%m-%d')
     }
+
+
+def create_progress_bar(total_items):
+    """
+    Creates and starts a progress bar for tracking the progress of for loops.
+
+    Args:
+    - total_items (int): The total number of itesm in the loop
+
+    Returns:
+    - progressbar.ProgressBar: An initialized and started progress bar.
+    """
+    progress_bar = progressbar.ProgressBar(maxval=total_items, widgets=[
+        ' [', progressbar.Percentage(), '] ',
+        progressbar.Bar(), ' (', progressbar.ETA(), ') '
+    ]).start()
+
+    return progress_bar
 
 
 def cw_filter_df(df, coin_id, wallet_address):
