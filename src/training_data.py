@@ -647,7 +647,7 @@ def classify_wallet_cohort(profits_df, wallet_cohort_config):
             - 'wallet_min_coin_wins': Minimum number of coins that meet the "win" threshold for a wallet to join the cohort.
 
     Returns:
-        cohort_summary_df (DataFrame): A DataFrame containing wallets and summary metrics, including:
+        wallet_cohort_df (DataFrame): A DataFrame containing wallets and summary metrics, including:
             - total inflows, total coins, total wins, win rate, and whether the wallet is in the cohort.
     """
     logger.debug('Classifying wallet cohort based on coin-level thresholds...')
@@ -690,9 +690,9 @@ def classify_wallet_cohort(profits_df, wallet_cohort_config):
 
     # Step 6: Compute wallet-level metrics for output
     # Merge wallet inflows, wins, total coins, profits, and return rate
-    cohort_summary_df = wallet_inflows_df.merge(wallet_coins_df, on='wallet_address')
-    cohort_summary_df = cohort_summary_df.merge(wallet_wins_df, on='wallet_address', how='left')
-    cohort_summary_df['winning_coins'] = cohort_summary_df['winning_coins'].fillna(0)
+    wallet_cohort_df = wallet_inflows_df.merge(wallet_coins_df, on='wallet_address')
+    wallet_cohort_df = wallet_cohort_df.merge(wallet_wins_df, on='wallet_address', how='left')
+    wallet_cohort_df['winning_coins'] = wallet_cohort_df['winning_coins'].fillna(0)
 
     # Calculate total profits (USD value)
     wallet_profits_df = profits_df.groupby('wallet_address')['profits_cumulative'].sum().reset_index()
@@ -703,201 +703,207 @@ def classify_wallet_cohort(profits_df, wallet_cohort_config):
     wallet_return_rate_df['return_rate'] = wallet_return_rate_df['total_profits'] / wallet_return_rate_df['usd_inflows']
 
     # Merge profits and return rate into the cohort summary
-    cohort_summary_df = cohort_summary_df.merge(wallet_profits_df, on='wallet_address', how='left')
-    cohort_summary_df = cohort_summary_df.merge(wallet_return_rate_df[['wallet_address', 'return_rate']], on='wallet_address', how='left')
+    wallet_cohort_df = wallet_cohort_df.merge(wallet_profits_df, on='wallet_address', how='left')
+    wallet_cohort_df = wallet_cohort_df.merge(wallet_return_rate_df[['wallet_address', 'return_rate']], on='wallet_address', how='left')
 
-    logger.info('Wallet cohort classification complete.')
+    # Count the number of wallets in the cohort
+    x = wallet_cohort_df[wallet_cohort_df['in_cohort'] == True].shape[0]
+    y = wallet_cohort_df.shape[0]
 
-    return cohort_summary_df
+    # Log the count of wallets added to the cohort using % syntax
+    logger.info('Wallet cohort classification complete. %d/%d eligible wallets were added to the cohort.' % (x, y))
 
-
-def calculate_shark_performance(transfers_df, prices_df, shark_wallets_df, config):
-    """
-    Calculate shark and non-shark performance based on profitability and inflows during the modeling period.
-
-    Args:
-        transfers_df (pd.DataFrame): DataFrame containing transfer data.
-        prices_df (pd.DataFrame): DataFrame containing price data.
-        shark_wallets_df (pd.DataFrame): DataFrame containing shark wallet classification.
-        config (dict): Configuration dictionary containing modeling period details.
-
-    Returns:
-        pd.DataFrame: DataFrame summarizing shark performance with aggregated return.
-    """
-
-    # Filter transfers for the modeling period
-    modeling_period_transfers_df = transfers_df[
-        (transfers_df['date'] >= config['training_data']['modeling_period_start']) &
-        (transfers_df['date'] <= config['training_data']['modeling_period_end'])
-    ]
-
-    # Create profits_df for the modeling period
-    logger.info("Creating modeling period profits data...")
-    modeling_period_profits_df = prepare_profits_data(modeling_period_transfers_df, prices_df)
-    modeling_period_profits_df = calculate_wallet_profitability(modeling_period_profits_df)
-
-    # Retrieve profit state at the end of the period for each coin-wallet pair
-    modeling_end_profits_df = modeling_period_profits_df[
-        modeling_period_profits_df['date'] == config['training_data']['modeling_period_end']
-    ]
-
-    # Aggregate wallet-level metrics by summing usd inflows and profits
-    modeling_end_wallet_profits_df = modeling_end_profits_df.groupby('wallet_address')[
-        ['usd_inflows_cumulative', 'profits_cumulative']
-    ].sum()
-
-    # Add prefix to the additional columns in shark_wallets_df
-    shark_wallets_df_prefixed = shark_wallets_df.add_prefix('training_period_')
-    shark_wallets_df_prefixed['wallet_address'] = shark_wallets_df['wallet_address']
-    shark_wallets_df_prefixed['is_shark'] = shark_wallets_df['is_shark']
-
-    # Classify wallets by shark status and compare their performance
-    shark_wallets_performance_df = shark_wallets_df_prefixed.merge(
-        modeling_end_wallet_profits_df,
-        on='wallet_address',
-        how='left'
-    )
-
-    # Replace NaNs with 0s for wallets that had no inflows and profits in the modeling period
-    shark_wallets_performance_df['usd_inflows_cumulative'] = shark_wallets_performance_df['usd_inflows_cumulative'].fillna(0)
-    shark_wallets_performance_df['profits_cumulative'] = shark_wallets_performance_df['profits_cumulative'].fillna(0)
-
-    # aggregate metrics on is_shark
-    shark_agg_performance_df = shark_wallets_performance_df.groupby('is_shark').agg(
-        count_wallets=('wallet_address', 'size'),
-        median_inflows=('usd_inflows_cumulative', 'median'),
-        median_profits=('profits_cumulative', 'median'),
-        mean_inflows=('usd_inflows_cumulative', 'mean'),
-        min_inflows=('usd_inflows_cumulative', 'min'),
-        max_inflows=('usd_inflows_cumulative', 'max'),
-        percentile_25_inflows=('usd_inflows_cumulative', lambda x: np.percentile(x.dropna(), 25) if len(x) > 1 else np.nan),
-        percentile_75_inflows=('usd_inflows_cumulative', lambda x: np.percentile(x.dropna(), 75) if len(x) > 1 else np.nan),
-        mean_profits=('profits_cumulative', 'mean'),
-        min_profits=('profits_cumulative', 'min'),
-        max_profits=('profits_cumulative', 'max'),
-        percentile_25_profits=('profits_cumulative', lambda x: np.percentile(x.dropna(), 25) if len(x) > 1 else np.nan),
-        percentile_75_profits=('profits_cumulative', lambda x: np.percentile(x.dropna(), 75) if len(x) > 1 else np.nan),
-        total_inflows=('usd_inflows_cumulative', 'sum'),
-        total_profits=('profits_cumulative', 'sum')
-    )
-    # Calculate median return
-    shark_agg_performance_df['median_return'] = np.divide(
-        shark_agg_performance_df['median_profits'],
-        shark_agg_performance_df['median_inflows'],
-        out=np.zeros_like(shark_agg_performance_df['median_profits']),
-        where=shark_agg_performance_df['median_inflows'] != 0
-    )
-    # Calculate aggregate return
-    shark_agg_performance_df['return_aggregate'] = np.divide(
-        shark_agg_performance_df['total_profits'],
-        shark_agg_performance_df['total_inflows'],
-        out=np.zeros_like(shark_agg_performance_df['total_profits']),
-        where=shark_agg_performance_df['total_inflows'] != 0
-    )
-
-    # calculate separate metrics for wallets that had transactions during the modeling period
-    nonzero_shark_wallets_performance_df = shark_wallets_performance_df[shark_wallets_performance_df['profits_cumulative']!=0]
-
-    nonzero_shark_agg_performance_df = nonzero_shark_wallets_performance_df.groupby('is_shark').agg(
-        count_wallets=('wallet_address', 'size'),
-        median_inflows=('usd_inflows_cumulative', 'median'),
-        median_profits=('profits_cumulative', 'median'),
-        percentile_25_inflows=('usd_inflows_cumulative', lambda x: np.percentile(x.dropna(), 25) if len(x) > 1 else np.nan),
-        percentile_75_inflows=('usd_inflows_cumulative', lambda x: np.percentile(x.dropna(), 75) if len(x) > 1 else np.nan),
-        percentile_25_profits=('profits_cumulative', lambda x: np.percentile(x.dropna(), 25) if len(x) > 1 else np.nan),
-        percentile_75_profits=('profits_cumulative', lambda x: np.percentile(x.dropna(), 75) if len(x) > 1 else np.nan),
-        total_inflows=('usd_inflows_cumulative', 'sum'),
-        total_profits=('profits_cumulative', 'sum')
-    )
-    # Calculate median return
-    nonzero_shark_agg_performance_df['median_return'] = np.divide(
-        nonzero_shark_agg_performance_df['median_profits'],
-        nonzero_shark_agg_performance_df['median_inflows'],
-        out=np.zeros_like(nonzero_shark_agg_performance_df['median_profits']),
-        where=nonzero_shark_agg_performance_df['median_inflows'] != 0
-    )
-    # Calculate aggregate return
-    nonzero_shark_agg_performance_df['return_aggregate'] = np.divide(
-        nonzero_shark_agg_performance_df['total_profits'],
-        nonzero_shark_agg_performance_df['total_inflows'],
-        out=np.zeros_like(nonzero_shark_agg_performance_df['total_profits']),
-        where=nonzero_shark_agg_performance_df['total_inflows'] != 0
-    )
-
-    # Prefix the nonzero DataFrame columns
-    nonzero_shark_agg_performance_df = nonzero_shark_agg_performance_df.add_prefix('nonzero_')
-
-    # Merge the two DataFrames on 'is_shark'
-    shark_agg_performance_df = shark_agg_performance_df.merge(
-        nonzero_shark_agg_performance_df, on='is_shark', how='left'
-    )
+    return wallet_cohort_df
 
 
 
-    # non-zero midrange wallet analysis
-    # ---------------------------------
-    # Filter wallets between the 10th and 90th percentile of profits_cumulative
-    # Filter wallets between the 10th and 90th percentile of sharks and non-sharks
-    shark_profits_10th = np.percentile(nonzero_shark_wallets_performance_df[nonzero_shark_wallets_performance_df['is_shark']]['profits_cumulative'], 10)
-    shark_profits_90th = np.percentile(nonzero_shark_wallets_performance_df[nonzero_shark_wallets_performance_df['is_shark']]['profits_cumulative'], 90)
+# def calculate_shark_performance(transfers_df, prices_df, shark_wallets_df, config):
+#     """
+#     Calculate shark and non-shark performance based on profitability and inflows during the modeling period.
 
-    nonshark_profits_10th = np.percentile(nonzero_shark_wallets_performance_df[~nonzero_shark_wallets_performance_df['is_shark']]['profits_cumulative'], 10)
-    nonshark_profits_90th = np.percentile(nonzero_shark_wallets_performance_df[~nonzero_shark_wallets_performance_df['is_shark']]['profits_cumulative'], 90)
+#     Args:
+#         transfers_df (pd.DataFrame): DataFrame containing transfer data.
+#         prices_df (pd.DataFrame): DataFrame containing price data.
+#         shark_wallets_df (pd.DataFrame): DataFrame containing shark wallet classification.
+#         config (dict): Configuration dictionary containing modeling period details.
 
-    # Filter sharks and non-sharks within their respective 10th–90th percentiles
-    midrange_shark_wallets_performance_df = nonzero_shark_wallets_performance_df[
-        (nonzero_shark_wallets_performance_df['is_shark']) &
-        (nonzero_shark_wallets_performance_df['profits_cumulative'] >= shark_profits_10th) &
-        (nonzero_shark_wallets_performance_df['profits_cumulative'] <= shark_profits_90th)
-    ]
+#     Returns:
+#         pd.DataFrame: DataFrame summarizing shark performance with aggregated return.
+#     """
 
-    midrange_nonshark_wallets_performance_df = nonzero_shark_wallets_performance_df[
-        (~nonzero_shark_wallets_performance_df['is_shark']) &
-        (nonzero_shark_wallets_performance_df['profits_cumulative'] >= nonshark_profits_10th) &
-        (nonzero_shark_wallets_performance_df['profits_cumulative'] <= nonshark_profits_90th)
-    ]
+#     # Filter transfers for the modeling period
+#     modeling_period_transfers_df = transfers_df[
+#         (transfers_df['date'] >= config['training_data']['modeling_period_start']) &
+#         (transfers_df['date'] <= config['training_data']['modeling_period_end'])
+#     ]
 
-    # Combine midrange shark and non-shark wallets
-    midrange_wallets_performance_df = pd.concat([midrange_shark_wallets_performance_df, midrange_nonshark_wallets_performance_df])
+#     # Create profits_df for the modeling period
+#     logger.info("Creating modeling period profits data...")
+#     modeling_period_profits_df = prepare_profits_data(modeling_period_transfers_df, prices_df)
+#     modeling_period_profits_df = calculate_wallet_profitability(modeling_period_profits_df)
 
-    # Calculate metrics for midrange wallets
-    midrange_shark_agg_performance_df = midrange_wallets_performance_df.groupby('is_shark').agg(
-        count_wallets=('wallet_address', 'size'),
-        median_inflows=('usd_inflows_cumulative', 'median'),
-        median_profits=('profits_cumulative', 'median'),
-        percentile_25_inflows=('usd_inflows_cumulative', lambda x: np.percentile(x.dropna(), 25) if len(x) > 1 else np.nan),
-        percentile_75_inflows=('usd_inflows_cumulative', lambda x: np.percentile(x.dropna(), 75) if len(x) > 1 else np.nan),
-        percentile_25_profits=('profits_cumulative', lambda x: np.percentile(x.dropna(), 25) if len(x) > 1 else np.nan),
-        percentile_75_profits=('profits_cumulative', lambda x: np.percentile(x.dropna(), 75) if len(x) > 1 else np.nan),
-        total_inflows=('usd_inflows_cumulative', 'sum'),
-        total_profits=('profits_cumulative', 'sum')
-    )
-    # calculate median return
-    midrange_shark_agg_performance_df['median_return'] = np.divide(
-        midrange_shark_agg_performance_df['median_profits'],
-        midrange_shark_agg_performance_df['median_inflows'],
-        out=np.zeros_like(midrange_shark_agg_performance_df['median_profits']),
-        where=midrange_shark_agg_performance_df['median_inflows'] != 0
-    )
-    # Calculate aggregate return
-    midrange_shark_agg_performance_df['return_aggregate'] = np.divide(
-        midrange_shark_agg_performance_df['total_profits'],
-        midrange_shark_agg_performance_df['total_inflows'],
-        out=np.zeros_like(midrange_shark_agg_performance_df['total_profits']),
-        where=midrange_shark_agg_performance_df['total_inflows'] != 0
-    )
+#     # Retrieve profit state at the end of the period for each coin-wallet pair
+#     modeling_end_profits_df = modeling_period_profits_df[
+#         modeling_period_profits_df['date'] == config['training_data']['modeling_period_end']
+#     ]
 
-    # Prefix the nonzero and midrange DataFrame columns
-    nonzero_shark_agg_performance_df = nonzero_shark_agg_performance_df.add_prefix('nonzero_')
-    midrange_shark_agg_performance_df = midrange_shark_agg_performance_df.add_prefix('midrange_')
+#     # Aggregate wallet-level metrics by summing usd inflows and profits
+#     modeling_end_wallet_profits_df = modeling_end_profits_df.groupby('wallet_address')[
+#         ['usd_inflows_cumulative', 'profits_cumulative']
+#     ].sum()
 
-    # Merge the three DataFrames on 'is_shark'
-    shark_agg_performance_df = shark_agg_performance_df.merge(
-        midrange_shark_agg_performance_df, on='is_shark', how='left'
-    )
+#     # Add prefix to the additional columns in shark_wallets_df
+#     shark_wallets_df_prefixed = shark_wallets_df.add_prefix('training_period_')
+#     shark_wallets_df_prefixed['wallet_address'] = shark_wallets_df['wallet_address']
+#     shark_wallets_df_prefixed['is_shark'] = shark_wallets_df['is_shark']
 
-    # Pivot
-    shark_agg_performance_df = shark_agg_performance_df.T.reset_index()
-    shark_agg_performance_df.columns = ['metric','not_sharks','sharks']
+#     # Classify wallets by shark status and compare their performance
+#     shark_wallets_performance_df = shark_wallets_df_prefixed.merge(
+#         modeling_end_wallet_profits_df,
+#         on='wallet_address',
+#         how='left'
+#     )
 
-    return shark_agg_performance_df,shark_wallets_performance_df
+#     # Replace NaNs with 0s for wallets that had no inflows and profits in the modeling period
+#     shark_wallets_performance_df['usd_inflows_cumulative'] = shark_wallets_performance_df['usd_inflows_cumulative'].fillna(0)
+#     shark_wallets_performance_df['profits_cumulative'] = shark_wallets_performance_df['profits_cumulative'].fillna(0)
+
+#     # aggregate metrics on is_shark
+#     shark_agg_performance_df = shark_wallets_performance_df.groupby('is_shark').agg(
+#         count_wallets=('wallet_address', 'size'),
+#         median_inflows=('usd_inflows_cumulative', 'median'),
+#         median_profits=('profits_cumulative', 'median'),
+#         mean_inflows=('usd_inflows_cumulative', 'mean'),
+#         min_inflows=('usd_inflows_cumulative', 'min'),
+#         max_inflows=('usd_inflows_cumulative', 'max'),
+#         percentile_25_inflows=('usd_inflows_cumulative', lambda x: np.percentile(x.dropna(), 25) if len(x) > 1 else np.nan),
+#         percentile_75_inflows=('usd_inflows_cumulative', lambda x: np.percentile(x.dropna(), 75) if len(x) > 1 else np.nan),
+#         mean_profits=('profits_cumulative', 'mean'),
+#         min_profits=('profits_cumulative', 'min'),
+#         max_profits=('profits_cumulative', 'max'),
+#         percentile_25_profits=('profits_cumulative', lambda x: np.percentile(x.dropna(), 25) if len(x) > 1 else np.nan),
+#         percentile_75_profits=('profits_cumulative', lambda x: np.percentile(x.dropna(), 75) if len(x) > 1 else np.nan),
+#         total_inflows=('usd_inflows_cumulative', 'sum'),
+#         total_profits=('profits_cumulative', 'sum')
+#     )
+#     # Calculate median return
+#     shark_agg_performance_df['median_return'] = np.divide(
+#         shark_agg_performance_df['median_profits'],
+#         shark_agg_performance_df['median_inflows'],
+#         out=np.zeros_like(shark_agg_performance_df['median_profits']),
+#         where=shark_agg_performance_df['median_inflows'] != 0
+#     )
+#     # Calculate aggregate return
+#     shark_agg_performance_df['return_aggregate'] = np.divide(
+#         shark_agg_performance_df['total_profits'],
+#         shark_agg_performance_df['total_inflows'],
+#         out=np.zeros_like(shark_agg_performance_df['total_profits']),
+#         where=shark_agg_performance_df['total_inflows'] != 0
+#     )
+
+#     # calculate separate metrics for wallets that had transactions during the modeling period
+#     nonzero_shark_wallets_performance_df = shark_wallets_performance_df[shark_wallets_performance_df['profits_cumulative']!=0]
+
+#     nonzero_shark_agg_performance_df = nonzero_shark_wallets_performance_df.groupby('is_shark').agg(
+#         count_wallets=('wallet_address', 'size'),
+#         median_inflows=('usd_inflows_cumulative', 'median'),
+#         median_profits=('profits_cumulative', 'median'),
+#         percentile_25_inflows=('usd_inflows_cumulative', lambda x: np.percentile(x.dropna(), 25) if len(x) > 1 else np.nan),
+#         percentile_75_inflows=('usd_inflows_cumulative', lambda x: np.percentile(x.dropna(), 75) if len(x) > 1 else np.nan),
+#         percentile_25_profits=('profits_cumulative', lambda x: np.percentile(x.dropna(), 25) if len(x) > 1 else np.nan),
+#         percentile_75_profits=('profits_cumulative', lambda x: np.percentile(x.dropna(), 75) if len(x) > 1 else np.nan),
+#         total_inflows=('usd_inflows_cumulative', 'sum'),
+#         total_profits=('profits_cumulative', 'sum')
+#     )
+#     # Calculate median return
+#     nonzero_shark_agg_performance_df['median_return'] = np.divide(
+#         nonzero_shark_agg_performance_df['median_profits'],
+#         nonzero_shark_agg_performance_df['median_inflows'],
+#         out=np.zeros_like(nonzero_shark_agg_performance_df['median_profits']),
+#         where=nonzero_shark_agg_performance_df['median_inflows'] != 0
+#     )
+#     # Calculate aggregate return
+#     nonzero_shark_agg_performance_df['return_aggregate'] = np.divide(
+#         nonzero_shark_agg_performance_df['total_profits'],
+#         nonzero_shark_agg_performance_df['total_inflows'],
+#         out=np.zeros_like(nonzero_shark_agg_performance_df['total_profits']),
+#         where=nonzero_shark_agg_performance_df['total_inflows'] != 0
+#     )
+
+#     # Prefix the nonzero DataFrame columns
+#     nonzero_shark_agg_performance_df = nonzero_shark_agg_performance_df.add_prefix('nonzero_')
+
+#     # Merge the two DataFrames on 'is_shark'
+#     shark_agg_performance_df = shark_agg_performance_df.merge(
+#         nonzero_shark_agg_performance_df, on='is_shark', how='left'
+#     )
+
+
+
+    # # non-zero midrange wallet analysis
+    # # ---------------------------------
+    # # Filter wallets between the 10th and 90th percentile of profits_cumulative
+    # # Filter wallets between the 10th and 90th percentile of sharks and non-sharks
+    # shark_profits_10th = np.percentile(nonzero_shark_wallets_performance_df[nonzero_shark_wallets_performance_df['is_shark']]['profits_cumulative'], 10)
+    # shark_profits_90th = np.percentile(nonzero_shark_wallets_performance_df[nonzero_shark_wallets_performance_df['is_shark']]['profits_cumulative'], 90)
+
+    # nonshark_profits_10th = np.percentile(nonzero_shark_wallets_performance_df[~nonzero_shark_wallets_performance_df['is_shark']]['profits_cumulative'], 10)
+    # nonshark_profits_90th = np.percentile(nonzero_shark_wallets_performance_df[~nonzero_shark_wallets_performance_df['is_shark']]['profits_cumulative'], 90)
+
+    # # Filter sharks and non-sharks within their respective 10th–90th percentiles
+    # midrange_shark_wallets_performance_df = nonzero_shark_wallets_performance_df[
+    #     (nonzero_shark_wallets_performance_df['is_shark']) &
+    #     (nonzero_shark_wallets_performance_df['profits_cumulative'] >= shark_profits_10th) &
+    #     (nonzero_shark_wallets_performance_df['profits_cumulative'] <= shark_profits_90th)
+    # ]
+
+    # midrange_nonshark_wallets_performance_df = nonzero_shark_wallets_performance_df[
+    #     (~nonzero_shark_wallets_performance_df['is_shark']) &
+    #     (nonzero_shark_wallets_performance_df['profits_cumulative'] >= nonshark_profits_10th) &
+    #     (nonzero_shark_wallets_performance_df['profits_cumulative'] <= nonshark_profits_90th)
+    # ]
+
+    # # Combine midrange shark and non-shark wallets
+    # midrange_wallets_performance_df = pd.concat([midrange_shark_wallets_performance_df, midrange_nonshark_wallets_performance_df])
+
+    # # Calculate metrics for midrange wallets
+    # midrange_shark_agg_performance_df = midrange_wallets_performance_df.groupby('is_shark').agg(
+    #     count_wallets=('wallet_address', 'size'),
+    #     median_inflows=('usd_inflows_cumulative', 'median'),
+    #     median_profits=('profits_cumulative', 'median'),
+    #     percentile_25_inflows=('usd_inflows_cumulative', lambda x: np.percentile(x.dropna(), 25) if len(x) > 1 else np.nan),
+    #     percentile_75_inflows=('usd_inflows_cumulative', lambda x: np.percentile(x.dropna(), 75) if len(x) > 1 else np.nan),
+    #     percentile_25_profits=('profits_cumulative', lambda x: np.percentile(x.dropna(), 25) if len(x) > 1 else np.nan),
+    #     percentile_75_profits=('profits_cumulative', lambda x: np.percentile(x.dropna(), 75) if len(x) > 1 else np.nan),
+    #     total_inflows=('usd_inflows_cumulative', 'sum'),
+    #     total_profits=('profits_cumulative', 'sum')
+    # )
+    # # calculate median return
+    # midrange_shark_agg_performance_df['median_return'] = np.divide(
+    #     midrange_shark_agg_performance_df['median_profits'],
+    #     midrange_shark_agg_performance_df['median_inflows'],
+    #     out=np.zeros_like(midrange_shark_agg_performance_df['median_profits']),
+    #     where=midrange_shark_agg_performance_df['median_inflows'] != 0
+    # )
+    # # Calculate aggregate return
+    # midrange_shark_agg_performance_df['return_aggregate'] = np.divide(
+    #     midrange_shark_agg_performance_df['total_profits'],
+    #     midrange_shark_agg_performance_df['total_inflows'],
+    #     out=np.zeros_like(midrange_shark_agg_performance_df['total_profits']),
+    #     where=midrange_shark_agg_performance_df['total_inflows'] != 0
+    # )
+
+    # # Prefix the nonzero and midrange DataFrame columns
+    # nonzero_shark_agg_performance_df = nonzero_shark_agg_performance_df.add_prefix('nonzero_')
+    # midrange_shark_agg_performance_df = midrange_shark_agg_performance_df.add_prefix('midrange_')
+
+    # # Merge the three DataFrames on 'is_shark'
+    # shark_agg_performance_df = shark_agg_performance_df.merge(
+    #     midrange_shark_agg_performance_df, on='is_shark', how='left'
+    # )
+
+    # # Pivot
+    # shark_agg_performance_df = shark_agg_performance_df.T.reset_index()
+    # shark_agg_performance_df.columns = ['metric','not_sharks','sharks']
+
+    # return shark_agg_performance_df,shark_wallets_performance_df
