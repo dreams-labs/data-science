@@ -294,7 +294,7 @@ def test_integration_buysell_metrics_df(buysell_metrics_df, cleaned_profits_df, 
 
     # 2. Validate Key Feature Calculations
     # Filter the cleaned_profits_df to only include cohort wallets and coins
-    cohort_wallets = wallet_cohort_df[wallet_cohort_df['is_cohort']]['wallet_address']
+    cohort_wallets = wallet_cohort_df[wallet_cohort_df['in_cohort']]['wallet_address']
 
     cohort_profits_df = cleaned_profits_df[
         (cleaned_profits_df['wallet_address'].isin(cohort_wallets)) &

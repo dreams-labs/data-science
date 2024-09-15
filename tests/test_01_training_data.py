@@ -752,13 +752,13 @@ def test_save_cohort_summary_df(wallet_cohort_df):
     assert len(wallet_cohort_df) > 0
 
 @pytest.mark.integration
-def test_no_duplicate_wallets(cohort_summary_df):
+def test_no_duplicate_wallets(wallet_cohort_df):
     """
-    Test to assert there are no duplicate wallet addresses in the cohort_summary_df.
+    Test to assert there are no duplicate wallet addresses in the wallet_cohort_df.
     """
 
     # Group by coin_id and wallet_address and check for duplicates
-    duplicates = cohort_summary_df.duplicated(subset=['wallet_address'], keep=False)
+    duplicates = wallet_cohort_df.duplicated(subset=['wallet_address'], keep=False)
 
     # Assert that there are no duplicates in sharks_df
     assert not duplicates.any(), "Duplicate wallet addresses found in sharks_df"
