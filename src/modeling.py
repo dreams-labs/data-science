@@ -17,6 +17,9 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.metrics import roc_auc_score, confusion_matrix, log_loss
 
+# project files
+from utils import timing_decorator
+
 # set up logger at the module level
 logger = dc.setup_logger()
 
@@ -88,6 +91,7 @@ def split_model_input(model_input_df, target_column, test_size=0.2, random_state
 
 
 
+@timing_decorator
 def train_model(X_train, y_train, modeling_folder, model_params=None):
     """
     Trains a model on the training data and saves the model, logs, and feature importance.

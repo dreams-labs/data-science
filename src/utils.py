@@ -35,22 +35,25 @@ def timing_decorator(func):
     """
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
+        # Get the logger
+        logger = logging.getLogger(func.__module__)
+
+        # Log the initiation of the function
+        logger.debug('Initiating %s...', func.__name__)
+
+        # Time the function execution
         start_time = time.time()
         result = func(*args, **kwargs)
         end_time = time.time()
 
-        # Get the logger
-        logger = logging.getLogger(func.__module__)
-
-        # Log the execution time using lazy % formatting
+        # Log the execution time
         logger.info(
-            '%s took %.2f seconds to execute.',
+            'Completed %s after %.2f seconds.',
             func.__name__,
             end_time - start_time
         )
         return result
     return wrapper
-
 
 
 def load_config(file_path='../notebooks/config.yaml'):

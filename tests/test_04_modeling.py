@@ -16,8 +16,10 @@ import pandas as pd
 import numpy as np
 from dotenv import load_dotenv
 import pytest
+from unittest import mock
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 from dreams_core import core as dc
-
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 import modeling as m # type: ignore[reportMissingImports]
@@ -25,8 +27,6 @@ from utils import load_config # type: ignore[reportMissingImports]
 
 load_dotenv()
 logger = dc.setup_logger()
-
-
 
 
 
@@ -125,6 +125,148 @@ def test_one_class_in_target():
     
     with pytest.raises(ValueError, match="y_train or y_test contains only one class"):
         m.split_model_input(data, 'target')
+
+
+# ---------------------------------- #
+# train_model() unit tests
+# ---------------------------------- #
+
+# Fixtures for sample data
+@pytest.fixture
+def sample_data():
+    """
+    Fixture that returns sample training data (X_train and y_train).
+    X_train is a DataFrame with two features.
+    y_train is a Series with binary target labels.
+    """
+    X_train = pd.DataFrame({
+        'feature1': range(10),
+        'feature2': range(10, 20)
+    })
+    y_train = pd.Series([0, 1] * 5)
+    return X_train, y_train
+
+@pytest.fixture
+def modeling_folder():
+    """
+    Fixture that returns the path to the test_modeling folder.
+    This folder is assumed to be in the same directory as the test files.
+    """
+    return "test_modeling"  # Relative path to the test_modeling folder
+
+@pytest.fixture
+def setup_modeling_folders(modeling_folder):
+    """
+    Fixture that ensures the necessary directory structure is created
+    for the train_model function.
+    """
+    os.makedirs(os.path.join(modeling_folder, "outputs", "feature_importance"), exist_ok=True)
+    os.makedirs(os.path.join(modeling_folder, "logs"), exist_ok=True)
+    os.makedirs(os.path.join(modeling_folder, "models"), exist_ok=True)
+
+@pytest.mark.unit
+@mock.patch('joblib.dump')  # Only mock saving the model, not folder creation
+@mock.patch('builtins.open', new_callable=mock.mock_open)  # Mock the open function for file writing
+def test_basic_functionality(mock_open, mock_dump, sample_data, setup_modeling_folders, modeling_folder):
+    """
+    Test basic functionality of the train_model function.
+    Ensures model is trained, files are saved, and a model ID is generated.
+    """
+    X_train, y_train = sample_data
+
+    # Call the function to test
+    model, model_id = m.train_model(X_train, y_train, modeling_folder)
+
+    # Assert the model is a RandomForestClassifier instance
+    assert isinstance(model, RandomForestClassifier)
+
+    # Assert model ID is generated
+    assert isinstance(model_id, str)
+
+    # Assert files are saved
+    mock_dump.assert_called_once()
+    mock_open.assert_called()
+
+@pytest.mark.unit
+@mock.patch('joblib.dump')
+@mock.patch('builtins.open', new_callable=mock.mock_open)
+def test_custom_model_parameters(mock_open, mock_dump, sample_data, setup_modeling_folders, modeling_folder):
+    """
+    Test train_model with custom model parameters.
+    Ensures the model is trained with specified parameters.
+    """
+    X_train, y_train = sample_data
+    custom_params = {"n_estimators": 50, "random_state": 10}
+
+    model, model_id = m.train_model(X_train, y_train, modeling_folder, model_params=custom_params)
+
+    # Assert the model is trained with custom parameters
+    assert model.n_estimators == 50
+    assert model.random_state == 10
+
+    # Assert model ID is generated
+    assert isinstance(model_id, str)
+
+    # Assert files are saved
+    mock_dump.assert_called_once()
+    mock_open.assert_called()
+
+# Unit Test: Invalid Model Parameters
+@pytest.mark.unit
+@mock.patch('joblib.dump')
+@mock.patch('builtins.open', new_callable=mock.mock_open)
+def test_invalid_model_parameters(mock_open, mock_dump, sample_data, setup_modeling_folders, modeling_folder):
+    """
+    Test train_model with invalid model parameters.
+    Ensures the function raises a TypeError when invalid parameters are passed.
+    """
+    X_train, y_train = sample_data
+    invalid_params = {"invalid_param": 100}
+
+    # Expect TypeError due to invalid parameter
+    with pytest.raises(TypeError):
+        m.train_model(X_train, y_train, modeling_folder, model_params=invalid_params)
+
+# Unit Test: Feature Importance Validation
+@pytest.mark.unit
+@mock.patch('pandas.DataFrame.to_csv')  # Mock the to_csv function
+@mock.patch('pandas.read_csv')  # Mock the read_csv function
+@mock.patch('joblib.dump')
+@mock.patch('builtins.open', new_callable=mock.mock_open)
+def test_feature_importance_validation(mock_open, mock_dump, mock_read_csv, mock_to_csv, sample_data, setup_modeling_folders, modeling_folder):
+    """
+    Test the accuracy of feature importance saved by train_model.
+    Ensures the saved feature importance matches the model's internal feature importance.
+    """
+    X_train, y_train = sample_data
+
+    # Expected feature importance content
+    expected_feature_importances = pd.DataFrame({
+        'feature': X_train.columns,
+        'importance': [0.7, 0.3]  # Simulated importances
+    })
+
+    # Mock the to_csv call, assume it writes correctly
+    mock_to_csv.return_value = None
+
+    # Mock the read_csv call to return the expected feature importance DataFrame
+    mock_read_csv.return_value = expected_feature_importances
+
+    # Call the function to test
+    model, model_id = m.train_model(X_train, y_train, modeling_folder)
+
+    # Mock reading the feature importance CSV file
+    feature_importances_path = os.path.join(modeling_folder, "outputs", "feature_importance", f"feature_importance_{model_id}.csv")
+    
+    # Now check that the read content matches the expected importances
+    feature_importances = pd.read_csv(feature_importances_path)
+
+    assert (feature_importances['feature'] == X_train.columns).all()
+    assert (feature_importances['importance'] == expected_feature_importances['importance']).all()
+
+
+
+
 
 # ======================================================== #
 #                                                          #

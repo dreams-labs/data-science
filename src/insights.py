@@ -19,7 +19,7 @@ import seaborn as sns
 import dreams_core.core as dc
 
 # project files
-from utils import load_config, create_progress_bar
+from utils import load_config, create_progress_bar, timing_decorator
 import training_data as td
 import feature_engineering as fe
 import coin_wallet_metrics as cwm
@@ -29,6 +29,7 @@ import modeling as m
 logger = dc.setup_logger()
 
 
+@timing_decorator
 def generate_experiment_configurations(config_folder, method='grid', max_evals=50):
     """
     Generates experiment configurations based on the validated experiment config YAML file and the search method.
