@@ -19,6 +19,9 @@ metrics:
         scaling: "minmax"      # Scaling for mean to normalize values between 0 and 1.
       std:
         scaling: "standard"    # Standard scaling for standard deviation to account for variability.
+      median:                  # No scaling specified here
+        scaling: "none"        # No scaling for percentage change, as it's already normalized.
+
     rolling:
       stats:
         sum:
@@ -29,7 +32,7 @@ metrics:
         change:
           scaling: "standard"
         pct_change:
-          scaling: None        # No scaling for percentage change, as it's already normalized.
+          scaling: "none"        # No scaling for percentage change, as it's already normalized.
       window_duration: 7
       lookback_periods: 8
       
@@ -38,7 +41,6 @@ metrics:
       sum:
         scaling: "standard"    # Large sums of total bought should be scaled to avoid model distortion.
       median:
-        scaling: None          # No scaling needed for median.
     rolling:
       stats:
         sum:
@@ -57,4 +59,17 @@ metrics:
   total_buyers:
     aggregations:
       sum:
-        scaling: None          # No scaling for sum of total buyers, as it's likely a more stable number.
+  sellers_new:
+    aggregations:
+      sum:
+        scaling: 'standard'  # Standard scaling
+      mean:
+        scaling: 'standard'
+      median:
+  buyers_repeat:
+    aggregations:
+      sum:
+        scaling: 'standard'  # Standard scaling
+      mean:
+        scaling: 'standard'
+      median:

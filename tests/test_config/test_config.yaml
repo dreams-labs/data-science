@@ -4,19 +4,20 @@ training_data:
   # Defining the modeling and training periods (dates must follow YYYY-MM-DD format)
   # The modeling period end date and training period start and end dates are automatically 
   # imputed using utils.py function calculate_period_dates() when load_config() is run
-  modeling_period_start: '2024-05-01'  # Start date for the modeling period
+  modeling_period_start: '2024-03-01'  # Start date for the modeling period
   modeling_period_duration: 14    # Duration of the modeling period in days
-  training_period_duration: 60    # Duration of the training period in days
+  training_period_duration: 180    # Duration of the training period in days
 
-  # Shark coin thresholds
-  shark_coin_minimum_inflows: 5000  # Minimum USD inflows for a coin to be considered a 'shark' coin
-  shark_coin_profits_threshold: 20000  # Lifetime absolute USD profit threshold for a 'shark' coin
-  shark_coin_return_threshold: 0.5  # Minimum lifetime percentage return threshold for a 'shark' coin (e.g., 50% ROI)
+wallet_cohorts:
+  # Cohorts of wallets with different characteristics
 
-  # Shark wallet thresholds
-  shark_wallet_type: 'is_shark'  # Shark wallet type identifier used in filtering
-  shark_wallet_min_coins: 4  # Minimum number of coins a wallet must hold to be considered a shark
-  shark_wallet_min_shark_rate: 0.4  # Minimum percentage of coins that meet the shark coin thresholds for the wallet to be classified as a shark (40%)
+  # Shark wallets
+  sharks:
+    wallet_minimum_inflows: 10000  # Minimum USD inflows for a wallet to be considered a 'shark'
+    wallet_maximum_inflows: 50000  # Maximum USD inflows for a wallet to be considered a 'shark'
+    coin_profits_win_threshold: 5000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
+    coin_return_win_threshold: 0.5  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
+    wallet_min_coin_wins: 3  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
 
 data_cleaning:
   # Variables used to clean and filter raw data before training data is built

@@ -90,11 +90,10 @@ def test_unit_generate_buysell_metrics_df(mock_profits_df):
     tests the generation of buysell metrics for a wallet-coin cohort
     """
     cohort_wallets = ['wallet1', 'wallet2', 'wallet3', 'wallet5']  # Include wallet5
-    cohort_coins = ['coin1', 'coin2', 'coin3']  # Cohort coins
     training_period_end = '2024-01-05'  # Set a training period end date
 
     # Call the function
-    result_df = cwm.generate_buysell_metrics_df(mock_profits_df, training_period_end, cohort_wallets, cohort_coins)
+    result_df = cwm.generate_buysell_metrics_df(mock_profits_df, training_period_end, cohort_wallets)
 
     # Test the output structure
     expected_columns = [
@@ -116,11 +115,8 @@ def test_unit_generate_buysell_metrics_df(mock_profits_df):
     # buyers_repeat for coin2 on 1/3/24 should be 2 (wallet2 and wallet5)
     assert result_df[(result_df['coin_id'] == 'coin2') & (result_df['date'] == '2024-01-03')]['buyers_repeat'].iloc[0] == 2
 
-    # Filter mock_profits_df to only include cohort wallets and coins
-    cohort_profits_df = mock_profits_df[
-        (mock_profits_df['wallet_address'].isin(cohort_wallets)) & 
-        (mock_profits_df['coin_id'].isin(cohort_coins))
-    ]
+    # Filter mock_profits_df to only include cohort wallets
+    cohort_profits_df = mock_profits_df[mock_profits_df['wallet_address'].isin(cohort_wallets)]
 
     # total_bought should match the sum of positive net_transfers in cohort_profits_df
     total_bought_mock = cohort_profits_df[cohort_profits_df['net_transfers'] > 0]['net_transfers'].sum()
@@ -239,18 +235,11 @@ def cleaned_profits_df():
     return pd.read_csv('tests/fixtures/cleaned_profits_df.csv')
 
 @pytest.fixture(scope="session")
-def shark_wallets_df():
+def wallet_cohort_df():
     """
-    Fixture to load the shark_wallets_df from the fixtures folder.
+    Fixture to load the wallet_cohort_df from the fixtures folder.
     """
-    return pd.read_csv('tests/fixtures/shark_wallets_df.csv')
-
-@pytest.fixture(scope="session")
-def shark_coins_df():
-    """
-    Fixture to load the shark_coins_df from the fixtures folder.
-    """
-    return pd.read_csv('tests/fixtures/shark_coins_df.csv')
+    return pd.read_csv('tests/fixtures/wallet_cohort_df.csv')
 
 
 # ---------------------------------- #
@@ -258,20 +247,18 @@ def shark_coins_df():
 # ---------------------------------- #
 
 @pytest.fixture(scope="session")
-def buysell_metrics_df(cleaned_profits_df, shark_wallets_df, shark_coins_df, config):
+def buysell_metrics_df(cleaned_profits_df, wallet_cohort_df, config):
     """
-    Fixture to generate the buysell_metrics_df from the cleaned_profits_df, shark_wallets_df, and shark_coins_df.
+    Fixture to generate the buysell_metrics_df.
     """
     # Generate inputs for generate_buysell_metrics_df
-    cohort_wallets = shark_wallets_df[shark_wallets_df['is_shark']]['wallet_address'].unique()
-    cohort_coins = shark_coins_df['coin_id'].unique()
+    cohort_wallets = wallet_cohort_df[wallet_cohort_df['in_cohort']]['wallet_address'].unique()
 
     # Generate the buysell_metrics_df
     return cwm.generate_buysell_metrics_df(
         cleaned_profits_df,
         config['training_data']['training_period_end'],
-        cohort_wallets,
-        cohort_coins
+        cohort_wallets
     )
 
 # Save buysell_metrics_df.csv in fixtures/
@@ -291,7 +278,7 @@ def test_save_buysell_metrics_df(buysell_metrics_df):
 
 
 @pytest.mark.integration
-def test_integration_buysell_metrics_df(buysell_metrics_df, cleaned_profits_df, shark_wallets_df, shark_coins_df, config):
+def test_integration_buysell_metrics_df(buysell_metrics_df, cleaned_profits_df, wallet_cohort_df, config):
     """
     Integration test for the buysell_metrics_df fixture.
     Validates the structure and key calculations in the final DataFrame.
@@ -307,12 +294,10 @@ def test_integration_buysell_metrics_df(buysell_metrics_df, cleaned_profits_df, 
 
     # 2. Validate Key Feature Calculations
     # Filter the cleaned_profits_df to only include cohort wallets and coins
-    cohort_wallets = shark_wallets_df[shark_wallets_df['is_shark']]['wallet_address'].unique()
-    cohort_coins = shark_coins_df['coin_id'].unique()
+    cohort_wallets = wallet_cohort_df[wallet_cohort_df['in_cohort']]['wallet_address']
 
     cohort_profits_df = cleaned_profits_df[
         (cleaned_profits_df['wallet_address'].isin(cohort_wallets)) &
-        (cleaned_profits_df['coin_id'].isin(cohort_coins)) &
         (cleaned_profits_df['date'] <= config['training_data']['training_period_end'])  # Add date filtering
     ]
 
@@ -336,9 +321,6 @@ def test_integration_buysell_metrics_df(buysell_metrics_df, cleaned_profits_df, 
     critical_columns = buysell_metrics_df.columns
     for col in critical_columns:
         assert buysell_metrics_df[col].isnull().sum() == 0, f"Found NaN values in {col}"
-
-    # Ensure non-cohort wallets and coins are excluded
-    assert set(buysell_metrics_df['coin_id']).issubset(cohort_coins), "Non-cohort coins found in buysell_metrics_df"
 
     # Check that all dates in buysell_metrics_df fall within the expected range
     assert buysell_metrics_df['date'].max() <= pd.to_datetime(config['training_data']['training_period_end']), \

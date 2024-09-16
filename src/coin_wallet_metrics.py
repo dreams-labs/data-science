@@ -13,7 +13,7 @@ import dreams_core.core as dc
 logger = dc.setup_logger()
 
 
-def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets,cohort_coins):
+def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets):
     """
     Generates buysell metrics for all cohort coins by looping through each coin_id and applying 
     calculate_buysell_coin_metrics_df().
@@ -22,7 +22,6 @@ def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets,co
     - profits_df (pd.DataFrame): DataFrame containing profits data
     - training_period_end (string): Date on which the final metrics will be generated, formatted YYYY-MM-DD
     - cohort_wallets (array-like): List of wallet addresses to include.
-    - cohort_coins (array-like): List of coin IDs to include.
 
     Returns:
     - buysell_metrics_df (pd.DataFrame): DataFrame keyed date-coin_id that includes various metrics 
@@ -38,15 +37,10 @@ def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets,co
     # Raise an error if either the wallet cohort or coin list is empty
     if len(cohort_wallets) == 0:
         raise ValueError("Wallet cohort is empty. Provide at least one wallet address.")
-    if len(cohort_coins) == 0:
-        raise ValueError("Coin list is empty. Provide at least one coin ID.")
 
     # Create cohort_profits_df by filtering projects_df to only include the cohort coins and wallets during the training period
     profits_df = profits_df[profits_df['date']<=training_period_end]
-    cohort_profits_df = profits_df[
-        (profits_df['wallet_address'].isin(cohort_wallets)) &
-        (profits_df['coin_id'].isin(cohort_coins))
-    ]
+    cohort_profits_df = profits_df[profits_df['wallet_address'].isin(cohort_wallets)]
     cohort_profits_df = cohort_profits_df[['coin_id','wallet_address','date','balance','net_transfers']]
 
     # Raise an error if the filtered df is empty

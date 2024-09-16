@@ -316,7 +316,7 @@ def calculate_stat(ts, stat):
 
 
 
-def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_period_start, description=None):
+def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_period_start):
     """
     Saves the flattened DataFrame with descriptive metrics into a CSV file.
 
@@ -341,8 +341,7 @@ def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_per
     
     # Define filename with metric description and optional description
     timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M')
-    description_suffix = f"_{description}" if description else ""
-    filename = f"{metric_description}{description_suffix}_{timestamp}_model_period_{modeling_period_start}.csv"
+    filename = f"{metric_description}_{timestamp}_model_period_{modeling_period_start}.csv"
 
     # Save file
     output_path = os.path.join(output_dir, filename)
@@ -376,9 +375,8 @@ def preprocess_coin_df(input_path, modeling_config, metrics_config):
 
     # Step 3: Apply feature selection (using drop_features)
     drop_features = modeling_config['preprocessing'].get('drop_features', [])
-    initial_columns = set(df.columns)
-    df = df.drop(columns=drop_features, errors='ignore')
-    dropped_columns = initial_columns - set(df.columns)
+    if drop_features is not None:
+        df = df.drop(columns=drop_features, errors='ignore')
 
     # Step 4: Apply scaling to the relevant columns based on the metrics config
     scalers = {
@@ -396,7 +394,10 @@ def preprocess_coin_df(input_path, modeling_config, metrics_config):
             # Check if the column exists in the DataFrame
             if column_name in df.columns:
                 # Retrieve the scaling method from the configuration (e.g., 'standard', 'minmax')
-                scaling_method = agg_settings.get('scaling')
+                try:
+                    scaling_method = agg_settings.get('scaling')
+                except AttributeError:
+                    scaling_method = None
                 
                 # If a scaling method is specified
                 if scaling_method:
@@ -421,8 +422,6 @@ def preprocess_coin_df(input_path, modeling_config, metrics_config):
 
     # Step 7: Log the changes made
     logger.info("Preprocessed file saved at: %s", output_path)
-    logger.info("Dropped %d columns: %s", len(dropped_columns), ', '.join(dropped_columns))
-
     return df, output_path
 
 
@@ -544,27 +543,28 @@ def create_training_data_df(input_directory, input_filenames):
 
 
 
-def create_target_variables_mooncrater(prices_df, training_data_config, config_modeling):
+def create_target_variables_mooncrater(prices_df, training_data_config, modeling_config):
     """
     Creates a DataFrame with target variables 'is_moon' and 'is_crater' based on price performance 
-    during the modeling period, using the thresholds from config_modeling.
+    during the modeling period, using the thresholds from modeling_config.
 
     Parameters:
     - prices_df: DataFrame containing price data with columns 'coin_id', 'date', and 'price'.
     - config: General configuration file with modeling period dates.
-    - config_modeling: Configuration for modeling with target variable thresholds.
+    - modeling_config: Configuration for modeling with target variable thresholds.
 
     Returns:
     - target_variable_df: DataFrame with columns 'coin_id', 'is_moon', and 'is_crater'.
     - outcomes_df: DataFrame tracking outcomes for each coin.
     """
-    # Retrieve the necessary values from config_modeling
+    # Retrieve the necessary values from modeling_config
     modeling_period_start = pd.to_datetime(training_data_config['modeling_period_start'])
     modeling_period_end = pd.to_datetime(training_data_config['modeling_period_end'])
-    moon_threshold = config_modeling['target_variables']['moon_threshold']
-    crater_threshold = config_modeling['target_variables']['crater_threshold']
+    moon_threshold = modeling_config['target_variables']['moon_threshold']
+    crater_threshold = modeling_config['target_variables']['crater_threshold']
 
     # Filter for the modeling period and sort the DataFrame
+    prices_df['date'] = pd.to_datetime(prices_df['date'])
     modeling_period_df = prices_df[(prices_df['date'] >= modeling_period_start) & (prices_df['date'] <= modeling_period_end)]
     modeling_period_df = modeling_period_df.sort_values(by=['coin_id', 'date'])
 

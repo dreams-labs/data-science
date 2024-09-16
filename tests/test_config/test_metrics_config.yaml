@@ -30,7 +30,7 @@ metrics:
         change:
           scaling: "standard"
         pct_change:
-          scaling: None        # No scaling for percentage change, as it's already normalized.
+          scaling: "none"        # No scaling for percentage change, as it's already normalized.
       window_duration: 7
       lookback_periods: 8
       
@@ -39,7 +39,7 @@ metrics:
       sum:
         scaling: "standard"    # Large sums of total bought should be scaled to avoid model distortion.
       median:
-        scaling: None          # No scaling needed for median.
+        scaling: "none"          # No scaling needed for median.
     rolling:
       stats:
         sum:
@@ -58,4 +58,4 @@ metrics:
   total_buyers:
     aggregations:
       sum:
-        scaling: None          # No scaling for sum of total buyers, as it's likely a more stable number.
+        scaling: "none"          # No scaling for sum of total buyers, as it's likely a more stable number.

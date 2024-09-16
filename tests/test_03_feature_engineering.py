@@ -522,10 +522,9 @@ def test_save_flattened_outputs(mock_coin_df):
     test_output_path = os.path.join(os.getcwd(), "tests", "test_modeling", "outputs", "flattened_outputs")
     metric_description = 'buysell'
     modeling_period_start = '2024-04-01'
-    description = 'v0.1'
 
     # Call the function to save the CSV and get the DataFrame and output path
-    _, saved_file_path = fe.save_flattened_outputs(mock_coin_df, test_output_path, metric_description, modeling_period_start, description)
+    _, saved_file_path = fe.save_flattened_outputs(mock_coin_df, test_output_path, metric_description, modeling_period_start)
     
     # Assert that the file was created
     assert os.path.exists(saved_file_path), f"File was not saved at {saved_file_path}"
@@ -817,7 +816,7 @@ def test_create_target_variables_mooncrater():
         'modeling_period_end': '2024-12-31',
     }
 
-    config_modeling = {
+    modeling_config = {
         'target_variables': {
             'moon_threshold': 0.5,  # 50% increase
             'crater_threshold': -0.5  # 50% decrease
@@ -825,7 +824,7 @@ def test_create_target_variables_mooncrater():
     }
 
     # Call the function being tested
-    target_variables_df, outcomes_df = fe.create_target_variables_mooncrater(prices_df, training_data_config, config_modeling)
+    target_variables_df, outcomes_df = fe.create_target_variables_mooncrater(prices_df, training_data_config, modeling_config)
 
     # Assertions for target variables
     assert target_variables_df[target_variables_df['coin_id'] == 'coin1']['is_moon'].values[0] == 0
@@ -867,7 +866,7 @@ def metrics_config():
     """
     Fixture to load the configuration from the YAML file.
     """
-    return load_config('tests/test_config/test_config_metrics.yaml')
+    return load_config('tests/test_config/test_metrics_config.yaml')
 
 @pytest.fixture(scope="session")
 def buysell_metrics_df():

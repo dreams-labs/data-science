@@ -9,7 +9,6 @@ import os
 import json
 import uuid
 import joblib
-from datetime import datetime
 import pandas as pd
 import numpy as np
 import dreams_core.core as dc
@@ -17,8 +16,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.metrics import roc_auc_score, confusion_matrix, log_loss
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 # set up logger at the module level
 logger = dc.setup_logger()
@@ -35,10 +32,10 @@ def split_model_input(model_input_df, target_column, test_size=0.2, random_state
     - random_state (int): Random state for reproducibility.
     
     Returns:
-    - X_train (pd.DataFrame): Training features.
-    - X_test (pd.DataFrame): Test features.
-    - y_train (pd.Series): Training target.
-    - y_test (pd.Series): Test target.
+    - X_train (pd.DataFrame): Training features with 'coin_id' as the index.
+    - X_test (pd.DataFrame): Test features with 'coin_id' as the index.
+    - y_train (pd.Series): Training target with 'coin_id' as the index.
+    - y_test (pd.Series): Test target with 'coin_id' as the index.
 
     Raises:
     - ValueError: If the 'coin_id' column is not present in the DataFrame.
@@ -54,8 +51,8 @@ def split_model_input(model_input_df, target_column, test_size=0.2, random_state
         raise ValueError("'coin_id' column is required in the DataFrame.")
     
     # Separate the features and the target
-    X = model_input_df.drop(columns=[target_column, 'coin_id'])  # Drop target and coin_id from features
-    y = model_input_df[target_column]  # The target column
+    X = model_input_df.drop(columns=[target_column]).set_index('coin_id')  # Set 'coin_id' as index for X
+    y = model_input_df[target_column]  # Extract target as Series, it will retain the index from model_input_df
 
     # Check for missing values in features or target
     if X.isnull().values.any():
@@ -81,13 +78,14 @@ def split_model_input(model_input_df, target_column, test_size=0.2, random_state
     )
 
     # Log the size and number of positives for y_train and y_test
-    logger.info(f"y_train: {y_train.sum()}/{len(y_train)} positives, y_test: {y_test.sum()}/{len(y_test)} positives")
+    logger.info("y_train: %d/%d positives, y_test: %d/%d positives", y_train.sum(), len(y_train), y_test.sum(), len(y_test))
 
     # Check if y_train or y_test contains only one unique value
     if len(np.unique(y_train)) <= 1 or len(np.unique(y_test)) <= 1:
         raise ValueError("y_train or y_test contains only one class, which is not suitable for model training.")
     
     return X_train, X_test, y_train, y_test
+
 
 
 def train_model(X_train, y_train, modeling_folder, model_params=None):
@@ -137,7 +135,7 @@ def train_model(X_train, y_train, modeling_folder, model_params=None):
         "Model parameters": model_params,
     }
     log_filename = os.path.join(logs_path, f"log_{model_id}.json")
-    with open(log_filename, 'w') as log_file:
+    with open(log_filename, 'w', encoding='utf-8') as log_file:
         json.dump(log_data, log_file, indent=4)
 
     # Step 3: Save feature importance (if available)
@@ -155,12 +153,12 @@ def train_model(X_train, y_train, modeling_folder, model_params=None):
 
 def evaluate_model(model, X_test, y_test, model_id, modeling_folder):
     """
-    Evaluates a trained model on the test set and outputs key metrics.
+    Evaluates a trained model on the test set and outputs key metrics, including storing predictions.
     
     Args:
     - model (sklearn model): The trained model.
-    - X_test (pd.DataFrame): The test features.
-    - y_test (pd.Series): The true labels for the test set.
+    - X_test (pd.DataFrame): The test features with 'coin_id' as the index.
+    - y_test (pd.Series): The true labels with 'coin_id' as the index.
     - model_id (str): The unique ID of the model being evaluated.
     - modeling_folder (str): The base folder for saving outputs.
 
@@ -169,14 +167,25 @@ def evaluate_model(model, X_test, y_test, model_id, modeling_folder):
     """
     # Construct the performance metrics folder path
     evaluation_folder = os.path.join(modeling_folder, "outputs", "performance_metrics")
+    predictions_folder = os.path.join(modeling_folder, "outputs", "predictions")
     
-    # Ensure the evaluation folder exists
+    # Ensure the evaluation and predictions folders exist
     if not os.path.exists(evaluation_folder):
         raise FileNotFoundError(f"The evaluation folder '{evaluation_folder}' does not exist.")
-
+    if not os.path.exists(predictions_folder):
+        raise FileNotFoundError(f"The predictions folder '{predictions_folder}' does not exist.")
+    
     # Predict the probabilities and the labels
     y_pred_prob = model.predict_proba(X_test)[:, 1]  # Probabilities for the positive class
     y_pred = model.predict(X_test)
+
+    # Save predictions to CSV with 'coin_id' as the index
+    predictions_df = pd.DataFrame({
+        "y_pred_prob": y_pred_prob,
+        "y_pred": y_pred
+    }, index=X_test.index)  # Use the index which includes 'coin_id'
+    predictions_filename = os.path.join(predictions_folder, f"predictions_{model_id}.csv")
+    predictions_df.to_csv(predictions_filename, index=True)
 
     # Calculate metrics
     metrics_dict = {
@@ -185,21 +194,9 @@ def evaluate_model(model, X_test, y_test, model_id, modeling_folder):
         "recall": recall_score(y_test, y_pred),
         "f1_score": f1_score(y_test, y_pred),
         "roc_auc": roc_auc_score(y_test, y_pred_prob),
-        "log_loss": log_loss(y_test, y_pred_prob)
+        "log_loss": log_loss(y_test, y_pred_prob),
+        "confusion_matrix": confusion_matrix(y_test, y_pred).tolist()  # Store confusion matrix as a list
     }
-
-    # Confusion Matrix
-    conf_matrix = confusion_matrix(y_test, y_pred)
-
-    # Save confusion matrix as a heatmap
-    plt.figure(figsize=(6, 4))
-    sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=['Negative', 'Positive'], yticklabels=['Negative', 'Positive'])
-    plt.title(f'Confusion Matrix for Model {model_id}')
-    plt.xlabel('Predicted Label')
-    plt.ylabel('True Label')
-    conf_matrix_filename = os.path.join(evaluation_folder, f"confusion_matrix_{model_id}.png")
-    plt.savefig(conf_matrix_filename)
-    plt.close()
 
     # Save metrics to a CSV
     metrics_df = pd.DataFrame([metrics_dict])
@@ -210,58 +207,77 @@ def evaluate_model(model, X_test, y_test, model_id, modeling_folder):
 
 
 
-def log_experiment_results(modeling_folder, model_id):
+def log_trial_results(modeling_folder, model_id, experiment_id, trial_overrides):
     """
-    Logs the results of a modeling experiment by pulling data from saved files 
+    Logs the results of a modeling trial by pulling data from saved files 
     and storing the combined results in the experiment tracking folder.
     
     Args:
     - modeling_folder (str): The base folder where models, logs, and outputs are saved.
     - model_id (str): The unique ID of the model being evaluated.
+    - experiment_id (str): The unique ID of the experiment.
+    - trial_overrides (dict): The override parameters used in the specific trial.
     
     Returns:
-    - experiment_log (dict): A dictionary with the logged experiment details.
+    - trial_log (dict): A dictionary with the logged trial details.
     """
     # Define folder paths
     logs_path = os.path.join(modeling_folder, "logs")
     performance_metrics_path = os.path.join(modeling_folder, "outputs", "performance_metrics")
     feature_importance_path = os.path.join(modeling_folder, "outputs", "feature_importance")
-    experiment_tracking_path = os.path.join(modeling_folder, "experiment_tracking")
+    predictions_path = os.path.join(modeling_folder, "outputs", "predictions")
+    experiment_tracking_path = os.path.join(modeling_folder, "outputs", "experiment_tracking")
     
     # Step 1: Ensure the experiment_tracking folder exists
     if not os.path.exists(experiment_tracking_path):
         raise FileNotFoundError(f"The folder '{experiment_tracking_path}' does not exist.")
 
     # Initialize an empty dictionary to collect all the results
-    experiment_log = {}
+    trial_log = {
+        "experiment_id": experiment_id,
+        "model_id": model_id,
+        "trial_overrides": trial_overrides,
+        "metrics": {}  # Initialize the 'metrics' key for performance metrics
+    }
 
     # Step 2: Read the model training log in JSON format
     log_filename = os.path.join(logs_path, f"log_{model_id}.json")
     if os.path.exists(log_filename):
-        with open(log_filename, 'r') as log_file:
+        with open(log_filename, 'r', encoding='utf-8') as log_file:
             log_data = json.load(log_file)
-            experiment_log.update(log_data)
+            trial_log.update(log_data)
     else:
         raise FileNotFoundError(f"Training log not found for model {model_id}.")
 
-    # Step 3: Read the performance metrics
+    # Step 3: Read the performance metrics and store them under 'metrics' key
     metrics_filename = os.path.join(performance_metrics_path, f"metrics_{model_id}.csv")
     if os.path.exists(metrics_filename):
         metrics_df = pd.read_csv(metrics_filename)
-        experiment_log.update(metrics_df.iloc[0].to_dict())
+        trial_log['metrics'] = metrics_df.iloc[0].to_dict()
     else:
         raise FileNotFoundError(f"Performance metrics not found for model {model_id}.")
 
-    # Step 4: Read the feature importance if available
+    # Step 4: Read the feature importance if available and store as a dict
     feature_importance_filename = os.path.join(feature_importance_path, f"feature_importance_{model_id}.csv")
     if os.path.exists(feature_importance_filename):
-        experiment_log["feature_importance"] = feature_importance_filename
+        feature_importance_df = pd.read_csv(feature_importance_filename)
+        feature_importance_dict = dict(zip(feature_importance_df['feature'], feature_importance_df['importance']))
+        trial_log["feature_importance"] = feature_importance_dict
     else:
-        experiment_log["feature_importance"] = "N/A"  # Optional, in case feature importance isn't available
+        trial_log["feature_importance"] = "N/A"
 
-    # Step 5: Save the experiment log as a JSON file
-    experiment_log_filename = os.path.join(experiment_tracking_path, f"experiment_log_{model_id}.json")
-    with open(experiment_log_filename, 'w') as experiment_log_file:
-        json.dump(experiment_log, experiment_log_file, indent=4)
+    # Step 5: Read the predictions from CSV and store as a dict
+    predictions_filename = os.path.join(predictions_path, f"predictions_{model_id}.csv")
+    if os.path.exists(predictions_filename):
+        predictions_df = pd.read_csv(predictions_filename)
+        predictions_dict = predictions_df.to_dict(orient='list')
+        trial_log["predictions"] = predictions_dict
+    else:
+        trial_log["predictions"] = "N/A"
 
-    return experiment_log
+    # Step 6: Save the trial log as a JSON file
+    trial_log_filename = os.path.join(experiment_tracking_path, f"trial_log_{model_id}.json")
+    with open(trial_log_filename, 'w', encoding='utf-8') as trial_log_file:
+        json.dump(trial_log, trial_log_file, indent=4)
+
+    return trial_log_filename
