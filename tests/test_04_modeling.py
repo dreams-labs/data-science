@@ -15,6 +15,7 @@ import os
 import pandas as pd
 import numpy as np
 from dotenv import load_dotenv
+import json
 import pytest
 from unittest import mock
 from sklearn.ensemble import RandomForestClassifier
@@ -264,8 +265,206 @@ def test_feature_importance_validation(mock_open, mock_dump, mock_read_csv, mock
     assert (feature_importances['feature'] == X_train.columns).all()
     assert (feature_importances['importance'] == expected_feature_importances['importance']).all()
 
+# ---------------------------------- #
+# log_trial_results() unit tests
+# ---------------------------------- #
+
+@pytest.fixture
+def model_id():
+    """Fixture to provide a model ID for testing."""
+    return "model123"
+
+@pytest.fixture
+def experiment_id():
+    """Fixture to provide an experiment ID for testing."""
+    return "exp456"
+
+@pytest.fixture
+def mock_modeling_folder(tmp_path):
+    """Fixture to create a temporary directory structure that mimics the modeling folder."""
+    folder = tmp_path / "modeling_folder"
+    folder.mkdir()
+
+    # Create subdirectories
+    (folder / "logs").mkdir()
+    (folder / "outputs").mkdir()
+    (folder / "outputs" / "performance_metrics").mkdir()
+    (folder / "outputs" / "feature_importance").mkdir()
+    (folder / "outputs" / "predictions").mkdir()
+    (folder / "outputs" / "experiment_tracking").mkdir()
+
+    return folder
+
+@pytest.fixture
+def mock_log_file(mock_modeling_folder, model_id):
+    """Fixture to create a mock log file for the given model_id."""
+    log_path = mock_modeling_folder / "logs" / f"log_{model_id}.json"
+    log_data = {"training_accuracy": 0.95}
+    with open(log_path, 'w', encoding='utf-8') as log_file:
+        json.dump(log_data, log_file)
+    return log_path
+
+@pytest.fixture
+def mock_metrics_file(mock_modeling_folder, model_id):
+    """Fixture to create a mock metrics CSV file for the given model_id."""
+    metrics_path = mock_modeling_folder / "outputs" / "performance_metrics" / f"metrics_{model_id}.csv"
+    metrics_data = pd.DataFrame({"accuracy": [0.95], "precision": [0.9], "recall": [0.85]})
+    metrics_data.to_csv(metrics_path, index=False)
+    return metrics_path
+
+@pytest.fixture
+def mock_feature_importance_file(mock_modeling_folder, model_id):
+    """Fixture to create a mock feature importance CSV file for the given model_id."""
+    feature_importance_path = mock_modeling_folder / "outputs" / "feature_importance" / f"feature_importance_{model_id}.csv"
+    feature_importance_data = pd.DataFrame({"feature": ["f1", "f2"], "importance": [0.8, 0.2]})
+    feature_importance_data.to_csv(feature_importance_path, index=False)
+    return feature_importance_path
+
+@pytest.fixture
+def mock_predictions_file(mock_modeling_folder, model_id):
+    """Fixture to create a mock predictions CSV file for the given model_id."""
+    predictions_path = mock_modeling_folder / "outputs" / "predictions" / f"predictions_{model_id}.csv"
+    predictions_data = pd.DataFrame({"id": [1, 2], "prediction": [0.9, 0.8]})
+    predictions_data.to_csv(predictions_path, index=False)
+    return predictions_path
+
+@pytest.mark.unit
+def test_log_trial_results_normal_case(mock_modeling_folder, mock_log_file, mock_metrics_file, mock_feature_importance_file, mock_predictions_file, model_id, experiment_id):
+    """
+    Test normal case where all necessary files exist, and ensure that
+    the function correctly logs the trial results.
+    """
+    trial_overrides = {"learning_rate": 0.01}
+
+    # Call the function
+    trial_log_filename = m.log_trial_results(mock_modeling_folder, model_id, experiment_id, trial_overrides)
+    
+    # Open and read the generated trial log file
+    with open(trial_log_filename, 'r', encoding='utf-8') as log_file:
+        trial_log = json.load(log_file)
+    
+    # Assertions to check correctness of logged data
+    assert trial_log["experiment_id"] == experiment_id
+    assert trial_log["model_id"] == model_id
+    assert trial_log["metrics"]["accuracy"] == 0.95
+    assert trial_log["feature_importance"]["f1"] == 0.8
+    assert trial_log["predictions"]["id"] == [1, 2]
+
+@pytest.mark.unit
+def test_log_trial_results_missing_experiment_tracking_folder(mock_modeling_folder, model_id, experiment_id):
+    """
+    Test case where the experiment_tracking folder does not exist,
+    expecting FileNotFoundError.
+    """
+    trial_overrides = {"learning_rate": 0.01}
+    
+    # Remove the experiment_tracking folder
+    experiment_tracking_path = mock_modeling_folder / "outputs" / "experiment_tracking"
+    os.rmdir(experiment_tracking_path)
+
+    with pytest.raises(FileNotFoundError):
+        m.log_trial_results(mock_modeling_folder, model_id, experiment_id, trial_overrides)
 
 
+@pytest.mark.unit
+def test_log_trial_results_missing_log_file(mock_modeling_folder, mock_metrics_file, mock_feature_importance_file, mock_predictions_file, model_id, experiment_id):
+    """
+    Test case where the log file is missing, expecting FileNotFoundError.
+    """
+    trial_overrides = {"learning_rate": 0.01}
+
+    # No log file created, expect a FileNotFoundError
+    with pytest.raises(FileNotFoundError):
+        m.log_trial_results(mock_modeling_folder, model_id, experiment_id, trial_overrides)
+
+
+@pytest.mark.unit
+def test_log_trial_results_missing_metrics_file(mock_modeling_folder, mock_log_file, mock_feature_importance_file, mock_predictions_file, model_id, experiment_id):
+    """
+    Test case where the performance metrics file is missing,
+    expecting FileNotFoundError.
+    """
+    trial_overrides = {"learning_rate": 0.01}
+
+    # Don't create the metrics file to simulate it being missing
+
+    # Call the function and expect it to raise FileNotFoundError
+    with pytest.raises(FileNotFoundError):
+        m.log_trial_results(mock_modeling_folder, model_id, experiment_id, trial_overrides)
+
+
+@pytest.mark.unit
+def test_log_trial_results_missing_feature_importance_file(mock_modeling_folder, mock_log_file, mock_metrics_file, mock_predictions_file, model_id, experiment_id):
+    """
+    Test case where the feature importance file is missing,
+    expecting 'feature_importance' to be 'N/A'.
+    """
+    trial_overrides = {"learning_rate": 0.01}
+
+    # Don't create the feature importance file to simulate it being missing
+
+    # Call the function
+    trial_log_filename = m.log_trial_results(mock_modeling_folder, model_id, experiment_id, trial_overrides)
+    
+    # Check the trial log
+    with open(trial_log_filename, 'r', encoding='utf-8') as log_file:
+        trial_log = json.load(log_file)
+    
+    # Expect the feature importance to be "N/A"
+    assert trial_log["feature_importance"] == "N/A"
+
+
+@pytest.mark.unit
+def test_log_trial_results_missing_predictions_file(mock_modeling_folder, mock_log_file, mock_metrics_file, mock_feature_importance_file, model_id, experiment_id):
+    """
+    Test case where the predictions file is missing, expecting 'predictions' to be 'N/A'.
+    """
+    trial_overrides = {"learning_rate": 0.01}
+
+    # Don't create the predictions file to simulate it being missing
+
+    # Call the function
+    trial_log_filename = m.log_trial_results(mock_modeling_folder, model_id, experiment_id, trial_overrides)
+    
+    # Check the trial log
+    with open(trial_log_filename, 'r', encoding='utf-8') as log_file:
+        trial_log = json.load(log_file)
+
+    # Expect the predictions to be "N/A"
+    assert trial_log["predictions"] == "N/A"
+
+
+@pytest.mark.unit
+def test_log_trial_results_empty_metrics_file(mock_modeling_folder, mock_log_file, mock_feature_importance_file, mock_predictions_file, model_id, experiment_id):
+    """
+    Test case where the metrics CSV file is empty, expecting a pandas.errors.EmptyDataError.
+    """
+    trial_overrides = {"learning_rate": 0.01}
+    
+    # Create an empty metrics file
+    metrics_path = mock_modeling_folder / "outputs" / "performance_metrics" / f"metrics_{model_id}.csv"
+    pd.DataFrame().to_csv(metrics_path, index=False)
+    
+    # Expect an EmptyDataError when trying to read an empty CSV
+    with pytest.raises(pd.errors.EmptyDataError):
+        m.log_trial_results(mock_modeling_folder, model_id, experiment_id, trial_overrides)
+
+
+@pytest.mark.unit
+def test_log_trial_results_trial_overrides_handling(mock_modeling_folder, mock_log_file, mock_metrics_file, mock_feature_importance_file, mock_predictions_file, model_id, experiment_id):
+    """
+    Test that the trial overrides are properly logged in the trial log.
+    """
+    trial_overrides = {"learning_rate": 0.01}
+
+    # Call the function
+    trial_log_filename = m.log_trial_results(mock_modeling_folder, model_id, experiment_id, trial_overrides)
+
+    # Check the trial log
+    with open(trial_log_filename, 'r', encoding='utf-8') as log_file:
+        trial_log = json.load(log_file)
+
+    assert trial_log["trial_overrides"] == {"learning_rate": 0.01}
 
 
 # ======================================================== #
