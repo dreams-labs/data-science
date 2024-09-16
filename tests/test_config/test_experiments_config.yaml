@@ -4,74 +4,77 @@
 # - modeling_config.yaml: Contains preprocessing steps and modeling-related parameters.
 # - metrics_config.yaml: Defines metrics and their aggregations for evaluation.
 
-config:
-  # Alterations related to training data settings
-  training_data:
-    modeling_period_duration:
-      - 14  # 14 days modeling period
-      - 30  # 30 days modeling period
-    training_period_duration:
-      - 180  # 180 days training period
-      - 365  # 365 days training period
+experiment_metadata:
+  experiment_name: "shark_behavior_experiment"
+  experiment_id: "1234-5678-91011"
+  search_method: "grid"
+  description: "Experiment to analyze shark behavior across various coin metrics."
+  start_time: "2024-09-15T10:00:00"
+  metrics_to_compare:
+    - accuracy
+    - precision
+    - recall
+    - f1_score
+    - roc_auc
+  thresholds: [0.5, 0.6, 0.7]
 
-  # Alterations for wallet cohort configurations
-  wallet_cohorts:
-    sharks:
-      wallet_minimum_inflows:
-        - 10000  # Minimum USD inflows for a coin to be considered a 'shark' coin
-        - 20000  # More restrictive inflows filter
-      wallet_maximum_inflows:
-        - 50000  # Maximum USD inflows for a 'shark' coin
-        - 100000 # Allowing higher inflows for larger cohort sizes
-      coin_profits_win_threshold:
-        - 5000   # Lifetime absolute USD profit threshold for a 'shark' coin
-        - 10000  # More restrictive profit threshold
-      coin_return_win_threshold:
-        - 0.5    # 50% minimum lifetime return threshold
-        - 0.75   # 75% return threshold for more aggressive 'shark' classification
-      wallet_min_coin_wins:
-        - 2      # Wallets must have at least 2 winning coins to be part of the shark cohort
-        - 3      # More restrictive, requiring 3 winning coins
+variable_overrides:
+  config:
+    training_data:
+      modeling_period_duration:
+        - 14  # 14 days modeling period
+        - 30  # 30 days modeling period
+      training_period_duration:
+        - 180  # 180 days training period
+        - 90   # 90 days training period
 
-  # Alterations for data cleaning settings
-  data_cleaning:
-    profitability_filter:
-      - 15000000  # Exclude wallets with profits or losses greater than or equal to this amount (USD)
-    inflows_filter:
-      - 10000000  # Exclude wallets with inflows greater than or equal to this amount (USD)
+    wallet_cohorts:
+      sharks:
+        wallet_minimum_inflows:
+          - 10000  # Minimum USD inflows for a coin to be considered a 'shark' coin
+          - 25000  # More restrictive inflows filter
+        wallet_maximum_inflows:
+          - 50000  # Maximum USD inflows for a 'shark' coin
+          - 100000 # Allowing higher inflows for larger cohort sizes
+        coin_profits_win_threshold:
+          - 5000   # Lifetime absolute USD profit threshold for a 'shark' coin
+          - 10000  # More restrictive profit threshold
+        coin_return_win_threshold:
+          - 0.5    # 50% minimum lifetime return threshold
+          - 0.75   # 75% return threshold for more aggressive 'shark' classification
+        wallet_min_coin_wins:
+          - 2      # Wallets must have at least 2 winning coins to be part of the shark cohort
+          - 4      # More restrictive, requiring 3 winning coins
 
-modeling_config:
-  # Preprocessing settings
-  preprocessing:
-    drop_features:
-      - ['total_sellers_sum', 'buyers_new_median']  # Drop these two features
-      - ['total_sellers_sum']  # Drop only one feature for comparison
+  modeling_config:
+    preprocessing:
+      drop_features:
+        - ['total_sellers_sum', 'buyers_new_median']  # Drop these two features
+        - ['total_sellers_sum']  # Drop only one feature for comparison
 
-  # Modeling-specific settings
-  target_variables:
-    moon_threshold:
-      - 0.3  # Moon threshold of 30%
-      - 0.5  # Moon threshold of 50%
+    target_variables:
+      moon_threshold:
+        - 0.3  # Moon threshold of 30%
+        - 0.5  # Moon threshold of 50%
 
-metrics_config:
-  # Metrics configuration
-  metrics:
-    buyers_new:
-      aggregations:
-        sum:
-          scaling:
-            - 'standard'  # Standard scaling
-            - 'minmax'    # Min-max scaling
-        mean:
-          scaling:
-            - 'standard'
-            - 'minmax'
-    total_bought:
-      aggregations:
-        sum:
-          scaling:
-            - 'standard'
-            - 'minmax'
-        median:
-          scaling:
-            - 'None'  # No scaling for the median
+  metrics_config:
+    metrics:
+      buyers_new:
+        aggregations:
+          sum:
+            scaling:
+              - 'standard'  # Standard scaling
+              - 'minmax'    # Min-max scaling
+          mean:
+            scaling:
+              - 'standard'
+              - 'minmax'
+      total_bought:
+        aggregations:
+          sum:
+            scaling:
+              - 'standard'
+              - 'minmax'
+          median:
+            scaling:
+              - 'None'  # No scaling for the median

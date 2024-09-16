@@ -8,6 +8,7 @@ functions used to build coin-level features from training data
 
 import os
 import time
+import uuid
 from datetime import datetime
 import random
 import hashlib
@@ -104,8 +105,14 @@ def validate_experiments_yaml(config_folder):
     # Load the experiments_config.yaml file
     experiment_config = load_config(experiment_config_path)
 
-    # Dynamically generate the list of config files based on the experiment_config keys
-    config_files = {section: f"{section}.yaml" for section in experiment_config.keys()}
+    # Extract the variable_overrides section
+    if 'variable_overrides' not in experiment_config:
+        raise ValueError("Missing 'variable_overrides' section in experiments_config.yaml.")
+    
+    variable_overrides = experiment_config['variable_overrides']
+
+    # Dynamically generate the list of config files based on the variable_overrides keys
+    config_files = {section: f"{section}.yaml" for section in variable_overrides.keys()}
 
     # Load all referenced config files dynamically
     loaded_configs = {}
@@ -116,10 +123,10 @@ def validate_experiments_yaml(config_folder):
         else:
             raise FileNotFoundError(f"{file_name} not found in {config_folder}")
 
-    # Validate that each variable in experiment_config maps correctly to the loaded config files
-    for section, section_values in experiment_config.items():
+    # Validate that each variable in variable_overrides maps correctly to the loaded config files
+    for section, section_values in variable_overrides.items():
         if section not in loaded_configs:
-            raise ValueError(f"Section '{section}' in experiments_config.yaml not found in any loaded config file.")
+            raise ValueError(f"Section '{section}' in variable_overrides not found in any loaded config file.")
 
         # Get the corresponding config file for this section
         corresponding_config = loaded_configs[section]
@@ -127,16 +134,15 @@ def validate_experiments_yaml(config_folder):
         # Validate that keys and values exist in the corresponding config
         for key, values in section_values.items():
             if key not in corresponding_config:
-                raise ValueError(f"Key '{key}' in experiments_config.yaml not found in {section}.yaml.")
+                raise ValueError(f"Key '{key}' in variable_overrides not found in {section}.yaml.")
             
             # Ensure the values are valid in the corresponding config
             for value in values:
                 if value not in corresponding_config[key]:
-                    raise ValueError(f"Value '{value}' for key '{key}' in experiments_config.yaml is invalid.")
+                    raise ValueError(f"Value '{value}' for key '{key}' in variable_overrides is invalid.")
 
     # If all checks pass, return configurations
-    return list(experiment_config.items())
-
+    return list(variable_overrides.items())
 
 
 
@@ -397,7 +403,7 @@ def build_configured_model_input(profits_df, prices_df, config, metrics_config, 
 
 
 
-def run_experiments(search_method, modeling_config, experiment_name, experiment_metadata={}, max_evals=50):
+def run_experiments(search_method, modeling_config, experiment_name, experiment_metadata=None, max_evals=50):
     """
     Runs experiments using a specified search method (grid or random), builds models,
     and logs the results of each experiment.
@@ -416,6 +422,8 @@ def run_experiments(search_method, modeling_config, experiment_name, experiment_
 
     # Add a UUID to the experiment name for uniqueness
     experiment_id = f"{experiment_name}_{uuid.uuid4()}"
+    if experiment_metadata is None:
+        experiment_metadata = {}
 
     # Add a timestamp to the metadata
     experiment_metadata['start_time'] = datetime.now().isoformat()
@@ -455,7 +463,7 @@ def run_experiments(search_method, modeling_config, experiment_name, experiment_
 
         # 3.6 Log the experiment results for this configuration
         # Include the experiment name, metadata, and other relevant details
-        m.log_experiment_results(modeling_folder, model_id, experiment_id=experiment_id, experiment_metadata=experiment_metadata)
+        m.log_experiment_results(modeling_folder, model_id, experiment_id)
 
         # Update the progress bar
         experiments_bar.update(n + 1)
@@ -467,5 +475,4 @@ def run_experiments(search_method, modeling_config, experiment_name, experiment_
     experiment_metadata['end_time'] = datetime.now().isoformat()
     experiment_metadata['duration'] = time
 
-    # # 4. Compare all experiments and analyze the best-performing configuration
-    # analyze_experiments(modeling_folder)
+    print('experiment done')
