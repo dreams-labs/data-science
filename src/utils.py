@@ -2,9 +2,58 @@
 utility functions use in data science notebooks
 """
 
+import time
 from datetime import datetime, timedelta
+import logging
+import functools
 import yaml
 import progressbar
+
+
+
+def timing_decorator(func):
+    """
+    A decorator that logs the execution time of the decorated function.
+
+    This decorator wraps the given function, times its execution, and logs
+    the time taken using the logger of the module where the decorated function
+    is defined. It uses lazy % formatting for efficient logging.
+
+    Args:
+        func (callable): The function to be decorated.
+
+    Returns:
+        callable: The wrapped function.
+
+    Example:
+        @timing_decorator
+        def my_function(x, y):
+            return x + y
+
+    When my_function is called, it will log a message like:
+    "my_function took 0.001 seconds to execute."
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        # Get the logger
+        logger = logging.getLogger(func.__module__)
+
+        # Log the initiation of the function
+        logger.debug('Initiating %s...', func.__name__)
+
+        # Time the function execution
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+
+        # Log the execution time
+        logger.info(
+            'Completed %s after %.2f seconds.',
+            func.__name__,
+            end_time - start_time
+        )
+        return result
+    return wrapper
 
 
 def load_config(file_path='../notebooks/config.yaml'):
@@ -32,7 +81,7 @@ def load_config(file_path='../notebooks/config.yaml'):
 
     return config
 
-
+# helper function for load_config
 def calculate_period_dates(config):
     """
     Calculate the training and modeling period start and end dates based on the provided
@@ -73,6 +122,7 @@ def calculate_period_dates(config):
     }
 
 
+
 def create_progress_bar(total_items):
     """
     Creates and starts a progress bar for tracking the progress of for loops.
@@ -102,6 +152,7 @@ def create_progress_bar(total_items):
     ).start()
 
     return progress_bar
+
 
 
 def cw_filter_df(df, coin_id, wallet_address):

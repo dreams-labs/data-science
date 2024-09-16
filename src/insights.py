@@ -19,7 +19,7 @@ import seaborn as sns
 import dreams_core.core as dc
 
 # project files
-from utils import load_config, create_progress_bar
+from utils import load_config, create_progress_bar, timing_decorator
 import training_data as td
 import feature_engineering as fe
 import coin_wallet_metrics as cwm
@@ -29,6 +29,7 @@ import modeling as m
 logger = dc.setup_logger()
 
 
+@timing_decorator
 def generate_experiment_configurations(config_folder, method='grid', max_evals=50):
     """
     Generates experiment configurations based on the validated experiment config YAML file and the search method.
@@ -336,10 +337,10 @@ def build_configured_model_input(profits_df, prices_df, config, metrics_config, 
     """
     
     # 1. Identify cohort of wallets (e.g., sharks) based on the cohort classification logic
-    cohort_summary_df = td.classify_wallet_cohort(profits_df, config['wallet_cohorts']['sharks'])
+    wallet_cohort_df = td.classify_wallet_cohort(profits_df, config['wallet_cohorts']['sharks'])
 
     # 2. Generate buysell metrics for wallets in the identified cohort
-    cohort_wallets = cohort_summary_df[cohort_summary_df['in_cohort']]['wallet_address']
+    cohort_wallets = wallet_cohort_df[wallet_cohort_df['in_cohort']]['wallet_address']
     buysell_metrics_df = cwm.generate_buysell_metrics_df(
         profits_df,
         config['training_data']['training_period_end'],

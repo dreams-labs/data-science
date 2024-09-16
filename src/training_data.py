@@ -10,6 +10,10 @@ import numpy as np
 from dreams_core.googlecloud import GoogleCloud as dgc
 from dreams_core import core as dc
 
+# project file imports
+from utils import timing_decorator
+
+
 # set up logger at the module level
 logger = dc.setup_logger()
 
@@ -336,7 +340,7 @@ def retrieve_transfers_data(training_period_start,modeling_period_start,modeling
     return transfers_df
 
 
-
+@timing_decorator
 def prepare_profits_data(transfers_df, prices_df):
     """
     Prepares a DataFrame (profits_df) by merging wallet transfer data with coin price data,
@@ -371,7 +375,6 @@ def prepare_profits_data(transfers_df, prices_df):
         A merged DataFrame containing profitability data, with new records added for wallets
         that had balances prior to the first available price date for each coin.
     """
-    logger.info("Preparing profits_df data...")
     start_time = time.time()
 
     # Raise an error if either df is empty
@@ -450,7 +453,7 @@ def prepare_profits_data(transfers_df, prices_df):
 
     # 5. Remove all records before a coin-wallet pair has any priced tokens
     # ---------------------------------------------------------------------
-    # these are artifacts resulting from activity prior to price data availability. if wallets purchased 
+    # these are artifacts resulting from activity prior to price data availability. if wallets purchased
     # and sold all coins in these pre-data eras, their first record will be of a zero-balance state.
 
     # calculate cumulative token inflows
@@ -472,12 +475,11 @@ def prepare_profits_data(transfers_df, prices_df):
     # Reset the index
     profits_df = profits_df.reset_index(drop=True)
 
-    logger.debug(f"generated profits_df after {time.time() - start_time:.2f} total seconds")
-
     return profits_df
 
 
 
+@timing_decorator
 def calculate_wallet_profitability(profits_df):
     """
     Calculates the profitability metrics for each wallet-coin pair by analyzing changes in price 
@@ -515,7 +517,6 @@ def calculate_wallet_profitability(profits_df):
     Raises:
     - ValueError: If any missing prices are found in the `profits_df`.
     """
-    logger.debug("Starting generation of profits_df...")
     start_time = time.time()
 
     # Raise an error if there are any missing prices
@@ -550,13 +551,10 @@ def calculate_wallet_profitability(profits_df):
     # Drop helper columns
     profits_df.drop(columns=['previous_price', 'previous_balance'], inplace=True)
 
-    total_time = time.time() - start_time
-    logger.info(f"Generated profits df after {total_time:.2f} seconds")
-
     return profits_df
 
 
-
+@timing_decorator
 def clean_profits_df(profits_df, data_cleaning_config):
     """
     Clean the profits DataFrame by excluding all records for any wallet_addresses that either have: 
@@ -574,8 +572,6 @@ def clean_profits_df(profits_df, data_cleaning_config):
     Returns:
     - Cleaned DataFrame with records for coin_id-wallet_address pairs filtered out.
     """
-    logger.debug("Starting generation of profits_cleaned_df...")
-    start_time = time.time()
 
     # 1. Remove wallets with higher or lower total profits than the profitability_filter
     # ----------------------------------------------------------------------------------
@@ -621,14 +617,13 @@ def clean_profits_df(profits_df, data_cleaning_config):
     exclusions_logs_df['inflows_exclusion'] = exclusions_logs_df['inflows_exclusion'].astype(bool).fillna(False)
 
     # log outputs
-    total_time = time.time() - start_time
-    logger.info("Finished cleaning profits_df after %.2f seconds.",total_time)
     logger.debug("Identified %s coin-wallet pairs beyond profit threshold of $%s and %s pairs beyond inflows filter of %s.",
         exclusions_profits_df.shape[0], dc.human_format(data_cleaning_config['profitability_filter']),
         exclusions_inflows_df.shape[0], dc.human_format(data_cleaning_config['inflows_filter'])
     )
 
     return profits_cleaned_df,exclusions_logs_df
+
 
 
 def classify_wallet_cohort(profits_df, wallet_cohort_config):
@@ -707,11 +702,11 @@ def classify_wallet_cohort(profits_df, wallet_cohort_config):
     wallet_cohort_df = wallet_cohort_df.merge(wallet_return_rate_df[['wallet_address', 'return_rate']], on='wallet_address', how='left')
 
     # Count the number of wallets in the cohort
-    x = wallet_cohort_df[wallet_cohort_df['in_cohort'] == True].shape[0]
+    x = wallet_cohort_df[wallet_cohort_df['in_cohort']].shape[0]
     y = wallet_cohort_df.shape[0]
 
     # Log the count of wallets added to the cohort using % syntax
-    logger.info('Wallet cohort classification complete. %d/%d eligible wallets were added to the cohort.' % (x, y))
+    logger.info('Wallet cohort classification complete. %d/%d eligible wallets were added to the cohort.', x, y)
 
     return wallet_cohort_df
 
