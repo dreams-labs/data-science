@@ -707,11 +707,11 @@ def classify_wallet_cohort(profits_df, wallet_cohort_config):
     wallet_cohort_df = wallet_cohort_df.merge(wallet_return_rate_df[['wallet_address', 'return_rate']], on='wallet_address', how='left')
 
     # Count the number of wallets in the cohort
-    x = wallet_cohort_df[wallet_cohort_df['in_cohort'] == True].shape[0]
+    x = wallet_cohort_df[wallet_cohort_df['in_cohort']].shape[0]
     y = wallet_cohort_df.shape[0]
 
     # Log the count of wallets added to the cohort using % syntax
-    logger.info('Wallet cohort classification complete. %d/%d eligible wallets were added to the cohort.' % (x, y))
+    logger.info('Wallet cohort classification complete. %d/%d eligible wallets were added to the cohort.', x, y)
 
     return wallet_cohort_df
 
