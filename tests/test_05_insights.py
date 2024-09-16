@@ -290,18 +290,24 @@ def test_prepare_configs_failure(tmpdir):
 # ---------------------------------------------- #
 # rebuild_profits_df_if_necessary() unit tests
 # ---------------------------------------------- #
-
 # Mock DataFrame to simulate profits_df
 @pytest.fixture
-def mock_profits_df(): # pylint: disable=C0116 # docstring
+def mock_profits_df():  # pylint: disable=C0116 # docstring
     return pd.DataFrame({
         'wallet_address': ['wallet1', 'wallet2'],
         'profitability': [1000, 2000]
     })
 
+# Mock DataFrame to simulate prices_df
+@pytest.fixture
+def mock_prices_df():  # pylint: disable=C0116 # docstring
+    return pd.DataFrame({
+        'prices': [100, 200, 300]
+    })
+
 # Mock Configuration
 @pytest.fixture
-def mock_config(): # pylint: disable=C0116 # docstring
+def mock_config():  # pylint: disable=C0116 # docstring
     return {
         'training_data': {
             'training_period_start': '2023-01-01',
@@ -312,9 +318,8 @@ def mock_config(): # pylint: disable=C0116 # docstring
             'max_gap_days': 7
         }
     }
+
 @mock.patch('insights.td.retrieve_transfers_data')
-@mock.patch('insights.td.retrieve_prices_data')
-@mock.patch('insights.td.fill_prices_gaps')
 @mock.patch('insights.td.prepare_profits_data')
 @mock.patch('insights.td.calculate_wallet_profitability')
 @mock.patch('insights.td.clean_profits_df')
@@ -323,18 +328,15 @@ def mock_config(): # pylint: disable=C0116 # docstring
 @pytest.mark.unit
 def test_rebuild_profits_df_if_necessary(
     mock_clean_profits_df, mock_calculate_wallet_profitability, 
-    mock_prepare_profits_data, mock_fill_prices_gaps, 
-    mock_retrieve_prices_data, mock_retrieve_transfers_data, 
-    mock_config, mock_profits_df, tmpdir):
+    mock_prepare_profits_data, mock_retrieve_transfers_data, 
+    mock_config, mock_profits_df, mock_prices_df, tmpdir):
     """
     Test the case where the config changes and profits_df is rebuilt by calling
     the production functions (mocked to avoid time-consuming operations).
     """
-        
+
     # Set up the mock return values
     mock_retrieve_transfers_data.return_value = pd.DataFrame({'transfers': [1, 2, 3]})
-    mock_retrieve_prices_data.return_value = pd.DataFrame({'prices': [100, 200, 300]})
-    mock_fill_prices_gaps.return_value = (pd.DataFrame({'prices': [100, 200, 300]}), None)
     mock_prepare_profits_data.return_value = pd.DataFrame({'profits': [1000, 2000]})
     mock_calculate_wallet_profitability.return_value = mock_profits_df
     mock_clean_profits_df.return_value = (mock_profits_df, None)
@@ -344,23 +346,22 @@ def test_rebuild_profits_df_if_necessary(
     temp_folder = os.path.join(temp_dir, "outputs/temp")
     os.makedirs(temp_folder)
 
-    # Call the function to trigger the rebuild
-    new_profits_df = i.rebuild_profits_df_if_necessary(mock_config, str(temp_dir), profits_df=None)
+    # Call the function to trigger the rebuild with prices_df passed as an argument
+    new_profits_df = i.rebuild_profits_df_if_necessary(mock_config, str(temp_dir), mock_prices_df, profits_df=None)
 
     # Assertions
     mock_retrieve_transfers_data.assert_called_once()
-    mock_retrieve_prices_data.assert_called_once()
-    mock_fill_prices_gaps.assert_called_once()
-    mock_prepare_profits_data.assert_called_once()
+    mock_prepare_profits_data.assert_called_once_with(mock_retrieve_transfers_data.return_value, mock_prices_df)
     mock_calculate_wallet_profitability.assert_called_once()
     mock_clean_profits_df.assert_called_once()
 
     assert new_profits_df.equals(mock_profits_df)
 
+
 # Test using pytest timeout decorator
 @pytest.mark.timeout(1)  # Set timeout limit of 1 second
 @pytest.mark.unit
-def test_return_cached_profits_df(mock_config, mock_profits_df, tmpdir):
+def test_return_cached_profits_df(mock_config, mock_profits_df, mock_prices_df, tmpdir):
     """
     Test the case where the config has not changed and the cached profits_df is returned from memory.
     """
@@ -380,7 +381,8 @@ def test_return_cached_profits_df(mock_config, mock_profits_df, tmpdir):
     # pylint: disable=W0718
     # Call the function and verify the profits_df is returned from memory without rebuilding
     try:
-        returned_profits_df = i.rebuild_profits_df_if_necessary(mock_config, str(temp_dir), profits_df=mock_profits_df)
+        # Now passing mock_prices_df as an argument
+        returned_profits_df = i.rebuild_profits_df_if_necessary(mock_config, str(temp_dir), mock_prices_df, profits_df=mock_profits_df)
         assert returned_profits_df.equals(mock_profits_df)
     except Exception as e:
         pytest.fail(f"Test failed due to timeout: {str(e)}")

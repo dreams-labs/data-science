@@ -207,18 +207,19 @@ def evaluate_model(model, X_test, y_test, model_id, modeling_folder):
 
 
 
-def log_experiment_results(modeling_folder, model_id, experiment_id):
+def log_trial_results(modeling_folder, model_id, experiment_id, trial_overrides):
     """
-    Logs the results of a modeling experiment by pulling data from saved files 
+    Logs the results of a modeling trial by pulling data from saved files 
     and storing the combined results in the experiment tracking folder.
     
     Args:
     - modeling_folder (str): The base folder where models, logs, and outputs are saved.
     - model_id (str): The unique ID of the model being evaluated.
     - experiment_id (str): The unique ID of the experiment.
+    - trial_overrides (dict): The override parameters used in the specific trial.
     
     Returns:
-    - experiment_log (dict): A dictionary with the logged experiment details.
+    - trial_log (dict): A dictionary with the logged trial details.
     """
     # Define folder paths
     logs_path = os.path.join(modeling_folder, "logs")
@@ -232,22 +233,27 @@ def log_experiment_results(modeling_folder, model_id, experiment_id):
         raise FileNotFoundError(f"The folder '{experiment_tracking_path}' does not exist.")
 
     # Initialize an empty dictionary to collect all the results
-    experiment_log = {"experiment_id": experiment_id}
+    trial_log = {
+        "experiment_id": experiment_id,
+        "model_id": model_id,
+        "trial_overrides": trial_overrides,
+        "metrics": {}  # Initialize the 'metrics' key for performance metrics
+    }
 
     # Step 2: Read the model training log in JSON format
     log_filename = os.path.join(logs_path, f"log_{model_id}.json")
     if os.path.exists(log_filename):
         with open(log_filename, 'r', encoding='utf-8') as log_file:
             log_data = json.load(log_file)
-            experiment_log.update(log_data)
+            trial_log.update(log_data)
     else:
         raise FileNotFoundError(f"Training log not found for model {model_id}.")
 
-    # Step 3: Read the performance metrics
+    # Step 3: Read the performance metrics and store them under 'metrics' key
     metrics_filename = os.path.join(performance_metrics_path, f"metrics_{model_id}.csv")
     if os.path.exists(metrics_filename):
         metrics_df = pd.read_csv(metrics_filename)
-        experiment_log.update(metrics_df.iloc[0].to_dict())
+        trial_log['metrics'] = metrics_df.iloc[0].to_dict()
     else:
         raise FileNotFoundError(f"Performance metrics not found for model {model_id}.")
 
@@ -256,22 +262,22 @@ def log_experiment_results(modeling_folder, model_id, experiment_id):
     if os.path.exists(feature_importance_filename):
         feature_importance_df = pd.read_csv(feature_importance_filename)
         feature_importance_dict = dict(zip(feature_importance_df['feature'], feature_importance_df['importance']))
-        experiment_log["feature_importance"] = feature_importance_dict
+        trial_log["feature_importance"] = feature_importance_dict
     else:
-        experiment_log["feature_importance"] = "N/A"
+        trial_log["feature_importance"] = "N/A"
 
     # Step 5: Read the predictions from CSV and store as a dict
     predictions_filename = os.path.join(predictions_path, f"predictions_{model_id}.csv")
     if os.path.exists(predictions_filename):
         predictions_df = pd.read_csv(predictions_filename)
         predictions_dict = predictions_df.to_dict(orient='list')
-        experiment_log["predictions"] = predictions_dict
+        trial_log["predictions"] = predictions_dict
     else:
-        experiment_log["predictions"] = "N/A"
+        trial_log["predictions"] = "N/A"
 
-    # Step 6: Save the experiment log as a JSON file
-    experiment_log_filename = os.path.join(experiment_tracking_path, f"experiment_log_{model_id}.json")
-    with open(experiment_log_filename, 'w', encoding='utf-8') as experiment_log_file:
-        json.dump(experiment_log, experiment_log_file, indent=4)
+    # Step 6: Save the trial log as a JSON file
+    trial_log_filename = os.path.join(experiment_tracking_path, f"trial_log_{model_id}.json")
+    with open(trial_log_filename, 'w', encoding='utf-8') as trial_log_file:
+        json.dump(trial_log, trial_log_file, indent=4)
 
-    return experiment_log
+    return trial_log_filename

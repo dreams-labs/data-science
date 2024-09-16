@@ -7,18 +7,19 @@ functions used to build coin-level features from training data
 # pylint: disable=E0401 # can't find utils import
 
 import os
-import time
 import uuid
 from datetime import datetime
 import random
 import hashlib
 import json
+import pandas as pd
 from sklearn.model_selection import ParameterGrid, ParameterSampler
+import matplotlib.pyplot as plt
+import seaborn as sns
 import dreams_core.core as dc
-import progressbar
 
 # project files
-from utils import load_config
+from utils import load_config, create_progress_bar
 import training_data as td
 import feature_engineering as fe
 import coin_wallet_metrics as cwm
@@ -229,13 +230,14 @@ def validate_key_in_config(config, key_path):
 
 
 
-def rebuild_profits_df_if_necessary(config, modeling_folder, profits_df=None):
+def rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_df=None):
     """
     Checks if the config has changed and reruns time-intensive steps if needed.
 
     Args:
     - config (dict): The config containing training_data and data_cleaning.
     - modeling_folder (str): Folder for outputs, including temp files.
+    - prices_df (DataFrame): The prices dataframe needed to compute profits_df.
     - profits_df (DataFrame, optional): The profits dataframe passed in memory.
 
     Returns:
@@ -268,8 +270,6 @@ def rebuild_profits_df_if_necessary(config, modeling_folder, profits_df=None):
         config['training_data']['modeling_period_start'],
         config['training_data']['modeling_period_end']
     )
-    prices_df = td.retrieve_prices_data()
-    prices_df, _ = td.fill_prices_gaps(prices_df, config['data_cleaning']['max_gap_days'])
     
     profits_df = td.prepare_profits_data(transfers_df, prices_df)
     profits_df = td.calculate_wallet_profitability(profits_df)
@@ -399,58 +399,80 @@ def build_configured_model_input(profits_df, prices_df, config, metrics_config, 
     )
 
     return X_train, X_test, y_train, y_test
+ 
 
 
 
-
-def run_experiments(search_method, modeling_config, experiment_name, experiment_metadata=None, max_evals=50):
+def run_experiment(modeling_config):
     """
-    Runs experiments using a specified search method (grid or random), builds models,
-    and logs the results of each experiment.
+    Runs an experiment using configurations from the experiments_config.yaml,
+    builds models, and logs the results of each trial.
 
     Args:
-    - search_method (str): 'grid' or 'random' to select the search method.
     - modeling_config (dict): Configuration dictionary containing paths, model params, etc.
-    - experiment_name (str): The base name for the experiment.
-    - experiment_metadata (dict): Metadata for the experiment, can be expanded over time.
-    - max_evals (int): Number of iterations for Random search (default is 50).
+
+    Returns:
+    - experiment_id (string): the ID of the experiment that can be used to retrieve metadata
+        from modeling/experiment metadat
     """
 
+    # 1. Extract config variables and store experiment metadata
+    # ---------------------------------------------------------
     # Extract folder paths from modeling_config
     modeling_folder = modeling_config['modeling']['modeling_folder']
     config_folder = modeling_config['modeling']['config_folder']
 
-    # Add a UUID to the experiment name for uniqueness
+    # Load experiments_config.yaml
+    experiments_config = load_config(os.path.join(config_folder, 'experiments_config.yaml'))
+
+    # Extract metadata and experiment details from experiments_config
+    experiment_name = experiments_config['metadata']['experiment_name']
     experiment_id = f"{experiment_name}_{uuid.uuid4()}"
-    if experiment_metadata is None:
-        experiment_metadata = {}
+    search_method = experiments_config['metadata']['search_method']
+    max_evals = experiments_config['metadata']['max_evals']
 
     # Add a timestamp to the metadata
-    experiment_metadata['start_time'] = datetime.now().isoformat()
+    metadata = experiments_config['metadata']
+    metadata['experiment_id'] = experiment_id
+    metadata['start_time'] = datetime.now().isoformat()
+    metadata['trial_logs'] = []  # Initialize the array for trial log filenames
 
-    # 1. Generate the experiment configurations
-    experiment_configurations = generate_experiment_configurations(config_folder, method=search_method, max_evals=max_evals)
+
+    # 2. Initialize trial configurations and initial variables
+    # -------------------------------------------------------------------------
+    # Generate the trial configurations based on variable_overrides
+    trial_configurations = generate_experiment_configurations(config_folder, method=search_method, max_evals=max_evals)
+
+    # Cap the number of trials if 'max_evals' is set
+    max_evals = experiments_config['metadata'].get('max_evals', len(trial_configurations))
+    total_trials = min(len(trial_configurations), max_evals)
 
     # Generate prices_df
     config = load_config(os.path.join(config_folder, 'config.yaml'))
     prices_df = td.retrieve_prices_data()
     prices_df, _ = td.fill_prices_gaps(prices_df, config['data_cleaning']['max_gap_days'])
 
-    # 2. Create the progress bar
-    total_experiments = len(experiment_configurations)
-    experiments_bar = progressbar.ProgressBar(maxval=total_experiments, widgets=[
-        ' [', progressbar.Percentage(), '] ',
-        progressbar.Bar(), ' (', progressbar.ETA(), ') '
-    ]).start()
+    # Initialize progress bar and empty variables
+    trials_bar = create_progress_bar(total_trials)
+    profits_df = None
 
-    # 3. Iterate through each configuration
-    for n, experiment in enumerate(experiment_configurations):
+
+    # 3. Iterate through each trial configuration
+    # -------------------------------------------
+    for n, trial in enumerate(trial_configurations[:total_trials]):
         
-        # 3.1 Prepare the full configuration by applying overrides from the current experiment config
-        config, metrics_config, modeling_config = prepare_configs(config_folder, experiment)
+        # 3.1 Prepare the full configuration by applying overrides from the current trial config
+        config, metrics_config, modeling_config = prepare_configs(config_folder, trial)
+        
+        # Store the configuration settings used in this trial in metadata
+        metadata['config_settings'] = {
+            "config": config,
+            "metrics_config": metrics_config,
+            "modeling_config": modeling_config
+        }
         
         # 3.2 Retrieve or rebuild profits_df based on config changes
-        profits_df = rebuild_profits_df_if_necessary(config, modeling_folder)
+        profits_df = rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_df)
         
         # 3.3 Build the configured model input data (train/test data)
         X_train, X_test, y_train, y_test = build_configured_model_input(profits_df, prices_df, config, metrics_config, modeling_config)
@@ -461,18 +483,192 @@ def run_experiments(search_method, modeling_config, experiment_name, experiment_
         # 3.5 Evaluate and log the model's performance on the test set
         _ = m.evaluate_model(model, X_test, y_test, model_id, modeling_folder)
 
-        # 3.6 Log the experiment results for this configuration
-        # Include the experiment name, metadata, and other relevant details
-        m.log_experiment_results(modeling_folder, model_id, experiment_id)
+        # 3.6 Log the trial results for this configuration
+        # Include the trial name, metadata, and other relevant details
+        trial_log_filename = m.log_trial_results(modeling_folder, model_id, experiment_id, trial)
+
+        # Append the trial log filename to the metadata
+        metadata['trial_logs'].append(trial_log_filename)
 
         # Update the progress bar
-        experiments_bar.update(n + 1)
+        trials_bar.update(n + 1)
 
     # Finish the progress bar
-    experiments_bar.finish()
+    trials_bar.finish()
 
+
+    # 4. Log experiment metadata
+    # -------------------------------------------
     # Add the experiment end time and calculate the duration
-    experiment_metadata['end_time'] = datetime.now().isoformat()
-    experiment_metadata['duration'] = time
+    metadata['end_time'] = datetime.now().isoformat()
+    metadata['duration'] = (datetime.fromisoformat(metadata['end_time']) -
+                            datetime.fromisoformat(metadata['start_time'])).total_seconds()
 
-    print('experiment done')
+    # Log experiment metadata
+    experiment_tracking_path = os.path.join(modeling_folder, "experiment_metadata")
+    os.makedirs(experiment_tracking_path, exist_ok=True)
+    experiment_metadata_file = os.path.join(experiment_tracking_path, f"{experiment_id}.json")
+    with open(experiment_metadata_file, 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, indent=4)
+
+    logger.info('Experiment %s complete.', experiment_id)
+
+    return experiment_id
+
+
+def generate_trial_df(modeling_folder, experiment_id):
+    """
+    Generates a DataFrame by loading and processing trial logs from a specified modeling folder and experiment ID.
+    
+    Parameters:
+    - modeling_folder: The path to the folder where model data is stored.
+    - experiment_id: The ID of the experiment to retrieve trial logs from.
+    
+    Returns:
+    - A pandas DataFrame (trial_df) containing the processed trial logs.
+    """
+    
+    # 1. Construct the path to the experiment metadata file
+    experiment_metadata_path = os.path.join(modeling_folder, "experiment_metadata", f"{experiment_id}.json")
+    
+    # 2. Load the experiment metadata
+    with open(experiment_metadata_path, 'r', encoding='utf-8') as f:
+        experiment_metadata = json.load(f)
+
+    # Retrieve trial log filenames
+    trial_logs = experiment_metadata['trial_logs']
+
+    # 3. Initialize lists to store trial data
+    trial_data = []
+
+    # 4. Loop through each trial log and extract relevant information
+    for trial_log_path in trial_logs:
+        with open(trial_log_path, 'r', encoding='utf-8') as f:
+            trial_log_data = json.load(f)
+        
+        # Extract trial_overrides and performance metrics
+        trial_overrides = trial_log_data.get('trial_overrides', {})
+        performance_metrics = trial_log_data.get('metrics', {})
+        
+        # Merge trial_overrides and performance metrics into a single dictionary
+        trial_info = {**trial_overrides, **performance_metrics}
+        
+        # Append trial info to the list
+        trial_data.append(trial_info)
+    
+    # 5. Convert the list of dictionaries to a pandas DataFrame
+    trial_df = pd.DataFrame(trial_data)
+    
+    return trial_df
+
+
+def plot_roc_auc_performance(trial_df, top_n):
+    """
+    Plot the average ROC AUC performance for the top N features in the trial_df.
+    
+    Parameters:
+    - trial_df: DataFrame containing trial data with columns to be grouped and evaluated.
+    - top_n: The number of top features based on average ROC AUC to plot.
+    """
+    # Ensure all columns are converted to strings to handle arrays, lists, and other non-numeric data types
+    trial_df = trial_df.applymap(lambda x: str(x) if isinstance(x, (list, dict, tuple)) else x)
+
+    # Calculate mean roc_auc for each category in the relevant columns
+    roc_auc_means = pd.DataFrame()
+
+    for column in trial_df.columns:
+        if column not in ['accuracy', 'precision', 'recall', 'f1_score', 'roc_auc', 'log_loss', 'confusion_matrix']:
+            grouped = trial_df.groupby(column)['roc_auc'].mean().reset_index()
+            grouped['feature'] = column
+            roc_auc_means = pd.concat([roc_auc_means, grouped], ignore_index=True)
+
+    # Sort by mean ROC AUC and select the top N
+    roc_auc_means = roc_auc_means.sort_values(by='roc_auc', ascending=False).head(top_n)
+
+    # Plot the results in a single bar chart
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x='roc_auc', y='feature', data=roc_auc_means)
+    plt.title(f'Top {top_n} Features by ROC AUC Performance')
+    plt.xlabel('Average ROC AUC')
+    plt.ylabel('Feature')
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_top_feature_importance(modeling_folder, experiment_id, top_n=10):
+    """
+    Plot the top features by mean importance from an experiment's feature importance logs.
+
+    Parameters:
+    - modeling_folder: str, path to the folder where the experiment data is stored.
+    - experiment_id: str, unique identifier for the experiment to retrieve the logs.
+    - top_n: int, number of top features to display in the bar chart (default: 10).
+    
+    This function retrieves trial logs from an experiment's metadata, extracts feature importance 
+    data, calculates the mean importance across all trials, and displays a bar chart of the top_n 
+    most important features.
+    """
+    # 1. Construct the path to the experiment metadata file
+    experiment_metadata_path = os.path.join(modeling_folder, "experiment_metadata", f"{experiment_id}.json")
+    
+    # Load the experiment metadata to retrieve trial logs
+    with open(experiment_metadata_path, 'r', encoding='utf-8') as f:
+        experiment_metadata = json.load(f)
+    
+    # Retrieve trial log filenames
+    trial_logs = experiment_metadata['trial_logs']
+    
+    # Initialize an empty list to store DataFrames
+    all_feature_importances = []
+    
+    # Loop through each trial log and process feature importance
+    for trial_log_path in trial_logs:
+        with open(trial_log_path, 'r', encoding='utf-8') as f:
+            trial_log_data = json.load(f)
+        
+        # Extract feature importance and convert to DataFrame
+        feature_importance = trial_log_data['feature_importance']
+        feature_importance_df = pd.DataFrame(list(feature_importance.items()), columns=['feature', 'importance'])
+        
+        # Append the DataFrame to the list
+        all_feature_importances.append(feature_importance_df)
+    
+    # Concatenate all DataFrames
+    combined_feature_importance_df = pd.concat(all_feature_importances)
+    
+    # Group by feature and calculate mean importance
+    feature_stats = combined_feature_importance_df.groupby('feature')['importance'].agg(['mean', 'var', 'std']).reset_index()
+    
+    # Sort by mean importance
+    sorted_features = feature_stats.sort_values(by='mean', ascending=False)
+    
+    # Plot the top features by importance
+    sorted_features.head(top_n).sort_values(by='mean',ascending=True).plot(kind='barh', x='feature', y='mean', title=f'Top {top_n} Features by Mean Importance')
+    
+    # Display the plot
+    plt.xlabel('Mean Importance')
+    plt.ylabel('Feature')
+    plt.tight_layout()
+    plt.show()
+
+
+
+def analyze_experiment(modeling_folder, experiment_id, top_n=10):
+    """
+    Analyze experiment results by generating two visualizations:
+    1. A bar chart of the top N features by ROC AUC performance.
+    2. A bar chart of the top N features by mean importance from the trial logs.
+
+    Parameters:
+    - modeling_folder: str, path to the folder where the experiment data is stored.
+    - experiment_id: str, unique identifier for the experiment to retrieve the logs.
+    - top_n: int, number of top features to display in the bar charts (default: 10).
+    """
+    # Generate trial DataFrame from the experiment logs
+    trial_df = generate_trial_df(modeling_folder, experiment_id)
+    
+    # Plot ROC AUC performance for the top N features
+    plot_roc_auc_performance(trial_df, top_n)
+    
+    # Plot top feature importance based on the trial logs
+    plot_top_feature_importance(modeling_folder, experiment_id, top_n)

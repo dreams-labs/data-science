@@ -20,6 +20,8 @@ metrics:
       std:
         scaling: "standard"    # Standard scaling for standard deviation to account for variability.
       median:                  # No scaling specified here
+        scaling: "none"        # No scaling for percentage change, as it's already normalized.
+
     rolling:
       stats:
         sum:
@@ -39,7 +41,6 @@ metrics:
       sum:
         scaling: "standard"    # Large sums of total bought should be scaled to avoid model distortion.
       median:
-        scaling: "none"          # No scaling needed for median.
     rolling:
       stats:
         sum:
@@ -58,4 +59,17 @@ metrics:
   total_buyers:
     aggregations:
       sum:
-        scaling: "none"          # No scaling for sum of total buyers, as it's likely a more stable number.
+  sellers_new:
+    aggregations:
+      sum:
+        scaling: 'standard'  # Standard scaling
+      mean:
+        scaling: 'standard'
+      median:
+  buyers_repeat:
+    aggregations:
+      sum:
+        scaling: 'standard'  # Standard scaling
+      mean:
+        scaling: 'standard'
+      median:

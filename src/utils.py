@@ -78,15 +78,28 @@ def create_progress_bar(total_items):
     Creates and starts a progress bar for tracking the progress of for loops.
 
     Args:
-    - total_items (int): The total number of itesm in the loop
+    - total_items (int): The total number of items in the loop
 
     Returns:
     - progressbar.ProgressBar: An initialized and started progress bar.
     """
-    progress_bar = progressbar.ProgressBar(maxval=total_items, widgets=[
-        ' [', progressbar.Percentage(), '] ',
-        progressbar.Bar(), ' (', progressbar.ETA(), ') '
-    ]).start()
+    _widgets = [
+        'Completed ',  # Customizable label for context
+        progressbar.SimpleProgress(),  # Displays 'current/total' format
+        ' ',
+        progressbar.Percentage(),
+        ' ',
+        progressbar.Bar(),
+        ' ',
+        progressbar.ETA()
+    ]
+
+    # Create and start the progress bar with widgets, redirecting stdout to make it "float"
+    progress_bar = progressbar.ProgressBar(
+        maxval=total_items,
+        widgets=_widgets,
+        redirect_stdout=True  # Redirect stdout to prevent new lines
+    ).start()
 
     return progress_bar
 
