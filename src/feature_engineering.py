@@ -385,7 +385,9 @@ def preprocess_coin_df(input_path, modeling_config, metrics_config):
     Params:
     - input_path (str): Path to the flattened CSV file.
     - modeling_config (dict): Configuration with modeling-specific parameters.
-    - metrics_config (dict): Configuration with metrics and their associated scaling methods.
+    - metrics_config (dict): The input file's configuration with metrics and their scaling methods,
+        aggregations, etc. This needs to be metrics_config['metrics'][dataset_name], rather than
+        the full config file.
 
     Returns:
     - df (pd.DataFrame): The preprocessed DataFrame.
@@ -410,7 +412,7 @@ def preprocess_coin_df(input_path, modeling_config, metrics_config):
     }
 
     # Loop through each metric and its settings in the metrics_config
-    for metric, settings in metrics_config['metrics'].items():
+    for metric, settings in metrics_config.items():
         # Loop through each aggregation (e.g., sum, mean) and its associated settings
         for agg, agg_settings in settings['aggregations'].items():
             # Construct the column name based on the metric and aggregation (e.g., 'buyers_new_sum')

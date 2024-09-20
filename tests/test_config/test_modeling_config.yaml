@@ -2,7 +2,7 @@ preprocessing:
   drop_features:  # List of features to drop from the dataset before modeling
 
 target_variables: 
-  moon_threshold: 0.15  # Target for a 'moon' event, defined as a 15% price increase
+  moon_threshold: 0.2  # Target for a 'moon' event, defined as a 15% price increase
   crater_threshold: -0.2  # Target for a 'crater' event, defined as a 20% price decrease
 
 modeling:

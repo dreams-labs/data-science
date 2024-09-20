@@ -1,3 +1,0 @@
-for file in config/*; do
-    cp "$file" "tests/test_config/test_$(basename "$file")"
-done

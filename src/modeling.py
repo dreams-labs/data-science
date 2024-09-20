@@ -27,13 +27,13 @@ logger = dc.setup_logger()
 def split_model_input(model_input_df, target_column, test_size=0.2, random_state=42):
     """
     Splits the input DataFrame into training and test sets, separating features and target.
-    
+
     Args:
     - model_input_df (pd.DataFrame): The full input DataFrame containing features and target.
     - target_column (str): The name of the target variable.
     - test_size (float): The proportion of data to include in the test set.
     - random_state (int): Random state for reproducibility.
-    
+
     Returns:
     - X_train (pd.DataFrame): Training features with 'coin_id' as the index.
     - X_test (pd.DataFrame): Test features with 'coin_id' as the index.
@@ -52,7 +52,7 @@ def split_model_input(model_input_df, target_column, test_size=0.2, random_state
     # Check for 'coin_id' column
     if 'coin_id' not in model_input_df.columns:
         raise ValueError("'coin_id' column is required in the DataFrame.")
-    
+
     # Separate the features and the target
     X = model_input_df.drop(columns=[target_column]).set_index('coin_id')  # Set 'coin_id' as index for X
     y = model_input_df[target_column]  # Extract target as Series, it will retain the index from model_input_df
@@ -66,7 +66,7 @@ def split_model_input(model_input_df, target_column, test_size=0.2, random_state
     # Check if dataset is too small
     if len(X) < 10:
         raise ValueError("Dataset is too small to perform a meaningful split. Need at least 10 data points.")
-    
+
     # Check for imbalanced target (for classification problems)
     if y.value_counts(normalize=True).max() > 0.95:
         raise ValueError("Target is heavily imbalanced. Consider rebalancing or using specialized techniques.")
@@ -86,7 +86,7 @@ def split_model_input(model_input_df, target_column, test_size=0.2, random_state
     # Check if y_train or y_test contains only one unique value
     if len(np.unique(y_train)) <= 1 or len(np.unique(y_test)) <= 1:
         raise ValueError("y_train or y_test contains only one class, which is not suitable for model training.")
-    
+
     return X_train, X_test, y_train, y_test
 
 
@@ -96,7 +96,7 @@ def train_model(X_train, y_train, modeling_folder, model_params=None):
     """
     Trains a model on the training data and saves the model, logs, and feature importance.
     Uses a UUID to uniquely identify the model files.
-    
+
     Args:
     - X_train (pd.DataFrame): The training features.
     - y_train (pd.Series): The training target.
@@ -158,7 +158,7 @@ def train_model(X_train, y_train, modeling_folder, model_params=None):
 def evaluate_model(model, X_test, y_test, model_id, modeling_folder):
     """
     Evaluates a trained model on the test set and outputs key metrics, including storing predictions.
-    
+
     Args:
     - model (sklearn model): The trained model.
     - X_test (pd.DataFrame): The test features with 'coin_id' as the index.
@@ -172,13 +172,13 @@ def evaluate_model(model, X_test, y_test, model_id, modeling_folder):
     # Construct the performance metrics folder path
     evaluation_folder = os.path.join(modeling_folder, "outputs", "performance_metrics")
     predictions_folder = os.path.join(modeling_folder, "outputs", "predictions")
-    
+
     # Ensure the evaluation and predictions folders exist
     if not os.path.exists(evaluation_folder):
         raise FileNotFoundError(f"The evaluation folder '{evaluation_folder}' does not exist.")
     if not os.path.exists(predictions_folder):
         raise FileNotFoundError(f"The predictions folder '{predictions_folder}' does not exist.")
-    
+
     # Predict the probabilities and the labels
     y_pred_prob = model.predict_proba(X_test)[:, 1]  # Probabilities for the positive class
     y_pred = model.predict(X_test)
@@ -211,17 +211,17 @@ def evaluate_model(model, X_test, y_test, model_id, modeling_folder):
 
 
 
-def log_trial_results(modeling_folder, model_id, experiment_id, trial_overrides):
+def log_trial_results(modeling_folder, model_id, experiment_id=None, trial_overrides=None):
     """
-    Logs the results of a modeling trial by pulling data from saved files 
+    Logs the results of a modeling trial by pulling data from saved files
     and storing the combined results in the experiment tracking folder.
-    
+
     Args:
     - modeling_folder (str): The base folder where models, logs, and outputs are saved.
     - model_id (str): The unique ID of the model being evaluated.
-    - experiment_id (str): The unique ID of the experiment.
-    - trial_overrides (dict): The override parameters used in the specific trial.
-    
+    - experiment_id (str, optional): The unique ID of the experiment.
+    - trial_overrides (dict, optional): The override parameters used in the specific trial.
+
     Returns:
     - trial_log (dict): A dictionary with the logged trial details.
     """
@@ -231,7 +231,7 @@ def log_trial_results(modeling_folder, model_id, experiment_id, trial_overrides)
     feature_importance_path = os.path.join(modeling_folder, "outputs", "feature_importance")
     predictions_path = os.path.join(modeling_folder, "outputs", "predictions")
     experiment_tracking_path = os.path.join(modeling_folder, "outputs", "experiment_tracking")
-    
+
     # Step 1: Ensure the experiment_tracking folder exists
     if not os.path.exists(experiment_tracking_path):
         raise FileNotFoundError(f"The folder '{experiment_tracking_path}' does not exist.")
