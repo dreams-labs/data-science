@@ -20,8 +20,8 @@ def flatten_coin_date_df(df, df_metrics_config, training_period_end):
 
     Params:
     - df (pd.DataFrame): DataFrame containing time series data for multiple coins (coin_id-date).
-    - df_metrics_config (dict): Configuration object with metric rules from the metrics file, filtered
-        to the metrics that apply to the specific input df.
+    - df_metrics_config (dict): Configuration object showing the settings for the metrics
+        that apply to the specific input df.
     - training_period_end (datetime): The end of the training period to ensure dates are filled
         until this date and that rolling windows end on the training_period_end
 
@@ -384,9 +384,9 @@ def preprocess_coin_df(input_path, modeling_config, df_metrics_config):
     Params:
     - input_path (str): Path to the flattened CSV file.
     - modeling_config (dict): Configuration with modeling-specific parameters.
-    - df_metrics_config (dict): The input file's configuration with metrics and their scaling methods,
-        aggregations, etc. This needs to be metrics_config['metrics'][dataset_name], rather than
-        the full config file.
+    - df_metrics_config (dict): The input file's configuration with metrics and their scaling
+        methods, aggregations, etc. This needs to be metrics_config['metrics'][dataset_name],
+        rather than the full config file.
 
     Returns:
     - df (pd.DataFrame): The preprocessed DataFrame.
