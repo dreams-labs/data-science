@@ -1,8 +1,6 @@
 """
 functions used to build coin-level features from training data
 """
-# pylint: disable=C0301  # lines over 100 chars
-
 import os
 from datetime import datetime
 import time
@@ -208,6 +206,22 @@ def calculate_rolling_window_features(
     # Ensure we're not calculating more periods than we have data for
     actual_lookback_periods = min(lookback_periods, num_complete_periods)
 
+    # Helper function for comparison metric formulas
+    def calculate_comparisons(rolling_window, comparison):
+        """
+        helper function that calculates the comparison metric for the specific rolling window.
+        this helps make the for loop more readable.
+
+        params:
+            - rolling_window (pd.Series): the metric series for the given window only
+            - comparison (string): the type of comparison calculation to perform
+        """
+        if comparison == 'change':
+            return rolling_window.iloc[-1] - rolling_window.iloc[0]
+        elif comparison == 'pct_change':
+            start_value, end_value = rolling_window.iloc[0], rolling_window.iloc[-1]
+            return calculate_adj_pct_change(start_value, end_value)
+
     # Start processing from the last complete period, moving backwards
     for i in range(actual_lookback_periods):
         # Define the start and end of the current rolling window
@@ -216,22 +230,18 @@ def calculate_rolling_window_features(
 
         # Ensure that the start index is not out of bounds
         if start_period >= 0:
-            # Slice the time series to get the data for the current rolling window
             rolling_window = ts.iloc[start_period:end_period]
 
             # Loop through each statistic to calculate for the rolling window
             for stat in rolling_stats:
-                features[f'{metric_name}_{stat}_{window_duration}d_period_{i+1}'] = calculate_stat(rolling_window, stat)
+                stat_key = f'{metric_name}_{stat}_{window_duration}d_period_{i+1}'
+                features[stat_key] = calculate_stat(rolling_window, stat)
 
             # If the rolling window has enough data, calculate comparisons
             if len(rolling_window) > 0:
                 for comparison in comparisons:
-                    if comparison == 'change':
-                        features[f'{metric_name}_change_{window_duration}d_period_{i+1}'] = rolling_window.iloc[-1] - rolling_window.iloc[0]
-                    elif comparison == 'pct_change':
-                        start_value = rolling_window.iloc[0]
-                        end_value = rolling_window.iloc[-1]
-                        features[f'{metric_name}_pct_change_{window_duration}d_period_{i+1}'] = calculate_adj_pct_change(start_value, end_value)
+                    comparison_key = f'{metric_name}_{comparison}_{window_duration}d_period_{i+1}'
+                    features[comparison_key] = calculate_comparisons(rolling_window, comparison)
 
     return features  # Return the dictionary of rolling window features
 
@@ -522,9 +532,12 @@ def create_training_data_df(input_directory, input_filenames):
             for column in df.columns:
                 if column != 'coin_id':
                     column_with_suffix = f"{column}_{suffix}"
+
+                    # Check if suffix exists in the count, increment if necessary
                     if column_with_suffix in column_suffix_count:
                         column_suffix_count[column_with_suffix] += 1
-                        column_with_suffix = f"{column_with_suffix}_{column_suffix_count[column_with_suffix]}"
+                        suffix_count = column_suffix_count[column_with_suffix]
+                        column_with_suffix = f"{column_with_suffix}_{suffix_count}"
                     else:
                         column_suffix_count[column_with_suffix] = 1
 
@@ -548,8 +561,12 @@ def create_training_data_df(input_directory, input_filenames):
         raise ValueError("No preprocessed output files found for the given filenames.")
 
     # Check if all files have identical coin_ids
-    if not all(coin_id_set == coin_id_sets[0] for coin_id_set in coin_id_sets):
-        raise ValueError("Input files do not have the same coin_ids. All files must have matching ids.")
+    base_coin_ids = coin_id_sets[0]
+    non_matching_ids = [coin_id_set for coin_id_set in coin_id_sets if coin_id_set != base_coin_ids]
+    if non_matching_ids:
+        raise ValueError(
+            f"Input files do not have matching coin_ids. Non-matching ids: {non_matching_ids}"
+        )
 
     # Log the results
     logger.info("%d files were successfully merged.", len(df_list))
@@ -585,14 +602,24 @@ def create_target_variables_mooncrater(prices_df, training_data_config, modeling
 
     # Filter for the modeling period and sort the DataFrame
     prices_df['date'] = pd.to_datetime(prices_df['date'])
-    modeling_period_df = prices_df[(prices_df['date'] >= modeling_period_start) & (prices_df['date'] <= modeling_period_end)]
+    modeling_period_df = prices_df[
+        (prices_df['date'] >= modeling_period_start) &
+        (prices_df['date'] <= modeling_period_end)
+    ]
     modeling_period_df = modeling_period_df.sort_values(by=['coin_id', 'date'])
 
     # Raise an exception if any coins are missing a price at the start or end date
-    missing_start_price = modeling_period_df[modeling_period_df['date'] == modeling_period_start]['coin_id'].unique()
-    missing_end_price = modeling_period_df[modeling_period_df['date'] == modeling_period_end]['coin_id'].unique()
+    start_price_coins = modeling_period_df[
+        modeling_period_df['date'] == modeling_period_start
+    ]['coin_id'].unique()
+
+    end_price_coins = modeling_period_df[
+        modeling_period_df['date'] == modeling_period_end
+    ]['coin_id'].unique()
+
     all_coins = modeling_period_df['coin_id'].unique()
-    coins_missing_price = set(all_coins) - set(missing_start_price) - set(missing_end_price)
+    coins_missing_price = set(all_coins) - set(start_price_coins) - set(end_price_coins)
+
     if coins_missing_price:
         missing = ', '.join(map(str, coins_missing_price))
         raise ValueError(f"Missing price for coins at start or end date: {missing}")
@@ -623,7 +650,9 @@ def create_target_variables_mooncrater(prices_df, training_data_config, modeling
                 outcomes.append({'coin_id': coin_id, 'outcome': 'missing end price'})
 
     # Log outcomes for coins with no data in the modeling period
-    coins_with_no_data = set(prices_df['coin_id'].unique()) - set(modeling_period_df['coin_id'].unique())
+    all_coins = set(prices_df['coin_id'].unique())
+    modeling_period_coins = set(modeling_period_df['coin_id'].unique())
+    coins_with_no_data = all_coins - modeling_period_coins
     for coin_id in coins_with_no_data:
         outcomes.append({'coin_id': coin_id, 'outcome': 'missing both'})
 
