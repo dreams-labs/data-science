@@ -199,7 +199,7 @@ def test_fe_calculate_global_stats():
     }
 
     no_stats = fe.calculate_global_stats(sample_ts, 'buyers_new', no_stats_config)
-    assert no_stats == {}  # Should return an empty dictionary since no stats are defined
+    assert not no_stats  # Should return an empty dictionary since no stats are defined
 
 
 
@@ -250,7 +250,8 @@ def test_fe_calculate_rolling_window_features():
 
 
     # Test Case 1: Multiple periods with complete windows (10 records, 3 periods, window_duration=3)
-    rolling_features = fe.calculate_rolling_window_features(ts, window_duration, lookback_periods, rolling_stats, comparisons, metric_name)
+    rolling_features = fe.calculate_rolling_window_features(
+        ts, window_duration, lookback_periods, rolling_stats, comparisons, metric_name)
 
     assert rolling_features['buyers_new_sum_3d_period_1'] == 27  # Last 3 records: 9+10+8 = 27
     assert rolling_features['buyers_new_max_3d_period_1'] == 10
@@ -263,7 +264,8 @@ def test_fe_calculate_rolling_window_features():
 
 
     # Test Case 2: Non-divisible records (8 records, window_duration=3)
-    rolling_features_partial_window = fe.calculate_rolling_window_features(ts_with_8_records, 3, 3, ['sum', 'max'], ['change', 'pct_change'], metric_name)
+    rolling_features_partial_window = fe.calculate_rolling_window_features(
+        ts_with_8_records, 3, 3, ['sum', 'max'], ['change', 'pct_change'], metric_name)
 
     # Only two full periods (6-8 and 3-5), so period 3 should not exist
     assert rolling_features_partial_window['buyers_new_sum_3d_period_1'] == 21  # Last 3 records: 6+7+8
@@ -275,14 +277,16 @@ def test_fe_calculate_rolling_window_features():
 
 
     # Test Case 3: Small dataset (2 records)
-    rolling_features_small_ts = fe.calculate_rolling_window_features(small_ts, window_duration, lookback_periods, rolling_stats, comparisons, metric_name)
+    rolling_features_small_ts = fe.calculate_rolling_window_features(
+        small_ts, window_duration, lookback_periods, rolling_stats, comparisons, metric_name)
 
     # No valid 3-period windows exist, so the function should handle it gracefully
-    assert rolling_features_small_ts == {}  # Expect empty dict since window is larger than available data
+    assert not rolling_features_small_ts  # Expect empty dict since window is larger than available data
 
 
     # Test Case 4: Check std and median specifically with window of 3 and valid lookback periods
-    rolling_features_std_median = fe.calculate_rolling_window_features(ts, window_duration, lookback_periods, ['std', 'median'], comparisons, metric_name)
+    rolling_features_std_median = fe.calculate_rolling_window_features(
+        ts, window_duration, lookback_periods, ['std', 'median'], comparisons, metric_name)
 
     # Check for standard deviation and median over the last 3 periods
     assert round(rolling_features_std_median['buyers_new_std_3d_period_1'], 5) == round(ts.iloc[-3:].std(), 5)
@@ -293,7 +297,8 @@ def test_fe_calculate_rolling_window_features():
 
     # Test Case 5: Handle pct_change with impute_value logic (start_value=0)
     ts_with_zeros = pd.Series([0, 0, 5, 10, 15, 20])
-    rolling_features_zeros = fe.calculate_rolling_window_features(ts_with_zeros, window_duration, lookback_periods, ['sum'], comparisons, metric_name)
+    rolling_features_zeros = fe.calculate_rolling_window_features(
+        ts_with_zeros, window_duration, lookback_periods, ['sum'], comparisons, metric_name)
 
     assert 'buyers_new_pct_change_3d_period_1' in rolling_features_zeros
     assert rolling_features_zeros['buyers_new_pct_change_3d_period_2'] <= 1000  # Ensure capping at 1000%
@@ -582,13 +587,12 @@ def mock_metrics_config():
     This configuration includes settings for scaling different features.
     """
     return {
-        'metrics': {
             'feature_1': {
                 'aggregations': {
                     'sum': {'scaling': 'standard'}
+                    ,'max': {}
                 }
             }
-        }
     }
 
 @pytest.fixture
@@ -795,6 +799,9 @@ def test_duplicate_coin_id(mock_input_files):
 
 @pytest.mark.unit
 def test_create_target_variables_mooncrater():
+    """
+    tests whether ths is_moon and is_crater target variables are calculated correctly.
+    """
     # Mock data
     data = {
         'coin_id': ['coin1', 'coin2', 'coin3', 'coin4', 'coin5', 'coin1', 'coin2', 'coin3', 'coin4', 'coin5'],
