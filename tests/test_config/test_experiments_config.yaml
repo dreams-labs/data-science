@@ -52,7 +52,7 @@ variable_overrides:
 
 
   metrics_config:
-    metrics:
+    wallet_cohorts:
       sharks:
         buyers_new:
           aggregations:

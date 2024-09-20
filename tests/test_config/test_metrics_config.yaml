@@ -10,7 +10,7 @@
 # lookback_periods:
 #   - Defines how many periods to look back when calculating rolling stats (e.g., 8 means calculate rolling stats over 8 previous periods)
 
-metrics:
+wallet_cohorts:
   sharks:
     buyers_new:
       aggregations:
@@ -90,3 +90,19 @@ metrics:
             scaling: "none"        # No scaling for percentage change, as it's already normalized.
         window_duration: 14
         lookback_periods: 4
+
+# New top-level section for time series
+time_series_metrics:
+  # Specify which DataFrame the metrics apply to
+  prices:
+    metrics:
+      sma:
+        period: 20
+        scaling: "standard"
+      ema:
+        period: 20
+        scaling: "minmax"
+      bollinger_bands:
+        period: 20
+        std_dev: 2
+        scaling: "none"

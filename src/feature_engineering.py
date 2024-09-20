@@ -385,8 +385,7 @@ def preprocess_coin_df(input_path, modeling_config, df_metrics_config):
     - input_path (str): Path to the flattened CSV file.
     - modeling_config (dict): Configuration with modeling-specific parameters.
     - df_metrics_config (dict): The input file's configuration with metrics and their scaling
-        methods, aggregations, etc. This needs to be metrics_config['metrics'][dataset_name],
-        rather than the full config file.
+        methods, aggregations, etc.
 
     Returns:
     - df (pd.DataFrame): The preprocessed DataFrame.

@@ -15,7 +15,7 @@ logger = dc.setup_logger()
 
 def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets):
     """
-    Generates buysell metrics for all cohort coins by looping through each coin_id and applying 
+    Generates buysell metrics for all cohort coins by looping through each coin_id and applying
     calculate_buysell_coin_metrics_df().
 
     Parameters:
@@ -24,9 +24,9 @@ def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets):
     - cohort_wallets (array-like): List of wallet addresses to include.
 
     Returns:
-    - buysell_metrics_df (pd.DataFrame): DataFrame keyed date-coin_id that includes various metrics 
-        about the cohort's buying, selling, and holding behavior. This date is filled to have a row for 
-        every coin_id-date pair through the training_period_end. 
+    - buysell_metrics_df (pd.DataFrame): DataFrame keyed date-coin_id that includes various metrics
+        about the cohort's buying, selling, and holding behavior. This date is filled to have a row for
+        every coin_id-date pair through the training_period_end.
     """
     start_time = time.time()
     logger.info('Preparing buysell_metrics_df...')
@@ -108,7 +108,7 @@ def generate_coin_buysell_metrics_df(coin_cohort_profits_df):
 
     params:
     - coin_cohort_profits_df (dataframe): df showing profits data for a single coin_id
-    
+
     returns:
     - buysell_metrics_df (dataframe): df of metrics on new/repeat buyers/sellers and transaction totals on each date
     '''
@@ -163,13 +163,13 @@ def generate_coin_buysell_metrics_df(coin_cohort_profits_df):
 def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
     """
     Fills missing dates in buysell_metrics_df and applies appropriate logic to fill NaN values for each metric.
-    
+
     This function:
     - Adds rows with missing dates (if any) between the latest date in buysell_metrics_df and the training_period_end.
     - Fills NaN values for buy/sell metrics, balances, and other key metrics according to the following rules:
       - total_balance and total_holders: forward-filled (if no activity, assume balances/holders remain the same).
       - total_bought, total_sold, total_net_transfers, total_volume, buyers_new, buyers_repeat, sellers_new, sellers_repeat: filled with 0 (if no activity, assume no transactions).
-    
+
     Parameters:
     - buysell_metrics_df: DataFrame containing buy/sell metrics keyed on coin_id-date
     - training_period_end: The end of the training period (datetime)
@@ -177,7 +177,7 @@ def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
     Returns:
     - buysell_metrics_df with missing dates and NaN values appropriately filled.
     """
-    
+
     # Identify the expected rows for all coin_id-date pairs
     min_date = buysell_metrics_df['date'].min()
     full_date_range = pd.date_range(start=min_date, end=training_period_end, freq='D')
@@ -203,13 +203,13 @@ def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
             # After the forward-fill, fill 0 for dates earlier than the first balance/holders records
             total_balance=buysell_metrics_df.groupby('coin_id')['total_balance'].ffill().fillna(0),
             total_holders=buysell_metrics_df.groupby('coin_id')['total_holders'].ffill().fillna(0),
-            
+
             # Fill 0 for metrics related to transactions (buying, selling) that should be 0 when there's no activity
             total_bought=buysell_metrics_df['total_bought'].fillna(0),
             total_sold=buysell_metrics_df['total_sold'].fillna(0),
             total_net_transfers=buysell_metrics_df['total_net_transfers'].fillna(0),
             total_volume=buysell_metrics_df['total_volume'].fillna(0),
-            
+
             # Fill 0 for buyer/seller counts on days with no transactions
             buyers_new=buysell_metrics_df['buyers_new'].fillna(0),
             buyers_repeat=buysell_metrics_df['buyers_repeat'].fillna(0),
@@ -220,17 +220,21 @@ def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
         )
         ,include_groups=False  # Exclude the grouping columns (coin_id) from the operation
     ).reset_index(drop=True)
-    
+
     return buysell_metrics_df
+
+
+
+
 
 
 # def prepare_cohort_profits_df(profits_df,cohort_wallets,cohort_coins):
 #     '''
 #     Prepare a simplified version of profits_df for analysis based on the given wallet cohort and coin list.
 
-#     runs two bigquery queries to retrieve the dfs necessary for wallet metric calculation. 
-#     note that the all_balances_df is very large as it contains all transfer-days for all coins, 
-#     which is why metadata is stored in a separate much smaller table. 
+#     runs two bigquery queries to retrieve the dfs necessary for wallet metric calculation.
+#     note that the all_balances_df is very large as it contains all transfer-days for all coins,
+#     which is why metadata is stored in a separate much smaller table.
 
 #     Parameters:
 #     - cohort_wallets (array-like): List of wallet addresses to include.
@@ -283,7 +287,7 @@ def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
 # def resample_profits_df(cohort_profits_df, resampling_period=3):
 #     '''
 #     Resamples the cohort_profits_df over a specified resampling time period by aggregating coin-wallet
-#     pair activity within each resampling period. 
+#     pair activity within each resampling period.
 
 #     Parameters:
 #     - cohort_profits_df (pd.DataFrame): DataFrame containing profits data for wallet-coin pairs.
@@ -488,7 +492,7 @@ def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
 
 #     params:
 #     - balances_df (dataframe): df showing daily wallet balances of a coin_id token that \
-#         has been filtered to only include one coin_id. 
+#         has been filtered to only include one coin_id.
 
 #     returns:
 #     - gini_df (dataframe): df with dates as the index and the Gini coefficients as the values.
@@ -549,7 +553,7 @@ def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
 
 #     Parameters:
 #     arr : numpy.ndarray or list
-#         A 1D array or list containing the values for which the Gini coefficient 
+#         A 1D array or list containing the values for which the Gini coefficient
 #         should be calculated. These values represent a distribution (e.g., income, wealth).
 
 #     Returns:
