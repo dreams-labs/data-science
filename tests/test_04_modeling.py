@@ -8,23 +8,24 @@ tests used to audit the files in the data-science/src folder
 # pylint: disable=W0612 # unused variables (due to test reusing functions with 2 outputs)
 # pylint: disable=W0621 # redefining from outer scope triggering on pytest fixtures
 # pylint: disable=E0401 # can't find import (due to local import)
-
+# pylint: disable=C0103 # X_train violates camelcase
+# pylint: disable=W0613  # unused arguments, some mocked fixtures are "unused" but needed to mock the rest of the data
 
 import sys
 import os
+from unittest import mock
+import json
 import pandas as pd
 import numpy as np
 from dotenv import load_dotenv
-import json
 import pytest
-from unittest import mock
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
 from dreams_core import core as dc
 
+# pyright: reportMissingImports=false
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
-import modeling as m # type: ignore[reportMissingImports]
-from utils import load_config # type: ignore[reportMissingImports]
+import modeling as m
+from utils import load_config
 
 load_dotenv()
 logger = dc.setup_logger()
@@ -42,8 +43,11 @@ logger = dc.setup_logger()
 # split_model_input() unit tests
 # ---------------------------------- #
 
-# Helper function to create a DataFrame with specified features,
+
 def create_dataframe(features, target, coin_id=True):
+    """
+    Helper function to create a DataFrame with specified features,
+    """
     data = pd.DataFrame(features)
     data['target'] = target
     if coin_id:
@@ -57,7 +61,7 @@ def test_missing_coin_id():
     """
     # Create a DataFrame without 'coin_id' column
     data = create_dataframe({'feature1': [1, 2, 3], 'feature2': [4, 5, 6]}, [0, 1, 0], coin_id=False)
-    
+
     with pytest.raises(ValueError, match="'coin_id' column is required in the DataFrame"):
         m.split_model_input(data, 'target')
 
@@ -68,7 +72,7 @@ def test_missing_values_in_features():
     """
     # Create a DataFrame with missing values in features
     data = create_dataframe({'feature1': [1, 2, np.nan, 4, 5, 6, 7, 8, 9, 10], 'feature2': [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]}, [0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
-    
+
     with pytest.raises(ValueError, match="Features contain missing values"):
         m.split_model_input(data, 'target')
 
@@ -79,7 +83,7 @@ def test_missing_values_in_target():
     """
     # Create a DataFrame with missing values in the target
     data = create_dataframe({'feature1': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 'feature2': [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]}, [0, np.nan, 1, 0, 1, 0, 1, 0, 1, 0])
-    
+
     with pytest.raises(ValueError, match="Target column contains missing values"):
         m.split_model_input(data, 'target')
 
@@ -90,7 +94,7 @@ def test_dataset_too_small():
     """
     # Create a DataFrame with less than 10 rows
     data = create_dataframe({'feature1': [1, 2], 'feature2': [4, 5]}, [0, 1])
-    
+
     with pytest.raises(ValueError, match="Dataset is too small"):
         m.split_model_input(data, 'target')
 
@@ -101,7 +105,7 @@ def test_imbalanced_target():
     """
     # Create a DataFrame with an imbalanced target and 10 rows
     data = create_dataframe({'feature1': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 'feature2': [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]}, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
-    
+
     with pytest.raises(ValueError, match="Target is heavily imbalanced"):
         m.split_model_input(data, 'target')
 
@@ -112,7 +116,7 @@ def test_non_numeric_features():
     """
     # Create a DataFrame with non-numeric features and 10 rows
     data = create_dataframe({'feature1': ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'], 'feature2': ['x', 'y', 'z', 'a', 'b', 'c', 'd', 'e', 'f', 'g']}, [0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
-    
+
     with pytest.raises(ValueError, match="Features contain non-numeric data"):
         m.split_model_input(data, 'target')
 
@@ -123,7 +127,7 @@ def test_one_class_in_target():
     """
     # Create a DataFrame where the target has only one class and 10 rows
     data = create_dataframe({'feature1': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 'feature2': [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]}, [1, 0, 1, 1, 1, 1, 1, 1, 1, 1])
-    
+
     with pytest.raises(ValueError, match="y_train or y_test contains only one class"):
         m.split_model_input(data, 'target')
 
@@ -153,7 +157,7 @@ def modeling_folder():
     Fixture that returns the path to the test_modeling folder.
     This folder is assumed to be in the same directory as the test files.
     """
-    return "test_modeling"  # Relative path to the test_modeling folder
+    return "tests/test_modeling"  # Relative path to the test_modeling folder
 
 @pytest.fixture
 def setup_modeling_folders(modeling_folder):
@@ -168,7 +172,7 @@ def setup_modeling_folders(modeling_folder):
 @pytest.mark.unit
 @mock.patch('joblib.dump')  # Only mock saving the model, not folder creation
 @mock.patch('builtins.open', new_callable=mock.mock_open)  # Mock the open function for file writing
-def test_basic_functionality(mock_open, mock_dump, sample_data, setup_modeling_folders, modeling_folder):
+def test_basic_functionality(mock_open, mock_dump, sample_data, modeling_folder):
     """
     Test basic functionality of the train_model function.
     Ensures model is trained, files are saved, and a model ID is generated.
@@ -258,7 +262,7 @@ def test_feature_importance_validation(mock_open, mock_dump, mock_read_csv, mock
 
     # Mock reading the feature importance CSV file
     feature_importances_path = os.path.join(modeling_folder, "outputs", "feature_importance", f"feature_importance_{model_id}.csv")
-    
+
     # Now check that the read content matches the expected importances
     feature_importances = pd.read_csv(feature_importances_path)
 
@@ -338,11 +342,11 @@ def test_log_trial_results_normal_case(mock_modeling_folder, mock_log_file, mock
 
     # Call the function
     trial_log_filename = m.log_trial_results(mock_modeling_folder, model_id, experiment_id, trial_overrides)
-    
+
     # Open and read the generated trial log file
     with open(trial_log_filename, 'r', encoding='utf-8') as log_file:
         trial_log = json.load(log_file)
-    
+
     # Assertions to check correctness of logged data
     assert trial_log["experiment_id"] == experiment_id
     assert trial_log["model_id"] == model_id
@@ -357,7 +361,7 @@ def test_log_trial_results_missing_experiment_tracking_folder(mock_modeling_fold
     expecting FileNotFoundError.
     """
     trial_overrides = {"learning_rate": 0.01}
-    
+
     # Remove the experiment_tracking folder
     experiment_tracking_path = mock_modeling_folder / "outputs" / "experiment_tracking"
     os.rmdir(experiment_tracking_path)
@@ -405,11 +409,11 @@ def test_log_trial_results_missing_feature_importance_file(mock_modeling_folder,
 
     # Call the function
     trial_log_filename = m.log_trial_results(mock_modeling_folder, model_id, experiment_id, trial_overrides)
-    
+
     # Check the trial log
     with open(trial_log_filename, 'r', encoding='utf-8') as log_file:
         trial_log = json.load(log_file)
-    
+
     # Expect the feature importance to be "N/A"
     assert trial_log["feature_importance"] == "N/A"
 
@@ -425,7 +429,7 @@ def test_log_trial_results_missing_predictions_file(mock_modeling_folder, mock_l
 
     # Call the function
     trial_log_filename = m.log_trial_results(mock_modeling_folder, model_id, experiment_id, trial_overrides)
-    
+
     # Check the trial log
     with open(trial_log_filename, 'r', encoding='utf-8') as log_file:
         trial_log = json.load(log_file)
@@ -440,11 +444,11 @@ def test_log_trial_results_empty_metrics_file(mock_modeling_folder, mock_log_fil
     Test case where the metrics CSV file is empty, expecting a pandas.errors.EmptyDataError.
     """
     trial_overrides = {"learning_rate": 0.01}
-    
+
     # Create an empty metrics file
     metrics_path = mock_modeling_folder / "outputs" / "performance_metrics" / f"metrics_{model_id}.csv"
     pd.DataFrame().to_csv(metrics_path, index=False)
-    
+
     # Expect an EmptyDataError when trying to read an empty CSV
     with pytest.raises(pd.errors.EmptyDataError):
         m.log_trial_results(mock_modeling_folder, model_id, experiment_id, trial_overrides)
@@ -503,4 +507,3 @@ def buysell_metrics_df():
 # ---------------------------------- #
 # flatten_coin_date_df() integration tests
 # ---------------------------------- #
-
