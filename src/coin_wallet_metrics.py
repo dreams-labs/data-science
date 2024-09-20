@@ -225,6 +225,65 @@ def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
 
 
 
+def generate_time_series_metrics(
+        time_series_df: pd.DataFrame,
+        metrics_config: dict,
+        dataset_key: str,
+        colname: str
+    ) -> pd.DataFrame:
+    """
+    Generates time series metrics (e.g., SMA, EMA) based on the given config.
+
+    Params:
+    - time_series_df (pd.DataFrame): The input DataFrame with time series data.
+    - metrics_config: The full metrics_config file with a time_series key that matches the dataset_key param.
+    - dataset_key (string): The dataset's key in the metrics_config['time_series'] section.
+    - colname (string): The name of the column that the metrics should be calculated for (e.g., 'price').
+
+    Returns:
+    - time_series_metrics_df (pd.DataFrame): The input DataFrame with the configured metrics added as new columns.
+    """
+
+    # Retrieve relevant metrics configuration
+    try:
+        time_series_metrics_config = metrics_config['time_series'][dataset_key]
+    except KeyError as exc:
+        raise KeyError(f"Key {dataset_key} not found in metrics_config['time_series']") from exc
+
+    # Ensure date is in datetime format and sorted by coin_id and date
+    time_series_df['date'] = pd.to_datetime(time_series_df['date'])
+    time_series_df = time_series_df.sort_values(by=['coin_id', 'date'])
+
+    # Loop over each coin_id group
+    for _, group in time_series_df.groupby('coin_id'):
+        for metric, config in time_series_metrics_config.items():
+            period = config['parameters']['period']
+
+            # Create the dynamic column name, e.g., 'prices_sma_20'
+            metric_colname = f'{dataset_key}_{metric}_{period}'
+
+            # Calculate the corresponding metric
+            if metric == 'sma':
+                sma = calculate_sma(group[colname], period)
+                time_series_df.loc[group.index, metric_colname] = sma
+
+            elif metric == 'ema':
+                ema = calculate_ema(group[colname], period)
+                time_series_df.loc[group.index, metric_colname] = ema
+
+    # Include all dynamically created columns in the return DataFrame
+    dynamic_cols = [col for col in time_series_df.columns if col.startswith(f'{dataset_key}_')]
+    time_series_metrics_df = time_series_df[['coin_id', 'date', colname] + dynamic_cols]
+
+    return time_series_metrics_df
+
+def calculate_sma(timeseries: pd.Series, period: int) -> pd.Series:
+    """Calculates Simple Moving Average (SMA) for a given time series."""
+    return timeseries.rolling(window=period).mean()
+
+def calculate_ema(timeseries: pd.Series, period: int) -> pd.Series:
+    """Calculates Exponential Moving Average (EMA) for a given time series."""
+    return timeseries.ewm(span=period, adjust=False).mean()
 
 
 
