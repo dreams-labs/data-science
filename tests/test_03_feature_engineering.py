@@ -18,10 +18,10 @@ from dotenv import load_dotenv
 import pytest
 from dreams_core import core as dc
 
-
+# pyright: reportMissingImports=false
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
-import feature_engineering as fe # type: ignore[reportMissingImports]
-from utils import load_config # type: ignore[reportMissingImports]
+import feature_engineering as fe
+from utils import load_config
 
 load_dotenv()
 logger = dc.setup_logger()
@@ -45,7 +45,7 @@ logger = dc.setup_logger()
 def test_fe_calculate_stat():
     """
     basic tests for calculation, ensuring that the inputs map to the correct
-    functions and that an invalid input raises an error. 
+    functions and that an invalid input raises an error.
     """
     # Sample data for testing
     sample_series = pd.Series([1, 2, 3, 4, 5])
@@ -53,26 +53,26 @@ def test_fe_calculate_stat():
 
     # Test sum
     assert fe.calculate_stat(sample_series, 'sum') == 15
-    
+
     # Test mean
     assert fe.calculate_stat(sample_series, 'mean') == 3
-    
+
     # Test median
     assert fe.calculate_stat(sample_series, 'median') == 3
-    
+
     # Test std (rounded for comparison)
     assert round(fe.calculate_stat(sample_series, 'std'), 5) == round(sample_series.std(), 5)
-    
+
     # Test max
     assert fe.calculate_stat(sample_series, 'max') == 5
-    
+
     # Test min
     assert fe.calculate_stat(sample_series, 'min') == 1
-    
+
     # Test invalid statistic
     with pytest.raises(KeyError):
         fe.calculate_stat(sample_series, 'invalid_stat')
-    
+
     # Test empty series
     assert np.isnan(fe.calculate_stat(empty_series, 'mean'))
     assert fe.calculate_stat(empty_series, 'sum') == 0
@@ -87,7 +87,7 @@ def test_fe_calculate_stat():
 def test_calculate_adj_pct_change():
     """
     Unit tests for the calculate_adj_pct_change function.
-    
+
     Tests:
     1. Standard case (non-zero values)
     2. Zero start, non-zero end (capped)
@@ -101,27 +101,27 @@ def test_calculate_adj_pct_change():
     # Test 1: Standard Case
     result = fe.calculate_adj_pct_change(100, 150, 1000)
     assert result == 50, f"Expected 50, got {result}"
-    
+
     # Test 2: Zero Start, Non-Zero End (Capped)
     result = fe.calculate_adj_pct_change(0, 100, 1000)
     assert result == 1000, f"Expected 1000 (capped), got {result}"
-    
+
     # Test 3: Zero Start, Zero End (0/0 case)
     result = fe.calculate_adj_pct_change(0, 0, 1000)
     assert result == 0, f"Expected 0 for 0/0 case, got {result}"
-    
+
     # Test 4: Negative Start to Positive End
     result = fe.calculate_adj_pct_change(-50, 100, 1000)
     assert result == -300, f"Expected -300, got {result}"
-    
+
     # Test 5: Start Greater than End (Decrease)
     result = fe.calculate_adj_pct_change(200, 100, 1000)
     assert result == -50, f"Expected -50, got {result}"
-    
+
     # Test 6: Small Positive Change (Cap not breached)
     result = fe.calculate_adj_pct_change(0, 6, 1000, 1)
     assert result == 500, f"Expected 500, got {result}"
-    
+
     # Test 7: Large Increase (Capped at 1000%)
     result = fe.calculate_adj_pct_change(10, 800, 1000)
     assert result == 1000, f"Expected 1000 (capped), got {result}"
@@ -150,14 +150,14 @@ def test_fe_calculate_global_stats():
             'buyers_new': ['sum', 'mean']
         }
     }
-    
+
     multiple_metrics_config = {
         'metrics': {
             'buyers_new': ['sum', 'mean'],
             'sellers_new': ['median', 'std']
         }
     }
-    
+
     empty_ts = pd.Series([])
     single_value_ts = pd.Series([10])
     sample_ts = pd.Series([1, 2, 3, 4, 5])
@@ -166,38 +166,38 @@ def test_fe_calculate_global_stats():
     basic_stats = fe.calculate_global_stats(sample_ts, 'buyers_new', basic_config)
     assert basic_stats['buyers_new_sum'] == 15
     assert basic_stats['buyers_new_mean'] == 3
-    
+
     # Test Case 2: Multiple metrics with different stats
     sample_coin_df = pd.DataFrame({
         'buyers_new': [1, 2, 3, 4, 5],
         'sellers_new': [5, 4, 3, 2, 1]
     })
-    
+
     multiple_stats = fe.calculate_global_stats(sample_coin_df['buyers_new'], 'buyers_new', multiple_metrics_config)
     assert multiple_stats['buyers_new_sum'] == 15
     assert multiple_stats['buyers_new_mean'] == 3
-    
+
     multiple_stats = fe.calculate_global_stats(sample_coin_df['sellers_new'], 'sellers_new', multiple_metrics_config)
     assert multiple_stats['sellers_new_median'] == 3
     assert round(multiple_stats['sellers_new_std'], 5) == round(sample_coin_df['sellers_new'].std(), 5)
-    
+
     # Test Case 3: Empty time series should return NaN or 0 for certain stats
     empty_stats = fe.calculate_global_stats(empty_ts, 'buyers_new', basic_config)
     assert pd.isna(empty_stats['buyers_new_mean'])
     assert empty_stats['buyers_new_sum'] == 0
-    
+
     # Test Case 4: Single value time series
     single_value_stats = fe.calculate_global_stats(single_value_ts, 'buyers_new', basic_config)
     assert single_value_stats['buyers_new_sum'] == 10
     assert single_value_stats['buyers_new_mean'] == 10
-    
+
     # Test Case 5: No stats defined for the given metric
     no_stats_config = {
         'metrics': {
             'buyers_new': []
         }
     }
-    
+
     no_stats = fe.calculate_global_stats(sample_ts, 'buyers_new', no_stats_config)
     assert no_stats == {}  # Should return an empty dictionary since no stats are defined
 
@@ -309,16 +309,16 @@ def test_fe_flatten_coin_features():
     Unit test for the flatten_coin_features function, which flattens metrics for a single coin.
 
     Test Cases:
-    1. Basic functionality: Tests that the function correctly aggregates columns like 'buyers_new' 
+    1. Basic functionality: Tests that the function correctly aggregates columns like 'buyers_new'
        and 'sellers_new' with specified aggregations (sum, mean, max, etc.) based on the sample data.
-    2. Missing metric column: Ensures that the function raises a ValueError if a required metric 
+    2. Missing metric column: Ensures that the function raises a ValueError if a required metric
        is missing from the input DataFrame.
-    3. Missing 'coin_id' column: Verifies that the function raises a ValueError if the input 
+    3. Missing 'coin_id' column: Verifies that the function raises a ValueError if the input
        DataFrame does not contain a 'coin_id' column.
-    4. Invalid aggregation function: Tests that the function raises a KeyError if an unrecognized 
+    4. Invalid aggregation function: Tests that the function raises a KeyError if an unrecognized
        aggregation function is specified in the configuration.
-    5. Rolling window metrics: Tests the rolling window functionality, ensuring that the correct 
-       rolling stats (e.g., sum, max) and comparisons (change, pct_change) are calculated over 
+    5. Rolling window metrics: Tests the rolling window functionality, ensuring that the correct
+       rolling stats (e.g., sum, max) and comparisons (change, pct_change) are calculated over
        specified windows.
     """
     # Sample DataFrame for testing
@@ -327,7 +327,7 @@ def test_fe_flatten_coin_features():
         'buyers_new': [10, 20, 30, 40, 50, 60],
         'sellers_new': [5, 10, 15, 20, 25, 30]
     })
-    
+
     # Sample configuration for metrics
     metrics_config = {
         'metrics': {
@@ -348,7 +348,7 @@ def test_fe_flatten_coin_features():
 
     # Test Case 1: Basic functionality with all metrics present
     flat_features = fe.flatten_coin_features(sample_coin_df, metrics_config)
-    
+
     assert flat_features['buyers_new_sum'] == 210  # Sum of buyers_new column
     assert flat_features['buyers_new_mean'] == 35   # Mean of buyers_new column
     assert flat_features['buyers_new_max'] == 60    # Max of buyers_new column
@@ -384,7 +384,7 @@ def test_fe_flatten_coin_features():
 
     # Test Case 5: Rolling window metrics
     rolling_features = fe.flatten_coin_features(sample_coin_df, metrics_config)
-    
+
     assert 'buyers_new_sum_3d_period_1' in rolling_features  # Ensure rolling stats are calculated
     assert 'buyers_new_max_3d_period_1' in rolling_features
     assert 'buyers_new_sum_3d_period_2' in rolling_features
@@ -403,14 +403,14 @@ def test_fe_flatten_coin_date_df():
     Unit test for the flatten_coin_date_df function, which flattens metrics over multiple coins and dates.
 
     Test Cases:
-    1. Basic functionality with multiple coins: Tests that the function correctly aggregates metrics 
-       (e.g., 'buyers_new', 'sellers_new') for multiple coins across multiple dates, and that the 
+    1. Basic functionality with multiple coins: Tests that the function correctly aggregates metrics
+       (e.g., 'buyers_new', 'sellers_new') for multiple coins across multiple dates, and that the
        output contains all expected columns.
-    2. Missing metric data: Ensures that the function raises a ValueError when a required metric 
+    2. Missing metric data: Ensures that the function raises a ValueError when a required metric
        (e.g., 'buyers_new') is missing from the input DataFrame.
-    3. Empty DataFrame: Verifies that the function raises a ValueError when an empty DataFrame 
+    3. Empty DataFrame: Verifies that the function raises a ValueError when an empty DataFrame
        is provided as input.
-    4. One coin in the dataset: Tests that the function correctly processes a dataset containing 
+    4. One coin in the dataset: Tests that the function correctly processes a dataset containing
        only one coin and generates the expected columns and values.
     """
     # Sample data for testing
@@ -433,7 +433,7 @@ def test_fe_flatten_coin_date_df():
         }
     }
 
-    # demo 
+    # demo
     training_period_end = '2024-01-03'
 
     # Test Case 1: Basic functionality with multiple coins
@@ -445,7 +445,7 @@ def test_fe_flatten_coin_date_df():
 
     # Check that all expected columns exist for both coins
     expected_columns = [
-        'coin_id', 'buyers_new_sum', 'buyers_new_mean', 'buyers_new_max', 'buyers_new_min', 
+        'coin_id', 'buyers_new_sum', 'buyers_new_mean', 'buyers_new_max', 'buyers_new_min',
         'buyers_new_median', 'buyers_new_std', 'sellers_new_sum', 'sellers_new_mean', 'sellers_new_max'
     ]
     assert all(col in result.columns for col in expected_columns)
@@ -525,7 +525,7 @@ def test_save_flattened_outputs(mock_coin_df):
 
     # Call the function to save the CSV and get the DataFrame and output path
     _, saved_file_path = fe.save_flattened_outputs(mock_coin_df, test_output_path, metric_description, modeling_period_start)
-    
+
     # Assert that the file was created
     assert os.path.exists(saved_file_path), f"File was not saved at {saved_file_path}"
 
@@ -596,7 +596,7 @@ def mock_input_df():
     """
     Creates a mock DataFrame and saves it as a CSV for testing.
     The CSV file is saved in the 'tests/test_modeling/outputs/flattened_outputs' directory.
-    
+
     Returns:
     - input_path: Path to the CSV file.
     - df: Original mock DataFrame.
@@ -615,24 +615,24 @@ def mock_input_df():
 def test_preprocess_coin_df_drops_columns(mock_modeling_config, mock_metrics_config, mock_input_df):
     """
     Tests that the preprocess_coin_df function correctly drops the specified columns.
-    
+
     Steps:
     - Preprocesses the mock DataFrame by dropping the 'feature_to_drop' column.
     - Asserts that the output CSV is created and the column was dropped.
     - Cleans up the test files after execution.
     """
     input_path, original_df = mock_input_df
-    
+
     # Call the function
     output_df, output_path = fe.preprocess_coin_df(input_path, mock_modeling_config, mock_metrics_config)
-    
+
     # Check that the output file exists
     assert os.path.exists(output_path), "Output CSV file was not created."
-    
+
     # Check that the 'feature_to_drop' column is missing in the output DataFrame
     assert 'feature_to_drop' not in output_df.columns, "Column 'feature_to_drop' was not dropped."
     assert len(output_df.columns) == len(original_df.columns) - 1, "Unexpected number of columns after preprocessing."
-    
+
     # Cleanup (remove the test files)
     os.remove(output_path)
     os.remove(input_path)
@@ -641,22 +641,22 @@ def test_preprocess_coin_df_drops_columns(mock_modeling_config, mock_metrics_con
 def test_preprocess_coin_df_scaling(mock_modeling_config, mock_metrics_config, mock_input_df):
     """
     Tests that the preprocess_coin_df function correctly applies scaling to the specified features.
-    
+
     Steps:
     - Preprocesses the mock DataFrame by applying standard scaling to 'feature_1'.
     - Asserts that the column is scaled correctly.
     - Cleans up the test files after execution.
     """
     input_path, original_df = mock_input_df
-    
+
     # Call the function
     output_df, output_path = fe.preprocess_coin_df(input_path, mock_modeling_config, mock_metrics_config)
-    
+
     # Check that 'feature_1' is scaled (mean should be near 0 and std should be near 1)
     scaled_column = output_df['feature_1_sum']
     assert abs(scaled_column.mean()) < 1e-6, "Standard scaling not applied correctly to 'feature_1_sum'."
     assert abs(np.std(scaled_column) - 1) < 1e-6, "Standard scaling not applied correctly to 'feature_1_sum'."
-    
+
     # Cleanup (remove the test files)
     os.remove(output_path)
     os.remove(input_path)
@@ -680,7 +680,7 @@ def mock_input_files_colnames(tmpdir):
         'buysell_metrics_megasharks_2024-09-13_14-45_model_period_2024-05-01_v0.2.csv',
         'price_metrics_2024-09-13_14-45_model_period_2024-05-01_v0.1.csv'
     ]
-    
+
     # Create mock DataFrames for each file
     df1 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [100, 200]})
     df2 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [150, 250]})
@@ -727,7 +727,7 @@ def mock_input_files(tmpdir):
         'file2_2024-09-13_14-45.csv',
         'file3_2024-09-13_14-46.csv'
     ]
-    
+
     # Create mock DataFrames
     df1 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [100, 200]})
     df2 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [150, 250]})
@@ -907,8 +907,8 @@ def test_aggregation_methods(buysell_metrics_df, metrics_config, config):
     Test that the aggregation methods applied during flattening are correct.
 
     This test verifies that the aggregation of metrics (such as total_bought) is handled correctly
-    by the flatten_coin_date_df function. It compares manually calculated sums for total_bought at 
-    the coin_id level with the corresponding values in the flattened DataFrame, ensuring that the 
+    by the flatten_coin_date_df function. It compares manually calculated sums for total_bought at
+    the coin_id level with the corresponding values in the flattened DataFrame, ensuring that the
     sum matches the expected result.
     """
 
@@ -932,8 +932,8 @@ def test_outlier_handling(buysell_metrics_df, metrics_config, config):
     Test that extreme values (outliers) are correctly handled by the flattening function.
 
     This test introduces an extreme value (outlier) into the buysell_metrics_df and passes it through
-    the flatten_coin_date_df function. It asserts that the extreme value is properly included in the 
-    aggregated total_bought_sum column, ensuring that the function can handle large outliers without 
+    the flatten_coin_date_df function. It asserts that the extreme value is properly included in the
+    aggregated total_bought_sum column, ensuring that the function can handle large outliers without
     breaking or misrepresenting the data.
     """
 
@@ -954,7 +954,7 @@ def test_all_coin_ids_present(buysell_metrics_df, metrics_config, config):
     Test that all coin_ids from the original DataFrame are present in the flattened output.
 
     This test ensures that every coin_id from the buysell_metrics_df is retained in the flattened
-    DataFrame after processing. It verifies that no coin_ids were lost during the flattening process 
+    DataFrame after processing. It verifies that no coin_ids were lost during the flattening process
     by comparing the unique coin_ids in the input with those in the output.
     """
 
