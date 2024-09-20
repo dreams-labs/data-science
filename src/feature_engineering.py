@@ -24,14 +24,14 @@ def flatten_coin_date_df(df, metrics_config, training_period_end):
     Params:
     - df (pd.DataFrame): DataFrame containing time series data for multiple coins (coin_id-date).
     - metrics_config (dict): Configuration object with metric rules from the metrics file.
-    - training_period_end (datetime): The end of the training period to ensure dates are filled until 
+    - training_period_end (datetime): The end of the training period to ensure dates are filled until
         this date and that rolling windows end on the training_period_end
 
     Returns:
     - result (pd.DataFrame): A DataFrame of flattened features for all coins.
 
     Raises:
-    - ValueError: 
+    - ValueError:
         - If the input DataFrame is empty.
         - If the time series data contains missing dates or NaN values.
     """
@@ -41,22 +41,22 @@ def flatten_coin_date_df(df, metrics_config, training_period_end):
     # Check if df is empty
     if df.empty:
         raise ValueError("Input DataFrame is empty. Check your data source and ensure it's populated correctly.")
-    
+
     # Check that all coin-date pairs are complete for the full df
     missing_dates_dict = {}
     for coin_id in df['coin_id'].unique():
 
         coin_df = df[df['coin_id'] == coin_id]
-        
+
         # Create the full date range for the coin, explicitly cast to pd.Timestamp
         full_date_range = pd.to_datetime(pd.date_range(start=coin_df['date'].min(), end=training_period_end)).to_pydatetime()
 
         # Get the existing dates for the coin, explicitly cast to pd.Timestamp
         existing_dates = set(pd.to_datetime(coin_df['date'].unique()).to_pydatetime())
-        
+
         # Find the missing dates by subtracting existing from full date range
         missing_dates = set(full_date_range) - existing_dates
-        
+
         # Store the missing dates for the current coin_id
         missing_dates_dict[coin_id] = sorted(missing_dates)
 
@@ -64,7 +64,7 @@ def flatten_coin_date_df(df, metrics_config, training_period_end):
     missing_dates_df = pd.DataFrame(list(missing_dates_dict.items()), columns=['coin_id', 'missing_dates'])
     if any(len(missing_dates_df) > 0 for missing in missing_dates):
         raise ValueError(f"Timeseries contains missing dates. Ensure all dates are filled up to the training_period_end for all coins. Missing dates found: {missing_dates}")
-    
+
     # Check for NaN values
     if df.isnull().values.any():
         raise ValueError("Timeseries contains NaN values. Ensure imputation is done upstream before calling flatten_coin_date_df().")
@@ -79,7 +79,7 @@ def flatten_coin_date_df(df, metrics_config, training_period_end):
 
 
     # Step 2: Flatten the metrics
-    # ---------------------------    
+    # ---------------------------
     start_time = time.time()
     logger.info("Flattening columns %s into coin-level features...", configured_metrics)
 
@@ -93,13 +93,13 @@ def flatten_coin_date_df(df, metrics_config, training_period_end):
         # Flatten the features for this coin
         flat_features = flatten_coin_features(coin_df, metrics_config)
         all_flat_features.append(flat_features)
-    
+
     # Convert the list of feature dictionaries into a DataFrame
     flattened_df = pd.DataFrame(all_flat_features)
 
     logger.info('Flattened input df into coin-level features with shape %s after %.2f seconds.', flattened_df.shape, time.time() - start_time)
 
-    
+
     return flattened_df
 
 
@@ -122,12 +122,12 @@ def flatten_coin_features(coin_df, metrics_config):
     # Check if the required 'coin_id' column is present
     if 'coin_id' not in coin_df.columns:
         raise ValueError("The input DataFrame is missing the required 'coin_id' column.")
-    
+
     flat_features = {'coin_id': coin_df['coin_id'].iloc[0]}  # Initialize with coin_id
 
     # Access the 'metrics' section directly from the config
     metrics_section = metrics_config.get('metrics', {})
-    
+
     # Apply global stats calculations for each metric
     for metric, config in metrics_section.items():
         if metric not in coin_df.columns:
@@ -188,10 +188,10 @@ def calculate_rolling_window_features(ts, window_duration, lookback_periods, rol
     """
 
     features = {}  # Initialize an empty dictionary to store the rolling window features
-    
+
     # Calculate the total number of complete periods that fit within the time series
     num_complete_periods = len(ts) // window_duration
-    
+
     # Ensure we're not calculating more periods than we have data for
     actual_lookback_periods = min(lookback_periods, num_complete_periods)
 
@@ -228,7 +228,7 @@ def calculate_adj_pct_change(start_value, end_value, cap=1000, impute_value=1):
     """
     Calculates the adjusted percentage change between two values.
     Handles cases where the start_value is 0 by imputing a value and caps extreme percentage changes.
-    
+
     Params:
     - start_value (float): The value at the beginning of the period.
     - end_value (float): The value at the end of the period.
@@ -263,7 +263,7 @@ def calculate_global_stats(ts, metric_name, config):
     Returns:
     - stats (dict): A dictionary containing calculated statistics. The keys are in the format
                     of '{metric_name}_{aggregation}' (e.g., 'buyers_new_sum').
-    
+
     Example:
     If the config specifies 'sum' and 'mean' for 'buyers_new', the result will include:
     {
@@ -272,15 +272,15 @@ def calculate_global_stats(ts, metric_name, config):
     }
     """
     stats = {}  # Initialize an empty dictionary to hold the calculated stats.
-    
+
     # Get the aggregation functions for the given metric from the config.
     metric_config = config['metrics'].get(metric_name, [])
-    
+
     # Loop through each aggregation function and calculate the stat.
     for agg in metric_config:
         # Use the helper function 'calculate_stat' to calculate each aggregation.
         stats[f'{metric_name}_{agg}'] = calculate_stat(ts, agg)
-    
+
     return stats  # Return the dictionary of calculated statistics.
 
 
@@ -295,7 +295,7 @@ def calculate_stat(ts, stat):
 
     Returns:
     - The calculated statistic value.
-    
+
     Raises:
     - KeyError: If the statistic is not recognized.
     """
@@ -331,14 +331,14 @@ def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_per
     - coin_df (pd.DataFrame): The same DataFrame that was passed in.
     - output_path (str): The full path to the saved CSV file.
     """
-    
+
     # Check if 'coin_id' exists and is fully unique
     if 'coin_id' not in coin_df.columns:
         raise ValueError("The DataFrame must contain a 'coin_id' column.")
-    
+
     if not coin_df['coin_id'].is_unique:
         raise ValueError("The 'coin_id' column must have fully unique values.")
-    
+
     # Define filename with metric description and optional description
     timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M')
     filename = f"{metric_description}_{timestamp}_model_period_{modeling_period_start}.csv"
@@ -348,7 +348,7 @@ def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_per
     coin_df.to_csv(output_path, index=False)
 
     logger.debug("Saved flattened outputs to %s", output_path)
-    
+
     return coin_df, output_path
 
 
@@ -356,7 +356,7 @@ def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_per
 def preprocess_coin_df(input_path, modeling_config, metrics_config):
     """
     Preprocess the flattened coin DataFrame by applying feature selection and scaling based on the metrics config.
-    
+
     Params:
     - input_path (str): Path to the flattened CSV file.
     - modeling_config (dict): Configuration with modeling-specific parameters.
@@ -390,7 +390,7 @@ def preprocess_coin_df(input_path, modeling_config, metrics_config):
         for agg, agg_settings in settings['aggregations'].items():
             # Construct the column name based on the metric and aggregation (e.g., 'buyers_new_sum')
             column_name = f"{metric}_{agg}"
-            
+
             # Check if the column exists in the DataFrame
             if column_name in df.columns:
                 # Retrieve the scaling method from the configuration (e.g., 'standard', 'minmax')
@@ -398,19 +398,19 @@ def preprocess_coin_df(input_path, modeling_config, metrics_config):
                     scaling_method = agg_settings.get('scaling')
                 except AttributeError:
                     scaling_method = None
-                
+
                 # If a scaling method is specified
                 if scaling_method:
                     # Check if the scaling method is recognized (exists in the 'scalers' dictionary)
                     if scaling_method in scalers:
                         # Retrieve the appropriate scaler (e.g., StandardScaler, MinMaxScaler)
                         scaler = scalers[scaling_method]
-                        
+
                         # Apply the scaling transformation to the specified column
                         df[[column_name]] = scaler.fit_transform(df[[column_name]])
                     else:
                         # Log a warning if the scaling method specified is not recognized
-                        logger.warning("Unknown scaling method %s for column %s", scaling_method, column_name)
+                        logger.info("Unknown scaling method %s for column %s", scaling_method, column_name)
 
     # Step 5: Generate output path and filename based on input
     base_filename = os.path.basename(input_path).replace(".csv", "")
@@ -429,7 +429,7 @@ def preprocess_coin_df(input_path, modeling_config, metrics_config):
 
 def create_training_data_df(input_directory, input_filenames):
     """
-    Merges specified preprocessed output CSVs into a single DataFrame and checks if all have 
+    Merges specified preprocessed output CSVs into a single DataFrame and checks if all have
     identical coin_ids to ensure consistency. Adds suffixes to column names based on filename
     components to avoid duplicates.
 
@@ -446,10 +446,10 @@ def create_training_data_df(input_directory, input_filenames):
     df_list = []
     missing_files = []
     coin_id_sets = []
-    
+
     # Regex to extract the date pattern %Y-%m-%d_%H-%M from the filename
     date_pattern = re.compile(r'\d{4}-\d{2}-\d{2}_\d{2}-\d{2}')
-    
+
     # Dictionary to track how many times each column name has been used
     column_suffix_count = {}
 
@@ -461,7 +461,7 @@ def create_training_data_df(input_directory, input_filenames):
         match = date_pattern.search(filename)
         if not match:
             raise ValueError(f"No valid date string found in the filename: {filename}")
-        
+
         date_string = match.group()
         metric_string = filename.split(date_string)[0].rstrip('_')
 
@@ -488,7 +488,7 @@ def create_training_data_df(input_directory, input_filenames):
             match = date_pattern.search(filename)
             if not match:
                 raise ValueError(f"No valid date string found in the filename: {filename}")
-            
+
             date_string = match.group()  # e.g., '2024-09-13_14-44'
             metric_string = filename.split(date_string)[0].rstrip('_')
 
@@ -545,7 +545,7 @@ def create_training_data_df(input_directory, input_filenames):
 
 def create_target_variables_mooncrater(prices_df, training_data_config, modeling_config):
     """
-    Creates a DataFrame with target variables 'is_moon' and 'is_crater' based on price performance 
+    Creates a DataFrame with target variables 'is_moon' and 'is_crater' based on price performance
     during the modeling period, using the thresholds from modeling_config.
 
     Parameters:
@@ -614,7 +614,7 @@ def create_target_variables_mooncrater(prices_df, training_data_config, modeling
     target_variable_count = len(outcomes_df[outcomes_df['outcome'] == 'target variable created'])
     moons = target_variables_df[target_variables_df['is_moon'] == 1].shape[0]
     craters = target_variables_df[target_variables_df['is_crater'] == 1].shape[0]
-    
+
     logger.info(
         "Target variables created for %s coins with %s/%s (%s) moons and %s/%s (%s) craters.",
         target_variable_count,
@@ -628,8 +628,8 @@ def create_target_variables_mooncrater(prices_df, training_data_config, modeling
 
 def prepare_model_input_df(training_data_df, target_variable_df, target_column):
     """
-    Prepares the final model input DataFrame by merging the training data with the target variables 
-    on 'coin_id' and selects the specified target column. Checks for data quality issues like missing 
+    Prepares the final model input DataFrame by merging the training data with the target variables
+    on 'coin_id' and selects the specified target column. Checks for data quality issues like missing
     columns, duplicate coin_ids, and missing target variables.
 
     Parameters:
@@ -658,7 +658,7 @@ def prepare_model_input_df(training_data_df, target_variable_df, target_column):
         raise ValueError(f"The target column '{target_column}' is missing in target_variable_df")
 
     # Step 4: Merge the training data with the target variable DataFrame on 'coin_id'
-    model_input_df = pd.merge(training_data_df, target_variable_df[['coin_id', target_column]], 
+    model_input_df = pd.merge(training_data_df, target_variable_df[['coin_id', target_column]],
                               on='coin_id', how='inner')
 
     # Step 5: Check if any coin_id from training_data_df is missing a target variable

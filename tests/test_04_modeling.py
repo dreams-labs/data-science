@@ -42,7 +42,7 @@ logger = dc.setup_logger()
 # split_model_input() unit tests
 # ---------------------------------- #
 
-# Helper function to create a DataFrame with specified features, target, and coin_id
+# Helper function to create a DataFrame with specified features,
 def create_dataframe(features, target, coin_id=True):
     data = pd.DataFrame(features)
     data['target'] = target

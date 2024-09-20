@@ -19,12 +19,13 @@ from dotenv import load_dotenv
 import pytest
 from dreams_core import core as dc
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))  # type: ignore
-from utils import load_config  # type: ignore
-import training_data as td  # type: ignore
-import feature_engineering as fe  # type: ignore
-import coin_wallet_metrics as cwm  # type: ignore
-import insights as i  # type: ignore
+# pyright: reportMissingImports=false
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
+from utils import load_config
+import training_data as td
+import feature_engineering as fe
+import coin_wallet_metrics as cwm
+import insights as i
 
 load_dotenv()
 logger = dc.setup_logger()
@@ -87,7 +88,7 @@ def test_validate_experiments_yaml_success(tmpdir):
 
     # Run the function and verify no errors
     configurations = i.validate_experiments_yaml(str(config_folder))
-    
+
     # Assert that both config and modeling_config sections are validated
     assert len(configurations) == 2  # Two sections: config and modeling_config
 
@@ -327,8 +328,8 @@ def mock_config():  # pylint: disable=C0116 # docstring
 # Correctly patch functions from the module where they are called
 @pytest.mark.unit
 def test_rebuild_profits_df_if_necessary(
-    mock_clean_profits_df, mock_calculate_wallet_profitability, 
-    mock_prepare_profits_data, mock_retrieve_transfers_data, 
+    mock_clean_profits_df, mock_calculate_wallet_profitability,
+    mock_prepare_profits_data, mock_retrieve_transfers_data,
     mock_config, mock_profits_df, mock_prices_df, tmpdir):
     """
     Test the case where the config changes and profits_df is rebuilt by calling
@@ -425,7 +426,7 @@ def modeling_config():
 
     # Override modeling_folder to point to tests/tests_modeling
     modeling_config['modeling']['modeling_folder'] = 'tests/test_modeling'
-    
+
     return modeling_config
 
 
@@ -505,5 +506,5 @@ def test_build_configured_model_input(config, metrics_config, modeling_config, p
     # Assert that the column count in flattened_buysell_metrics_df is 1 more than X_train
     assert flattened_buysell_metrics_df.shape[1] == X_train.shape[1] + 1, \
         "Column count mismatch: flattened_buysell_metrics_df should have 1 more column than X_train"
-    
+
     logger.debug(f"Shape of X_train: {X_train.shape}")

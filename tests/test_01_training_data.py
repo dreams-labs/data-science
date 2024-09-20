@@ -15,10 +15,10 @@ from dotenv import load_dotenv
 import pytest
 from dreams_core import core as dc
 
-
+# pyright: reportMissingImports=false
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
-import training_data as td # type: ignore[reportMissingImports]
-from utils import load_config # type: ignore[reportMissingImports]
+import training_data as td
+from utils import load_config
 
 load_dotenv()
 logger = dc.setup_logger()
@@ -40,12 +40,12 @@ def sample_transfers_df():
     Create a sample transfers DataFrame for testing.
     """
     data = {
-        'coin_id': ['BTC', 'BTC', 'ETH', 'ETH', 'BTC', 'ETH', 'MYRO', 'MYRO', 'MYRO', 
+        'coin_id': ['BTC', 'BTC', 'ETH', 'ETH', 'BTC', 'ETH', 'MYRO', 'MYRO', 'MYRO',
                     'BTC', 'ETH', 'BTC', 'ETH', 'MYRO'],
         'wallet_address': ['wallet1', 'wallet1', 'wallet1', 'wallet2', 'wallet2', 'wallet2', 'wallet3', 'wallet3', 'wallet3',
                            'wallet1', 'wallet1', 'wallet2', 'wallet2', 'wallet3'],
         'date': [
-            '2023-01-01', '2023-02-01', '2023-01-01', '2023-01-01', '2023-01-01', '2023-02-01', 
+            '2023-01-01', '2023-02-01', '2023-01-01', '2023-01-01', '2023-01-01', '2023-02-01',
             '2023-01-01', '2023-02-01', '2023-03-01',
             '2023-04-01', '2023-04-01', '2023-04-01', '2023-04-01', '2023-04-01'
         ],
@@ -605,7 +605,7 @@ def profits_df(transfers_df, prices_df):
 @pytest.mark.integration
 def test_profits_df_completeness(profits_df):
     """
-    Checks if there are any NaN values in profits_df. 
+    Checks if there are any NaN values in profits_df.
     """
     missing_values = profits_df.isna().sum()
     assert missing_values.sum() == 0, "There are missing values in the dataset"
@@ -616,7 +616,7 @@ def test_modeling_period_end_wallet_completeness(profits_df):
     """
     Checks if all of the coin-wallet pairs at the end of the training period
     have data at the end of the modeling period to esnure they can be analyzed
-    for profitability. 
+    for profitability.
     """
     training_period_end = pd.to_datetime(MODELING_PERIOD_START) - pd.Timedelta(1, 'day')
     modeling_period_end = MODELING_PERIOD_END
@@ -657,7 +657,7 @@ def cleaned_profits_df(profits_df):
 def test_save_cleaned_profits_df(cleaned_profits_df):
     """
     This is not a test! This function saves a cleaned_profits_df.csv in the fixtures folder so it can be \
-    used for integration tests in other modules. 
+    used for integration tests in other modules.
     """
     cleaned_df,_ = cleaned_profits_df
 
@@ -760,8 +760,8 @@ def wallet_cohort_df(cleaned_profits_df):
 # ----------------------------------------
 def test_save_cohort_summary_df(wallet_cohort_df):
     """
-    This is not a test! This function saves a wallet_cohort_df.csv in the fixtures folder 
-    so it can be used for integration tests in other modules. 
+    This is not a test! This function saves a wallet_cohort_df.csv in the fixtures folder
+    so it can be used for integration tests in other modules.
     """
     # Save the cleaned DataFrame to the fixtures folder
     wallet_cohort_df.to_csv('tests/fixtures/wallet_cohort_df.csv', index=False)

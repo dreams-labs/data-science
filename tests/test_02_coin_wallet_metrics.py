@@ -17,10 +17,10 @@ from dotenv import load_dotenv
 import pytest
 from dreams_core import core as dc
 
-
+# pyright: reportMissingImports=false
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
-import coin_wallet_metrics as cwm # type: ignore[reportMissingImports]
-from utils import load_config # type: ignore[reportMissingImports]
+import coin_wallet_metrics as cwm
+from utils import load_config
 
 load_dotenv()
 logger = dc.setup_logger()
@@ -145,20 +145,20 @@ def test_fill_buysell_metrics_df():
     Unit test for the fill_buysell_metrics_df function.
 
     This test checks the following:
-    
+
     1. Missing dates within the input DataFrame's date range are correctly identified and filled.
     2. Missing rows beyond the latest date (up to the training_period_end) are added with NaN values initially, then filled appropriately.
     3. Forward-filling for 'total_balance' and 'total_holders' works as expected, ensuring that:
        - Values are forward-filled correctly for each coin_id.
        - Any missing dates earlier than the first record for 'total_balance' or 'total_holders' are filled with 0.
     4. 'buyers_new' and other transaction-related columns (e.g., 'total_bought', 'total_sold') are correctly filled with 0 for missing dates.
-    
+
     Test Case Summary:
     - The test includes three coins: 'coin1', 'coin2', and 'coin3'.
     - 'coin1' has two records: one on 2024-01-01 and one on 2024-01-04, and is missing values for 2024-01-02, 2024-01-03, and 2024-01-05.
     - 'coin2' has two records: one on 2024-01-01 and one on 2024-01-03, and is missing values for 2024-01-02 and 2024-01-05.
     - 'coin3' has a single record on 2024-01-03 and is missing values for 2024-01-04 and 2024-01-05.
-    
+
     Expected Assertions:
     - The 'total_balance' and 'buyers_new' columns are correctly forward-filled for each coin, ensuring no values leak across coin_ids.
     - For each coin_id, records with missing 'total_balance' or 'total_holders' before the first non-null date are filled with 0.
@@ -224,7 +224,7 @@ def test_fill_buysell_metrics_df():
 def config():
     """
     Fixture to load the configuration from the YAML file.
-    """    
+    """
     return load_config('tests/test_config/test_config.yaml')
 
 @pytest.fixture(scope="session")
@@ -266,8 +266,8 @@ def buysell_metrics_df(cleaned_profits_df, wallet_cohort_df, config):
 @pytest.mark.integration
 def test_save_buysell_metrics_df(buysell_metrics_df):
     """
-    This is not a test! This function saves a buysell_metrics_df.csv in the fixtures folder 
-    so it can be used for integration tests in other modules. 
+    This is not a test! This function saves a buysell_metrics_df.csv in the fixtures folder
+    so it can be used for integration tests in other modules.
     """
     # Save the cleaned DataFrame to the fixtures folder
     buysell_metrics_df.to_csv('tests/fixtures/buysell_metrics_df.csv', index=False)
@@ -315,7 +315,7 @@ def test_integration_buysell_metrics_df(buysell_metrics_df, cleaned_profits_df, 
     total_net_transfers_mock = cohort_profits_df['net_transfers'].sum()
     total_net_transfers_result = buysell_metrics_df['total_net_transfers'].sum()
     assert total_net_transfers_mock == pytest.approx(total_net_transfers_result, rel=1e-9), f"Total net transfers mismatch: {total_net_transfers_mock} != {total_net_transfers_result}"
-    
+
     # 3. Data Quality Checks
     # Ensure there are no NaN values in critical columns
     critical_columns = buysell_metrics_df.columns
@@ -334,4 +334,3 @@ def test_integration_buysell_metrics_df(buysell_metrics_df, cleaned_profits_df, 
     ,include_groups=False)
     if any(len(missing) > 0 for missing in missing_dates):
         raise ValueError("Timeseries contains missing dates. Ensure all dates are filled up to the training_period_end before calling flatten_coin_date_df().")
-    
