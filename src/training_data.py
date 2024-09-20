@@ -57,7 +57,7 @@ def fill_prices_gaps(prices_df, max_gap_days):
     - max_gap_days: The maximum allowed consecutive missing days for forward-filling.
 
     Returns:
-    - prices_filled_df: DataFrame with small gaps forward-filled, excluding coins with gaps 
+    - prices_filled_df: DataFrame with small gaps forward-filled, excluding coins with gaps
         too large to fill.
     - outcomes_df: DataFrame tracking the outcome for each coin_id.
     """
@@ -73,7 +73,7 @@ def fill_prices_gaps(prices_df, max_gap_days):
     # Iterate over each coin_id
     for coin_id in unique_coins:
         # Step 1: Reindex to create rows for all missing dates
-        coin_df = prices_df[prices_df['coin_id'] == coin_id].copy()
+        coin_df = prices_df[prices_df['coin_id'] == coin_id].sort_values('date', ascending=True).copy()
 
         # Create the full date range
         full_date_range = pd.date_range(start=coin_df['date'].min(), end=coin_df['date'].max(), freq='D')
@@ -136,16 +136,16 @@ def fill_prices_gaps(prices_df, max_gap_days):
 
 def retrieve_transfers_data(training_period_start,modeling_period_start,modeling_period_end):
     """
-    Retrieves wallet transfers data from the core.coin_wallet_transfers table and converts 
-    columns to categorical for calculation efficiency. 
+    Retrieves wallet transfers data from the core.coin_wallet_transfers table and converts
+    columns to categorical for calculation efficiency.
 
-    New rows are added for every coin-wallet pair start as of the start and end of the training 
+    New rows are added for every coin-wallet pair start as of the start and end of the training
     and modeling periods. If there was no existing row then the transfer is counted as 0 and the
-    existing balance is carried forward. 
-      
-    These imputed rows are needed for profitability calculations and are very compute intensive to 
-    add using pandas. 
-    
+    existing balance is carried forward.
+
+    These imputed rows are needed for profitability calculations and are very compute intensive to
+    add using pandas.
+
     Params:
     - training_period_start: String with format 'YYYY-MM-DD'
     - modeling_period_start: String with format 'YYYY-MM-DD'
@@ -173,7 +173,7 @@ def retrieve_transfers_data(training_period_start,modeling_period_start,modeling
                 from `core.coin_market_data`
                 group by 1
             ) cmd on cmd.coin_id = cwt.coin_id
-            
+
             -- remove some of the largest coins that add many records and aren't altcoins
             where cwt.coin_id not in (
                 '06b54bc2-8688-43e7-a49a-755300a4f995' -- SHIB
@@ -202,7 +202,7 @@ def retrieve_transfers_data(training_period_start,modeling_period_start,modeling
             select t.*
             ,row_number() over (partition by t.coin_id,t.wallet_address order by t.date desc) as rn
             from transfers_base t
-            left join training_start_existing_rows e on e.coin_id = t.coin_id 
+            left join training_start_existing_rows e on e.coin_id = t.coin_id
                 and e.wallet_address = t.wallet_address
             where t.date < '{training_period_start}'
             and e.coin_id is null
@@ -232,7 +232,7 @@ def retrieve_transfers_data(training_period_start,modeling_period_start,modeling
             select t.*
             ,row_number() over (partition by t.coin_id,t.wallet_address order by t.date desc) as rn
             from transfers_base t
-            left join training_end_existing_rows e on e.coin_id = t.coin_id 
+            left join training_end_existing_rows e on e.coin_id = t.coin_id
                 and e.wallet_address = t.wallet_address
             where t.date < date_sub('{modeling_period_start}', interval 1 day)
             and e.coin_id is null
@@ -262,7 +262,7 @@ def retrieve_transfers_data(training_period_start,modeling_period_start,modeling
             select t.*
             ,row_number() over (partition by t.coin_id,t.wallet_address order by t.date desc) as rn
             from transfers_base t
-            left join modeling_start_existing_rows e on e.coin_id = t.coin_id 
+            left join modeling_start_existing_rows e on e.coin_id = t.coin_id
                 and e.wallet_address = t.wallet_address
             where t.date < '{modeling_period_start}'
             and e.coin_id is null
@@ -291,7 +291,7 @@ def retrieve_transfers_data(training_period_start,modeling_period_start,modeling
             select t.*
             ,row_number() over (partition by t.coin_id,t.wallet_address order by t.date desc) as rn
             from transfers_base t
-            left join modeling_end_existing_rows e on e.coin_id = t.coin_id 
+            left join modeling_end_existing_rows e on e.coin_id = t.coin_id
                 and e.wallet_address = t.wallet_address
             where t.date < '{modeling_period_end}'
             and e.coin_id is null
@@ -350,13 +350,13 @@ def prepare_profits_data(transfers_df, prices_df):
     The function performs the following steps:
     1. Merges the `transfers_df` and `prices_df` on 'coin_id' and 'date'.
     2. Identifies wallets with transfer records before the first available price for each coin.
-    3. Creates new records for these wallets, treating the balance as a net transfer on the 
+    3. Creates new records for these wallets, treating the balance as a net transfer on the
        first price date.
     4. Removes original records with missing price data.
     5. Appends the newly created records and sorts the resulting DataFrame.
 
     Parameters:
-    - transfers_df (pd.DataFrame): 
+    - transfers_df (pd.DataFrame):
         A DataFrame containing wallet transaction data with columns:
         - coin_id: The ID of the coin/token.
         - wallet_address: The unique identifier of the wallet.
@@ -364,14 +364,14 @@ def prepare_profits_data(transfers_df, prices_df):
         - net_transfers: The net tokens transferred in or out of the wallet on that date.
         - balance: The token balance in the wallet at the end of the day.
 
-    - prices_df (pd.DataFrame): 
+    - prices_df (pd.DataFrame):
         A DataFrame containing price data with columns:
         - coin_id: The ID of the coin/token.
         - date: The date of the price record.
         - price: The price of the coin/token on that date.
 
     Returns:
-    - pd.DataFrame: 
+    - pd.DataFrame:
         A merged DataFrame containing profitability data, with new records added for wallets
         that had balances prior to the first available price date for each coin.
     """
@@ -482,8 +482,8 @@ def prepare_profits_data(transfers_df, prices_df):
 @timing_decorator
 def calculate_wallet_profitability(profits_df):
     """
-    Calculates the profitability metrics for each wallet-coin pair by analyzing changes in price 
-    and balance over time. The function computes both daily profitability changes and cumulative 
+    Calculates the profitability metrics for each wallet-coin pair by analyzing changes in price
+    and balance over time. The function computes both daily profitability changes and cumulative
     profitability, along with additional metrics such as USD inflows and returns.
 
     Process Summary:
@@ -493,7 +493,7 @@ def calculate_wallet_profitability(profits_df):
     4. Calculate USD balances, net transfers, inflows, and the overall rate of return.
 
     Parameters:
-    - profits_df (pd.DataFrame): 
+    - profits_df (pd.DataFrame):
         A DataFrame containing merged wallet transaction and price data with columns:
         - coin_id: The ID of the coin/token.
         - wallet_address: The unique identifier of the wallet.
@@ -503,9 +503,9 @@ def calculate_wallet_profitability(profits_df):
         - price: The price of the coin/token on that date.
 
     Returns:
-    - pd.DataFrame: 
+    - pd.DataFrame:
         A DataFrame with the following additional columns:
-        - profits_change: The daily change in profitability, calculated as the difference between 
+        - profits_change: The daily change in profitability, calculated as the difference between
           the current price and the previous price, multiplied by the previous balance.
         - profits_cumulative: The cumulative profitability for each wallet-coin pair over time.
         - usd_balance: The USD value of the wallet's balance, based on the current price.
@@ -557,18 +557,18 @@ def calculate_wallet_profitability(profits_df):
 @timing_decorator
 def clean_profits_df(profits_df, data_cleaning_config):
     """
-    Clean the profits DataFrame by excluding all records for any wallet_addresses that either have: 
+    Clean the profits DataFrame by excluding all records for any wallet_addresses that either have:
      - aggregate profitabiilty above profitability_filter (abs value of gains or losses).
      - aggregate USD inflows above the inflows_filter
     this catches outliers such as minting/burning addresses, contract addresses, etc and ensures
-    they are not included in the wallet behavior training data. 
-    
+    they are not included in the wallet behavior training data.
+
     Parameters:
     - profits_df: DataFrame with columns ['coin_id', 'wallet_address', 'date', 'profits_cumulative']
     - data_cleaning_config:
         - profitability_filter: Threshold value to exclude pairs with profits or losses exceeding this value
         - inflows_filter: Threshold value to exclude pairs with USD inflows
-        
+
     Returns:
     - Cleaned DataFrame with records for coin_id-wallet_address pairs filtered out.
     """
