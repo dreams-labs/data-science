@@ -14,13 +14,14 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 logger = dc.setup_logger()
 
 
-def flatten_coin_date_df(df, metrics_config, training_period_end):
+def flatten_coin_date_df(df, df_metrics_config, training_period_end):
     """
     Processes all coins in the DataFrame and flattens relevant time series metrics for each coin.
 
     Params:
     - df (pd.DataFrame): DataFrame containing time series data for multiple coins (coin_id-date).
-    - metrics_config (dict): Configuration object with metric rules from the metrics file.
+    - df_metrics_config (dict): Configuration object with metric rules from the metrics file, filtered
+        to the metrics that apply to the specific input df.
     - training_period_end (datetime): The end of the training period to ensure dates are filled
         until this date and that rolling windows end on the training_period_end
 
@@ -72,13 +73,13 @@ def flatten_coin_date_df(df, metrics_config, training_period_end):
         raise ValueError(
             "Timeseries contains NaN values. Ensure imputation is done upstream before flattening."
         )
-    # Check if df columns have configurations in metrics_config
+    # Check if df columns have configurations in df_metrics_config
     configured_metrics = []
-    for m in metrics_config['metrics'].keys():
+    for m in df_metrics_config.keys():
         if m in df.columns:
             configured_metrics.append(m)
     if len(configured_metrics) == 0:
-        raise ValueError("No columns in the input_df were found in metrics_config.")
+        raise ValueError("No columns in the input_df were found in df_metrics_config.")
 
 
     # Step 2: Flatten the metrics
@@ -94,7 +95,7 @@ def flatten_coin_date_df(df, metrics_config, training_period_end):
         coin_df = df[df['coin_id'] == coin_id].copy()
 
         # Flatten the features for this coin
-        flat_features = flatten_coin_features(coin_df, metrics_config)
+        flat_features = flatten_coin_features(coin_df, df_metrics_config)
         all_flat_features.append(flat_features)
 
     # Convert the list of feature dictionaries into a DataFrame
@@ -108,13 +109,14 @@ def flatten_coin_date_df(df, metrics_config, training_period_end):
 
 
 
-def flatten_coin_features(coin_df, metrics_config):
+def flatten_coin_features(coin_df, df_metrics_config):
     """
     Flattens all relevant time series metrics for a single coin into a row of features.
 
     Params:
     - coin_df (pd.DataFrame): DataFrame with time series data for a single coin (coin_id-date).
-    - metrics_config (dict): Configuration object with metric rules from the metrics file.
+    - df_metrics_config (dict): Configuration object with metric rules from the metrics file for
+        the specific input df.
 
     Returns:
     - flat_features (dict): A dictionary of flattened features for the coin.
@@ -129,11 +131,8 @@ def flatten_coin_features(coin_df, metrics_config):
 
     flat_features = {'coin_id': coin_df['coin_id'].iloc[0]}  # Initialize with coin_id
 
-    # Access the 'metrics' section directly from the config
-    metrics_section = metrics_config.get('metrics', {})
-
     # Apply global stats calculations for each metric
-    for metric, config in metrics_section.items():
+    for metric, config in df_metrics_config.items():
         if metric not in coin_df.columns:
             raise ValueError(f"Metric '{metric}' is missing from the input DataFrame.")
 
@@ -377,7 +376,7 @@ def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_per
 
 
 
-def preprocess_coin_df(input_path, modeling_config, metrics_config):
+def preprocess_coin_df(input_path, modeling_config, df_metrics_config):
     """
     Preprocess the flattened coin DataFrame by applying feature selection and scaling based on
     the metrics config.
@@ -385,7 +384,7 @@ def preprocess_coin_df(input_path, modeling_config, metrics_config):
     Params:
     - input_path (str): Path to the flattened CSV file.
     - modeling_config (dict): Configuration with modeling-specific parameters.
-    - metrics_config (dict): The input file's configuration with metrics and their scaling methods,
+    - df_metrics_config (dict): The input file's configuration with metrics and their scaling methods,
         aggregations, etc. This needs to be metrics_config['metrics'][dataset_name], rather than
         the full config file.
 
@@ -411,8 +410,8 @@ def preprocess_coin_df(input_path, modeling_config, metrics_config):
         "minmax": MinMaxScaler()
     }
 
-    # Loop through each metric and its settings in the metrics_config
-    for metric, settings in metrics_config.items():
+    # Loop through each metric and its settings in the df_metrics_config
+    for metric, settings in df_metrics_config.items():
         # Loop through each aggregation (e.g., sum, mean) and its associated settings
         for agg, agg_settings in settings['aggregations'].items():
             # Construct the column name based on the metric and aggregation (e.g., 'buyers_new_sum')

@@ -483,24 +483,20 @@ def test_build_configured_model_input(config, metrics_config, modeling_config, p
         cohort_wallets
     )
 
-    # 3. Flatten the buysell metrics DataFrame, save it, and preprocess it
-    flattened_output_directory = os.path.join(
-        modeling_config['modeling']['modeling_folder'],
-        'outputs/flattened_outputs/'
-    )
-    cohort_name = list(config['wallet_cohorts'].keys())[0]
-    metric_description = f"{cohort_name}_cohort"
+    # Retrieve the metrics configuration for the first df
+    _, df_metrics_config = next(iter(metrics_config['metrics'].items()))
+
 
     flattened_buysell_metrics_df = fe.flatten_coin_date_df(
         buysell_metrics_df,
-        metrics_config,
+        df_metrics_config,
         config['training_data']['training_period_end']
     )
     logger.debug(f"Shape of flattened_buysell_metrics_df: {flattened_buysell_metrics_df.shape}")
 
     # Run build_configured_model_input
     X_train, X_test, y_train, y_test = i.build_configured_model_input(
-        profits_df, prices_df, config, metrics_config, modeling_config
+        profits_df, prices_df, config, df_metrics_config, modeling_config
     )
 
     # Assert that the column count in flattened_buysell_metrics_df is 1 more than X_train

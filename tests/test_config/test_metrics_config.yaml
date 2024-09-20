@@ -79,7 +79,7 @@ metrics:
       aggregations:
         max:
           scaling: "standard"
-rolling:
+    rolling:
         stats:
           sum:
             scaling: "minmax"
