@@ -18,7 +18,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from sklearn.metrics import roc_auc_score, confusion_matrix, log_loss
 
 # project files
-from utils import timing_decorator
+from utils import timing_decorator  # pylint: disable=E0401 # can't find utils import
 
 # set up logger at the module level
 logger = dc.setup_logger()
