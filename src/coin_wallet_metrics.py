@@ -13,6 +13,92 @@ import dreams_core.core as dc
 logger = dc.setup_logger()
 
 
+
+def classify_wallet_cohort(profits_df, wallet_cohort_config):
+    """
+    Classifies wallets into a cohort based on their activity across multiple coins.
+    The function directly applies the inflows, profitability, and return thresholds at the wallet level.
+    Outputs a DataFrame with aggregated wallet-level metrics and cohort classification.
+
+    Parameters:
+        profits_df (DataFrame): A DataFrame containing wallet-coin records with profits and returns data.
+        wallet_cohort_config (dict): A configuration object containing cohort parameters, including:
+            - 'wallet_minimum_inflows': Minimum total USD inflow to be eligible for the cohort.
+            - 'wallet_maximum_inflows': Maximum total USD inflow to be eligible for the cohort.
+            - 'coin_profits_win_threshold': Minimum total profits for a coin to be considered a "win".
+            - 'coin_return_win_threshold': Minimum total return for a coin to be considered a "win".
+            - 'wallet_min_coin_wins': Minimum number of coins that meet the "win" threshold for a wallet to join the cohort.
+
+    Returns:
+        wallet_cohort_df (DataFrame): A DataFrame containing wallets and summary metrics, including:
+            - total inflows, total coins, total wins, win rate, and whether the wallet is in the cohort.
+    """
+    logger.debug('Classifying wallet cohort based on coin-level thresholds...')
+
+    # Step 1: Aggregate wallet-level inflows and filter eligible wallets
+    wallet_inflows_df = profits_df.groupby('wallet_address')['usd_inflows'].sum().reset_index()
+    eligible_wallets_df = wallet_inflows_df[
+        (wallet_inflows_df['usd_inflows'] >= wallet_cohort_config['wallet_minimum_inflows']) &
+        (wallet_inflows_df['usd_inflows'] <= wallet_cohort_config['wallet_maximum_inflows'])
+    ]
+
+    # Step 2: Group by wallet and coin to aggregate profits and return
+    # filter profits_df for only eligible wallets
+    eligible_wallets_profits_df = profits_df[profits_df['wallet_address'].isin(eligible_wallets_df['wallet_address'])].copy()
+    eligible_wallets_profits_df = eligible_wallets_profits_df.sort_values(by=['wallet_address', 'coin_id', 'date'])
+
+    # compute wallet-coin level metrics
+    eligible_wallets_coins_df = eligible_wallets_profits_df.groupby(['wallet_address', 'coin_id']).agg({
+        'profits_cumulative': 'last',  # Use the last record for cumulative profits
+        'total_return': 'last'  # Use the last record for total return
+    }).reset_index()
+
+    # Step 3: Apply wallet-coin-level thresholds (profits AND return) to each wallet and classify "win"s
+    eligible_wallets_coins_df['is_profits_win'] = eligible_wallets_coins_df['profits_cumulative'] >= wallet_cohort_config['coin_profits_win_threshold']
+    eligible_wallets_coins_df['is_returns_win'] = eligible_wallets_coins_df['total_return'] >= wallet_cohort_config['coin_return_win_threshold']
+
+    # A coin is classified as a "win" if it meets both the profits AND returns threshold
+    eligible_wallets_coins_df['is_coin_win'] = eligible_wallets_coins_df['is_profits_win'] & eligible_wallets_coins_df['is_returns_win']
+
+    # Step 4: Aggregate at the wallet level to count the number of "winning" coins and total coins
+    wallet_wins_df = eligible_wallets_coins_df.groupby('wallet_address')['is_coin_win'].sum().reset_index()
+    wallet_wins_df.columns = ['wallet_address', 'winning_coins']
+
+    wallet_coins_df = eligible_wallets_coins_df.groupby('wallet_address')['coin_id'].nunique().reset_index()
+    wallet_coins_df.columns = ['wallet_address', 'total_coins']
+
+    # Step 5: Classify wallets into the cohort based on minimum number of coin wins
+    wallet_wins_df['in_cohort'] = wallet_wins_df['winning_coins'] >= wallet_cohort_config['wallet_min_coin_wins']
+
+
+    # Step 6: Compute wallet-level metrics for output
+    # Merge wallet inflows, wins, total coins, profits, and return rate
+    wallet_cohort_df = wallet_inflows_df.merge(wallet_coins_df, on='wallet_address')
+    wallet_cohort_df = wallet_cohort_df.merge(wallet_wins_df, on='wallet_address', how='left')
+    wallet_cohort_df['winning_coins'] = wallet_cohort_df['winning_coins'].fillna(0)
+
+    # Calculate total profits (USD value)
+    wallet_profits_df = profits_df.groupby('wallet_address')['profits_cumulative'].sum().reset_index()
+    wallet_profits_df.columns = ['wallet_address', 'total_profits']
+
+    # Calculate return rate: total profits / total inflows
+    wallet_return_rate_df = wallet_profits_df.merge(wallet_inflows_df, on='wallet_address')
+    wallet_return_rate_df['return_rate'] = wallet_return_rate_df['total_profits'] / wallet_return_rate_df['usd_inflows']
+
+    # Merge profits and return rate into the cohort summary
+    wallet_cohort_df = wallet_cohort_df.merge(wallet_profits_df, on='wallet_address', how='left')
+    wallet_cohort_df = wallet_cohort_df.merge(wallet_return_rate_df[['wallet_address', 'return_rate']], on='wallet_address', how='left')
+
+    # Count the number of wallets in the cohort
+    x = wallet_cohort_df[wallet_cohort_df['in_cohort']].shape[0]
+    y = wallet_cohort_df.shape[0]
+
+    # Log the count of wallets added to the cohort using % syntax
+    logger.info('Wallet cohort classification complete. %d/%d eligible wallets were added to the cohort.', x, y)
+
+    return wallet_cohort_df
+
+
 def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets):
     """
     Generates buysell metrics for all cohort coins by looping through each coin_id and applying
