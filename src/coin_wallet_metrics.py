@@ -5,6 +5,7 @@ calculates metrics related to the distribution of coin ownership across wallets
 # pylint: disable=C0303 # trailing whitespace
 
 import time
+from typing import Tuple
 import pandas as pd
 import numpy as np
 import dreams_core.core as dc
@@ -229,8 +230,9 @@ def generate_time_series_metrics(
         time_series_df: pd.DataFrame,
         metrics_config: dict,
         dataset_key: str,
-        colname: str
-    ) -> pd.DataFrame:
+        colname: str,
+        required_duration: int = 60
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Generates time series metrics (e.g., SMA, EMA) based on the given config.
 
@@ -239,14 +241,16 @@ def generate_time_series_metrics(
     - metrics_config: The full metrics_config file with a time_series key that matches the dataset_key param.
     - dataset_key (string): The dataset's key in the metrics_config['time_series'] section.
     - colname (string): The name of the column that the metrics should be calculated for (e.g., 'price').
+    - required_duration (int): Minimum number of days the coin must have data to be included.
 
     Returns:
-    - time_series_metrics_df (pd.DataFrame): The input DataFrame with the configured metrics added as new columns.
+    - time_series_metrics_df (pd.DataFrame): DataFrame with full duration data and the configured metrics.
+    - partial_time_series_metrics_df (pd.DataFrame): DataFrame for coins with incomplete duration.
     """
     # 1. Data Quality Checks and Formatting
     # -------------------------------------
     # Confirm that the colname is in the input df
-    if not colname in time_series_df.columns:
+    if colname not in time_series_df.columns:
         raise KeyError(f"Input DataFrame does not include column '{colname}'.")
 
     # Confirm there are no null values in the input column
@@ -261,37 +265,48 @@ def generate_time_series_metrics(
 
     # Raise error if there are no metrics for the key
     if not metrics_config['time_series'][dataset_key]:
-        raise KeyError(f"No metrics are specified for key [{dataset_key}] in metrics_df. ")
+        raise KeyError(f"No metrics are specified for key [{dataset_key}] in metrics_df.")
 
     # Ensure date is in datetime format and sorted by coin_id and date
     time_series_df['date'] = pd.to_datetime(time_series_df['date'])
     time_series_df = time_series_df.sort_values(by=['coin_id', 'date'])
 
-
-    # 2. Metric Calculations
+    # 2. Metric Calculations for All Coins
     # -------------------------------------
-    # Loop over each coin_id group
     for _, group in time_series_df.groupby('coin_id'):
         for metric, config in time_series_metrics_config.items():
             period = config['parameters']['period']
 
-            # Create the dynamic column name, e.g., 'prices_sma_20'
-            metric_colname = f'{dataset_key}_{metric}_{period}'
-
             # Calculate the corresponding metric
             if metric == 'sma':
                 sma = calculate_sma(group[colname], period)
-                time_series_df.loc[group.index, metric_colname] = sma
+                time_series_df.loc[group.index, metric] = sma
 
             elif metric == 'ema':
                 ema = calculate_ema(group[colname], period)
-                time_series_df.loc[group.index, metric_colname] = ema
+                time_series_df.loc[group.index, metric] = ema
 
     # Include all dynamically created columns in the return DataFrame
-    dynamic_cols = [col for col in time_series_df.columns if col.startswith(f'{dataset_key}_')]
+    dynamic_cols = [metric for metric in time_series_metrics_config.keys()]
     time_series_metrics_df = time_series_df[['coin_id', 'date', colname] + dynamic_cols]
 
-    return time_series_metrics_df
+    # 3. Split the DataFrames After Metric Calculation
+    # -------------------------------------
+    # Count the number of records for each coin
+    coin_counts = time_series_df.groupby('coin_id').size()
+
+    # Identify coins with full and partial time series
+    full_duration_coins = coin_counts[coin_counts >= required_duration].index
+    partial_duration_coins = coin_counts[coin_counts < required_duration].index
+
+    # Filter for full and partial coins
+    full_metrics_df = time_series_metrics_df[time_series_metrics_df['coin_id'].isin(full_duration_coins)]
+    partial_time_series_metrics_df = time_series_metrics_df[time_series_metrics_df['coin_id'].isin(partial_duration_coins)]
+
+    # Log the number of coins with incomplete data
+    logger.info("Removed %s coins with incomplete time series.", len(partial_duration_coins))
+
+    return full_metrics_df, partial_time_series_metrics_df
 
 def calculate_sma(timeseries: pd.Series, period: int) -> pd.Series:
     """
