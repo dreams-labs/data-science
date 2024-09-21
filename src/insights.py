@@ -336,7 +336,7 @@ def build_configured_model_input(profits_df, prices_df, config, metrics_config, 
     """
 
     # 1. Identify cohort of wallets (e.g., sharks) based on the cohort classification logic
-    wallet_cohort_df = td.classify_wallet_cohort(profits_df, config['wallet_cohorts']['sharks'])
+    wallet_cohort_df = td.classify_wallet_cohort(profits_df, config['datasets']['wallet_cohorts']['sharks'])
 
     # 2. Generate buysell metrics for wallets in the identified cohort
     cohort_wallets = wallet_cohort_df[wallet_cohort_df['in_cohort']]['wallet_address']
@@ -351,7 +351,7 @@ def build_configured_model_input(profits_df, prices_df, config, metrics_config, 
         modeling_config['modeling']['modeling_folder'],
         'outputs/flattened_outputs/'
     )
-    cohort_name = list(config['wallet_cohorts'].keys())[0]
+    cohort_name = list(config['datasets']['wallet_cohorts'].keys())[0]
     metric_description = f"{cohort_name}_cohort"
 
     flattened_buysell_metrics_df = fe.flatten_coin_date_df(
@@ -374,7 +374,7 @@ def build_configured_model_input(profits_df, prices_df, config, metrics_config, 
     # 4. Create training data from the preprocessed DataFrame
     input_directory = f"{preprocessed_filepath.split('preprocessed_outputs/')[0]}preprocessed_outputs/"
     input_filenames = [preprocessed_filepath.split('preprocessed_outputs/')[1]]
-    training_data_df = fe.create_training_data_df(input_directory, input_filenames)
+    training_data_df, _ = fe.create_training_data_df(input_directory, input_filenames)
 
     # 5. Create the target variable DataFrame based on price changes
     target_variable_df, _ = fe.create_target_variables_mooncrater(

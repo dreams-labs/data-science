@@ -236,27 +236,29 @@ def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
 
 def generate_time_series_metrics(
         time_series_df: pd.DataFrame,
+        config: dict,
         metrics_config: dict,
         dataset_key: str,
-        colname: str,
-        required_duration: int = 60
+        colname: str
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Generates time series metrics (e.g., SMA, EMA) based on the given config.
 
     Params:
     - time_series_df (pd.DataFrame): The input DataFrame with time series data.
+    - config: The full general config file containing training_period_start and
+        modeling_period_end.
     - metrics_config: The full metrics_config file with a time_series key that matches the
         dataset_key param.
     - dataset_key (string): The dataset's key in the metrics_config['time_series'] section.
-    - colname (string): The name of the column use to calculate the metrics (e.g., 'price').
-    - required_duration (int): Minimum number of days the coin must have data to be included.
+    - colname (string): The name of the column used to calculate the metrics (e.g., 'price').
 
     Returns:
-    - time_series_metrics_df (pd.DataFrame): Input df with additional columns for the
-        configured metrics. Only includes coins that had complete data for the period duration.
+    - full_metrics_df (pd.DataFrame): Input df with additional columns for the configured metrics.
+        Only includes coins that had complete data for the period between training_period_start
+        and modeling_period_end.
     - partial_time_series_metrics_df (pd.DataFrame): Input df with additional columns for the
-        configured metrics. Only includes coins that had partial data for the period duration.
+        configured metrics. Only includes coins that had partial data for the period.
     """
     # 1. Data Quality Checks and Formatting
     # -------------------------------------
@@ -282,6 +284,15 @@ def generate_time_series_metrics(
     time_series_df['date'] = pd.to_datetime(time_series_df['date'])
     time_series_df = time_series_df.sort_values(by=['coin_id', 'date'])
 
+    # Retrieve training and modeling period dates from the general config
+    training_period_start = pd.to_datetime(config['training_data']['training_period_start'])
+    modeling_period_end = pd.to_datetime(config['training_data']['modeling_period_end'])
+
+    # Filter the df to only include data within the period and log the count of all coins
+    all_coins_count = len(time_series_df['coin_id'].unique())
+    time_series_df = time_series_df[(time_series_df['date'] >= training_period_start) &
+                                    (time_series_df['date'] <= modeling_period_end)]
+
     # 2. Metric Calculations for All Coins
     # -------------------------------------
     for _, group in time_series_df.groupby('coin_id'):
@@ -303,19 +314,30 @@ def generate_time_series_metrics(
 
     # 3. Split the DataFrames After Metric Calculation
     # -------------------------------------
-    # Count the number of records for each coin
-    coin_counts = time_series_df.groupby('coin_id').size()
+    # Identify coins that have complete data for the period
+    coin_data_range = time_series_df.groupby('coin_id')['date'].agg(['min', 'max'])
 
-    # Identify coins with full and partial time series
-    full_duration_coins = coin_counts[coin_counts >= required_duration].index
-    partial_duration_coins = coin_counts[coin_counts < required_duration].index
+    # Full duration coins: Data spans the entire training to modeling period
+    full_duration_coins = coin_data_range[
+        (coin_data_range['min'] <= training_period_start) &
+        (coin_data_range['max'] >= modeling_period_end)
+    ].index
+
+    # Partial duration coins: Data does not span the entire period
+    partial_duration_coins = coin_data_range[~coin_data_range.index.isin(full_duration_coins)].index
 
     # Filter for full and partial coins
     full_metrics_df = time_series_metrics_df[time_series_metrics_df['coin_id'].isin(full_duration_coins)]
     partial_time_series_metrics_df = time_series_metrics_df[time_series_metrics_df['coin_id'].isin(partial_duration_coins)]
 
-    # Log the number of coins with incomplete data
-    logger.info("Removed %s coins with incomplete time series.", len(partial_duration_coins))
+    # Log the number of coins with incomplete or missing data
+    logger.debug("Generated time series metrics data. Out of %s total coins, %s had complete period "
+                 "coverage, %s had partial coverage, and %s had no coverage."
+                 ,all_coins_count
+                 ,len(full_duration_coins)
+                 ,len(partial_duration_coins)
+                 ,all_coins_count - len(full_duration_coins) - len(partial_duration_coins)
+                 )
 
     return full_metrics_df, partial_time_series_metrics_df
 

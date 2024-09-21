@@ -95,7 +95,7 @@ def flatten_coin_date_df(df, df_metrics_config, training_period_end):
         coin_df = df[df['coin_id'] == coin_id].copy()
 
         # Flatten the features for this coin
-        flat_features = flatten_coin_features(coin_df, df_metrics_config)
+        flat_features = flatten_date_features(coin_df, df_metrics_config)
         all_flat_features.append(flat_features)
 
     # Convert the list of feature dictionaries into a DataFrame
@@ -109,7 +109,7 @@ def flatten_coin_date_df(df, df_metrics_config, training_period_end):
 
 
 
-def flatten_coin_features(coin_df, df_metrics_config):
+def flatten_date_features(coin_df, df_metrics_config):
     """
     Flattens all relevant time series metrics for a single coin into a row of features.
 

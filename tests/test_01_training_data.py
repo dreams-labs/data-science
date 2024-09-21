@@ -930,7 +930,7 @@ def wallet_cohort_df(cleaned_profits_df):
     Builds shark_wallets_df from shark_coins_df for data quality checks.
     """
     profits_df, _ = cleaned_profits_df  # Use the cleaned profits DataFrame
-    wallet_cohort_df = td.classify_wallet_cohort(profits_df, config['wallet_cohorts']['sharks'])
+    wallet_cohort_df = td.classify_wallet_cohort(profits_df, config['datasets']['wallet_cohorts']['sharks'])
     return wallet_cohort_df
 
 # Save cohort_summary_df.csv in fixtures/

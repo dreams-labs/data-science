@@ -19,20 +19,21 @@ metadata:
 
 variable_overrides:
   config:
-    wallet_cohorts:
-      sharks:
-        wallet_minimum_inflows:
-          - 5000  # Minimum USD inflows for a coin to be considered a 'shark' coin
-          - 15000  # More restrictive inflows filter
-        coin_profits_win_threshold:
-          - 2000   # Lifetime absolute USD profit threshold for a 'shark' coin
-          - 7000  # More restrictive profit threshold
-        coin_return_win_threshold:
-          - 0.4    # 50% minimum lifetime return threshold
-          - 0.65   # 75% return threshold for more aggressive 'shark' classification
-        wallet_min_coin_wins:
-          - 3      # Wallets must have at least 2 winning coins to be part of the shark cohort
-          - 5      # More restrictive, requiring 3 winning coins
+    datasets:
+      wallet_cohorts:
+        sharks:
+          wallet_minimum_inflows:
+            - 5000  # Minimum USD inflows for a coin to be considered a 'shark' coin
+            - 15000  # More restrictive inflows filter
+          coin_profits_win_threshold:
+            - 2000   # Lifetime absolute USD profit threshold for a 'shark' coin
+            - 7000  # More restrictive profit threshold
+          coin_return_win_threshold:
+            - 0.4    # 50% minimum lifetime return threshold
+            - 0.65   # 75% return threshold for more aggressive 'shark' classification
+          wallet_min_coin_wins:
+            - 3      # Wallets must have at least 2 winning coins to be part of the shark cohort
+            - 5      # More restrictive, requiring 3 winning coins
 
   modeling_config:
     preprocessing:
