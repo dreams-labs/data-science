@@ -622,3 +622,86 @@ def clean_profits_df(profits_df, data_cleaning_config):
     )
 
     return profits_cleaned_df,exclusions_logs_df
+
+
+
+def retrieve_metadata_data():
+    """
+    Retrieves metadata from the core.coin_facts_metadata table.
+
+    Returns:
+    - metadata_df: DataFrame containing coin_id-keyed metadata
+    """
+    # SQL query to retrieve prices data
+    query_sql = '''
+        select c.coin_id
+        ,md.categories
+        ,c.chain
+        from core.coins c
+        join core.coin_facts_metadata md on md.coin_id = c.coin_id
+    '''
+
+    # Run the SQL query using dgc's run_sql method
+    logger.debug('retrieving metadata data...')
+    metadata_df = dgc().run_sql(query_sql)
+
+    logger.info('retrieved metadata_df with shape %s',metadata_df.shape)
+
+    return metadata_df
+
+
+
+def generate_coin_metadata_features(metadata_df, config):
+    """
+    Generate model-friendly coin metadata features.
+
+    Args:
+    - metadata_df: DataFrame containing coin_id, categories, and chain information.
+    - config: Configuration dict that includes the chain threshold.
+
+    Returns:
+    - A DataFrame with coin_id, boolean category columns, and boolean chain columns.
+    """
+
+    # Step 1: Create boolean columns for each unique category
+    logger.debug("Creating boolean columns for each category...")
+
+    # Get all unique categories from the categories column
+    all_categories = set(cat for sublist in metadata_df['categories'] for cat in sublist)
+
+    # Create boolean columns for each category
+    for category in all_categories:
+        column_name = f"category_{category.lower()}"
+        metadata_df[column_name] = metadata_df['categories'].apply(
+            lambda cats, category=category: category.lower() in [c.lower() for c in cats]
+        )
+
+    # Step 2: Process chain data and apply threshold
+    logger.debug("Processing chain data and applying chain threshold...")
+
+    # Lowercase chain values
+    metadata_df['chain'] = metadata_df['chain'].str.lower()
+
+    # Count number of coins per chain
+    chain_counts = metadata_df['chain'].value_counts()
+    chain_threshold = config['datasets']['coin_facts']['coin_metadata']['chain_threshold']
+
+    # Create boolean columns for chains above the threshold
+    for chain, count in chain_counts.items():
+        if count >= chain_threshold:
+            metadata_df[f'chain_{chain}'] = metadata_df['chain'] == chain
+
+    # Create chain_other column for chains below the threshold or missing chain data
+    metadata_df['chain_other'] = metadata_df['chain'].apply(
+        lambda x: chain_counts.get(x, 0) < chain_threshold if pd.notna(x) else True
+    )
+
+    # Step 3: Return the final DataFrame with boolean columns
+    # Keep only relevant columns
+    columns_to_keep = ['coin_id'] + [
+        col for col in metadata_df.columns if col.startswith('category_') or col.startswith('chain_')
+    ]
+    metadata_features_df = metadata_df[columns_to_keep].copy()
+    logger.info("Generated coin_metadata_features_df.")
+
+    return metadata_features_df

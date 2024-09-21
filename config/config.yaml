@@ -9,8 +9,10 @@ training_data:
   training_period_duration: 60    # Duration of the training period in days
 
 datasets:
+
+  # Keyed on coin_id-date
   wallet_cohorts:
-    # Cohorts of wallets with different characteristics
+  # Cohorts of wallets with different characteristics
 
     # Shark wallets
     sharks:
@@ -21,10 +23,16 @@ datasets:
       coin_return_win_threshold: 0.5  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
       wallet_min_coin_wins: 3  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
 
+  # Keyed on coin_id-date
   time_series:
     prices:
       fill_method: 'drop_records'
 
+  # Keyed on coin_id
+  coin_facts:
+    coin_metadata:
+      fill_method: 'drop_records'
+      chain_threshold: 10  # Minimum coins associated with a chain for the chain to become a boolean feature
 
 data_cleaning:
   # Variables used to clean and filter raw data before training data is built
