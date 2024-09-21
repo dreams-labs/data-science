@@ -30,6 +30,180 @@ logger = dc.setup_logger()
 #                                                       #
 # ===================================================== #
 
+# -------------------------------- #
+# fill_prices_gaps() unit tests
+# -------------------------------- #
+
+@pytest.fixture
+def max_gap_days():
+    """
+    Fixture for max_gap_days parameter, reused across multiple tests.
+    """
+    return 2
+
+@pytest.mark.unit
+def test_no_gaps(max_gap_days):
+    """
+    Test case for no gaps. Ensure that no changes are made to the input data.
+    """
+    # Input data
+    prices_df_no_gaps = pd.DataFrame({
+        'coin_id': ['coin1', 'coin1', 'coin1', 'coin2', 'coin2', 'coin2'],
+        'date': pd.to_datetime(['2024-01-01', '2024-01-02', '2024-01-03',
+                                '2024-01-01', '2024-01-02', '2024-01-03']),
+        'price': [100, 101, 102, 200, 201, 202]
+    })
+
+    # Expected output: Should remain the same as input
+    expected_df = prices_df_no_gaps[['date', 'coin_id', 'price']].copy()
+
+    # Run the function
+    prices_filled_df, outcomes_df = td.fill_prices_gaps(prices_df_no_gaps, max_gap_days)
+
+    # Reorder columns for comparison
+    prices_filled_df = prices_filled_df[['date', 'coin_id', 'price']]
+
+    # Assertions
+    pd.testing.assert_frame_equal(prices_filled_df, expected_df)
+    assert all(outcomes_df['outcome'] == 'no gaps')
+
+@pytest.mark.unit
+def test_gaps_below_max(max_gap_days):
+    """
+    Test case for a DataFrame with gaps below max_gap_days. Ensure gaps are forward-filled.
+    """
+    # Input data
+    prices_df_gaps_below_max = pd.DataFrame({
+        'coin_id': ['coin1', 'coin1', 'coin1', 'coin2', 'coin2'],
+        'date': pd.to_datetime(['2024-01-01', '2024-01-03', '2024-01-04',
+                                '2024-01-01', '2024-01-03']),
+        'price': [100, 102, 103, 200, 202]
+    })
+
+    # Expected data after filling
+    expected_data = {
+        'date': pd.to_datetime(['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04',  # coin1
+                                '2024-01-01', '2024-01-02', '2024-01-03']),  # coin2
+        'coin_id': ['coin1', 'coin1', 'coin1', 'coin1',
+                    'coin2', 'coin2', 'coin2'],
+        'price': [100.0, 100, 102, 103,
+                  200, 200, 202]
+    }
+    expected_df = pd.DataFrame(expected_data)[['date', 'coin_id', 'price']]
+
+    # Run the function
+    prices_filled_df, outcomes_df = td.fill_prices_gaps(prices_df_gaps_below_max, max_gap_days)
+
+    # Reorder columns for comparison
+    prices_filled_df = prices_filled_df[['date', 'coin_id', 'price']]
+
+    # Assertions
+    pd.testing.assert_frame_equal(prices_filled_df, expected_df)
+    assert all(outcomes_df['outcome'] == 'gaps below threshold')
+
+@pytest.mark.unit
+def test_gaps_at_max(max_gap_days):
+    """
+    Test case for a DataFrame with gaps exactly equal to max_gap_days. Ensure gaps are forward-filled.
+    """
+    # Input data
+    prices_df_gaps_at_max = pd.DataFrame({
+        'coin_id': ['coin1', 'coin1', 'coin1', 'coin2', 'coin2'],
+        'date': pd.to_datetime(['2024-01-01', '2024-01-03', '2024-01-05',
+                                '2024-01-01', '2024-01-03']),
+        'price': [100, 102, 103, 200, 202]
+    })
+
+    # Expected data after filling
+    expected_data = {
+        'date': pd.to_datetime(['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05',  # coin1
+                                '2024-01-01', '2024-01-02', '2024-01-03']),  # coin2
+        'coin_id': ['coin1', 'coin1', 'coin1', 'coin1', 'coin1',
+                    'coin2', 'coin2', 'coin2'],
+        'price': [100.0, 100, 102, 102, 103,
+                  200, 200, 202]
+    }
+    expected_df = pd.DataFrame(expected_data)[['date', 'coin_id', 'price']]
+
+    # Run the function
+    prices_filled_df, outcomes_df = td.fill_prices_gaps(prices_df_gaps_at_max, max_gap_days)
+
+    # Reorder columns for comparison
+    prices_filled_df = prices_filled_df[['date', 'coin_id', 'price']]
+
+    # Assertions
+    pd.testing.assert_frame_equal(prices_filled_df, expected_df)
+    assert all(outcomes_df['outcome'] == 'gaps below threshold')
+
+@pytest.mark.unit
+def test_gaps_above_max(max_gap_days):
+    """
+    Test case for a DataFrame with gaps exceeding max_gap_days. Ensure these coins are excluded.
+    """
+    # Input data
+    prices_df_gaps_above_max = pd.DataFrame({
+        'coin_id': ['coin1', 'coin1', 'coin1', 'coin2', 'coin2','coin3','coin3','coin3'],
+        'date': pd.to_datetime(['2024-01-01', '2024-01-05', '2024-01-06',
+                                '2024-01-01', '2024-01-07',
+                                '2024-01-01', '2024-01-02','2024-01-04']),
+        'price': [100.0, 105, 106, 200, 207, 15, 18, 29]
+    })
+
+    # Expected data: No data should be returned since gaps are too large
+    expected_data = {
+        'date': pd.to_datetime(['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04']),
+        'coin_id': ['coin3', 'coin3', 'coin3', 'coin3'],
+        'price': [15.0, 18, 18, 29]
+    }
+    expected_df = pd.DataFrame(expected_data)[['date', 'coin_id', 'price']]
+
+    # Run the function
+    prices_filled_df, outcomes_df = td.fill_prices_gaps(prices_df_gaps_above_max, max_gap_days)
+
+    # Assertions
+    pd.testing.assert_frame_equal(prices_filled_df, expected_df)
+
+@pytest.mark.unit
+def test_mixed_gaps(max_gap_days):
+    """
+    Test case for a DataFrame with a mix of no gaps, gaps below, and gaps above max_gap_days.
+    """
+    # Input data
+    prices_df_mixed_gaps = pd.DataFrame({
+        'coin_id': ['coin1', 'coin1', 'coin1', 'coin2', 'coin2', 'coin2', 'coin3', 'coin3'],
+        'date': pd.to_datetime(['2024-01-01', '2024-01-02', '2024-01-03',
+                                '2024-01-01', '2024-01-04', '2024-01-05',
+                                '2024-01-01', '2024-01-10']),
+        'price': [100, 101, 102, 200, 204, 205, 300, 310]
+    })
+
+    # Expected data:
+    # - coin1 has no gaps.
+    # - coin2 has gaps below the threshold (filled for 2024-01-02, 2024-01-03).
+    # - coin3 has a gap too large (should be excluded).
+    expected_data = {
+        'date': pd.to_datetime(['2024-01-01', '2024-01-02', '2024-01-03',  # coin1
+                                '2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05']),  # coin2
+        'coin_id': ['coin1', 'coin1', 'coin1',
+                    'coin2', 'coin2', 'coin2', 'coin2', 'coin2'],
+        'price': [100.0, 101, 102,
+                  200, 200, 200, 204, 205]
+    }
+    expected_df = pd.DataFrame(expected_data)[['date', 'coin_id', 'price']]
+
+    # Run the function
+    prices_filled_df, outcomes_df = td.fill_prices_gaps(prices_df_mixed_gaps, max_gap_days)
+
+    # Reorder columns for comparison
+    prices_filled_df = prices_filled_df[['date', 'coin_id', 'price']]
+
+    # Assertions
+    pd.testing.assert_frame_equal(prices_filled_df, expected_df)
+    assert 'no gaps' in outcomes_df['outcome'].values
+    assert 'gaps below threshold' in outcomes_df['outcome'].values
+    assert 'gaps above threshold' in outcomes_df['outcome'].values
+
+
 # ---------------------------------------- #
 # calculate_wallet_profitability() unit tests
 # ---------------------------------------- #
@@ -402,6 +576,9 @@ def test_wallet_cohort_classification():
     assert wallet_1_metrics['usd_inflows'].values[0] == 13000, f"Expected total inflows for Wallet_1 to be 13000, got {wallet_1_metrics['usd_inflows'].values[0]}"
     assert wallet_1_metrics['total_coins'].values[0] == 2, f"Expected total coins for Wallet_1 to be 2, got {wallet_1_metrics['total_coins'].values[0]}"
     assert wallet_1_metrics['total_profits'].values[0] == 9000, f"Expected total profits for Wallet_1 to be 9000, got {wallet_1_metrics['total_profits'].values[0]}"
+
+
+
 
 
 

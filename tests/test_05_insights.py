@@ -192,11 +192,12 @@ def test_prepare_configs_success(tmpdir):
       wallet_min_coins: 2
     """
     metrics_config_yaml = """
-    metrics:
-      buyers_new:
-        aggregations:
-          mean:
-            scaling: None
+    wallet_cohorts:
+      sharks:
+        buyers_new:
+          aggregations:
+            mean:
+              scaling: None
     """
     modeling_config_yaml = """
     preprocessing:
@@ -219,7 +220,7 @@ def test_prepare_configs_success(tmpdir):
     override_params = {
         'config.data_cleaning.inflows_filter': 10000000,
         'config.training_data.modeling_period_duration': 14,
-        'metrics_config.metrics.buyers_new.aggregations.mean.scaling': 'standard',
+        'metrics_config.wallet_cohorts.sharks.buyers_new.aggregations.mean.scaling': 'standard',
         'modeling_config.preprocessing.drop_features': ['buyers_new_median'],
         'modeling_config.target_variables.moon_threshold': 0.3
     }
@@ -230,7 +231,7 @@ def test_prepare_configs_success(tmpdir):
     # Assert the overrides were applied correctly
     assert config['data_cleaning']['inflows_filter'] == 10000000
     assert config['training_data']['modeling_period_duration'] == 14
-    assert metrics_config['metrics']['buyers_new']['aggregations']['mean']['scaling'] == 'standard'
+    assert metrics_config['wallet_cohorts']['sharks']['buyers_new']['aggregations']['mean']['scaling'] == 'standard'
     assert modeling_config['preprocessing']['drop_features'] == ['buyers_new_median']
     assert modeling_config['target_variables']['moon_threshold'] == 0.3
 
@@ -254,11 +255,12 @@ def test_prepare_configs_failure(tmpdir):
       wallet_min_coins: 2
     """
     metrics_config_yaml = """
-    metrics:
-      buyers_new:
-        aggregations:
-          mean:
-            scaling: None
+    wallet_cohorts:
+      sharks:
+        buyers_new:
+          aggregations:
+            mean:
+              scaling: None
     """
     modeling_config_yaml = """
     preprocessing:
@@ -483,24 +485,20 @@ def test_build_configured_model_input(config, metrics_config, modeling_config, p
         cohort_wallets
     )
 
-    # 3. Flatten the buysell metrics DataFrame, save it, and preprocess it
-    flattened_output_directory = os.path.join(
-        modeling_config['modeling']['modeling_folder'],
-        'outputs/flattened_outputs/'
-    )
-    cohort_name = list(config['wallet_cohorts'].keys())[0]
-    metric_description = f"{cohort_name}_cohort"
+    # Retrieve the metrics configuration for the first df
+    _, df_metrics_config = next(iter(metrics_config['wallet_cohorts'].items()))
+
 
     flattened_buysell_metrics_df = fe.flatten_coin_date_df(
         buysell_metrics_df,
-        metrics_config,
+        df_metrics_config,
         config['training_data']['training_period_end']
     )
     logger.debug(f"Shape of flattened_buysell_metrics_df: {flattened_buysell_metrics_df.shape}")
 
     # Run build_configured_model_input
     X_train, X_test, y_train, y_test = i.build_configured_model_input(
-        profits_df, prices_df, config, metrics_config, modeling_config
+        profits_df, prices_df, config, df_metrics_config, modeling_config
     )
 
     # Assert that the column count in flattened_buysell_metrics_df is 1 more than X_train

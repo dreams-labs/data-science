@@ -10,52 +10,110 @@
 # lookback_periods:
 #   - Defines how many periods to look back when calculating rolling stats (e.g., 8 means calculate rolling stats over 8 previous periods)
 
-metrics:
-  buyers_new:
-    aggregations:
-      sum:
-        scaling: "standard"    # Scaling applied to sums, which can vary significantly in range.
-      mean:
-        scaling: "minmax"      # Scaling for mean to normalize values between 0 and 1.
-      std:
-        scaling: "standard"    # Standard scaling for standard deviation to account for variability.
-      median:                  # No scaling specified here
-    rolling:
-      stats:
+wallet_cohorts:
+  sharks:
+    buyers_new:
+      aggregations:
         sum:
-          scaling: "minmax"
+          scaling: "standard"    # Scaling applied to sums, which can vary significantly in range.
+        mean:
+          scaling: "minmax"      # Scaling for mean to normalize values between 0 and 1.
+        std:
+          scaling: "standard"    # Standard scaling for standard deviation to account for variability.
+        median:                  # No scaling specified here
+          scaling: "none"        # No scaling for percentage change, as it's already normalized.
+
+      rolling:
+        stats:
+          sum:
+            scaling: "minmax"
+          max:
+            scaling: "standard"
+        comparisons:
+          change:
+            scaling: "standard"
+          pct_change:
+            scaling: "none"        # No scaling for percentage change, as it's already normalized.
+        window_duration: 14
+        lookback_periods: 4
+
+    total_bought:
+      aggregations:
+        sum:
+          scaling: "standard"    # Large sums of total bought should be scaled to avoid model distortion.
+        median:
+      rolling:
+        stats:
+          sum:
+            scaling: "minmax"
+        comparisons:
+          change:
+            scaling: "standard"
+        window_duration: 14
+        lookback_periods: 4
+
+    total_sold:
+      aggregations:
+        sum:
+          scaling: "standard"    # Total sold should also be scaled to account for high variance.
+
+    total_buyers:
+      aggregations:
+        sum:
+    sellers_new:
+      aggregations:
+        sum:
+          scaling: "standard"
+        mean:
+          scaling: "standard"
+        median:
+    buyers_repeat:
+      aggregations:
+        sum:
+          scaling: "standard"
+        mean:
+          scaling: "standard"
+        median:
+  prices:
+    price:
+      aggregations:
         max:
           scaling: "standard"
-      comparisons: 
-        change:
-          scaling: "standard"
-        pct_change:
-          scaling: "none"        # No scaling for percentage change, as it's already normalized.
-      window_duration: 7
-      lookback_periods: 8
-      
-  total_bought:
-    aggregations:
-      sum:
-        scaling: "standard"    # Large sums of total bought should be scaled to avoid model distortion.
-      median:
-        scaling: "none"          # No scaling needed for median.
     rolling:
-      stats:
-        sum:
-          scaling: "minmax"
-      comparisons:
-        change:
+        stats:
+          sum:
+            scaling: "minmax"
+          max:
+            scaling: "standard"
+        comparisons:
+          pct_change:
+            scaling: "none"        # No scaling for percentage change, as it's already normalized.
+        window_duration: 14
+        lookback_periods: 4
+
+# New top-level section for time series
+time_series:
+  # Specify which DataFrame the metrics apply to
+  prices:
+    sma:
+      parameters:
+        period: 20
+      aggregations:
+        std:
           scaling: "standard"
-      window_duration: 7
-      lookback_periods: 8
-
-  total_sold:
-    aggregations:
-      sum:
-        scaling: "standard"    # Total sold should also be scaled to account for high variance.
-
-  total_buyers:
-    aggregations:
-      sum:
-        scaling: "none"          # No scaling for sum of total buyers, as it's likely a more stable number.
+      rolling:
+        stats:
+          mean:
+            scaling: "standard"
+        window_duration: 10
+        lookback_periods: 5
+    ema:
+      parameters:
+        period: 10
+      aggregations:
+        std:
+          scaling: "standard"
+  volume:
+    sma:
+      parameters:
+        period: 15

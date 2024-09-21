@@ -199,7 +199,7 @@ def test_fe_calculate_global_stats():
     }
 
     no_stats = fe.calculate_global_stats(sample_ts, 'buyers_new', no_stats_config)
-    assert no_stats == {}  # Should return an empty dictionary since no stats are defined
+    assert not no_stats  # Should return an empty dictionary since no stats are defined
 
 
 
@@ -250,7 +250,8 @@ def test_fe_calculate_rolling_window_features():
 
 
     # Test Case 1: Multiple periods with complete windows (10 records, 3 periods, window_duration=3)
-    rolling_features = fe.calculate_rolling_window_features(ts, window_duration, lookback_periods, rolling_stats, comparisons, metric_name)
+    rolling_features = fe.calculate_rolling_window_features(
+        ts, window_duration, lookback_periods, rolling_stats, comparisons, metric_name)
 
     assert rolling_features['buyers_new_sum_3d_period_1'] == 27  # Last 3 records: 9+10+8 = 27
     assert rolling_features['buyers_new_max_3d_period_1'] == 10
@@ -263,7 +264,8 @@ def test_fe_calculate_rolling_window_features():
 
 
     # Test Case 2: Non-divisible records (8 records, window_duration=3)
-    rolling_features_partial_window = fe.calculate_rolling_window_features(ts_with_8_records, 3, 3, ['sum', 'max'], ['change', 'pct_change'], metric_name)
+    rolling_features_partial_window = fe.calculate_rolling_window_features(
+        ts_with_8_records, 3, 3, ['sum', 'max'], ['change', 'pct_change'], metric_name)
 
     # Only two full periods (6-8 and 3-5), so period 3 should not exist
     assert rolling_features_partial_window['buyers_new_sum_3d_period_1'] == 21  # Last 3 records: 6+7+8
@@ -275,14 +277,16 @@ def test_fe_calculate_rolling_window_features():
 
 
     # Test Case 3: Small dataset (2 records)
-    rolling_features_small_ts = fe.calculate_rolling_window_features(small_ts, window_duration, lookback_periods, rolling_stats, comparisons, metric_name)
+    rolling_features_small_ts = fe.calculate_rolling_window_features(
+        small_ts, window_duration, lookback_periods, rolling_stats, comparisons, metric_name)
 
     # No valid 3-period windows exist, so the function should handle it gracefully
-    assert rolling_features_small_ts == {}  # Expect empty dict since window is larger than available data
+    assert not rolling_features_small_ts  # Expect empty dict since window is larger than available data
 
 
     # Test Case 4: Check std and median specifically with window of 3 and valid lookback periods
-    rolling_features_std_median = fe.calculate_rolling_window_features(ts, window_duration, lookback_periods, ['std', 'median'], comparisons, metric_name)
+    rolling_features_std_median = fe.calculate_rolling_window_features(
+        ts, window_duration, lookback_periods, ['std', 'median'], comparisons, metric_name)
 
     # Check for standard deviation and median over the last 3 periods
     assert round(rolling_features_std_median['buyers_new_std_3d_period_1'], 5) == round(ts.iloc[-3:].std(), 5)
@@ -293,7 +297,8 @@ def test_fe_calculate_rolling_window_features():
 
     # Test Case 5: Handle pct_change with impute_value logic (start_value=0)
     ts_with_zeros = pd.Series([0, 0, 5, 10, 15, 20])
-    rolling_features_zeros = fe.calculate_rolling_window_features(ts_with_zeros, window_duration, lookback_periods, ['sum'], comparisons, metric_name)
+    rolling_features_zeros = fe.calculate_rolling_window_features(
+        ts_with_zeros, window_duration, lookback_periods, ['sum'], comparisons, metric_name)
 
     assert 'buyers_new_pct_change_3d_period_1' in rolling_features_zeros
     assert rolling_features_zeros['buyers_new_pct_change_3d_period_2'] <= 1000  # Ensure capping at 1000%
@@ -330,19 +335,17 @@ def test_fe_flatten_coin_features():
 
     # Sample configuration for metrics
     metrics_config = {
-        'metrics': {
-            'buyers_new': {
-                'aggregations': ['sum', 'mean', 'max', 'min', 'median', 'std'],
-                'rolling': {
-                    'stats': ['sum', 'max'],
-                    'comparisons': ['change', 'pct_change'],
-                    'window_duration': 3,
-                    'lookback_periods': 2
-                }
-            },
-            'sellers_new': {
-                'aggregations': ['sum', 'mean', 'max']
+        'buyers_new': {
+            'aggregations': ['sum', 'mean', 'max', 'min', 'median', 'std'],
+            'rolling': {
+                'stats': ['sum', 'max'],
+                'comparisons': ['change', 'pct_change'],
+                'window_duration': 3,
+                'lookback_periods': 2
             }
+        },
+        'sellers_new': {
+            'aggregations': ['sum', 'mean', 'max']
         }
     }
 
@@ -363,7 +366,11 @@ def test_fe_flatten_coin_features():
     # Test Case 2: Missing metric column in DataFrame
     with pytest.raises(ValueError, match="Metric 'nonexistent_metric' is missing from the input DataFrame"):
         sample_coin_df_invalid = sample_coin_df.drop(columns=['buyers_new'])
-        metrics_config_invalid = {'metrics': {'nonexistent_metric': {'aggregations': ['sum']}}}
+        metrics_config_invalid = {
+            'nonexistent_metric': {
+                'aggregations': ['sum']
+            }
+        }
         fe.flatten_coin_features(sample_coin_df_invalid, metrics_config_invalid)
 
     # Test Case 3: Missing 'coin_id' column in DataFrame
@@ -374,10 +381,8 @@ def test_fe_flatten_coin_features():
     # Test Case 4: Invalid aggregation function
     with pytest.raises(KeyError, match="Aggregation 'invalid_agg' for metric 'buyers_new' is not recognized"):
         metrics_config_invalid_agg = {
-            'metrics': {
-                'buyers_new': {
-                    'aggregations': ['invalid_agg']
-                }
+            'buyers_new': {
+                'aggregations': ['invalid_agg']
             }
         }
         fe.flatten_coin_features(sample_coin_df, metrics_config_invalid_agg)
@@ -389,7 +394,6 @@ def test_fe_flatten_coin_features():
     assert 'buyers_new_max_3d_period_1' in rolling_features
     assert 'buyers_new_sum_3d_period_2' in rolling_features
     assert 'buyers_new_max_3d_period_2' in rolling_features
-
     assert 'buyers_new_sum_3d_period_3' not in rolling_features  # Ensure no extra periods
 
 
@@ -422,14 +426,12 @@ def test_fe_flatten_coin_date_df():
     })
 
     # Sample configuration for metrics
-    metrics_config = {
-        'metrics': {
-            'buyers_new': {
-                'aggregations': ['sum', 'mean', 'max', 'min', 'median', 'std'],
-            },
-            'sellers_new': {
-                'aggregations': ['sum', 'mean', 'max']
-            }
+    df_metrics_config = {
+        'buyers_new': {
+            'aggregations': ['sum', 'mean', 'max', 'min', 'median', 'std'],
+        },
+        'sellers_new': {
+            'aggregations': ['sum', 'mean', 'max']
         }
     }
 
@@ -437,7 +439,7 @@ def test_fe_flatten_coin_date_df():
     training_period_end = '2024-01-03'
 
     # Test Case 1: Basic functionality with multiple coins
-    result = fe.flatten_coin_date_df(sample_df, metrics_config, training_period_end)
+    result = fe.flatten_coin_date_df(sample_df, df_metrics_config, training_period_end)
 
     # Check that there are two coins in the output
     assert len(result['coin_id'].unique()) == 2
@@ -458,12 +460,12 @@ def test_fe_flatten_coin_date_df():
     })
 
     with pytest.raises(ValueError, match="Metric 'buyers_new' is missing from the input DataFrame."):
-        fe.flatten_coin_date_df(df_missing_metric, metrics_config, training_period_end)
+        fe.flatten_coin_date_df(df_missing_metric, df_metrics_config, training_period_end)
 
     # Test Case 3: Empty DataFrame (should raise ValueError)
     df_empty = pd.DataFrame(columns=['coin_id', 'buyers_new', 'sellers_new'])
     with pytest.raises(ValueError, match="Input DataFrame is empty"):
-        fe.flatten_coin_date_df(df_empty, metrics_config, training_period_end)
+        fe.flatten_coin_date_df(df_empty, df_metrics_config, training_period_end)
 
     # Test Case 4: One coin in the dataset
     df_one_coin = pd.DataFrame({
@@ -472,7 +474,7 @@ def test_fe_flatten_coin_date_df():
         'buyers_new': [10, 20, 30],
         'sellers_new': [5, 10, 15]
     })
-    result_one_coin = fe.flatten_coin_date_df(df_one_coin, metrics_config, training_period_end)
+    result_one_coin = fe.flatten_coin_date_df(df_one_coin, df_metrics_config, training_period_end)
 
     # Check that the single coin is processed correctly and the columns are as expected
     assert len(result_one_coin['coin_id'].unique()) == 1
@@ -582,13 +584,12 @@ def mock_metrics_config():
     This configuration includes settings for scaling different features.
     """
     return {
-        'metrics': {
             'feature_1': {
                 'aggregations': {
                     'sum': {'scaling': 'standard'}
+                    ,'max': {}
                 }
             }
-        }
     }
 
 @pytest.fixture
@@ -795,6 +796,9 @@ def test_duplicate_coin_id(mock_input_files):
 
 @pytest.mark.unit
 def test_create_target_variables_mooncrater():
+    """
+    tests whether ths is_moon and is_crater target variables are calculated correctly.
+    """
     # Mock data
     data = {
         'coin_id': ['coin1', 'coin2', 'coin3', 'coin4', 'coin5', 'coin1', 'coin2', 'coin3', 'coin4', 'coin5'],
@@ -862,11 +866,14 @@ def config():
     return load_config('tests/test_config/test_config.yaml')
 
 @pytest.fixture(scope="session")
-def metrics_config():
+def df_metrics_config():
     """
     Fixture to load the configuration from the YAML file.
     """
-    return load_config('tests/test_config/test_metrics_config.yaml')
+    metrics_config = load_config('tests/test_config/test_metrics_config.yaml')
+    first_cohort_name, first_cohort_metrics = next(iter(metrics_config['wallet_cohorts'].items()))
+
+    return first_cohort_metrics
 
 @pytest.fixture(scope="session")
 def buysell_metrics_df():
@@ -882,27 +889,26 @@ def buysell_metrics_df():
 # ---------------------------------- #
 
 @pytest.mark.integration
-def test_metrics_config_alignment(buysell_metrics_df, metrics_config):
+def test_metrics_config_alignment(buysell_metrics_df, df_metrics_config):
     """
-    Test that at least one metric from the buysell_metrics_df is configured in the metrics_config.
+    Test that at least one metric from the buysell_metrics_df is configured in the df_metrics_config.
 
     This test ensures that the buysell_metrics_df contains columns that are defined in the metrics
     configuration file. It checks whether there is any overlap between the metrics from the DataFrame
     and the metrics defined in the configuration, asserting that at least one match is found.
     """
-
     # Extract column names from the DataFrame
     df_columns = buysell_metrics_df.columns
 
     # Find the intersection of DataFrame columns and config metrics
-    matching_metrics = [metric for metric in df_columns if metric in metrics_config['metrics']]
+    matching_metrics = [metric for metric in df_columns if metric in df_metrics_config]
 
     # Assert that at least one metric in the config applies to the buysell_metrics_df
     assert matching_metrics, "No matching metrics found between buysell_metrics_df and the metrics configuration"
 
 
 @pytest.mark.integration
-def test_aggregation_methods(buysell_metrics_df, metrics_config, config):
+def test_aggregation_methods(buysell_metrics_df, df_metrics_config, config):
     """
     Test that the aggregation methods applied during flattening are correct.
 
@@ -911,9 +917,8 @@ def test_aggregation_methods(buysell_metrics_df, metrics_config, config):
     the coin_id level with the corresponding values in the flattened DataFrame, ensuring that the
     sum matches the expected result.
     """
-
     # Flatten the buysell metrics DataFrame to the coin_id level
-    flattened_buysell_metrics_df = fe.flatten_coin_date_df(buysell_metrics_df, metrics_config, config['training_data']['training_period_end'])
+    flattened_buysell_metrics_df = fe.flatten_coin_date_df(buysell_metrics_df, df_metrics_config, config['training_data']['training_period_end'])
 
     # Example: Verify that total_bought_sum is aggregated correctly at the coin_id level
     # Manually group the original buysell_metrics_df by coin_id to compute expected sums
@@ -927,7 +932,7 @@ def test_aggregation_methods(buysell_metrics_df, metrics_config, config):
 
 
 @pytest.mark.integration
-def test_outlier_handling(buysell_metrics_df, metrics_config, config):
+def test_outlier_handling(buysell_metrics_df, df_metrics_config, config):
     """
     Test that extreme values (outliers) are correctly handled by the flattening function.
 
@@ -942,14 +947,14 @@ def test_outlier_handling(buysell_metrics_df, metrics_config, config):
     outlier_df.loc[0, 'total_bought'] = 1e12  # Extreme value
 
     # Flatten the modified DataFrame
-    flattened_buysell_metrics_df = fe.flatten_coin_date_df(outlier_df, metrics_config, config['training_data']['training_period_end'])
+    flattened_buysell_metrics_df = fe.flatten_coin_date_df(outlier_df, df_metrics_config, config['training_data']['training_period_end'])
 
     # Ensure the extreme value is handled and aggregated correctly
     assert flattened_buysell_metrics_df['total_bought_sum'].max() >= 1e12, "Outlier in total_bought not handled correctly"
 
 
 @pytest.mark.integration
-def test_all_coin_ids_present(buysell_metrics_df, metrics_config, config):
+def test_all_coin_ids_present(buysell_metrics_df, df_metrics_config, config):
     """
     Test that all coin_ids from the original DataFrame are present in the flattened output.
 
@@ -959,7 +964,7 @@ def test_all_coin_ids_present(buysell_metrics_df, metrics_config, config):
     """
 
     # Flatten the buysell metrics DataFrame to the coin_id level
-    flattened_buysell_metrics_df = fe.flatten_coin_date_df(buysell_metrics_df, metrics_config, config['training_data']['training_period_end'])
+    flattened_buysell_metrics_df = fe.flatten_coin_date_df(buysell_metrics_df, df_metrics_config, config['training_data']['training_period_end'])
 
     # Get unique coin_ids from the original DataFrame
     expected_coin_ids = buysell_metrics_df['coin_id'].unique()

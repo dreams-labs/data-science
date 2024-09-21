@@ -5,6 +5,7 @@ calculates metrics related to the distribution of coin ownership across wallets
 # pylint: disable=C0303 # trailing whitespace
 
 import time
+from typing import Tuple
 import pandas as pd
 import numpy as np
 import dreams_core.core as dc
@@ -15,7 +16,7 @@ logger = dc.setup_logger()
 
 def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets):
     """
-    Generates buysell metrics for all cohort coins by looping through each coin_id and applying 
+    Generates buysell metrics for all cohort coins by looping through each coin_id and applying
     calculate_buysell_coin_metrics_df().
 
     Parameters:
@@ -24,9 +25,9 @@ def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets):
     - cohort_wallets (array-like): List of wallet addresses to include.
 
     Returns:
-    - buysell_metrics_df (pd.DataFrame): DataFrame keyed date-coin_id that includes various metrics 
-        about the cohort's buying, selling, and holding behavior. This date is filled to have a row for 
-        every coin_id-date pair through the training_period_end. 
+    - buysell_metrics_df (pd.DataFrame): DataFrame keyed date-coin_id that includes various metrics
+        about the cohort's buying, selling, and holding behavior. This date is filled to have a row for
+        every coin_id-date pair through the training_period_end.
     """
     start_time = time.time()
     logger.info('Preparing buysell_metrics_df...')
@@ -108,7 +109,7 @@ def generate_coin_buysell_metrics_df(coin_cohort_profits_df):
 
     params:
     - coin_cohort_profits_df (dataframe): df showing profits data for a single coin_id
-    
+
     returns:
     - buysell_metrics_df (dataframe): df of metrics on new/repeat buyers/sellers and transaction totals on each date
     '''
@@ -163,13 +164,13 @@ def generate_coin_buysell_metrics_df(coin_cohort_profits_df):
 def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
     """
     Fills missing dates in buysell_metrics_df and applies appropriate logic to fill NaN values for each metric.
-    
+
     This function:
     - Adds rows with missing dates (if any) between the latest date in buysell_metrics_df and the training_period_end.
     - Fills NaN values for buy/sell metrics, balances, and other key metrics according to the following rules:
       - total_balance and total_holders: forward-filled (if no activity, assume balances/holders remain the same).
       - total_bought, total_sold, total_net_transfers, total_volume, buyers_new, buyers_repeat, sellers_new, sellers_repeat: filled with 0 (if no activity, assume no transactions).
-    
+
     Parameters:
     - buysell_metrics_df: DataFrame containing buy/sell metrics keyed on coin_id-date
     - training_period_end: The end of the training period (datetime)
@@ -177,7 +178,7 @@ def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
     Returns:
     - buysell_metrics_df with missing dates and NaN values appropriately filled.
     """
-    
+
     # Identify the expected rows for all coin_id-date pairs
     min_date = buysell_metrics_df['date'].min()
     full_date_range = pd.date_range(start=min_date, end=training_period_end, freq='D')
@@ -203,13 +204,13 @@ def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
             # After the forward-fill, fill 0 for dates earlier than the first balance/holders records
             total_balance=buysell_metrics_df.groupby('coin_id')['total_balance'].ffill().fillna(0),
             total_holders=buysell_metrics_df.groupby('coin_id')['total_holders'].ffill().fillna(0),
-            
+
             # Fill 0 for metrics related to transactions (buying, selling) that should be 0 when there's no activity
             total_bought=buysell_metrics_df['total_bought'].fillna(0),
             total_sold=buysell_metrics_df['total_sold'].fillna(0),
             total_net_transfers=buysell_metrics_df['total_net_transfers'].fillna(0),
             total_volume=buysell_metrics_df['total_volume'].fillna(0),
-            
+
             # Fill 0 for buyer/seller counts on days with no transactions
             buyers_new=buysell_metrics_df['buyers_new'].fillna(0),
             buyers_repeat=buysell_metrics_df['buyers_repeat'].fillna(0),
@@ -220,17 +221,122 @@ def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
         )
         ,include_groups=False  # Exclude the grouping columns (coin_id) from the operation
     ).reset_index(drop=True)
-    
+
     return buysell_metrics_df
+
+
+
+def generate_time_series_metrics(
+        time_series_df: pd.DataFrame,
+        metrics_config: dict,
+        dataset_key: str,
+        colname: str,
+        required_duration: int = 60
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Generates time series metrics (e.g., SMA, EMA) based on the given config.
+
+    Params:
+    - time_series_df (pd.DataFrame): The input DataFrame with time series data.
+    - metrics_config: The full metrics_config file with a time_series key that matches the dataset_key param.
+    - dataset_key (string): The dataset's key in the metrics_config['time_series'] section.
+    - colname (string): The name of the column that the metrics should be calculated for (e.g., 'price').
+    - required_duration (int): Minimum number of days the coin must have data to be included.
+
+    Returns:
+    - time_series_metrics_df (pd.DataFrame): DataFrame with full duration data and the configured metrics.
+    - partial_time_series_metrics_df (pd.DataFrame): DataFrame for coins with incomplete duration.
+    """
+    # 1. Data Quality Checks and Formatting
+    # -------------------------------------
+    # Confirm that the colname is in the input df
+    if colname not in time_series_df.columns:
+        raise KeyError(f"Input DataFrame does not include column '{colname}'.")
+
+    # Confirm there are no null values in the input column
+    if time_series_df[colname].isnull().any():
+        raise ValueError(f"The '{colname}' column contains null values, which are not allowed.")
+
+    # Retrieve relevant metrics configuration and raise error if the key doesn't exist
+    try:
+        time_series_metrics_config = metrics_config['time_series'][dataset_key]
+    except KeyError as exc:
+        raise KeyError(f"Key [{dataset_key}] not found in metrics_config['time_series']") from exc
+
+    # Raise error if there are no metrics for the key
+    if not metrics_config['time_series'][dataset_key]:
+        raise KeyError(f"No metrics are specified for key [{dataset_key}] in metrics_df.")
+
+    # Ensure date is in datetime format and sorted by coin_id and date
+    time_series_df['date'] = pd.to_datetime(time_series_df['date'])
+    time_series_df = time_series_df.sort_values(by=['coin_id', 'date'])
+
+    # 2. Metric Calculations for All Coins
+    # -------------------------------------
+    for _, group in time_series_df.groupby('coin_id'):
+        for metric, config in time_series_metrics_config.items():
+            period = config['parameters']['period']
+
+            # Calculate the corresponding metric
+            if metric == 'sma':
+                sma = calculate_sma(group[colname], period)
+                time_series_df.loc[group.index, metric] = sma
+
+            elif metric == 'ema':
+                ema = calculate_ema(group[colname], period)
+                time_series_df.loc[group.index, metric] = ema
+
+    # Include all dynamically created columns in the return DataFrame
+    dynamic_cols = [metric for metric in time_series_metrics_config.keys()]
+    time_series_metrics_df = time_series_df[['coin_id', 'date', colname] + dynamic_cols]
+
+    # 3. Split the DataFrames After Metric Calculation
+    # -------------------------------------
+    # Count the number of records for each coin
+    coin_counts = time_series_df.groupby('coin_id').size()
+
+    # Identify coins with full and partial time series
+    full_duration_coins = coin_counts[coin_counts >= required_duration].index
+    partial_duration_coins = coin_counts[coin_counts < required_duration].index
+
+    # Filter for full and partial coins
+    full_metrics_df = time_series_metrics_df[time_series_metrics_df['coin_id'].isin(full_duration_coins)]
+    partial_time_series_metrics_df = time_series_metrics_df[time_series_metrics_df['coin_id'].isin(partial_duration_coins)]
+
+    # Log the number of coins with incomplete data
+    logger.info("Removed %s coins with incomplete time series.", len(partial_duration_coins))
+
+    return full_metrics_df, partial_time_series_metrics_df
+
+def calculate_sma(timeseries: pd.Series, period: int) -> pd.Series:
+    """
+    Calculates Simple Moving Average (SMA) for a given time series, with handling for imputing
+    null values on dates that occur when there are fewer data points than the period duration.
+    """
+    # Calculate the SMA for the first few values where data is less than the period
+    sma = timeseries.expanding(min_periods=1).apply(lambda x: x.mean() if len(x) < period else np.nan)
+
+    # Use rolling().mean() for the rest once the period is reached
+    rolling_sma = timeseries.rolling(window=period, min_periods=period).mean()
+
+    # Combine the two: use the expanding calculation until the period is reached, then use rolling()
+    sma = sma.combine_first(rolling_sma)
+
+    return sma
+
+def calculate_ema(timeseries: pd.Series, period: int) -> pd.Series:
+    """Calculates Exponential Moving Average (EMA) for a given time series."""
+    return timeseries.ewm(span=period, adjust=False).mean()
+
 
 
 # def prepare_cohort_profits_df(profits_df,cohort_wallets,cohort_coins):
 #     '''
 #     Prepare a simplified version of profits_df for analysis based on the given wallet cohort and coin list.
 
-#     runs two bigquery queries to retrieve the dfs necessary for wallet metric calculation. 
-#     note that the all_balances_df is very large as it contains all transfer-days for all coins, 
-#     which is why metadata is stored in a separate much smaller table. 
+#     runs two bigquery queries to retrieve the dfs necessary for wallet metric calculation.
+#     note that the all_balances_df is very large as it contains all transfer-days for all coins,
+#     which is why metadata is stored in a separate much smaller table.
 
 #     Parameters:
 #     - cohort_wallets (array-like): List of wallet addresses to include.
@@ -283,7 +389,7 @@ def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
 # def resample_profits_df(cohort_profits_df, resampling_period=3):
 #     '''
 #     Resamples the cohort_profits_df over a specified resampling time period by aggregating coin-wallet
-#     pair activity within each resampling period. 
+#     pair activity within each resampling period.
 
 #     Parameters:
 #     - cohort_profits_df (pd.DataFrame): DataFrame containing profits data for wallet-coin pairs.
@@ -488,7 +594,7 @@ def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
 
 #     params:
 #     - balances_df (dataframe): df showing daily wallet balances of a coin_id token that \
-#         has been filtered to only include one coin_id. 
+#         has been filtered to only include one coin_id.
 
 #     returns:
 #     - gini_df (dataframe): df with dates as the index and the Gini coefficients as the values.
@@ -549,7 +655,7 @@ def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
 
 #     Parameters:
 #     arr : numpy.ndarray or list
-#         A 1D array or list containing the values for which the Gini coefficient 
+#         A 1D array or list containing the values for which the Gini coefficient
 #         should be calculated. These values represent a distribution (e.g., income, wealth).
 
 #     Returns:
