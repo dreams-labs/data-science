@@ -2,7 +2,6 @@
 calculates metrics related to the distribution of coin ownership across wallets
 '''
 # pylint: disable=C0301 # line too long
-# pylint: disable=C0303 # trailing whitespace
 
 import time
 from typing import Tuple

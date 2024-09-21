@@ -2,7 +2,6 @@
 functions used to build coin-level features from training data
 """
 # pylint: disable=C0301 # line over 100 chars
-# pylint: disable=C0303 # trailing whitespace
 # pylint: disable=C0103 # X_train violates camelcase
 # pylint: disable=E0401 # can't find utils import
 
