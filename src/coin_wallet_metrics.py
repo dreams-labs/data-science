@@ -243,17 +243,33 @@ def generate_time_series_metrics(
     Returns:
     - time_series_metrics_df (pd.DataFrame): The input DataFrame with the configured metrics added as new columns.
     """
+    # 1. Data Quality Checks and Formatting
+    # -------------------------------------
+    # Confirm that the colname is in the input df
+    if not colname in time_series_df.columns:
+        raise KeyError(f"Input DataFrame does not include column '{colname}'.")
 
-    # Retrieve relevant metrics configuration
+    # Confirm there are no null values in the input column
+    if time_series_df[colname].isnull().any():
+        raise ValueError(f"The '{colname}' column contains null values, which are not allowed.")
+
+    # Retrieve relevant metrics configuration and raise error if the key doesn't exist
     try:
         time_series_metrics_config = metrics_config['time_series'][dataset_key]
     except KeyError as exc:
-        raise KeyError(f"Key {dataset_key} not found in metrics_config['time_series']") from exc
+        raise KeyError(f"Key [{dataset_key}] not found in metrics_config['time_series']") from exc
+
+    # Raise error if there are no metrics for the key
+    if not metrics_config['time_series'][dataset_key]:
+        raise KeyError(f"No metrics are specified for key [{dataset_key}] in metrics_df. ")
 
     # Ensure date is in datetime format and sorted by coin_id and date
     time_series_df['date'] = pd.to_datetime(time_series_df['date'])
     time_series_df = time_series_df.sort_values(by=['coin_id', 'date'])
 
+
+    # 2. Metric Calculations
+    # -------------------------------------
     # Loop over each coin_id group
     for _, group in time_series_df.groupby('coin_id'):
         for metric, config in time_series_metrics_config.items():

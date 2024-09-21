@@ -113,3 +113,7 @@ time_series:
       aggregations:
         std:
           scaling: "standard"
+  volume:
+    sma:
+      parameters:
+        period: 15
