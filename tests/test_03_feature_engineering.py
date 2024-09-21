@@ -1032,7 +1032,7 @@ def df_metrics_config():
     Fixture to load the configuration from the YAML file.
     """
     metrics_config = load_config('tests/test_config/test_metrics_config.yaml')
-    first_cohort_name, first_cohort_metrics = next(iter(metrics_config['datasets']['wallet_cohorts'].items()))
+    first_cohort_name, first_cohort_metrics = next(iter(metrics_config['wallet_cohorts'].items()))
 
     return first_cohort_metrics
 
