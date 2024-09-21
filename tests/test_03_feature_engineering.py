@@ -671,8 +671,11 @@ def test_preprocess_coin_df_scaling(mock_modeling_config, mock_metrics_config, m
 @pytest.fixture
 def mock_input_files_colnames(tmpdir):
     """
-    unit test data for scenario with many duplicate columns and similar filenames
+    Unit test data for scenario with many duplicate columns and similar filenames.
     """
+    # Create the correct subdirectory structure in tmpdir
+    preprocessed_output_dir = tmpdir.mkdir("outputs").mkdir("preprocessed_outputs")
+
     # Create mock filenames and corresponding DataFrames
     filenames = [
         'buysell_metrics_2024-09-13_14-44_model_period_2024-05-01_v0.1.csv',
@@ -689,21 +692,24 @@ def mock_input_files_colnames(tmpdir):
     df4 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [120, 220]})
     df5 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [130, 230]})
 
-    # Save each DataFrame as a CSV
+    # Save each DataFrame as a CSV to the correct directory
     for i, df in enumerate([df1, df2, df3, df4, df5]):
-        df.to_csv(os.path.join(tmpdir, filenames[i]), index=False)
+        df.to_csv(os.path.join(preprocessed_output_dir, filenames[i]), index=False)
 
-    return tmpdir, filenames
+    # Create a tuple list with filenames and 'fill_zeros' strategy
+    input_files = [(filenames[i], 'fill_zeros') for i in range(len(filenames))]
+
+    return tmpdir, input_files
 
 @pytest.mark.unit
 def test_create_training_data_df(mock_input_files_colnames):
     """
-    test column renaming logic for clarity
+    Test column renaming logic for clarity when merging multiple files with similar filenames.
     """
-    tmpdir, filenames = mock_input_files_colnames
+    tmpdir, input_files = mock_input_files_colnames
 
-    # Call the function
-    merged_df = fe.create_training_data_df(tmpdir, filenames)
+    # Call the function using tmpdir as the modeling_folder
+    merged_df, _ = fe.create_training_data_df(tmpdir, input_files)
 
     # Check if the columns have the correct suffixes
     expected_columns = [
@@ -715,13 +721,17 @@ def test_create_training_data_df(mock_input_files_colnames):
         'buyers_new_price_metrics'
     ]
 
-    assert list(merged_df.columns) == expected_columns, f"Expected columns: {expected_columns}, but got: {list(merged_df.columns)}"
+    assert list(merged_df.columns) == expected_columns, \
+        f"Expected columns: {expected_columns}, but got: {list(merged_df.columns)}"
 
 @pytest.fixture
 def mock_input_files(tmpdir):
     """
-    valid input filenames that will be combined with invalid files
+    Valid input filenames that will be combined with invalid files.
     """
+    # Create the correct subdirectory structure in tmpdir
+    preprocessed_output_dir = tmpdir.mkdir("outputs").mkdir("preprocessed_outputs")
+
     # Create mock filenames and corresponding DataFrames with dummy date values
     filenames = [
         'file1_2024-09-13_14-44.csv',
@@ -734,60 +744,211 @@ def mock_input_files(tmpdir):
     df2 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [150, 250]})
     df3 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [110, 210]})
 
-    # Save each DataFrame as a CSV
+    # Save each DataFrame as a CSV to the correct directory
     for i, df in enumerate([df1, df2, df3]):
-        df.to_csv(os.path.join(tmpdir, filenames[i]), index=False)
+        df.to_csv(os.path.join(preprocessed_output_dir, filenames[i]), index=False)
 
-    return tmpdir, filenames
+    # Create a tuple list with filenames and 'fill_zeros' strategy
+    input_files = [(filenames[i], 'fill_zeros') for i in range(len(filenames))]
 
-# Test Scenario 1: One of the files cannot be found
+    return tmpdir, input_files
+
+
 @pytest.mark.unit
 def test_file_not_found(mock_input_files):
     """
-    confirms the error message when a input file does not exist
+    Confirms the error message when an input file does not exist.
     """
     tmpdir, filenames = mock_input_files
 
     # Simulate one of the files not existing
-    filenames = ['file4_nonexistent_2024-09-13_14-47.csv']
-    with pytest.raises(ValueError, match="No preprocessed output files found for the given filenames"):
+    filenames = [('file4_nonexistent_2024-09-13_14-47.csv', 'fill_zeros')]
+
+    with pytest.raises(ValueError, match="No DataFrames to merge."):
         fe.create_training_data_df(tmpdir, filenames)
 
-# Test Scenario 2: One of the files is missing a coin_id
+
 @pytest.mark.unit
 def test_missing_coin_id(mock_input_files):
     """
-    confirms the error message when a input file does not have a coin_id column
+    Confirms the error message when an input file does not have a coin_id column.
     """
     tmpdir, filenames = mock_input_files
 
     # Create a DataFrame missing the 'coin_id' column
     df_missing_coin_id = pd.DataFrame({'buyers_new': [100, 200]})
-    df_missing_coin_id.to_csv(os.path.join(tmpdir, 'file_missing_coin_id_2024-09-13_14-47.csv'), index=False)
+    preprocessed_output_dir = os.path.join(tmpdir, 'outputs', 'preprocessed_outputs')
+    df_missing_coin_id.to_csv(os.path.join(preprocessed_output_dir, 'file_missing_coin_id_2024-09-13_14-47.csv'), index=False)
 
-    filenames.append('file_missing_coin_id_2024-09-13_14-47.csv')
+    filenames.append(('file_missing_coin_id_2024-09-13_14-47.csv', 'fill_zeros'))
 
     with pytest.raises(ValueError, match="coin_id column is missing in file_missing_coin_id_2024-09-13_14-47.csv"):
         fe.create_training_data_df(tmpdir, filenames)
 
-# Test Scenario 3: One of the files has a duplicate record for a coin_id
+
 @pytest.mark.unit
 def test_duplicate_coin_id(mock_input_files):
     """
-    confirms the error message when a input file has duplicate coin_id rows
+    Confirms the error message when an input file has duplicate coin_id rows.
     """
     tmpdir, filenames = mock_input_files
+    preprocessed_output_dir = os.path.join(tmpdir, 'outputs', 'preprocessed_outputs')
     bad_file = 'file_duplicate_coin_id_2024-09-13_14-47.csv'
 
     # Create a DataFrame with duplicate 'coin_id' values
     df_duplicate_coin_id = pd.DataFrame({'coin_id': [1, 1], 'buyers_new': [100, 200]})
-    df_duplicate_coin_id.to_csv(os.path.join(tmpdir, bad_file), index=False)
+    df_duplicate_coin_id.to_csv(os.path.join(preprocessed_output_dir, bad_file), index=False)
 
-    filenames.append(bad_file)
+    filenames.append((bad_file, 'fill_zeros'))
 
     with pytest.raises(ValueError, match=f"Duplicate coin_ids found in file: {bad_file}"):
         fe.create_training_data_df(tmpdir, filenames)
 
+
+# ------------------------------------------ #
+# merge_and_fill_training_data() unit tests
+# ------------------------------------------ #
+
+@pytest.mark.unit
+def test_merge_and_fill_training_data_same_coin_ids():
+    """
+    Test the merge_and_fill_training_data function with two DataFrames
+    that both have coin_id values 1, 2, 3 and the 'fill_zeros' strategy.
+    """
+    # Create mock DataFrames with the same coin_ids
+    df1 = pd.DataFrame({
+        'coin_id': [1, 2, 3],
+        'metric_1': [100, 200, 300]
+    })
+    df2 = pd.DataFrame({
+        'coin_id': [1, 2, 3],
+        'metric_2': [400, 500, 600]
+    })
+
+    # fill_zeros happy path
+    # ---------------------
+    # List of tuples (df, fill_strategy, filename), where 'filename' is a placeholder for logging
+    input_dfs = [
+        (df1, 'fill_zeros', 'file1'),
+        (df2, 'fill_zeros', 'file2')
+    ]
+
+    # Run the function
+    training_data_df, merge_logs_df = fe.merge_and_fill_training_data(input_dfs)
+
+    # Assert that the merged DataFrame matches the expected DataFrame
+    expected_df = pd.DataFrame({
+        'coin_id': [1, 2, 3],
+        'metric_1': [100, 200, 300],
+        'metric_2': [400, 500, 600]
+    })
+    pd.testing.assert_frame_equal(training_data_df, expected_df)
+
+    # Assert that the logs match the expected logs
+    expected_logs = pd.DataFrame({
+        'file': ['file1', 'file2'],
+        'original_count': [3, 3],
+        'filled_count': [0, 0],
+    })
+    pd.testing.assert_frame_equal(merge_logs_df, expected_logs)
+
+    # drop_records happy path
+    # ---------------------
+    # Rerun the same function with drop_records and confirm that the output is identical
+    input_dfs = [
+        (df1, 'drop_records', 'file1'),
+        (df2, 'drop_records', 'file2')
+    ]
+
+    # Run the function
+    training_data_df, merge_logs_df = fe.merge_and_fill_training_data(input_dfs)
+
+    # Assert that the merged DataFrame matches the expected DataFrame
+    pd.testing.assert_frame_equal(training_data_df, expected_df)
+
+    # Assert that the logs match the expected logs
+    pd.testing.assert_frame_equal(merge_logs_df, expected_logs)
+
+
+
+@pytest.mark.unit
+def test_merge_and_fill_training_data_fill_zeros():
+    """
+    Test that merge_and_fill_training_data correctly applies the 'fill_zeros' strategy for missing coin_ids.
+    """
+    # Define mock DataFrames
+    df1 = pd.DataFrame({'coin_id': [1, 2, 3], 'metric_1': [10, 20, 30]})
+    df2 = pd.DataFrame({'coin_id': [2, 3], 'metric_2': [50, 60]})
+
+    # Expected DataFrame
+    expected_df = pd.DataFrame({
+        'coin_id': [1, 2, 3],
+        'metric_1': [10, 20, 30],
+        'metric_2': [0, 50, 60]
+    })
+
+    # Call the function
+    merged_df, merge_logs_df = fe.merge_and_fill_training_data([
+        (df1, 'fill_zeros', 'df1'),
+        (df2, 'fill_zeros', 'df2')
+    ])
+
+    # Assert that the merged DataFrame matches the expected DataFrame
+    assert np.array_equal(merged_df.values, expected_df.values), "merged_df has unexpected values."
+
+    # Check logs
+    df1_log = merge_logs_df[merge_logs_df['file'] == 'df1']
+    df2_log = merge_logs_df[merge_logs_df['file'] == 'df2']
+
+    # df1 has no filling, but 1 dropped coin_id (coin_id 1 missing from df2)
+    assert df1_log['filled_count'].iloc[0] == 0, "df1 should have no filled entries."
+
+    # df2 has 1 filled entry for coin_id 1
+    assert df2_log['filled_count'].iloc[0] == 1, "df2 should have 1 filled entry."
+
+
+@pytest.mark.unit
+def test_merge_and_fill_training_data_drop_records():
+    """
+    Test the merge_and_fill_training_data function when the 'drop_records' strategy is used.
+    Ensures that the merge works correctly and that filled_count is logged appropriately.
+    """
+    # Mock DataFrames
+    df1 = pd.DataFrame({
+        'coin_id': [1, 2, 3],
+        'metric_1': [10, 20, 30]
+    })
+
+    df2 = pd.DataFrame({
+        'coin_id': [2, 3],
+        'metric_2': [200, 300]
+    })
+
+    # Expected output when drop_records is applied: rows for coin 1 should be dropped
+    expected_df = pd.DataFrame({
+        'coin_id': [2, 3],
+        'metric_1': [20, 30],
+        'metric_2': [200, 300]
+    })
+
+    # Run the function
+    merged_df, logs_df = fe.merge_and_fill_training_data([
+        (df1, 'drop_records', 'df1'),
+        (df2, 'drop_records', 'df2')
+    ])
+
+    # Assert the merged DataFrame is correct
+    assert np.array_equal(merged_df.values, expected_df.values), "merged_df has unexpected values."
+
+    # Assert the logs are correct
+    # df1 should have no filled rows, and df2 should also have no filled rows (since we used drop_records)
+    expected_logs = pd.DataFrame({
+        'file': ['df1', 'df2'],
+        'original_count': [3, 2],
+        'filled_count': [0, 0]
+    })
+
+    assert np.array_equal(logs_df.values, expected_logs.values), "merged_df has unexpected values."
 
 
 # ------------------------------------------ #
