@@ -403,40 +403,8 @@ def preprocess_coin_df(input_path, modeling_config, df_metrics_config):
     if drop_features is not None:
         df = df.drop(columns=drop_features, errors='ignore')
 
-    # Step 4: Apply scaling to the relevant columns based on the metrics config
-    scalers = {
-        "standard": StandardScaler(),
-        "minmax": MinMaxScaler()
-    }
-
-    # Loop through each metric and its settings in the df_metrics_config
-    for metric, settings in df_metrics_config.items():
-        # Loop through each aggregation (e.g., sum, mean) and its associated settings
-        for agg, agg_settings in settings['aggregations'].items():
-            # Construct the column name based on the metric and aggregation (e.g., 'buyers_new_sum')
-            column_name = f"{metric}_{agg}"
-
-            # Check if the column exists in the DataFrame
-            if column_name in df.columns:
-                # Retrieve the scaling method from the configuration (e.g., 'standard', 'minmax')
-                try:
-                    scaling_method = agg_settings.get('scaling')
-                except AttributeError:
-                    scaling_method = None
-
-                # If a scaling method is specified
-                if scaling_method:
-                    # Check if the scaling method is recognized (exists in the 'scalers' dictionary)
-                    if scaling_method in scalers:
-                        # Retrieve the appropriate scaler (e.g., StandardScaler, MinMaxScaler)
-                        scaler = scalers[scaling_method]
-
-                        # Apply the scaling transformation to the specified column
-                        df[[column_name]] = scaler.fit_transform(df[[column_name]])
-                    else:
-                        # Log a warning if the scaling method specified is not recognized
-                        logger.info("Unknown scaling method %s for column %s"
-                                    , scaling_method, column_name)
+    # Step 4: Apply scaling (moved to helper function)
+    df = apply_scaling(df, df_metrics_config)
 
     # Step 5: Generate output path and filename based on input
     base_filename = os.path.basename(input_path).replace(".csv", "")
@@ -452,6 +420,39 @@ def preprocess_coin_df(input_path, modeling_config, df_metrics_config):
     logger.info("Preprocessed file saved at: %s", output_path)
     return df, output_path
 
+
+
+def apply_scaling(df, df_metrics_config):
+    """
+    Apply scaling to the relevant columns in the DataFrame based on the metrics config.
+
+    Params:
+    - df (pd.DataFrame): The DataFrame to scale.
+    - df_metrics_config (dict): The input file's configuration with metrics and their scaling
+        methods, aggregations, etc.
+
+    Returns:
+    - df (pd.DataFrame): The scaled DataFrame.
+    """
+    scalers = {
+        "standard": StandardScaler(),
+        "minmax": MinMaxScaler()
+    }
+
+    # Loop through each metric and its settings in the df_metrics_config
+    for metric, settings in df_metrics_config.items():
+        for agg, agg_settings in settings['aggregations'].items():
+            column_name = f"{metric}_{agg}"
+            if column_name in df.columns:
+                scaling_method = agg_settings.get('scaling', None)
+                if scaling_method and scaling_method in scalers:
+                    scaler = scalers[scaling_method]
+                    df[[column_name]] = scaler.fit_transform(df[[column_name]])
+                else:
+                    logger.info("Unknown scaling method %s for column %s",
+                                scaling_method, column_name)
+
+    return df
 
 
 
