@@ -2,7 +2,6 @@
 functions used to build coin-level features from training data
 """
 # pylint: disable=C0301 # line over 100 chars
-# pylint: disable=C0303 # trailing whitespace
 # pylint: disable=C0103 # X_train violates camelcase
 # pylint: disable=E0401 # can't find utils import
 
@@ -42,13 +41,13 @@ def generate_experiment_configurations(config_folder, method='grid', max_evals=5
     Returns:
     - configurations (list): List of generated configurations.
     """
-    
+
     # Load and validate the experiment configuration
     experiment_config = validate_experiments_yaml(config_folder)
 
     # Flatten the experiment configuration into a dictionary that can be used for grid/random search
     param_grid = {}
-    
+
     # Flatten the config dictionary so it can be used for the search
     for section, parameters in experiment_config:
         param_grid.update(flatten_dict(parameters, section))
@@ -68,14 +67,14 @@ def generate_experiment_configurations(config_folder, method='grid', max_evals=5
 # helper function for generate_experiment_configurations()
 def flatten_dict(d, parent_key='', sep='.'):
     """
-    Helper function for generate_experiment_configurations(). 
+    Helper function for generate_experiment_configurations().
     Flattens a nested dictionary.
-    
+
     Args:
     - d (dict): The dictionary to flatten.
     - parent_key (str): The base key (used during recursion).
     - sep (str): Separator between keys.
-    
+
     Returns:
     - flat_dict (dict): Flattened dictionary.
     """
@@ -100,17 +99,17 @@ def validate_experiments_yaml(config_folder):
     Returns:
     - configurations (list): List of valid configurations or raises an error if any issues are found.
     """
-    
+
     # Path to the experiments_config.yaml file
     experiment_config_path = os.path.join(config_folder, 'experiments_config.yaml')
-    
+
     # Load the experiments_config.yaml file
     experiment_config = load_config(experiment_config_path)
 
     # Extract the variable_overrides section
     if 'variable_overrides' not in experiment_config:
         raise ValueError("Missing 'variable_overrides' section in experiments_config.yaml.")
-    
+
     variable_overrides = experiment_config['variable_overrides']
 
     # Dynamically generate the list of config files based on the variable_overrides keys
@@ -132,12 +131,12 @@ def validate_experiments_yaml(config_folder):
 
         # Get the corresponding config file for this section
         corresponding_config = loaded_configs[section]
-        
+
         # Validate that keys and values exist in the corresponding config
         for key, values in section_values.items():
             if key not in corresponding_config:
                 raise ValueError(f"Key '{key}' in variable_overrides not found in {section}.yaml.")
-            
+
             # Ensure the values are valid in the corresponding config
             for value in values:
                 if value not in corresponding_config[key]:
@@ -162,7 +161,7 @@ def prepare_configs(config_folder, override_params):
     - metrics_config (dict): The metrics configuration with overrides applied.
     - modeling_config (dict): The modeling configuration with overrides applied.
     """
-    
+
     # Load the main config files using load_config
     config_path = os.path.join(config_folder, 'config.yaml')
     metrics_config_path = os.path.join(config_folder, 'metrics_config.yaml')
@@ -261,17 +260,17 @@ def rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_
     if config_hash == previous_hash and profits_df is not None:
         logger.debug("Using passed profits_df from memory.")
         return profits_df
-    
+
     # Otherwise, rerun time-intensive steps
     logger.debug("Config changes detected or missing profits_df, rerunning time-intensive steps...")
-    
+
     # Example time-intensive logic to regenerate profits_df
     transfers_df = td.retrieve_transfers_data(
         config['training_data']['training_period_start'],
         config['training_data']['modeling_period_start'],
         config['training_data']['modeling_period_end']
     )
-    
+
     profits_df = td.prepare_profits_data(transfers_df, prices_df)
     profits_df = td.calculate_wallet_profitability(profits_df)
     profits_df, _ = td.clean_profits_df(profits_df, config['data_cleaning'])
@@ -335,7 +334,7 @@ def build_configured_model_input(profits_df, prices_df, config, metrics_config, 
     - y_train (Series): Training target variable.
     - y_test (Series): Testing target variable.
     """
-    
+
     # 1. Identify cohort of wallets (e.g., sharks) based on the cohort classification logic
     wallet_cohort_df = td.classify_wallet_cohort(profits_df, config['wallet_cohorts']['sharks'])
 
@@ -400,7 +399,7 @@ def build_configured_model_input(profits_df, prices_df, config, metrics_config, 
     )
 
     return X_train, X_test, y_train, y_test
- 
+
 
 
 
@@ -461,26 +460,26 @@ def run_experiment(modeling_config):
     # 3. Iterate through each trial configuration
     # -------------------------------------------
     for n, trial in enumerate(trial_configurations[:total_trials]):
-        
+
         # 3.1 Prepare the full configuration by applying overrides from the current trial config
         config, metrics_config, modeling_config = prepare_configs(config_folder, trial)
-        
+
         # Store the configuration settings used in this trial in metadata
         metadata['config_settings'] = {
             "config": config,
             "metrics_config": metrics_config,
             "modeling_config": modeling_config
         }
-        
+
         # 3.2 Retrieve or rebuild profits_df based on config changes
         profits_df = rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_df)
-        
+
         # 3.3 Build the configured model input data (train/test data)
         X_train, X_test, y_train, y_test = build_configured_model_input(profits_df, prices_df, config, metrics_config, modeling_config)
 
         # 3.4 Train the model using the current configuration and log the results
         model, model_id = m.train_model(X_train, y_train, modeling_folder, modeling_config['modeling']['model_params'])
-        
+
         # 3.5 Evaluate and log the model's performance on the test set
         _ = m.evaluate_model(model, X_test, y_test, model_id, modeling_folder)
 
@@ -520,18 +519,18 @@ def run_experiment(modeling_config):
 def generate_trial_df(modeling_folder, experiment_id):
     """
     Generates a DataFrame by loading and processing trial logs from a specified modeling folder and experiment ID.
-    
+
     Parameters:
     - modeling_folder: The path to the folder where model data is stored.
     - experiment_id: The ID of the experiment to retrieve trial logs from.
-    
+
     Returns:
     - A pandas DataFrame (trial_df) containing the processed trial logs.
     """
-    
+
     # 1. Construct the path to the experiment metadata file
     experiment_metadata_path = os.path.join(modeling_folder, "experiment_metadata", f"{experiment_id}.json")
-    
+
     # 2. Load the experiment metadata
     with open(experiment_metadata_path, 'r', encoding='utf-8') as f:
         experiment_metadata = json.load(f)
@@ -546,27 +545,27 @@ def generate_trial_df(modeling_folder, experiment_id):
     for trial_log_path in trial_logs:
         with open(trial_log_path, 'r', encoding='utf-8') as f:
             trial_log_data = json.load(f)
-        
+
         # Extract trial_overrides and performance metrics
         trial_overrides = trial_log_data.get('trial_overrides', {})
         performance_metrics = trial_log_data.get('metrics', {})
-        
+
         # Merge trial_overrides and performance metrics into a single dictionary
         trial_info = {**trial_overrides, **performance_metrics}
-        
+
         # Append trial info to the list
         trial_data.append(trial_info)
-    
+
     # 5. Convert the list of dictionaries to a pandas DataFrame
     trial_df = pd.DataFrame(trial_data)
-    
+
     return trial_df
 
 
 def plot_roc_auc_performance(trial_df, top_n):
     """
     Plot the average ROC AUC performance for the top N features in the trial_df.
-    
+
     Parameters:
     - trial_df: DataFrame containing trial data with columns to be grouped and evaluated.
     - top_n: The number of top features based on average ROC AUC to plot.
@@ -604,48 +603,48 @@ def plot_top_feature_importance(modeling_folder, experiment_id, top_n=10):
     - modeling_folder: str, path to the folder where the experiment data is stored.
     - experiment_id: str, unique identifier for the experiment to retrieve the logs.
     - top_n: int, number of top features to display in the bar chart (default: 10).
-    
-    This function retrieves trial logs from an experiment's metadata, extracts feature importance 
-    data, calculates the mean importance across all trials, and displays a bar chart of the top_n 
+
+    This function retrieves trial logs from an experiment's metadata, extracts feature importance
+    data, calculates the mean importance across all trials, and displays a bar chart of the top_n
     most important features.
     """
     # 1. Construct the path to the experiment metadata file
     experiment_metadata_path = os.path.join(modeling_folder, "experiment_metadata", f"{experiment_id}.json")
-    
+
     # Load the experiment metadata to retrieve trial logs
     with open(experiment_metadata_path, 'r', encoding='utf-8') as f:
         experiment_metadata = json.load(f)
-    
+
     # Retrieve trial log filenames
     trial_logs = experiment_metadata['trial_logs']
-    
+
     # Initialize an empty list to store DataFrames
     all_feature_importances = []
-    
+
     # Loop through each trial log and process feature importance
     for trial_log_path in trial_logs:
         with open(trial_log_path, 'r', encoding='utf-8') as f:
             trial_log_data = json.load(f)
-        
+
         # Extract feature importance and convert to DataFrame
         feature_importance = trial_log_data['feature_importance']
         feature_importance_df = pd.DataFrame(list(feature_importance.items()), columns=['feature', 'importance'])
-        
+
         # Append the DataFrame to the list
         all_feature_importances.append(feature_importance_df)
-    
+
     # Concatenate all DataFrames
     combined_feature_importance_df = pd.concat(all_feature_importances)
-    
+
     # Group by feature and calculate mean importance
     feature_stats = combined_feature_importance_df.groupby('feature')['importance'].agg(['mean', 'var', 'std']).reset_index()
-    
+
     # Sort by mean importance
     sorted_features = feature_stats.sort_values(by='mean', ascending=False)
-    
+
     # Plot the top features by importance
     sorted_features.head(top_n).sort_values(by='mean',ascending=True).plot(kind='barh', x='feature', y='mean', title=f'Top {top_n} Features by Mean Importance')
-    
+
     # Display the plot
     plt.xlabel('Mean Importance')
     plt.ylabel('Feature')
@@ -667,9 +666,9 @@ def analyze_experiment(modeling_folder, experiment_id, top_n=10):
     """
     # Generate trial DataFrame from the experiment logs
     trial_df = generate_trial_df(modeling_folder, experiment_id)
-    
+
     # Plot ROC AUC performance for the top N features
     plot_roc_auc_performance(trial_df, top_n)
-    
+
     # Plot top feature importance based on the trial logs
     plot_top_feature_importance(modeling_folder, experiment_id, top_n)

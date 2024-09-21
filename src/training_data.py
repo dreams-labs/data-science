@@ -3,7 +3,6 @@ functions used in generating training data for the models
 """
 # pylint: disable=W1203 # fstrings in logs
 # pylint: disable=C0301 # line over 100 chars
-
 import time
 import pandas as pd
 import numpy as np
@@ -11,7 +10,7 @@ from dreams_core.googlecloud import GoogleCloud as dgc
 from dreams_core import core as dc
 
 # project file imports
-from utils import timing_decorator
+from utils import timing_decorator  # pylint: disable=E0401 # can't find utils import
 
 
 # set up logger at the module level

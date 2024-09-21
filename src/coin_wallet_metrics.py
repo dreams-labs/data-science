@@ -2,7 +2,6 @@
 calculates metrics related to the distribution of coin ownership across wallets
 '''
 # pylint: disable=C0301 # line too long
-# pylint: disable=C0303 # trailing whitespace
 
 import time
 from typing import Tuple
@@ -39,7 +38,8 @@ def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets):
     if len(cohort_wallets) == 0:
         raise ValueError("Wallet cohort is empty. Provide at least one wallet address.")
 
-    # Create cohort_profits_df by filtering projects_df to only include the cohort coins and wallets during the training period
+    # Create cohort_profits_df by filtering profits_df to only include the cohort coins and wallets
+    # during the training period
     profits_df = profits_df[profits_df['date']<=training_period_end]
     cohort_profits_df = profits_df[profits_df['wallet_address'].isin(cohort_wallets)]
     cohort_profits_df = cohort_profits_df[['coin_id','wallet_address','date','balance','net_transfers']]
@@ -155,7 +155,7 @@ def generate_coin_buysell_metrics_df(coin_cohort_profits_df):
     buysell_metrics_df = pd.merge(buysell_metrics_df, transactions_df, on='date', how='outer')
     buysell_metrics_df = pd.merge(buysell_metrics_df, holders_df, on='date', how='outer')
 
-    logger.debug('New vs repeat buyer/seller counts, transaction totals, and holder metrics complete after %.2f seconds', time.time() - start_time)
+    logger.debug('Buysell metrics generated after %.2f seconds', time.time() - start_time)
 
     return buysell_metrics_df
 
@@ -163,13 +163,19 @@ def generate_coin_buysell_metrics_df(coin_cohort_profits_df):
 
 def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
     """
-    Fills missing dates in buysell_metrics_df and applies appropriate logic to fill NaN values for each metric.
+    Fills missing dates in buysell_metrics_df and applies appropriate logic to fill NaN values
+    for each metric.
 
     This function:
-    - Adds rows with missing dates (if any) between the latest date in buysell_metrics_df and the training_period_end.
-    - Fills NaN values for buy/sell metrics, balances, and other key metrics according to the following rules:
-      - total_balance and total_holders: forward-filled (if no activity, assume balances/holders remain the same).
-      - total_bought, total_sold, total_net_transfers, total_volume, buyers_new, buyers_repeat, sellers_new, sellers_repeat: filled with 0 (if no activity, assume no transactions).
+    - Adds rows with missing dates (if any) between the latest date in buysell_metrics_df and the
+        training_period_end.
+    - Fills NaN values for buy/sell metrics, balances, and other key metrics according to the
+        following rules:
+        - total_balance and total_holders:
+                forward-filled (if no activity, assume balances/holders remain the same).
+        - total_bought, total_sold, total_net_transfers, total_volume, buyers_new,
+          buyers_repeat, sellers_new, sellers_repeat:
+                filled with 0 (if no activity, assume no transactions).
 
     Parameters:
     - buysell_metrics_df: DataFrame containing buy/sell metrics keyed on coin_id-date
@@ -182,7 +188,9 @@ def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
     # Identify the expected rows for all coin_id-date pairs
     min_date = buysell_metrics_df['date'].min()
     full_date_range = pd.date_range(start=min_date, end=training_period_end, freq='D')
-    all_combinations = pd.MultiIndex.from_product([buysell_metrics_df['coin_id'].unique(), full_date_range], names=['coin_id', 'date'])
+    all_combinations = pd.MultiIndex.from_product(
+        [buysell_metrics_df['coin_id'].unique(), full_date_range], names=['coin_id', 'date']
+    )
 
     # Identify missing rows by comparing the existing rows to the expected
     existing_combinations = pd.MultiIndex.from_frame(buysell_metrics_df[['coin_id', 'date']])
@@ -238,14 +246,17 @@ def generate_time_series_metrics(
 
     Params:
     - time_series_df (pd.DataFrame): The input DataFrame with time series data.
-    - metrics_config: The full metrics_config file with a time_series key that matches the dataset_key param.
+    - metrics_config: The full metrics_config file with a time_series key that matches the
+        dataset_key param.
     - dataset_key (string): The dataset's key in the metrics_config['time_series'] section.
-    - colname (string): The name of the column that the metrics should be calculated for (e.g., 'price').
+    - colname (string): The name of the column use to calculate the metrics (e.g., 'price').
     - required_duration (int): Minimum number of days the coin must have data to be included.
 
     Returns:
-    - time_series_metrics_df (pd.DataFrame): DataFrame with full duration data and the configured metrics.
-    - partial_time_series_metrics_df (pd.DataFrame): DataFrame for coins with incomplete duration.
+    - time_series_metrics_df (pd.DataFrame): Input df with additional columns for the
+        configured metrics. Only includes coins that had complete data for the period duration.
+    - partial_time_series_metrics_df (pd.DataFrame): Input df with additional columns for the
+        configured metrics. Only includes coins that had partial data for the period duration.
     """
     # 1. Data Quality Checks and Formatting
     # -------------------------------------

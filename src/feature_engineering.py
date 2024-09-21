@@ -455,27 +455,35 @@ def preprocess_coin_df(input_path, modeling_config, df_metrics_config):
 
 
 
-def create_training_data_df(input_directory, input_filenames):
+def create_training_data_df(
+    modeling_folder: str,
+    input_file_tuples: list[tuple[str, str]]
+) -> pd.DataFrame:
     """
-    Merges specified preprocessed output CSVs into a single DataFrame and checks if all have
-    identical coin_ids to ensure consistency. Adds suffixes to column names based on filename
-    components to avoid duplicates.
+    Merges specified preprocessed output CSVs into a single DataFrame, applies fill strategies,
+    and ensures consistency of coin_ids across datasets. Adds suffixes to column names to
+    avoid duplicates.
 
-    Additionally, raises an error if any of the input files have duplicate coin_ids or are
-    missing the coin_id column.
+    Additionally, raises an error if any of the input files have duplicate coin_ids or are missing
+    the coin_id column.
 
     Params:
-    - input_directory (str): Directory containing preprocessed output CSVs.
-    - input_filenames (list): List of filenames to be merged (without directory path).
+    - modeling_folder (str): Location of the parent modeling folder.
+    - input_file_tuples (list of tuples): List of tuples where each tuple contains:
+        - filename (str): The name of the CSV file to process.
+        - fill_strategy (str): Strategy for handling missing values ('fill_zeros', 'drop_records').
 
     Returns:
-    - training_data_df (pd.DataFrame): DataFrame with merged data from all specified
-        preprocessed outputs.
+    - training_data_df (pd.DataFrame): Merged DataFrame with all specified preprocessed and all
+        fill strategies applied.
+    - merge_logs_df (pd.DataFrame): Log DataFrame detailing record counts for each input DataFrame.
     """
+    # Initialize location of the preprocessed_outputs directory
+    input_directory = os.path.join(modeling_folder,'outputs/preprocessed_outputs/')
+
     # Initialize an empty list to hold DataFrames
     df_list = []
     missing_files = []
-    coin_id_sets = []
 
     # Regex to extract the date pattern %Y-%m-%d_%H-%M from the filename
     date_pattern = re.compile(r'\d{4}-\d{2}-\d{2}_\d{2}-\d{2}')
@@ -487,7 +495,7 @@ def create_training_data_df(input_directory, input_filenames):
     metric_string_count = {}
 
     # First loop to count how often each metric_string appears
-    for filename in input_filenames:
+    for filename, _ in input_file_tuples:
         match = date_pattern.search(filename)
         if not match:
             raise ValueError(f"No valid date string found in the filename: {filename}")
@@ -500,12 +508,13 @@ def create_training_data_df(input_directory, input_filenames):
         else:
             metric_string_count[metric_string] += 1
 
-    # Loop through the input filenames and attempt to read each
-    for filename in input_filenames:
+    # Loop through the input_file_tuples (filename, fill_strategy)
+    for filename, fill_strategy in input_file_tuples:
         file_path = os.path.join(input_directory, filename)
+        print(file_path)
         if os.path.exists(file_path):
             df = pd.read_csv(file_path)
-
+            print(df.shape)
             # Check if coin_id column exists; raise an error if missing
             if 'coin_id' not in df.columns:
                 raise ValueError(f"coin_id column is missing in {filename}")
@@ -543,30 +552,13 @@ def create_training_data_df(input_directory, input_filenames):
 
                     df = df.rename(columns={column: column_with_suffix})
 
-            df_list.append(df)
-            coin_id_sets.append(set(df['coin_id'].unique()))
+            # Append DataFrame and fill strategy to the list for processing
+            df_list.append((df, fill_strategy, filename))
         else:
             missing_files.append(filename)
 
-    # Merge all DataFrames iteratively on 'coin_id'
-    if df_list:
-        training_data_df = df_list[0]
-        for df in df_list[1:]:
-            training_data_df = pd.merge(training_data_df, df, on='coin_id', how='inner')
-
-        # Ensure no duplicate columns after merging
-        training_data_df = training_data_df.loc[:, ~training_data_df.columns.duplicated()]
-
-    else:
-        raise ValueError("No preprocessed output files found for the given filenames.")
-
-    # Check if all files have identical coin_ids
-    base_coin_ids = coin_id_sets[0]
-    non_matching_ids = [coin_id_set for coin_id_set in coin_id_sets if coin_id_set != base_coin_ids]
-    if non_matching_ids:
-        raise ValueError(
-            f"Input files do not have matching coin_ids. Non-matching ids: {non_matching_ids}"
-        )
+    # Merge the output DataFrames based on their fill strategies
+    training_data_df, merge_logs_df = merge_and_fill_training_data(df_list)
 
     # Log the results
     logger.info("%d files were successfully merged.", len(df_list))
@@ -575,8 +567,85 @@ def create_training_data_df(input_directory, input_filenames):
     else:
         logger.info("All specified files were found and merged successfully.")
 
-    return training_data_df
+    return training_data_df, merge_logs_df
 
+
+
+def merge_and_fill_training_data(
+    df_list: list[tuple[pd.DataFrame, str, str]]
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Merges a list of DataFrames on 'coin_id' and applies specified fill strategies for missing
+    values. Generates a log of the merging process with details on record counts and modifications.
+
+    Params:
+    - df_list (list of tuples): Each tuple contains:
+        - df (pd.DataFrame): A DataFrame to merge.
+        - fill_strategy (str): The strategy to handle missing values ('fill_zeros', 'drop_records').
+        - filename (str): The name of the input file, used for logging.
+
+    Returns:
+    - training_data_df (pd.DataFrame): Merged DataFrame with applied fill strategies.
+    - merge_logs_df (pd.DataFrame): Log DataFrame detailing record counts for each input DataFrame.
+    """
+    if not df_list:
+        raise ValueError("No DataFrames to merge.")
+
+    # Initialize the log DataFrame
+    merge_logs = []
+
+    # Pull a unique set of all coin_ids across all DataFrames
+    all_coin_ids = set()
+    for df, _, _ in df_list:
+        all_coin_ids.update(df['coin_id'].unique())
+
+    # Convert set of coin_ids to a DataFrame
+    all_coin_ids_df = pd.DataFrame(all_coin_ids, columns=['coin_id'])
+
+    # Start merging with the full set of coin_ids
+    training_data_df = all_coin_ids_df
+
+    # Iterate through df_list and merge each one
+    for df, fill_strategy, filename in df_list:
+        original_coin_ids = set(df['coin_id'].unique())  # Track original coin_ids
+
+        # Merge with the full coin_id set (outer join)
+        training_data_df = pd.merge(training_data_df, df, on='coin_id', how='outer')
+
+        # Apply the fill strategy
+        if fill_strategy == 'fill_zeros':
+            # Fill missing values with 0
+            training_data_df.fillna(0, inplace=True)
+        elif fill_strategy == 'drop_records':
+            # Drop rows with missing values for this DataFrame's columns
+            training_data_df.dropna(inplace=True)
+        else:
+            raise ValueError("Invalid fill strategy listed. Valid strategies include "
+                             "['fill_zeros','drop_records']")
+
+        # Calculate log details
+        final_coin_ids = set(training_data_df['coin_id'].unique())
+        filled_ids = final_coin_ids - original_coin_ids  # Present in final, missing in original
+
+        # Add log information for this DataFrame
+        merge_logs.append({
+            'file': filename,  # Use filename for logging
+            'original_count': len(original_coin_ids),
+            'filled_count': len(filled_ids)
+        })
+
+    # Ensure no duplicate columns after merging
+    if training_data_df.columns.duplicated().any():
+        raise ValueError("Duplicate columns found after merging.")
+
+    # Raise an error if there are any null values in the final DataFrame
+    if training_data_df.isnull().any().any():
+        raise ValueError("Null values detected in the final merged DataFrame.")
+
+    # Convert logs to a DataFrame
+    merge_logs_df = pd.DataFrame(merge_logs)
+
+    return training_data_df, merge_logs_df
 
 
 
