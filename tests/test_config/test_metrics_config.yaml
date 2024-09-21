@@ -92,17 +92,28 @@ wallet_cohorts:
         lookback_periods: 4
 
 # New top-level section for time series
-time_series_metrics:
+time_series:
   # Specify which DataFrame the metrics apply to
   prices:
-    metrics:
-      sma:
+    sma:
+      parameters:
         period: 20
-        scaling: "standard"
-      ema:
-        period: 20
-        scaling: "minmax"
-      bollinger_bands:
-        period: 20
-        std_dev: 2
-        scaling: "none"
+      aggregations:
+        std:
+          scaling: "standard"
+      rolling:
+        stats:
+          mean:
+            scaling: "standard"
+        window_duration: 10
+        lookback_periods: 5
+    ema:
+      parameters:
+        period: 10
+      aggregations:
+        std:
+          scaling: "standard"
+  volume:
+    sma:
+      parameters:
+        period: 15

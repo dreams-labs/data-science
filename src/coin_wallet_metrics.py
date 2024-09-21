@@ -294,8 +294,20 @@ def generate_time_series_metrics(
     return time_series_metrics_df
 
 def calculate_sma(timeseries: pd.Series, period: int) -> pd.Series:
-    """Calculates Simple Moving Average (SMA) for a given time series."""
-    return timeseries.rolling(window=period).mean()
+    """
+    Calculates Simple Moving Average (SMA) for a given time series, with handling for imputing
+    null values on dates that occur when there are fewer data points than the period duration.
+    """
+    # Calculate the SMA for the first few values where data is less than the period
+    sma = timeseries.expanding(min_periods=1).apply(lambda x: x.mean() if len(x) < period else np.nan)
+
+    # Use rolling().mean() for the rest once the period is reached
+    rolling_sma = timeseries.rolling(window=period, min_periods=period).mean()
+
+    # Combine the two: use the expanding calculation until the period is reached, then use rolling()
+    sma = sma.combine_first(rolling_sma)
+
+    return sma
 
 def calculate_ema(timeseries: pd.Series, period: int) -> pd.Series:
     """Calculates Exponential Moving Average (EMA) for a given time series."""

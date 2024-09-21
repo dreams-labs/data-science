@@ -28,6 +28,9 @@ load_dotenv()
 logger = dc.setup_logger()
 
 
+
+
+
 # ===================================================== #
 #                                                       #
 #                 U N I T   T E S T S                   #
@@ -272,7 +275,7 @@ def test_generate_time_series_metrics_basic_functionality(sample_time_series_df,
     assert all(col in result_df.columns for col in expected_columns), "Missing expected columns in the result."
 
     # Assert that SMA and EMA are calculated correctly
-    expected_sma_1 = [float('nan'), 105.0, 115.0]  # SMA for coin_id=1 with period=2
+    expected_sma_1 = [100.0, 105.0, 115.0]  # SMA for coin_id=1 with period=2
     expected_ema_1 = [100.0, 106.666667, 115.555556]  # EMA for coin_id=1 with period=2
 
     # Confirm that the SMA result matches the expected, with special logic to handle NaNs
@@ -291,7 +294,7 @@ def test_generate_time_series_metrics_basic_functionality(sample_time_series_df,
     ), "EMA calculation incorrect for coin_id=1"
 
     # Check for another coin_id
-    expected_sma_2 = [float('nan'), 205.0, 215.0]  # SMA for coin_id=2 with period=2
+    expected_sma_2 = [200.0, 205.0, 215.0]  # SMA for coin_id=2 with period=2
     expected_ema_2 = [200.0, 206.666667, 215.555556]  # EMA for coin_id=2 with period=2
 
     # Confirm that the SMA result matches the expected, with special logic to handle NaNs
@@ -354,7 +357,7 @@ def test_generate_time_series_metrics_different_periods(sample_time_series_df):
     assert all(col in result_df.columns for col in expected_columns), "Missing expected columns in the result."
 
     # Expected SMA and EMA values for coin_id=1
-    expected_sma_1 = [float('nan'), float('nan'), 110.0]  # SMA for coin_id=1 with period=3
+    expected_sma_1 = [100.0, 105.0, 110.0]  # SMA for coin_id=1 with period=3
     expected_ema_1 = [100.0, 106.666667, 115.555556]  # EMA for coin_id=1 with period=2
 
     # Confirm that the SMA result matches the expected, with special logic to handle NaNs
@@ -373,7 +376,7 @@ def test_generate_time_series_metrics_different_periods(sample_time_series_df):
     ), "EMA calculation incorrect for coin_id=1"
 
     # Expected SMA and EMA values for coin_id=2
-    expected_sma_2 = [float('nan'), float('nan'), 210.0]  # SMA for coin_id=2 with period=3
+    expected_sma_2 = [200.0, 205.0, 210.0]  # SMA for coin_id=2 with period=3
     expected_ema_2 = [200.0, 206.666667, 215.555556]  # EMA for coin_id=2 with period=2
 
     # Confirm that the SMA result matches the expected, with special logic to handle NaNs
@@ -470,6 +473,14 @@ def test_generate_time_series_metrics_dataset_key_no_metrics(sample_time_series_
             colname='price'
         )
 
+
+
+
+
+
+
+
+
 # ======================================================== #
 #                                                          #
 #            I N T E G R A T I O N   T E S T S             #
@@ -489,6 +500,20 @@ def config():
     return load_config('tests/test_config/test_config.yaml')
 
 @pytest.fixture(scope="session")
+def metrics_config():
+    """
+    Fixture to load the configuration from the YAML file.
+    """
+    return load_config('tests/test_config/test_metrics_config.yaml')
+
+@pytest.fixture(scope="session")
+def prices_df():
+    """
+    Fixture to load the prices_df from the fixtures folder.
+    """
+    return pd.read_csv('tests/fixtures/prices_df.csv')
+
+@pytest.fixture(scope="session")
 def cleaned_profits_df():
     """
     Fixture to load the cleaned_profits_df from the fixtures folder.
@@ -503,9 +528,9 @@ def wallet_cohort_df():
     return pd.read_csv('tests/fixtures/wallet_cohort_df.csv')
 
 
-# ---------------------------------- #
+# ------------------------------------------- #
 # generate_buysell_metrics_df() integration tests
-# ---------------------------------- #
+# ------------------------------------------- #
 
 @pytest.fixture(scope="session")
 def buysell_metrics_df(cleaned_profits_df, wallet_cohort_df, config):
@@ -595,3 +620,33 @@ def test_integration_buysell_metrics_df(buysell_metrics_df, cleaned_profits_df, 
     ,include_groups=False)
     if any(len(missing) > 0 for missing in missing_dates):
         raise ValueError("Timeseries contains missing dates. Ensure all dates are filled up to the training_period_end before calling flatten_coin_date_df().")
+
+
+# ------------------------------------------- #
+# generate_buysell_metrics_df() integration tests
+# ------------------------------------------- #
+
+@pytest.mark.integration
+def test_generate_time_series_metrics_no_nulls_and_row_count(prices_df, metrics_config):
+    """
+    Integration test for cwm.generate_time_series_metrics to confirm that:
+    1. The returned DataFrame has no null values.
+    2. The number of rows in the output matches the input prices_df.
+    """
+    # Define dataset key and column name
+    dataset_key = 'prices'
+    colname = 'price'
+
+    # Run the generate_time_series_metrics function
+    result_df = cwm.generate_time_series_metrics(
+        time_series_df=prices_df,
+        metrics_config=metrics_config,
+        dataset_key=dataset_key,
+        colname=colname
+    )
+
+    # Check that the number of rows in the result matches the input
+    assert len(result_df) == len(prices_df), "The number of rows in the output does not match the input DataFrame."
+
+    # Check that there are no null values in the result
+    assert not result_df.isnull().values.any(), "The output DataFrame contains null values."
