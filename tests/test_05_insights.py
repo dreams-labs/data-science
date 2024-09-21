@@ -475,7 +475,7 @@ def test_build_configured_model_input(config, metrics_config, modeling_config, p
     modeling_config['preprocessing']['drop_features'] = []
 
     # 1. Identify cohort of wallets (e.g., sharks) based on the cohort classification logic
-    cohort_summary_df = td.classify_wallet_cohort(profits_df, config['wallet_cohorts']['sharks'])
+    cohort_summary_df = td.classify_wallet_cohort(profits_df, config['datasets']['wallet_cohorts']['sharks'])
 
     # 2. Generate buysell metrics for wallets in the identified cohort
     cohort_wallets = cohort_summary_df[cohort_summary_df['in_cohort']]['wallet_address']

@@ -305,13 +305,13 @@ def test_fe_calculate_rolling_window_features():
 
 
 # ------------------------------------------ #
-# flatten_coin_features() unit tests
+# flatten_date_features() unit tests
 # ------------------------------------------ #
 
 @pytest.mark.unit
-def test_fe_flatten_coin_features():
+def test_fe_flatten_date_features():
     """
-    Unit test for the flatten_coin_features function, which flattens metrics for a single coin.
+    Unit test for the flatten_date_features function, which flattens metrics for a single coin.
 
     Test Cases:
     1. Basic functionality: Tests that the function correctly aggregates columns like 'buyers_new'
@@ -350,7 +350,7 @@ def test_fe_flatten_coin_features():
     }
 
     # Test Case 1: Basic functionality with all metrics present
-    flat_features = fe.flatten_coin_features(sample_coin_df, metrics_config)
+    flat_features = fe.flatten_date_features(sample_coin_df, metrics_config)
 
     assert flat_features['buyers_new_sum'] == 210  # Sum of buyers_new column
     assert flat_features['buyers_new_mean'] == 35   # Mean of buyers_new column
@@ -371,12 +371,12 @@ def test_fe_flatten_coin_features():
                 'aggregations': ['sum']
             }
         }
-        fe.flatten_coin_features(sample_coin_df_invalid, metrics_config_invalid)
+        fe.flatten_date_features(sample_coin_df_invalid, metrics_config_invalid)
 
     # Test Case 3: Missing 'coin_id' column in DataFrame
     with pytest.raises(ValueError, match="The input DataFrame is missing the required 'coin_id' column."):
         sample_coin_df_no_id = sample_coin_df.drop(columns=['coin_id'])
-        fe.flatten_coin_features(sample_coin_df_no_id, metrics_config)
+        fe.flatten_date_features(sample_coin_df_no_id, metrics_config)
 
     # Test Case 4: Invalid aggregation function
     with pytest.raises(KeyError, match="Aggregation 'invalid_agg' for metric 'buyers_new' is not recognized"):
@@ -385,10 +385,10 @@ def test_fe_flatten_coin_features():
                 'aggregations': ['invalid_agg']
             }
         }
-        fe.flatten_coin_features(sample_coin_df, metrics_config_invalid_agg)
+        fe.flatten_date_features(sample_coin_df, metrics_config_invalid_agg)
 
     # Test Case 5: Rolling window metrics
-    rolling_features = fe.flatten_coin_features(sample_coin_df, metrics_config)
+    rolling_features = fe.flatten_date_features(sample_coin_df, metrics_config)
 
     assert 'buyers_new_sum_3d_period_1' in rolling_features  # Ensure rolling stats are calculated
     assert 'buyers_new_max_3d_period_1' in rolling_features
@@ -398,7 +398,7 @@ def test_fe_flatten_coin_features():
 
 
 # ------------------------------------------ #
-# flatten_coin_features() unit tests
+# flatten_date_features() unit tests
 # ------------------------------------------ #
 
 @pytest.mark.unit
@@ -1032,7 +1032,7 @@ def df_metrics_config():
     Fixture to load the configuration from the YAML file.
     """
     metrics_config = load_config('tests/test_config/test_metrics_config.yaml')
-    first_cohort_name, first_cohort_metrics = next(iter(metrics_config['wallet_cohorts'].items()))
+    first_cohort_name, first_cohort_metrics = next(iter(metrics_config['datasets']['wallet_cohorts'].items()))
 
     return first_cohort_metrics
 

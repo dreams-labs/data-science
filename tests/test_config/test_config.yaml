@@ -8,16 +8,23 @@ training_data:
   modeling_period_duration: 14    # Duration of the modeling period in days
   training_period_duration: 60    # Duration of the training period in days
 
-wallet_cohorts:
-  # Cohorts of wallets with different characteristics
+datasets:
+  wallet_cohorts:
+    # Cohorts of wallets with different characteristics
 
-  # Shark wallets
-  sharks:
-    wallet_minimum_inflows: 10000  # Minimum USD inflows for a wallet to be considered a 'shark'
-    wallet_maximum_inflows: 50000  # Maximum USD inflows for a wallet to be considered a 'shark'
-    coin_profits_win_threshold: 5000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
-    coin_return_win_threshold: 0.5  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
-    wallet_min_coin_wins: 3  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
+    # Shark wallets
+    sharks:
+      fill_method: 'fill_zeros'
+      wallet_minimum_inflows: 10000  # Minimum USD inflows for a wallet to be considered a 'shark'
+      wallet_maximum_inflows: 50000  # Maximum USD inflows for a wallet to be considered a 'shark'
+      coin_profits_win_threshold: 5000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
+      coin_return_win_threshold: 0.5  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
+      wallet_min_coin_wins: 3  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
+
+  time_series:
+    prices:
+      fill_method: 'drop_records'
+
 
 data_cleaning:
   # Variables used to clean and filter raw data before training data is built
