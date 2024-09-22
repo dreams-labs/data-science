@@ -95,28 +95,29 @@ wallet_cohorts:
 time_series:
   # Specify which DataFrame the metrics apply to
   prices:
-    sma:
-      parameters:
-        period: 20
-      aggregations:
-        std:
-          scaling: "standard"
-      rolling:
-        stats:
-          mean:
+    price:
+      sma:
+        parameters:
+          period: 20
+        aggregations:
+          std:
             scaling: "standard"
-        window_duration: 10
-        lookback_periods: 5
-    ema:
-      parameters:
-        period: 10
-      aggregations:
-        std:
-          scaling: "standard"
-  volume:
-    sma:
-      parameters:
-        period: 15
+        rolling:
+          stats:
+            mean:
+              scaling: "standard"
+          window_duration: 10
+          lookback_periods: 5
+      ema:
+        parameters:
+          period: 10
+        aggregations:
+          std:
+            scaling: "standard"
+    volume:
+      sma:
+        parameters:
+          period: 15
 
 # Time series keyed on only date
 macro_series:
