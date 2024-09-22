@@ -368,16 +368,17 @@ def generate_time_series_metrics(
 
     # Ensure date is in datetime format and sorted by coin_id and date
     time_series_df['date'] = pd.to_datetime(time_series_df['date'])
-    time_series_df = time_series_df.sort_values(by=['coin_id', 'date'])
 
     # Retrieve training and modeling period dates from the general config
     training_period_start = pd.to_datetime(config['training_data']['training_period_start'])
     modeling_period_end = pd.to_datetime(config['training_data']['modeling_period_end'])
 
     # Filter the df to only include data within the period and log the count of all coins
-    all_coins_count = len(time_series_df['coin_id'].unique())
     time_series_df = time_series_df[(time_series_df['date'] >= training_period_start) &
                                     (time_series_df['date'] <= modeling_period_end)]
+
+    # Sort the timeseries to ensure correct timeseries function calculations
+    time_series_df = time_series_df.sort_values(by=['coin_id', 'date'])
 
     # 2. Metric Calculations for All Coins
     # -------------------------------------
@@ -407,11 +408,13 @@ def generate_time_series_metrics(
     # Log the number of coins with incomplete or missing data
     logger.debug("Generated time series metrics data. Out of %s total coins, %s had complete period "
                  "coverage, %s had partial coverage, and %s had no coverage."
-                 ,all_coins_count
+                 ,len(time_series_df['coin_id'].unique())
                  ,len(full_metrics_df['coin_id'].unique())
                  ,len(partial_time_series_metrics_df['coin_id'].unique())
-                 ,all_coins_count - len(full_metrics_df['coin_id'].unique()) - len(partial_time_series_metrics_df['coin_id'].unique())
-                 )
+                 ,len(time_series_df['coin_id'].unique())
+                      - len(full_metrics_df['coin_id'].unique())
+                      - len(partial_time_series_metrics_df['coin_id'].unique())
+                )
 
     return full_metrics_df, partial_time_series_metrics_df
 
