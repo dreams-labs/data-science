@@ -4,6 +4,8 @@ functions used to build coin-level features from training data
 # pylint: disable=C0301 # line over 100 chars
 # pylint: disable=C0103 # X_train violates camelcase
 # pylint: disable=E0401 # can't find utils import
+# pyright: reportMissingImports=false
+# pyright: reportMissingModuleSource=false
 
 import os
 import uuid
@@ -336,7 +338,7 @@ def build_configured_model_input(profits_df, prices_df, config, metrics_config, 
     """
 
     # 1. Identify cohort of wallets (e.g., sharks) based on the cohort classification logic
-    wallet_cohort_df = td.classify_wallet_cohort(profits_df, config['datasets']['wallet_cohorts']['sharks'])
+    wallet_cohort_df = cwm.classify_wallet_cohort(profits_df, config['datasets']['wallet_cohorts']['sharks'])
 
     # 2. Generate buysell metrics for wallets in the identified cohort
     cohort_wallets = wallet_cohort_df[wallet_cohort_df['in_cohort']]['wallet_address']

@@ -2,13 +2,13 @@
 tests used to audit the files in the data-science/src folder
 """
 # pylint: disable=C0301 # line over 100 chars
+# pylint: disable=C0302 # over 1000 lines
 # pylint: disable=C0413 # import not at top of doc (due to local import)
-# pylint: disable=C0303 # trailing whitespace
-# pylint: disable=W1203 # fstrings in logs
 # pylint: disable=W0612 # unused variables (due to test reusing functions with 2 outputs)
 # pylint: disable=W0621 # redefining from outer scope triggering on pytest fixtures
+# pylint: disable=W1203 # fstrings in logs
 # pylint: disable=E0401 # can't find import (due to local import)
-
+# pyright: reportMissingModuleSource=false
 
 import sys
 import os
@@ -650,8 +650,13 @@ def test_preprocess_coin_df_scaling(mock_modeling_config, mock_metrics_config, m
     """
     input_path, original_df = mock_input_df
 
+    # Declare empty dataset_config
+    mock_dataset_config = {}
+
     # Call the function
-    output_df, output_path = fe.preprocess_coin_df(input_path, mock_modeling_config, mock_metrics_config)
+    output_df, output_path = fe.preprocess_coin_df(
+        input_path, mock_modeling_config, mock_dataset_config, mock_metrics_config
+    )
 
     # Check that 'feature_1' is scaled (mean should be near 0 and std should be near 1)
     scaled_column = output_df['feature_1_sum']

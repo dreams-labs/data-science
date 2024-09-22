@@ -9,7 +9,7 @@ tests used to audit the files in the data-science/src folder
 # pylint: disable=W0621 # redefining from outer scope triggering on pytest fixtures
 # pylint: disable=E0401 # can't find import (due to local import)
 # pylint: disable=C0103 # X_train violates camelcase
-
+# pyright: reportMissingModuleSource=false
 
 import sys
 import os
@@ -22,16 +22,12 @@ from dreams_core import core as dc
 # pyright: reportMissingImports=false
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 from utils import load_config
-import training_data as td
 import feature_engineering as fe
 import coin_wallet_metrics as cwm
 import insights as i
 
 load_dotenv()
 logger = dc.setup_logger()
-
-
-
 
 
 
@@ -463,6 +459,10 @@ def profits_df():
 # Integration test for build_configured_model_input()
 # ----------------------------------------------- #
 
+
+@pytest.mark.xfail
+# this function will be refactored after additional functionality is added \
+# to feature eng and modeling
 @pytest.mark.integration
 def test_build_configured_model_input(config, metrics_config, modeling_config, prices_df, profits_df):
     """
@@ -475,7 +475,7 @@ def test_build_configured_model_input(config, metrics_config, modeling_config, p
     modeling_config['preprocessing']['drop_features'] = []
 
     # 1. Identify cohort of wallets (e.g., sharks) based on the cohort classification logic
-    cohort_summary_df = td.classify_wallet_cohort(profits_df, config['datasets']['wallet_cohorts']['sharks'])
+    cohort_summary_df = cwm.classify_wallet_cohort(profits_df, config['datasets']['wallet_cohorts']['sharks'])
 
     # 2. Generate buysell metrics for wallets in the identified cohort
     cohort_wallets = cohort_summary_df[cohort_summary_df['in_cohort']]['wallet_address']

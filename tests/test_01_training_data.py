@@ -509,77 +509,91 @@ def test_clean_profits_aggregate_inflows_profits_across_coins(sample_clean_profi
 
 
 
-# ---------------------------------------- #
-# classify_wallet_cohort() unit tests
-# ---------------------------------------- #
 
-# Sample profits data
-def sample_wallet_cohort_profits_df():
+# -------------------------------------------- #
+# generate_coin_metadata_features() unit tests
+# -------------------------------------------- #
+
+@pytest.fixture
+def mock_metadata_df():
     """
-    Sample DataFrame for testing classify_wallet_cohort function
+    Fixture to create a mock metadata DataFrame for testing.
+    Includes edge cases for chain threshold and category unpacking.
     """
     data = {
-        'coin_id': ['coin_1', 'coin_1', 'coin_1', 'coin_2', 'coin_3', 'coin_1'],
-        'wallet_address': ['wallet_1', 'wallet_2', 'wallet_2', 'wallet_1', 'wallet_3', 'wallet_4'],
-        'date': ['2024-02-15', '2024-02-18', '2024-02-20', '2024-02-18', '2024-02-25', '2024-02-20'],
-        'usd_inflows': [5000, 7500, 7500, 8000, 20000, 1000],
-        'profits_cumulative': [3000, 2000, 8000, 6000, 9000, 500]
+        'coin_id': ['coin_1', 'coin_2', 'coin_3', 'coin_4', 'coin_5'],
+        'categories': [['meme'], [], ['defi', 'dex'], ['nft'], []],
+        'chain': ['ethereum', 'solana', 'solana', 'binance', 'base']
     }
+    return pd.DataFrame(data)
 
-    # Recompute total return: total_return = profits_cumulative / usd_inflows
-    df = pd.DataFrame(data)
-    df['total_return'] = df['profits_cumulative'] / df['usd_inflows']
-    return df
-
-# Sample config for wallet cohort
-def sample_wallet_cohort_config():
+@pytest.fixture
+def mock_config():
     """
-    Sample configuration for testing classify_wallet_cohort function
+    Fixture to provide a mock configuration with a chain threshold value.
     """
     return {
-        'wallet_minimum_inflows': 10000,
-        'wallet_maximum_inflows': 50000,
-        'coin_profits_win_threshold': 5000,  # Coin must have profits of at least 5000 USD to be a win
-        'coin_return_win_threshold': 0.5,  # Coin must have at least a 50% return to be a win
-        'wallet_min_coin_wins': 1  # Minimum of 1 coin must meet the "win" threshold for the wallet to join the cohort
+        'datasets': {
+            'coin_facts': {
+                'coin_metadata': {
+                    'chain_threshold': 2  # Threshold set to 2 for testing
+                }
+            }
+        }
     }
 
-# Test case for classify_wallet_cohort
-def test_wallet_cohort_classification():
+# Chain Threshold Tests
+@pytest.mark.unit
+def test_chain_threshold(mock_metadata_df, mock_config):
     """
-    Unit test for classify_wallet_cohort() function with assertions for specific items.
+    Test to ensure that chains are correctly categorized based on the threshold.
+    - Chain 'solana' has 2 coins (at the threshold).
+    - Chain 'ethereum' has 1 coin (below the threshold).
+    - Chain 'binance' and 'base' have 1 coin (below the threshold).
     """
-    sample_profits_df = sample_wallet_cohort_profits_df()
-    sample_config = sample_wallet_cohort_config()
+    result_df = td.generate_coin_metadata_features(mock_metadata_df, mock_config)
 
-    # Run classification
-    cohort_wallets_df = td.classify_wallet_cohort(sample_profits_df, sample_config)
+    # Assert solana is included as a boolean column
+    assert 'chain_solana' in result_df.columns
+    assert result_df['chain_solana'].sum() == 2  # 2 solana coins
 
-    # Test 1: Ensure wallets are filtered correctly based on inflows eligibility criteria.
-    eligible_wallets = cohort_wallets_df['wallet_address'].unique()
-    assert 'wallet_4' not in eligible_wallets, "Wallet_4 should be excluded due to insufficient inflows."
-    assert 'wallet_2' in eligible_wallets, "Wallet_2 should be included."
-    assert 'wallet_3' in eligible_wallets, "Wallet_3 should be included."
+    # Assert ethereum, binance, and base are categorized as 'chain_other'
+    assert 'chain_other' in result_df.columns
+    assert result_df['chain_other'].sum() == 3  # 3 coins below the threshold
 
-    # Test 2: Verify that wallets are classified based on profits win threshold.
-    wallet_1_wins = cohort_wallets_df[cohort_wallets_df['wallet_address'] == 'wallet_1']['winning_coins'].values[0]
-    wallet_2_wins = cohort_wallets_df[cohort_wallets_df['wallet_address'] == 'wallet_2']['winning_coins'].values[0]
-    assert wallet_1_wins == 1, f"Expected 1 winning coin for Wallet_1, got {wallet_1_wins}"
-    assert wallet_2_wins == 1, f"Expected 1 winning coin for Wallet_2, got {wallet_2_wins}"
+    # Assert chains like ethereum, binance, and base don't have their own columns
+    assert 'chain_ethereum' not in result_df.columns
+    assert 'chain_binance' not in result_df.columns
+    assert 'chain_base' not in result_df.columns
 
-    # Test 3: Ensure wallets are classified based on combined profits and return thresholds.
-    wallet_2_is_cohort = cohort_wallets_df[cohort_wallets_df['wallet_address'] == 'wallet_2']['in_cohort'].values[0]
-    assert wallet_2_is_cohort, "Wallet_2 should be classified as a cohort member."
+# Category Unpacking Tests
+@pytest.mark.unit
+def test_category_unpacking(mock_metadata_df, mock_config):
+    """
+    Test to ensure that categories are correctly unpacked, including:
+    - Coins with 0 categories.
+    - Coins with 1 category.
+    - Coins with 2+ categories.
+    """
+    result_df = td.generate_coin_metadata_features(mock_metadata_df, mock_config)
 
-    # Test 5: Check summary metrics for wallet_1
-    wallet_1_metrics = cohort_wallets_df[cohort_wallets_df['wallet_address'] == 'wallet_1']
-    assert wallet_1_metrics['usd_inflows'].values[0] == 13000, f"Expected total inflows for Wallet_1 to be 13000, got {wallet_1_metrics['usd_inflows'].values[0]}"
-    assert wallet_1_metrics['total_coins'].values[0] == 2, f"Expected total coins for Wallet_1 to be 2, got {wallet_1_metrics['total_coins'].values[0]}"
-    assert wallet_1_metrics['total_profits'].values[0] == 9000, f"Expected total profits for Wallet_1 to be 9000, got {wallet_1_metrics['total_profits'].values[0]}"
+    # Assert correct category columns exist
+    assert 'category_meme' in result_df.columns
+    assert 'category_defi' in result_df.columns
+    assert 'category_dex' in result_df.columns
+    assert 'category_nft' in result_df.columns
 
+    # Test coins with 0 categories
+    assert not result_df.loc[result_df['coin_id'] == 'coin_2', 'category_meme'].values[0]
+    assert not result_df.loc[result_df['coin_id'] == 'coin_5', 'category_meme'].values[0]
 
+    # Test coins with 1 category
+    assert result_df.loc[result_df['coin_id'] == 'coin_1', 'category_meme'].values[0]
+    assert result_df.loc[result_df['coin_id'] == 'coin_4', 'category_nft'].values[0]
 
-
+    # Test coins with 2+ categories
+    assert result_df.loc[result_df['coin_id'] == 'coin_3', 'category_defi'].values[0]
+    assert result_df.loc[result_df['coin_id'] == 'coin_3', 'category_dex'].values[0]
 
 
 # ======================================================== #
@@ -763,6 +777,39 @@ def test_save_prices_df(prices_df):
     assert len(prices_df) > 0
 
 
+
+# ---------------------------------------- #
+# retrieve_metadata_data() integration tests
+# ---------------------------------------- #
+
+@pytest.fixture(scope='session')
+def metadata_df():
+    """
+    Retrieve and preprocess the metadata_df.
+    """
+    logger.info("Generating metadata_df from production data...")
+    metadata_df = td.retrieve_metadata_data()
+    return metadata_df
+
+# Save metadata_df.csv in fixtures/
+# ----------------------------------------
+def test_save_metadata_df(metadata_df):
+    """
+    This is not a test! This function saves a metadata_df.csv in the fixtures folder so it can be
+    used for integration tests in other modules.
+    """
+    # Save the metadata DataFrame to the fixtures folder
+    metadata_df.to_csv('tests/fixtures/metadata_df.csv', index=False)
+
+    # Add some basic assertions to ensure the data was saved correctly
+    assert metadata_df is not None
+    assert len(metadata_df) > 0
+
+    # Assert that coin_id is unique
+    assert metadata_df['coin_id'].is_unique, "coin_id is not unique in metadata_df"
+
+
+
 # ---------------------------------------- #
 # calculate_wallet_profitability() integration tests
 # ---------------------------------------- #
@@ -918,45 +965,3 @@ def test_clean_profits_aggregate_sums(cleaned_profits_df):
 
     # Assert that no wallets in the cleaned DataFrame breach the thresholds
     assert over_threshold_wallets.empty, "Some remaining wallets exceed the thresholds."
-
-
-# ---------------------------------------- #
-# classify_wallet_cohort() tests
-# ---------------------------------------- #
-
-@pytest.fixture(scope='session')
-def wallet_cohort_df(cleaned_profits_df):
-    """
-    Builds shark_wallets_df from shark_coins_df for data quality checks.
-    """
-    profits_df, _ = cleaned_profits_df  # Use the cleaned profits DataFrame
-    wallet_cohort_df = td.classify_wallet_cohort(profits_df, config['datasets']['wallet_cohorts']['sharks'])
-    return wallet_cohort_df
-
-# Save cohort_summary_df.csv in fixtures/
-# ----------------------------------------
-def test_save_cohort_summary_df(wallet_cohort_df):
-    """
-    This is not a test! This function saves a wallet_cohort_df.csv in the fixtures folder
-    so it can be used for integration tests in other modules.
-    """
-    # Save the cleaned DataFrame to the fixtures folder
-    wallet_cohort_df.to_csv('tests/fixtures/wallet_cohort_df.csv', index=False)
-    logger.info("Saved tests/fixtures/wallet_cohort_df.csv from production data...")
-
-
-    # Add some basic assertions to ensure the data was saved correctly
-    assert wallet_cohort_df is not None
-    assert len(wallet_cohort_df) > 0
-
-@pytest.mark.integration
-def test_no_duplicate_wallets(wallet_cohort_df):
-    """
-    Test to assert there are no duplicate wallet addresses in the wallet_cohort_df.
-    """
-
-    # Group by coin_id and wallet_address and check for duplicates
-    duplicates = wallet_cohort_df.duplicated(subset=['wallet_address'], keep=False)
-
-    # Assert that there are no duplicates in sharks_df
-    assert not duplicates.any(), "Duplicate wallet addresses found in sharks_df"
