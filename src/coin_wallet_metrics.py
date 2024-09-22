@@ -325,7 +325,7 @@ def generate_time_series_metrics(
         config: dict,
         metrics_config: dict,
         dataset_key: str,
-        colname: str
+        value_column: str
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Generates time series metrics (e.g., SMA, EMA) based on the given config.
@@ -337,7 +337,7 @@ def generate_time_series_metrics(
     - metrics_config: The full metrics_config file with a time_series key that matches the
         dataset_key param.
     - dataset_key (string): The dataset's key in the metrics_config['time_series'] section.
-    - colname (string): The name of the column used to calculate the metrics (e.g., 'price').
+    - value_column (string): The name of the column used to calculate the metrics (e.g., 'price').
 
     Returns:
     - full_metrics_df (pd.DataFrame): Input df with additional columns for the configured metrics.
@@ -348,13 +348,13 @@ def generate_time_series_metrics(
     """
     # 1. Data Quality Checks and Formatting
     # -------------------------------------
-    # Confirm that the colname is in the input df
-    if colname not in time_series_df.columns:
-        raise KeyError(f"Input DataFrame does not include column '{colname}'.")
+    # Confirm that the value_column is in the input df
+    if value_column not in time_series_df.columns:
+        raise KeyError(f"Input DataFrame does not include column '{value_column}'.")
 
     # Confirm there are no null values in the input column
-    if time_series_df[colname].isnull().any():
-        raise ValueError(f"The '{colname}' column contains null values, which are not allowed.")
+    if time_series_df[value_column].isnull().any():
+        raise ValueError(f"The '{value_column}' column contains null values, which are not allowed.")
 
     # Retrieve relevant metrics configuration and raise error if the key doesn't exist
     try:
@@ -386,16 +386,16 @@ def generate_time_series_metrics(
 
             # Calculate the corresponding metric
             if metric == 'sma':
-                sma = calculate_sma(group[colname], period)
+                sma = calculate_sma(group[value_column], period)
                 time_series_df.loc[group.index, metric] = sma
 
             elif metric == 'ema':
-                ema = calculate_ema(group[colname], period)
+                ema = calculate_ema(group[value_column], period)
                 time_series_df.loc[group.index, metric] = ema
 
     # Include all dynamically created columns in the return DataFrame
     dynamic_cols = [metric for metric in time_series_metrics_config.keys()]
-    time_series_metrics_df = time_series_df[['coin_id', 'date', colname] + dynamic_cols]
+    time_series_metrics_df = time_series_df[['coin_id', 'date', value_column] + dynamic_cols]
 
     # 3. Split records by complete vs partial time series coverage
     # ------------------------------------------------------------

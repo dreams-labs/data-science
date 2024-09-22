@@ -669,7 +669,7 @@ def test_preprocess_coin_df_scaling(mock_modeling_config, mock_metrics_config, m
 # ------------------------------------------ #
 
 @pytest.fixture
-def mock_input_files_colnames(tmpdir):
+def mock_input_files_value_columns(tmpdir):
     """
     Unit test data for scenario with many duplicate columns and similar filenames.
     """
@@ -702,11 +702,11 @@ def mock_input_files_colnames(tmpdir):
     return tmpdir, input_files
 
 @pytest.mark.unit
-def test_create_training_data_df(mock_input_files_colnames):
+def test_create_training_data_df(mock_input_files_value_columns):
     """
     Test column renaming logic for clarity when merging multiple files with similar filenames.
     """
-    tmpdir, input_files = mock_input_files_colnames
+    tmpdir, input_files = mock_input_files_value_columns
 
     # Call the function using tmpdir as the modeling_folder
     merged_df, _ = fe.create_training_data_df(tmpdir, input_files)

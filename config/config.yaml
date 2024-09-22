@@ -32,7 +32,7 @@ datasets:
       description: 'price'  # prefix that will be included in feature columns
       fill_method: 'drop_records'
       sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
-      colname: 'price'
+      value_column: 'price'
 
 
   # Keyed on only date
