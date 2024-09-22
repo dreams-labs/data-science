@@ -400,6 +400,37 @@ def generate_time_series_metrics(
 
     # 3. Split the DataFrames After Metric Calculation
     # -------------------------------------
+    full_metrics_df, partial_time_series_metrics_df = split_dataframe_by_coverage(
+        time_series_metrics_df, training_period_start, modeling_period_end
+    )
+
+    # Log the number of coins with incomplete or missing data
+    logger.debug("Generated time series metrics data. Out of %s total coins, %s had complete period "
+                 "coverage, %s had partial coverage, and %s had no coverage."
+                 ,all_coins_count
+                 ,len(full_metrics_df['coin_id'].unique())
+                 ,len(partial_time_series_metrics_df['coin_id'].unique())
+                 ,all_coins_count - len(full_metrics_df['coin_id'].unique()) - len(partial_time_series_metrics_df['coin_id'].unique())
+                 )
+
+    return full_metrics_df, partial_time_series_metrics_df
+
+
+def split_dataframe_by_coverage(time_series_df: pd.DataFrame,
+                                training_period_start: pd.Timestamp,
+                                modeling_period_end: pd.Timestamp) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Splits the input DataFrame into full coverage and partial coverage based on date range.
+
+    Params:
+    - time_series_df (pd.DataFrame): The input DataFrame with time series data.
+    - training_period_start (pd.Timestamp): Start date of the training period.
+    - modeling_period_end (pd.Timestamp): End date of the modeling period.
+
+    Returns:
+    - full_coverage_df (pd.DataFrame): DataFrame with coins having complete data for the period.
+    - partial_coverage_df (pd.DataFrame): DataFrame with coins having partial data for the period.
+    """
     # Identify coins that have complete data for the period
     coin_data_range = time_series_df.groupby('coin_id')['date'].agg(['min', 'max'])
 
@@ -413,19 +444,11 @@ def generate_time_series_metrics(
     partial_duration_coins = coin_data_range[~coin_data_range.index.isin(full_duration_coins)].index
 
     # Filter for full and partial coins
-    full_metrics_df = time_series_metrics_df[time_series_metrics_df['coin_id'].isin(full_duration_coins)]
-    partial_time_series_metrics_df = time_series_metrics_df[time_series_metrics_df['coin_id'].isin(partial_duration_coins)]
+    full_coverage_df = time_series_df[time_series_df['coin_id'].isin(full_duration_coins)]
+    partial_coverage_df = time_series_df[time_series_df['coin_id'].isin(partial_duration_coins)]
 
-    # Log the number of coins with incomplete or missing data
-    logger.debug("Generated time series metrics data. Out of %s total coins, %s had complete period "
-                 "coverage, %s had partial coverage, and %s had no coverage."
-                 ,all_coins_count
-                 ,len(full_duration_coins)
-                 ,len(partial_duration_coins)
-                 ,all_coins_count - len(full_duration_coins) - len(partial_duration_coins)
-                 )
+    return full_coverage_df, partial_coverage_df
 
-    return full_metrics_df, partial_time_series_metrics_df
 
 def calculate_sma(timeseries: pd.Series, period: int) -> pd.Series:
     """

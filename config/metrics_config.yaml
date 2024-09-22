@@ -91,7 +91,7 @@ wallet_cohorts:
         window_duration: 14
         lookback_periods: 4
 
-# New top-level section for time series
+# Time series keyed on coin_id-date
 time_series:
   # Specify which DataFrame the metrics apply to
   prices:
