@@ -333,7 +333,7 @@ def generate_time_series_metrics(
     Params:
     - time_series_df (pd.DataFrame): The input DataFrame with time series data.
     - config: The full general config file containing training_period_start and
-        modeling_period_end.
+        training_period_end.
     - metrics_config: The full metrics_config file with a time_series key that matches the
         dataset_key param.
     - dataset_key (string): The dataset's key in the metrics_config['time_series'] section.
@@ -342,7 +342,7 @@ def generate_time_series_metrics(
     Returns:
     - full_metrics_df (pd.DataFrame): Input df with additional columns for the configured metrics.
         Only includes coins that had complete data for the period between training_period_start
-        and modeling_period_end.
+        and training_period_end.
     - partial_time_series_metrics_df (pd.DataFrame): Input df with additional columns for the
         configured metrics. Only includes coins that had partial data for the period.
     """
@@ -366,16 +366,14 @@ def generate_time_series_metrics(
     if not metrics_config['time_series'][dataset_key]:
         raise KeyError(f"No metrics are specified for key [{dataset_key}] in metrics_df.")
 
-    # Ensure date is in datetime format and sorted by coin_id and date
+    # Ensure all dates are in datetime format
     time_series_df['date'] = pd.to_datetime(time_series_df['date'])
-
-    # Retrieve training and modeling period dates from the general config
     training_period_start = pd.to_datetime(config['training_data']['training_period_start'])
-    modeling_period_end = pd.to_datetime(config['training_data']['modeling_period_end'])
+    training_period_end = pd.to_datetime(config['training_data']['training_period_end'])
 
     # Filter the df to only include data within the period and log the count of all coins
     time_series_df = time_series_df[(time_series_df['date'] >= training_period_start) &
-                                    (time_series_df['date'] <= modeling_period_end)]
+                                    (time_series_df['date'] <= training_period_end)]
 
     # Sort the timeseries to ensure correct timeseries function calculations
     time_series_df = time_series_df.sort_values(by=['coin_id', 'date'])
@@ -399,10 +397,10 @@ def generate_time_series_metrics(
     dynamic_cols = [metric for metric in time_series_metrics_config.keys()]
     time_series_metrics_df = time_series_df[['coin_id', 'date', colname] + dynamic_cols]
 
-    # 3. Split the DataFrames After Metric Calculation
-    # -------------------------------------
+    # 3. Split records by complete vs partial time series coverage
+    # ------------------------------------------------------------
     full_metrics_df, partial_time_series_metrics_df = split_dataframe_by_coverage(
-        time_series_metrics_df, training_period_start, modeling_period_end
+        time_series_metrics_df, training_period_start, training_period_end
     )
 
     # Log the number of coins with incomplete or missing data
@@ -420,15 +418,15 @@ def generate_time_series_metrics(
 
 
 def split_dataframe_by_coverage(time_series_df: pd.DataFrame,
-                                training_period_start: pd.Timestamp,
-                                modeling_period_end: pd.Timestamp) -> Tuple[pd.DataFrame, pd.DataFrame]:
+                                start_date: pd.Timestamp,
+                                end_date: pd.Timestamp) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Splits the input DataFrame into full coverage and partial coverage based on date range.
 
     Params:
     - time_series_df (pd.DataFrame): The input DataFrame with time series data.
-    - training_period_start (pd.Timestamp): Start date of the training period.
-    - modeling_period_end (pd.Timestamp): End date of the modeling period.
+    - start_date (pd.Timestamp): Start date of the training period.
+    - end_date (pd.Timestamp): End date of the modeling period.
 
     Returns:
     - full_coverage_df (pd.DataFrame): DataFrame with coins having complete data for the period.
@@ -439,8 +437,8 @@ def split_dataframe_by_coverage(time_series_df: pd.DataFrame,
 
     # Full duration coins: Data spans the entire training to modeling period
     full_duration_coins = coin_data_range[
-        (coin_data_range['min'] <= training_period_start) &
-        (coin_data_range['max'] >= modeling_period_end)
+        (coin_data_range['min'] <= start_date) &
+        (coin_data_range['max'] >= end_date)
     ].index
 
     # Partial duration coins: Data does not span the entire period
