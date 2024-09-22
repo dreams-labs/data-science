@@ -9,6 +9,7 @@ tests used to audit the files in the data-science/src folder
 # pylint: disable=W0612 # unused variables (due to test reusing functions with 2 outputs)
 # pylint: disable=W0621 # redefining from outer scope triggering on pytest fixtures
 # pylint: disable=E0401 # can't find import (due to local import)
+# pyright: reportMissingModuleSource=false
 
 import sys
 import os

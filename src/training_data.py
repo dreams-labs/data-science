@@ -662,6 +662,7 @@ def generate_coin_metadata_features(metadata_df, config):
     Returns:
     - A DataFrame with coin_id, boolean category columns, and boolean chain columns.
     """
+    metadata_df = metadata_df.copy()
 
     # Step 1: Create boolean columns for each unique category
     logger.debug("Creating boolean columns for each category...")

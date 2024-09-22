@@ -9,7 +9,7 @@ tests used to audit the files in the data-science/src folder
 # pylint: disable=W0621 # redefining from outer scope triggering on pytest fixtures
 # pylint: disable=E0401 # can't find import (due to local import)
 # pylint: disable=C0103 # X_train violates camelcase
-
+# pyright: reportMissingModuleSource=false
 
 import sys
 import os
@@ -28,9 +28,6 @@ import insights as i
 
 load_dotenv()
 logger = dc.setup_logger()
-
-
-
 
 
 

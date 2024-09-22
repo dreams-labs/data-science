@@ -376,16 +376,17 @@ def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_per
 
 
 
-def preprocess_coin_df(input_path, modeling_config, df_metrics_config):
+def preprocess_coin_df(input_path, modeling_config, dataset_config, df_metrics_config=None):
     """
-    Preprocess the flattened coin DataFrame by applying feature selection and scaling based on
-    the metrics config.
+    Preprocess the flattened coin DataFrame by applying feature selection based on the modeling
+    and dataset-specific configs, and optional scaling based on the metrics config.
 
     Params:
     - input_path (str): Path to the flattened CSV file.
     - modeling_config (dict): Configuration with modeling-specific parameters.
-    - df_metrics_config (dict): The input file's configuration with metrics and their scaling
-        methods, aggregations, etc.
+    - dataset_config (dict): Dataset-specific configuration (e.g., sharks, coin_metadata).
+    - df_metrics_config (dict, optional): Configuration for scaling metrics, can be None if scaling
+        is not required.
 
     Returns:
     - df (pd.DataFrame): The preprocessed DataFrame.
@@ -398,25 +399,39 @@ def preprocess_coin_df(input_path, modeling_config, df_metrics_config):
     if df.isnull().values.any():
         raise ValueError("Missing values detected in the DataFrame.")
 
-    # Step 3: Apply feature selection (using drop_features)
+    # Step 3: Apply feature selection based on drop_features from modeling_config
     drop_features = modeling_config['preprocessing'].get('drop_features', [])
     if drop_features is not None:
         df = df.drop(columns=drop_features, errors='ignore')
 
-    # Step 4: Apply scaling (moved to helper function)
-    df = apply_scaling(df, df_metrics_config)
+    # Step 4: Apply feature selection based on sameness_threshold and retain_columns from
+        # dataset_config, defaulting to a threshold of 1.0, i.e. no sameness filter
+    sameness_threshold = dataset_config.get('sameness_threshold', 1.0)
+    retain_columns = dataset_config.get('retain_columns', [])
 
-    # Step 5: Generate output path and filename based on input
+    # Drop columns with more than `sameness_threshold` of the same value, unless in retain_columns
+    for column in df.columns:
+        if column not in retain_columns:
+            max_value_ratio = df[column].value_counts(normalize=True).max()
+            if max_value_ratio >= sameness_threshold:
+                df = df.drop(columns=[column])
+                logger.info("Dropped column %s due to sameness_threshold", column)
+
+    # Step 5: Apply scaling if df_metrics_config is provided
+    if df_metrics_config:
+        df = apply_scaling(df, df_metrics_config)
+
+    # Step 6: Generate output path and filename based on input
     base_filename = os.path.basename(input_path).replace(".csv", "")
     output_filename = f"{base_filename}_preprocessed.csv"
     output_path = os.path.join(os.path.dirname(input_path)
                                .replace("flattened_outputs", "preprocessed_outputs")
                                , output_filename)
 
-    # Step 6: Save the preprocessed data
+    # Step 7: Save the preprocessed data
     df.to_csv(output_path, index=False)
 
-    # Step 7: Log the changes made
+    # Step 8: Log the changes made
     logger.info("Preprocessed file saved at: %s", output_path)
     return df, output_path
 
@@ -442,10 +457,19 @@ def apply_scaling(df, df_metrics_config):
     # Loop through each metric and its settings in the df_metrics_config
     for metric, settings in df_metrics_config.items():
         for agg, agg_settings in settings['aggregations'].items():
+            # Ensure agg_settings exists and is not None
+            if not agg_settings:
+                continue
+
             column_name = f"{metric}_{agg}"
             if column_name in df.columns:
                 scaling_method = agg_settings.get('scaling', None)
-                if scaling_method and scaling_method in scalers:
+
+                # Skip scaling if set to "none" or if no scaling is provided
+                if scaling_method is None or scaling_method == "none":
+                    continue
+
+                if scaling_method in scalers:
                     scaler = scalers[scaling_method]
                     df[[column_name]] = scaler.fit_transform(df[[column_name]])
                 else:
