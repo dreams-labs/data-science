@@ -26,13 +26,14 @@ datasets:
       wallet_min_coin_wins: 3  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
 
 
-  # Keyed on coin_id-date
+  # Keyed on coin_id-date or just date
   time_series:
     prices:
       description: 'price'  # prefix that will be included in feature columns
       fill_method: 'drop_records'
       sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
       colname: 'price'
+
 
   # Keyed on coin_id
   coin_facts:
