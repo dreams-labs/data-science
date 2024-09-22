@@ -392,20 +392,30 @@ def preprocess_coin_df(input_path, modeling_config, dataset_config, df_metrics_c
     - df (pd.DataFrame): The preprocessed DataFrame.
     - output_path (str): The full path to the saved preprocessed CSV file.
     """
-    # Step 1: Load the flattened data
+
+    # Step 1: Load and Validate Data
+    # ----------------------------------------------------
     df = pd.read_csv(input_path)
 
-    # Step 2: Check for missing values and raise an error if any are found
+    # Check for missing values and raise an error if any are found
     if df.isnull().values.any():
         raise ValueError("Missing values detected in the DataFrame.")
 
-    # Step 3: Apply feature selection based on drop_features from modeling_config
+
+    # Step 2: Preprocess Data
+    # ----------------------------------------------------
+    # Convert boolean columns to integers
+    df = df.apply(lambda col: col.astype(int) if col.dtype == bool else col)
+
+    # Apply feature selection based on drop_features from modeling_config
     drop_features = modeling_config['preprocessing'].get('drop_features', [])
-    if drop_features is not None:
+    if drop_features:
         df = df.drop(columns=drop_features, errors='ignore')
 
-    # Step 4: Apply feature selection based on sameness_threshold and retain_columns from
-        # dataset_config, defaulting to a threshold of 1.0, i.e. no sameness filter
+
+    # Step 3: Feature Selection Based on Config
+    # ----------------------------------------------------
+    # Apply feature selection based on sameness_threshold and retain_columns from dataset_config
     sameness_threshold = dataset_config.get('sameness_threshold', 1.0)
     retain_columns = dataset_config.get('retain_columns', [])
 
@@ -417,24 +427,31 @@ def preprocess_coin_df(input_path, modeling_config, dataset_config, df_metrics_c
                 df = df.drop(columns=[column])
                 logger.info("Dropped column %s due to sameness_threshold", column)
 
-    # Step 5: Apply scaling if df_metrics_config is provided
+
+    # Step 4: Scaling and Transformation
+    # ----------------------------------------------------
+    # Apply scaling if df_metrics_config is provided
     if df_metrics_config:
         df = apply_scaling(df, df_metrics_config)
 
-    # Step 6: Generate output path and filename based on input
+
+    # Step 5: Save and Log Preprocessed Data
+    # ----------------------------------------------------
+    # Generate output path and filename based on input
     base_filename = os.path.basename(input_path).replace(".csv", "")
     output_filename = f"{base_filename}_preprocessed.csv"
-    output_path = os.path.join(os.path.dirname(input_path)
-                               .replace("flattened_outputs", "preprocessed_outputs")
-                               , output_filename)
+    output_path = os.path.join(
+        os.path.dirname(input_path).replace("flattened_outputs", "preprocessed_outputs"),
+        output_filename
+    )
 
-    # Step 7: Save the preprocessed data
+    # Save the preprocessed data
     df.to_csv(output_path, index=False)
 
-    # Step 8: Log the changes made
+    # Log the changes made
     logger.info("Preprocessed file saved at: %s", output_path)
-    return df, output_path
 
+    return df, output_path
 
 
 def apply_scaling(df, df_metrics_config):
