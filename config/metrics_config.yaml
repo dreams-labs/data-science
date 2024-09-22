@@ -96,24 +96,25 @@ time_series:
   # Specify which DataFrame the metrics apply to
   prices:
     price:
-      sma:
-        parameters:
-          period: 20
-        aggregations:
-          std:
-            scaling: "standard"
-        rolling:
-          stats:
-            mean:
+      metrics:
+        sma:
+          parameters:
+            period: 20
+          aggregations:
+            std:
               scaling: "standard"
-          window_duration: 10
-          lookback_periods: 5
-      ema:
-        parameters:
-          period: 10
-        aggregations:
-          std:
-            scaling: "standard"
+          rolling:
+            stats:
+              mean:
+                scaling: "standard"
+            window_duration: 10
+            lookback_periods: 5
+        ema:
+          parameters:
+            period: 10
+          aggregations:
+            std:
+              scaling: "standard"
     volume:
       sma:
         parameters:
@@ -132,6 +133,9 @@ macro_series:
           aggregations:
             std:
               scaling: "standard"
+        sma:
+          parameters:
+            period: 20
       aggregations:
         first:
           scaling: "standard"
@@ -146,6 +150,13 @@ macro_series:
         window_duration: 14
         lookback_periods: 4
     cryptocurrency_worldwide:
+      metrics:
+        ema:
+          parameters:
+            period: 10
+          aggregations:
+            std:
+              scaling: "standard"
       aggregations:
         first:
           scaling: "standard"

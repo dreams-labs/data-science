@@ -13,7 +13,6 @@ tests used to audit the files in the data-science/src folder
 
 import sys
 import os
-import re
 import pandas as pd
 import numpy as np
 from dotenv import load_dotenv
@@ -246,7 +245,12 @@ def test_fill_buysell_metrics_df():
     """
     buysell_metrics_df = pd.DataFrame({
         'coin_id': ['coin1', 'coin1', 'coin2', 'coin2', 'coin3'],
-        'date': [pd.Timestamp('2024-01-01'), pd.Timestamp('2024-01-04'), pd.Timestamp('2024-01-01'), pd.Timestamp('2024-01-03'), pd.Timestamp('2024-01-03')],
+        'date': [pd.Timestamp('2024-01-01'),
+                 pd.Timestamp('2024-01-04'),
+                 pd.Timestamp('2024-01-01'),
+                 pd.Timestamp('2024-01-03'),
+                 pd.Timestamp('2024-01-03')
+                ],
         'total_balance': [100, 110, 200, None, 300],  # Added coin3 with balance 300 on 2024-01-03
         'total_bought': [50, 20, 75, None, 60],
         'total_sold': [10, 5, 15, None, 20],
@@ -309,14 +313,18 @@ def sample_metrics_config():
     return {
         'time_series': {
             'prices': {
-                'sma': {
-                    'parameters': {
-                        'period': 2
-                    }
-                },
-                'ema': {
-                    'parameters': {
-                        'period': 2
+                'price': {
+                    'metrics': {
+                        'sma': {
+                            'parameters': {
+                                'period': 2
+                            }
+                        },
+                        'ema': {
+                            'parameters': {
+                                'period': 2
+                            }
+                        }
                     }
                 }
             }
@@ -329,7 +337,7 @@ def sample_config():
     return {
         'training_data': {
             'training_period_start': '2023-01-01',
-            'modeling_period_end': '2023-01-03'
+            'training_period_end': '2023-01-03'
         }
     }
 
@@ -347,13 +355,12 @@ def test_generate_time_series_metrics_basic_functionality(sample_time_series_df,
     result_df, _ = cwm.generate_time_series_metrics(
         time_series_df=sample_time_series_df,
         config=sample_config,
-        metrics_config=sample_metrics_config,
-        dataset_key='prices',
+        value_column_metrics_config=sample_metrics_config['time_series']['prices']['price']['metrics'],
         value_column='price'
     )
 
     # Expected columns in the result
-    expected_columns = ['coin_id', 'date', 'price', 'sma', 'ema']
+    expected_columns = ['coin_id', 'date', 'price', 'price_sma', 'price_ema']
 
     # Assert that the columns exist in the result
     assert all(col in result_df.columns for col in expected_columns), "Missing expected columns in the result."
@@ -365,14 +372,14 @@ def test_generate_time_series_metrics_basic_functionality(sample_time_series_df,
     # Confirm that the SMA result matches the expected, with special logic to handle NaNs
     for i, (expected, actual) in enumerate(zip(
         expected_sma_1,
-        result_df[result_df['coin_id'] == 1]['sma'].tolist()
+        result_df[result_df['coin_id'] == 1]['price_sma'].tolist()
     )):
         if np.isnan(expected) and np.isnan(actual):
             continue  # Both values are NaN, so this is considered equal
         assert expected == actual, f"Mismatch at index {i}: expected {expected}, got {actual}"
 
     # Confirm that the EMA result matches the expected
-    assert result_df[result_df['coin_id'] == 1]['ema'].tolist() == pytest.approx(
+    assert result_df[result_df['coin_id'] == 1]['price_ema'].tolist() == pytest.approx(
         expected_ema_1,
         abs=1e-2
     ), "EMA calculation incorrect for coin_id=1"
@@ -384,14 +391,14 @@ def test_generate_time_series_metrics_basic_functionality(sample_time_series_df,
     # Confirm that the SMA result matches the expected, with special logic to handle NaNs
     for i, (expected, actual) in enumerate(zip(
         expected_sma_2,
-        result_df[result_df['coin_id'] == 2]['sma'].tolist()
+        result_df[result_df['coin_id'] == 2]['price_sma'].tolist()
     )):
         if np.isnan(expected) and np.isnan(actual):
             continue  # Both values are NaN, so this is considered equal
         assert expected == actual, f"Mismatch at index {i}: expected {expected}, got {actual}"
 
     # Confirm that the EMA result matches the expected
-    assert result_df[result_df['coin_id'] == 2]['ema'].tolist() == pytest.approx(
+    assert result_df[result_df['coin_id'] == 2]['price_ema'].tolist() == pytest.approx(
         expected_ema_2,
         abs=1e-2
     ), "EMA calculation incorrect for coin_id=2"
@@ -408,14 +415,18 @@ def test_generate_time_series_metrics_different_periods(sample_time_series_df, s
     sample_metrics_config = {
         'time_series': {
             'prices': {
-                'sma': {
-                    'parameters': {
-                        'period': 3  # Different period for SMA
-                    }
-                },
-                'ema': {
-                    'parameters': {
-                        'period': 2  # Different period for EMA
+                'price': {
+                    'metrics': {
+                        'sma': {
+                            'parameters': {
+                                'period': 3  # Different period for SMA
+                            }
+                        },
+                        'ema': {
+                            'parameters': {
+                                'period': 2  # Different period for EMA
+                            }
+                        }
                     }
                 }
             }
@@ -429,13 +440,12 @@ def test_generate_time_series_metrics_different_periods(sample_time_series_df, s
     result_df, _ = cwm.generate_time_series_metrics(
         time_series_df=sample_time_series_df,
         config=sample_config,
-        metrics_config=sample_metrics_config,
-        dataset_key='prices',
+        value_column_metrics_config=sample_metrics_config['time_series']['prices']['price']['metrics'],
         value_column='price'
     )
 
     # Expected columns in the result
-    expected_columns = ['coin_id', 'date', 'price', 'sma', 'ema']
+    expected_columns = ['coin_id', 'date', 'price', 'price_sma', 'price_ema']
 
     # Assert that the columns exist in the result
     assert all(col in result_df.columns for col in expected_columns), "Missing expected columns in the result."
@@ -447,14 +457,14 @@ def test_generate_time_series_metrics_different_periods(sample_time_series_df, s
     # Confirm that the SMA result matches the expected, with special logic to handle NaNs
     for i, (expected, actual) in enumerate(zip(
         expected_sma_1,
-        result_df[result_df['coin_id'] == 1]['sma'].tolist()
+        result_df[result_df['coin_id'] == 1]['price_sma'].tolist()
     )):
         if np.isnan(expected) and np.isnan(actual):
             continue  # Both values are NaN, so this is considered equal
         assert expected == actual, f"Mismatch at index {i}: expected {expected}, got {actual}"
 
     # Confirm that the EMA result matches the expected
-    assert result_df[result_df['coin_id'] == 1]['ema'].tolist() == pytest.approx(
+    assert result_df[result_df['coin_id'] == 1]['price_ema'].tolist() == pytest.approx(
         expected_ema_1,
         abs=1e-2
     ), "EMA calculation incorrect for coin_id=1"
@@ -466,14 +476,14 @@ def test_generate_time_series_metrics_different_periods(sample_time_series_df, s
     # Confirm that the SMA result matches the expected, with special logic to handle NaNs
     for i, (expected, actual) in enumerate(zip(
         expected_sma_2,
-        result_df[result_df['coin_id'] == 2]['sma'].tolist()
+        result_df[result_df['coin_id'] == 2]['price_sma'].tolist()
     )):
         if np.isnan(expected) and np.isnan(actual):
             continue  # Both values are NaN, so this is considered equal
         assert expected == actual, f"Mismatch at index {i}: expected {expected}, got {actual}"
 
     # Confirm that the EMA result matches the expected
-    assert result_df[result_df['coin_id'] == 2]['ema'].tolist() == pytest.approx(
+    assert result_df[result_df['coin_id'] == 2]['price_ema'].tolist() == pytest.approx(
         expected_ema_2,
         abs=1e-2
     ), "EMA calculation incorrect for coin_id=2"
@@ -486,12 +496,11 @@ def test_generate_time_series_metrics_value_column_does_not_exist(sample_time_se
     # Use a value_column that doesn't exist in the DataFrame
     invalid_value_column = 'non_existent_column'
 
-    with pytest.raises(KeyError, match=f"'{invalid_value_column}'"):
+    with pytest.raises(KeyError, match=f"Input DataFrame does not include column '{invalid_value_column}'"):
         cwm.generate_time_series_metrics(
             time_series_df=sample_time_series_df,
             config=sample_config,
-            metrics_config=sample_metrics_config,
-            dataset_key='prices',
+            value_column_metrics_config=sample_metrics_config['time_series']['prices']['price']['metrics'],
             value_column=invalid_value_column
         )
 
@@ -508,64 +517,9 @@ def test_generate_time_series_metrics_value_column_contains_nan(sample_time_seri
         cwm.generate_time_series_metrics(
             time_series_df=sample_time_series_df,
             config=sample_config,
-            metrics_config=sample_metrics_config,
-            dataset_key='prices',
+            value_column_metrics_config=sample_metrics_config['time_series']['prices']['price']['metrics'],
             value_column='price'
         )
-
-@pytest.mark.unit
-def test_generate_time_series_metrics_dataset_key_does_not_exist(sample_time_series_df, sample_config):
-    """
-    Test that generate_time_series_metrics raises a KeyError if the dataset_key does not exist in the metrics_config.
-    """
-    invalid_dataset_key = 'non_existent_dataset'
-
-    sample_metrics_config = {
-        'time_series': {
-            'prices': {
-                'sma': {
-                    'parameters': {
-                        'period': 2
-                    }
-                }
-            }
-        }
-    }
-
-    with pytest.raises(KeyError, match=re.escape(f"Key [{invalid_dataset_key}] not found")):
-        cwm.generate_time_series_metrics(
-            time_series_df=sample_time_series_df,
-            config=sample_config,
-            metrics_config=sample_metrics_config,
-            dataset_key=invalid_dataset_key,
-            value_column='price'
-        )
-
-
-@pytest.mark.unit
-def test_generate_time_series_metrics_dataset_key_no_metrics(sample_time_series_df, sample_config):
-    """
-    Test that generate_time_series_metrics raises a KeyError if the dataset_key exists but has no metrics under it.
-    """
-    # Sample metrics_config with an empty 'prices' key
-    sample_metrics_config = {
-        'time_series': {
-            'prices': {}  # No metrics specified under 'prices'
-        }
-    }
-
-    with pytest.raises(KeyError, match=re.escape("No metrics are specified")):
-        cwm.generate_time_series_metrics(
-            time_series_df=sample_time_series_df,
-            config=sample_config,
-            metrics_config=sample_metrics_config,
-            dataset_key='prices',
-            value_column='price'
-        )
-
-
-
-
 
 # ======================================================== #
 #                                                          #
@@ -756,7 +710,6 @@ def test_generate_time_series_metrics_no_nulls_and_row_count(prices_df, config, 
     2. The number of rows in the output matches the input prices_df.
     """
     # Define dataset key and column name
-    dataset_key = 'prices'
     value_column = 'price'
 
     # Identify coins that have complete data for the period
@@ -764,12 +717,12 @@ def test_generate_time_series_metrics_no_nulls_and_row_count(prices_df, config, 
 
     # Full duration coins: Data spans the entire training to modeling period
     training_period_start = pd.to_datetime(config['training_data']['training_period_start'])
-    modeling_period_end = pd.to_datetime(config['training_data']['modeling_period_end'])
+    training_period_end = pd.to_datetime(config['training_data']['training_period_end'])
 
-    full_duration_days = (modeling_period_end - training_period_start).days + 1
+    full_duration_days = (training_period_end - training_period_start).days + 1
     full_duration_coins = coin_data_range[
         (coin_data_range['min'] <= config['training_data']['training_period_start']) &
-        (coin_data_range['max'] >= config['training_data']['modeling_period_end'])
+        (coin_data_range['max'] >= config['training_data']['training_period_end'])
     ].index
 
     expected_rows = len(full_duration_coins) * full_duration_days
@@ -778,13 +731,12 @@ def test_generate_time_series_metrics_no_nulls_and_row_count(prices_df, config, 
     full_metrics_df, partial_time_series_metrics_df = cwm.generate_time_series_metrics(
         time_series_df=prices_df,
         config=config,
-        metrics_config=metrics_config,
-        dataset_key=dataset_key,
+        value_column_metrics_config=metrics_config['time_series']['prices']['price']['metrics'],
         value_column=value_column
     )
 
-    # Check that the number of rows in the result matches the input
-    assert len(full_metrics_df) == expected_rows, "The number of rows in the output does not match the input DataFrame."
+    # Check that the number of rows in the result matches the expected number of rows
+    assert len(full_metrics_df) == expected_rows, "The number of rows in the output does not match the expected number of rows."
 
     # Check that there are no null values in the result
     assert not full_metrics_df.isnull().values.any(), "The output DataFrame contains null values."

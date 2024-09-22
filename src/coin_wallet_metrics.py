@@ -336,9 +336,7 @@ def generate_time_series_metrics(
     - config: The full general config file containing training_period_start and
         training_period_end.
     - value_column_metrics_config: The metrics_config subcomponent with the parameters for the
-        value_column, e.g. metrics_config['time_series']['prices']['price']
-    - dataset_category (string): The dataset's category in the metrics_config['datasets'] section.
-    - dataset_key (string): The dataset's key in the metrics_config['time_series'] section.
+        value_column, e.g. metrics_config['time_series']['prices']['price']['metrics']
     - value_column (string): The name of the column used to calculate the metrics (e.g., 'price').
     - id_column (Optional[string]): The name of the column used to identify different series
         (e.g., 'coin_id'). If None, assumes a single time series.
@@ -358,6 +356,7 @@ def generate_time_series_metrics(
     if time_series_df[value_column].isnull().any():
         raise ValueError(f"The '{value_column}' column contains null values, which are not allowed.")
 
+    time_series_df = time_series_df.copy()
     time_series_df['date'] = pd.to_datetime(time_series_df['date'])
     training_period_start = pd.to_datetime(config['training_data']['training_period_start'])
     training_period_end = pd.to_datetime(config['training_data']['training_period_end'])
@@ -374,7 +373,7 @@ def generate_time_series_metrics(
     else:
         # Single time series data
         time_series_df = time_series_df.sort_values(by=['date'])
-        groupby_column = 'group_all' # dummy column to group all records on
+        groupby_column = lambda x: True # Group all rows on dummy column    # pylint: disable=C3001
 
     for _, group in time_series_df.groupby(groupby_column):
         for metric, config in value_column_metrics_config.items():
@@ -382,20 +381,16 @@ def generate_time_series_metrics(
 
             if metric == 'sma':
                 sma = calculate_sma(group[value_column], period)
-                time_series_df.loc[group.index, metric] = sma
+                time_series_df.loc[group.index, f"{value_column}_{metric}"] = sma
             elif metric == 'ema':
                 ema = calculate_ema(group[value_column], period)
-                time_series_df.loc[group.index, metric] = ema
-
-    dynamic_cols = list(value_column_metrics_config.keys())
-    base_cols = [col for col in ['date', value_column, id_column] if col is not None]
-    time_series_metrics_df = time_series_df[base_cols + dynamic_cols]
+                time_series_df.loc[group.index, f"{value_column}_{metric}"] = ema
 
 
     # 3. Split records by complete vs partial time series coverage
     # ------------------------------------------------------------
     full_metrics_df, partial_time_series_metrics_df, coverage_stats = split_dataframe_by_coverage(
-        time_series_metrics_df, training_period_start, training_period_end, id_column
+        time_series_df, training_period_start, training_period_end, id_column
     )
 
     # Logging
