@@ -96,25 +96,29 @@ def flatten_coin_date_df(df, df_metrics_config, training_period_end):
 
         # Flatten the features for this coin
         flat_features = flatten_date_features(coin_df, df_metrics_config)
+
+        # Add coin_id to the flattened features
+        flat_features['coin_id'] = coin_id
+
         all_flat_features.append(flat_features)
 
     # Convert the list of feature dictionaries into a DataFrame
     flattened_df = pd.DataFrame(all_flat_features)
 
-    logger.info('Flattened input df into coin-level features with shape %s after %.2f seconds.'
-                , flattened_df.shape, time.time() - start_time)
+    logger.info('Flattened input df into coin-level features with shape %s after %.2f seconds.',
+                flattened_df.shape, time.time() - start_time)
 
 
     return flattened_df
 
 
 
-def flatten_date_features(coin_df, df_metrics_config):
+def flatten_date_features(time_series_df, df_metrics_config):
     """
     Flattens all relevant time series metrics for a single coin into a row of features.
 
     Params:
-    - coin_df (pd.DataFrame): DataFrame with time series data for a single coin (coin_id-date).
+    - time_series_df (pd.DataFrame): DataFrame keyed on date with a time series dataset
     - df_metrics_config (dict): Configuration object with metric rules from the metrics file for
         the specific input df.
 
@@ -122,45 +126,27 @@ def flatten_date_features(coin_df, df_metrics_config):
     - flat_features (dict): A dictionary of flattened features for the coin.
 
     Raises:
-    - KeyError: If a metric in the DataFrame is not found in the configuration.
     - ValueError: If an expected column (e.g., a metric) is missing from the DataFrame.
     """
-    # Check if the required 'coin_id' column is present
-    if 'coin_id' not in coin_df.columns:
-        raise ValueError("The input DataFrame is missing the required 'coin_id' column.")
-
-    flat_features = {'coin_id': coin_df['coin_id'].iloc[0]}  # Initialize with coin_id
+    flat_features = {}
 
     # Apply global stats calculations for each metric
     for metric, config in df_metrics_config.items():
-        if metric not in coin_df.columns:
+        if metric not in time_series_df.columns:
             raise ValueError(f"Metric '{metric}' is missing from the input DataFrame.")
 
-        ts = coin_df[metric].copy()  # Get the time series for this metric
+        ts = time_series_df[metric].copy()  # Get the time series for this metric
 
         # Standard aggregations
         if 'aggregations' in config:
             for agg in config['aggregations']:
-                if agg == 'sum':
-                    flat_features[f'{metric}_sum'] = ts.sum()
-                elif agg == 'mean':
-                    flat_features[f'{metric}_mean'] = ts.mean()
-                elif agg == 'median':
-                    flat_features[f'{metric}_median'] = ts.median()
-                elif agg == 'min':
-                    flat_features[f'{metric}_min'] = ts.min()
-                elif agg == 'max':
-                    flat_features[f'{metric}_max'] = ts.max()
-                elif agg == 'std':
-                    flat_features[f'{metric}_std'] = ts.std()
-                else:
-                    raise KeyError(f"Aggregation '{agg}' for metric '{metric}' is not recognized.")
+                flat_features[f'{metric}_{agg}'] = calculate_stat(ts, agg)
 
         # Rolling window calculations
         rolling = config.get('rolling', False)
         if rolling:
-            rolling_stats = config['rolling']['stats']  # Get rolling stats
-            comparisons = config['rolling'].get('comparisons', [])  # Get comparisons
+            rolling_stats = config['rolling']['stats']
+            comparisons = config['rolling'].get('comparisons', [])
             window_duration = config['rolling']['window_duration']
             lookback_periods = config['rolling']['lookback_periods']
 
@@ -170,7 +156,6 @@ def flatten_date_features(coin_df, df_metrics_config):
             flat_features.update(rolling_features)
 
     return flat_features
-
 
 
 def calculate_rolling_window_features(
@@ -310,33 +295,30 @@ def calculate_global_stats(ts, metric_name, config):
 
 def calculate_stat(ts, stat):
     """
-    Helper function to calculate a given statistic for a time series.
+    Centralized function to calculate various aggregations on a time series.
 
-    Params:
-    - ts (pd.Series): Time series data.
-    - stat (str): The statistic to calculate (e.g., 'sum', 'mean').
+    Parameters:
+    - ts (pd.Series): The time series to aggregate.
+    - stat (str): The type of aggregation to perform.
 
     Returns:
-    - The calculated statistic value.
-
-    Raises:
-    - KeyError: If the statistic is not recognized.
+    - The calculated aggregation value.
     """
-    if stat == 'sum':
-        return ts.sum()
-    elif stat == 'mean':
-        return ts.mean()
-    elif stat == 'median':
-        return ts.median()
-    elif stat == 'std':
-        return ts.std()
-    elif stat == 'max':
-        return ts.max()
-    elif stat == 'min':
-        return ts.min()
-    else:
-        raise KeyError(f"Invalid statistic: '{stat}'")
+    agg_functions = {
+        'sum': ts.sum,
+        'mean': ts.mean,
+        'median': ts.median,
+        'std': ts.std,
+        'max': ts.max,
+        'min': ts.min,
+        'first': lambda: ts.iloc[0],
+        'last': lambda: ts.iloc[-1]
+    }
 
+    if stat not in agg_functions:
+        raise KeyError(f"Unsupported aggregation type: '{stat}'.")
+
+    return agg_functions[stat]()
 
 
 def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_period_start):

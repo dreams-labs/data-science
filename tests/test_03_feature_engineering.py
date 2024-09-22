@@ -373,13 +373,8 @@ def test_fe_flatten_date_features():
         }
         fe.flatten_date_features(sample_coin_df_invalid, metrics_config_invalid)
 
-    # Test Case 3: Missing 'coin_id' column in DataFrame
-    with pytest.raises(ValueError, match="The input DataFrame is missing the required 'coin_id' column."):
-        sample_coin_df_no_id = sample_coin_df.drop(columns=['coin_id'])
-        fe.flatten_date_features(sample_coin_df_no_id, metrics_config)
-
-    # Test Case 4: Invalid aggregation function
-    with pytest.raises(KeyError, match="Aggregation 'invalid_agg' for metric 'buyers_new' is not recognized"):
+    # Test Case 3: Invalid aggregation function
+    with pytest.raises(KeyError, match="Unsupported aggregation type: 'invalid_agg'."):
         metrics_config_invalid_agg = {
             'buyers_new': {
                 'aggregations': ['invalid_agg']
@@ -387,7 +382,7 @@ def test_fe_flatten_date_features():
         }
         fe.flatten_date_features(sample_coin_df, metrics_config_invalid_agg)
 
-    # Test Case 5: Rolling window metrics
+    # Test Case 4: Rolling window metrics
     rolling_features = fe.flatten_date_features(sample_coin_df, metrics_config)
 
     assert 'buyers_new_sum_3d_period_1' in rolling_features  # Ensure rolling stats are calculated
