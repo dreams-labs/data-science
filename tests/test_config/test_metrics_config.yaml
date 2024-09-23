@@ -115,10 +115,6 @@ time_series:
           aggregations:
             std:
               scaling: "standard"
-    volume:
-      sma:
-        parameters:
-          period: 15
 
 # Time series keyed on only date
 macro_series:
@@ -132,21 +128,16 @@ macro_series:
             period: 10
           aggregations:
             std:
-              scaling: "standard"
         sma:
           parameters:
             period: 20
       aggregations:
         first:
-          scaling: "standard"
         last:
-          scaling: "standard"
         std:
-          scaling: "standard"
       rolling:
         comparisons:
           pct_change:
-            scaling: "none"        # No scaling for percentage change, as it's already normalized.
         window_duration: 14
         lookback_periods: 4
     cryptocurrency_worldwide:
@@ -156,17 +147,12 @@ macro_series:
             period: 10
           aggregations:
             std:
-              scaling: "standard"
       aggregations:
         first:
-          scaling: "standard"
         last:
-          scaling: "standard"
         std:
-          scaling: "standard"
       rolling:
         comparisons:
           pct_change:
-            scaling: "none"        # No scaling for percentage change, as it's already normalized.
         window_duration: 14
         lookback_periods: 4

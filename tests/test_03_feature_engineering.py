@@ -503,14 +503,6 @@ def mock_coin_df():
     return pd.DataFrame(data)
 
 @pytest.fixture
-def mock_no_coin_id_df():
-    """
-    Mock DataFrame without a 'coin_id' column
-    """
-    data = {'coin': ['BTC', 'ETH'], 'buyers_new': [50000, 4000]}
-    return pd.DataFrame(data)
-
-@pytest.fixture
 def mock_non_unique_coin_id_df():
     """
     Mock DataFrame with non-unique 'coin_id' values (keyed on coin_id-date)
@@ -540,19 +532,6 @@ def test_save_flattened_outputs(mock_coin_df):
 
     # Cleanup (remove the test file after the test)
     os.remove(saved_file_path)
-
-@pytest.mark.unit
-def test_save_flattened_outputs_no_coin_id(mock_no_coin_id_df):
-    """
-    Confirms that the function raises a ValueError if 'coin_id' column is missing
-    """
-    test_output_path = os.path.join(os.getcwd(), "tests", "test_modeling", "outputs", "flattened_outputs")
-    metric_description = 'buysell'
-    modeling_period_start = '2024-04-01'
-
-    # Check for the ValueError due to missing 'coin_id' column
-    with pytest.raises(ValueError, match="The DataFrame must contain a 'coin_id' column."):
-        fe.save_flattened_outputs(mock_no_coin_id_df, test_output_path, metric_description, modeling_period_start)
 
 @pytest.mark.unit
 def test_save_flattened_outputs_non_unique_coin_id(mock_non_unique_coin_id_df):

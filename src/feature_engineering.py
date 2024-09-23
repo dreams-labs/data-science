@@ -321,28 +321,26 @@ def calculate_stat(ts, stat):
     return agg_functions[stat]()
 
 
-def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_period_start):
+def save_flattened_outputs(flattened_df, output_dir, metric_description, modeling_period_start):
     """
     Saves the flattened DataFrame with descriptive metrics into a CSV file.
 
     Params:
-    - coin_df (pd.DataFrame): The DataFrame containing flattened data.
+    - flattened_df (pd.DataFrame): The DataFrame containing flattened data.
     - output_dir (str): Directory where the CSV file will be saved.
     - metric_description (str): Description of metrics (e.g., 'buysell_metrics').
     - modeling_period_start (str): Start of the modeling period (e.g., '2023-01-01').
     - description (str, optional): A description to be added to the filename.
 
     Returns:
-    - coin_df (pd.DataFrame): The same DataFrame that was passed in.
+    - flattened_df (pd.DataFrame): The same DataFrame that was passed in.
     - output_path (str): The full path to the saved CSV file.
     """
 
-    # Check if 'coin_id' exists and is fully unique
-    if 'coin_id' not in coin_df.columns:
-        raise ValueError("The DataFrame must contain a 'coin_id' column.")
-
-    if not coin_df['coin_id'].is_unique:
-        raise ValueError("The 'coin_id' column must have fully unique values.")
+    # if the coin_id column exists, confirm it is fully unique
+    if 'coin_id' in flattened_df.columns:
+        if not flattened_df['coin_id'].is_unique:
+            raise ValueError("The 'coin_id' column must have fully unique values.")
 
     # Define filename with metric description and optional description
     timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M')
@@ -350,11 +348,11 @@ def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_per
 
     # Save file
     output_path = os.path.join(output_dir, filename)
-    coin_df.to_csv(output_path, index=False)
+    flattened_df.to_csv(output_path, index=False)
 
     logger.debug("Saved flattened outputs to %s", output_path)
 
-    return coin_df, output_path
+    return flattened_df, output_path
 
 
 
@@ -405,7 +403,8 @@ def preprocess_coin_df(input_path, modeling_config, dataset_config, df_metrics_c
     for column in df.columns:
         if column not in retain_columns:
             max_value_ratio = df[column].value_counts(normalize=True).max()
-            if max_value_ratio >= sameness_threshold:
+            if max_value_ratio > sameness_threshold:
+                print(f"max_value_ratio:{max_value_ratio}, sameness_threshold:{sameness_threshold}")
                 df = df.drop(columns=[column])
                 logger.info("Dropped column %s due to sameness_threshold", column)
 
@@ -455,6 +454,10 @@ def apply_scaling(df, df_metrics_config):
 
     # Loop through each metric and its settings in the df_metrics_config
     for metric, settings in df_metrics_config.items():
+
+        # if there are not aggregations for the metric, continue
+        if 'aggregations' not in settings.keys():
+            continue
         for agg, agg_settings in settings['aggregations'].items():
             # Ensure agg_settings exists and is not None
             if not agg_settings:
@@ -482,7 +485,7 @@ def apply_scaling(df, df_metrics_config):
 def create_training_data_df(
     modeling_folder: str,
     input_file_tuples: list[tuple[str, str]]
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Merges specified preprocessed output CSVs into a single DataFrame, applies fill strategies,
     and ensures consistency of coin_ids across datasets. Adds suffixes to column names to
@@ -538,20 +541,20 @@ def create_training_data_df(
         print(file_path)
         if os.path.exists(file_path):
             df = pd.read_csv(file_path)
-            print(df.shape)
-            # Check if coin_id column exists; raise an error if missing
-            if 'coin_id' not in df.columns:
-                raise ValueError(f"coin_id column is missing in {filename}")
 
-            # Raise an error if there are duplicate coin_ids in the file
-            if df['coin_id'].duplicated().any():
-                raise ValueError(f"Duplicate coin_ids found in file: {filename}")
+            # Check if coin_id column exists if the fill strategy requires it
+            if fill_strategy in ['drop_records','fill_zeros']:
+                if 'coin_id' not in df.columns:
+                    raise ValueError(f"coin_id column is missing in {filename}")
+
+                # Raise an error if there are duplicate coin_ids in the file
+                if df['coin_id'].duplicated().any():
+                    raise ValueError(f"Duplicate coin_ids found in file: {filename}")
 
             # Extract the date string from the filename
             match = date_pattern.search(filename)
             if not match:
                 raise ValueError(f"No valid date string found in the filename: {filename}")
-
             date_string = match.group()  # e.g., '2024-09-13_14-44'
             metric_string = filename.split(date_string)[0].rstrip('_')
 
@@ -621,31 +624,34 @@ def merge_and_fill_training_data(
     # Pull a unique set of all coin_ids across all DataFrames
     all_coin_ids = set()
     for df, _, _ in df_list:
-        all_coin_ids.update(df['coin_id'].unique())
+        if 'coin_id' in df.columns:
+            all_coin_ids.update(df['coin_id'].unique())
 
-    # Convert set of coin_ids to a DataFrame
-    all_coin_ids_df = pd.DataFrame(all_coin_ids, columns=['coin_id'])
-
-    # Start merging with the full set of coin_ids
-    training_data_df = all_coin_ids_df
+    # Start merging with the full set of coin_ids in a DataFrame
+    training_data_df = pd.DataFrame(all_coin_ids, columns=['coin_id'])
 
     # Iterate through df_list and merge each one
     for df, fill_strategy, filename in df_list:
-        original_coin_ids = set(df['coin_id'].unique())  # Track original coin_ids
 
-        # Merge with the full coin_id set (outer join)
-        training_data_df = pd.merge(training_data_df, df, on='coin_id', how='outer')
+        # if the df is a macro_series without a coin_id, cross join it to all coin_ids
+        if fill_strategy == 'expand':
+            original_coin_ids = set()
+            training_data_df = training_data_df.merge(df, how='cross')
 
-        # Apply the fill strategy
-        if fill_strategy == 'fill_zeros':
-            # Fill missing values with 0
-            training_data_df.fillna(0, inplace=True)
-        elif fill_strategy == 'drop_records':
-            # Drop rows with missing values for this DataFrame's columns
-            training_data_df.dropna(inplace=True)
         else:
-            raise ValueError("Invalid fill strategy listed. Valid strategies include "
-                             "['fill_zeros','drop_records']")
+            # Merge with the full coin_id set (outer join)
+            original_coin_ids = set(df['coin_id'].unique())  # Track original coin_ids
+            training_data_df = pd.merge(training_data_df, df, on='coin_id', how='outer')
+
+            # Apply the fill strategy
+            if fill_strategy == 'fill_zeros':
+                # Fill missing values with 0
+                training_data_df.fillna(0, inplace=True)
+            elif fill_strategy == 'drop_records':
+                # Drop rows with missing values for this DataFrame's columns
+                training_data_df.dropna(inplace=True)
+            else:
+                raise ValueError(f"Invalid fill strategy '{fill_strategy}' found in config.yaml.")
 
         # Calculate log details
         final_coin_ids = set(training_data_df['coin_id'].unique())

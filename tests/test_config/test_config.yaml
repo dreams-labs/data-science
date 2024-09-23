@@ -39,7 +39,6 @@ datasets:
     google_trends:
       description: 'google_trends'  # prefix that will be included in feature columns
       fill_method: 'expand'
-      sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
 
 
   # Keyed on only coin_id
