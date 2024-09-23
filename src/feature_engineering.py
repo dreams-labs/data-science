@@ -145,7 +145,7 @@ def flatten_date_features(time_series_df, df_metrics_config):
         # Rolling window calculations
         rolling = config.get('rolling', False)
         if rolling:
-            rolling_stats = config['rolling']['stats']
+            rolling_stats = config['rolling'].get('stats', [])
             comparisons = config['rolling'].get('comparisons', [])
             window_duration = config['rolling']['window_duration']
             lookback_periods = config['rolling']['lookback_periods']

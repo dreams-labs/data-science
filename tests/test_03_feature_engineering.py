@@ -137,11 +137,16 @@ def test_fe_calculate_global_stats():
     Unit tests for the fe.calculate_global_stats() function.
 
     Test Cases:
-    1. **Basic case**: Tests that 'sum' and 'mean' statistics are calculated correctly for a simple time series.
-    2. **Multiple metrics**: Verifies that different metrics with different configurations of stats (e.g., 'sum', 'mean', 'median', 'std') are handled properly.
-    3. **Empty time series**: Ensures that an empty time series is handled correctly, returning NaN for mean and 0 for sum.
-    4. **Edge case (single value)**: Tests the function's behavior when the time series contains only a single value.
-    5. **No stats in config**: Ensures that when no stats are defined for a metric, the function returns an empty dictionary without errors.
+    1. **Basic case**: Tests that 'sum' and 'mean' statistics are calculated correctly for a
+        simple time series.
+    2. **Multiple metrics**: Verifies that different metrics with different configurations of
+        stats (e.g., 'sum', 'mean', 'median', 'std') are handled properly.
+    3. **Empty time series**: Ensures that an empty time series is handled correctly, returning
+        NaN for mean and 0 for sum.
+    4. **Edge case (single value)**: Tests the function's behavior when the time series contains
+        only a single value.
+    5. **No stats in config**: Ensures that when no stats are defined for a metric, the function
+        returns an empty dictionary without errors.
     """
 
     # Sample configurations and time series for testing
@@ -414,7 +419,14 @@ def test_fe_flatten_coin_date_df():
     """
     # Sample data for testing
     sample_df = pd.DataFrame({
-        'date': [pd.Timestamp('2024-01-01'), pd.Timestamp('2024-01-02'), pd.Timestamp('2024-01-03'), pd.Timestamp('2024-01-01'), pd.Timestamp('2024-01-02'), pd.Timestamp('2024-01-03')],
+        'date': [
+            pd.Timestamp('2024-01-01'),
+            pd.Timestamp('2024-01-02'),
+            pd.Timestamp('2024-01-03'),
+            pd.Timestamp('2024-01-01'),
+            pd.Timestamp('2024-01-02'),
+            pd.Timestamp('2024-01-03')
+            ],
         'coin_id': [1, 1, 1, 2, 2, 2],
         'buyers_new': [10, 20, 30, 40, 50, 60],
         'sellers_new': [5, 10, 15, 20, 25, 30]
