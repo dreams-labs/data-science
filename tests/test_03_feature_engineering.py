@@ -137,11 +137,16 @@ def test_fe_calculate_global_stats():
     Unit tests for the fe.calculate_global_stats() function.
 
     Test Cases:
-    1. **Basic case**: Tests that 'sum' and 'mean' statistics are calculated correctly for a simple time series.
-    2. **Multiple metrics**: Verifies that different metrics with different configurations of stats (e.g., 'sum', 'mean', 'median', 'std') are handled properly.
-    3. **Empty time series**: Ensures that an empty time series is handled correctly, returning NaN for mean and 0 for sum.
-    4. **Edge case (single value)**: Tests the function's behavior when the time series contains only a single value.
-    5. **No stats in config**: Ensures that when no stats are defined for a metric, the function returns an empty dictionary without errors.
+    1. **Basic case**: Tests that 'sum' and 'mean' statistics are calculated correctly for a
+        simple time series.
+    2. **Multiple metrics**: Verifies that different metrics with different configurations of
+        stats (e.g., 'sum', 'mean', 'median', 'std') are handled properly.
+    3. **Empty time series**: Ensures that an empty time series is handled correctly, returning
+        NaN for mean and 0 for sum.
+    4. **Edge case (single value)**: Tests the function's behavior when the time series contains
+        only a single value.
+    5. **No stats in config**: Ensures that when no stats are defined for a metric, the function
+        returns an empty dictionary without errors.
     """
 
     # Sample configurations and time series for testing
@@ -373,13 +378,8 @@ def test_fe_flatten_date_features():
         }
         fe.flatten_date_features(sample_coin_df_invalid, metrics_config_invalid)
 
-    # Test Case 3: Missing 'coin_id' column in DataFrame
-    with pytest.raises(ValueError, match="The input DataFrame is missing the required 'coin_id' column."):
-        sample_coin_df_no_id = sample_coin_df.drop(columns=['coin_id'])
-        fe.flatten_date_features(sample_coin_df_no_id, metrics_config)
-
-    # Test Case 4: Invalid aggregation function
-    with pytest.raises(KeyError, match="Aggregation 'invalid_agg' for metric 'buyers_new' is not recognized"):
+    # Test Case 3: Invalid aggregation function
+    with pytest.raises(KeyError, match="Unsupported aggregation type: 'invalid_agg'."):
         metrics_config_invalid_agg = {
             'buyers_new': {
                 'aggregations': ['invalid_agg']
@@ -387,7 +387,7 @@ def test_fe_flatten_date_features():
         }
         fe.flatten_date_features(sample_coin_df, metrics_config_invalid_agg)
 
-    # Test Case 5: Rolling window metrics
+    # Test Case 4: Rolling window metrics
     rolling_features = fe.flatten_date_features(sample_coin_df, metrics_config)
 
     assert 'buyers_new_sum_3d_period_1' in rolling_features  # Ensure rolling stats are calculated
@@ -419,7 +419,14 @@ def test_fe_flatten_coin_date_df():
     """
     # Sample data for testing
     sample_df = pd.DataFrame({
-        'date': [pd.Timestamp('2024-01-01'), pd.Timestamp('2024-01-02'), pd.Timestamp('2024-01-03'), pd.Timestamp('2024-01-01'), pd.Timestamp('2024-01-02'), pd.Timestamp('2024-01-03')],
+        'date': [
+            pd.Timestamp('2024-01-01'),
+            pd.Timestamp('2024-01-02'),
+            pd.Timestamp('2024-01-03'),
+            pd.Timestamp('2024-01-01'),
+            pd.Timestamp('2024-01-02'),
+            pd.Timestamp('2024-01-03')
+            ],
         'coin_id': [1, 1, 1, 2, 2, 2],
         'buyers_new': [10, 20, 30, 40, 50, 60],
         'sellers_new': [5, 10, 15, 20, 25, 30]
@@ -496,14 +503,6 @@ def mock_coin_df():
     return pd.DataFrame(data)
 
 @pytest.fixture
-def mock_no_coin_id_df():
-    """
-    Mock DataFrame without a 'coin_id' column
-    """
-    data = {'coin': ['BTC', 'ETH'], 'buyers_new': [50000, 4000]}
-    return pd.DataFrame(data)
-
-@pytest.fixture
 def mock_non_unique_coin_id_df():
     """
     Mock DataFrame with non-unique 'coin_id' values (keyed on coin_id-date)
@@ -533,19 +532,6 @@ def test_save_flattened_outputs(mock_coin_df):
 
     # Cleanup (remove the test file after the test)
     os.remove(saved_file_path)
-
-@pytest.mark.unit
-def test_save_flattened_outputs_no_coin_id(mock_no_coin_id_df):
-    """
-    Confirms that the function raises a ValueError if 'coin_id' column is missing
-    """
-    test_output_path = os.path.join(os.getcwd(), "tests", "test_modeling", "outputs", "flattened_outputs")
-    metric_description = 'buysell'
-    modeling_period_start = '2024-04-01'
-
-    # Check for the ValueError due to missing 'coin_id' column
-    with pytest.raises(ValueError, match="The DataFrame must contain a 'coin_id' column."):
-        fe.save_flattened_outputs(mock_no_coin_id_df, test_output_path, metric_description, modeling_period_start)
 
 @pytest.mark.unit
 def test_save_flattened_outputs_non_unique_coin_id(mock_non_unique_coin_id_df):
@@ -674,7 +660,7 @@ def test_preprocess_coin_df_scaling(mock_modeling_config, mock_metrics_config, m
 # ------------------------------------------ #
 
 @pytest.fixture
-def mock_input_files_colnames(tmpdir):
+def mock_input_files_value_columns(tmpdir):
     """
     Unit test data for scenario with many duplicate columns and similar filenames.
     """
@@ -707,11 +693,11 @@ def mock_input_files_colnames(tmpdir):
     return tmpdir, input_files
 
 @pytest.mark.unit
-def test_create_training_data_df(mock_input_files_colnames):
+def test_create_training_data_df(mock_input_files_value_columns):
     """
     Test column renaming logic for clarity when merging multiple files with similar filenames.
     """
-    tmpdir, input_files = mock_input_files_colnames
+    tmpdir, input_files = mock_input_files_value_columns
 
     # Call the function using tmpdir as the modeling_folder
     merged_df, _ = fe.create_training_data_df(tmpdir, input_files)

@@ -706,3 +706,33 @@ def generate_coin_metadata_features(metadata_df, config):
     logger.info("Generated coin_metadata_features_df.")
 
     return metadata_features_df
+
+
+
+def retrieve_google_trends_data():
+    """
+    Retrieves Google Trends data from the macro_trends dataset. Because the data is weekly, it also
+    resamples to daily records using linear interpolation.
+
+    Returns:
+    - google_trends_df: DataFrame keyed on date containing Google Trends values for multiple terms
+    """
+    query_sql = '''
+        select *
+        from `macro_trends.google_trends`
+        order by date
+    '''
+
+    # Run the SQL query using dgc's run_sql method
+    google_trends_df = dgc().run_sql(query_sql)
+    logger.info('retrieved Google Trends data with shape %s',google_trends_df.shape)
+
+    # Convert the date column to datetime format
+    google_trends_df['date'] = pd.to_datetime(google_trends_df['date'])
+
+    # Resample the df to fill in missing days by using date as the index
+    google_trends_df.set_index('date', inplace=True)
+    google_trends_df = google_trends_df.resample('D').interpolate(method='linear')
+    google_trends_df.reset_index(inplace=True)
+
+    return google_trends_df

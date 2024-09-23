@@ -96,25 +96,29 @@ def flatten_coin_date_df(df, df_metrics_config, training_period_end):
 
         # Flatten the features for this coin
         flat_features = flatten_date_features(coin_df, df_metrics_config)
+
+        # Add coin_id to the flattened features
+        flat_features['coin_id'] = coin_id
+
         all_flat_features.append(flat_features)
 
     # Convert the list of feature dictionaries into a DataFrame
     flattened_df = pd.DataFrame(all_flat_features)
 
-    logger.info('Flattened input df into coin-level features with shape %s after %.2f seconds.'
-                , flattened_df.shape, time.time() - start_time)
+    logger.info('Flattened input df into coin-level features with shape %s after %.2f seconds.',
+                flattened_df.shape, time.time() - start_time)
 
 
     return flattened_df
 
 
 
-def flatten_date_features(coin_df, df_metrics_config):
+def flatten_date_features(time_series_df, df_metrics_config):
     """
     Flattens all relevant time series metrics for a single coin into a row of features.
 
     Params:
-    - coin_df (pd.DataFrame): DataFrame with time series data for a single coin (coin_id-date).
+    - time_series_df (pd.DataFrame): DataFrame keyed on date with a time series dataset
     - df_metrics_config (dict): Configuration object with metric rules from the metrics file for
         the specific input df.
 
@@ -122,45 +126,27 @@ def flatten_date_features(coin_df, df_metrics_config):
     - flat_features (dict): A dictionary of flattened features for the coin.
 
     Raises:
-    - KeyError: If a metric in the DataFrame is not found in the configuration.
     - ValueError: If an expected column (e.g., a metric) is missing from the DataFrame.
     """
-    # Check if the required 'coin_id' column is present
-    if 'coin_id' not in coin_df.columns:
-        raise ValueError("The input DataFrame is missing the required 'coin_id' column.")
-
-    flat_features = {'coin_id': coin_df['coin_id'].iloc[0]}  # Initialize with coin_id
+    flat_features = {}
 
     # Apply global stats calculations for each metric
     for metric, config in df_metrics_config.items():
-        if metric not in coin_df.columns:
+        if metric not in time_series_df.columns:
             raise ValueError(f"Metric '{metric}' is missing from the input DataFrame.")
 
-        ts = coin_df[metric].copy()  # Get the time series for this metric
+        ts = time_series_df[metric].copy()  # Get the time series for this metric
 
         # Standard aggregations
         if 'aggregations' in config:
             for agg in config['aggregations']:
-                if agg == 'sum':
-                    flat_features[f'{metric}_sum'] = ts.sum()
-                elif agg == 'mean':
-                    flat_features[f'{metric}_mean'] = ts.mean()
-                elif agg == 'median':
-                    flat_features[f'{metric}_median'] = ts.median()
-                elif agg == 'min':
-                    flat_features[f'{metric}_min'] = ts.min()
-                elif agg == 'max':
-                    flat_features[f'{metric}_max'] = ts.max()
-                elif agg == 'std':
-                    flat_features[f'{metric}_std'] = ts.std()
-                else:
-                    raise KeyError(f"Aggregation '{agg}' for metric '{metric}' is not recognized.")
+                flat_features[f'{metric}_{agg}'] = calculate_stat(ts, agg)
 
         # Rolling window calculations
         rolling = config.get('rolling', False)
         if rolling:
-            rolling_stats = config['rolling']['stats']  # Get rolling stats
-            comparisons = config['rolling'].get('comparisons', [])  # Get comparisons
+            rolling_stats = config['rolling'].get('stats', [])
+            comparisons = config['rolling'].get('comparisons', [])
             window_duration = config['rolling']['window_duration']
             lookback_periods = config['rolling']['lookback_periods']
 
@@ -170,7 +156,6 @@ def flatten_date_features(coin_df, df_metrics_config):
             flat_features.update(rolling_features)
 
     return flat_features
-
 
 
 def calculate_rolling_window_features(
@@ -310,57 +295,52 @@ def calculate_global_stats(ts, metric_name, config):
 
 def calculate_stat(ts, stat):
     """
-    Helper function to calculate a given statistic for a time series.
+    Centralized function to calculate various aggregations on a time series.
 
-    Params:
-    - ts (pd.Series): Time series data.
-    - stat (str): The statistic to calculate (e.g., 'sum', 'mean').
+    Parameters:
+    - ts (pd.Series): The time series to aggregate.
+    - stat (str): The type of aggregation to perform.
 
     Returns:
-    - The calculated statistic value.
-
-    Raises:
-    - KeyError: If the statistic is not recognized.
+    - The calculated aggregation value.
     """
-    if stat == 'sum':
-        return ts.sum()
-    elif stat == 'mean':
-        return ts.mean()
-    elif stat == 'median':
-        return ts.median()
-    elif stat == 'std':
-        return ts.std()
-    elif stat == 'max':
-        return ts.max()
-    elif stat == 'min':
-        return ts.min()
-    else:
-        raise KeyError(f"Invalid statistic: '{stat}'")
+    agg_functions = {
+        'sum': ts.sum,
+        'mean': ts.mean,
+        'median': ts.median,
+        'std': ts.std,
+        'max': ts.max,
+        'min': ts.min,
+        'first': lambda: ts.iloc[0],
+        'last': lambda: ts.iloc[-1]
+    }
+
+    if stat not in agg_functions:
+        raise KeyError(f"Unsupported aggregation type: '{stat}'.")
+
+    return agg_functions[stat]()
 
 
-
-def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_period_start):
+def save_flattened_outputs(flattened_df, output_dir, metric_description, modeling_period_start):
     """
     Saves the flattened DataFrame with descriptive metrics into a CSV file.
 
     Params:
-    - coin_df (pd.DataFrame): The DataFrame containing flattened data.
+    - flattened_df (pd.DataFrame): The DataFrame containing flattened data.
     - output_dir (str): Directory where the CSV file will be saved.
     - metric_description (str): Description of metrics (e.g., 'buysell_metrics').
     - modeling_period_start (str): Start of the modeling period (e.g., '2023-01-01').
     - description (str, optional): A description to be added to the filename.
 
     Returns:
-    - coin_df (pd.DataFrame): The same DataFrame that was passed in.
+    - flattened_df (pd.DataFrame): The same DataFrame that was passed in.
     - output_path (str): The full path to the saved CSV file.
     """
 
-    # Check if 'coin_id' exists and is fully unique
-    if 'coin_id' not in coin_df.columns:
-        raise ValueError("The DataFrame must contain a 'coin_id' column.")
-
-    if not coin_df['coin_id'].is_unique:
-        raise ValueError("The 'coin_id' column must have fully unique values.")
+    # if the coin_id column exists, confirm it is fully unique
+    if 'coin_id' in flattened_df.columns:
+        if not flattened_df['coin_id'].is_unique:
+            raise ValueError("The 'coin_id' column must have fully unique values.")
 
     # Define filename with metric description and optional description
     timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M')
@@ -368,11 +348,11 @@ def save_flattened_outputs(coin_df, output_dir, metric_description, modeling_per
 
     # Save file
     output_path = os.path.join(output_dir, filename)
-    coin_df.to_csv(output_path, index=False)
+    flattened_df.to_csv(output_path, index=False)
 
     logger.debug("Saved flattened outputs to %s", output_path)
 
-    return coin_df, output_path
+    return flattened_df, output_path
 
 
 
@@ -423,7 +403,8 @@ def preprocess_coin_df(input_path, modeling_config, dataset_config, df_metrics_c
     for column in df.columns:
         if column not in retain_columns:
             max_value_ratio = df[column].value_counts(normalize=True).max()
-            if max_value_ratio >= sameness_threshold:
+            if max_value_ratio > sameness_threshold:
+                print(f"max_value_ratio:{max_value_ratio}, sameness_threshold:{sameness_threshold}")
                 df = df.drop(columns=[column])
                 logger.info("Dropped column %s due to sameness_threshold", column)
 
@@ -473,6 +454,10 @@ def apply_scaling(df, df_metrics_config):
 
     # Loop through each metric and its settings in the df_metrics_config
     for metric, settings in df_metrics_config.items():
+
+        # if there are not aggregations for the metric, continue
+        if 'aggregations' not in settings.keys():
+            continue
         for agg, agg_settings in settings['aggregations'].items():
             # Ensure agg_settings exists and is not None
             if not agg_settings:
@@ -500,7 +485,7 @@ def apply_scaling(df, df_metrics_config):
 def create_training_data_df(
     modeling_folder: str,
     input_file_tuples: list[tuple[str, str]]
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Merges specified preprocessed output CSVs into a single DataFrame, applies fill strategies,
     and ensures consistency of coin_ids across datasets. Adds suffixes to column names to
@@ -556,20 +541,20 @@ def create_training_data_df(
         print(file_path)
         if os.path.exists(file_path):
             df = pd.read_csv(file_path)
-            print(df.shape)
-            # Check if coin_id column exists; raise an error if missing
-            if 'coin_id' not in df.columns:
-                raise ValueError(f"coin_id column is missing in {filename}")
 
-            # Raise an error if there are duplicate coin_ids in the file
-            if df['coin_id'].duplicated().any():
-                raise ValueError(f"Duplicate coin_ids found in file: {filename}")
+            # Check if coin_id column exists if the fill strategy requires it
+            if fill_strategy in ['drop_records','fill_zeros']:
+                if 'coin_id' not in df.columns:
+                    raise ValueError(f"coin_id column is missing in {filename}")
+
+                # Raise an error if there are duplicate coin_ids in the file
+                if df['coin_id'].duplicated().any():
+                    raise ValueError(f"Duplicate coin_ids found in file: {filename}")
 
             # Extract the date string from the filename
             match = date_pattern.search(filename)
             if not match:
                 raise ValueError(f"No valid date string found in the filename: {filename}")
-
             date_string = match.group()  # e.g., '2024-09-13_14-44'
             metric_string = filename.split(date_string)[0].rstrip('_')
 
@@ -639,31 +624,34 @@ def merge_and_fill_training_data(
     # Pull a unique set of all coin_ids across all DataFrames
     all_coin_ids = set()
     for df, _, _ in df_list:
-        all_coin_ids.update(df['coin_id'].unique())
+        if 'coin_id' in df.columns:
+            all_coin_ids.update(df['coin_id'].unique())
 
-    # Convert set of coin_ids to a DataFrame
-    all_coin_ids_df = pd.DataFrame(all_coin_ids, columns=['coin_id'])
-
-    # Start merging with the full set of coin_ids
-    training_data_df = all_coin_ids_df
+    # Start merging with the full set of coin_ids in a DataFrame
+    training_data_df = pd.DataFrame(all_coin_ids, columns=['coin_id'])
 
     # Iterate through df_list and merge each one
     for df, fill_strategy, filename in df_list:
-        original_coin_ids = set(df['coin_id'].unique())  # Track original coin_ids
 
-        # Merge with the full coin_id set (outer join)
-        training_data_df = pd.merge(training_data_df, df, on='coin_id', how='outer')
+        # if the df is a macro_series without a coin_id, cross join it to all coin_ids
+        if fill_strategy == 'expand':
+            original_coin_ids = set()
+            training_data_df = training_data_df.merge(df, how='cross')
 
-        # Apply the fill strategy
-        if fill_strategy == 'fill_zeros':
-            # Fill missing values with 0
-            training_data_df.fillna(0, inplace=True)
-        elif fill_strategy == 'drop_records':
-            # Drop rows with missing values for this DataFrame's columns
-            training_data_df.dropna(inplace=True)
         else:
-            raise ValueError("Invalid fill strategy listed. Valid strategies include "
-                             "['fill_zeros','drop_records']")
+            # Merge with the full coin_id set (outer join)
+            original_coin_ids = set(df['coin_id'].unique())  # Track original coin_ids
+            training_data_df = pd.merge(training_data_df, df, on='coin_id', how='outer')
+
+            # Apply the fill strategy
+            if fill_strategy == 'fill_zeros':
+                # Fill missing values with 0
+                training_data_df.fillna(0, inplace=True)
+            elif fill_strategy == 'drop_records':
+                # Drop rows with missing values for this DataFrame's columns
+                training_data_df.dropna(inplace=True)
+            else:
+                raise ValueError(f"Invalid fill strategy '{fill_strategy}' found in config.yaml.")
 
         # Calculate log details
         final_coin_ids = set(training_data_df['coin_id'].unique())

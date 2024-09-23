@@ -91,29 +91,68 @@ wallet_cohorts:
         window_duration: 14
         lookback_periods: 4
 
-# New top-level section for time series
+# Time series keyed on coin_id-date
 time_series:
   # Specify which DataFrame the metrics apply to
   prices:
-    sma:
-      parameters:
-        period: 20
+    price:
+      metrics:
+        sma:
+          parameters:
+            period: 20
+          aggregations:
+            std:
+              scaling: "standard"
+          rolling:
+            stats:
+              mean:
+                scaling: "standard"
+            window_duration: 10
+            lookback_periods: 5
+        ema:
+          parameters:
+            period: 10
+          aggregations:
+            std:
+              scaling: "standard"
+
+# Time series keyed on only date
+macro_series:
+  # matches config key
+  google_trends:
+    # matches column names
+    altcoin_worldwide:
+      metrics:
+        ema:
+          parameters:
+            period: 10
+          aggregations:
+            std:
+        sma:
+          parameters:
+            period: 20
       aggregations:
+        first:
+        last:
         std:
-          scaling: "standard"
       rolling:
-        stats:
-          mean:
-            scaling: "standard"
-        window_duration: 10
-        lookback_periods: 5
-    ema:
-      parameters:
-        period: 10
+        comparisons:
+          pct_change:
+        window_duration: 14
+        lookback_periods: 4
+    cryptocurrency_worldwide:
+      metrics:
+        ema:
+          parameters:
+            period: 10
+          aggregations:
+            std:
       aggregations:
+        first:
+        last:
         std:
-          scaling: "standard"
-  volume:
-    sma:
-      parameters:
-        period: 15
+      rolling:
+        comparisons:
+          pct_change:
+        window_duration: 14
+        lookback_periods: 4
