@@ -202,10 +202,20 @@ def flatten_date_features(time_series_df, df_metrics_config):
 
         # Standard aggregations
         if 'aggregations' in config:
-            for agg in config['aggregations']:
-                flat_features[f'{metric}_{agg}'] = calculate_stat(ts, agg)
+            for agg, agg_config in config['aggregations'].items():
+                agg_value = calculate_stat(ts, agg)
 
-        # Rolling window calculations
+                # Generate bucket columns if buckets are specified in the config
+                if 'buckets' in agg_config:
+                    bucket_category = bucketize_value(agg_value, agg_config['buckets'])
+                    flat_features[f'{metric}_{agg}_bucket'] = bucket_category
+
+                # Return the aggregate metric if it is not bucketized
+                else:
+                    flat_features[f'{metric}_{agg}'] = agg_value
+
+
+        # Rolling window calculations (unchanged)
         rolling = config.get('rolling', False)
         if rolling:
             rolling_stats = config['rolling'].get('stats', [])
@@ -218,11 +228,32 @@ def flatten_date_features(time_series_df, df_metrics_config):
                 ts, window_duration, lookback_periods, rolling_stats, comparisons, metric)
             flat_features.update(rolling_features)
 
-
     if not matched_columns:
         raise ValueError("No metrics matched the columns in the DataFrame.")
 
     return flat_features
+
+
+
+def bucketize_value(value, buckets):
+    """
+    Categorizes a value based on the defined buckets.
+
+    Params:
+    - value (float): The value to categorize
+    - buckets (list): List of dictionaries defining the buckets
+
+    Returns:
+    - str: The category the value falls into
+    """
+    for bucket in buckets:
+        for category, threshold in bucket.items():
+            if threshold == "remainder" or value <= threshold:
+                return category
+
+    # This should never be reached if buckets are properly defined
+    raise ValueError(f"Value {value} does not fit in any defined bucket.")
+
 
 
 def calculate_rolling_window_features(
