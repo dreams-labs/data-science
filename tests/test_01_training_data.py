@@ -31,7 +31,7 @@ logger = dc.setup_logger()
 # ===================================================== #
 
 # -------------------------------- #
-# fill_prices_gaps() unit tests
+# fill_market_data_gaps() unit tests
 # -------------------------------- #
 
 @pytest.fixture
@@ -58,7 +58,7 @@ def test_no_gaps(max_gap_days):
     expected_df = prices_df_no_gaps[['date', 'coin_id', 'price']].copy()
 
     # Run the function
-    prices_filled_df, outcomes_df = td.fill_prices_gaps(prices_df_no_gaps, max_gap_days)
+    prices_filled_df, outcomes_df = td.fill_market_data_gaps(prices_df_no_gaps, max_gap_days)
 
     # Reorder columns for comparison
     prices_filled_df = prices_filled_df[['date', 'coin_id', 'price']]
@@ -92,7 +92,7 @@ def test_gaps_below_max(max_gap_days):
     expected_df = pd.DataFrame(expected_data)[['date', 'coin_id', 'price']]
 
     # Run the function
-    prices_filled_df, outcomes_df = td.fill_prices_gaps(prices_df_gaps_below_max, max_gap_days)
+    prices_filled_df, outcomes_df = td.fill_market_data_gaps(prices_df_gaps_below_max, max_gap_days)
 
     # Reorder columns for comparison
     prices_filled_df = prices_filled_df[['date', 'coin_id', 'price']]
@@ -126,7 +126,7 @@ def test_gaps_at_max(max_gap_days):
     expected_df = pd.DataFrame(expected_data)[['date', 'coin_id', 'price']]
 
     # Run the function
-    prices_filled_df, outcomes_df = td.fill_prices_gaps(prices_df_gaps_at_max, max_gap_days)
+    prices_filled_df, outcomes_df = td.fill_market_data_gaps(prices_df_gaps_at_max, max_gap_days)
 
     # Reorder columns for comparison
     prices_filled_df = prices_filled_df[['date', 'coin_id', 'price']]
@@ -158,7 +158,7 @@ def test_gaps_above_max(max_gap_days):
     expected_df = pd.DataFrame(expected_data)[['date', 'coin_id', 'price']]
 
     # Run the function
-    prices_filled_df, outcomes_df = td.fill_prices_gaps(prices_df_gaps_above_max, max_gap_days)
+    prices_filled_df, outcomes_df = td.fill_market_data_gaps(prices_df_gaps_above_max, max_gap_days)
 
     # Assertions
     pd.testing.assert_frame_equal(prices_filled_df, expected_df)
@@ -192,7 +192,7 @@ def test_mixed_gaps(max_gap_days):
     expected_df = pd.DataFrame(expected_data)[['date', 'coin_id', 'price']]
 
     # Run the function
-    prices_filled_df, outcomes_df = td.fill_prices_gaps(prices_df_mixed_gaps, max_gap_days)
+    prices_filled_df, outcomes_df = td.fill_market_data_gaps(prices_df_mixed_gaps, max_gap_days)
 
     # Reorder columns for comparison
     prices_filled_df = prices_filled_df[['date', 'coin_id', 'price']]
@@ -749,7 +749,7 @@ def test_transfers_data_quality(transfers_df):
 
 
 # ---------------------------------------- #
-# retrieve_prices_data() integration tests
+# retreive_market_data() integration tests
 # ---------------------------------------- #
 
 @pytest.fixture(scope='session')
@@ -758,8 +758,8 @@ def prices_df():
     Retrieve and preprocess the prices_df, filling gaps as needed.
     """
     logger.info("Generating prices_df from production data...")
-    prices_df = td.retrieve_prices_data()
-    prices_df, _ = td.fill_prices_gaps(prices_df, max_gap_days=2)
+    prices_df = td.retrieve_market_data()
+    prices_df, _ = td.fill_market_data_gaps(prices_df, max_gap_days=2)
     return prices_df
 
 # Save prices_df.csv in fixtures/

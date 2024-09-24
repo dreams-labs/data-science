@@ -87,7 +87,7 @@ def flatten_coin_date_df(df, df_metrics_config, training_period_end):
     # Step 2: Flatten the metrics
     # ---------------------------
     start_time = time.time()
-    logger.info("Flattening columns %s into coin-level features...", configured_metrics)
+    logger.debug("Flattening columns %s into coin-level features...", configured_metrics)
 
     all_flat_features = []
 
@@ -107,7 +107,7 @@ def flatten_coin_date_df(df, df_metrics_config, training_period_end):
     # Convert the list of feature dictionaries into a DataFrame
     flattened_df = pd.DataFrame(all_flat_features)
 
-    logger.info('Flattened input df into coin-level features with shape %s after %.2f seconds.',
+    logger.debug('Flattened input df into coin-level features with shape %s after %.2f seconds.',
                 flattened_df.shape, time.time() - start_time)
 
 
