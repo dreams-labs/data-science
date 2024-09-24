@@ -15,6 +15,66 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 logger = dc.setup_logger()
 
 
+
+def convert_coin_date_metrics_to_features(
+    dataset_metrics_df,
+    dataset_config,
+    dataset_metrics_config,
+    config,
+    modeling_config
+):
+    """
+    Converts a dataset keyed on coin_id-date into features by flattening and preprocessing.
+
+    Args:
+        dataset_metrics_df (pd.DataFrame): Input DataFrame containing raw metrics data.
+        dataset_config (dict): The component of config['datasets'] relating to this dataset
+        dataset_metrics_config (dict): The component of metrics_config relating to this dataset
+        config (dict): The whole main config, which includes period boundary dates
+        modeling_config (dict): The whole modeling_config, which includes a list of tables to
+            drop in preprocessing
+
+    Returns:
+        preprocessed_df (pd.DataFrame): The preprocessed DataFrame ready for model training.
+        dataset_tuple (tuple): Contains the preprocessed file name and fill method for the dataset.
+    """
+
+    # Flatten the metrics DataFrame into the required format for feature engineering
+    flattened_metrics_df = flatten_coin_date_df(
+        dataset_metrics_df,
+        dataset_metrics_config,
+        config['training_data']['training_period_end']  # Ensure data is up to training period end
+    )
+
+    # Save the flattened output and retrieve the file path
+    _, flattened_metrics_filepath = save_flattened_outputs(
+        flattened_metrics_df,
+        os.path.join(
+            modeling_config['modeling']['modeling_folder'],  # Folder to store flattened outputs
+            'outputs/flattened_outputs'
+        ),
+        dataset_config['description'],  # Descriptive metadata for the dataset
+        config['training_data']['modeling_period_start']  # Ensure data starts from modeling period
+    )
+
+    # Preprocess the flattened data and return the preprocessed file path
+    preprocessed_df, preprocessed_filepath = preprocess_coin_df(
+        flattened_metrics_filepath,
+        modeling_config,
+        dataset_config,
+        dataset_metrics_config
+    )
+
+    # this tuple is the input for create_training_data_df() that will merge all the files
+    dataset_tuple = (
+        preprocessed_filepath.split('preprocessed_outputs/')[1],  # Extract file name from the path
+        dataset_config['fill_method']  # fill method to be used as part of the merge process
+    )
+
+    return preprocessed_df, dataset_tuple
+
+
+
 def flatten_coin_date_df(df, df_metrics_config, training_period_end):
     """
     Processes all coins in the DataFrame and flattens relevant time series metrics for each coin.
@@ -703,19 +763,16 @@ def create_target_variables_mooncrater(prices_df, training_data_config, modeling
     - target_variable_df: DataFrame with columns 'coin_id', 'is_moon', and 'is_crater'.
     - outcomes_df: DataFrame tracking outcomes for each coin.
     """
-    # Retrieve the necessary values from modeling_config
+    # 1. Retrieve Variables and Prepare DataFrame
+    # -------------------------------------------
+    prices_df = prices_df.copy()
+    prices_df['date'] = pd.to_datetime(prices_df['date'])
     modeling_period_start = pd.to_datetime(training_data_config['modeling_period_start'])
     modeling_period_end = pd.to_datetime(training_data_config['modeling_period_end'])
-    moon_threshold = modeling_config['target_variables']['moon_threshold']
-    crater_threshold = modeling_config['target_variables']['crater_threshold']
 
-    # Filter for the modeling period and sort the DataFrame
-    prices_df['date'] = pd.to_datetime(prices_df['date'])
-    modeling_period_df = prices_df[
-        (prices_df['date'] >= modeling_period_start) &
-        (prices_df['date'] <= modeling_period_end)
+    modeling_period_df = prices_df.loc[
+        prices_df['date'].between(modeling_period_start, modeling_period_end)
     ]
-    modeling_period_df = modeling_period_df.sort_values(by=['coin_id', 'date'])
 
     # Raise an exception if any coins are missing a price at the start or end date
     start_price_coins = modeling_period_df[
@@ -733,9 +790,18 @@ def create_target_variables_mooncrater(prices_df, training_data_config, modeling
         missing = ', '.join(map(str, coins_missing_price))
         raise ValueError(f"Missing price for coins at start or end date: {missing}")
 
+
+    # 2. Generate Target Variables
+    # ----------------------------
+    moon_threshold = modeling_config['target_variables']['moon_threshold']
+    crater_threshold = modeling_config['target_variables']['crater_threshold']
+    moon_minimum_percent = modeling_config['target_variables']['moon_minimum_percent']
+    crater_minimum_percent = modeling_config['target_variables']['crater_minimum_percent']
+
     # Process coins with data
     target_data = []
     outcomes = []
+    price_performance = []
     for coin_id, group in modeling_period_df.groupby('coin_id'):
         # Get the price on the start and end dates
         price_start = group[group['date'] == modeling_period_start]['price'].values
@@ -745,10 +811,12 @@ def create_target_variables_mooncrater(prices_df, training_data_config, modeling
         if len(price_start) > 0 and len(price_end) > 0:
             price_start = price_start[0]
             price_end = price_end[0]
-            is_moon = int(price_end >= (1 + moon_threshold) * price_start)
-            is_crater = int(price_end <= (1 + crater_threshold) * price_start)
+            performance = (price_end - price_start) / price_start
+            is_moon = int(performance >= moon_threshold)
+            is_crater = int(performance <= crater_threshold)
             target_data.append({'coin_id': coin_id, 'is_moon': is_moon, 'is_crater': is_crater})
             outcomes.append({'coin_id': coin_id, 'outcome': 'target variable created'})
+            price_performance.append({'coin_id': coin_id, 'performance': performance})
 
         else:
             if len(price_start) == 0 and len(price_end) == 0:
@@ -758,27 +826,57 @@ def create_target_variables_mooncrater(prices_df, training_data_config, modeling
             else:
                 outcomes.append({'coin_id': coin_id, 'outcome': 'missing end price'})
 
-    # Log outcomes for coins with no data in the modeling period
-    all_coins = set(prices_df['coin_id'].unique())
-    modeling_period_coins = set(modeling_period_df['coin_id'].unique())
-    coins_with_no_data = all_coins - modeling_period_coins
-    for coin_id in coins_with_no_data:
-        outcomes.append({'coin_id': coin_id, 'outcome': 'missing both'})
 
-    # Convert target data and outcomes to DataFrames
+    # 3. Ensure minimum percentage for moon and crater
+    # ------------------------------------------------
     target_variables_df = pd.DataFrame(target_data)
-    outcomes_df = pd.DataFrame(outcomes)
+    price_performance_df = pd.DataFrame(price_performance)
 
-    # Log summary based on outcomes
-    target_variable_count = len(outcomes_df[outcomes_df['outcome'] == 'target variable created'])
+    # Sort by performance for filling the remaining moons and craters
+    price_performance_df = price_performance_df.sort_values(by='performance', ascending=False)
+
+    total_coins = len(target_variables_df)
     moons = target_variables_df[target_variables_df['is_moon'] == 1].shape[0]
     craters = target_variables_df[target_variables_df['is_crater'] == 1].shape[0]
 
+    # Check if moons meet minimum percentage
+    if moons / total_coins < moon_minimum_percent:
+        additional_moons_needed = int(total_coins * moon_minimum_percent) - moons
+        # Mark additional top-performing coins as moons
+        moon_candidates = price_performance_df[~price_performance_df['coin_id'].isin(  # pylint: disable=E1136
+            target_variables_df[target_variables_df['is_moon'] == 1]['coin_id']
+            )].head(additional_moons_needed)
+        target_variables_df.loc[
+            target_variables_df['coin_id'].isin(moon_candidates['coin_id']), 'is_moon'
+            ] = 1
+
+    # Check if craters meet minimum percentage
+    if craters / total_coins < crater_minimum_percent:
+        additional_craters_needed = int(total_coins * crater_minimum_percent) - craters
+        # Mark additional worst-performing coins as craters
+        crater_candidates = price_performance_df[~price_performance_df['coin_id'].isin(  # pylint: disable=E1136
+            target_variables_df[target_variables_df['is_crater'] == 1]['coin_id']
+            )].tail(additional_craters_needed)
+        target_variables_df.loc[
+            target_variables_df['coin_id'].isin(crater_candidates['coin_id']), 'is_crater'
+            ] = 1
+
+
+    # 4. Log and Format Output DataFrame
+    # ----------------------------------
+    outcomes_df = pd.DataFrame(outcomes)
+
     logger.info(
         "Target variables created for %s coins with %s/%s (%s) moons and %s/%s (%s) craters.",
-        target_variable_count,
-        moons, target_variable_count, dc.human_format(100 * moons / target_variable_count) + '%',
-        craters, target_variable_count, dc.human_format(100 * craters / target_variable_count) + '%'
+        len(target_variables_df),
+        target_variables_df[target_variables_df['is_moon'] == 1].shape[0], total_coins,
+        dc.human_format(
+            100 * target_variables_df[target_variables_df['is_moon'] == 1].shape[0] / total_coins
+            ) + '%',
+        target_variables_df[target_variables_df['is_crater'] == 1].shape[0], total_coins,
+        dc.human_format(
+            100 * target_variables_df[target_variables_df['is_crater'] == 1].shape[0] / total_coins
+            ) + '%'
     )
 
     return target_variables_df, outcomes_df
@@ -831,62 +929,3 @@ def prepare_model_input_df(training_data_df, target_variable_df, target_column):
 
     # Step 7: Return the final model input DataFrame
     return model_input_df
-
-
-
-def convert_to_features(
-    dataset_metrics_df,
-    dataset_config,
-    dataset_metrics_config,
-    config,
-    modeling_config
-):
-    """
-    Converts a dataset into features by flattening, saving, and preprocessing.
-
-    Args:
-        dataset_metrics_df (pd.DataFrame): Input DataFrame containing raw metrics data.
-        dataset_config (dict): The component of config['datasets'] relating to this dataset
-        dataset_metrics_config (dict): The component of metrics_config relating to this dataset
-        config (dict): The whole main config, which includes period boundary dates
-        modeling_config (dict): The whole modeling_config, which includes a list of tables to
-            drop in preprocessing
-
-    Returns:
-        preprocessed_df (pd.DataFrame): The preprocessed DataFrame ready for model training.
-        dataset_tuple (tuple): Contains the preprocessed file name and fill method for the dataset.
-    """
-
-    # Flatten the metrics DataFrame into the required format for feature engineering
-    flattened_metrics_df = flatten_coin_date_df(
-        dataset_metrics_df,
-        dataset_metrics_config,
-        config['training_data']['training_period_end']  # Ensure data is up to training period end
-    )
-
-    # Save the flattened output and retrieve the file path
-    _, flattened_metrics_filepath = save_flattened_outputs(
-        flattened_metrics_df,
-        os.path.join(
-            modeling_config['modeling']['modeling_folder'],  # Folder to store flattened outputs
-            'outputs/flattened_outputs'
-        ),
-        dataset_config['description'],  # Descriptive metadata for the dataset
-        config['training_data']['modeling_period_start']  # Ensure data starts from modeling period
-    )
-
-    # Preprocess the flattened data and return the preprocessed file path
-    preprocessed_df, preprocessed_filepath = preprocess_coin_df(
-        flattened_metrics_filepath,
-        modeling_config,
-        dataset_config,
-        dataset_metrics_config
-    )
-
-    # this tuple is the input for create_training_data_df() that will merge all the files
-    dataset_tuple = (
-        preprocessed_filepath.split('preprocessed_outputs/')[1],  # Extract file name from the path
-        dataset_config['fill_method']  # fill method to be used as part of the merge process
-    )
-
-    return preprocessed_df, dataset_tuple

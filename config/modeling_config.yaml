@@ -2,8 +2,16 @@ preprocessing:
   drop_features:  # List of features to drop from the dataset before modeling
 
 target_variables:
-  moon_threshold: 0.3  # Target for a 'moon' event, defined as a 15% price increase
-  crater_threshold: -0.2  # Target for a 'crater' event, defined as a 20% price decrease
+  moon_threshold: 0.3  # Minimum price % increase for a coin to be is_moon
+  moon_minimum_percent: 0.1  # Minimum percentage of coins tagged as is_moon
+    # If the % of coins that meet the moon_threshold is below this
+    # value, additional coins are added in order of price performance
+    # until this % is reached
+  crater_threshold: -0.3  # Minimum price % decrease for a coin to be is_crater
+  crater_minimum_percent: 0.1  # Minimum percentage of coins tagged as is_crater
+    # If the % of coins that meet the crater_threshold is below this
+    # value, additional coins are added in order of price performance
+    # until this % is reached
 
 modeling:
   target_column: "is_moon"  # or "is_crater" depending on the experiment

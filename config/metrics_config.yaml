@@ -17,21 +17,21 @@ wallet_cohorts:
         sum:
           scaling: "log"    # Scaling applied to sums, which can vary significantly in range.
       rolling:
-        comparisons:
-          pct_change:
-            scaling: "none"        # No scaling for percentage change, as it's already normalized.
-        window_duration: 20
-        lookback_periods: 3
+        aggregations:
+          sum:
+            scaling: "log"
+        window_duration: 15
+        lookback_periods: 1
     total_bought:
       aggregations:
         sum:
           scaling: "log"    # Scaling applied to sums, which can vary significantly in range.
       rolling:
-        comparisons:
-          pct_change:
-            scaling: "none"        # No scaling for percentage change, as it's already normalized.
-        window_duration: 20
-        lookback_periods: 3
+        aggregations:
+          sum:
+            scaling: "log"
+        window_duration: 15
+        lookback_periods: 1
     total_sold:
       aggregations:
         sum:
@@ -44,21 +44,21 @@ wallet_cohorts:
         sum:
           scaling: "log"    # Scaling applied to sums, which can vary significantly in range.
       rolling:
-        comparisons:
-          pct_change:
-            scaling: "none"        # No scaling for percentage change, as it's already normalized.
-        window_duration: 20
-        lookback_periods: 3
+        aggregations:
+          sum:
+            scaling: "log"
+        window_duration: 15
+        lookback_periods: 1
     total_bought:
       aggregations:
         sum:
           scaling: "log"    # Scaling applied to sums, which can vary significantly in range.
       rolling:
-        comparisons:
-          pct_change:
-            scaling: "none"        # No scaling for percentage change, as it's already normalized.
+        aggregations:
+          sum:
+            scaling: "log"
         window_duration: 15
-        lookback_periods: 3
+        lookback_periods: 1
     total_sold:
       aggregations:
         sum:
@@ -71,21 +71,21 @@ wallet_cohorts:
         sum:
           scaling: "log"    # Scaling applied to sums, which can vary significantly in range.
       rolling:
-        comparisons:
-          pct_change:
-            scaling: "none"        # No scaling for percentage change, as it's already normalized.
+        aggregations:
+          sum:
+            scaling: "log"
         window_duration: 15
-        lookback_periods: 3
+        lookback_periods: 1
     total_bought:
       aggregations:
         sum:
           scaling: "log"    # Scaling applied to sums, which can vary significantly in range.
       rolling:
-        comparisons:
-          pct_change:
-            scaling: "none"        # No scaling for percentage change, as it's already normalized.
+        aggregations:
+          sum:
+            scaling: "log"
         window_duration: 15
-        lookback_periods: 3
+        lookback_periods: 1
     total_sold:
       aggregations:
         sum:
@@ -105,6 +105,9 @@ time_series:
 
     volume:
       rolling:
+        aggregations:
+          sum:
+            scaling: "log"
         comparisons:
           pct_change:
             scaling: "none"        # No scaling for percentage change, as it's already normalized.
