@@ -6,6 +6,7 @@ from datetime import datetime
 import time
 import re
 import pandas as pd
+import numpy as np
 import dreams_core.core as dc
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
@@ -126,15 +127,17 @@ def flatten_date_features(time_series_df, df_metrics_config):
     - flat_features (dict): A dictionary of flattened features for the coin.
 
     Raises:
-    - ValueError: If an expected column (e.g., a metric) is missing from the DataFrame.
+    - ValueError: If no columns were matched to the config.
     """
     flat_features = {}
+    matched_columns = False
 
     # Apply global stats calculations for each metric
     for metric, config in df_metrics_config.items():
         if metric not in time_series_df.columns:
-            raise ValueError(f"Metric '{metric}' is missing from the input DataFrame.")
+            continue
 
+        matched_columns = True
         ts = time_series_df[metric].copy()  # Get the time series for this metric
 
         # Standard aggregations
@@ -154,6 +157,10 @@ def flatten_date_features(time_series_df, df_metrics_config):
             rolling_features = calculate_rolling_window_features(
                 ts, window_duration, lookback_periods, rolling_stats, comparisons, metric)
             flat_features.update(rolling_features)
+
+
+    if not matched_columns:
+        raise ValueError("No metrics matched the columns in the DataFrame.")
 
     return flat_features
 
@@ -231,7 +238,7 @@ def calculate_rolling_window_features(
 
 
 
-def calculate_adj_pct_change(start_value, end_value, cap=1000, impute_value=1):
+def calculate_adj_pct_change(start_value, end_value, cap=5, impute_value=1):
     """
     Calculates the adjusted percentage change between two values.
     Handles cases where the start_value is 0 by imputing a value and capping extreme
@@ -251,9 +258,9 @@ def calculate_adj_pct_change(start_value, end_value, cap=1000, impute_value=1):
             return 0  # 0/0 case
         else:
             # Use imputed value to maintain scale of increase
-            return min((end_value / impute_value - 1) * 100, cap)
+            return min((end_value / impute_value) - 1, cap)
     else:
-        pct_change = (end_value / start_value - 1) * 100
+        pct_change = (end_value / start_value) - 1
         return min(pct_change, cap)  # Cap the percentage change if it's too large
 
 
@@ -404,7 +411,6 @@ def preprocess_coin_df(input_path, modeling_config, dataset_config, df_metrics_c
         if column not in retain_columns:
             max_value_ratio = df[column].value_counts(normalize=True).max()
             if max_value_ratio > sameness_threshold:
-                print(f"max_value_ratio:{max_value_ratio}, sameness_threshold:{sameness_threshold}")
                 df = df.drop(columns=[column])
                 logger.info("Dropped column %s due to sameness_threshold", column)
 
@@ -435,6 +441,7 @@ def preprocess_coin_df(input_path, modeling_config, dataset_config, df_metrics_c
     return df, output_path
 
 
+
 def apply_scaling(df, df_metrics_config):
     """
     Apply scaling to the relevant columns in the DataFrame based on the metrics config.
@@ -455,7 +462,7 @@ def apply_scaling(df, df_metrics_config):
     # Loop through each metric and its settings in the df_metrics_config
     for metric, settings in df_metrics_config.items():
 
-        # if there are not aggregations for the metric, continue
+        # if there are no aggregations for the metric, continue
         if 'aggregations' not in settings.keys():
             continue
         for agg, agg_settings in settings['aggregations'].items():
@@ -471,7 +478,10 @@ def apply_scaling(df, df_metrics_config):
                 if scaling_method is None or scaling_method == "none":
                     continue
 
-                if scaling_method in scalers:
+                if scaling_method == "log":
+                    # Apply log1p scaling (log(1 + x)) to avoid issues with zero values
+                    df[[column_name]] = np.log1p(df[[column_name]])
+                elif scaling_method in scalers:
                     scaler = scalers[scaling_method]
                     df[[column_name]] = scaler.fit_transform(df[[column_name]])
                 else:
@@ -810,11 +820,10 @@ def prepare_model_input_df(training_data_df, target_variable_df, target_column):
     model_input_df = pd.merge(training_data_df, target_variable_df[['coin_id', target_column]],
                               on='coin_id', how='inner')
 
-    # Step 5: Check if any coin_id from training_data_df is missing a target variable
-    missing_targets = set(training_data_df['coin_id']) - set(target_variable_df['coin_id'])
-    if missing_targets:
-        logger.warning("Some 'coin_id's are missing target variables: %s"
-                       , ', '.join(map(str, missing_targets)))
+    # Step 5: Remove coins without target variables and output a warning with the number removed
+    removed_coins = len(training_data_df) - len(model_input_df)
+    if removed_coins > 0:
+        logger.warning("%s coins were removed due to missing target variables", removed_coins)
 
     # Step 6: Perform final quality checks (e.g., no NaNs in important columns)
     if model_input_df.isnull().any().any():
@@ -822,3 +831,62 @@ def prepare_model_input_df(training_data_df, target_variable_df, target_column):
 
     # Step 7: Return the final model input DataFrame
     return model_input_df
+
+
+
+def convert_to_features(
+    dataset_metrics_df,
+    dataset_config,
+    dataset_metrics_config,
+    config,
+    modeling_config
+):
+    """
+    Converts a dataset into features by flattening, saving, and preprocessing.
+
+    Args:
+        dataset_metrics_df (pd.DataFrame): Input DataFrame containing raw metrics data.
+        dataset_config (dict): The component of config['datasets'] relating to this dataset
+        dataset_metrics_config (dict): The component of metrics_config relating to this dataset
+        config (dict): The whole main config, which includes period boundary dates
+        modeling_config (dict): The whole modeling_config, which includes a list of tables to
+            drop in preprocessing
+
+    Returns:
+        preprocessed_df (pd.DataFrame): The preprocessed DataFrame ready for model training.
+        dataset_tuple (tuple): Contains the preprocessed file name and fill method for the dataset.
+    """
+
+    # Flatten the metrics DataFrame into the required format for feature engineering
+    flattened_metrics_df = flatten_coin_date_df(
+        dataset_metrics_df,
+        dataset_metrics_config,
+        config['training_data']['training_period_end']  # Ensure data is up to training period end
+    )
+
+    # Save the flattened output and retrieve the file path
+    _, flattened_metrics_filepath = save_flattened_outputs(
+        flattened_metrics_df,
+        os.path.join(
+            modeling_config['modeling']['modeling_folder'],  # Folder to store flattened outputs
+            'outputs/flattened_outputs'
+        ),
+        dataset_config['description'],  # Descriptive metadata for the dataset
+        config['training_data']['modeling_period_start']  # Ensure data starts from modeling period
+    )
+
+    # Preprocess the flattened data and return the preprocessed file path
+    preprocessed_df, preprocessed_filepath = preprocess_coin_df(
+        flattened_metrics_filepath,
+        modeling_config,
+        dataset_config,
+        dataset_metrics_config
+    )
+
+    # this tuple is the input for create_training_data_df() that will merge all the files
+    dataset_tuple = (
+        preprocessed_filepath.split('preprocessed_outputs/')[1],  # Extract file name from the path
+        dataset_config['fill_method']  # fill method to be used as part of the merge process
+    )
+
+    return preprocessed_df, dataset_tuple

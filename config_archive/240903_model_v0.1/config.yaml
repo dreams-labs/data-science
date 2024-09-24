@@ -1,0 +1,65 @@
+training_data:
+  # Variables used to define the training data
+
+  # Defining the modeling and training periods (dates must follow YYYY-MM-DD format)
+  # The modeling period end date and training period start and end dates are automatically
+  # imputed using utils.py function calculate_period_dates() when load_config() is run
+  modeling_period_start: '2024-03-01'  # Start date for the modeling period
+  modeling_period_duration: 14    # Duration of the modeling period in days
+  training_period_duration: 60    # Duration of the training period in days
+
+datasets:
+
+  # Keyed on coin_id-date
+  wallet_cohorts:
+  # Cohorts of wallets with different characteristics
+
+    # Shark wallets
+    sharks:
+      description: 'cohort_sharks'  # prefix that will be included in feature columns
+      fill_method: 'fill_zeros'
+      sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
+      wallet_minimum_inflows: 10000  # Minimum USD inflows for a wallet to be considered a 'shark'
+      wallet_maximum_inflows: 50000  # Maximum USD inflows for a wallet to be considered a 'shark'
+      coin_profits_win_threshold: 5000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
+      coin_return_win_threshold: 0.5  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
+      wallet_min_coin_wins: 3  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
+
+
+  # Keyed on coin_id-date
+  time_series:
+    prices:
+      description: 'price'  # prefix that will be included in feature columns
+      fill_method: 'drop_records'
+      sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
+
+
+  # Keyed on only date
+  macro_series:
+    google_trends:
+      description: 'google_trends'  # prefix that will be included in feature columns
+      fill_method: 'expand'
+
+
+  # Keyed on only coin_id
+  coin_facts:
+    coin_metadata:
+      description: 'metadata'  # prefix that will be included in feature columns
+      fill_method: 'drop_records'
+      sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
+      retain_columns:  # these columns will be retained regardless of sameness %
+      - category_ai
+      - category_rwa
+      - chain_base
+      chain_threshold: 10  # Minimum coins associated with a chain for the chain to become a boolean feature
+
+
+data_cleaning:
+  # Variables used to clean and filter raw data before training data is built
+
+  # profits_df filters: The goal is to remove wallets that don't belong in the dataset (e.g., CEX, mint, contract wallets)
+  profitability_filter: 15000000  # Exclude wallets with profits or losses greater than or equal to this amount (USD)
+  inflows_filter: 10000000  # Exclude wallets with inflows greater than or equal to this amount (USD)
+
+  # prices_df filters: Define how to handle missing price data
+  max_gap_days: 10  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)

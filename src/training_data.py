@@ -17,51 +17,60 @@ from utils import timing_decorator  # pylint: disable=E0401 # can't find utils i
 logger = dc.setup_logger()
 
 
-def retrieve_prices_data():
+def retrieve_market_data():
     """
-    Retrieves prices data from the core.coin_market_data table and converts coin_id to categorical
+    Retrieves market data from the core.coin_market_data table and converts coin_id to categorical
 
     Returns:
-    - prices_df: DataFrame containing coin prices with 'coin_id' as a categorical column.
+    - market_data_df: DataFrame containing market data with 'coin_id' as a categorical column.
     """
-    # SQL query to retrieve prices data
+    # SQL query to retrieve market data
     query_sql = '''
         select cmd.coin_id
         ,date
         ,cast(cmd.price as float64) as price
+        ,cmd.volume
+        ,coalesce(cmd.market_cap,cmd.fdv) as market_cap
         from core.coin_market_data cmd
         order by 1,2
     '''
 
     # Run the SQL query using dgc's run_sql method
-    logger.debug('retrieving prices data...')
-    prices_df = dgc().run_sql(query_sql)
+    logger.debug('retrieving market data...')
+    market_data_df = dgc().run_sql(query_sql)
 
     # Convert coin_id column to categorical to reduce memory usage
-    prices_df['coin_id'] = prices_df['coin_id'].astype('category')
+    market_data_df['coin_id'] = market_data_df['coin_id'].astype('category')
 
-    prices_df['date'] = pd.to_datetime(prices_df['date'])
+    market_data_df['date'] = pd.to_datetime(market_data_df['date'])
 
-    logger.info('retrieved prices data with shape %s',prices_df.shape)
+    logger.info('retrieved market data with shape %s',market_data_df.shape)
 
-    return prices_df
+    return market_data_df
 
 
 
-def fill_prices_gaps(prices_df, max_gap_days):
+def fill_market_data_gaps(market_data_df, max_gap_days):
     """
-    Forward-fills small gaps in price data for each coin_id.
+    Forward-fills small gaps in market data for each coin_id. The function first confirms that
+    there are no null values in any metric columns of the df, then uses price to identify dates that
+    need to be filled for all of the metric columns.
+
     Parameters:
-    - prices_df: DataFrame containing price data with columns 'coin_id', 'date', and 'price'.
+    - market_data_df: DataFrame containing market data keyed on coin_id-date
     - max_gap_days: The maximum allowed consecutive missing days for forward-filling.
 
     Returns:
-    - prices_filled_df: DataFrame with small gaps forward-filled, excluding coins with gaps
+    - market_data_filled_df: DataFrame with small gaps forward-filled, excluding coins with gaps
         too large to fill.
     - outcomes_df: DataFrame tracking the outcome for each coin_id.
     """
+    # Confirm there are no null values in the input df
+    if market_data_df.isna().sum().sum() > 0:
+        raise ValueError("Market data df contains null values")
+
     # Get unique coin_ids
-    unique_coins = prices_df['coin_id'].unique()
+    unique_coins = market_data_df['coin_id'].unique()
 
     # List to store results
     filled_results = []
@@ -72,7 +81,7 @@ def fill_prices_gaps(prices_df, max_gap_days):
     # Iterate over each coin_id
     for coin_id in unique_coins:
         # Step 1: Reindex to create rows for all missing dates
-        coin_df = prices_df[prices_df['coin_id'] == coin_id].sort_values('date', ascending=True).copy()
+        coin_df = market_data_df[market_data_df['coin_id'] == coin_id].sort_values('date', ascending=True).copy()
 
         # Create the full date range
         full_date_range = pd.date_range(start=coin_df['date'].min(), end=coin_df['date'].max(), freq='D')
@@ -99,10 +108,11 @@ def fill_prices_gaps(prices_df, max_gap_days):
 
         # Step 3: Forward-fill any gaps that are smaller than max_gap_days
         coin_df['price'] = coin_df['price'].ffill(limit=max_gap_days)
+        coin_df['market_cap'] = coin_df['market_cap'].ffill(limit=max_gap_days)
+        coin_df['volume'] = coin_df['volume'].fillna(0)
 
         # Remove rows with larger gaps that shouldn't be filled (already handled by check above)
         coin_df = coin_df[coin_df['missing_gap'] <= max_gap_days]
-
 
         # Append to the result list
         filled_results.append(coin_df)
@@ -110,12 +120,12 @@ def fill_prices_gaps(prices_df, max_gap_days):
 
     # Concatenate all results
     if filled_results:
-        prices_filled_df = pd.concat(filled_results).reset_index(drop=True)
+        market_data_filled_df = pd.concat(filled_results).reset_index(drop=True)
     else:
-        prices_filled_df = pd.DataFrame()  # Handle case where no coins were filled
+        market_data_filled_df = pd.DataFrame()  # Handle case where no coins were filled
 
     # Drop the temporary 'missing_gap' column
-    prices_filled_df = prices_filled_df.drop(columns=['missing_gap'])
+    market_data_filled_df = market_data_filled_df.drop(columns=['missing_gap'])
 
     # Convert outcomes to DataFrame
     outcomes_df = pd.DataFrame(outcomes)
@@ -129,7 +139,7 @@ def fill_prices_gaps(prices_df, max_gap_days):
     logger.info("%s coins had no gaps, %s coins had gaps filled, and %s coins were dropped due to large gaps.",
                 no_gaps_count, gaps_below_threshold_count, gaps_above_threshold_count)
 
-    return prices_filled_df, outcomes_df
+    return market_data_filled_df, outcomes_df
 
 
 
