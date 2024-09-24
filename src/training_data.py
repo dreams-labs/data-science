@@ -108,8 +108,10 @@ def fill_market_data_gaps(market_data_df, max_gap_days):
 
         # Step 3: Forward-fill any gaps that are smaller than max_gap_days
         coin_df['price'] = coin_df['price'].ffill(limit=max_gap_days)
-        coin_df['market_cap'] = coin_df['market_cap'].ffill(limit=max_gap_days)
-        coin_df['volume'] = coin_df['volume'].fillna(0)
+        if 'market_cap' in market_data_df.columns:
+            coin_df['market_cap'] = coin_df['market_cap'].ffill(limit=max_gap_days)
+        if 'volume' in market_data_df.columns:
+            coin_df['volume'] = coin_df['volume'].fillna(0)
 
         # Remove rows with larger gaps that shouldn't be filled (already handled by check above)
         coin_df = coin_df[coin_df['missing_gap'] <= max_gap_days]
