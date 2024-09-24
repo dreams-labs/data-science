@@ -324,42 +324,6 @@ def calculate_adj_pct_change(start_value, end_value, cap=5, impute_value=1):
         return min(pct_change, cap)  # Cap the percentage change if it's too large
 
 
-
-def calculate_global_stats(ts, metric_name, config):
-    """
-    Calculates global statistics for a given time series based on the configuration.
-
-    Params:
-    - ts (pd.Series): The time series data for the metric.
-    - metric_name (str): The name of the metric (e.g., 'buyers_new').
-    - config (dict): The configuration object that specifies which statistics to calculate
-                     for each metric.
-
-    Returns:
-    - stats (dict): A dictionary containing calculated statistics. The keys are in the format
-                    of '{metric_name}_{aggregation}' (e.g., 'buyers_new_sum').
-
-    Example:
-    If the config specifies 'sum' and 'mean' for 'buyers_new', the result will include:
-    {
-        'buyers_new_sum': value,
-        'buyers_new_mean': value
-    }
-    """
-    stats = {}  # Initialize an empty dictionary to hold the calculated stats.
-
-    # Get the aggregation functions for the given metric from the config.
-    metric_config = config['metrics'].get(metric_name, [])
-
-    # Loop through each aggregation function and calculate the stat.
-    for agg in metric_config:
-        # Use the helper function 'calculate_stat' to calculate each aggregation.
-        stats[f'{metric_name}_{agg}'] = calculate_stat(ts, agg)
-
-    return stats  # Return the dictionary of calculated statistics.
-
-
-
 def calculate_stat(ts, stat):
     """
     Centralized function to calculate various aggregations on a time series.

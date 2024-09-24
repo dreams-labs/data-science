@@ -4,9 +4,9 @@ training_data:
   # Defining the modeling and training periods (dates must follow YYYY-MM-DD format)
   # The modeling period end date and training period start and end dates are automatically
   # imputed using utils.py function calculate_period_dates() when load_config() is run
-  modeling_period_start: '2024-04-01'  # Start date for the modeling period
+  modeling_period_start: '2024-08-01'  # Start date for the modeling period
   modeling_period_duration: 15    # Duration of the modeling period in days
-  training_period_duration: 45    # Duration of the training period in days
+  training_period_duration: 90    # Duration of the training period in days
 
 datasets:
 
