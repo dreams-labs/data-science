@@ -4,9 +4,9 @@ training_data:
   # Defining the modeling and training periods (dates must follow YYYY-MM-DD format)
   # The modeling period end date and training period start and end dates are automatically
   # imputed using utils.py function calculate_period_dates() when load_config() is run
-  modeling_period_start: '2024-08-01'  # Start date for the modeling period
+  modeling_period_start: '2024-09-01'  # Start date for the modeling period
   modeling_period_duration: 15    # Duration of the modeling period in days
-  training_period_duration: 90    # Duration of the training period in days
+  training_period_duration: 45    # Duration of the training period in days
 
 datasets:
 
@@ -21,7 +21,7 @@ datasets:
       wallet_maximum_inflows: 15000  # Maximum USD inflows for a wallet to be considered a 'shark'
       coin_profits_win_threshold: 300  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
       coin_return_win_threshold: 0.3  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
-      wallet_min_coin_wins: 5  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
+      wallet_min_coin_wins: 3  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
 
     under_75k:
       description: 'cohort_50k'  # prefix that will be included in feature columns
@@ -31,7 +31,7 @@ datasets:
       wallet_maximum_inflows: 75000  # Maximum USD inflows for a wallet to be considered a 'shark'
       coin_profits_win_threshold: 5000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
       coin_return_win_threshold: 0.2  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
-      wallet_min_coin_wins: 3  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
+      wallet_min_coin_wins: 2  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
 
     whales:
       description: 'cohort_whales'  # prefix that will be included in feature columns
@@ -41,7 +41,7 @@ datasets:
       wallet_maximum_inflows: 5000000  # Maximum USD inflows for a wallet to be considered a 'shark'
       coin_profits_win_threshold: 15000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
       coin_return_win_threshold: 0.2  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
-      wallet_min_coin_wins: 3  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
+      wallet_min_coin_wins: 2  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
 
   # Keyed on coin_id-date
   time_series:

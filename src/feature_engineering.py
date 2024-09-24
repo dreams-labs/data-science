@@ -16,65 +16,6 @@ logger = dc.setup_logger()
 
 
 
-def convert_coin_date_metrics_to_features(
-    dataset_metrics_df,
-    dataset_config,
-    dataset_metrics_config,
-    config,
-    modeling_config
-):
-    """
-    Converts a dataset keyed on coin_id-date into features by flattening and preprocessing.
-
-    Args:
-        dataset_metrics_df (pd.DataFrame): Input DataFrame containing raw metrics data.
-        dataset_config (dict): The component of config['datasets'] relating to this dataset
-        dataset_metrics_config (dict): The component of metrics_config relating to this dataset
-        config (dict): The whole main config, which includes period boundary dates
-        modeling_config (dict): The whole modeling_config, which includes a list of tables to
-            drop in preprocessing
-
-    Returns:
-        preprocessed_df (pd.DataFrame): The preprocessed DataFrame ready for model training.
-        dataset_tuple (tuple): Contains the preprocessed file name and fill method for the dataset.
-    """
-
-    # Flatten the metrics DataFrame into the required format for feature engineering
-    flattened_metrics_df = flatten_coin_date_df(
-        dataset_metrics_df,
-        dataset_metrics_config,
-        config['training_data']['training_period_end']  # Ensure data is up to training period end
-    )
-
-    # Save the flattened output and retrieve the file path
-    _, flattened_metrics_filepath = save_flattened_outputs(
-        flattened_metrics_df,
-        os.path.join(
-            modeling_config['modeling']['modeling_folder'],  # Folder to store flattened outputs
-            'outputs/flattened_outputs'
-        ),
-        dataset_config['description'],  # Descriptive metadata for the dataset
-        config['training_data']['modeling_period_start']  # Ensure data starts from modeling period
-    )
-
-    # Preprocess the flattened data and return the preprocessed file path
-    preprocessed_df, preprocessed_filepath = preprocess_coin_df(
-        flattened_metrics_filepath,
-        modeling_config,
-        dataset_config,
-        dataset_metrics_config
-    )
-
-    # this tuple is the input for create_training_data_df() that will merge all the files
-    dataset_tuple = (
-        preprocessed_filepath.split('preprocessed_outputs/')[1],  # Extract file name from the path
-        dataset_config['fill_method']  # fill method to be used as part of the merge process
-    )
-
-    return preprocessed_df, dataset_tuple
-
-
-
 def flatten_coin_date_df(df, df_metrics_config, training_period_end):
     """
     Processes all coins in the DataFrame and flattens relevant time series metrics for each coin.
@@ -383,6 +324,66 @@ def calculate_stat(ts, stat):
     return agg_functions[stat]()
 
 
+
+def convert_coin_date_metrics_to_features(
+    dataset_metrics_df,
+    dataset_config,
+    dataset_metrics_config,
+    config,
+    modeling_config
+):
+    """
+    Converts a dataset keyed on coin_id-date into features by flattening and preprocessing.
+
+    Args:
+        dataset_metrics_df (pd.DataFrame): Input DataFrame containing raw metrics data.
+        dataset_config (dict): The component of config['datasets'] relating to this dataset
+        dataset_metrics_config (dict): The component of metrics_config relating to this dataset
+        config (dict): The whole main config, which includes period boundary dates
+        modeling_config (dict): The whole modeling_config, which includes a list of tables to
+            drop in preprocessing
+
+    Returns:
+        preprocessed_df (pd.DataFrame): The preprocessed DataFrame ready for model training.
+        dataset_tuple (tuple): Contains the preprocessed file name and fill method for the dataset.
+    """
+
+    # Flatten the metrics DataFrame into the required format for feature engineering
+    flattened_metrics_df = flatten_coin_date_df(
+        dataset_metrics_df,
+        dataset_metrics_config,
+        config['training_data']['training_period_end']  # Ensure data is up to training period end
+    )
+
+    # Save the flattened output and retrieve the file path
+    _, flattened_metrics_filepath = save_flattened_outputs(
+        flattened_metrics_df,
+        os.path.join(
+            modeling_config['modeling']['modeling_folder'],  # Folder to store flattened outputs
+            'outputs/flattened_outputs'
+        ),
+        dataset_config['description'],  # Descriptive metadata for the dataset
+        config['training_data']['modeling_period_start']  # Ensure data starts from modeling period
+    )
+
+    # Preprocess the flattened data and return the preprocessed file path
+    preprocessed_df, preprocessed_filepath = preprocess_coin_df(
+        flattened_metrics_filepath,
+        modeling_config,
+        dataset_config,
+        dataset_metrics_config
+    )
+
+    # this tuple is the input for create_training_data_df() that will merge all the files
+    dataset_tuple = (
+        preprocessed_filepath.split('preprocessed_outputs/')[1],  # Extract file name from the path
+        dataset_config['fill_method']  # fill method to be used as part of the merge process
+    )
+
+    return preprocessed_df, dataset_tuple
+
+
+
 def save_flattened_outputs(flattened_df, output_dir, metric_description, modeling_period_start):
     """
     Saves the flattened DataFrame with descriptive metrics into a CSV file.
@@ -446,6 +447,17 @@ def preprocess_coin_df(input_path, modeling_config, dataset_config, df_metrics_c
 
     # Step 2: Preprocess Data
     # ----------------------------------------------------
+    # Convert categorical columns to one-hot encoding (get_dummies)
+    categorical_columns = df.select_dtypes(include=['object', 'category']).columns
+    categorical_columns = [col for col in categorical_columns if col != 'coin_id']
+    for col in categorical_columns:
+        num_categories = df[col].nunique()
+        if num_categories > 8:
+            logger.warning("Column '%s' has %s categories, consider reducing categories.",
+                           col, num_categories)
+        df = pd.get_dummies(df, columns=[col], drop_first=True)
+
+
     # Convert boolean columns to integers
     df = df.apply(lambda col: col.astype(int) if col.dtype == bool else col)
 
@@ -491,7 +503,7 @@ def preprocess_coin_df(input_path, modeling_config, dataset_config, df_metrics_c
     df.to_csv(output_path, index=False)
 
     # Log the changes made
-    logger.info("Preprocessed file saved at: %s", output_path)
+    logger.debug("Preprocessed file saved at: %s", output_path)
 
     return df, output_path
 
