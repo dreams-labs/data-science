@@ -42,6 +42,7 @@ wallet_cohorts:
     buyers_new:
       aggregations:
         sum:
+          scaling: "log"    # Scaling applied to sums, which can vary significantly in range.
       rolling:
         aggregations:
           sum:
