@@ -33,9 +33,12 @@ class TrainingDataConfig(BaseModel):
     """
     These variables relate to how the training period is defined
     """
-    modeling_period_start: date = Field(...)
-    modeling_period_duration: int = Field(..., gt=0)
     training_period_duration: int = Field(..., gt=0)
+    training_period_start: date = Field(...)
+    training_period_end: date = Field(...)
+    modeling_period_duration: int = Field(..., gt=0)
+    modeling_period_start: date = Field(...)
+    modeling_period_end: date = Field(...)
 
 # ============================================================================
 # Datasets Configuration

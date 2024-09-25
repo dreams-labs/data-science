@@ -134,7 +134,9 @@ class RollingMetrics(BaseModel):
         if comparisons:
             for comparison_type, scaling_config in comparisons.items():
                 if not scaling_config or not scaling_config.scaling:
-                    raise ValueError(f"Comparison '{comparison_type}' requires a valid 'scaling' configuration.")
+                    raise ValueError(
+                        f"Comparison '{comparison_type}' requires a valid 'scaling' configuration."
+                        )
         return values
 
 
@@ -244,3 +246,9 @@ class TimeSeriesValueColumn(RootModel[Dict[str, 'Metric']]):
     RootModel is used to define a class that acts as a wrapper around a dictionary.
     """
     pass
+
+# ============================================================================
+# Model Rebuilding
+# ============================================================================
+
+MetricsConfig.model_rebuild()

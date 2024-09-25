@@ -241,8 +241,6 @@ def generate_coin_buysell_metrics_df(coin_cohort_profits_df):
     buysell_metrics_df = pd.merge(buysell_metrics_df, transactions_df, on='date', how='outer')
     buysell_metrics_df = pd.merge(buysell_metrics_df, holders_df, on='date', how='outer')
 
-    logger.debug('Buysell metrics generated after %.2f seconds', time.time() - start_time)
-
     return buysell_metrics_df
 
 
