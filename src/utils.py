@@ -1,14 +1,61 @@
 """
 utility functions use in data science notebooks
 """
-
 import time
+import os
 from datetime import datetime, timedelta
 import logging
+import warnings
 import functools
 import yaml
 import progressbar
 
+# pydantic config classes
+from config_models.config import MainConfig
+from config_models.metrics_config import MetricsConfig
+
+
+
+def load_config(file_path='../notebooks/config.yaml'):
+    """
+    Load configuration from a YAML file. Automatically calculates and adds period dates
+    if modeling_period_start is present in the training_data section.
+
+    Args:
+        file_path (str): Path to the config file.
+
+    Returns:
+        dict: Parsed YAML configuration with calculated date fields, if applicable.
+    """
+    with open(file_path, 'r', encoding='utf-8') as file:
+        config_dict = yaml.safe_load(file)
+
+    # Calculate and add period boundary dates into the config['training_data'] section
+    if 'training_data' in config_dict and 'modeling_period_start' in config_dict['training_data']:
+        period_dates = calculate_period_dates(config_dict['training_data'])
+        config_dict['training_data'].update(period_dates)
+
+    # If a pydantic definition exists for the config, return it in json format
+    filename = os.path.basename(file_path)
+
+    with warnings.catch_warnings():
+        # Suppresses pydantic "serialized value may not be as expected" warnings
+        # See https://github.com/pydantic/pydantic/issues/7905 for details
+        warnings.filterwarnings("ignore", category=UserWarning)
+
+        if filename in ['config.yaml', 'test_config.yaml']:
+            config_pydantic = MainConfig(**config_dict)
+            config = config_pydantic.model_dump(mode="json")
+
+        elif filename in ['metrics_config.yaml', 'test_metrics_config.yaml']:
+            config_pydantic = MetricsConfig(**config_dict)
+            config = config_pydantic.model_dump(mode="json")
+
+        # Otherwise return the normal dict
+        else:
+            config = config_dict
+
+    return config
 
 
 def timing_decorator(func):
@@ -56,30 +103,6 @@ def timing_decorator(func):
     return wrapper
 
 
-def load_config(file_path='../notebooks/config.yaml'):
-    """
-    Load configuration from a YAML file. Automatically calculates and adds period dates
-    if modeling_period_start is present in the training_data section.
-
-    Args:
-        file_path (str): Path to the config file.
-
-    Returns:
-        dict: Parsed YAML configuration with calculated date fields, if applicable.
-    """
-    with open(file_path, 'r', encoding='utf-8') as file:
-        config = yaml.safe_load(file)
-
-    # Check if training_data and modeling_period_start are present in the config
-    if 'training_data' in config and 'modeling_period_start' in config['training_data']:
-
-        # Calculate the period dates using the logic from utils.py
-        period_dates = calculate_period_dates(config['training_data'])
-
-        # Add the calculated dates back into the training_data section
-        config['training_data'].update(period_dates)
-
-    return config
 
 # helper function for load_config
 def calculate_period_dates(config):
