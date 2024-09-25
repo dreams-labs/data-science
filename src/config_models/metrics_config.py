@@ -3,24 +3,28 @@ Validation logic for items in metrics_config.yaml
 """
 # pylint: disable=W0611
 from enum import Enum
-from typing import Dict, Optional, Literal, Any, Annotated
-from pydantic import BaseModel, RootModel, Field, model_validator
+from typing import Dict, Optional, Literal, Any, Annotated, List, Union
+from pydantic import BaseModel, RootModel, Field, model_validator, conlist
 
 # pylint: disable=C0115  # no docstring for class Config
 # pylint: disable=R0903  # too few methods for class Config
+# pylint: disable=W0107  # unneccesary pass in the RootModel classes
+# pylint: disable=E0213  # we are defining classes and not class instancees so we don't need "self"
+
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Modular Metrics System Components
+# Modular Metrics Flattening System
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class Metric(BaseModel):
     """
-    This config file defines how a time series should be flattened into a single row by defining
-    the columns that will show up in the row, e.g. sum of buyers_new in the sharks cohort. These
-    are the three ways that metrics can be generated from time series data:
+    The Metric config class defines how a time series should be flattened into a single row by
+    specifying the columns that will show up in the row, e.g. sum of buyers_new in the sharks
+    cohort. These are the three ways that metrics can be generated from time series data:
 
-    * Aggregations are calculations that flatten an entire series, e.g. sum, last, max, etc.
+    * Aggregations are calculations that flatten an entire series, e.g. sum, last, max, etc. The
+        Bucket
 
     * RollingMetrics split the time series into x lookback_periods of y window_duration days. The
         lookback periods can then be flattened into Aggregations or compared with each other
@@ -33,17 +37,17 @@ class Metric(BaseModel):
     calculated. Scaling is applied to the dataframe containing every coin_id's values for the
     metric and done as part of preprocessing.
     """
-    aggregations: Optional['Aggregations'] = None
+    aggregations: Optional[Dict['AggregationType', 'AggregationConfig']] = None
     rolling: Optional['RollingMetrics'] = None
     indicators: Optional[Dict[str, 'Indicators']] = None
 
 
-# ----------------------------------------------------------------------------
+
 # Modular Metrics: Aggregations
-# ----------------------------------------------------------------------------
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 class AggregationType(str, Enum):
     """
-    Lists the aggregation functions that can be applied
+    List of aggregation functions that can be applied
     """
     SUM = "sum"
     MEAN = "mean"
@@ -54,22 +58,39 @@ class AggregationType(str, Enum):
     FIRST = "first"
     LAST = "last"
 
-# Use RootModel for dynamic aggregation types
-class Aggregations(RootModel[Dict[AggregationType, 'ScalingConfig']]):
+class AggregationConfig(BaseModel):
     """
-    RootModel: This how to define a class that acts as a wrapper around a dictionary. The
-    Aggregations class will now dynamically accept any valid AggregationType as keys and
-    their corresponding ScalingConfig values.
+    Defines the configuration for each aggregation type.
+    An aggregation can have a scaling field or a buckets field.
     """
-    pass  # pylint: disable=W0107
+    scaling: Optional[str] = None  # Optional scaling field (e.g., "log", "standard")
+    buckets: Optional['BucketsList'] = None  # Optional buckets field
 
 
-# ----------------------------------------------------------------------------
+
+# Modular Metrics: Buckets
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+class BucketsList(RootModel[List[Dict[str, Union[float, str]]]]):
+    """
+    Represents a collection of bucket tiers, ensuring that one bucket contains 'remainder'.
+    The RootModel now directly supports a list of dictionaries, where the key is the label
+    and the value is the threshold.
+    """
+
+    @model_validator(mode='after')
+    def validate_remainder_bucket(cls, values):
+        """confirms that a bucket has the 'remainder' value """
+        remainder_found = any("remainder" in bucket.values() for bucket in values.root)
+        if not remainder_found:
+            raise ValueError("At least one bucket must have the 'remainder' value.")
+        return values
+
+
 # Modular Metrics: RollingMetrics and Comparisons
-# ----------------------------------------------------------------------------
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 class ComparisonType(str, Enum):
     """
-    Lists the functions that can be used to compare rolling metric periods.
+    List of functions that can be used to compare rolling metric periods.
     """
     CHANGE = "change"
     PCT_CHANGE = "pct_change"
@@ -82,7 +103,7 @@ class RollingMetrics(BaseModel):
     """
     window_duration: Annotated[int, Field(gt=0)]  # Must be an integer > 0
     lookback_periods: Annotated[int, Field(gt=0)]  # Must be an integer > 0
-    aggregations: Optional['Aggregations'] = None
+    aggregations: Optional['AggregationConfig'] = None
     comparisons: Optional[Dict['ComparisonType', 'ScalingConfig']] = None
 
 
@@ -96,25 +117,32 @@ class Comparisons(BaseModel):
     scaling: Optional['ScalingConfig'] = None
 
 
-# ----------------------------------------------------------------------------
 # Modular Metrics: Indicators
-# ----------------------------------------------------------------------------
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 class IndicatorType(str, Enum):
     """
-    Lists the technical analysis indicators that can be created
+    List of technical analysis indicators that can be created
     """
     SMA = "sma"
     EMA = "ema"
 
 class Indicators(BaseModel):
     parameters: Dict[str, Any]  # Flexible to handle unique parameters
-    aggregations: Optional['Aggregations'] = None
-    rolling: Optional['RollingMetrics'] = None
+    aggregations: Optional['AggregationConfig']
+    rolling: Optional['RollingMetrics']
 
 
-# ----------------------------------------------------------------------------
 # Modular Metrics: ScalingConfig
-# ----------------------------------------------------------------------------
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+class ScalingType(str, Enum):
+    """
+    List of scaling methods that can be applied
+    """
+    STANDARD = "standard"
+    MINMAX = "minmax"
+    LOG = "log"
+    NONE = "none"
+
 class ScalingConfig(BaseModel):
     scaling: Literal["log", "standard", "none"] = "none"
 
@@ -122,9 +150,11 @@ class ScalingConfig(BaseModel):
 
 
 
-# \/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/
-#                    metrics_config.yaml Main Configuration
-# /\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\
+# ____________________________________________________________________________
+# ----------------------------------------------------------------------------
+#                      config.yaml Main Configuration
+# ----------------------------------------------------------------------------
+# ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
 
 class MetricsConfig(BaseModel):
     """
@@ -133,7 +163,9 @@ class MetricsConfig(BaseModel):
     Wallet cohorts conform to the structure of a dict keyed on the cohort name and containing
     a dict with keys that match WalletCohortMetricType.
     """
-    wallet_cohorts: Dict[str, Dict['WalletCohortMetricType', 'Metric']]  # Direct mapping
+    wallet_cohorts: Optional[Dict[str, 'WalletCohort']]
+    time_series: Optional[Dict[str, 'TimeSeriesValueColumn']]
+
 
     model_config = {
         "extra": "forbid"
@@ -143,7 +175,7 @@ class MetricsConfig(BaseModel):
 # Wallet Cohort Metrics
 # ============================================================================
 
-class WalletCohortMetricType(str, Enum):
+class WalletCohortMetric(str, Enum):
     """
     A list of all valid names of wallet cohort buysell metrics.
     """
@@ -159,3 +191,23 @@ class WalletCohortMetricType(str, Enum):
     SELLERS_REPEAT = "sellers_repeat"
 
 
+class WalletCohort(RootModel[Dict['WalletCohortMetric', 'Metric']]):
+    """
+    Represents a cohort that contains valid cohort metrics (e.g. total_bought, buyers_new, etc.)
+    and their associated modular metrics flattening definitions.
+    """
+    pass
+
+
+# ============================================================================
+# Time Series Metrics
+# ============================================================================
+
+class TimeSeriesValueColumn(RootModel[Dict[str, 'Metric']]):
+    """
+    Represents a dataset that contains a value_column such as price, volume, etc. and their
+    corresponding metrics flattening definitions.
+
+    RootModel is used to define a class that acts as a wrapper around a dictionary.
+    """
+    pass
