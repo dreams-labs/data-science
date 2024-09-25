@@ -1,13 +1,16 @@
 """
 utility functions use in data science notebooks
 """
-
 import time
+import os
 from datetime import datetime, timedelta
 import logging
 import functools
 import yaml
 import progressbar
+
+# pydantic config classes
+from config_models.config import MainConfig
 
 
 
@@ -68,18 +71,23 @@ def load_config(file_path='../notebooks/config.yaml'):
         dict: Parsed YAML configuration with calculated date fields, if applicable.
     """
     with open(file_path, 'r', encoding='utf-8') as file:
-        config = yaml.safe_load(file)
+        config_dict = yaml.safe_load(file)
 
-    # Check if training_data and modeling_period_start are present in the config
-    if 'training_data' in config and 'modeling_period_start' in config['training_data']:
+    # Calculate and add period boundary dates into the config['training_data'] section
+    if 'training_data' in config_dict and 'modeling_period_start' in config_dict['training_data']:
+        period_dates = calculate_period_dates(config_dict['training_data'])
+        config_dict['training_data'].update(period_dates)
 
-        # Calculate the period dates using the logic from utils.py
-        period_dates = calculate_period_dates(config['training_data'])
+    # If the config file has a pydantic definition, return the pydantic object
+    filename = os.path.basename(file_path)
+    if filename == 'config.yaml':
+        config = MainConfig(**config_dict)
+        return config
 
-        # Add the calculated dates back into the training_data section
-        config['training_data'].update(period_dates)
+    # Otherwise return the normal dict
+    return config_dict
 
-    return config
+
 
 # helper function for load_config
 def calculate_period_dates(config):
