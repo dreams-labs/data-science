@@ -320,10 +320,10 @@ def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
 
 
 
-def generate_time_series_metrics(
+def generate_time_series_indicators(
         time_series_df: pd.DataFrame,
         config: dict,
-        value_column_metrics_config: dict,
+        value_column_indicators_config: dict,
         value_column: str,
         id_column: Optional[str]='coin_id'
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -335,18 +335,18 @@ def generate_time_series_metrics(
     - time_series_df (pd.DataFrame): The input DataFrame with time series data.
     - config: The full general config file containing training_period_start and
         training_period_end.
-    - value_column_metrics_config: The metrics_config subcomponent with the parameters for the
-        value_column, e.g. metrics_config['time_series']['prices']['price']['metrics']
-    - value_column (string): The name of the column used to calculate the metrics (e.g., 'price').
+    - value_column_indicators_config: The metrics_config subcomponent with the parameters for the
+        value_column, e.g. metrics_config['time_series']['prices']['price']['indicators']
+    - value_column (string): The column used to calculate the indicators (e.g., 'price').
     - id_column (Optional[string]): The name of the column used to identify different series
         (e.g., 'coin_id'). If None, assumes a single time series.
 
     Returns:
-    - full_metrics_df (pd.DataFrame): Input df with additional columns for the configured metrics.
-        Only includes series that had complete data for the period between training_period_start
-        and training_period_end.
-    - partial_time_series_metrics_df (pd.DataFrame): Input df with additional columns for the
-        configured metrics. Only includes series that had partial data for the period.
+    - full_indicators_df (pd.DataFrame): Input df with additional columns for the specified
+        indicators. Only includes series that had complete data for the period between
+        training_period_start and training_period_end.
+    - partial_time_series_indicators_df (pd.DataFrame): Input df with additional columns for the
+        configured indicators. Only includes series that had partial data for the period.
     """
     # 1. Data Quality Checks and Formatting
     # -------------------------------------
@@ -364,7 +364,7 @@ def generate_time_series_metrics(
     time_series_df = time_series_df[(time_series_df['date'] >= training_period_start) &
                                     (time_series_df['date'] <= training_period_end)]
 
-    # 2. Metric Calculations
+    # 2. Indicator Calculations
     # ----------------------
     if id_column:
         # Multi-series data (e.g., multiple coins)
@@ -376,7 +376,7 @@ def generate_time_series_metrics(
         groupby_column = lambda x: True # Group all rows on dummy column    # pylint: disable=C3001
 
     for _, group in time_series_df.groupby(groupby_column):
-        for metric, config in value_column_metrics_config.items():
+        for metric, config in value_column_indicators_config.items():
             period = config['parameters']['period']
 
             if metric == 'sma':
@@ -389,19 +389,19 @@ def generate_time_series_metrics(
 
     # 3. Split records by complete vs partial time series coverage
     # ------------------------------------------------------------
-    full_metrics_df, partial_time_series_metrics_df, coverage_stats = split_dataframe_by_coverage(
+    full_indicators_df, partial_time_series_indicators_df, coverage_stats = split_dataframe_by_coverage(
         time_series_df, training_period_start, training_period_end, id_column
     )
 
     # Logging
-    logger.debug("Generated time series metrics data. Out of %s total series, %s had complete period "
+    logger.debug("Generated time series indicators data. Out of %s total series, %s had complete period "
                  "coverage, %s had partial coverage",
                  coverage_stats['total_series'],
                  coverage_stats['full_coverage'],
                  coverage_stats['partial_coverage']
     )
 
-    return full_metrics_df, partial_time_series_metrics_df
+    return full_indicators_df, partial_time_series_indicators_df
 
 
 def split_dataframe_by_coverage(

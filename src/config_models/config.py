@@ -1,11 +1,12 @@
 """
 Validation logic for items in config.yaml
 """
-# pylint: disable=C0115
 from datetime import date
 from typing import Dict, Optional
 from pydantic import BaseModel, Field
 
+# pylint: disable=C0115  # no docstring for class Config
+# pylint: disable=R0903  # too few methods for class Config
 
 # ----------------------------------------------------------------------------
 # ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||

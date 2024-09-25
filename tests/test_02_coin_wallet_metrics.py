@@ -293,7 +293,7 @@ def test_fill_buysell_metrics_df():
 
 
 # ------------------------------------------ #
-# generate_time_series_metrics() unit tests
+# generate_time_series_indicators() unit tests
 # ------------------------------------------ #
 
 @pytest.fixture
@@ -342,20 +342,20 @@ def sample_config():
     }
 
 @pytest.mark.unit
-def test_generate_time_series_metrics_basic_functionality(sample_time_series_df, sample_metrics_config, sample_config):
+def test_generate_time_series_indicators_basic_functionality(sample_time_series_df, sample_metrics_config, sample_config):
     """
-    Test the basic functionality of generate_time_series_metrics to ensure that SMA and EMA
+    Test the basic functionality of generate_time_series_indicators to ensure that SMA and EMA
     are calculated correctly for a simple DataFrame with multiple coin_ids, and that the date
     range filtering works.
     """
     # Convert the date to datetime in the sample data
     sample_time_series_df['date'] = pd.to_datetime(sample_time_series_df['date'])
 
-    # Run the generate_time_series_metrics function
-    result_df, _ = cwm.generate_time_series_metrics(
-        time_series_df=sample_time_series_df,
-        config=sample_config,
-        value_column_metrics_config=sample_metrics_config['time_series']['prices']['price']['metrics'],
+    # Run the generate_time_series_indicators function
+    result_df, _ = cwm.generate_time_series_indicators(
+        sample_time_series_df,
+        sample_config,
+        sample_metrics_config['time_series']['prices']['price']['metrics'],
         value_column='price'
     )
 
@@ -407,9 +407,9 @@ def test_generate_time_series_metrics_basic_functionality(sample_time_series_df,
     assert len(result_df) == len(sample_time_series_df), "Output row count does not match input row count"
 
 @pytest.mark.unit
-def test_generate_time_series_metrics_different_periods(sample_time_series_df, sample_config):
+def test_generate_time_series_indicators_different_periods(sample_time_series_df, sample_config):
     """
-    Test the functionality of generate_time_series_metrics with different periods for SMA and EMA.
+    Test the functionality of generate_time_series_indicators with different periods for SMA and EMA.
     """
     # Adjust the sample_metrics_config for different periods
     sample_metrics_config = {
@@ -437,10 +437,10 @@ def test_generate_time_series_metrics_different_periods(sample_time_series_df, s
     sample_time_series_df['date'] = pd.to_datetime(sample_time_series_df['date'])
 
     # Run the generate_time_series_metrics function
-    result_df, _ = cwm.generate_time_series_metrics(
-        time_series_df=sample_time_series_df,
-        config=sample_config,
-        value_column_metrics_config=sample_metrics_config['time_series']['prices']['price']['metrics'],
+    result_df, _ = cwm.generate_time_series_indicators(
+        sample_time_series_df,
+        sample_config,
+        sample_metrics_config['time_series']['prices']['price']['metrics'],
         value_column='price'
     )
 
@@ -489,35 +489,35 @@ def test_generate_time_series_metrics_different_periods(sample_time_series_df, s
     ), "EMA calculation incorrect for coin_id=2"
 
 @pytest.mark.unit
-def test_generate_time_series_metrics_value_column_does_not_exist(sample_time_series_df, sample_metrics_config, sample_config):
+def test_generate_time_series_indicators_value_column_does_not_exist(sample_time_series_df, sample_metrics_config, sample_config):
     """
-    Test that generate_time_series_metrics raises a KeyError if the value_column does not exist in the time_series_df.
+    Test that generate_time_series_indicators raises a KeyError if the value_column does not exist in the time_series_df.
     """
     # Use a value_column that doesn't exist in the DataFrame
     invalid_value_column = 'non_existent_column'
 
     with pytest.raises(KeyError, match=f"Input DataFrame does not include column '{invalid_value_column}'"):
-        cwm.generate_time_series_metrics(
+        cwm.generate_time_series_indicators(
             time_series_df=sample_time_series_df,
             config=sample_config,
-            value_column_metrics_config=sample_metrics_config['time_series']['prices']['price']['metrics'],
+            value_column_indicators_config=sample_metrics_config['time_series']['prices']['price']['metrics'],
             value_column=invalid_value_column
         )
 
 
 @pytest.mark.unit
-def test_generate_time_series_metrics_value_column_contains_nan(sample_time_series_df, sample_metrics_config, sample_config):
+def test_generate_time_series_indicators_value_column_contains_nan(sample_time_series_df, sample_metrics_config, sample_config):
     """
-    Test that generate_time_series_metrics raises a ValueError if the value_column contains null values.
+    Test that generate_time_series_indicators raises a ValueError if the value_column contains null values.
     """
     # Introduce null values into the 'price' column
     sample_time_series_df.loc[0, 'price'] = None
 
     with pytest.raises(ValueError, match="contains null values"):
-        cwm.generate_time_series_metrics(
+        cwm.generate_time_series_indicators(
             time_series_df=sample_time_series_df,
             config=sample_config,
-            value_column_metrics_config=sample_metrics_config['time_series']['prices']['price']['metrics'],
+            value_column_indicators_config=sample_metrics_config['time_series']['prices']['price']['metrics'],
             value_column='price'
         )
 
@@ -727,11 +727,11 @@ def test_generate_time_series_metrics_no_nulls_and_row_count(prices_df, config, 
 
     expected_rows = len(full_duration_coins) * full_duration_days
 
-    # Run the generate_time_series_metrics function
-    full_metrics_df, partial_time_series_metrics_df = cwm.generate_time_series_metrics(
+    # Run the generate_time_series_indicators function
+    full_metrics_df, partial_time_series_metrics_df = cwm.generate_time_series_indicators(
         time_series_df=prices_df,
         config=config,
-        value_column_metrics_config=metrics_config['time_series']['prices']['price']['metrics'],
+        value_column_indicators_config=metrics_config['time_series']['prices']['price']['indicators'],
         value_column=value_column
     )
 
