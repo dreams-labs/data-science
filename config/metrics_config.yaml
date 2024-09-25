@@ -46,12 +46,12 @@ time_series:
         max:
           scaling: "standard"
       rolling:
-        stats:
+        aggregations:
           max:
             scaling: "standard"
         comparisons:
           pct_change:
-            scaling: "none"        # No scaling for percentage change, as it's already normalized.
+            scaling: "none"
         window_duration: 15
         lookback_periods: 3
       indicators:
@@ -62,7 +62,7 @@ time_series:
             max:
               scaling: "standard"
           rolling:
-            stats:
+            aggregations:
               mean:
                 scaling: "standard"
             comparisons:
@@ -78,7 +78,7 @@ time_series:
             scaling: "log"
         comparisons:
           pct_change:
-            scaling: "none"        # No scaling for percentage change, as it's already normalized.
+            scaling: "none"
         window_duration: 15
         lookback_periods: 3
 

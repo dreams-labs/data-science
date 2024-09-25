@@ -37,10 +37,29 @@ class Metric(BaseModel):
     calculated. Scaling is applied to the dataframe containing every coin_id's values for the
     metric and done as part of preprocessing.
     """
-    aggregations: Optional[Dict['AggregationType', 'AggregationConfig']] = None
-    rolling: Optional['RollingMetrics'] = None
-    indicators: Optional[Dict[str, 'Indicators']] = None
+    aggregations: Optional[Dict['AggregationType', 'AggregationConfig']] = Field(default=None)
+    rolling: Optional['RollingMetrics'] = Field(default=None)
+    indicators: Optional[Dict[str, 'Indicators']] = Field(default=None)
 
+    @model_validator(mode='after')
+    def remove_empty_fields(cls, values):
+        """
+        Remove all empty dictionaries, None values, or empty lists from the nested structure.
+        """
+        values_dict = values.dict(exclude_none=True)  # Exclude None values
+        cleaned_dict = remove_empty_dicts(values_dict)  # Recursively remove empty dictionaries
+        return cleaned_dict
+
+def remove_empty_dicts(data):
+    """
+    Recursively remove all empty dictionaries from a nested structure.
+    """
+    if isinstance(data, dict):
+        return {k: remove_empty_dicts(v) for k, v in data.items() if v not in [None, {}, []]}
+    elif isinstance(data, list):
+        return [remove_empty_dicts(item) for item in data if item not in [None, {}, []]]
+    else:
+        return data
 
 
 # Modular Metrics: Aggregations
@@ -63,8 +82,8 @@ class AggregationConfig(BaseModel):
     Defines the configuration for each aggregation type.
     An aggregation can have a scaling field or a buckets field.
     """
-    scaling: Optional[str] = None  # Optional scaling field (e.g., "log", "standard")
-    buckets: Optional['BucketsList'] = None  # Optional buckets field
+    scaling: Optional[str] = Field(default=None)
+    buckets: Optional['BucketsList'] = Field(default=None)
 
 
 
@@ -103,8 +122,21 @@ class RollingMetrics(BaseModel):
     """
     window_duration: Annotated[int, Field(gt=0)]  # Must be an integer > 0
     lookback_periods: Annotated[int, Field(gt=0)]  # Must be an integer > 0
-    aggregations: Optional['AggregationConfig'] = None
-    comparisons: Optional[Dict['ComparisonType', 'ScalingConfig']] = None
+    aggregations: Optional['AggregationConfig'] = Field(default=None)
+    comparisons: Optional[Dict[ComparisonType, Optional['ScalingConfig']]] = Field(default=None)
+
+    @model_validator(mode='after')
+    def validate_comparisons_scaling(cls, values):
+        """
+        Validate that all ComparisonType entries in comparisons have a valid 'scaling' config.
+        """
+        comparisons = values.comparisons  # Access attribute directly
+        if comparisons:
+            for comparison_type, scaling_config in comparisons.items():
+                if not scaling_config or not scaling_config.scaling:
+                    raise ValueError(f"Comparison '{comparison_type}' requires a valid 'scaling' configuration.")
+        return values
+
 
 
 class Comparisons(BaseModel):
@@ -114,7 +146,8 @@ class Comparisons(BaseModel):
     See feature_engineering.calculate_comparisons().
     """
     comparison_type: ComparisonType
-    scaling: Optional['ScalingConfig'] = None
+    scaling: Optional['ScalingConfig'] = Field(default=None)
+
 
 
 # Modular Metrics: Indicators
@@ -128,8 +161,8 @@ class IndicatorType(str, Enum):
 
 class Indicators(BaseModel):
     parameters: Dict[str, Any]  # Flexible to handle unique parameters
-    aggregations: Optional['AggregationConfig']
-    rolling: Optional['RollingMetrics']
+    aggregations: Optional['AggregationConfig'] = Field(default=None)
+    rolling: Optional['RollingMetrics'] = Field(default=None)
 
 
 # Modular Metrics: ScalingConfig
@@ -144,10 +177,10 @@ class ScalingType(str, Enum):
     NONE = "none"
 
 class ScalingConfig(BaseModel):
-    scaling: Literal["log", "standard", "none"] = "none"
-
-
-
+    """
+    Configuration for applying scaling to metrics.
+    """
+    scaling: ScalingType  # Make scaling required for any ComparisonType
 
 
 # ____________________________________________________________________________
@@ -163,8 +196,8 @@ class MetricsConfig(BaseModel):
     Wallet cohorts conform to the structure of a dict keyed on the cohort name and containing
     a dict with keys that match WalletCohortMetricType.
     """
-    wallet_cohorts: Optional[Dict[str, 'WalletCohort']]
-    time_series: Optional[Dict[str, 'TimeSeriesValueColumn']]
+    wallet_cohorts: Optional[Dict[str, 'WalletCohort']] = Field(default=None)
+    time_series: Optional[Dict[str, 'TimeSeriesValueColumn']] = Field(default=None)
 
 
     model_config = {
