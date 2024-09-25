@@ -12,10 +12,75 @@ from pydantic import BaseModel, RootModel, Field, model_validator, conlist
 # pylint: disable=E0213  # we are defining classes and not class instancees so we don't need "self"
 
 
+# ____________________________________________________________________________
+# ----------------------------------------------------------------------------
+#                   metrics_config.yaml Main Configuration
+# ----------------------------------------------------------------------------
+# ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
 
+class MetricsConfig(BaseModel):
+    """
+    Top level structure of the main metrics_config.yaml file.
+
+    Wallet cohorts conform to the structure of a dict keyed on the cohort name and containing
+    a dict with keys that match WalletCohortMetricType.
+    """
+    wallet_cohorts: Optional[Dict[str, 'WalletCohort']] = Field(default=None)
+    time_series: Optional[Dict[str, 'TimeSeriesValueColumn']] = Field(default=None)
+
+    model_config = {
+        "extra": "forbid",  # Prevent extra fields that are not defined
+        "str_max_length": 2000  # Increase the max length of error message string representations
+    }
+
+# ============================================================================
+# Wallet Cohort Metrics
+# ============================================================================
+
+class WalletCohortMetric(str, Enum):
+    """
+    A list of all valid names of wallet cohort buysell metrics.
+    """
+    TOTAL_BALANCE = "total_balance"
+    TOTAL_HOLDERS = "total_holders"
+    TOTAL_BOUGHT = "total_bought"
+    TOTAL_SOLD = "total_sold"
+    TOTAL_NET_TRANSFERS = "total_net_transfers"
+    TOTAL_VOLUME = "total_volume"
+    BUYERS_NEW = "buyers_new"
+    BUYERS_REPEAT = "buyers_repeat"
+    SELLERS_NEW = "sellers_new"
+    SELLERS_REPEAT = "sellers_repeat"
+
+
+class WalletCohort(RootModel[Dict['WalletCohortMetric', 'Metric']]):
+    """
+    Represents a cohort that contains valid cohort metrics (e.g. total_bought, buyers_new, etc.)
+    and their associated modular metrics flattening definitions.
+    """
+    pass
+
+
+# ============================================================================
+# Time Series Metrics
+# ============================================================================
+
+class TimeSeriesValueColumn(RootModel[Dict[str, 'Metric']]):
+    """
+    Represents a dataset that contains a value_column such as price, volume, etc. and their
+    corresponding metrics flattening definitions.
+
+    RootModel is used to define a class that acts as a wrapper around a dictionary.
+    """
+    pass
+
+
+
+# ____________________________________________________________________________
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Modular Metrics Flattening System
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
 
 class Metric(BaseModel):
     """
@@ -185,67 +250,6 @@ class ScalingConfig(BaseModel):
     scaling: ScalingType  # Make scaling required for any ComparisonType
 
 
-# ____________________________________________________________________________
-# ----------------------------------------------------------------------------
-#                      config.yaml Main Configuration
-# ----------------------------------------------------------------------------
-# ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
-
-class MetricsConfig(BaseModel):
-    """
-    Top level structure of the main metrics_config.yaml file.
-
-    Wallet cohorts conform to the structure of a dict keyed on the cohort name and containing
-    a dict with keys that match WalletCohortMetricType.
-    """
-    wallet_cohorts: Optional[Dict[str, 'WalletCohort']] = Field(default=None)
-    time_series: Optional[Dict[str, 'TimeSeriesValueColumn']] = Field(default=None)
-
-    model_config = {
-        "extra": "forbid",  # Prevent extra fields that are not defined
-        "str_max_length": 2000  # Increase the max length of error message string representations
-    }
-
-# ============================================================================
-# Wallet Cohort Metrics
-# ============================================================================
-
-class WalletCohortMetric(str, Enum):
-    """
-    A list of all valid names of wallet cohort buysell metrics.
-    """
-    TOTAL_BALANCE = "total_balance"
-    TOTAL_HOLDERS = "total_holders"
-    TOTAL_BOUGHT = "total_bought"
-    TOTAL_SOLD = "total_sold"
-    TOTAL_NET_TRANSFERS = "total_net_transfers"
-    TOTAL_VOLUME = "total_volume"
-    BUYERS_NEW = "buyers_new"
-    BUYERS_REPEAT = "buyers_repeat"
-    SELLERS_NEW = "sellers_new"
-    SELLERS_REPEAT = "sellers_repeat"
-
-
-class WalletCohort(RootModel[Dict['WalletCohortMetric', 'Metric']]):
-    """
-    Represents a cohort that contains valid cohort metrics (e.g. total_bought, buyers_new, etc.)
-    and their associated modular metrics flattening definitions.
-    """
-    pass
-
-
-# ============================================================================
-# Time Series Metrics
-# ============================================================================
-
-class TimeSeriesValueColumn(RootModel[Dict[str, 'Metric']]):
-    """
-    Represents a dataset that contains a value_column such as price, volume, etc. and their
-    corresponding metrics flattening definitions.
-
-    RootModel is used to define a class that acts as a wrapper around a dictionary.
-    """
-    pass
 
 # ============================================================================
 # Model Rebuilding
