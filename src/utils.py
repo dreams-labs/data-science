@@ -14,6 +14,36 @@ from config_models.config import MainConfig
 
 
 
+def load_config(file_path='../notebooks/config.yaml'):
+    """
+    Load configuration from a YAML file. Automatically calculates and adds period dates
+    if modeling_period_start is present in the training_data section.
+
+    Args:
+        file_path (str): Path to the config file.
+
+    Returns:
+        dict: Parsed YAML configuration with calculated date fields, if applicable.
+    """
+    with open(file_path, 'r', encoding='utf-8') as file:
+        config_dict = yaml.safe_load(file)
+
+    # Calculate and add period boundary dates into the config['training_data'] section
+    if 'training_data' in config_dict and 'modeling_period_start' in config_dict['training_data']:
+        period_dates = calculate_period_dates(config_dict['training_data'])
+        config_dict['training_data'].update(period_dates)
+
+    # If the config file has a pydantic definition, return the pydantic object
+    filename = os.path.basename(file_path)
+    if filename == 'config.yaml':
+        config = MainConfig(**config_dict)
+        return config
+
+    # Otherwise return the normal dict
+    return config_dict
+
+
+
 def timing_decorator(func):
     """
     A decorator that logs the execution time of the decorated function.
@@ -57,35 +87,6 @@ def timing_decorator(func):
         )
         return result
     return wrapper
-
-
-def load_config(file_path='../notebooks/config.yaml'):
-    """
-    Load configuration from a YAML file. Automatically calculates and adds period dates
-    if modeling_period_start is present in the training_data section.
-
-    Args:
-        file_path (str): Path to the config file.
-
-    Returns:
-        dict: Parsed YAML configuration with calculated date fields, if applicable.
-    """
-    with open(file_path, 'r', encoding='utf-8') as file:
-        config_dict = yaml.safe_load(file)
-
-    # Calculate and add period boundary dates into the config['training_data'] section
-    if 'training_data' in config_dict and 'modeling_period_start' in config_dict['training_data']:
-        period_dates = calculate_period_dates(config_dict['training_data'])
-        config_dict['training_data'].update(period_dates)
-
-    # If the config file has a pydantic definition, return the pydantic object
-    filename = os.path.basename(file_path)
-    if filename == 'config.yaml':
-        config = MainConfig(**config_dict)
-        return config
-
-    # Otherwise return the normal dict
-    return config_dict
 
 
 
