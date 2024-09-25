@@ -6,12 +6,14 @@ from datetime import datetime
 import time
 import re
 import pandas as pd
+import numpy as np
 import dreams_core.core as dc
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 
 # set up logger at the module level
 logger = dc.setup_logger()
+
 
 
 def flatten_coin_date_df(df, df_metrics_config, training_period_end):
@@ -85,7 +87,7 @@ def flatten_coin_date_df(df, df_metrics_config, training_period_end):
     # Step 2: Flatten the metrics
     # ---------------------------
     start_time = time.time()
-    logger.info("Flattening columns %s into coin-level features...", configured_metrics)
+    logger.debug("Flattening columns %s into coin-level features...", configured_metrics)
 
     all_flat_features = []
 
@@ -105,7 +107,7 @@ def flatten_coin_date_df(df, df_metrics_config, training_period_end):
     # Convert the list of feature dictionaries into a DataFrame
     flattened_df = pd.DataFrame(all_flat_features)
 
-    logger.info('Flattened input df into coin-level features with shape %s after %.2f seconds.',
+    logger.debug('Flattened input df into coin-level features with shape %s after %.2f seconds.',
                 flattened_df.shape, time.time() - start_time)
 
 
@@ -126,23 +128,35 @@ def flatten_date_features(time_series_df, df_metrics_config):
     - flat_features (dict): A dictionary of flattened features for the coin.
 
     Raises:
-    - ValueError: If an expected column (e.g., a metric) is missing from the DataFrame.
+    - ValueError: If no columns were matched to the config.
     """
     flat_features = {}
+    matched_columns = False
 
     # Apply global stats calculations for each metric
     for metric, config in df_metrics_config.items():
         if metric not in time_series_df.columns:
-            raise ValueError(f"Metric '{metric}' is missing from the input DataFrame.")
+            continue
 
+        matched_columns = True
         ts = time_series_df[metric].copy()  # Get the time series for this metric
 
         # Standard aggregations
         if 'aggregations' in config:
-            for agg in config['aggregations']:
-                flat_features[f'{metric}_{agg}'] = calculate_stat(ts, agg)
+            for agg, agg_config in config['aggregations'].items():
+                agg_value = calculate_stat(ts, agg)
 
-        # Rolling window calculations
+                # Generate bucket columns if buckets are specified in the config
+                if agg_config and 'buckets' in agg_config:
+                    bucket_category = bucketize_value(agg_value, agg_config['buckets'])
+                    flat_features[f'{metric}_{agg}_bucket'] = bucket_category
+
+                # Return the aggregate metric if it is not bucketized
+                else:
+                    flat_features[f'{metric}_{agg}'] = agg_value
+
+
+        # Rolling window calculations (unchanged)
         rolling = config.get('rolling', False)
         if rolling:
             rolling_stats = config['rolling'].get('stats', [])
@@ -155,7 +169,32 @@ def flatten_date_features(time_series_df, df_metrics_config):
                 ts, window_duration, lookback_periods, rolling_stats, comparisons, metric)
             flat_features.update(rolling_features)
 
+    if not matched_columns:
+        raise ValueError("No metrics matched the columns in the DataFrame.")
+
     return flat_features
+
+
+
+def bucketize_value(value, buckets):
+    """
+    Categorizes a value based on the defined buckets.
+
+    Params:
+    - value (float): The value to categorize
+    - buckets (list): List of dictionaries defining the buckets
+
+    Returns:
+    - str: The category the value falls into
+    """
+    for bucket in buckets:
+        for category, threshold in bucket.items():
+            if threshold == "remainder" or value <= threshold:
+                return category
+
+    # This should never be reached if buckets are properly defined
+    raise ValueError(f"Value {value} does not fit in any defined bucket.")
+
 
 
 def calculate_rolling_window_features(
@@ -231,7 +270,7 @@ def calculate_rolling_window_features(
 
 
 
-def calculate_adj_pct_change(start_value, end_value, cap=1000, impute_value=1):
+def calculate_adj_pct_change(start_value, end_value, cap=5, impute_value=1):
     """
     Calculates the adjusted percentage change between two values.
     Handles cases where the start_value is 0 by imputing a value and capping extreme
@@ -251,46 +290,10 @@ def calculate_adj_pct_change(start_value, end_value, cap=1000, impute_value=1):
             return 0  # 0/0 case
         else:
             # Use imputed value to maintain scale of increase
-            return min((end_value / impute_value - 1) * 100, cap)
+            return min((end_value / impute_value) - 1, cap)
     else:
-        pct_change = (end_value / start_value - 1) * 100
+        pct_change = (end_value / start_value) - 1
         return min(pct_change, cap)  # Cap the percentage change if it's too large
-
-
-
-def calculate_global_stats(ts, metric_name, config):
-    """
-    Calculates global statistics for a given time series based on the configuration.
-
-    Params:
-    - ts (pd.Series): The time series data for the metric.
-    - metric_name (str): The name of the metric (e.g., 'buyers_new').
-    - config (dict): The configuration object that specifies which statistics to calculate
-                     for each metric.
-
-    Returns:
-    - stats (dict): A dictionary containing calculated statistics. The keys are in the format
-                    of '{metric_name}_{aggregation}' (e.g., 'buyers_new_sum').
-
-    Example:
-    If the config specifies 'sum' and 'mean' for 'buyers_new', the result will include:
-    {
-        'buyers_new_sum': value,
-        'buyers_new_mean': value
-    }
-    """
-    stats = {}  # Initialize an empty dictionary to hold the calculated stats.
-
-    # Get the aggregation functions for the given metric from the config.
-    metric_config = config['metrics'].get(metric_name, [])
-
-    # Loop through each aggregation function and calculate the stat.
-    for agg in metric_config:
-        # Use the helper function 'calculate_stat' to calculate each aggregation.
-        stats[f'{metric_name}_{agg}'] = calculate_stat(ts, agg)
-
-    return stats  # Return the dictionary of calculated statistics.
-
 
 
 def calculate_stat(ts, stat):
@@ -319,6 +322,67 @@ def calculate_stat(ts, stat):
         raise KeyError(f"Unsupported aggregation type: '{stat}'.")
 
     return agg_functions[stat]()
+
+
+
+def convert_dataset_metrics_to_features(
+    dataset_metrics_df,
+    dataset_config,
+    dataset_metrics_config,
+    config,
+    modeling_config,
+):
+    """
+    Converts a dataset keyed on coin_id-date into features by flattening and preprocessing.
+
+    Args:
+        dataset_metrics_df (pd.DataFrame): Input DataFrame containing raw metrics data.
+        dataset_config (dict): The component of config['datasets'] relating to this dataset
+        dataset_metrics_config (dict): The component of metrics_config relating to this dataset
+        config (dict): The whole main config, which includes period boundary dates
+        modeling_config (dict): The whole modeling_config, which includes a list of tables to
+            drop in preprocessing
+
+    Returns:
+        preprocessed_df (pd.DataFrame): The preprocessed DataFrame ready for model training.
+        dataset_tuple (tuple): Contains the preprocessed file name and fill method for the dataset.
+    """
+
+    # Flatten the metrics DataFrame into the required format for feature engineering
+    flattened_metrics_df = flatten_coin_date_df(
+        dataset_metrics_df,
+        dataset_metrics_config,
+        config['training_data']['training_period_end']  # Ensure data is up to training period end
+    )
+
+    # Save the flattened output and retrieve the file path
+    _, flattened_metrics_filepath = save_flattened_outputs(
+        flattened_metrics_df,
+        os.path.join(
+            modeling_config['modeling']['modeling_folder'],  # Folder to store flattened outputs
+            'outputs/flattened_outputs'
+        ),
+        dataset_config['description'],  # Descriptive metadata for the dataset
+        config['training_data']['modeling_period_start']  # Ensure data starts from modeling period
+    )
+
+    # Preprocess the flattened data and return the preprocessed file path
+    preprocessed_df, preprocessed_filepath = preprocess_coin_df(
+        flattened_metrics_filepath,
+        modeling_config,
+        dataset_config,
+        dataset_metrics_config
+    )
+
+    # this tuple is the input for create_training_data_df() that will merge all the files
+    dataset_tuple = (
+        preprocessed_filepath.split('preprocessed_outputs/')[1],  # Extract file name from the path
+        dataset_config['fill_method']  # fill method to be used as part of the merge process
+    )
+
+    return preprocessed_df, dataset_tuple
+
+
 
 
 def save_flattened_outputs(flattened_df, output_dir, metric_description, modeling_period_start):
@@ -384,6 +448,17 @@ def preprocess_coin_df(input_path, modeling_config, dataset_config, df_metrics_c
 
     # Step 2: Preprocess Data
     # ----------------------------------------------------
+    # Convert categorical columns to one-hot encoding (get_dummies)
+    categorical_columns = df.select_dtypes(include=['object', 'category']).columns
+    categorical_columns = [col for col in categorical_columns if col != 'coin_id']
+    for col in categorical_columns:
+        num_categories = df[col].nunique()
+        if num_categories > 8:
+            logger.warning("Column '%s' has %s categories, consider reducing categories.",
+                           col, num_categories)
+        df = pd.get_dummies(df, columns=[col], drop_first=True)
+
+
     # Convert boolean columns to integers
     df = df.apply(lambda col: col.astype(int) if col.dtype == bool else col)
 
@@ -404,7 +479,6 @@ def preprocess_coin_df(input_path, modeling_config, dataset_config, df_metrics_c
         if column not in retain_columns:
             max_value_ratio = df[column].value_counts(normalize=True).max()
             if max_value_ratio > sameness_threshold:
-                print(f"max_value_ratio:{max_value_ratio}, sameness_threshold:{sameness_threshold}")
                 df = df.drop(columns=[column])
                 logger.info("Dropped column %s due to sameness_threshold", column)
 
@@ -430,9 +504,10 @@ def preprocess_coin_df(input_path, modeling_config, dataset_config, df_metrics_c
     df.to_csv(output_path, index=False)
 
     # Log the changes made
-    logger.info("Preprocessed file saved at: %s", output_path)
+    logger.debug("Preprocessed file saved at: %s", output_path)
 
     return df, output_path
+
 
 
 def apply_scaling(df, df_metrics_config):
@@ -455,7 +530,7 @@ def apply_scaling(df, df_metrics_config):
     # Loop through each metric and its settings in the df_metrics_config
     for metric, settings in df_metrics_config.items():
 
-        # if there are not aggregations for the metric, continue
+        # if there are no aggregations for the metric, continue
         if 'aggregations' not in settings.keys():
             continue
         for agg, agg_settings in settings['aggregations'].items():
@@ -471,7 +546,10 @@ def apply_scaling(df, df_metrics_config):
                 if scaling_method is None or scaling_method == "none":
                     continue
 
-                if scaling_method in scalers:
+                if scaling_method == "log":
+                    # Apply log1p scaling (log(1 + x)) to avoid issues with zero values
+                    df[[column_name]] = np.log1p(df[[column_name]])
+                elif scaling_method in scalers:
                     scaler = scalers[scaling_method]
                     df[[column_name]] = scaler.fit_transform(df[[column_name]])
                 else:
@@ -693,19 +771,16 @@ def create_target_variables_mooncrater(prices_df, training_data_config, modeling
     - target_variable_df: DataFrame with columns 'coin_id', 'is_moon', and 'is_crater'.
     - outcomes_df: DataFrame tracking outcomes for each coin.
     """
-    # Retrieve the necessary values from modeling_config
+    # 1. Retrieve Variables and Prepare DataFrame
+    # -------------------------------------------
+    prices_df = prices_df.copy()
+    prices_df['date'] = pd.to_datetime(prices_df['date'])
     modeling_period_start = pd.to_datetime(training_data_config['modeling_period_start'])
     modeling_period_end = pd.to_datetime(training_data_config['modeling_period_end'])
-    moon_threshold = modeling_config['target_variables']['moon_threshold']
-    crater_threshold = modeling_config['target_variables']['crater_threshold']
 
-    # Filter for the modeling period and sort the DataFrame
-    prices_df['date'] = pd.to_datetime(prices_df['date'])
-    modeling_period_df = prices_df[
-        (prices_df['date'] >= modeling_period_start) &
-        (prices_df['date'] <= modeling_period_end)
+    modeling_period_df = prices_df.loc[
+        prices_df['date'].between(modeling_period_start, modeling_period_end)
     ]
-    modeling_period_df = modeling_period_df.sort_values(by=['coin_id', 'date'])
 
     # Raise an exception if any coins are missing a price at the start or end date
     start_price_coins = modeling_period_df[
@@ -723,9 +798,18 @@ def create_target_variables_mooncrater(prices_df, training_data_config, modeling
         missing = ', '.join(map(str, coins_missing_price))
         raise ValueError(f"Missing price for coins at start or end date: {missing}")
 
+
+    # 2. Generate Target Variables
+    # ----------------------------
+    moon_threshold = modeling_config['target_variables']['moon_threshold']
+    crater_threshold = modeling_config['target_variables']['crater_threshold']
+    moon_minimum_percent = modeling_config['target_variables']['moon_minimum_percent']
+    crater_minimum_percent = modeling_config['target_variables']['crater_minimum_percent']
+
     # Process coins with data
     target_data = []
     outcomes = []
+    price_performance = []
     for coin_id, group in modeling_period_df.groupby('coin_id'):
         # Get the price on the start and end dates
         price_start = group[group['date'] == modeling_period_start]['price'].values
@@ -735,10 +819,12 @@ def create_target_variables_mooncrater(prices_df, training_data_config, modeling
         if len(price_start) > 0 and len(price_end) > 0:
             price_start = price_start[0]
             price_end = price_end[0]
-            is_moon = int(price_end >= (1 + moon_threshold) * price_start)
-            is_crater = int(price_end <= (1 + crater_threshold) * price_start)
+            performance = (price_end - price_start) / price_start
+            is_moon = int(performance >= moon_threshold)
+            is_crater = int(performance <= crater_threshold)
             target_data.append({'coin_id': coin_id, 'is_moon': is_moon, 'is_crater': is_crater})
             outcomes.append({'coin_id': coin_id, 'outcome': 'target variable created'})
+            price_performance.append({'coin_id': coin_id, 'performance': performance})
 
         else:
             if len(price_start) == 0 and len(price_end) == 0:
@@ -748,27 +834,57 @@ def create_target_variables_mooncrater(prices_df, training_data_config, modeling
             else:
                 outcomes.append({'coin_id': coin_id, 'outcome': 'missing end price'})
 
-    # Log outcomes for coins with no data in the modeling period
-    all_coins = set(prices_df['coin_id'].unique())
-    modeling_period_coins = set(modeling_period_df['coin_id'].unique())
-    coins_with_no_data = all_coins - modeling_period_coins
-    for coin_id in coins_with_no_data:
-        outcomes.append({'coin_id': coin_id, 'outcome': 'missing both'})
 
-    # Convert target data and outcomes to DataFrames
+    # 3. Ensure minimum percentage for moon and crater
+    # ------------------------------------------------
     target_variables_df = pd.DataFrame(target_data)
-    outcomes_df = pd.DataFrame(outcomes)
+    price_performance_df = pd.DataFrame(price_performance)
 
-    # Log summary based on outcomes
-    target_variable_count = len(outcomes_df[outcomes_df['outcome'] == 'target variable created'])
+    # Sort by performance for filling the remaining moons and craters
+    price_performance_df = price_performance_df.sort_values(by='performance', ascending=False)
+
+    total_coins = len(target_variables_df)
     moons = target_variables_df[target_variables_df['is_moon'] == 1].shape[0]
     craters = target_variables_df[target_variables_df['is_crater'] == 1].shape[0]
 
+    # Check if moons meet minimum percentage
+    if moons / total_coins < moon_minimum_percent:
+        additional_moons_needed = int(total_coins * moon_minimum_percent) - moons
+        # Mark additional top-performing coins as moons
+        moon_candidates = price_performance_df[~price_performance_df['coin_id'].isin(  # pylint: disable=E1136
+            target_variables_df[target_variables_df['is_moon'] == 1]['coin_id']
+            )].head(additional_moons_needed)
+        target_variables_df.loc[
+            target_variables_df['coin_id'].isin(moon_candidates['coin_id']), 'is_moon'
+            ] = 1
+
+    # Check if craters meet minimum percentage
+    if craters / total_coins < crater_minimum_percent:
+        additional_craters_needed = int(total_coins * crater_minimum_percent) - craters
+        # Mark additional worst-performing coins as craters
+        crater_candidates = price_performance_df[~price_performance_df['coin_id'].isin(  # pylint: disable=E1136
+            target_variables_df[target_variables_df['is_crater'] == 1]['coin_id']
+            )].tail(additional_craters_needed)
+        target_variables_df.loc[
+            target_variables_df['coin_id'].isin(crater_candidates['coin_id']), 'is_crater'
+            ] = 1
+
+
+    # 4. Log and Format Output DataFrame
+    # ----------------------------------
+    outcomes_df = pd.DataFrame(outcomes)
+
     logger.info(
         "Target variables created for %s coins with %s/%s (%s) moons and %s/%s (%s) craters.",
-        target_variable_count,
-        moons, target_variable_count, dc.human_format(100 * moons / target_variable_count) + '%',
-        craters, target_variable_count, dc.human_format(100 * craters / target_variable_count) + '%'
+        len(target_variables_df),
+        target_variables_df[target_variables_df['is_moon'] == 1].shape[0], total_coins,
+        dc.human_format(
+            100 * target_variables_df[target_variables_df['is_moon'] == 1].shape[0] / total_coins
+            ) + '%',
+        target_variables_df[target_variables_df['is_crater'] == 1].shape[0], total_coins,
+        dc.human_format(
+            100 * target_variables_df[target_variables_df['is_crater'] == 1].shape[0] / total_coins
+            ) + '%'
     )
 
     return target_variables_df, outcomes_df
@@ -810,11 +926,10 @@ def prepare_model_input_df(training_data_df, target_variable_df, target_column):
     model_input_df = pd.merge(training_data_df, target_variable_df[['coin_id', target_column]],
                               on='coin_id', how='inner')
 
-    # Step 5: Check if any coin_id from training_data_df is missing a target variable
-    missing_targets = set(training_data_df['coin_id']) - set(target_variable_df['coin_id'])
-    if missing_targets:
-        logger.warning("Some 'coin_id's are missing target variables: %s"
-                       , ', '.join(map(str, missing_targets)))
+    # Step 5: Remove coins without target variables and output a warning with the number removed
+    removed_coins = len(training_data_df) - len(model_input_df)
+    if removed_coins > 0:
+        logger.warning("%s coins were removed due to missing target variables", removed_coins)
 
     # Step 6: Perform final quality checks (e.g., no NaNs in important columns)
     if model_input_df.isnull().any().any():

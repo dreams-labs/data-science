@@ -419,13 +419,16 @@ def split_dataframe_by_coverage(
     - start_date (pd.Timestamp): Start date of the training period.
     - end_date (pd.Timestamp): End date of the modeling period.
     - id_column (Optional[str]): The name of the column used to identify different series.
-                                 If None, assumes a single time series.
 
     Returns:
     - full_coverage_df (pd.DataFrame): DataFrame with series having complete data for the period.
     - partial_coverage_df (pd.DataFrame): DataFrame with series having partial data for the period.
     - coverage_stats (dict): Dictionary containing coverage statistics.
     """
+    # Convert params to datetime
+    start_date = pd.to_datetime(start_date)
+    end_date = pd.to_datetime(end_date)
+
     # Define a function to check if a date range has full coverage
     def has_full_coverage(min_date, max_date):
         return (min_date <= start_date) and (max_date >= end_date)

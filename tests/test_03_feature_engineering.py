@@ -99,113 +99,32 @@ def test_calculate_adj_pct_change():
     """
 
     # Test 1: Standard Case
-    result = fe.calculate_adj_pct_change(100, 150, 1000)
-    assert result == 50, f"Expected 50, got {result}"
+    result = fe.calculate_adj_pct_change(100, 150, 10)
+    assert result == .50, f"Expected 50, got {result}"
 
     # Test 2: Zero Start, Non-Zero End (Capped)
-    result = fe.calculate_adj_pct_change(0, 100, 1000)
-    assert result == 1000, f"Expected 1000 (capped), got {result}"
+    result = fe.calculate_adj_pct_change(0, 100, 10)
+    assert result == 10, f"Expected 1000 (capped), got {result}"
 
     # Test 3: Zero Start, Zero End (0/0 case)
-    result = fe.calculate_adj_pct_change(0, 0, 1000)
+    result = fe.calculate_adj_pct_change(0, 0, 10)
     assert result == 0, f"Expected 0 for 0/0 case, got {result}"
 
     # Test 4: Negative Start to Positive End
-    result = fe.calculate_adj_pct_change(-50, 100, 1000)
-    assert result == -300, f"Expected -300, got {result}"
+    result = fe.calculate_adj_pct_change(-50, 100, 10)
+    assert result == -3, f"Expected -300, got {result}"
 
     # Test 5: Start Greater than End (Decrease)
-    result = fe.calculate_adj_pct_change(200, 100, 1000)
-    assert result == -50, f"Expected -50, got {result}"
+    result = fe.calculate_adj_pct_change(200, 100, 10)
+    assert result == -.5, f"Expected -50, got {result}"
 
     # Test 6: Small Positive Change (Cap not breached)
-    result = fe.calculate_adj_pct_change(0, 6, 1000, 1)
-    assert result == 500, f"Expected 500, got {result}"
+    result = fe.calculate_adj_pct_change(0, 6, 10, 1)
+    assert result == 5, f"Expected 500, got {result}"
 
     # Test 7: Large Increase (Capped at 1000%)
-    result = fe.calculate_adj_pct_change(10, 800, 1000)
-    assert result == 1000, f"Expected 1000 (capped), got {result}"
-
-
-# ------------------------------------------ #
-# calculate_adj_pct_change() unit tests
-# ------------------------------------------ #
-
-@pytest.mark.unit
-def test_fe_calculate_global_stats():
-    """
-    Unit tests for the fe.calculate_global_stats() function.
-
-    Test Cases:
-    1. **Basic case**: Tests that 'sum' and 'mean' statistics are calculated correctly for a
-        simple time series.
-    2. **Multiple metrics**: Verifies that different metrics with different configurations of
-        stats (e.g., 'sum', 'mean', 'median', 'std') are handled properly.
-    3. **Empty time series**: Ensures that an empty time series is handled correctly, returning
-        NaN for mean and 0 for sum.
-    4. **Edge case (single value)**: Tests the function's behavior when the time series contains
-        only a single value.
-    5. **No stats in config**: Ensures that when no stats are defined for a metric, the function
-        returns an empty dictionary without errors.
-    """
-
-    # Sample configurations and time series for testing
-    basic_config = {
-        'metrics': {
-            'buyers_new': ['sum', 'mean']
-        }
-    }
-
-    multiple_metrics_config = {
-        'metrics': {
-            'buyers_new': ['sum', 'mean'],
-            'sellers_new': ['median', 'std']
-        }
-    }
-
-    empty_ts = pd.Series([])
-    single_value_ts = pd.Series([10])
-    sample_ts = pd.Series([1, 2, 3, 4, 5])
-
-    # Test Case 1: Basic case with simple sum and mean
-    basic_stats = fe.calculate_global_stats(sample_ts, 'buyers_new', basic_config)
-    assert basic_stats['buyers_new_sum'] == 15
-    assert basic_stats['buyers_new_mean'] == 3
-
-    # Test Case 2: Multiple metrics with different stats
-    sample_coin_df = pd.DataFrame({
-        'buyers_new': [1, 2, 3, 4, 5],
-        'sellers_new': [5, 4, 3, 2, 1]
-    })
-
-    multiple_stats = fe.calculate_global_stats(sample_coin_df['buyers_new'], 'buyers_new', multiple_metrics_config)
-    assert multiple_stats['buyers_new_sum'] == 15
-    assert multiple_stats['buyers_new_mean'] == 3
-
-    multiple_stats = fe.calculate_global_stats(sample_coin_df['sellers_new'], 'sellers_new', multiple_metrics_config)
-    assert multiple_stats['sellers_new_median'] == 3
-    assert round(multiple_stats['sellers_new_std'], 5) == round(sample_coin_df['sellers_new'].std(), 5)
-
-    # Test Case 3: Empty time series should return NaN or 0 for certain stats
-    empty_stats = fe.calculate_global_stats(empty_ts, 'buyers_new', basic_config)
-    assert pd.isna(empty_stats['buyers_new_mean'])
-    assert empty_stats['buyers_new_sum'] == 0
-
-    # Test Case 4: Single value time series
-    single_value_stats = fe.calculate_global_stats(single_value_ts, 'buyers_new', basic_config)
-    assert single_value_stats['buyers_new_sum'] == 10
-    assert single_value_stats['buyers_new_mean'] == 10
-
-    # Test Case 5: No stats defined for the given metric
-    no_stats_config = {
-        'metrics': {
-            'buyers_new': []
-        }
-    }
-
-    no_stats = fe.calculate_global_stats(sample_ts, 'buyers_new', no_stats_config)
-    assert not no_stats  # Should return an empty dictionary since no stats are defined
-
+    result = fe.calculate_adj_pct_change(10, 800, 10)
+    assert result == 10, f"Expected 1000 (capped), got {result}"
 
 
 # ------------------------------------------ #
@@ -341,7 +260,14 @@ def test_fe_flatten_date_features():
     # Sample configuration for metrics
     metrics_config = {
         'buyers_new': {
-            'aggregations': ['sum', 'mean', 'max', 'min', 'median', 'std'],
+            'aggregations': {
+                'sum': {'scaling': 'none'},
+                'mean': {'scaling': 'none'},
+                'max': {'scaling': 'none'},
+                'min': {'scaling': 'none'},
+                'median': {'scaling': 'none'},
+                'std': {'scaling': 'none'}
+            },
             'rolling': {
                 'stats': ['sum', 'max'],
                 'comparisons': ['change', 'pct_change'],
@@ -350,7 +276,11 @@ def test_fe_flatten_date_features():
             }
         },
         'sellers_new': {
-            'aggregations': ['sum', 'mean', 'max']
+            'aggregations': {
+                'sum': {'scaling': 'none'},
+                'mean': {'scaling': 'none'},
+                'max': {'scaling': 'none'}
+            }
         }
     }
 
@@ -369,11 +299,13 @@ def test_fe_flatten_date_features():
     assert flat_features['sellers_new_max'] == 30  # Max of sellers_new column
 
     # Test Case 2: Missing metric column in DataFrame
-    with pytest.raises(ValueError, match="Metric 'nonexistent_metric' is missing from the input DataFrame"):
+    with pytest.raises(ValueError, match="No metrics matched the columns in the DataFrame"):
         sample_coin_df_invalid = sample_coin_df.drop(columns=['buyers_new'])
         metrics_config_invalid = {
             'nonexistent_metric': {
-                'aggregations': ['sum']
+                'aggregations': {
+                    'sum': {'scaling': 'none'}
+                }
             }
         }
         fe.flatten_date_features(sample_coin_df_invalid, metrics_config_invalid)
@@ -382,7 +314,9 @@ def test_fe_flatten_date_features():
     with pytest.raises(KeyError, match="Unsupported aggregation type: 'invalid_agg'."):
         metrics_config_invalid_agg = {
             'buyers_new': {
-                'aggregations': ['invalid_agg']
+                'aggregations': {
+                    'invalid_agg': {'scaling': 'none'}
+                }
             }
         }
         fe.flatten_date_features(sample_coin_df, metrics_config_invalid_agg)
@@ -435,10 +369,21 @@ def test_fe_flatten_coin_date_df():
     # Sample configuration for metrics
     df_metrics_config = {
         'buyers_new': {
-            'aggregations': ['sum', 'mean', 'max', 'min', 'median', 'std'],
+            'aggregations': {
+                'sum': {'scaling': 'none'},
+                'mean': {'scaling': 'none'},
+                'max': {'scaling': 'none'},
+                'min': {'scaling': 'none'},
+                'median': {'scaling': 'none'},
+                'std': {'scaling': 'none'}
+            }
         },
         'sellers_new': {
-            'aggregations': ['sum', 'mean', 'max']
+            'aggregations': {
+                'sum': {'scaling': 'none'},
+                'mean': {'scaling': 'none'},
+                'max': {'scaling': 'none'}
+            }
         }
     }
 
@@ -459,22 +404,12 @@ def test_fe_flatten_coin_date_df():
     ]
     assert all(col in result.columns for col in expected_columns)
 
-    # Test Case 2: One coin with missing metric data (buyers_new should raise ValueError)
-    df_missing_metric = pd.DataFrame({
-        'date': [pd.Timestamp('2024-01-01'), pd.Timestamp('2024-01-02'), pd.Timestamp('2024-01-03')],
-        'coin_id': [1, 1, 1],
-        'sellers_new': [5, 10, 15]
-    })
-
-    with pytest.raises(ValueError, match="Metric 'buyers_new' is missing from the input DataFrame."):
-        fe.flatten_coin_date_df(df_missing_metric, df_metrics_config, training_period_end)
-
-    # Test Case 3: Empty DataFrame (should raise ValueError)
+    # Test Case 2: Empty DataFrame (should raise ValueError)
     df_empty = pd.DataFrame(columns=['coin_id', 'buyers_new', 'sellers_new'])
     with pytest.raises(ValueError, match="Input DataFrame is empty"):
         fe.flatten_coin_date_df(df_empty, df_metrics_config, training_period_end)
 
-    # Test Case 4: One coin in the dataset
+    # Test Case 3: One coin in the dataset
     df_one_coin = pd.DataFrame({
         'date': [pd.Timestamp('2024-01-01'), pd.Timestamp('2024-01-02'), pd.Timestamp('2024-01-03')],
         'coin_id': [1, 1, 1],
@@ -975,7 +910,9 @@ def test_create_target_variables_mooncrater():
     modeling_config = {
         'target_variables': {
             'moon_threshold': 0.5,  # 50% increase
-            'crater_threshold': -0.5  # 50% decrease
+            'moon_minimum_percent': 0.0,
+            'crater_threshold': -0.5,  # 50% decrease
+            'crater_minimum_percent': 0.0
         }
     }
 
