@@ -201,9 +201,9 @@ class MetricsConfig(BaseModel):
     wallet_cohorts: Optional[Dict[str, 'WalletCohort']] = Field(default=None)
     time_series: Optional[Dict[str, 'TimeSeriesValueColumn']] = Field(default=None)
 
-
     model_config = {
-        "extra": "forbid"
+        "extra": "forbid",  # Prevent extra fields that are not defined
+        "str_max_length": 2000  # Increase the max length of error message string representations
     }
 
 # ============================================================================

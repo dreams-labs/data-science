@@ -199,8 +199,6 @@ def generate_coin_buysell_metrics_df(coin_cohort_profits_df):
     returns:
     - buysell_metrics_df (dataframe): df of metrics on new/repeat buyers/sellers and transaction totals on each date
     '''
-    start_time = time.time()
-
     # Ensure 'date' column is of datetime type
     coin_cohort_profits_df['date'] = pd.to_datetime(coin_cohort_profits_df['date'])
 
