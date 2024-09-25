@@ -147,7 +147,7 @@ def flatten_date_features(time_series_df, df_metrics_config):
                 agg_value = calculate_stat(ts, agg)
 
                 # Generate bucket columns if buckets are specified in the config
-                if 'buckets' in agg_config:
+                if agg_config and 'buckets' in agg_config:
                     bucket_category = bucketize_value(agg_value, agg_config['buckets'])
                     flat_features[f'{metric}_{agg}_bucket'] = bucket_category
 
@@ -325,12 +325,12 @@ def calculate_stat(ts, stat):
 
 
 
-def convert_coin_date_metrics_to_features(
+def convert_dataset_metrics_to_features(
     dataset_metrics_df,
     dataset_config,
     dataset_metrics_config,
     config,
-    modeling_config
+    modeling_config,
 ):
     """
     Converts a dataset keyed on coin_id-date into features by flattening and preprocessing.
@@ -381,6 +381,7 @@ def convert_coin_date_metrics_to_features(
     )
 
     return preprocessed_df, dataset_tuple
+
 
 
 

@@ -92,6 +92,33 @@ wallet_cohorts:
           scaling: "log"    # Total sold should also be scaled to account for high variance.
 
 
+  normies:
+    buyers_new:
+      aggregations:
+        sum:
+          scaling: "log"    # Scaling applied to sums, which can vary significantly in range.
+      rolling:
+        aggregations:
+          sum:
+            scaling: "log"
+        window_duration: 15
+        lookback_periods: 1
+    total_bought:
+      aggregations:
+        sum:
+          scaling: "log"    # Scaling applied to sums, which can vary significantly in range.
+      rolling:
+        aggregations:
+          sum:
+            scaling: "log"
+        window_duration: 15
+        lookback_periods: 1
+    total_sold:
+      aggregations:
+        sum:
+          scaling: "log"    # Total sold should also be scaled to account for high variance.
+
+
 # Time series keyed on coin_id-date
 time_series:
   market_data:

@@ -14,7 +14,7 @@ target_variables:
     # until this % is reached
 
 modeling:
-  target_column: "is_crater"  # "is_moon" or "is_crater" depending on the experiment
+  target_column: "is_moon"  # "is_moon" or "is_crater" depending on the experiment
   modeling_folder: "..//modeling"  # location of the modeling folder where outputs will be saved
   config_folder: "..//config"  # location of the config folder where base case config files are
   train_test_split: 0.25  # Size of the test set as a proportion of the data

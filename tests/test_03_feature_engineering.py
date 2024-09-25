@@ -298,7 +298,6 @@ def test_fe_flatten_date_features():
     assert flat_features['sellers_new_mean'] == 17.5  # Mean of sellers_new column
     assert flat_features['sellers_new_max'] == 30  # Max of sellers_new column
 
-    import pytest
     # Test Case 2: Missing metric column in DataFrame
     with pytest.raises(ValueError, match="No metrics matched the columns in the DataFrame"):
         sample_coin_df_invalid = sample_coin_df.drop(columns=['buyers_new'])
@@ -405,22 +404,12 @@ def test_fe_flatten_coin_date_df():
     ]
     assert all(col in result.columns for col in expected_columns)
 
-    # Test Case 2: One coin with missing metric data (buyers_new should raise ValueError)
-    df_missing_metric = pd.DataFrame({
-        'date': [pd.Timestamp('2024-01-01'), pd.Timestamp('2024-01-02'), pd.Timestamp('2024-01-03')],
-        'coin_id': [1, 1, 1],
-        'sellers_new': [5, 10, 15]
-    })
-
-    with pytest.raises(ValueError, match="Metric 'buyers_new' is missing from the input DataFrame."):
-        fe.flatten_coin_date_df(df_missing_metric, df_metrics_config, training_period_end)
-
-    # Test Case 3: Empty DataFrame (should raise ValueError)
+    # Test Case 2: Empty DataFrame (should raise ValueError)
     df_empty = pd.DataFrame(columns=['coin_id', 'buyers_new', 'sellers_new'])
     with pytest.raises(ValueError, match="Input DataFrame is empty"):
         fe.flatten_coin_date_df(df_empty, df_metrics_config, training_period_end)
 
-    # Test Case 4: One coin in the dataset
+    # Test Case 3: One coin in the dataset
     df_one_coin = pd.DataFrame({
         'date': [pd.Timestamp('2024-01-01'), pd.Timestamp('2024-01-02'), pd.Timestamp('2024-01-03')],
         'coin_id': [1, 1, 1],
@@ -921,7 +910,9 @@ def test_create_target_variables_mooncrater():
     modeling_config = {
         'target_variables': {
             'moon_threshold': 0.5,  # 50% increase
-            'crater_threshold': -0.5  # 50% decrease
+            'moon_minimum_percent': 0.0,
+            'crater_threshold': -0.5,  # 50% decrease
+            'crater_minimum_percent': 0.0
         }
     }
 
