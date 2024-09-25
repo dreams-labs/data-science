@@ -99,32 +99,32 @@ def test_calculate_adj_pct_change():
     """
 
     # Test 1: Standard Case
-    result = fe.calculate_adj_pct_change(100, 150, 1000)
-    assert result == 50, f"Expected 50, got {result}"
+    result = fe.calculate_adj_pct_change(100, 150, 10)
+    assert result == .50, f"Expected 50, got {result}"
 
     # Test 2: Zero Start, Non-Zero End (Capped)
-    result = fe.calculate_adj_pct_change(0, 100, 1000)
-    assert result == 1000, f"Expected 1000 (capped), got {result}"
+    result = fe.calculate_adj_pct_change(0, 100, 10)
+    assert result == 10, f"Expected 1000 (capped), got {result}"
 
     # Test 3: Zero Start, Zero End (0/0 case)
-    result = fe.calculate_adj_pct_change(0, 0, 1000)
+    result = fe.calculate_adj_pct_change(0, 0, 10)
     assert result == 0, f"Expected 0 for 0/0 case, got {result}"
 
     # Test 4: Negative Start to Positive End
-    result = fe.calculate_adj_pct_change(-50, 100, 1000)
-    assert result == -300, f"Expected -300, got {result}"
+    result = fe.calculate_adj_pct_change(-50, 100, 10)
+    assert result == -3, f"Expected -300, got {result}"
 
     # Test 5: Start Greater than End (Decrease)
-    result = fe.calculate_adj_pct_change(200, 100, 1000)
-    assert result == -50, f"Expected -50, got {result}"
+    result = fe.calculate_adj_pct_change(200, 100, 10)
+    assert result == -.5, f"Expected -50, got {result}"
 
     # Test 6: Small Positive Change (Cap not breached)
-    result = fe.calculate_adj_pct_change(0, 6, 1000, 1)
-    assert result == 500, f"Expected 500, got {result}"
+    result = fe.calculate_adj_pct_change(0, 6, 10, 1)
+    assert result == 5, f"Expected 500, got {result}"
 
     # Test 7: Large Increase (Capped at 1000%)
-    result = fe.calculate_adj_pct_change(10, 800, 1000)
-    assert result == 1000, f"Expected 1000 (capped), got {result}"
+    result = fe.calculate_adj_pct_change(10, 800, 10)
+    assert result == 10, f"Expected 1000 (capped), got {result}"
 
 
 # ------------------------------------------ #
@@ -260,7 +260,14 @@ def test_fe_flatten_date_features():
     # Sample configuration for metrics
     metrics_config = {
         'buyers_new': {
-            'aggregations': ['sum', 'mean', 'max', 'min', 'median', 'std'],
+            'aggregations': {
+                'sum': {'scaling': 'none'},
+                'mean': {'scaling': 'none'},
+                'max': {'scaling': 'none'},
+                'min': {'scaling': 'none'},
+                'median': {'scaling': 'none'},
+                'std': {'scaling': 'none'}
+            },
             'rolling': {
                 'stats': ['sum', 'max'],
                 'comparisons': ['change', 'pct_change'],
@@ -269,7 +276,11 @@ def test_fe_flatten_date_features():
             }
         },
         'sellers_new': {
-            'aggregations': ['sum', 'mean', 'max']
+            'aggregations': {
+                'sum': {'scaling': 'none'},
+                'mean': {'scaling': 'none'},
+                'max': {'scaling': 'none'}
+            }
         }
     }
 
@@ -287,12 +298,15 @@ def test_fe_flatten_date_features():
     assert flat_features['sellers_new_mean'] == 17.5  # Mean of sellers_new column
     assert flat_features['sellers_new_max'] == 30  # Max of sellers_new column
 
+    import pytest
     # Test Case 2: Missing metric column in DataFrame
-    with pytest.raises(ValueError, match="Metric 'nonexistent_metric' is missing from the input DataFrame"):
+    with pytest.raises(ValueError, match="No metrics matched the columns in the DataFrame"):
         sample_coin_df_invalid = sample_coin_df.drop(columns=['buyers_new'])
         metrics_config_invalid = {
             'nonexistent_metric': {
-                'aggregations': ['sum']
+                'aggregations': {
+                    'sum': {'scaling': 'none'}
+                }
             }
         }
         fe.flatten_date_features(sample_coin_df_invalid, metrics_config_invalid)
@@ -301,7 +315,9 @@ def test_fe_flatten_date_features():
     with pytest.raises(KeyError, match="Unsupported aggregation type: 'invalid_agg'."):
         metrics_config_invalid_agg = {
             'buyers_new': {
-                'aggregations': ['invalid_agg']
+                'aggregations': {
+                    'invalid_agg': {'scaling': 'none'}
+                }
             }
         }
         fe.flatten_date_features(sample_coin_df, metrics_config_invalid_agg)
@@ -354,10 +370,21 @@ def test_fe_flatten_coin_date_df():
     # Sample configuration for metrics
     df_metrics_config = {
         'buyers_new': {
-            'aggregations': ['sum', 'mean', 'max', 'min', 'median', 'std'],
+            'aggregations': {
+                'sum': {'scaling': 'none'},
+                'mean': {'scaling': 'none'},
+                'max': {'scaling': 'none'},
+                'min': {'scaling': 'none'},
+                'median': {'scaling': 'none'},
+                'std': {'scaling': 'none'}
+            }
         },
         'sellers_new': {
-            'aggregations': ['sum', 'mean', 'max']
+            'aggregations': {
+                'sum': {'scaling': 'none'},
+                'mean': {'scaling': 'none'},
+                'max': {'scaling': 'none'}
+            }
         }
     }
 
