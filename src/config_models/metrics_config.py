@@ -201,7 +201,6 @@ class MetricsConfig(BaseModel):
     wallet_cohorts: Optional[Dict[str, 'WalletCohort']] = Field(default=None)
     time_series: Optional[Dict[str, 'TimeSeriesValueColumn']] = Field(default=None)
 
-
     model_config = {
         "extra": "forbid"
     }

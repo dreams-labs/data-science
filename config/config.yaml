@@ -14,7 +14,7 @@ datasets:
   wallet_cohorts:
 
     under_15k:
-      description: 'cohort_10k'  # prefix that will be included in feature columns
+      description: 'cohort_15k'  # prefix that will be included in feature columns
       fill_method: 'fill_zeros'
       sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
       wallet_minimum_inflows: 1000  # Minimum USD inflows for a wallet to be considered a 'shark'
@@ -24,7 +24,7 @@ datasets:
       wallet_min_coin_wins: 3  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
 
     under_75k:
-      description: 'cohort_50k'  # prefix that will be included in feature columns
+      description: 'cohort_75k'  # prefix that will be included in feature columns
       fill_method: 'fill_zeros'
       sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
       wallet_minimum_inflows: 10000  # Minimum USD inflows for a wallet to be considered a 'shark'

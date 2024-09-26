@@ -5,9 +5,6 @@ from datetime import date
 from typing import Dict, Optional
 from pydantic import BaseModel, Field
 
-# pylint: disable=C0115  # no docstring for class Config
-# pylint: disable=R0903  # too few methods for class Config
-
 
 # ____________________________________________________________________________
 # ----------------------------------------------------------------------------
@@ -22,8 +19,10 @@ class MainConfig(BaseModel):
     datasets: 'DatasetsConfig' = Field(...)
     data_cleaning: 'DataCleaningConfig' = Field(...)
 
-    class Config:
-        extra = "forbid"
+    model_config = {
+        "extra": "forbid"
+    }
+
 
 # ============================================================================
 # Training Data Configuration
@@ -49,12 +48,14 @@ class DatasetsConfig(BaseModel):
     These items represent categories of datasets that will be converted to features and used
     by the model. Each category must contain at least one item.
     """
-    wallet_cohorts: Dict[str, 'WalletCohortConfig'] = Field(..., min_items=1)
-    time_series: Dict[str, Dict[str, 'TimeSeriesDataConfig']] = Field(..., min_items=1)
-    coin_facts: Dict[str, 'CoinFactsConfig'] = Field(..., min_items=1)
+    wallet_cohorts: Dict[str, 'WalletCohortConfig'] = Field(..., min_length=1)
+    time_series: Dict[str, Dict[str, 'TimeSeriesDataConfig']] = Field(..., min_length=1)
+    coin_facts: Dict[str, 'CoinFactsConfig'] = Field(..., min_length=1)
 
-    class Config:
-        extra = "forbid"
+    model_config = {
+        "extra": "forbid"
+    }
+
 
 # ----------------------------------------------------------------------------
 # Wallet Cohort Configuration
