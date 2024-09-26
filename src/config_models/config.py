@@ -5,6 +5,9 @@ from datetime import date
 from typing import Dict, Optional
 from pydantic import BaseModel, Field
 
+# pylint: disable=C0115  # no docstring for class Config
+# pylint: disable=R0903  # too few methods for class Config
+
 
 # ____________________________________________________________________________
 # ----------------------------------------------------------------------------
@@ -20,9 +23,9 @@ class MainConfig(BaseModel):
     data_cleaning: 'DataCleaningConfig' = Field(...)
 
     model_config = {
-        "extra": "forbid"
+        "extra": "forbid",  # Prevent extra fields that are not defined
+        "str_max_length": 2000  # Increase the max length of error message string representations
     }
-
 
 # ============================================================================
 # Training Data Configuration
@@ -53,9 +56,8 @@ class DatasetsConfig(BaseModel):
     coin_facts: Dict[str, 'CoinFactsConfig'] = Field(..., min_length=1)
 
     model_config = {
-        "extra": "forbid"
+        "extra": "forbid",  # Prevent extra fields that are not defined
     }
-
 
 # ----------------------------------------------------------------------------
 # Wallet Cohort Configuration

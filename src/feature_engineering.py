@@ -4,6 +4,7 @@ functions used to build coin-level features from training data
 import os
 from datetime import datetime
 import time
+import copy
 import re
 import pandas as pd
 import numpy as np
@@ -13,6 +14,65 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 # set up logger at the module level
 logger = dc.setup_logger()
+
+
+
+def convert_dataset_metrics_to_features(
+    dataset_metrics_df,
+    dataset_config,
+    dataset_metrics_config,
+    config,
+    modeling_config,
+):
+    """
+    Converts a dataset keyed on coin_id-date into features by flattening and preprocessing.
+
+    Args:
+        dataset_metrics_df (pd.DataFrame): Input DataFrame containing raw metrics data.
+        dataset_config (dict): The component of config['datasets'] relating to this dataset
+        dataset_metrics_config (dict): The component of metrics_config relating to this dataset
+        config (dict): The whole main config, which includes period boundary dates
+        modeling_config (dict): The whole modeling_config, which includes a list of tables to
+            drop in preprocessing
+
+    Returns:
+        preprocessed_df (pd.DataFrame): The preprocessed DataFrame ready for model training.
+        dataset_tuple (tuple): Contains the preprocessed file name and fill method for the dataset.
+    """
+
+    # Flatten the metrics DataFrame into the required format for feature engineering
+    flattened_metrics_df = flatten_coin_date_df(
+        dataset_metrics_df,
+        dataset_metrics_config,
+        config['training_data']['training_period_end']  # Ensure data is up to training period end
+    )
+
+    # Save the flattened output and retrieve the file path
+    _, flattened_metrics_filepath = save_flattened_outputs(
+        flattened_metrics_df,
+        os.path.join(
+            modeling_config['modeling']['modeling_folder'],  # Folder to store flattened outputs
+            'outputs/flattened_outputs'
+        ),
+        dataset_config['description'],  # Descriptive metadata for the dataset
+        config['training_data']['modeling_period_start']  # Ensure data starts from modeling period
+    )
+
+    # Preprocess the flattened data and return the preprocessed file path
+    preprocessed_df, preprocessed_filepath = preprocess_coin_df(
+        flattened_metrics_filepath,
+        modeling_config,
+        dataset_config,
+        dataset_metrics_config
+    )
+
+    # this tuple is the input for create_training_data_df() that will merge all the files
+    dataset_tuple = (
+        preprocessed_filepath.split('preprocessed_outputs/')[1],  # Extract file name from the path
+        dataset_config['fill_method']  # fill method to be used as part of the merge process
+    )
+
+    return preprocessed_df, dataset_tuple
 
 
 
@@ -49,8 +109,7 @@ def flatten_coin_date_df(df, df_metrics_config, training_period_end):
         coin_df = df[df['coin_id'] == coin_id]
 
         # Create the full date range for the coin, explicitly cast to pd.Timestamp
-        full_date_range = pd.to_datetime(pd.date_range(start=coin_df['date'].min()
-                                                       , end=training_period_end)).to_pydatetime()
+        full_date_range = pd.date_range(start=coin_df['date'].min(), end=training_period_end)
 
         # Get the existing dates for the coin, explicitly cast to pd.Timestamp
         existing_dates = set(pd.to_datetime(coin_df['date'].unique()).to_pydatetime())
@@ -133,8 +192,11 @@ def flatten_date_features(time_series_df, df_metrics_config):
     flat_features = {}
     matched_columns = False
 
+    # promote indicators to the same key level as primary metrics
+    df_metrics_indicators_config = promote_indicators_to_metrics(df_metrics_config)
+
     # Apply global stats calculations for each metric
-    for metric, config in df_metrics_config.items():
+    for metric, config in df_metrics_indicators_config.items():
         if metric not in time_series_df.columns:
             continue
 
@@ -144,7 +206,7 @@ def flatten_date_features(time_series_df, df_metrics_config):
         # Standard aggregations
         if 'aggregations' in config:
             for agg, agg_config in config['aggregations'].items():
-                agg_value = calculate_stat(ts, agg)
+                agg_value = calculate_aggregation(ts, agg)
 
                 # Generate bucket columns if buckets are specified in the config
                 if agg_config and 'buckets' in agg_config:
@@ -159,20 +221,50 @@ def flatten_date_features(time_series_df, df_metrics_config):
         # Rolling window calculations (unchanged)
         rolling = config.get('rolling', False)
         if rolling:
-            rolling_stats = config['rolling'].get('stats', [])
+
+            rolling_aggregations = config['rolling'].get('aggregations', [])
             comparisons = config['rolling'].get('comparisons', [])
             window_duration = config['rolling']['window_duration']
             lookback_periods = config['rolling']['lookback_periods']
 
             # Calculate rolling metrics and update flat_features
             rolling_features = calculate_rolling_window_features(
-                ts, window_duration, lookback_periods, rolling_stats, comparisons, metric)
+                ts, window_duration, lookback_periods, rolling_aggregations, comparisons, metric)
             flat_features.update(rolling_features)
 
     if not matched_columns:
         raise ValueError("No metrics matched the columns in the DataFrame.")
 
     return flat_features
+
+
+def promote_indicators_to_metrics(df_metrics_config):
+    """
+    Moves indicators to the same level as other columns in the config file so that their
+    features can be generated the same way they are for primary metrics.
+
+    Params:
+    - df_metrics_config (dict): Configuration object with metric rules from the metrics file for
+        the specific input df.
+
+    Returns:
+    """
+    # make a deep copy to avoid impacting the original dict
+    df_metrics_indicators_config = copy.deepcopy(df_metrics_config)
+
+    for key, value in df_metrics_config.items():
+        # Check if indicators are present
+        if 'indicators' in value:
+            for indicator, indicator_data in value['indicators'].items():
+                # Create new top-level key: original key + indicator name
+                new_key = f"{key}_{indicator}"
+                df_metrics_indicators_config[new_key] = indicator_data
+
+            # Optionally, remove indicators from the original key
+            df_metrics_indicators_config[key].pop('indicators')
+
+    return df_metrics_indicators_config
+
 
 
 
@@ -201,7 +293,7 @@ def calculate_rolling_window_features(
         ts,
         window_duration,
         lookback_periods,
-        rolling_stats,
+        rolling_aggregations,
         comparisons,
         metric_name
     ):
@@ -213,7 +305,7 @@ def calculate_rolling_window_features(
     - ts (pd.Series): The time series data for the metric.
     - window_duration (int): The size of each rolling window (e.g., 7 for 7 days).
     - lookback_periods (int): The number of lookback periods to calculate (e.g., 2 for two periods).
-    - rolling_stats (list): The metrics to calculate for each rolling window (e.g. ['sum', 'max']).
+    - rolling_aggregations (list): The aggregations for each rolling window (e.g. ['sum', 'max']).
     - comparisons (list): The comparisons to make between the first and last value in the window.
     - metric_name (str): The name of the metric to include in the feature names.
 
@@ -229,22 +321,6 @@ def calculate_rolling_window_features(
     # Ensure we're not calculating more periods than we have data for
     actual_lookback_periods = min(lookback_periods, num_complete_periods)
 
-    # Helper function for comparison metric formulas
-    def calculate_comparisons(rolling_window, comparison):
-        """
-        helper function that calculates the comparison metric for the specific rolling window.
-        this helps make the for loop more readable.
-
-        params:
-            - rolling_window (pd.Series): the metric series for the given window only
-            - comparison (string): the type of comparison calculation to perform
-        """
-        if comparison == 'change':
-            return rolling_window.iloc[-1] - rolling_window.iloc[0]
-        elif comparison == 'pct_change':
-            start_value, end_value = rolling_window.iloc[0], rolling_window.iloc[-1]
-            return calculate_adj_pct_change(start_value, end_value)
-
     # Start processing from the last complete period, moving backwards
     for i in range(actual_lookback_periods):
         # Define the start and end of the current rolling window
@@ -256,9 +332,9 @@ def calculate_rolling_window_features(
             rolling_window = ts.iloc[start_period:end_period]
 
             # Loop through each statistic to calculate for the rolling window
-            for stat in rolling_stats:
-                stat_key = f'{metric_name}_{stat}_{window_duration}d_period_{i+1}'
-                features[stat_key] = calculate_stat(rolling_window, stat)
+            for agg in rolling_aggregations:
+                agg_key = f'{metric_name}_{agg}_{window_duration}d_period_{i+1}'
+                features[agg_key] = calculate_aggregation(rolling_window, agg)
 
             # If the rolling window has enough data, calculate comparisons
             if len(rolling_window) > 0:
@@ -296,7 +372,7 @@ def calculate_adj_pct_change(start_value, end_value, cap=5, impute_value=1):
         return min(pct_change, cap)  # Cap the percentage change if it's too large
 
 
-def calculate_stat(ts, stat):
+def calculate_aggregation(ts, stat):
     """
     Centralized function to calculate various aggregations on a time series.
 
@@ -324,65 +400,21 @@ def calculate_stat(ts, stat):
     return agg_functions[stat]()
 
 
-
-def convert_dataset_metrics_to_features(
-    dataset_metrics_df,
-    dataset_config,
-    dataset_metrics_config,
-    config,
-    modeling_config,
-):
+# Helper function for comparison metric formulas
+def calculate_comparisons(rolling_window, comparison):
     """
-    Converts a dataset keyed on coin_id-date into features by flattening and preprocessing.
+    helper function that calculates the comparison metric for the specific rolling window.
+    this helps make the for loop more readable.
 
-    Args:
-        dataset_metrics_df (pd.DataFrame): Input DataFrame containing raw metrics data.
-        dataset_config (dict): The component of config['datasets'] relating to this dataset
-        dataset_metrics_config (dict): The component of metrics_config relating to this dataset
-        config (dict): The whole main config, which includes period boundary dates
-        modeling_config (dict): The whole modeling_config, which includes a list of tables to
-            drop in preprocessing
-
-    Returns:
-        preprocessed_df (pd.DataFrame): The preprocessed DataFrame ready for model training.
-        dataset_tuple (tuple): Contains the preprocessed file name and fill method for the dataset.
+    params:
+        - rolling_window (pd.Series): the metric series for the given window only
+        - comparison (string): the type of comparison calculation to perform
     """
-
-    # Flatten the metrics DataFrame into the required format for feature engineering
-    flattened_metrics_df = flatten_coin_date_df(
-        dataset_metrics_df,
-        dataset_metrics_config,
-        config['training_data']['training_period_end']  # Ensure data is up to training period end
-    )
-
-    # Save the flattened output and retrieve the file path
-    _, flattened_metrics_filepath = save_flattened_outputs(
-        flattened_metrics_df,
-        os.path.join(
-            modeling_config['modeling']['modeling_folder'],  # Folder to store flattened outputs
-            'outputs/flattened_outputs'
-        ),
-        dataset_config['description'],  # Descriptive metadata for the dataset
-        config['training_data']['modeling_period_start']  # Ensure data starts from modeling period
-    )
-
-    # Preprocess the flattened data and return the preprocessed file path
-    preprocessed_df, preprocessed_filepath = preprocess_coin_df(
-        flattened_metrics_filepath,
-        modeling_config,
-        dataset_config,
-        dataset_metrics_config
-    )
-
-    # this tuple is the input for create_training_data_df() that will merge all the files
-    dataset_tuple = (
-        preprocessed_filepath.split('preprocessed_outputs/')[1],  # Extract file name from the path
-        dataset_config['fill_method']  # fill method to be used as part of the merge process
-    )
-
-    return preprocessed_df, dataset_tuple
-
-
+    if comparison == 'change':
+        return rolling_window.iloc[-1] - rolling_window.iloc[0]
+    elif comparison == 'pct_change':
+        start_value, end_value = rolling_window.iloc[0], rolling_window.iloc[-1]
+        return calculate_adj_pct_change(start_value, end_value)
 
 
 def save_flattened_outputs(flattened_df, output_dir, metric_description, modeling_period_start):
@@ -446,8 +478,8 @@ def preprocess_coin_df(input_path, modeling_config, dataset_config, df_metrics_c
         raise ValueError("Missing values detected in the DataFrame.")
 
 
-    # Step 2: Preprocess Data
-    # ----------------------------------------------------
+    # Step 2: Convert categorical and boolean columns to integers
+    # ---------------------------------------------------------------
     # Convert categorical columns to one-hot encoding (get_dummies)
     categorical_columns = df.select_dtypes(include=['object', 'category']).columns
     categorical_columns = [col for col in categorical_columns if col != 'coin_id']
@@ -462,14 +494,14 @@ def preprocess_coin_df(input_path, modeling_config, dataset_config, df_metrics_c
     # Convert boolean columns to integers
     df = df.apply(lambda col: col.astype(int) if col.dtype == bool else col)
 
-    # Apply feature selection based on drop_features from modeling_config
+
+    # Step 3: Feature Selection Based on Config
+    # ----------------------------------------------------
+    # Drop features specified in modeling_config['drop_features']
     drop_features = modeling_config['preprocessing'].get('drop_features', [])
     if drop_features:
         df = df.drop(columns=drop_features, errors='ignore')
 
-
-    # Step 3: Feature Selection Based on Config
-    # ----------------------------------------------------
     # Apply feature selection based on sameness_threshold and retain_columns from dataset_config
     sameness_threshold = dataset_config.get('sameness_threshold', 1.0)
     retain_columns = dataset_config.get('retain_columns', [])

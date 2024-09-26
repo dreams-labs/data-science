@@ -2,6 +2,8 @@
 utility functions use in data science notebooks
 """
 import time
+import sys
+import gc
 import os
 from datetime import datetime, timedelta
 import logging
@@ -9,11 +11,16 @@ import warnings
 import functools
 import yaml
 import progressbar
+import pandas as pd
+from pydantic import ValidationError
+import dreams_core.core as dc
 
-# pydantic config classes
+# pydantic config files
 from config_models.config import MainConfig
 from config_models.metrics_config import MetricsConfig
 
+# set up logger at the module level
+logger = dc.setup_logger()
 
 
 def load_config(file_path='../notebooks/config.yaml'):
@@ -40,22 +47,35 @@ def load_config(file_path='../notebooks/config.yaml'):
 
     with warnings.catch_warnings():
         # Suppresses pydantic "serialized value may not be as expected" warnings
-        # See https://github.com/pydantic/pydantic/issues/7905 for details
         warnings.filterwarnings("ignore", category=UserWarning)
 
-        if filename in ['config.yaml', 'test_config.yaml']:
-            config_pydantic = MainConfig(**config_dict)
-            config = config_pydantic.model_dump(mode="json")
+        try:
+            if filename in ['config.yaml', 'test_config.yaml']:
+                config_pydantic = MainConfig(**config_dict)
+                config = config_pydantic.model_dump(mode="json", exclude_none=True)
 
-        elif filename in ['metrics_config.yaml', 'test_metrics_config.yaml']:
-            config_pydantic = MetricsConfig(**config_dict)
-            config = config_pydantic.model_dump(mode="json")
+            elif filename in ['metrics_config.yaml', 'test_metrics_config.yaml']:
+                config_pydantic = MetricsConfig(**config_dict)
+                config = config_pydantic.model_dump(mode="json", exclude_none=True)
 
-        # Otherwise return the normal dict
-        else:
-            config = config_dict
+            # Otherwise return the normal dict
+            else:
+                config = config_dict
+
+        except ValidationError as e:
+            # Enhanced error reporting
+            logger.error("Validation Error in %s:", filename)
+            for err in e.errors():
+                issue = err['msg']
+                print(f"Issue: {issue}")
+                location = '.'.join(str(item) for item in err['loc'][:-1])
+                print(f"Location: {location}")
+                missing_field = err['loc'][-1]
+                print(f"Bad Field: {missing_field}")
+            raise e
 
     return config
+
 
 
 def timing_decorator(func):
@@ -83,10 +103,10 @@ def timing_decorator(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         # Get the logger
-        logger = logging.getLogger(func.__module__)
+        function_logger = logging.getLogger(func.__module__)
 
         # Log the initiation of the function
-        logger.debug('Initiating %s...', func.__name__)
+        function_logger.debug('Initiating %s...', func.__name__)
 
         # Time the function execution
         start_time = time.time()
@@ -94,7 +114,7 @@ def timing_decorator(func):
         end_time = time.time()
 
         # Log the execution time
-        logger.info(
+        function_logger.info(
             'Completed %s after %.2f seconds.',
             func.__name__,
             end_time - start_time
@@ -195,3 +215,38 @@ def cw_filter_df(df, coin_id, wallet_address):
         (df['wallet_address'] == wallet_address)
     ]
     return filtered_df
+
+
+
+def df_memory_usage(df):
+    """
+    Checks how much memory a dataframe is using
+    """
+
+    # Memory usage of each column
+    print(df.memory_usage(deep=True))
+
+    # Total memory usage in bytes
+    total_memory = df.memory_usage(deep=True).sum()
+    print(f'Total memory usage: {total_memory / 1024 ** 2:.2f} MB')
+
+
+def memory_usage():
+    """
+    Checks how much memory all objects are using
+
+    name logic needs to be redone
+    """
+    objects = []
+    for obj in gc.get_objects():
+        # try:
+        size = sys.getsizeof(obj)
+        if size >= 1000:  # Filter out objects smaller than 1000 bytes
+            obj_type = type(obj).__name__
+            obj_name = str(getattr(obj, '__name__', 'Unnamed'))  # Get name if available
+            objects.append((obj_name, obj_type, size / (1024 * 1024)))  # Convert size to MB
+        # except:
+        #     continue
+    mem_df = pd.DataFrame(objects, columns=['Name', 'Type', 'Size (MB)'])
+    mem_df = mem_df.sort_values(by='Size (MB)', ascending=False).reset_index(drop=True)
+    return mem_df

@@ -123,13 +123,23 @@ wallet_cohorts:
 time_series:
   market_data:
     price:
+      aggregations:
+        max:
+          scaling: "standard"
+        last:
+          buckets:
+          - small: .01
+          - medium: 1.0 # includes values up to this threshold
+          - large: "remainder" # includes all remaining records
       rolling:
+        aggregations:
+          max:
+            scaling: "standard"
         comparisons:
-          pct_change:
-            scaling: "none"        # No scaling for percentage change, as it's already normalized.
-        window_duration: 15
-        lookback_periods: 3
-
+          change:
+            scaling: "standard"
+        window_duration: 3
+        lookback_periods: 2
     volume:
       rolling:
         aggregations:
@@ -144,7 +154,6 @@ time_series:
     market_cap:
       aggregations:
         last:
-          # scaling: "log"
           buckets:
           - microcap: 5000000  # includes values up to this threshold
           - smallcap: 50000000 # includes values up to this threshold
