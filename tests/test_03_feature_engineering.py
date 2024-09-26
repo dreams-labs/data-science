@@ -168,14 +168,14 @@ def test_fe_calculate_rolling_window_features():
     # Configuration for window and lookback periods
     window_duration = 3
     lookback_periods = 3
-    rolling_stats = ['sum', 'max', 'min', 'median', 'std']
+    rolling_aggregations = ['sum', 'max', 'min', 'median', 'std']
     comparisons = ['change', 'pct_change']
     metric_name = 'buyers_new'
 
 
     # Test Case 1: Multiple periods with complete windows (10 records, 3 periods, window_duration=3)
     rolling_features = fe.calculate_rolling_window_features(
-        ts, window_duration, lookback_periods, rolling_stats, comparisons, metric_name)
+        ts, window_duration, lookback_periods, rolling_aggregations, comparisons, metric_name)
 
     assert rolling_features['buyers_new_sum_3d_period_1'] == 27  # Last 3 records: 9+10+8 = 27
     assert rolling_features['buyers_new_max_3d_period_1'] == 10
@@ -202,7 +202,7 @@ def test_fe_calculate_rolling_window_features():
 
     # Test Case 3: Small dataset (2 records)
     rolling_features_small_ts = fe.calculate_rolling_window_features(
-        small_ts, window_duration, lookback_periods, rolling_stats, comparisons, metric_name)
+        small_ts, window_duration, lookback_periods, rolling_aggregations, comparisons, metric_name)
 
     # No valid 3-period windows exist, so the function should handle it gracefully
     assert not rolling_features_small_ts  # Expect empty dict since window is larger than available data
@@ -247,8 +247,8 @@ def test_fe_flatten_date_features():
     4. Invalid aggregation function: Tests that the function raises a KeyError if an unrecognized
        aggregation function is specified in the configuration.
     5. Rolling window metrics: Tests the rolling window functionality, ensuring that the correct
-       rolling stats (e.g., sum, max) and comparisons (change, pct_change) are calculated over
-       specified windows.
+       rolling aggregations (e.g., sum, max) and comparisons (change, pct_change) are calculated
+       over specified windows.
     """
     # Sample DataFrame for testing
     sample_coin_df = pd.DataFrame({
@@ -269,7 +269,7 @@ def test_fe_flatten_date_features():
                 'std': {'scaling': 'none'}
             },
             'rolling': {
-                'stats': ['sum', 'max'],
+                'aggregations': ['sum', 'max'],
                 'comparisons': ['change', 'pct_change'],
                 'window_duration': 3,
                 'lookback_periods': 2
@@ -324,7 +324,7 @@ def test_fe_flatten_date_features():
     # Test Case 4: Rolling window metrics
     rolling_features = fe.flatten_date_features(sample_coin_df, metrics_config)
 
-    assert 'buyers_new_sum_3d_period_1' in rolling_features  # Ensure rolling stats are calculated
+    assert 'buyers_new_sum_3d_period_1' in rolling_features  # Ensure rolling aggregations are calculated
     assert 'buyers_new_max_3d_period_1' in rolling_features
     assert 'buyers_new_sum_3d_period_2' in rolling_features
     assert 'buyers_new_max_3d_period_2' in rolling_features

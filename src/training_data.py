@@ -603,7 +603,7 @@ def clean_profits_df(profits_df, data_cleaning_config):
     # 1. Remove wallets with higher or lower total profits than the profitability_filter
     # ----------------------------------------------------------------------------------
     # Group by wallet_address and calculate the total profitability
-    wallet_profits_agg_df = profits_df.groupby('wallet_address')['profits_change'].sum().reset_index()
+    wallet_profits_agg_df = profits_df.groupby('wallet_address', observed=True)['profits_change'].sum().reset_index()
 
     # Identify wallet_addresses with total profitability that exceeds the threshold
     exclusions_profits_df = wallet_profits_agg_df[
@@ -619,7 +619,7 @@ def clean_profits_df(profits_df, data_cleaning_config):
     # 2. Remove wallets with higher total inflows than the inflows_filter
     # -------------------------------------------------------------------
     # Group by wallet_address and calculate the total inflows
-    wallet_inflows_agg_df = profits_df.groupby('wallet_address')['usd_inflows'].sum().reset_index()
+    wallet_inflows_agg_df = profits_df.groupby('wallet_address', observed=True)['usd_inflows'].sum().reset_index()
 
     # Identify wallet addresses where total inflows exceed the threshold
     exclusions_inflows_df = wallet_inflows_agg_df[

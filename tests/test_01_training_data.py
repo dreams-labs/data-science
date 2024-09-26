@@ -931,7 +931,7 @@ def test_clean_profits_exclusions(cleaned_profits_df, profits_df):
     exclusions_with_breaches = exclusions_df.merge(profits_df, on='wallet_address', how='inner')
 
     # Calculate the total profits and inflows per wallet
-    wallet_agg_df = exclusions_with_breaches.groupby('wallet_address').agg({
+    wallet_agg_df = exclusions_with_breaches.groupby('wallet_address', observed=True).agg({
         'profits_change': 'sum',
         'usd_inflows': 'sum'
     }).reset_index()
@@ -974,7 +974,7 @@ def test_clean_profits_aggregate_sums(cleaned_profits_df):
     cleaned_df, _ = cleaned_profits_df
 
     # Aggregate the profits and inflows for the remaining wallets
-    remaining_wallets_agg_df = cleaned_df.groupby('wallet_address').agg({
+    remaining_wallets_agg_df = cleaned_df.groupby('wallet_address', observed=True).agg({
         'profits_change': 'sum',
         'usd_inflows': 'sum'
     }).reset_index()

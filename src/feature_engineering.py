@@ -305,7 +305,7 @@ def calculate_rolling_window_features(
     - ts (pd.Series): The time series data for the metric.
     - window_duration (int): The size of each rolling window (e.g., 7 for 7 days).
     - lookback_periods (int): The number of lookback periods to calculate (e.g., 2 for two periods).
-    - rolling_aggregations (list): The metrics to calculate for each rolling window (e.g. ['sum', 'max']).
+    - rolling_aggregations (list): The aggregations for each rolling window (e.g. ['sum', 'max']).
     - comparisons (list): The comparisons to make between the first and last value in the window.
     - metric_name (str): The name of the metric to include in the feature names.
 
