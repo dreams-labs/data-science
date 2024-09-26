@@ -164,6 +164,13 @@ time_series:
               scaling: "standard"
 
     volume:
+      indicators:
+        sma:
+          parameters:
+            period: 3
+          aggregations:
+            max:
+              scaling: "standard"
       rolling:
         aggregations:
           sum:

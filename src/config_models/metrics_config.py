@@ -237,7 +237,7 @@ class IndicatorType(str, Enum):
 
 class Indicators(BaseModel):
     parameters: Dict[str, Any]  # Flexible to handle unique parameters
-    aggregations: Optional['AggregationConfig'] = Field(default=None)
+    aggregations: Optional[Dict['AggregationType', 'AggregationConfig']] = Field(default=None)
     rolling: Optional['RollingMetrics'] = Field(default=None)
 
 

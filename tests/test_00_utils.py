@@ -621,10 +621,90 @@ def test_configuration_with_comments(temp_config_file_with_comments):
     assert 'market_data' in config['time_series']
     assert 'price' in config['time_series']['market_data']
 
+@pytest.fixture
+def config_demo_dict():
+    """
+    Fixture that provides valid configuration data for testing.
+    """
+    return """
+    time_series:
+      market_data:
+        price:
+          aggregations:
+            max:
+              scaling: "standard"
+            last:
+              buckets:
+              - small: .01
+              - medium: 1.0
+              - large: "remainder"
+          rolling:
+            aggregations:
+              max:
+                scaling: "standard"
+            comparisons:
+              change:
+                scaling: "standard"
+            window_duration: 3
+            lookback_periods: 2
+          indicators:
+            sma:
+              parameters:
+                period: 3
+              aggregations:
+                max:
+                  scaling: "standard"
+              rolling:
+                aggregations:
+                  mean:
+                    scaling: "standard"
+                comparisons:
+                  pct_change:
+                    scaling: "none"
+                window_duration: 3
+                lookback_periods: 2
+            ema:
+              parameters:
+                period: 3
+              aggregations:
+                mean:
+                  scaling: "standard"
+    """
+
+@pytest.fixture
+def temp_config_file_demo(tmp_path, config_demo_dict):
+    """
+    Fixture that writes the demo configuration data to a temporary file and returns the file path.
+    """
+    config_file = tmp_path / "metrics_config.yaml"
+    config_file.write_text(config_demo_dict)
+    return str(config_file)
+
+
+@pytest.mark.unit
+def test_load_demo_config(temp_config_file_demo):
+    """
+    Test that the demo configuration file loads completely.
+    """
+    # Attempt to load the configuration using the u.load_config function
+    config = u.load_config(file_path=temp_config_file_demo)
+
+    def count_keys(d):
+        count = 0
+        for _, value in d.items():
+            count += 1
+            if isinstance(value, dict):
+                count += count_keys(value)
+        return count
+
+    key_count = count_keys(config)
+
+    # this is how many items are actually in the dict
+    assert key_count==39
+
 
 # ======================================================== #
 #                                                          #
 #            I N T E G R A T I O N   T E S T S             #
 #                                                          #
 # ======================================================== #
-

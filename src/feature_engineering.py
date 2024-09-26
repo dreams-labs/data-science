@@ -4,6 +4,7 @@ functions used to build coin-level features from training data
 import os
 from datetime import datetime
 import time
+import copy
 import re
 import pandas as pd
 import numpy as np
@@ -191,8 +192,11 @@ def flatten_date_features(time_series_df, df_metrics_config):
     flat_features = {}
     matched_columns = False
 
+    # promote indicators to the same key level as primary metrics
+    df_metrics_indicators_config = promote_indicators_to_metrics(df_metrics_config)
+
     # Apply global stats calculations for each metric
-    for metric, config in df_metrics_config.items():
+    for metric, config in df_metrics_indicators_config.items():
         if metric not in time_series_df.columns:
             continue
 
@@ -232,6 +236,35 @@ def flatten_date_features(time_series_df, df_metrics_config):
         raise ValueError("No metrics matched the columns in the DataFrame.")
 
     return flat_features
+
+
+def promote_indicators_to_metrics(df_metrics_config):
+    """
+    Moves indicators to the same level as other columns in the config file so that their
+    features can be generated the same way they are for primary metrics.
+
+    Params:
+    - df_metrics_config (dict): Configuration object with metric rules from the metrics file for
+        the specific input df.
+
+    Returns:
+    """
+    # make a deep copy to avoid impacting the original dict
+    df_metrics_indicators_config = copy.deepcopy(df_metrics_config)
+
+    for key, value in df_metrics_config.items():
+        # Check if indicators are present
+        if 'indicators' in value:
+            for indicator, indicator_data in value['indicators'].items():
+                # Create new top-level key: original key + indicator name
+                new_key = f"{key}_{indicator}"
+                df_metrics_indicators_config[new_key] = indicator_data
+
+            # Optionally, remove indicators from the original key
+            df_metrics_indicators_config[key].pop('indicators')
+
+    return df_metrics_indicators_config
+
 
 
 
