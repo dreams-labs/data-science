@@ -132,7 +132,7 @@ time_series:
             scaling: "standard"
         window_duration: 10
         lookback_periods: 5
-      metrics:
+      indicators:
         sma:
           parameters:
             period: 20

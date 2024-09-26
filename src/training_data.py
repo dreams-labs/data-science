@@ -454,7 +454,8 @@ def prepare_profits_data(transfers_df, prices_df):
     profits_df = profits_df[profits_df['price'].notna()]
 
     # Append new records to the original dataframe
-    profits_df = pd.concat([profits_df, new_records], ignore_index=True)
+    if not new_records.empty:
+        profits_df = pd.concat([profits_df, new_records], ignore_index=True)
 
     # Sort by coin_id, wallet_address, and date to maintain order
     profits_df = profits_df.sort_values(by=['coin_id', 'wallet_address', 'date']).reset_index(drop=True)

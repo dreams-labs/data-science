@@ -61,14 +61,14 @@ def load_config(file_path='../notebooks/config.yaml'):
 
         except ValidationError as e:
             # Enhanced error reporting
-            logger.error("Configuration Validation Error:")
+            logger.error("Validation Error in %s:", filename)
             for err in e.errors():
                 issue = err['msg']
                 print(f"Issue: {issue}")
                 location = '.'.join(str(item) for item in err['loc'][:-1])
                 print(f"Location: {location}")
                 missing_field = err['loc'][-1]
-                print(f" - Impcated Field: {missing_field}")
+                print(f"Bad Field: {missing_field}")
             raise e
 
     return config

@@ -106,12 +106,16 @@ class Metric(BaseModel):
     rolling: Optional['RollingMetrics'] = Field(default=None)
     indicators: Optional[Dict[str, 'Indicators']] = Field(default=None)
 
+    model_config = {
+        "extra": "forbid",  # Prevent extra fields that are not defined
+    }
+
     @model_validator(mode='after')
     def remove_empty_fields(cls, values):
         """
         Remove all empty dictionaries, None values, or empty lists from the nested structure.
         """
-        values_dict = values.dict(exclude_none=True)  # Exclude None values
+        values_dict = values.model_dump(exclude_none=True)  # Exclude None values
         cleaned_dict = remove_empty_dicts(values_dict)  # Recursively remove empty dictionaries
         return cleaned_dict
 

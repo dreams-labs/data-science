@@ -18,6 +18,7 @@ from dreams_core import core as dc
 # pyright: reportMissingImports=false
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 import training_data as td
+import coin_wallet_metrics as cwm
 from utils import load_config
 
 load_dotenv()
@@ -596,6 +597,11 @@ def test_category_unpacking(mock_metadata_df, mock_config):
     assert result_df.loc[result_df['coin_id'] == 'coin_3', 'category_dex'].values[0]
 
 
+
+
+
+
+
 # ======================================================== #
 #                                                          #
 #            I N T E G R A T I O N   T E S T S             #
@@ -760,6 +766,12 @@ def market_data_df():
     logger.info("Generating market_data_df from production data...")
     market_data_df = td.retrieve_market_data()
     market_data_df, _ = td.fill_market_data_gaps(market_data_df, max_gap_days=config['data_cleaning']['max_gap_days'])
+    market_data_df,_,_ = cwm.split_dataframe_by_coverage(
+        market_data_df,
+        start_date=config['training_data']['training_period_start'],
+        end_date=config['training_data']['modeling_period_end'],
+        id_column='coin_id'
+    )
     return market_data_df
 
 @pytest.fixture(scope='session')
