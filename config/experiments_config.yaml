@@ -5,16 +5,12 @@
 # - metrics_config.yaml: Defines metrics and their aggregations for evaluation.
 
 metadata:
-  experiment_name: "more_sharks"
+  experiment_name: "0926_best_cohort"
   search_method: "random"
-  description: "Experiment to analyze shark behavior across various coin metrics."
+  description: "Experiment to assess the strongest initial cohort."
   metrics_to_compare:
-    - accuracy
-    - precision
-    - recall
-    - f1_score
     - roc_auc
-  thresholds: [0.5, 0.6, 0.7]
+  # thresholds: [0.5, 0.6, 0.7]
   max_evals: 10
 
 variable_overrides:

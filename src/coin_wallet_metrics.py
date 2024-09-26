@@ -33,7 +33,7 @@ def classify_wallet_cohort(profits_df, wallet_cohort_config):
         wallet_cohort_df (DataFrame): A DataFrame containing wallets and summary metrics, including:
             - total inflows, total coins, total wins, win rate, and whether the wallet is in the cohort.
     """
-    logger.debug('Classifying wallet cohort based on coin-level thresholds...')
+    logger.debug("Classifying wallet cohort '%s' based on coin-level thresholds...", wallet_cohort_config['description'])
     start_time = time.time()
 
     # Step 1: Aggregate wallet-level inflows and filter eligible wallets
@@ -114,13 +114,17 @@ def classify_wallet_cohort(profits_df, wallet_cohort_config):
     logger.debug("<Step 6a> Merge profits and return rate: %.2f seconds", time.time() - step_time)
     step_time = time.time()
 
-    # Count the number of wallets in the cohort
-    x = wallet_cohort_df[wallet_cohort_df['in_cohort']].shape[0]
-    y = wallet_cohort_df.shape[0]
-
     # Log the count of wallets added to the cohort using % syntax
-    logger.info('Wallet cohort classification complete after %.2f seconds. %d/%d eligible wallets were added to the cohort.',
-                 start_time, x, y)
+    logger.info("Wallet cohort '%s' classification complete after %.2f seconds.",
+        wallet_cohort_config['description'],
+        time.time() - start_time
+    )
+    logger.info("Out of %s total wallets, %s met inflows requirements and %s met win rate conditions.",
+        dc.human_format(len(wallet_inflows_df)),
+        dc.human_format(len(wallet_cohort_df)),
+        dc.human_format(len(wallet_cohort_df[wallet_cohort_df['in_cohort']]))
+    )
+
 
     return wallet_cohort_df
 
@@ -141,7 +145,7 @@ def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets):
         every coin_id-date pair through the training_period_end.
     """
     start_time = time.time()
-    logger.info('Preparing buysell_metrics_df...')
+    logger.debug('Preparing buysell_metrics_df...')
 
 
     # Step 1: Filter profits_df to cohort and conduct data quality checks
