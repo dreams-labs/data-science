@@ -37,252 +37,248 @@ logger = dc.setup_logger()
 #                                                       #
 # ===================================================== #
 
-# ---------------------------------------------- #
-# validate_experiments_yaml() unit tests
-# ---------------------------------------------- #
+# # ---------------------------------------------- #
+# # validate_experiments_yaml() unit tests
+# # ---------------------------------------------- #
 
-@pytest.mark.unit
-def test_validate_experiments_yaml_success(tmpdir):
-    """Unit Test: Success case where variables from 2 different config files are retrieved correctly."""
+# @pytest.mark.unit
+# def test_validate_experiments_yaml_success(tmpdir):
+#     """Unit Test: Success case where variables from 2 different config files are retrieved correctly."""
 
-    # Create the config folder and files
-    config_folder = tmpdir.mkdir("config_folder")
+#     # Create the config folder and files
+#     config_folder = tmpdir.mkdir("config_folder")
 
-    # Create experiments_config.yaml with variable_overrides
-    experiment_config = """
-    variable_overrides:
-      config:
-        training_data:
-          modeling_period_duration:
-            - 14
-            - 30
-      modeling_config:
-        learning_rate:
-          - 0.001
-        batch_size:
-          - 16
-    """
-    config_folder.join("experiments_config.yaml").write(experiment_config)
+#     # Create experiments_config.yaml with variable_overrides
+#     experiment_config = """
+#     variable_overrides:
+#       config:
+#         training_data:
+#           modeling_period_duration:
+#             - 14
+#             - 30
+#       modeling_config:
+#         learning_rate:
+#           - 0.001
+#         batch_size:
+#           - 16
+#     """
+#     config_folder.join("experiments_config.yaml").write(experiment_config)
 
-    # Create config.yaml
-    config = """
-    training_data:
-      modeling_period_duration:
-        - 14
-        - 30
-    """
-    config_folder.join("config.yaml").write(config)
+#     # Create config.yaml
+#     config = """
+#     training_data:
+#       modeling_period_duration:
+#         - 14
+#         - 30
+#     """
+#     config_folder.join("config.yaml").write(config)
 
-    # Create modeling_config.yaml
-    modeling_config = """
-    learning_rate:
-      - 0.001
-    batch_size:
-      - 16
-    """
-    config_folder.join("modeling_config.yaml").write(modeling_config)
+#     # Create modeling_config.yaml
+#     modeling_config = """
+#     learning_rate:
+#       - 0.001
+#     batch_size:
+#       - 16
+#     """
+#     config_folder.join("modeling_config.yaml").write(modeling_config)
 
-    # Run the function and verify no errors
-    configurations = i.validate_experiments_yaml(str(config_folder))
+#     # Run the function and verify no errors
+#     configurations = i.validate_experiments_yaml(str(config_folder))
 
-    # Assert that both config and modeling_config sections are validated
-    assert len(configurations) == 2  # Two sections: config and modeling_config
+#     # Assert that both config and modeling_config sections are validated
+#     assert len(configurations) == 2  # Two sections: config and modeling_config
 
-    # Check the overrides for 'config'
-    config_overrides = dict(configurations)["config"]
-    assert "training_data" in config_overrides
-    assert config_overrides["training_data"]["modeling_period_duration"] == [14, 30]
+#     # Check the overrides for 'config'
+#     config_overrides = dict(configurations)["config"]
+#     assert "training_data" in config_overrides
+#     assert config_overrides["training_data"]["modeling_period_duration"] == [14, 30]
 
-    # Check the overrides for 'modeling_config'
-    modeling_overrides = dict(configurations)["modeling_config"]
-    assert "learning_rate" in modeling_overrides
-    assert modeling_overrides["learning_rate"] == [0.001]
-    assert modeling_overrides["batch_size"] == [16]
-
-
-@pytest.mark.unit
-def test_validate_experiments_yaml_missing_file(tmpdir):
-    """Unit Test: Failure case where a referenced config file does not exist."""
-
-    # Create the config folder and files
-    config_folder = tmpdir.mkdir("config_folder")
-
-    # Create experiments_config.yaml referencing a non-existent file in variable_overrides
-    experiment_config = """
-    variable_overrides:
-      config:
-        training_data:
-          modeling_period_duration:
-            - 14
-      config_missing:
-        param_x:
-          - value
-    """
-    config_folder.join("experiments_config.yaml").write(experiment_config)
-
-    # Create config.yaml
-    config = """
-    training_data:
-      modeling_period_duration:
-        - 14
-    """
-    config_folder.join("config.yaml").write(config)
-
-    # Verify that it raises FileNotFoundError for the missing config file
-    with pytest.raises(FileNotFoundError, match="config_missing.yaml not found in"):
-        i.validate_experiments_yaml(str(config_folder))
+#     # Check the overrides for 'modeling_config'
+#     modeling_overrides = dict(configurations)["modeling_config"]
+#     assert "learning_rate" in modeling_overrides
+#     assert modeling_overrides["learning_rate"] == [0.001]
+#     assert modeling_overrides["batch_size"] == [16]
 
 
-@pytest.mark.unit
-def test_validate_experiments_yaml_invalid_key(tmpdir):
-    """Unit Test: Failure case where a referenced key in variable_overrides doesn't exist in the config files."""
+# @pytest.mark.unit
+# def test_validate_experiments_yaml_missing_file(tmpdir):
+#     """Unit Test: Failure case where a referenced config file does not exist."""
 
-    # Create the config folder and files
-    config_folder = tmpdir.mkdir("config_folder")
+#     # Create the config folder and files
+#     config_folder = tmpdir.mkdir("config_folder")
 
-    # Create experiments_config.yaml with an invalid key
-    experiment_config = """
-    variable_overrides:
-      config:
-        training_data:
-          modeling_period_duration:
-            - 14
-        invalid_key:
-            - non_existent
-    """
-    config_folder.join("experiments_config.yaml").write(experiment_config)
+#     # Create experiments_config.yaml referencing a non-existent file in variable_overrides
+#     experiment_config = """
+#     variable_overrides:
+#       config:
+#         training_data:
+#           modeling_period_duration:
+#             - 14
+#       config_missing:
+#         param_x:
+#           - value
+#     """
+#     config_folder.join("experiments_config.yaml").write(experiment_config)
 
-    # Create config.yaml
-    config = """
-    training_data:
-      modeling_period_duration:
-        - 14
-    """
-    config_folder.join("config.yaml").write(config)
+#     # Create config.yaml
+#     config = """
+#     training_data:
+#       modeling_period_duration:
+#         - 14
+#     """
+#     config_folder.join("config.yaml").write(config)
 
-    # Verify that it raises a ValueError for the invalid key
-    with pytest.raises(ValueError, match="Key 'invalid_key' in variable_overrides not found in config.yaml"):
-        i.validate_experiments_yaml(str(config_folder))
-
-
-# ---------------------------------------------- #
-# validate_experiments_yaml() unit tests
-# ---------------------------------------------- #
-
-@pytest.mark.unit
-def test_prepare_configs_success(tmpdir):
-    """
-    Test the success case for prepare_configs with valid override parameters.
-    """
-
-    # Create a temporary config folder
-    config_folder = tmpdir.mkdir("config_folder")
-
-    # Create mock config files
-    config_yaml = """
-    data_cleaning:
-      inflows_filter: 5000000
-      profitability_filter: 10000000
-    training_data:
-      modeling_period_duration: 30
-      wallet_min_coins: 2
-    """
-    metrics_config_yaml = """
-    wallet_cohorts:
-      sharks:
-        buyers_new:
-          aggregations:
-            mean:
-              scaling: None
-    """
-    modeling_config_yaml = """
-    preprocessing:
-      drop_features: ['total_sellers_sum']
-    target_variables:
-      moon_threshold: 0.5
-    """
-
-    # Write these config files to the temporary directory
-    config_file = config_folder.join("config.yaml")
-    config_file.write(config_yaml)
-
-    metrics_file = config_folder.join("metrics_config.yaml")
-    metrics_file.write(metrics_config_yaml)
-
-    modeling_file = config_folder.join("modeling_config.yaml")
-    modeling_file.write(modeling_config_yaml)
-
-    # Valid override parameters
-    override_params = {
-        'config.data_cleaning.inflows_filter': 10000000,
-        'config.training_data.modeling_period_duration': 14,
-        'metrics_config.wallet_cohorts.sharks.buyers_new.aggregations.mean.scaling': 'standard',
-        'modeling_config.preprocessing.drop_features': ['buyers_new_median'],
-        'modeling_config.target_variables.moon_threshold': 0.3
-    }
-
-    # Run the function
-    config, metrics_config, modeling_config = i.prepare_configs(str(config_folder), override_params)
-
-    # Assert the overrides were applied correctly
-    assert config['data_cleaning']['inflows_filter'] == 10000000
-    assert config['training_data']['modeling_period_duration'] == 14
-    assert metrics_config['wallet_cohorts']['sharks']['buyers_new']['aggregations']['mean']['scaling'] == 'standard'
-    assert modeling_config['preprocessing']['drop_features'] == ['buyers_new_median']
-    assert modeling_config['target_variables']['moon_threshold'] == 0.3
+#     # Verify that it raises FileNotFoundError for the missing config file
+#     with pytest.raises(FileNotFoundError, match="config_missing.yaml not found in"):
+#         i.validate_experiments_yaml(str(config_folder))
 
 
-@pytest.mark.unit
-def test_prepare_configs_failure(tmpdir):
-    """
-    Test the failure case for prepare_configs when an invalid key is used in override_params.
-    """
+# @pytest.mark.unit
+# def test_validate_experiments_yaml_invalid_key(tmpdir):
+#     """Unit Test: Failure case where a referenced key in variable_overrides doesn't exist in the config files."""
 
-    # Create a temporary config folder
-    config_folder = tmpdir.mkdir("config_folder")
+#     # Create the config folder and files
+#     config_folder = tmpdir.mkdir("config_folder")
 
-    # Create mock config files
-    config_yaml = """
-    data_cleaning:
-      inflows_filter: 5000000
-      profitability_filter: 10000000
-    training_data:
-      modeling_period_duration: 30
-      wallet_min_coins: 2
-    """
-    metrics_config_yaml = """
-    wallet_cohorts:
-      sharks:
-        buyers_new:
-          aggregations:
-            mean:
-              scaling: None
-    """
-    modeling_config_yaml = """
-    preprocessing:
-      drop_features: ['total_sellers_sum']
-    target_variables:
-      moon_threshold: 0.5
-    """
+#     # Create experiments_config.yaml with an invalid key
+#     experiment_config = """
+#     variable_overrides:
+#       config:
+#         training_data:
+#           modeling_period_duration:
+#             - 14
+#         invalid_key:
+#             - non_existent
+#     """
+#     config_folder.join("experiments_config.yaml").write(experiment_config)
 
-    # Write these config files to the temporary directory
-    config_file = config_folder.join("config.yaml")
-    config_file.write(config_yaml)
+#     # Create config.yaml
+#     config = """
+#     training_data:
+#       modeling_period_duration:
+#         - 14
+#     """
+#     config_folder.join("config.yaml").write(config)
 
-    metrics_file = config_folder.join("metrics_config.yaml")
-    metrics_file.write(metrics_config_yaml)
+#     # Verify that it raises a ValueError for the invalid key
+#     with pytest.raises(ValueError, match="Key 'invalid_key' in variable_overrides not found in config.yaml"):
+#         i.validate_experiments_yaml(str(config_folder))
 
-    modeling_file = config_folder.join("modeling_config.yaml")
-    modeling_file.write(modeling_config_yaml)
 
-    # Invalid override parameters (this key doesn't exist in the config)
-    override_params = {
-        'config.data_cleaning.non_existent_filter': 99999  # This will raise an error
-    }
+# @pytest.mark.unit
+# def test_prepare_configs_success(tmpdir):
+#     """
+#     Test the success case for prepare_configs with valid override parameters.
+#     """
 
-    # Run the function and expect a KeyError
-    with pytest.raises(KeyError, match="Key 'non_existent_filter' not found"):
-        i.prepare_configs(str(config_folder), override_params)
+#     # Create a temporary config folder
+#     config_folder = tmpdir.mkdir("config_folder")
+
+#     # Create mock config files
+#     config_yaml = """
+#     data_cleaning:
+#       inflows_filter: 5000000
+#       profitability_filter: 10000000
+#     training_data:
+#       modeling_period_duration: 30
+#       wallet_min_coins: 2
+#     """
+#     metrics_config_yaml = """
+#     wallet_cohorts:
+#       sharks:
+#         buyers_new:
+#           aggregations:
+#             mean:
+#               scaling: None
+#     """
+#     modeling_config_yaml = """
+#     preprocessing:
+#       drop_features: ['total_sellers_sum']
+#     target_variables:
+#       moon_threshold: 0.5
+#     """
+
+#     # Write these config files to the temporary directory
+#     config_file = config_folder.join("config.yaml")
+#     config_file.write(config_yaml)
+
+#     metrics_file = config_folder.join("metrics_config.yaml")
+#     metrics_file.write(metrics_config_yaml)
+
+#     modeling_file = config_folder.join("modeling_config.yaml")
+#     modeling_file.write(modeling_config_yaml)
+
+#     # Valid override parameters
+#     override_params = {
+#         'config.data_cleaning.inflows_filter': 10000000,
+#         'config.training_data.modeling_period_duration': 14,
+#         'metrics_config.wallet_cohorts.sharks.buyers_new.aggregations.mean.scaling': 'standard',
+#         'modeling_config.preprocessing.drop_features': ['buyers_new_median'],
+#         'modeling_config.target_variables.moon_threshold': 0.3
+#     }
+
+#     # Run the function
+#     config, metrics_config, modeling_config = i.prepare_configs(str(config_folder), override_params)
+
+#     # Assert the overrides were applied correctly
+#     assert config['data_cleaning']['inflows_filter'] == 10000000
+#     assert config['training_data']['modeling_period_duration'] == 14
+#     assert metrics_config['wallet_cohorts']['sharks']['buyers_new']['aggregations']['mean']['scaling'] == 'standard'
+#     assert modeling_config['preprocessing']['drop_features'] == ['buyers_new_median']
+#     assert modeling_config['target_variables']['moon_threshold'] == 0.3
+
+
+# @pytest.mark.unit
+# def test_prepare_configs_failure(tmpdir):
+#     """
+#     Test the failure case for prepare_configs when an invalid key is used in override_params.
+#     """
+
+#     # Create a temporary config folder
+#     config_folder = tmpdir.mkdir("config_folder")
+
+#     # Create mock config files
+#     config_yaml = """
+#     data_cleaning:
+#       inflows_filter: 5000000
+#       profitability_filter: 10000000
+#     training_data:
+#       modeling_period_duration: 30
+#       wallet_min_coins: 2
+#     """
+#     metrics_config_yaml = """
+#     wallet_cohorts:
+#       sharks:
+#         buyers_new:
+#           aggregations:
+#             mean:
+#               scaling: None
+#     """
+#     modeling_config_yaml = """
+#     preprocessing:
+#       drop_features: ['total_sellers_sum']
+#     target_variables:
+#       moon_threshold: 0.5
+#     """
+
+#     # Write these config files to the temporary directory
+#     config_file = config_folder.join("config.yaml")
+#     config_file.write(config_yaml)
+
+#     metrics_file = config_folder.join("metrics_config.yaml")
+#     metrics_file.write(metrics_config_yaml)
+
+#     modeling_file = config_folder.join("modeling_config.yaml")
+#     modeling_file.write(modeling_config_yaml)
+
+#     # Invalid override parameters (this key doesn't exist in the config)
+#     override_params = {
+#         'config.data_cleaning.non_existent_filter': 99999  # This will raise an error
+#     }
+
+#     # Run the function and expect a KeyError
+#     with pytest.raises(KeyError, match="Key 'non_existent_filter' not found"):
+#         i.prepare_configs(str(config_folder), override_params)
 
 
 

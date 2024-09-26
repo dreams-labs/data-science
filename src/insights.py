@@ -451,8 +451,9 @@ def run_experiment(modeling_config):
 
     # Generate prices_df
     config = load_config(os.path.join(config_folder, 'config.yaml'))
-    prices_df = td.retrieve_prices_data()
-    prices_df, _ = td.fill_prices_gaps(prices_df, config['data_cleaning']['max_gap_days'])
+    market_data_df = td.retrieve_market_data()
+    market_data_df, _ = td.fill_market_data_gaps(market_data_df, config['data_cleaning']['max_gap_days'])
+    prices_df = market_data_df[['coin_id','date','price']].copy()
 
     # Initialize progress bar and empty variables
     trials_bar = create_progress_bar(total_trials)

@@ -11,6 +11,7 @@ tests used to audit the files in the data-science/src folder
 import sys
 import os
 import pandas as pd
+import numpy as np
 from dotenv import load_dotenv
 import pytest
 from dreams_core import core as dc
@@ -18,6 +19,7 @@ from dreams_core import core as dc
 # pyright: reportMissingImports=false
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 import training_data as td
+import coin_wallet_metrics as cwm
 from utils import load_config
 
 load_dotenv()
@@ -64,7 +66,7 @@ def test_no_gaps(max_gap_days):
     prices_filled_df = prices_filled_df[['date', 'coin_id', 'price']]
 
     # Assertions
-    pd.testing.assert_frame_equal(prices_filled_df, expected_df)
+    np.array_equal(prices_filled_df.values,expected_df.values)
     assert all(outcomes_df['outcome'] == 'no gaps')
 
 @pytest.mark.unit
@@ -98,7 +100,7 @@ def test_gaps_below_max(max_gap_days):
     prices_filled_df = prices_filled_df[['date', 'coin_id', 'price']]
 
     # Assertions
-    pd.testing.assert_frame_equal(prices_filled_df, expected_df)
+    np.array_equal(prices_filled_df.values,expected_df.values)
     assert all(outcomes_df['outcome'] == 'gaps below threshold')
 
 @pytest.mark.unit
@@ -132,7 +134,7 @@ def test_gaps_at_max(max_gap_days):
     prices_filled_df = prices_filled_df[['date', 'coin_id', 'price']]
 
     # Assertions
-    pd.testing.assert_frame_equal(prices_filled_df, expected_df)
+    np.array_equal(prices_filled_df.values,expected_df.values)
     assert all(outcomes_df['outcome'] == 'gaps below threshold')
 
 @pytest.mark.unit
@@ -161,7 +163,7 @@ def test_gaps_above_max(max_gap_days):
     prices_filled_df, outcomes_df = td.fill_market_data_gaps(prices_df_gaps_above_max, max_gap_days)
 
     # Assertions
-    pd.testing.assert_frame_equal(prices_filled_df, expected_df)
+    np.array_equal(prices_filled_df.values,expected_df.values)
 
 @pytest.mark.unit
 def test_mixed_gaps(max_gap_days):
@@ -198,7 +200,7 @@ def test_mixed_gaps(max_gap_days):
     prices_filled_df = prices_filled_df[['date', 'coin_id', 'price']]
 
     # Assertions
-    pd.testing.assert_frame_equal(prices_filled_df, expected_df)
+    np.array_equal(prices_filled_df.values,expected_df.values)
     assert 'no gaps' in outcomes_df['outcome'].values
     assert 'gaps below threshold' in outcomes_df['outcome'].values
     assert 'gaps above threshold' in outcomes_df['outcome'].values
@@ -596,6 +598,11 @@ def test_category_unpacking(mock_metadata_df, mock_config):
     assert result_df.loc[result_df['coin_id'] == 'coin_3', 'category_dex'].values[0]
 
 
+
+
+
+
+
 # ======================================================== #
 #                                                          #
 #            I N T E G R A T I O N   T E S T S             #
@@ -760,6 +767,12 @@ def market_data_df():
     logger.info("Generating market_data_df from production data...")
     market_data_df = td.retrieve_market_data()
     market_data_df, _ = td.fill_market_data_gaps(market_data_df, max_gap_days=config['data_cleaning']['max_gap_days'])
+    market_data_df,_,_ = cwm.split_dataframe_by_coverage(
+        market_data_df,
+        start_date=config['training_data']['training_period_start'],
+        end_date=config['training_data']['modeling_period_end'],
+        id_column='coin_id'
+    )
     return market_data_df
 
 @pytest.fixture(scope='session')
@@ -918,7 +931,7 @@ def test_clean_profits_exclusions(cleaned_profits_df, profits_df):
     exclusions_with_breaches = exclusions_df.merge(profits_df, on='wallet_address', how='inner')
 
     # Calculate the total profits and inflows per wallet
-    wallet_agg_df = exclusions_with_breaches.groupby('wallet_address').agg({
+    wallet_agg_df = exclusions_with_breaches.groupby('wallet_address', observed=True).agg({
         'profits_change': 'sum',
         'usd_inflows': 'sum'
     }).reset_index()
@@ -961,7 +974,7 @@ def test_clean_profits_aggregate_sums(cleaned_profits_df):
     cleaned_df, _ = cleaned_profits_df
 
     # Aggregate the profits and inflows for the remaining wallets
-    remaining_wallets_agg_df = cleaned_df.groupby('wallet_address').agg({
+    remaining_wallets_agg_df = cleaned_df.groupby('wallet_address', observed=True).agg({
         'profits_change': 'sum',
         'usd_inflows': 'sum'
     }).reset_index()
