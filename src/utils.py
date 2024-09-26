@@ -49,11 +49,11 @@ def load_config(file_path='../notebooks/config.yaml'):
         try:
             if filename in ['config.yaml', 'test_config.yaml']:
                 config_pydantic = MainConfig(**config_dict)
-                config = config_pydantic.model_dump(mode="json")
+                config = config_pydantic.model_dump(mode="json", exclude_none=True)
 
             elif filename in ['metrics_config.yaml', 'test_metrics_config.yaml']:
                 config_pydantic = MetricsConfig(**config_dict)
-                config = config_pydantic.model_dump(mode="json")
+                config = config_pydantic.model_dump(mode="json", exclude_none=True)
 
             # Otherwise return the normal dict
             else:

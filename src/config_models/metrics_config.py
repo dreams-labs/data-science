@@ -151,9 +151,12 @@ class AggregationConfig(BaseModel):
     Defines the configuration for each aggregation type.
     An aggregation can have a scaling field or a buckets field.
     """
-    scaling: Optional[str] = Field(default=None)
+    scaling: Optional['ScalingType'] = Field(default=None)
     buckets: Optional['BucketsList'] = Field(default=None)
 
+    model_config = {
+        "extra": "forbid",  # Prevent extra fields that are not defined
+    }
 
 
 # Modular Metrics: Buckets
@@ -254,7 +257,9 @@ class ScalingConfig(BaseModel):
     Configuration for applying scaling to metrics.
     """
     scaling: ScalingType  # Make scaling required for any ComparisonType
-
+    model_config = {
+        "extra": "forbid",  # Prevent extra fields that are not defined
+    }
 
 
 # ============================================================================
