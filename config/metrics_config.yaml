@@ -126,16 +126,24 @@ time_series:
       aggregations:
         max:
           scaling: "standard"
+        last:
+          buckets:
+          - small: .01
+          - medium: 1.0 # includes values up to this threshold
+          - large: "remainder" # includes all remaining records
       rolling:
         aggregations:
           max:
             scaling: "standard"
-        window_duration: 10
-        lookback_periods: 5
+        comparisons:
+          change:
+            scaling: "standard"
+        window_duration: 3
+        lookback_periods: 2
       indicators:
         sma:
           parameters:
-            period: 20
+            period: 3
           aggregations:
             max:
               scaling: "standard"
@@ -144,10 +152,16 @@ time_series:
               mean:
                 scaling: "standard"
             comparisons:
-              change:
-                scaling: "standard"
-            window_duration: 10
-            lookback_periods: 5
+              pct_change:
+                scaling: "none"
+            window_duration: 3
+            lookback_periods: 2
+        ema:
+          parameters:
+            period: 3
+          aggregations:
+            mean:
+              scaling: "standard"
 
     volume:
       rolling:

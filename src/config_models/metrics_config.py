@@ -191,8 +191,12 @@ class RollingMetrics(BaseModel):
     """
     window_duration: Annotated[int, Field(gt=0)]  # Must be an integer > 0
     lookback_periods: Annotated[int, Field(gt=0)]  # Must be an integer > 0
-    aggregations: Optional['AggregationConfig'] = Field(default=None)
+    aggregations: Optional[Dict['AggregationType', 'AggregationConfig']] = Field(default=None)
     comparisons: Optional[Dict[ComparisonType, Optional['ScalingConfig']]] = Field(default=None)
+
+    model_config = {
+        "extra": "forbid",  # Prevent extra fields that are not defined
+    }
 
     @model_validator(mode='after')
     def validate_comparisons_scaling(cls, values):
@@ -209,7 +213,6 @@ class RollingMetrics(BaseModel):
         return values
 
 
-
 class Comparisons(BaseModel):
     """
     Comparisons are performed between the first and last value in any given lookback_period.
@@ -218,7 +221,6 @@ class Comparisons(BaseModel):
     """
     comparison_type: ComparisonType
     scaling: Optional['ScalingConfig'] = Field(default=None)
-
 
 
 # Modular Metrics: Indicators
