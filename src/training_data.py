@@ -352,9 +352,10 @@ def retrieve_transfers_data(training_period_start,modeling_period_start,modeling
 
     # Convert column types
     transfers_df['coin_id'] = transfers_df['coin_id'].astype('category')
+    transfers_df['wallet_address'] = transfers_df['wallet_address'].astype('category')
     transfers_df['date'] = pd.to_datetime(transfers_df['date'])
 
-    # Downcast to float32 to reduce memory usage
+    # Attempt to downcast to float32 to reduce memory usage
     transfers_df['net_transfers'] = pd.to_numeric(transfers_df['net_transfers'], downcast='float')
     transfers_df['balance'] = pd.to_numeric(transfers_df['balance'], downcast='float')
 
@@ -413,12 +414,11 @@ def prepare_profits_data(transfers_df, prices_df):
 
     transfers_df['date'] = pd.to_datetime(transfers_df['date'])
     prices_df['date'] = pd.to_datetime(prices_df['date'])
-    transfers_df['coin_id'] = transfers_df['coin_id'].astype('category')
-    prices_df['coin_id'] = prices_df['coin_id'].astype('category')
 
     # merge datasets and confirm coin_id is categorical
     profits_df = pd.merge(transfers_df, prices_df, on=['coin_id', 'date'], how='left')
     profits_df['coin_id'] = profits_df['coin_id'].astype('category')
+    profits_df['wallet_address'] = profits_df['wallet_address'].astype('category')
 
     logger.debug(f"<Step 1> merge transfers and prices: {time.time() - start_time:.2f} seconds")
     step_time = time.time()
@@ -633,6 +633,7 @@ def clean_profits_df(profits_df, data_cleaning_config):
 
     # Convert coin_id to categorical
     profits_df['coin_id'] = profits_df['coin_id'].astype('category')
+    profits_df['wallet_address'] = profits_df['wallet_address'].astype('category')
 
     # 3. Prepare exclusions_df and output logs
     # ----------------------------------------

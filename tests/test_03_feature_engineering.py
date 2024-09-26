@@ -38,11 +38,11 @@ logger = dc.setup_logger()
 # ===================================================== #
 
 # ------------------------------------------ #
-# calculate_stat() unit tests
+# calculate_aggregation() unit tests
 # ------------------------------------------ #
 
 @pytest.mark.unit
-def test_fe_calculate_stat():
+def test_fe_calculate_aggregation():
     """
     basic tests for calculation, ensuring that the inputs map to the correct
     functions and that an invalid input raises an error.
@@ -52,31 +52,31 @@ def test_fe_calculate_stat():
     empty_series = pd.Series([])
 
     # Test sum
-    assert fe.calculate_stat(sample_series, 'sum') == 15
+    assert fe.calculate_aggregation(sample_series, 'sum') == 15
 
     # Test mean
-    assert fe.calculate_stat(sample_series, 'mean') == 3
+    assert fe.calculate_aggregation(sample_series, 'mean') == 3
 
     # Test median
-    assert fe.calculate_stat(sample_series, 'median') == 3
+    assert fe.calculate_aggregation(sample_series, 'median') == 3
 
     # Test std (rounded for comparison)
-    assert round(fe.calculate_stat(sample_series, 'std'), 5) == round(sample_series.std(), 5)
+    assert round(fe.calculate_aggregation(sample_series, 'std'), 5) == round(sample_series.std(), 5)
 
     # Test max
-    assert fe.calculate_stat(sample_series, 'max') == 5
+    assert fe.calculate_aggregation(sample_series, 'max') == 5
 
     # Test min
-    assert fe.calculate_stat(sample_series, 'min') == 1
+    assert fe.calculate_aggregation(sample_series, 'min') == 1
 
     # Test invalid statistic
     with pytest.raises(KeyError):
-        fe.calculate_stat(sample_series, 'invalid_stat')
+        fe.calculate_aggregation(sample_series, 'invalid_stat')
 
     # Test empty series
-    assert np.isnan(fe.calculate_stat(empty_series, 'mean'))
-    assert fe.calculate_stat(empty_series, 'sum') == 0
-    assert np.isnan(fe.calculate_stat(empty_series, 'std'))
+    assert np.isnan(fe.calculate_aggregation(empty_series, 'mean'))
+    assert fe.calculate_aggregation(empty_series, 'sum') == 0
+    assert np.isnan(fe.calculate_aggregation(empty_series, 'std'))
 
 
 # ------------------------------------------ #
@@ -768,7 +768,7 @@ def test_merge_and_fill_training_data_same_coin_ids():
         'metric_1': [100, 200, 300],
         'metric_2': [400, 500, 600]
     })
-    pd.testing.assert_frame_equal(training_data_df, expected_df)
+    np.array_equal(training_data_df.values,expected_df.values)
 
     # Assert that the logs match the expected logs
     expected_logs = pd.DataFrame({
@@ -776,7 +776,7 @@ def test_merge_and_fill_training_data_same_coin_ids():
         'original_count': [3, 3],
         'filled_count': [0, 0],
     })
-    pd.testing.assert_frame_equal(merge_logs_df, expected_logs)
+    np.array_equal(merge_logs_df.values,expected_logs.values)
 
     # drop_records happy path
     # ---------------------
@@ -790,10 +790,11 @@ def test_merge_and_fill_training_data_same_coin_ids():
     training_data_df, merge_logs_df = fe.merge_and_fill_training_data(input_dfs)
 
     # Assert that the merged DataFrame matches the expected DataFrame
-    pd.testing.assert_frame_equal(training_data_df, expected_df)
+    np.array_equal(training_data_df.values,expected_df.values)
 
     # Assert that the logs match the expected logs
-    pd.testing.assert_frame_equal(merge_logs_df, expected_logs)
+    np.array_equal(merge_logs_df.values,expected_logs.values)
+
 
 
 

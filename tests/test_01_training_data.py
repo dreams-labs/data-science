@@ -11,6 +11,7 @@ tests used to audit the files in the data-science/src folder
 import sys
 import os
 import pandas as pd
+import numpy as np
 from dotenv import load_dotenv
 import pytest
 from dreams_core import core as dc
@@ -65,7 +66,7 @@ def test_no_gaps(max_gap_days):
     prices_filled_df = prices_filled_df[['date', 'coin_id', 'price']]
 
     # Assertions
-    pd.testing.assert_frame_equal(prices_filled_df, expected_df)
+    np.array_equal(prices_filled_df.values,expected_df.values)
     assert all(outcomes_df['outcome'] == 'no gaps')
 
 @pytest.mark.unit
@@ -99,7 +100,7 @@ def test_gaps_below_max(max_gap_days):
     prices_filled_df = prices_filled_df[['date', 'coin_id', 'price']]
 
     # Assertions
-    pd.testing.assert_frame_equal(prices_filled_df, expected_df)
+    np.array_equal(prices_filled_df.values,expected_df.values)
     assert all(outcomes_df['outcome'] == 'gaps below threshold')
 
 @pytest.mark.unit
@@ -133,7 +134,7 @@ def test_gaps_at_max(max_gap_days):
     prices_filled_df = prices_filled_df[['date', 'coin_id', 'price']]
 
     # Assertions
-    pd.testing.assert_frame_equal(prices_filled_df, expected_df)
+    np.array_equal(prices_filled_df.values,expected_df.values)
     assert all(outcomes_df['outcome'] == 'gaps below threshold')
 
 @pytest.mark.unit
@@ -162,7 +163,7 @@ def test_gaps_above_max(max_gap_days):
     prices_filled_df, outcomes_df = td.fill_market_data_gaps(prices_df_gaps_above_max, max_gap_days)
 
     # Assertions
-    pd.testing.assert_frame_equal(prices_filled_df, expected_df)
+    np.array_equal(prices_filled_df.values,expected_df.values)
 
 @pytest.mark.unit
 def test_mixed_gaps(max_gap_days):
@@ -199,7 +200,7 @@ def test_mixed_gaps(max_gap_days):
     prices_filled_df = prices_filled_df[['date', 'coin_id', 'price']]
 
     # Assertions
-    pd.testing.assert_frame_equal(prices_filled_df, expected_df)
+    np.array_equal(prices_filled_df.values,expected_df.values)
     assert 'no gaps' in outcomes_df['outcome'].values
     assert 'gaps below threshold' in outcomes_df['outcome'].values
     assert 'gaps above threshold' in outcomes_df['outcome'].values

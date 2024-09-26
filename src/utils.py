@@ -2,6 +2,8 @@
 utility functions use in data science notebooks
 """
 import time
+import sys
+import gc
 import os
 from datetime import datetime, timedelta
 import logging
@@ -9,6 +11,7 @@ import warnings
 import functools
 import yaml
 import progressbar
+import pandas as pd
 from pydantic import ValidationError
 import dreams_core.core as dc
 
@@ -212,3 +215,38 @@ def cw_filter_df(df, coin_id, wallet_address):
         (df['wallet_address'] == wallet_address)
     ]
     return filtered_df
+
+
+
+def df_memory_usage(df):
+    """
+    Checks how much memory a dataframe is using
+    """
+
+    # Memory usage of each column
+    print(df.memory_usage(deep=True))
+
+    # Total memory usage in bytes
+    total_memory = df.memory_usage(deep=True).sum()
+    print(f'Total memory usage: {total_memory / 1024 ** 2:.2f} MB')
+
+
+def memory_usage():
+    """
+    Checks how much memory all objects are using
+
+    name logic needs to be redone
+    """
+    objects = []
+    for obj in gc.get_objects():
+        # try:
+        size = sys.getsizeof(obj)
+        if size >= 1000:  # Filter out objects smaller than 1000 bytes
+            obj_type = type(obj).__name__
+            obj_name = str(getattr(obj, '__name__', 'Unnamed'))  # Get name if available
+            objects.append((obj_name, obj_type, size / (1024 * 1024)))  # Convert size to MB
+        # except:
+        #     continue
+    mem_df = pd.DataFrame(objects, columns=['Name', 'Type', 'Size (MB)'])
+    mem_df = mem_df.sort_values(by='Size (MB)', ascending=False).reset_index(drop=True)
+    return mem_df

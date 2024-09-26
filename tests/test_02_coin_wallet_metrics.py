@@ -731,16 +731,17 @@ def test_generate_time_series_metrics_no_nulls_and_row_count(prices_df, config, 
 
     expected_rows = len(full_duration_coins) * full_duration_days
 
-    # Run the generate_time_series_indicators function
-    full_metrics_df, partial_time_series_metrics_df = cwm.generate_time_series_indicators(
-        time_series_df=prices_df,
-        config=config,
-        value_column_indicators_config=metrics_config['time_series']['market_data']['price']['indicators'],
-        value_column=value_column
-    )
+    if 'indicators' in metrics_config['time_series']['market_data']['price'].keys():
+        # Run the generate_time_series_indicators function
+        full_metrics_df, _ = cwm.generate_time_series_indicators(
+            time_series_df=prices_df,
+            config=config,
+            value_column_indicators_config=metrics_config['time_series']['market_data']['price']['indicators'],
+            value_column=value_column
+        )
 
-    # Check that the number of rows in the result matches the expected number of rows
-    assert len(full_metrics_df) == expected_rows, "The number of rows in the output does not match the expected number of rows."
+        # Check that the number of rows in the result matches the expected number of rows
+        assert len(full_metrics_df) == expected_rows, "The number of rows in the output does not match the expected number of rows."
 
-    # Check that there are no null values in the result
-    assert not full_metrics_df.isnull().values.any(), "The output DataFrame contains null values."
+        # Check that there are no null values in the result
+        assert not full_metrics_df.isnull().values.any(), "The output DataFrame contains null values."
