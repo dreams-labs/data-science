@@ -30,6 +30,122 @@ import modeling as m
 logger = dc.setup_logger()
 
 
+
+def run_experiment(modeling_config):
+    """
+    Runs an experiment using configurations from the experiments_config.yaml,
+    builds models, and logs the results of each trial.
+
+    Args:
+    - modeling_config (dict): Configuration dictionary containing paths, model params, etc.
+
+    Returns:
+    - experiment_id (string): the ID of the experiment that can be used to retrieve metadata
+        from modeling/experiment metadat
+    """
+
+    # 1. Extract config variables and store experiment metadata
+    # ---------------------------------------------------------
+    # Extract folder paths from modeling_config
+    modeling_folder = modeling_config['modeling']['modeling_folder']
+    config_folder = modeling_config['modeling']['config_folder']
+
+    # Load experiments_config.yaml
+    experiments_config = load_config(os.path.join(config_folder, 'experiments_config.yaml'))
+
+    # Extract metadata and experiment details from experiments_config
+    experiment_name = experiments_config['metadata']['experiment_name']
+    experiment_id = f"{experiment_name}_{uuid.uuid4()}"
+    search_method = experiments_config['metadata']['search_method']
+    max_evals = experiments_config['metadata']['max_evals']
+
+    # Add a timestamp to the metadata
+    metadata = experiments_config['metadata']
+    metadata['experiment_id'] = experiment_id
+    metadata['start_time'] = datetime.now().isoformat()
+    metadata['trial_logs'] = []  # Initialize the array for trial log filenames
+
+
+    # 2. Initialize trial configurations and initial variables
+    # -------------------------------------------------------------------------
+    # Generate the trial configurations based on variable_overrides
+    trial_configurations = generate_experiment_configurations(config_folder, method=search_method, max_evals=max_evals)
+
+    # Cap the number of trials if 'max_evals' is set
+    max_evals = experiments_config['metadata'].get('max_evals', len(trial_configurations))
+    total_trials = min(len(trial_configurations), max_evals)
+
+    # Generate prices_df
+    config = load_config(os.path.join(config_folder, 'config.yaml'))
+    market_data_df = td.retrieve_market_data()
+    market_data_df, _ = td.fill_market_data_gaps(market_data_df, config['data_cleaning']['max_gap_days'])
+    prices_df = market_data_df[['coin_id','date','price']].copy()
+
+    # Initialize progress bar and empty variables
+    trials_bar = create_progress_bar(total_trials)
+    profits_df = None
+
+
+    # 3. Iterate through each trial configuration
+    # -------------------------------------------
+    for n, trial in enumerate(trial_configurations[:total_trials]):
+
+        # 3.1 Prepare the full configuration by applying overrides from the current trial config
+        config, metrics_config, modeling_config = prepare_configs(config_folder, trial)
+
+        # Store the configuration settings used in this trial in metadata
+        metadata['config_settings'] = {
+            "config": config,
+            "metrics_config": metrics_config,
+            "modeling_config": modeling_config
+        }
+
+        # 3.2 Retrieve or rebuild profits_df based on config changes
+        profits_df = rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_df)
+
+        # 3.3 Build the configured model input data (train/test data)
+        X_train, X_test, y_train, y_test = build_configured_model_input(profits_df, prices_df, config, metrics_config, modeling_config)
+
+        # 3.4 Train the model using the current configuration and log the results
+        model, model_id = m.train_model(X_train, y_train, modeling_folder, modeling_config['modeling']['model_params'])
+
+        # 3.5 Evaluate and log the model's performance on the test set
+        _ = m.evaluate_model(model, X_test, y_test, model_id, modeling_folder)
+
+        # 3.6 Log the trial results for this configuration
+        # Include the trial name, metadata, and other relevant details
+        trial_log_filename = m.log_trial_results(modeling_folder, model_id, experiment_id, trial)
+
+        # Append the trial log filename to the metadata
+        metadata['trial_logs'].append(trial_log_filename)
+
+        # Update the progress bar
+        trials_bar.update(n + 1)
+
+    # Finish the progress bar
+    trials_bar.finish()
+
+
+    # 4. Log experiment metadata
+    # -------------------------------------------
+    # Add the experiment end time and calculate the duration
+    metadata['end_time'] = datetime.now().isoformat()
+    metadata['duration'] = (datetime.fromisoformat(metadata['end_time']) -
+                            datetime.fromisoformat(metadata['start_time'])).total_seconds()
+
+    # Log experiment metadata
+    experiment_tracking_path = os.path.join(modeling_folder, "experiment_metadata")
+    os.makedirs(experiment_tracking_path, exist_ok=True)
+    experiment_metadata_file = os.path.join(experiment_tracking_path, f"{experiment_id}.json")
+    with open(experiment_metadata_file, 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, indent=4)
+
+    logger.info('Experiment %s complete.', experiment_id)
+
+    return experiment_id
+
+
+
 @timing_decorator
 def generate_experiment_configurations(config_folder, method='grid', max_evals=50):
     """
@@ -404,119 +520,6 @@ def build_configured_model_input(profits_df, prices_df, config, metrics_config, 
 
 
 
-
-def run_experiment(modeling_config):
-    """
-    Runs an experiment using configurations from the experiments_config.yaml,
-    builds models, and logs the results of each trial.
-
-    Args:
-    - modeling_config (dict): Configuration dictionary containing paths, model params, etc.
-
-    Returns:
-    - experiment_id (string): the ID of the experiment that can be used to retrieve metadata
-        from modeling/experiment metadat
-    """
-
-    # 1. Extract config variables and store experiment metadata
-    # ---------------------------------------------------------
-    # Extract folder paths from modeling_config
-    modeling_folder = modeling_config['modeling']['modeling_folder']
-    config_folder = modeling_config['modeling']['config_folder']
-
-    # Load experiments_config.yaml
-    experiments_config = load_config(os.path.join(config_folder, 'experiments_config.yaml'))
-
-    # Extract metadata and experiment details from experiments_config
-    experiment_name = experiments_config['metadata']['experiment_name']
-    experiment_id = f"{experiment_name}_{uuid.uuid4()}"
-    search_method = experiments_config['metadata']['search_method']
-    max_evals = experiments_config['metadata']['max_evals']
-
-    # Add a timestamp to the metadata
-    metadata = experiments_config['metadata']
-    metadata['experiment_id'] = experiment_id
-    metadata['start_time'] = datetime.now().isoformat()
-    metadata['trial_logs'] = []  # Initialize the array for trial log filenames
-
-
-    # 2. Initialize trial configurations and initial variables
-    # -------------------------------------------------------------------------
-    # Generate the trial configurations based on variable_overrides
-    trial_configurations = generate_experiment_configurations(config_folder, method=search_method, max_evals=max_evals)
-
-    # Cap the number of trials if 'max_evals' is set
-    max_evals = experiments_config['metadata'].get('max_evals', len(trial_configurations))
-    total_trials = min(len(trial_configurations), max_evals)
-
-    # Generate prices_df
-    config = load_config(os.path.join(config_folder, 'config.yaml'))
-    market_data_df = td.retrieve_market_data()
-    market_data_df, _ = td.fill_market_data_gaps(market_data_df, config['data_cleaning']['max_gap_days'])
-    prices_df = market_data_df[['coin_id','date','price']].copy()
-
-    # Initialize progress bar and empty variables
-    trials_bar = create_progress_bar(total_trials)
-    profits_df = None
-
-
-    # 3. Iterate through each trial configuration
-    # -------------------------------------------
-    for n, trial in enumerate(trial_configurations[:total_trials]):
-
-        # 3.1 Prepare the full configuration by applying overrides from the current trial config
-        config, metrics_config, modeling_config = prepare_configs(config_folder, trial)
-
-        # Store the configuration settings used in this trial in metadata
-        metadata['config_settings'] = {
-            "config": config,
-            "metrics_config": metrics_config,
-            "modeling_config": modeling_config
-        }
-
-        # 3.2 Retrieve or rebuild profits_df based on config changes
-        profits_df = rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_df)
-
-        # 3.3 Build the configured model input data (train/test data)
-        X_train, X_test, y_train, y_test = build_configured_model_input(profits_df, prices_df, config, metrics_config, modeling_config)
-
-        # 3.4 Train the model using the current configuration and log the results
-        model, model_id = m.train_model(X_train, y_train, modeling_folder, modeling_config['modeling']['model_params'])
-
-        # 3.5 Evaluate and log the model's performance on the test set
-        _ = m.evaluate_model(model, X_test, y_test, model_id, modeling_folder)
-
-        # 3.6 Log the trial results for this configuration
-        # Include the trial name, metadata, and other relevant details
-        trial_log_filename = m.log_trial_results(modeling_folder, model_id, experiment_id, trial)
-
-        # Append the trial log filename to the metadata
-        metadata['trial_logs'].append(trial_log_filename)
-
-        # Update the progress bar
-        trials_bar.update(n + 1)
-
-    # Finish the progress bar
-    trials_bar.finish()
-
-
-    # 4. Log experiment metadata
-    # -------------------------------------------
-    # Add the experiment end time and calculate the duration
-    metadata['end_time'] = datetime.now().isoformat()
-    metadata['duration'] = (datetime.fromisoformat(metadata['end_time']) -
-                            datetime.fromisoformat(metadata['start_time'])).total_seconds()
-
-    # Log experiment metadata
-    experiment_tracking_path = os.path.join(modeling_folder, "experiment_metadata")
-    os.makedirs(experiment_tracking_path, exist_ok=True)
-    experiment_metadata_file = os.path.join(experiment_tracking_path, f"{experiment_id}.json")
-    with open(experiment_metadata_file, 'w', encoding='utf-8') as f:
-        json.dump(metadata, f, indent=4)
-
-    logger.info('Experiment %s complete.', experiment_id)
-
-    return experiment_id
 
 
 def generate_trial_df(modeling_folder, experiment_id):
