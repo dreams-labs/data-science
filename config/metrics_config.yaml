@@ -140,37 +140,7 @@ time_series:
             scaling: "standard"
         window_duration: 3
         lookback_periods: 2
-      indicators:
-        sma:
-          parameters:
-            period: 3
-          aggregations:
-            max:
-              scaling: "standard"
-          rolling:
-            aggregations:
-              mean:
-                scaling: "standard"
-            comparisons:
-              pct_change:
-                scaling: "none"
-            window_duration: 3
-            lookback_periods: 2
-        ema:
-          parameters:
-            period: 3
-          aggregations:
-            mean:
-              scaling: "standard"
-
     volume:
-      indicators:
-        sma:
-          parameters:
-            period: 3
-          aggregations:
-            max:
-              scaling: "standard"
       rolling:
         aggregations:
           sum:

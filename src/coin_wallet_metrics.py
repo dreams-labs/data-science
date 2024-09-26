@@ -443,6 +443,9 @@ def split_dataframe_by_coverage(
     full_coverage_count = len(full_duration_series)
     partial_coverage_count = total_series - full_coverage_count
 
+    # Convert id column to categorical to reduce memory usage
+    time_series_df[id_column] = time_series_df[id_column].astype('category')
+
     # Split the dataframe
     if id_column:
         full_coverage_df = time_series_df[time_series_df[id_column].isin(full_duration_series)]

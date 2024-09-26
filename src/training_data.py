@@ -42,6 +42,12 @@ def retrieve_market_data():
     # Convert coin_id column to categorical to reduce memory usage
     market_data_df['coin_id'] = market_data_df['coin_id'].astype('category')
 
+    # Downcast numeric columns to reduce memory usage
+    market_data_df['price'] = pd.to_numeric(market_data_df['price'], downcast='float')
+    market_data_df['volume'] = pd.to_numeric(market_data_df['volume'], downcast='integer')
+    market_data_df['market_cap'] = pd.to_numeric(market_data_df['market_cap'], downcast='integer')
+
+    # Dates as dates
     market_data_df['date'] = pd.to_datetime(market_data_df['date'])
 
     logger.info('retrieved market data with shape %s',market_data_df.shape)
@@ -128,6 +134,9 @@ def fill_market_data_gaps(market_data_df, max_gap_days):
 
     # Drop the temporary 'missing_gap' column
     market_data_filled_df = market_data_filled_df.drop(columns=['missing_gap'])
+
+    # coin_id as categorical
+    market_data_filled_df['coin_id'] = market_data_filled_df['coin_id'].astype('category')
 
     # Convert outcomes to DataFrame
     outcomes_df = pd.DataFrame(outcomes)
@@ -345,6 +354,10 @@ def retrieve_transfers_data(training_period_start,modeling_period_start,modeling
     transfers_df['coin_id'] = transfers_df['coin_id'].astype('category')
     transfers_df['date'] = pd.to_datetime(transfers_df['date'])
 
+    # Downcast to float32 to reduce memory usage
+    transfers_df['net_transfers'] = pd.to_numeric(transfers_df['net_transfers'], downcast='float')
+    transfers_df['balance'] = pd.to_numeric(transfers_df['balance'], downcast='float')
+
     logger.info('retrieved transfers_df with shape %s after %s seconds.',
                 transfers_df.shape, round(time.time()-start_time,1))
 
@@ -403,8 +416,10 @@ def prepare_profits_data(transfers_df, prices_df):
     transfers_df['coin_id'] = transfers_df['coin_id'].astype('category')
     prices_df['coin_id'] = prices_df['coin_id'].astype('category')
 
-    # merge datasets
+    # merge datasets and confirm coin_id is categorical
     profits_df = pd.merge(transfers_df, prices_df, on=['coin_id', 'date'], how='left')
+    profits_df['coin_id'] = profits_df['coin_id'].astype('category')
+
     logger.debug(f"<Step 1> merge transfers and prices: {time.time() - start_time:.2f} seconds")
     step_time = time.time()
 
@@ -616,6 +631,8 @@ def clean_profits_df(profits_df, data_cleaning_config):
     profits_cleaned_df = profits_cleaned_df[profits_cleaned_df['_merge'] == 'left_only']
     profits_cleaned_df.drop(columns=['_merge'], inplace=True)
 
+    # Convert coin_id to categorical
+    profits_df['coin_id'] = profits_df['coin_id'].astype('category')
 
     # 3. Prepare exclusions_df and output logs
     # ----------------------------------------
