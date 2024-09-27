@@ -11,6 +11,13 @@ from pydantic import BaseModel, RootModel, Field, model_validator, conlist
 # pylint: disable=W0107  # unneccesary pass in the RootModel classes
 # pylint: disable=E0213  # we are defining classes and not class instancees so we don't need "self"
 
+# Custom base model to disable extra fields in all sections
+class NoExtrasBaseModel(BaseModel):
+    """Custom BaseModel to apply config settings globally."""
+    model_config = {
+        "extra": "forbid",  # Prevent extra fields that are not defined
+        "str_max_length": 2000,    # Increase the max length of error message string representations
+    }
 
 # ____________________________________________________________________________
 # ----------------------------------------------------------------------------
@@ -18,7 +25,7 @@ from pydantic import BaseModel, RootModel, Field, model_validator, conlist
 # ----------------------------------------------------------------------------
 # ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
 
-class MetricsConfig(BaseModel):
+class MetricsConfig(NoExtrasBaseModel):
     """
     Top level structure of the main metrics_config.yaml file.
 
@@ -28,15 +35,9 @@ class MetricsConfig(BaseModel):
     wallet_cohorts: Optional[Dict[str, 'WalletCohort']] = Field(default=None)
     time_series: Optional[Dict[str, 'TimeSeriesValueColumn']] = Field(default=None)
 
-    model_config = {
-        "extra": "forbid",  # Prevent extra fields that are not defined
-        "str_max_length": 2000  # Increase the max length of error message string representations
-    }
 
-# ============================================================================
 # Wallet Cohort Metrics
-# ============================================================================
-
+# ---------------------
 class WalletCohortMetric(str, Enum):
     """
     A list of all valid names of wallet cohort buysell metrics.
@@ -61,10 +62,8 @@ class WalletCohort(RootModel[Dict['WalletCohortMetric', 'Metric']]):
     pass
 
 
-# ============================================================================
 # Time Series Metrics
-# ============================================================================
-
+# -------------------
 class TimeSeriesValueColumn(RootModel[Dict[str, 'Metric']]):
     """
     Represents a dataset that contains a value_column such as price, volume, etc. and their
@@ -82,7 +81,7 @@ class TimeSeriesValueColumn(RootModel[Dict[str, 'Metric']]):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
 
-class Metric(BaseModel):
+class Metric(NoExtrasBaseModel):
     """
     The Metric config class defines how a time series should be flattened into a single row by
     specifying the columns that will show up in the row, e.g. sum of buyers_new in the sharks
@@ -105,10 +104,6 @@ class Metric(BaseModel):
     aggregations: Optional[Dict['AggregationType', 'AggregationConfig']] = Field(default=None)
     rolling: Optional['RollingMetrics'] = Field(default=None)
     indicators: Optional[Dict[str, 'Indicators']] = Field(default=None)
-
-    model_config = {
-        "extra": "forbid",  # Prevent extra fields that are not defined
-    }
 
     @model_validator(mode='after')
     def remove_empty_fields(cls, values):
@@ -146,17 +141,13 @@ class AggregationType(str, Enum):
     FIRST = "first"
     LAST = "last"
 
-class AggregationConfig(BaseModel):
+class AggregationConfig(NoExtrasBaseModel):
     """
     Defines the configuration for each aggregation type.
     An aggregation can have a scaling field or a buckets field.
     """
     scaling: Optional['ScalingType'] = Field(default=None)
     buckets: Optional['BucketsList'] = Field(default=None)
-
-    model_config = {
-        "extra": "forbid",  # Prevent extra fields that are not defined
-    }
 
 
 # Modular Metrics: Buckets
@@ -186,8 +177,7 @@ class ComparisonType(str, Enum):
     CHANGE = "change"
     PCT_CHANGE = "pct_change"
 
-
-class RollingMetrics(BaseModel):
+class RollingMetrics(NoExtrasBaseModel):
     """
     Rolling metrics generates a column for each {lookback_period} that last for
     {window_duration} days which can then be flattened through Aggregations or Comparisons.
@@ -196,10 +186,6 @@ class RollingMetrics(BaseModel):
     lookback_periods: Annotated[int, Field(gt=0)]  # Must be an integer > 0
     aggregations: Optional[Dict['AggregationType', 'AggregationConfig']] = Field(default=None)
     comparisons: Optional[Dict[ComparisonType, Optional['ScalingConfig']]] = Field(default=None)
-
-    model_config = {
-        "extra": "forbid",  # Prevent extra fields that are not defined
-    }
 
     @model_validator(mode='after')
     def validate_comparisons_scaling(cls, values):
@@ -215,8 +201,7 @@ class RollingMetrics(BaseModel):
                         )
         return values
 
-
-class Comparisons(BaseModel):
+class Comparisons(NoExtrasBaseModel):
     """
     Comparisons are performed between the first and last value in any given lookback_period.
 
@@ -224,11 +209,6 @@ class Comparisons(BaseModel):
     """
     comparison_type: ComparisonType
     scaling: Optional['ScalingConfig'] = Field(default=None)
-
-    model_config = {
-        "extra": "forbid",  # Prevent extra fields that are not defined
-    }
-
 
 
 # Modular Metrics: Indicators
@@ -240,14 +220,10 @@ class IndicatorType(str, Enum):
     SMA = "sma"
     EMA = "ema"
 
-class Indicators(BaseModel):
+class Indicators(NoExtrasBaseModel):
     parameters: Dict[str, Any]  # Flexible to handle unique parameters
     aggregations: Optional[Dict['AggregationType', 'AggregationConfig']] = Field(default=None)
     rolling: Optional['RollingMetrics'] = Field(default=None)
-
-    model_config = {
-        "extra": "forbid",  # Prevent extra fields that are not defined
-    }
 
 
 # Modular Metrics: ScalingConfig
@@ -261,18 +237,15 @@ class ScalingType(str, Enum):
     LOG = "log"
     NONE = "none"
 
-class ScalingConfig(BaseModel):
+class ScalingConfig(NoExtrasBaseModel):
     """
     Configuration for applying scaling to metrics.
     """
     scaling: ScalingType  # Make scaling required for any ComparisonType
-    model_config = {
-        "extra": "forbid",  # Prevent extra fields that are not defined
-    }
 
 
 # ============================================================================
 # Model Rebuilding
 # ============================================================================
-
+# Ensures all classes are fully reflected in structure regardless of the order they were defined
 MetricsConfig.model_rebuild()

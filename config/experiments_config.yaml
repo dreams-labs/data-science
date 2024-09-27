@@ -10,7 +10,7 @@ metadata:
   description: "Experiment to assess potential whale cohort cutoffs."
   metrics_to_compare:
     - roc_auc
-  # thresholds: [0.5, 0.6, 0.7]
+  threshold: 0.5
   max_evals: 108
 
 variable_overrides:

@@ -19,10 +19,14 @@ import dreams_core.core as dc
 # pydantic config files
 import config_models.config as py_c
 import config_models.metrics_config as py_mc
+import config_models.modeling_config as py_mo
+import config_models.experiments_config as py_e
 
 # Reload the Pydantic config models to reflect any changes made to their definitions
 importlib.reload(py_c)
 importlib.reload(py_mc)
+importlib.reload(py_mo)
+importlib.reload(py_e)
 
 
 # set up logger at the module level
@@ -59,14 +63,17 @@ def load_config(file_path='../notebooks/config.yaml'):
             if filename in ['config.yaml', 'test_config.yaml']:
                 config_pydantic = py_c.MainConfig(**config_dict)
                 config = config_pydantic.model_dump(mode="json", exclude_none=True)
-
             elif filename in ['metrics_config.yaml', 'test_metrics_config.yaml']:
                 config_pydantic = py_mc.MetricsConfig(**config_dict)
                 config = config_pydantic.model_dump(mode="json", exclude_none=True)
-
-            # Otherwise return the normal dict
+            elif filename in ['modeling_config.yaml', 'test_modeling_config.yaml']:
+                config_pydantic = py_mo.ModelingConfig(**config_dict)
+                config = config_pydantic.model_dump(mode="json", exclude_none=True)
+            elif filename in ['experiments_config.yaml', 'test_experiments_config.yaml']:
+                config_pydantic = py_e.ExperimentsConfig(**config_dict)
+                config = config_pydantic.model_dump(mode="json", exclude_none=True)
             else:
-                config = config_dict
+                raise ValueError(f"Loading failed for unknown config type '{filename}'")
 
         except ValidationError as e:
             # Enhanced error reporting
@@ -85,7 +92,8 @@ def load_config(file_path='../notebooks/config.yaml'):
                 error_messages.append(error_message)
 
             # Raise custom error with all gathered messages
-            raise ValueError(f"Validation Error in {filename}:\n" + "\n".join(error_messages)) from e
+            error_details = f"Validation Error in {filename}:\n" + "\n".join(error_messages)
+            raise ValueError(error_details) from e
 
     return config
 
