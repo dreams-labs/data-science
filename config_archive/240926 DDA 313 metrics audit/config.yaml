@@ -13,6 +13,26 @@ datasets:
   # Keyed on coin_id-date
   wallet_cohorts:
 
+    under_15k:
+      description: 'cohort_15k'  # prefix that will be included in feature columns
+      fill_method: 'fill_zeros'
+      sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
+      wallet_minimum_inflows: 1000  # Minimum USD inflows for a wallet to be considered a 'shark'
+      wallet_maximum_inflows: 15000  # Maximum USD inflows for a wallet to be considered a 'shark'
+      coin_profits_win_threshold: 300  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
+      coin_return_win_threshold: 0.3  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
+      wallet_min_coin_wins: 3  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
+
+    under_75k:
+      description: 'cohort_75k'  # prefix that will be included in feature columns
+      fill_method: 'fill_zeros'
+      sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
+      wallet_minimum_inflows: 10000  # Minimum USD inflows for a wallet to be considered a 'shark'
+      wallet_maximum_inflows: 75000  # Maximum USD inflows for a wallet to be considered a 'shark'
+      coin_profits_win_threshold: 5000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
+      coin_return_win_threshold: 0.2  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
+      wallet_min_coin_wins: 2  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
+
     whales:
       description: 'cohort_whales'  # prefix that will be included in feature columns
       fill_method: 'fill_zeros'

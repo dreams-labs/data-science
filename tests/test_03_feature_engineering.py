@@ -331,10 +331,6 @@ def test_fe_flatten_date_features():
     assert 'buyers_new_sum_3d_period_3' not in rolling_features  # Ensure no extra periods
 
 
-# ------------------------------------------ #
-# flatten_date_features() unit tests
-# ------------------------------------------ #
-
 @pytest.mark.unit
 def test_fe_flatten_coin_date_df():
     """
@@ -422,6 +418,51 @@ def test_fe_flatten_coin_date_df():
     assert len(result_one_coin['coin_id'].unique()) == 1
     assert 'buyers_new_sum' in result_one_coin.columns
     assert result_one_coin['buyers_new_sum'].iloc[0] == 60  # Sum of buyers_new for coin 1
+
+
+@pytest.mark.unit
+def test_fe_flatten_date_features_bucketing():
+    """
+    Unit test for checking the bucketing functionality in flatten_date_features function.
+
+    Test Cases:
+    1. Checks that the function correctly buckets the aggregated metrics based on the specified bucket ranges.
+    """
+
+    # Sample DataFrame for testing
+    sample_coin_high_df = pd.DataFrame({
+        'buyers_new': [10, 20, 30, 40, 50, 60],
+        'sellers_new': [5, 10, 15, 20, 25, 30]
+    })
+
+    # Sample DataFrame for testing
+    sample_coin_low_df = pd.DataFrame({
+        'buyers_new': [0, 3, 4, 15, 33, 12],
+        'sellers_new': [5, 10, 15, 20, 25, 30]
+    })
+
+
+    # Sample configuration for metrics with buckets
+    metrics_config = {
+        'buyers_new': {
+            'aggregations': {
+                'sum': {'buckets': [{'low': 100}, {'medium': 200}, {'high': 'remainder'}]},  # Define the bucket ranges
+                'mean': {'scaling': 'none'}
+            }
+        }
+    }
+
+    flat_features_high = fe.flatten_date_features(sample_coin_high_df, metrics_config)
+    flat_features_low = fe.flatten_date_features(sample_coin_low_df, metrics_config)
+
+    # Test Case 1: Bucketing functionality
+    assert flat_features_high['buyers_new_sum_bucket'] == 'high'  # Sum = 210
+    assert flat_features_low['buyers_new_sum_bucket'] == 'low'  # Sum = 67
+
+    # Test Case 2: Non-bucketed aggregation still returns raw value
+    assert flat_features_high['buyers_new_mean'] == 35  # Mean of buyers_new column
+    assert round(flat_features_low['buyers_new_mean']) == 11  # Mean of buyers_new column
+
 
 
 # ------------------------------------------ #

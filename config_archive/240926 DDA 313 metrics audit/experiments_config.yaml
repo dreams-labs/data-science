@@ -1,0 +1,99 @@
+# This experiment config file defines parameter variations for running experiments
+# across multiple configurations. It is linked to three main config files:
+# - config.yaml: Contains settings for training data, wallet cohorts, and data cleaning.
+# - modeling_config.yaml: Contains preprocessing steps and modeling-related parameters.
+# - metrics_config.yaml: Defines metrics and their aggregations for evaluation.
+
+metadata:
+  experiment_name: "0926_best_cohort"
+  search_method: "random"
+  description: "Experiment to assess the strongest initial cohort."
+  metrics_to_compare:
+    - roc_auc
+  # thresholds: [0.5, 0.6, 0.7]
+  max_evals: 10
+
+variable_overrides:
+  config:
+    datasets:
+      wallet_cohorts:
+        sharks:
+          wallet_minimum_inflows:
+            - 5000  # Minimum USD inflows for a coin to be considered a 'shark' coin
+            - 15000  # More restrictive inflows filter
+          coin_profits_win_threshold:
+            - 2000   # Lifetime absolute USD profit threshold for a 'shark' coin
+            - 7000  # More restrictive profit threshold
+          coin_return_win_threshold:
+            - 0.4    # 50% minimum lifetime return threshold
+            - 0.65   # 75% return threshold for more aggressive 'shark' classification
+          wallet_min_coin_wins:
+            - 3      # Wallets must have at least 2 winning coins to be part of the shark cohort
+            - 5      # More restrictive, requiring 3 winning coins
+
+  modeling_config:
+    preprocessing:
+      drop_features:
+        - ['total_sellers_sum', 'buyers_new_median']  # Drop these two features
+        - ['total_sellers_sum']  # Drop only one feature for comparison
+
+    target_variables:
+      moon_threshold:
+        - 0.3  # Moon threshold of 30%
+        - 0.5  # Moon threshold of 50%
+    modeling:
+      model_params:
+        n_estimators:
+          - 50  # Number of trees in the model
+          - 100  # Number of trees in the model
+
+
+  metrics_config:
+    wallet_cohorts:
+      sharks:
+        buyers_new:
+          aggregations:
+            sum:
+              scaling:
+                - 'standard'  # Standard scaling
+                - 'minmax'    # Min-max scaling
+            mean:
+              scaling:
+                - 'standard'
+                - 'minmax'
+          aggregations:
+            sum:
+              scaling:
+                - 'standard'
+            median:
+              scaling:
+                - 'None'  # No scaling for the median
+        sellers_new:
+          aggregations:
+            sum:
+              scaling:
+                - 'standard'  # Standard scaling
+            mean:
+              scaling:
+                - 'standard'
+                - 'minmax'
+        buyers_repeat:
+          aggregations:
+            sum:
+              scaling:
+                - 'standard'  # Standard scaling
+            mean:
+              scaling:
+                - 'standard'
+                - 'minmax'
+      prices:
+        price:
+          rolling:
+              window_duration:
+                - 14
+                - 7
+                - 21
+              lookback_periods:
+                - 2
+                - 4
+                - 6

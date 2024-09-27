@@ -1,6 +1,8 @@
 """
 functions used to build coin-level features from training data
 """
+# pylint: disable=C0302
+
 import os
 from datetime import datetime
 import time
@@ -11,9 +13,89 @@ import numpy as np
 import dreams_core.core as dc
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
+# project module imports
+import coin_wallet_metrics as cwm
+
 
 # set up logger at the module level
 logger = dc.setup_logger()
+
+
+def generate_time_series_features(
+        dataset_name,
+        dataset_df,
+        dataset_metrics_config,
+        config,
+        modeling_config
+    ):
+    """
+    Generates features for a time series dataset by generating all metrics defined in the
+    metrics_config for each coin_id. The metrics are then flattened into features and saved
+    in the format needed to merge them using fe.create_training_data_df().
+
+    Params:
+    - dataset_name (string): the key of the dataset,
+        e.g. config['datasets']['time_series'][{dataset_name}]
+    - dataset_df (pd.DataFrame): the dataframe containing the columns with defined metrics,
+        e.g. a column for each of metrics_config['time_series'][{dataset_name}].keys()
+    - dataset_metrics_config: this dataset's metrics_config,
+        e.g. metrics_config['time_series'][{dataset_name}]
+    - config (dict): config.yaml
+    - modeling_config (dict): modeling_config.yaml
+
+    Returns:
+    - training_data_tuples (list of tuples): Each tuple contains the preprocessed file name
+        and fill method for the value column contained in dataset_metrics_config, formatted for
+        input to fe.create_training_data_df().
+    - training_data_dfs (list of pd.DataFrames): A list of preprocessed DataFrames for each
+        value_column included in the dataset_metrics_config.
+    """
+    training_data_tuples = []
+    training_data_dfs = []
+
+    # calculate metrics for each value column
+    for value_column in list(dataset_metrics_config.keys()):
+
+        # a value_column-specific df will be used for feature generation
+        value_column_config = config['datasets']['time_series'][dataset_name][value_column]
+        value_column_metrics_config = dataset_metrics_config[value_column]
+        value_column_df = dataset_df[['date','coin_id',value_column]].copy()
+
+        # check if there are any time series indicators to add, e.g. sma, ema, etc
+        if 'indicators' in value_column_metrics_config:
+            value_column_metrics_df, _ = cwm.generate_time_series_indicators(
+                value_column_df,
+                config,
+                value_column_metrics_config['indicators'],
+                value_column,
+                id_column='coin_id'
+            )
+
+        else:
+            # if no indicators are needed, pass through coins with complete date coverage
+            value_column_metrics_df, _, _ = cwm.split_dataframe_by_coverage(
+                value_column_df,
+                config['training_data']['training_period_start'],
+                config['training_data']['training_period_end'],
+                id_column='coin_id'
+            )
+
+        # generate features from the metrics
+        value_column_features_df, value_column_tuple = convert_dataset_metrics_to_features(
+            value_column_metrics_df,
+            value_column_config,
+            dataset_metrics_config,
+            config,
+            modeling_config
+        )
+
+        logger.info('Generated features for %s.%s.%s',
+                    'time_series', dataset_name, value_column)
+
+        training_data_tuples.append(value_column_tuple)
+        training_data_dfs.append(value_column_features_df)
+
+    return training_data_tuples, training_data_dfs
 
 
 

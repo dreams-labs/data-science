@@ -54,13 +54,13 @@ def run_experiment(modeling_config):
     experiments_config = load_config(os.path.join(config_folder, 'experiments_config.yaml'))
 
     # Extract metadata and experiment details from experiments_config
-    experiment_name = experiments_config['metadata']['experiment_name']
-    experiment_id = f"{experiment_name}_{uuid.uuid4()}"
-    search_method = experiments_config['metadata']['search_method']
-    max_evals = experiments_config['metadata']['max_evals']
-
-    # Add a timestamp to the metadata
     metadata = experiments_config['metadata']
+    experiment_name = metadata['experiment_name']
+    search_method = metadata['search_method']
+    max_evals = metadata['max_evals']
+
+    # Add experiment_id and timestamp to the metadata
+    experiment_id = f"{experiment_name}_{uuid.uuid4()}"
     metadata['experiment_id'] = experiment_id
     metadata['start_time'] = datetime.now().isoformat()
     metadata['trial_logs'] = []  # Initialize the array for trial log filenames
