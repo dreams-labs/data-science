@@ -982,7 +982,7 @@ def create_target_variables_mooncrater(prices_df, training_data_config, modeling
     target_data = []
     outcomes = []
     price_performance = []
-    for coin_id, group in modeling_period_df.groupby('coin_id'):
+    for coin_id, group in modeling_period_df.groupby('coin_id', observed=True):
         # Get the price on the start and end dates
         price_start = group[group['date'] == modeling_period_start]['price'].values
         price_end = group[group['date'] == modeling_period_end]['price'].values

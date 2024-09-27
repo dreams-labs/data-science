@@ -82,7 +82,7 @@ time_series:
           pct_change:
             scaling: "none"
         window_duration: 10
-        lookback_periods: 3
+        lookback_periods: 5
     volume:
       rolling:
         aggregations:
@@ -92,7 +92,7 @@ time_series:
           pct_change:
             scaling: "none"        # No scaling for percentage change, as it's already normalized.
         window_duration: 10
-        lookback_periods: 3
+        lookback_periods: 5
     market_cap:
       aggregations:
         last:

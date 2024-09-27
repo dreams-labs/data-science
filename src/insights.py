@@ -20,7 +20,7 @@ import seaborn as sns
 import dreams_core.core as dc
 
 # project files
-from utils import load_config, create_progress_bar, timing_decorator
+import utils as u
 import training_data as td
 import feature_engineering as fe
 import modeling as m
@@ -50,7 +50,7 @@ def run_experiment(modeling_config):
     config_folder = modeling_config['modeling']['config_folder']
 
     # Load experiments_config.yaml
-    experiments_config = load_config(os.path.join(config_folder, 'experiments_config.yaml'))
+    experiments_config = u.load_config(os.path.join(config_folder, 'experiments_config.yaml'))
 
     # Extract metadata and experiment details from experiments_config
     metadata = experiments_config['metadata']
@@ -85,7 +85,7 @@ def run_experiment(modeling_config):
     total_trials = min(len(trial_configurations), max_evals)
 
     # Retrieve all base datasets
-    config = load_config(os.path.join(config_folder, 'config.yaml'))
+    config = u.load_config(os.path.join(config_folder, 'config.yaml'))
     market_data_df = td.retrieve_market_data()
     market_data_df, _ = td.fill_market_data_gaps(market_data_df, config['data_cleaning']['max_gap_days'])
     prices_df = market_data_df[['coin_id','date','price']].copy()
@@ -97,7 +97,7 @@ def run_experiment(modeling_config):
 
 
     # Initialize progress bar and empty variables
-    trials_bar = create_progress_bar(total_trials)
+    trials_bar = u.create_progress_bar(total_trials)
 
 
     # 3. Iterate through each trial configuration
@@ -160,7 +160,7 @@ def run_experiment(modeling_config):
 
 
 
-@timing_decorator
+@u.timing_decorator
 def generate_experiment_configurations(config_folder, method='grid', max_evals=50):
     """
     Generates experiment configurations based on the validated experiment config YAML file and the search method.
@@ -236,7 +236,7 @@ def validate_experiments_yaml(config_folder):
     experiment_config_path = os.path.join(config_folder, 'experiments_config.yaml')
 
     # Load the experiments_config.yaml file
-    experiment_config = load_config(experiment_config_path)
+    experiment_config = u.load_config(experiment_config_path)
 
     # Extract the variable_overrides section
     if 'variable_overrides' not in experiment_config:
@@ -252,7 +252,7 @@ def validate_experiments_yaml(config_folder):
     for section, file_name in config_files.items():
         file_path = os.path.join(config_folder, file_name)
         if os.path.exists(file_path):
-            loaded_configs[section] = load_config(file_path)
+            loaded_configs[section] = u.load_config(file_path)
         else:
             raise FileNotFoundError(f"{file_name} not found in {config_folder}")
 
@@ -299,9 +299,9 @@ def prepare_configs(config_folder, override_params):
     metrics_config_path = os.path.join(config_folder, 'metrics_config.yaml')
     modeling_config_path = os.path.join(config_folder, 'modeling_config.yaml')
 
-    config = load_config(config_path)
-    metrics_config = load_config(metrics_config_path)
-    modeling_config = load_config(modeling_config_path)
+    config = u.load_config(config_path)
+    metrics_config = u.load_config(metrics_config_path)
+    modeling_config = u.load_config(modeling_config_path)
 
     # Apply the flattened overrides to each config
     for full_key, value in override_params.items():
@@ -319,6 +319,10 @@ def prepare_configs(config_folder, override_params):
             set_nested_value(modeling_config, full_key[len('modeling_config.'):], value)
         else:
             raise ValueError(f"Unknown config section in key: {full_key}")
+
+    # reapply the period boundary dates based on the current config['training_data'] params
+    period_dates = u.calculate_period_dates(config['training_data'])
+    config['training_data'].update(period_dates)
 
     return config, metrics_config, modeling_config
 
@@ -470,12 +474,9 @@ def build_configured_model_input(profits_df, market_data_df, config, metrics_con
     # 1. Generate and merge features for all datasets
     # -------------------------------------
     # Time series features
-    dataset_name = 'market_data'
-    dataset_df = market_data_df.copy()
-
     market_data_tuples, _ = fe.generate_time_series_features(
-            dataset_name,
-            dataset_df,
+            'time_series',
+            market_data_df,
             config,
             metrics_config,
             modeling_config
@@ -563,6 +564,63 @@ def generate_trial_df(modeling_folder, experiment_id):
     trial_df = pd.DataFrame(trial_data)
 
     return trial_df
+
+
+def summarize_feature_performance(trial_df):
+    """
+    Summarizes the performance of the values for each feature that was experimented on.
+    """
+    #  Identify the value and feature columns
+    value_vars = ['accuracy', 'precision', 'recall', 'f1_score', 'roc_auc', 'log_loss']
+    id_vars = [col for col in trial_df.columns if col not in (value_vars + ['confusion_matrix'])]
+
+    # Melt the dataframe
+    melted_df = pd.melt(trial_df, id_vars=id_vars, value_vars=value_vars,
+                        var_name='metric', value_name='value')
+
+    # Create a list to store the results
+    results = []
+
+    # Iterate through each feature
+    for feature in id_vars:
+        # Group by feature value and metric, then calculate the mean
+        grouped = melted_df.groupby([feature, 'metric'])['value'].mean().unstack()
+
+        # Calculate the count of models for each feature value
+        model_count = melted_df.groupby(feature)['metric'].count().div(len(value_vars)).astype(int)
+
+        # Reset index and rename columns
+        grouped = grouped.reset_index()
+        grouped.columns.name = None
+        grouped = grouped.rename(columns={col: f'avg_{col}' for col in value_vars})
+
+        # Rename the feature column and add the model count
+        grouped = grouped.rename(columns={feature: 'value'})
+        grouped['model_count'] = grouped['value'].map(model_count)
+        grouped['feature'] = feature
+
+        # Reorder columns
+        column_order = ['feature', 'value', 'model_count'] + [f'avg_{metric}' for metric in value_vars]
+        grouped = grouped[column_order]
+
+        # Append to results
+        results.append(grouped)
+
+    # Concatenate all results and clean up formatting
+    feature_performance_df = pd.concat(results, ignore_index=True)
+    feature_performance_df = feature_performance_df.sort_values(['feature', 'value'])
+    feature_performance_df = feature_performance_df.reset_index(drop=True)
+
+    # Define the columns that start with 'avg'
+    columns_to_format = [f'avg_{metric}' for metric in value_vars]
+
+    # Apply conditional formatting to those columns
+    feature_performance_df = feature_performance_df.style.background_gradient(subset=columns_to_format, cmap='RdYlGn')
+
+    return feature_performance_df
+
+
+
 
 
 def plot_roc_auc_performance(trial_df, top_n):
