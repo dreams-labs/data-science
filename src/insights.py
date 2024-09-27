@@ -64,6 +64,16 @@ def run_experiment(modeling_config):
     metadata['start_time'] = datetime.now().isoformat()
     metadata['trial_logs'] = []  # Initialize the array for trial log filenames
 
+    # Write initial metadata file with start time
+    experiment_tracking_path = os.path.join(modeling_folder, "experiment_metadata")
+    os.makedirs(experiment_tracking_path, exist_ok=True)
+    experiment_metadata_file = os.path.join(experiment_tracking_path, f"{experiment_id}.json")
+
+    with open(experiment_metadata_file, 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, indent=4)
+
+    logger.info('Experiment %s started.', experiment_id)
+
 
     # 2. Initialize trial configurations and initial variables
     # -------------------------------------------------------------------------
