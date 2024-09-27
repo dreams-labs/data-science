@@ -225,6 +225,11 @@ class Comparisons(BaseModel):
     comparison_type: ComparisonType
     scaling: Optional['ScalingConfig'] = Field(default=None)
 
+    model_config = {
+        "extra": "forbid",  # Prevent extra fields that are not defined
+    }
+
+
 
 # Modular Metrics: Indicators
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -239,6 +244,10 @@ class Indicators(BaseModel):
     parameters: Dict[str, Any]  # Flexible to handle unique parameters
     aggregations: Optional[Dict['AggregationType', 'AggregationConfig']] = Field(default=None)
     rolling: Optional['RollingMetrics'] = Field(default=None)
+
+    model_config = {
+        "extra": "forbid",  # Prevent extra fields that are not defined
+    }
 
 
 # Modular Metrics: ScalingConfig

@@ -23,7 +23,6 @@ import dreams_core.core as dc
 from utils import load_config, create_progress_bar, timing_decorator
 import training_data as td
 import feature_engineering as fe
-import coin_wallet_metrics as cwm
 import modeling as m
 
 # set up logger at the module level
@@ -75,15 +74,20 @@ def run_experiment(modeling_config):
     max_evals = experiments_config['metadata'].get('max_evals', len(trial_configurations))
     total_trials = min(len(trial_configurations), max_evals)
 
-    # Generate prices_df
+    # Retrieve all base datasets
     config = load_config(os.path.join(config_folder, 'config.yaml'))
     market_data_df = td.retrieve_market_data()
     market_data_df, _ = td.fill_market_data_gaps(market_data_df, config['data_cleaning']['max_gap_days'])
     prices_df = market_data_df[['coin_id','date','price']].copy()
+    profits_df = rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_df=None)
+
+    # remove records from market_data_df that don't have transfers if configured to do so
+    if config['data_cleaning']['exclude_coins_without_transfers']:
+        market_data_df = market_data_df[market_data_df['coin_id'].isin(profits_df['coin_id'])]
+
 
     # Initialize progress bar and empty variables
     trials_bar = create_progress_bar(total_trials)
-    profits_df = None
 
 
     # 3. Iterate through each trial configuration
@@ -104,12 +108,12 @@ def run_experiment(modeling_config):
         profits_df = rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_df)
 
         # 3.3 Build the configured model input data (train/test data)
-        X_train, X_test, y_train, y_test = build_configured_model_input(profits_df, prices_df, config, metrics_config, modeling_config)
+        X_train, X_test, y_train, y_test = build_configured_model_input(profits_df, market_data_df, config, metrics_config, modeling_config)
 
         # 3.4 Train the model using the current configuration and log the results
         model, model_id = m.train_model(X_train, y_train, modeling_folder, modeling_config['modeling']['model_params'])
 
-        # 3.5 Evaluate and log the model's performance on the test set
+        # 3.5 Evaluate and save the model's performance on the test set to a CSV
         _ = m.evaluate_model(model, X_test, y_test, model_id, modeling_folder)
 
         # 3.6 Log the trial results for this configuration
@@ -435,13 +439,13 @@ def handle_hash(config_hash, temp_folder, operation='load'):
 
 
 
-def build_configured_model_input(profits_df, prices_df, config, metrics_config, modeling_config):
+def build_configured_model_input(profits_df, market_data_df, config, metrics_config, modeling_config):
     """
     Build the model input data (train/test sets) based on the configuration settings.
 
     Args:
     - profits_df (DataFrame): DataFrame containing profits information for wallets.
-    - prices_df (DataFrame): DataFrame containing price data for coins.
+    - market_data_df (DataFrame): DataFrame containing market data for coins.
     - config (dict): Overall configuration containing details for wallet cohorts and training data periods.
     - metrics_config (dict): Configuration for metric generation.
     - modeling_config (dict): Configuration for model training parameters.
@@ -453,62 +457,45 @@ def build_configured_model_input(profits_df, prices_df, config, metrics_config, 
     - y_test (Series): Testing target variable.
     """
 
-    # 1. Identify cohort of wallets (e.g., sharks) based on the cohort classification logic
-    wallet_cohort_df = cwm.classify_wallet_cohort(profits_df, config['datasets']['wallet_cohorts']['sharks'])
+    # 1. Generate and merge features for all datasets
+    # -------------------------------------
+    # Time series features
+    dataset_name = 'market_data'
+    dataset_df = market_data_df.copy()
 
-    # 2. Generate buysell metrics for wallets in the identified cohort
-    cohort_wallets = wallet_cohort_df[wallet_cohort_df['in_cohort']]['wallet_address']
-    buysell_metrics_df = cwm.generate_buysell_metrics_df(
-        profits_df,
-        config['training_data']['training_period_end'],
-        cohort_wallets
-    )
+    market_data_tuples, _ = fe.generate_time_series_features(
+            dataset_name,
+            dataset_df,
+            config,
+            metrics_config,
+            modeling_config
+        )
 
-    # 3. Flatten the buysell metrics DataFrame, save it, and preprocess it
-    flattened_output_directory = os.path.join(
-        modeling_config['modeling']['modeling_folder'],
-        'outputs/flattened_outputs/'
-    )
-    cohort_name = list(config['datasets']['wallet_cohorts'].keys())[0]
-    metric_description = f"{cohort_name}_cohort"
+    # Wallet cohort features
+    wallet_cohort_tuples, _ = fe.generate_wallet_cohort_features(
+            profits_df,
+            config,
+            metrics_config,
+            modeling_config
+        )
 
-    flattened_buysell_metrics_df = fe.flatten_coin_date_df(
-        buysell_metrics_df,
-        metrics_config,
-        config['training_data']['training_period_end']
-    )
-    _, flattened_filepath = fe.save_flattened_outputs(
-        flattened_buysell_metrics_df,
-        flattened_output_directory,
-        metric_description,
-        config['training_data']['modeling_period_start']
-    )
-    _, preprocessed_filepath = fe.preprocess_coin_df(
-        flattened_filepath,
-        modeling_config,
-        metrics_config
-    )
+    # Merge all the features
+    training_data_tuples = market_data_tuples + wallet_cohort_tuples
+    training_data_df, _ = fe.create_training_data_df(modeling_config['modeling']['modeling_folder'], training_data_tuples)
 
-    # 4. Create training data from the preprocessed DataFrame
-    input_directory = f"{preprocessed_filepath.split('preprocessed_outputs/')[0]}preprocessed_outputs/"
-    input_filenames = [preprocessed_filepath.split('preprocessed_outputs/')[1]]
-    training_data_df, _ = fe.create_training_data_df(input_directory, input_filenames)
 
-    # 5. Create the target variable DataFrame based on price changes
-    target_variable_df, _ = fe.create_target_variables_mooncrater(
-        prices_df,
-        config['training_data'],
-        modeling_config
-    )
+    # 2. Add target variable to training_data_df
+    # ------------------------------------------
+    # create the target variable df
+    target_variable_df,_ = fe.create_target_variables_mooncrater(market_data_df, config['training_data'], modeling_config)
 
-    # 6. Merge the training data with the target variables to create the model input DataFrame
-    model_input_df = fe.prepare_model_input_df(
-        training_data_df,
-        target_variable_df,
-        modeling_config['modeling']['target_column']
-    )
+    # merge the two into the final model input df
+    model_input_df = fe.prepare_model_input_df(training_data_df, target_variable_df, modeling_config['modeling']['target_column'])
 
-    # 7. Split the data into train and test sets
+
+    # 3. Split into train/test datasets
+    # ---------------------------------
+    # split the df into train and test sets
     X_train, X_test, y_train, y_test = m.split_model_input(
         model_input_df,
         modeling_config['modeling']['target_column'],

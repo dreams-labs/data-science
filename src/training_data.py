@@ -416,7 +416,7 @@ def prepare_profits_data(transfers_df, prices_df):
     prices_df['date'] = pd.to_datetime(prices_df['date'])
 
     # merge datasets and confirm coin_id is categorical
-    profits_df = pd.merge(transfers_df, prices_df, on=['coin_id', 'date'], how='left')
+    profits_df = pd.merge(transfers_df, prices_df, on=['coin_id', 'date'], how='inner')
     profits_df['coin_id'] = profits_df['coin_id'].astype('category')
     profits_df['wallet_address'] = profits_df['wallet_address'].astype('category')
 
@@ -434,7 +434,7 @@ def prepare_profits_data(transfers_df, prices_df):
     first_prices_df.columns = ['coin_id', 'first_price_date', 'first_price']
 
     # Merge the first price data into profits_df
-    profits_df = profits_df.merge(first_prices_df, on='coin_id', how='left')
+    profits_df = profits_df.merge(first_prices_df, on='coin_id', how='inner')
     logger.debug(f"<Step 2> identify first prices of coins: {time.time() - step_time:.2f} seconds")
     step_time = time.time()
 
@@ -484,7 +484,7 @@ def prepare_profits_data(transfers_df, prices_df):
     # and sold all coins in these pre-data eras, their first record will be of a zero-balance state.
 
     # calculate cumulative token inflows
-    profits_df['token_inflows'] = profits_df['net_transfers'].where(profits_df['net_transfers'] > 0, 0)
+    profits_df['token_inflows'] = profits_df['net_transfers'].clip(lower=0)
     profits_df['token_inflows_cumulative'] = profits_df.groupby(['coin_id', 'wallet_address'],observed=True)['token_inflows'].cumsum()
 
     # remove records prior to positive token_inflows

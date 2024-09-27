@@ -42,6 +42,10 @@ class TrainingDataConfig(BaseModel):
     modeling_period_start: date = Field(...)
     modeling_period_end: date = Field(...)
 
+    model_config = {
+        "extra": "forbid",  # Prevent extra fields that are not defined
+    }
+
 # ============================================================================
 # Datasets Configuration
 # ============================================================================
@@ -77,6 +81,11 @@ class WalletCohortConfig(BaseModel):
     coin_return_win_threshold: float = Field(...)
     wallet_min_coin_wins: int = Field(..., ge=0)
 
+    model_config = {
+        "extra": "forbid",  # Prevent extra fields that are not defined
+    }
+
+
 # ----------------------------------------------------------------------------
 # Time Series Data Configuration
 # ----------------------------------------------------------------------------
@@ -88,6 +97,10 @@ class TimeSeriesDataConfig(BaseModel):
     description: str = Field(...)
     fill_method: str = Field(...)
     sameness_threshold: float = Field(..., ge=0, le=1)
+
+    model_config = {
+        "extra": "forbid",  # Prevent extra fields that are not defined
+    }
 
 # ----------------------------------------------------------------------------
 # Coin Facts Configuration
@@ -104,6 +117,11 @@ class CoinFactsConfig(BaseModel):
     sameness_threshold: float = Field(..., ge=0, le=1)
     chain_threshold: Optional[int] = Field(None, ge=0)
 
+    model_config = {
+        "extra": "forbid",  # Prevent extra fields that are not defined
+    }
+
+
 # ============================================================================
 # Data Cleaning Configuration
 # ============================================================================
@@ -115,6 +133,12 @@ class DataCleaningConfig(BaseModel):
     profitability_filter: float = Field(..., gt=0)
     inflows_filter: float = Field(..., gt=0)
     max_gap_days: int = Field(..., gt=0)
+    exclude_coins_without_transfers: bool = Field(False)
+
+    model_config = {
+        "extra": "forbid",  # Prevent extra fields that are not defined
+    }
+
 
 # ============================================================================
 # Model Rebuilding

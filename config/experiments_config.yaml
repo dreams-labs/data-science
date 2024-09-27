@@ -5,22 +5,22 @@
 # - metrics_config.yaml: Defines metrics and their aggregations for evaluation.
 
 metadata:
-  experiment_name: "0926_whal_cohort_cutoffs"
-  search_method: "random"
+  experiment_name: "0926_whale_cohort_cutoffs"
+  search_method: "grid"
   description: "Experiment to assess potential whale cohort cutoffs."
   metrics_to_compare:
     - roc_auc
   # thresholds: [0.5, 0.6, 0.7]
-  max_evals: 100
+  max_evals: 108
 
 variable_overrides:
   config:
     datasets:
       wallet_cohorts:
         whales:
-          wallet_minimum_inflows: [50000,100000,250000,500000]
-          wallet_maximum_inflows: [600000,1000000,2000000,5000000]
-          coin_return_win_threshold: [0.1,0.2,0.35]
+          wallet_minimum_inflows: [50000,150000,500000]
+          wallet_maximum_inflows: [1000000,10000000]
+          coin_return_win_threshold: [0.15,.3]
           wallet_min_coin_wins: [1,2,3]
 
   modeling_config:

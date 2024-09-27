@@ -4,7 +4,7 @@ training_data:
   # Defining the modeling and training periods (dates must follow YYYY-MM-DD format)
   # The modeling period end date and training period start and end dates are automatically
   # imputed using utils.py function calculate_period_dates() when load_config() is run
-  modeling_period_start: '2024-09-01'  # Start date for the modeling period
+  modeling_period_start: '2024-03-01'  # Start date for the modeling period
   modeling_period_duration: 15    # Duration of the modeling period in days
   training_period_duration: 45    # Duration of the training period in days
 
@@ -70,3 +70,4 @@ data_cleaning:
 
   # prices_df filters: Define how to handle missing price data
   max_gap_days: 10  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
+  exclude_coins_without_transfers: True  # determines whether to create price features for coins without transfers data

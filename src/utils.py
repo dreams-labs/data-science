@@ -6,6 +6,7 @@ import sys
 import gc
 import os
 from datetime import datetime, timedelta
+import importlib
 import logging
 import warnings
 import functools
@@ -16,8 +17,13 @@ from pydantic import ValidationError
 import dreams_core.core as dc
 
 # pydantic config files
-from config_models.config import MainConfig
-from config_models.metrics_config import MetricsConfig
+import config_models.config as py_c
+import config_models.metrics_config as py_mc
+
+# Reload the Pydantic config models to reflect any changes made to their definitions
+importlib.reload(py_c)
+importlib.reload(py_mc)
+
 
 # set up logger at the module level
 logger = dc.setup_logger()
@@ -51,11 +57,11 @@ def load_config(file_path='../notebooks/config.yaml'):
 
         try:
             if filename in ['config.yaml', 'test_config.yaml']:
-                config_pydantic = MainConfig(**config_dict)
+                config_pydantic = py_c.MainConfig(**config_dict)
                 config = config_pydantic.model_dump(mode="json", exclude_none=True)
 
             elif filename in ['metrics_config.yaml', 'test_metrics_config.yaml']:
-                config_pydantic = MetricsConfig(**config_dict)
+                config_pydantic = py_mc.MetricsConfig(**config_dict)
                 config = config_pydantic.model_dump(mode="json", exclude_none=True)
 
             # Otherwise return the normal dict
@@ -64,15 +70,22 @@ def load_config(file_path='../notebooks/config.yaml'):
 
         except ValidationError as e:
             # Enhanced error reporting
+            error_messages = []
             logger.error("Validation Error in %s:", filename)
             for err in e.errors():
                 issue = err['msg']
-                print(f"Issue: {issue}")
                 location = '.'.join(str(item) for item in err['loc'][:-1])
-                print(f"Location: {location}")
                 missing_field = err['loc'][-1]
-                print(f"Bad Field: {missing_field}")
-            raise e
+
+                error_message = (
+                    f"Issue: {issue}\n"
+                    f"Location: {location}\n"
+                    f"Bad Field: {missing_field}\n"
+                )
+                error_messages.append(error_message)
+
+            # Raise custom error with all gathered messages
+            raise ValueError(f"Validation Error in {filename}:\n" + "\n".join(error_messages)) from e
 
     return config
 
