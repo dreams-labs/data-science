@@ -1,0 +1,161 @@
+# Available Commands:
+# aggregations:
+#   - "sum", "mean", "median", "min", "max", "std"
+# rolling stats:
+#   - "sum", "mean", "median", "max", "min", "std"
+# comparisons:
+#   - "change", "pct_change", "difference"
+# window_duration:
+#   - Specifies the number of days per rolling window (e.g., 7 means a 7-day rolling window)
+# lookback_periods:
+#   - Defines how many periods to look back when calculating rolling stats (e.g., 8 means calculate rolling stats over 8 previous periods)
+
+wallet_cohorts:
+  under_15k:
+    buyers_new:
+      aggregations:
+        sum:
+          scaling: "log"    # Scaling applied to sums, which can vary significantly in range.
+      rolling:
+        aggregations:
+          sum:
+            scaling: "log"
+        window_duration: 15
+        lookback_periods: 1
+    total_bought:
+      aggregations:
+        sum:
+          scaling: "log"    # Scaling applied to sums, which can vary significantly in range.
+      rolling:
+        aggregations:
+          sum:
+            scaling: "log"
+        window_duration: 15
+        lookback_periods: 1
+    total_sold:
+      aggregations:
+        sum:
+          scaling: "log"    # Total sold should also be scaled to account for high variance.
+
+
+  under_75k:
+    buyers_new:
+      aggregations:
+        sum:
+          scaling: "log"    # Scaling applied to sums, which can vary significantly in range.
+      rolling:
+        aggregations:
+          sum:
+            scaling: "log"
+        window_duration: 15
+        lookback_periods: 1
+    total_bought:
+      aggregations:
+        sum:
+          scaling: "log"    # Scaling applied to sums, which can vary significantly in range.
+      rolling:
+        aggregations:
+          sum:
+            scaling: "log"
+        window_duration: 15
+        lookback_periods: 1
+    total_sold:
+      aggregations:
+        sum:
+          scaling: "log"    # Total sold should also be scaled to account for high variance.
+
+
+  whales:
+    buyers_new:
+      aggregations:
+        sum:
+          scaling: "log"    # Scaling applied to sums, which can vary significantly in range.
+      rolling:
+        aggregations:
+          sum:
+            scaling: "log"
+        window_duration: 15
+        lookback_periods: 1
+    total_bought:
+      aggregations:
+        sum:
+          scaling: "log"    # Scaling applied to sums, which can vary significantly in range.
+      rolling:
+        aggregations:
+          sum:
+            scaling: "log"
+        window_duration: 15
+        lookback_periods: 1
+    total_sold:
+      aggregations:
+        sum:
+          scaling: "log"    # Total sold should also be scaled to account for high variance.
+
+
+  normies:
+    buyers_new:
+      aggregations:
+        sum:
+          scaling: "log"    # Scaling applied to sums, which can vary significantly in range.
+      rolling:
+        aggregations:
+          sum:
+            scaling: "log"
+        window_duration: 15
+        lookback_periods: 1
+    total_bought:
+      aggregations:
+        sum:
+          scaling: "log"    # Scaling applied to sums, which can vary significantly in range.
+      rolling:
+        aggregations:
+          sum:
+            scaling: "log"
+        window_duration: 15
+        lookback_periods: 1
+    total_sold:
+      aggregations:
+        sum:
+          scaling: "log"    # Total sold should also be scaled to account for high variance.
+
+
+# Time series keyed on coin_id-date
+time_series:
+  market_data:
+    price:
+      aggregations:
+        max:
+          scaling: "standard"
+        last:
+          buckets:
+          - small: .01
+          - medium: 1.0 # includes values up to this threshold
+          - large: "remainder" # includes all remaining records
+      rolling:
+        aggregations:
+          max:
+            scaling: "standard"
+        comparisons:
+          change:
+            scaling: "standard"
+        window_duration: 3
+        lookback_periods: 2
+    volume:
+      rolling:
+        aggregations:
+          sum:
+            scaling: "log"
+        comparisons:
+          pct_change:
+            scaling: "none"        # No scaling for percentage change, as it's already normalized.
+        window_duration: 15
+        lookback_periods: 3
+
+    market_cap:
+      aggregations:
+        last:
+          buckets:
+          - microcap: 5000000  # includes values up to this threshold
+          - smallcap: 50000000 # includes values up to this threshold
+          - midcap: 250000000  # includes values up to this threshold
+          - largecap: "remainder" # includes all remaining records

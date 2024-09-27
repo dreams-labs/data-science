@@ -20,17 +20,147 @@ import seaborn as sns
 import dreams_core.core as dc
 
 # project files
-from utils import load_config, create_progress_bar, timing_decorator
+import utils as u
 import training_data as td
 import feature_engineering as fe
-import coin_wallet_metrics as cwm
 import modeling as m
 
 # set up logger at the module level
 logger = dc.setup_logger()
 
 
-@timing_decorator
+
+def run_experiment(modeling_config):
+    """
+    Runs an experiment using configurations from the experiments_config.yaml,
+    builds models, and logs the results of each trial.
+
+    Args:
+    - modeling_config (dict): Configuration dictionary containing paths, model params, etc.
+
+    Returns:
+    - experiment_id (string): the ID of the experiment that can be used to retrieve metadata
+        from modeling/experiment metadat
+    """
+
+    # 1. Extract config variables and store experiment metadata
+    # ---------------------------------------------------------
+    # Extract folder paths from modeling_config
+    modeling_folder = modeling_config['modeling']['modeling_folder']
+    config_folder = modeling_config['modeling']['config_folder']
+
+    # Load experiments_config.yaml
+    experiments_config = u.load_config(os.path.join(config_folder, 'experiments_config.yaml'))
+
+    # Extract metadata and experiment details from experiments_config
+    metadata = experiments_config['metadata']
+    experiment_name = metadata['experiment_name']
+    search_method = metadata['search_method']
+    max_evals = metadata['max_evals']
+
+    # Add experiment_id and timestamp to the metadata
+    experiment_id = f"{experiment_name}_{uuid.uuid4()}"
+    metadata['experiment_id'] = experiment_id
+    metadata['start_time'] = datetime.now().isoformat()
+    metadata['trial_logs'] = []  # Initialize the array for trial log filenames
+
+    # Write initial metadata file with start time
+    experiment_tracking_path = os.path.join(modeling_folder, "experiment_metadata")
+    os.makedirs(experiment_tracking_path, exist_ok=True)
+    experiment_metadata_file = os.path.join(experiment_tracking_path, f"{experiment_id}.json")
+
+    with open(experiment_metadata_file, 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, indent=4)
+
+    logger.info('Experiment %s started.', experiment_id)
+
+
+    # 2. Initialize trial configurations and initial variables
+    # -------------------------------------------------------------------------
+    # Generate the trial configurations based on variable_overrides
+    trial_configurations = generate_experiment_configurations(config_folder, method=search_method, max_evals=max_evals)
+
+    # Cap the number of trials if 'max_evals' is set
+    max_evals = experiments_config['metadata'].get('max_evals', len(trial_configurations))
+    total_trials = min(len(trial_configurations), max_evals)
+
+    # Retrieve all base datasets
+    config = u.load_config(os.path.join(config_folder, 'config.yaml'))
+    market_data_df = td.retrieve_market_data()
+    market_data_df, _ = td.fill_market_data_gaps(market_data_df, config['data_cleaning']['max_gap_days'])
+    prices_df = market_data_df[['coin_id','date','price']].copy()
+    profits_df = rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_df=None)
+
+    # remove records from market_data_df that don't have transfers if configured to do so
+    if config['data_cleaning']['exclude_coins_without_transfers']:
+        market_data_df = market_data_df[market_data_df['coin_id'].isin(profits_df['coin_id'])]
+
+
+    # Initialize progress bar and empty variables
+    trials_bar = u.create_progress_bar(total_trials)
+
+
+    # 3. Iterate through each trial configuration
+    # -------------------------------------------
+    for n, trial in enumerate(trial_configurations[:total_trials]):
+
+        # 3.1 Prepare the full configuration by applying overrides from the current trial config
+        config, metrics_config, modeling_config = prepare_configs(config_folder, trial)
+
+        # Store the configuration settings used in this trial in metadata
+        metadata['config_settings'] = {
+            "config": config,
+            "metrics_config": metrics_config,
+            "modeling_config": modeling_config
+        }
+
+        # 3.2 Retrieve or rebuild profits_df based on config changes
+        profits_df = rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_df)
+
+        # 3.3 Build the configured model input data (train/test data)
+        X_train, X_test, y_train, y_test = build_configured_model_input(profits_df, market_data_df, config, metrics_config, modeling_config)
+
+        # 3.4 Train the model using the current configuration and log the results
+        model, model_id = m.train_model(X_train, y_train, modeling_folder, modeling_config['modeling']['model_params'])
+
+        # 3.5 Evaluate and save the model's performance on the test set to a CSV
+        _ = m.evaluate_model(model, X_test, y_test, model_id, modeling_folder)
+
+        # 3.6 Log the trial results for this configuration
+        # Include the trial name, metadata, and other relevant details
+        trial_log_filename = m.log_trial_results(modeling_folder, model_id, experiment_id, trial)
+
+        # Append the trial log filename to the metadata
+        metadata['trial_logs'].append(trial_log_filename)
+
+        # Update the progress bar
+        trials_bar.update(n + 1)
+
+    # Finish the progress bar
+    trials_bar.finish()
+
+
+    # 4. Log experiment metadata
+    # -------------------------------------------
+    # Add the experiment end time and calculate the duration
+    metadata['end_time'] = datetime.now().isoformat()
+    metadata['duration'] = (datetime.fromisoformat(metadata['end_time']) -
+                            datetime.fromisoformat(metadata['start_time'])).total_seconds()
+
+    # Log experiment metadata
+    experiment_tracking_path = os.path.join(modeling_folder, "experiment_metadata")
+    os.makedirs(experiment_tracking_path, exist_ok=True)
+    experiment_metadata_file = os.path.join(experiment_tracking_path, f"{experiment_id}.json")
+    with open(experiment_metadata_file, 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, indent=4)
+
+    logger.info('Experiment %s complete.', experiment_id)
+
+    return experiment_id
+
+
+
+@u.timing_decorator
 def generate_experiment_configurations(config_folder, method='grid', max_evals=50):
     """
     Generates experiment configurations based on the validated experiment config YAML file and the search method.
@@ -106,7 +236,7 @@ def validate_experiments_yaml(config_folder):
     experiment_config_path = os.path.join(config_folder, 'experiments_config.yaml')
 
     # Load the experiments_config.yaml file
-    experiment_config = load_config(experiment_config_path)
+    experiment_config = u.load_config(experiment_config_path)
 
     # Extract the variable_overrides section
     if 'variable_overrides' not in experiment_config:
@@ -122,7 +252,7 @@ def validate_experiments_yaml(config_folder):
     for section, file_name in config_files.items():
         file_path = os.path.join(config_folder, file_name)
         if os.path.exists(file_path):
-            loaded_configs[section] = load_config(file_path)
+            loaded_configs[section] = u.load_config(file_path)
         else:
             raise FileNotFoundError(f"{file_name} not found in {config_folder}")
 
@@ -169,9 +299,9 @@ def prepare_configs(config_folder, override_params):
     metrics_config_path = os.path.join(config_folder, 'metrics_config.yaml')
     modeling_config_path = os.path.join(config_folder, 'modeling_config.yaml')
 
-    config = load_config(config_path)
-    metrics_config = load_config(metrics_config_path)
-    modeling_config = load_config(modeling_config_path)
+    config = u.load_config(config_path)
+    metrics_config = u.load_config(metrics_config_path)
+    modeling_config = u.load_config(modeling_config_path)
 
     # Apply the flattened overrides to each config
     for full_key, value in override_params.items():
@@ -189,6 +319,10 @@ def prepare_configs(config_folder, override_params):
             set_nested_value(modeling_config, full_key[len('modeling_config.'):], value)
         else:
             raise ValueError(f"Unknown config section in key: {full_key}")
+
+    # reapply the period boundary dates based on the current config['training_data'] params
+    period_dates = u.calculate_period_dates(config['training_data'])
+    config['training_data'].update(period_dates)
 
     return config, metrics_config, modeling_config
 
@@ -319,13 +453,13 @@ def handle_hash(config_hash, temp_folder, operation='load'):
 
 
 
-def build_configured_model_input(profits_df, prices_df, config, metrics_config, modeling_config):
+def build_configured_model_input(profits_df, market_data_df, config, metrics_config, modeling_config):
     """
     Build the model input data (train/test sets) based on the configuration settings.
 
     Args:
     - profits_df (DataFrame): DataFrame containing profits information for wallets.
-    - prices_df (DataFrame): DataFrame containing price data for coins.
+    - market_data_df (DataFrame): DataFrame containing market data for coins.
     - config (dict): Overall configuration containing details for wallet cohorts and training data periods.
     - metrics_config (dict): Configuration for metric generation.
     - modeling_config (dict): Configuration for model training parameters.
@@ -337,62 +471,42 @@ def build_configured_model_input(profits_df, prices_df, config, metrics_config, 
     - y_test (Series): Testing target variable.
     """
 
-    # 1. Identify cohort of wallets (e.g., sharks) based on the cohort classification logic
-    wallet_cohort_df = cwm.classify_wallet_cohort(profits_df, config['datasets']['wallet_cohorts']['sharks'])
+    # 1. Generate and merge features for all datasets
+    # -------------------------------------
+    # Time series features
+    market_data_tuples, _ = fe.generate_time_series_features(
+            'time_series',
+            market_data_df,
+            config,
+            metrics_config,
+            modeling_config
+        )
 
-    # 2. Generate buysell metrics for wallets in the identified cohort
-    cohort_wallets = wallet_cohort_df[wallet_cohort_df['in_cohort']]['wallet_address']
-    buysell_metrics_df = cwm.generate_buysell_metrics_df(
-        profits_df,
-        config['training_data']['training_period_end'],
-        cohort_wallets
-    )
+    # Wallet cohort features
+    wallet_cohort_tuples, _ = fe.generate_wallet_cohort_features(
+            profits_df,
+            config,
+            metrics_config,
+            modeling_config
+        )
 
-    # 3. Flatten the buysell metrics DataFrame, save it, and preprocess it
-    flattened_output_directory = os.path.join(
-        modeling_config['modeling']['modeling_folder'],
-        'outputs/flattened_outputs/'
-    )
-    cohort_name = list(config['datasets']['wallet_cohorts'].keys())[0]
-    metric_description = f"{cohort_name}_cohort"
+    # Merge all the features
+    training_data_tuples = market_data_tuples + wallet_cohort_tuples
+    training_data_df, _ = fe.create_training_data_df(modeling_config['modeling']['modeling_folder'], training_data_tuples)
 
-    flattened_buysell_metrics_df = fe.flatten_coin_date_df(
-        buysell_metrics_df,
-        metrics_config,
-        config['training_data']['training_period_end']
-    )
-    _, flattened_filepath = fe.save_flattened_outputs(
-        flattened_buysell_metrics_df,
-        flattened_output_directory,
-        metric_description,
-        config['training_data']['modeling_period_start']
-    )
-    _, preprocessed_filepath = fe.preprocess_coin_df(
-        flattened_filepath,
-        modeling_config,
-        metrics_config
-    )
 
-    # 4. Create training data from the preprocessed DataFrame
-    input_directory = f"{preprocessed_filepath.split('preprocessed_outputs/')[0]}preprocessed_outputs/"
-    input_filenames = [preprocessed_filepath.split('preprocessed_outputs/')[1]]
-    training_data_df, _ = fe.create_training_data_df(input_directory, input_filenames)
+    # 2. Add target variable to training_data_df
+    # ------------------------------------------
+    # create the target variable df
+    target_variable_df,_ = fe.create_target_variables_mooncrater(market_data_df, config['training_data'], modeling_config)
 
-    # 5. Create the target variable DataFrame based on price changes
-    target_variable_df, _ = fe.create_target_variables_mooncrater(
-        prices_df,
-        config['training_data'],
-        modeling_config
-    )
+    # merge the two into the final model input df
+    model_input_df = fe.prepare_model_input_df(training_data_df, target_variable_df, modeling_config['modeling']['target_column'])
 
-    # 6. Merge the training data with the target variables to create the model input DataFrame
-    model_input_df = fe.prepare_model_input_df(
-        training_data_df,
-        target_variable_df,
-        modeling_config['modeling']['target_column']
-    )
 
-    # 7. Split the data into train and test sets
+    # 3. Split into train/test datasets
+    # ---------------------------------
+    # split the df into train and test sets
     X_train, X_test, y_train, y_test = m.split_model_input(
         model_input_df,
         modeling_config['modeling']['target_column'],
@@ -404,119 +518,6 @@ def build_configured_model_input(profits_df, prices_df, config, metrics_config, 
 
 
 
-
-def run_experiment(modeling_config):
-    """
-    Runs an experiment using configurations from the experiments_config.yaml,
-    builds models, and logs the results of each trial.
-
-    Args:
-    - modeling_config (dict): Configuration dictionary containing paths, model params, etc.
-
-    Returns:
-    - experiment_id (string): the ID of the experiment that can be used to retrieve metadata
-        from modeling/experiment metadat
-    """
-
-    # 1. Extract config variables and store experiment metadata
-    # ---------------------------------------------------------
-    # Extract folder paths from modeling_config
-    modeling_folder = modeling_config['modeling']['modeling_folder']
-    config_folder = modeling_config['modeling']['config_folder']
-
-    # Load experiments_config.yaml
-    experiments_config = load_config(os.path.join(config_folder, 'experiments_config.yaml'))
-
-    # Extract metadata and experiment details from experiments_config
-    experiment_name = experiments_config['metadata']['experiment_name']
-    experiment_id = f"{experiment_name}_{uuid.uuid4()}"
-    search_method = experiments_config['metadata']['search_method']
-    max_evals = experiments_config['metadata']['max_evals']
-
-    # Add a timestamp to the metadata
-    metadata = experiments_config['metadata']
-    metadata['experiment_id'] = experiment_id
-    metadata['start_time'] = datetime.now().isoformat()
-    metadata['trial_logs'] = []  # Initialize the array for trial log filenames
-
-
-    # 2. Initialize trial configurations and initial variables
-    # -------------------------------------------------------------------------
-    # Generate the trial configurations based on variable_overrides
-    trial_configurations = generate_experiment_configurations(config_folder, method=search_method, max_evals=max_evals)
-
-    # Cap the number of trials if 'max_evals' is set
-    max_evals = experiments_config['metadata'].get('max_evals', len(trial_configurations))
-    total_trials = min(len(trial_configurations), max_evals)
-
-    # Generate prices_df
-    config = load_config(os.path.join(config_folder, 'config.yaml'))
-    market_data_df = td.retrieve_market_data()
-    market_data_df, _ = td.fill_market_data_gaps(market_data_df, config['data_cleaning']['max_gap_days'])
-    prices_df = market_data_df[['coin_id','date','price']].copy()
-
-    # Initialize progress bar and empty variables
-    trials_bar = create_progress_bar(total_trials)
-    profits_df = None
-
-
-    # 3. Iterate through each trial configuration
-    # -------------------------------------------
-    for n, trial in enumerate(trial_configurations[:total_trials]):
-
-        # 3.1 Prepare the full configuration by applying overrides from the current trial config
-        config, metrics_config, modeling_config = prepare_configs(config_folder, trial)
-
-        # Store the configuration settings used in this trial in metadata
-        metadata['config_settings'] = {
-            "config": config,
-            "metrics_config": metrics_config,
-            "modeling_config": modeling_config
-        }
-
-        # 3.2 Retrieve or rebuild profits_df based on config changes
-        profits_df = rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_df)
-
-        # 3.3 Build the configured model input data (train/test data)
-        X_train, X_test, y_train, y_test = build_configured_model_input(profits_df, prices_df, config, metrics_config, modeling_config)
-
-        # 3.4 Train the model using the current configuration and log the results
-        model, model_id = m.train_model(X_train, y_train, modeling_folder, modeling_config['modeling']['model_params'])
-
-        # 3.5 Evaluate and log the model's performance on the test set
-        _ = m.evaluate_model(model, X_test, y_test, model_id, modeling_folder)
-
-        # 3.6 Log the trial results for this configuration
-        # Include the trial name, metadata, and other relevant details
-        trial_log_filename = m.log_trial_results(modeling_folder, model_id, experiment_id, trial)
-
-        # Append the trial log filename to the metadata
-        metadata['trial_logs'].append(trial_log_filename)
-
-        # Update the progress bar
-        trials_bar.update(n + 1)
-
-    # Finish the progress bar
-    trials_bar.finish()
-
-
-    # 4. Log experiment metadata
-    # -------------------------------------------
-    # Add the experiment end time and calculate the duration
-    metadata['end_time'] = datetime.now().isoformat()
-    metadata['duration'] = (datetime.fromisoformat(metadata['end_time']) -
-                            datetime.fromisoformat(metadata['start_time'])).total_seconds()
-
-    # Log experiment metadata
-    experiment_tracking_path = os.path.join(modeling_folder, "experiment_metadata")
-    os.makedirs(experiment_tracking_path, exist_ok=True)
-    experiment_metadata_file = os.path.join(experiment_tracking_path, f"{experiment_id}.json")
-    with open(experiment_metadata_file, 'w', encoding='utf-8') as f:
-        json.dump(metadata, f, indent=4)
-
-    logger.info('Experiment %s complete.', experiment_id)
-
-    return experiment_id
 
 
 def generate_trial_df(modeling_folder, experiment_id):
@@ -563,6 +564,63 @@ def generate_trial_df(modeling_folder, experiment_id):
     trial_df = pd.DataFrame(trial_data)
 
     return trial_df
+
+
+def summarize_feature_performance(trial_df):
+    """
+    Summarizes the performance of the values for each feature that was experimented on.
+    """
+    #  Identify the value and feature columns
+    value_vars = ['accuracy', 'precision', 'recall', 'f1_score', 'roc_auc', 'log_loss']
+    id_vars = [col for col in trial_df.columns if col not in (value_vars + ['confusion_matrix'])]
+
+    # Melt the dataframe
+    melted_df = pd.melt(trial_df, id_vars=id_vars, value_vars=value_vars,
+                        var_name='metric', value_name='value')
+
+    # Create a list to store the results
+    results = []
+
+    # Iterate through each feature
+    for feature in id_vars:
+        # Group by feature value and metric, then calculate the mean
+        grouped = melted_df.groupby([feature, 'metric'])['value'].mean().unstack()
+
+        # Calculate the count of models for each feature value
+        model_count = melted_df.groupby(feature)['metric'].count().div(len(value_vars)).astype(int)
+
+        # Reset index and rename columns
+        grouped = grouped.reset_index()
+        grouped.columns.name = None
+        grouped = grouped.rename(columns={col: f'avg_{col}' for col in value_vars})
+
+        # Rename the feature column and add the model count
+        grouped = grouped.rename(columns={feature: 'value'})
+        grouped['model_count'] = grouped['value'].map(model_count)
+        grouped['feature'] = feature
+
+        # Reorder columns
+        column_order = ['feature', 'value', 'model_count'] + [f'avg_{metric}' for metric in value_vars]
+        grouped = grouped[column_order]
+
+        # Append to results
+        results.append(grouped)
+
+    # Concatenate all results and clean up formatting
+    feature_performance_df = pd.concat(results, ignore_index=True)
+    feature_performance_df = feature_performance_df.sort_values(['feature', 'value'])
+    feature_performance_df = feature_performance_df.reset_index(drop=True)
+
+    # Define the columns that start with 'avg'
+    columns_to_format = [f'avg_{metric}' for metric in value_vars]
+
+    # Apply conditional formatting to those columns
+    feature_performance_df = feature_performance_df.style.background_gradient(subset=columns_to_format, cmap='RdYlGn')
+
+    return feature_performance_df
+
+
+
 
 
 def plot_roc_auc_performance(trial_df, top_n):

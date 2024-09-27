@@ -1,6 +1,8 @@
 """
 functions used to build coin-level features from training data
 """
+# pylint: disable=C0302
+
 import os
 from datetime import datetime
 import time
@@ -11,9 +13,146 @@ import numpy as np
 import dreams_core.core as dc
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
+# project module imports
+import coin_wallet_metrics as cwm
+
 
 # set up logger at the module level
 logger = dc.setup_logger()
+
+
+def generate_time_series_features(
+        dataset_name,
+        dataset_df,
+        config,
+        metrics_config,
+        modeling_config
+    ):
+    """
+    Generates features for a time series dataset by calculating all metrics defined in the
+    metrics_config for each coin_id. The metrics are then flattened into features and saved
+    in the format needed to merge them using fe.create_training_data_df().
+
+    Params:
+    - dataset_name (string): the key of the dataset,
+        e.g. config['datasets']['time_series'][{dataset_name}]
+    - dataset_df (pd.DataFrame): the dataframe containing the columns with defined metrics,
+        e.g. a column for each of metrics_config['time_series'][{dataset_name}].keys()
+    - config (dict): config.yaml
+    - metrics_config (dict): metrics_config.yaml
+    - modeling_config (dict): modeling_config.yaml
+
+    Returns:
+    - training_data_tuples (list of tuples): Each tuple contains the preprocessed file name
+        and fill method for the value column contained in dataset_metrics_config, formatted for
+        input to fe.create_training_data_df().
+    - training_data_dfs (list of pd.DataFrames): A list of preprocessed DataFrames for each
+        value_column included in the dataset_metrics_config.
+    """
+    training_data_tuples = []
+    training_data_dfs = []
+    dataset_metrics_config = metrics_config['time_series'][dataset_name]
+
+    # calculate metrics for each value column
+    for value_column in list(dataset_metrics_config.keys()):
+
+        # a value_column-specific df will be used for feature generation
+        value_column_config = config['datasets']['time_series'][dataset_name][value_column]
+        value_column_metrics_config = dataset_metrics_config[value_column]
+        value_column_df = dataset_df[['date','coin_id',value_column]].copy()
+
+        # check if there are any time series indicators to add, e.g. sma, ema, etc
+        if 'indicators' in value_column_metrics_config:
+            value_column_metrics_df, _ = cwm.generate_time_series_indicators(
+                value_column_df,
+                config,
+                value_column_metrics_config['indicators'],
+                value_column,
+                id_column='coin_id'
+            )
+
+        else:
+            # if no indicators are needed, pass through coins with complete date coverage
+            value_column_metrics_df, _, _ = cwm.split_dataframe_by_coverage(
+                value_column_df,
+                config['training_data']['training_period_start'],
+                config['training_data']['training_period_end'],
+                id_column='coin_id'
+            )
+
+        # generate features from the metrics
+        value_column_features_df, value_column_tuple = convert_dataset_metrics_to_features(
+            value_column_metrics_df,
+            value_column_config,
+            dataset_metrics_config,
+            config,
+            modeling_config
+        )
+
+        logger.info('Generated features for %s.%s.%s',
+                    'time_series', dataset_name, value_column)
+
+        training_data_tuples.append(value_column_tuple)
+        training_data_dfs.append(value_column_features_df)
+
+    return training_data_tuples, training_data_dfs
+
+
+
+def generate_wallet_cohort_features(
+        profits_df,
+        config,
+        metrics_config,
+        modeling_config
+    ):
+    """
+    Generates features for all wallet cohorts by calculating the metrics defined in the
+    metrics_config for each coin_id. The metrics are then flattened into features and saved
+    in the format needed to merge them using fe.create_training_data_df().
+    """
+    wallet_cohort_tuples = []
+    wallet_data_dfs = []
+
+    for cohort_name in metrics_config['wallet_cohorts']:
+
+        # load configs
+        dataset_metrics_config = metrics_config['wallet_cohorts'][cohort_name]
+        dataset_config = config['datasets']['wallet_cohorts'][cohort_name]
+
+        # identify wallets in the cohort
+        cohort_summary_df = cwm.classify_wallet_cohort(profits_df, dataset_config)
+        cohort_wallets = cohort_summary_df[cohort_summary_df['in_cohort']]['wallet_address']
+
+        # If no cohort members were identified, continue
+        if len(cohort_wallets) == 0:
+            logger.info("No wallets identified as members of cohort '%s'", cohort_name)
+            continue
+
+        # generate cohort buysell_metrics
+        cohort_metrics_df = cwm.generate_buysell_metrics_df(
+            profits_df,config['training_data']['training_period_end'],cohort_wallets)
+
+        # generate features from the metrics
+        dataset_features_df, dataset_tuple = convert_dataset_metrics_to_features(
+            cohort_metrics_df,
+            dataset_config,
+            dataset_metrics_config,
+            config,
+            modeling_config
+        )
+
+        # identify columns for logging
+        dataset_features = dataset_features_df.columns.tolist()
+        dataset_features.remove('coin_id')
+
+        logger.info("Generated %s features for wallet cohort '%s'.",
+                    len(dataset_features), cohort_name)
+        logger.debug('Features generated: %s', dataset_features)
+
+        wallet_cohort_tuples.append(dataset_tuple)
+        wallet_data_dfs.append(dataset_features_df)
+
+    return wallet_cohort_tuples, wallet_data_dfs
 
 
 
@@ -512,7 +651,7 @@ def preprocess_coin_df(input_path, modeling_config, dataset_config, df_metrics_c
             max_value_ratio = df[column].value_counts(normalize=True).max()
             if max_value_ratio > sameness_threshold:
                 df = df.drop(columns=[column])
-                logger.info("Dropped column %s due to sameness_threshold", column)
+                logger.debug("Dropped column %s due to sameness_threshold", column)
 
 
     # Step 4: Scaling and Transformation
@@ -648,7 +787,7 @@ def create_training_data_df(
     # Loop through the input_file_tuples (filename, fill_strategy)
     for filename, fill_strategy in input_file_tuples:
         file_path = os.path.join(input_directory, filename)
-        print(file_path)
+
         if os.path.exists(file_path):
             df = pd.read_csv(file_path)
 
@@ -698,11 +837,12 @@ def create_training_data_df(
     training_data_df, merge_logs_df = merge_and_fill_training_data(df_list)
 
     # Log the results
-    logger.info("%d files were successfully merged.", len(df_list))
+    logger.debug("%d files were successfully merged into training_data_df.", len(df_list))
     if missing_files:
-        logger.info("%d files could not be found: %s", len(missing_files), ', '.join(missing_files))
+        logger.warning("%d files could not be found: %s",
+                        len(missing_files), ', '.join(missing_files))
     else:
-        logger.info("All specified files were found and merged successfully.")
+        logger.debug("All specified files were found and merged into training_data_df.")
 
     return training_data_df, merge_logs_df
 
@@ -842,7 +982,7 @@ def create_target_variables_mooncrater(prices_df, training_data_config, modeling
     target_data = []
     outcomes = []
     price_performance = []
-    for coin_id, group in modeling_period_df.groupby('coin_id'):
+    for coin_id, group in modeling_period_df.groupby('coin_id', observed=True):
         # Get the price on the start and end dates
         price_start = group[group['date'] == modeling_period_start]['price'].values
         price_end = group[group['date'] == modeling_period_end]['price'].values

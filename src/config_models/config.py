@@ -8,13 +8,18 @@ from pydantic import BaseModel, Field
 # pylint: disable=C0115  # no docstring for class Config
 # pylint: disable=R0903  # too few methods for class Config
 
+# Custom base model to disable extra fields in all sections
+class NoExtrasBaseModel(BaseModel):
+    """Custom BaseModel to apply config settings globally."""
+    model_config = {
+        "extra": "forbid",  # Prevent extra fields that are not defined
+        "str_max_length": 2000,    # Increase the max length of error message string representations
+    }
 
-# ____________________________________________________________________________
-# ----------------------------------------------------------------------------
+# ============================================================================
 #                      config.yaml Main Configuration
-# ----------------------------------------------------------------------------
-# ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
-class MainConfig(BaseModel):
+# ============================================================================
+class MainConfig(NoExtrasBaseModel):
     """
     Top level structure of the main config.yaml file
     """
@@ -22,16 +27,11 @@ class MainConfig(BaseModel):
     datasets: 'DatasetsConfig' = Field(...)
     data_cleaning: 'DataCleaningConfig' = Field(...)
 
-    model_config = {
-        "extra": "forbid",  # Prevent extra fields that are not defined
-        "str_max_length": 2000  # Increase the max length of error message string representations
-    }
 
-# ============================================================================
-# Training Data Configuration
-# ============================================================================
-
-class TrainingDataConfig(BaseModel):
+# ----------------------------------------------------------------------------
+# Training Data Section
+# ----------------------------------------------------------------------------
+class TrainingDataConfig(NoExtrasBaseModel):
     """
     These variables relate to how the training period is defined
     """
@@ -42,11 +42,11 @@ class TrainingDataConfig(BaseModel):
     modeling_period_start: date = Field(...)
     modeling_period_end: date = Field(...)
 
-# ============================================================================
-# Datasets Configuration
-# ============================================================================
 
-class DatasetsConfig(BaseModel):
+# ----------------------------------------------------------------------------
+# Datasets Section
+# ----------------------------------------------------------------------------
+class DatasetsConfig(NoExtrasBaseModel):
     """
     These items represent categories of datasets that will be converted to features and used
     by the model. Each category must contain at least one item.
@@ -55,15 +55,9 @@ class DatasetsConfig(BaseModel):
     time_series: Dict[str, Dict[str, 'TimeSeriesDataConfig']] = Field(..., min_length=1)
     coin_facts: Dict[str, 'CoinFactsConfig'] = Field(..., min_length=1)
 
-    model_config = {
-        "extra": "forbid",  # Prevent extra fields that are not defined
-    }
-
-# ----------------------------------------------------------------------------
-# Wallet Cohort Configuration
-# ----------------------------------------------------------------------------
-
-class WalletCohortConfig(BaseModel):
+# Wallet Cohorts Configuration
+# ---------------------------
+class WalletCohortConfig(NoExtrasBaseModel):
     """
     This data category is a series of metrics generated based on the behavior of a cohort
     of wallets, which are defined using the variables within.
@@ -77,11 +71,9 @@ class WalletCohortConfig(BaseModel):
     coin_return_win_threshold: float = Field(...)
     wallet_min_coin_wins: int = Field(..., ge=0)
 
-# ----------------------------------------------------------------------------
 # Time Series Data Configuration
-# ----------------------------------------------------------------------------
-
-class TimeSeriesDataConfig(BaseModel):
+# ------------------------------
+class TimeSeriesDataConfig(NoExtrasBaseModel):
     """
     This data category includes any dataset keyed on both coin_id and date.
     """
@@ -89,11 +81,9 @@ class TimeSeriesDataConfig(BaseModel):
     fill_method: str = Field(...)
     sameness_threshold: float = Field(..., ge=0, le=1)
 
-# ----------------------------------------------------------------------------
 # Coin Facts Configuration
-# ----------------------------------------------------------------------------
-
-class CoinFactsConfig(BaseModel):
+# ------------------------
+class CoinFactsConfig(NoExtrasBaseModel):
     """
     This data category includes items only keyed on coin_id and not date, meaning that they
     do not generally change over time. Examples include a token's category, blockchain,
@@ -104,20 +94,22 @@ class CoinFactsConfig(BaseModel):
     sameness_threshold: float = Field(..., ge=0, le=1)
     chain_threshold: Optional[int] = Field(None, ge=0)
 
-# ============================================================================
-# Data Cleaning Configuration
-# ============================================================================
 
-class DataCleaningConfig(BaseModel):
+# ----------------------------------------------------------------------------
+# Data Cleaning Section
+# ----------------------------------------------------------------------------
+class DataCleaningConfig(NoExtrasBaseModel):
     """
     Variables used to clean and filter raw data before training data is built
     """
     profitability_filter: float = Field(..., gt=0)
     inflows_filter: float = Field(..., gt=0)
     max_gap_days: int = Field(..., gt=0)
+    exclude_coins_without_transfers: bool = Field(False)
+
 
 # ============================================================================
 # Model Rebuilding
 # ============================================================================
-
+# Ensures all classes are fully reflected in structure regardless of the order they were defined
 MainConfig.model_rebuild()

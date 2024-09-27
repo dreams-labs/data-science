@@ -45,6 +45,7 @@ logger = dc.setup_logger()
 # ---------------------------------------- #
 
 # Sample profits data
+@pytest.fixture
 def sample_wallet_cohort_profits_df():
     """
     Sample DataFrame for testing classify_wallet_cohort function
@@ -63,6 +64,7 @@ def sample_wallet_cohort_profits_df():
     return df
 
 # Sample config for wallet cohort
+@pytest.fixture
 def sample_wallet_cohort_config():
     """
     Sample configuration for testing classify_wallet_cohort function
@@ -76,12 +78,13 @@ def sample_wallet_cohort_config():
     }
 
 # Test case for classify_wallet_cohort
-def test_wallet_cohort_classification():
+@pytest.mark.unit
+def test_wallet_cohort_classification(sample_wallet_cohort_profits_df,sample_wallet_cohort_config):
     """
     Unit test for classify_wallet_cohort() function with assertions for specific items.
     """
-    sample_profits_df = sample_wallet_cohort_profits_df()
-    sample_config = sample_wallet_cohort_config()
+    sample_profits_df = sample_wallet_cohort_profits_df
+    sample_config = sample_wallet_cohort_config
 
     # Run classification
     cohort_wallets_df = cwm.classify_wallet_cohort(sample_profits_df, sample_config)
@@ -108,6 +111,28 @@ def test_wallet_cohort_classification():
     assert wallet_1_metrics['total_coins'].values[0] == 2, f"Expected total coins for Wallet_1 to be 2, got {wallet_1_metrics['total_coins'].values[0]}"
     assert wallet_1_metrics['total_profits'].values[0] == 9000, f"Expected total profits for Wallet_1 to be 9000, got {wallet_1_metrics['total_profits'].values[0]}"
 
+@pytest.mark.unit
+def test_wallet_maximum_inflows_filter(sample_wallet_cohort_profits_df,sample_wallet_cohort_config):
+    """
+    Unit test for classify_wallet_cohort() function to check if wallets with inflows above the maximum
+    threshold are excluded.
+    """
+    sample_profits_df = sample_wallet_cohort_profits_df
+
+    # Modify the config to test maximum inflows filter
+    sample_config = sample_wallet_cohort_config
+    sample_config['wallet_maximum_inflows'] = 15000  # Set a low maximum inflows to test filtering
+
+    # Run classification
+    cohort_wallets_df = cwm.classify_wallet_cohort(sample_profits_df, sample_config)
+
+    # Test: Wallet with inflows exceeding the maximum threshold should be excluded
+    excluded_wallets = cohort_wallets_df[cohort_wallets_df['usd_inflows'] > sample_config['wallet_maximum_inflows']]['wallet_address'].unique()
+    assert 'wallet_3' not in cohort_wallets_df['wallet_address'].values, "Wallet_3 should be excluded due to exceeding the maximum inflows threshold."
+
+    # Ensure wallet_1 and wallet_2 are still eligible (below max inflows)
+    assert 'wallet_1' in cohort_wallets_df['wallet_address'].values, "Wallet_1 should be included."
+    assert 'wallet_2' in cohort_wallets_df['wallet_address'].values, "Wallet_2 should be included."
 
 
 
