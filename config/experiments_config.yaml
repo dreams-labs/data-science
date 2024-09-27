@@ -8,9 +8,9 @@ metadata:
   experiment_name: "0926_whale_cohort_cutoffs"
   search_method: "grid"
   description: "Experiment to assess potential whale cohort cutoffs."
-  metrics_to_compare:
-    - roc_auc
-  threshold: 0.5
+  # metrics_to_compare:
+  #   - roc_auc
+  # threshold: 0.5
   max_evals: 1000
 
 variable_overrides:

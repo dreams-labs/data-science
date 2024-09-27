@@ -36,8 +36,8 @@ class MetadataConfig(NoExtrasBaseModel):
     experiment_name: str = Field(default="experiment")
     search_method: SearchMethod = Field(default=SearchMethod.RANDOM)
     description: Optional[str] = Field(default=None)
-    metrics_to_compare: List[str]  # List of metric names to compare
-    threshold: Annotated[float, Field(gt=0, lt=1)] = Field(default=0.5)  # Between 0.0 and 1.0
+    # metrics_to_compare: List[str]  # List of metric names to compare
+    # threshold: Annotated[float, Field(gt=0, lt=1)] = Field(default=0.5)  # Between 0.0 and 1.0
     max_evals: Annotated[int, Field(ge=1)] = Field(default=45)  # Integer 1 or higher
 
 
