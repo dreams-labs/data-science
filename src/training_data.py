@@ -24,13 +24,17 @@ def retrieve_market_data():
     Returns:
     - market_data_df: DataFrame containing market data with 'coin_id' as a categorical column.
     """
+    start_time = time.time()
+    logger.debug('Retrieving market data...')
+
+
     # SQL query to retrieve market data
     query_sql = '''
         select cmd.coin_id
         ,date
         ,cast(cmd.price as float64) as price
-        ,cmd.volume
-        ,coalesce(cmd.market_cap,cmd.fdv) as market_cap
+        ,cast(cmd.volume as int64) as volume
+        ,cast(coalesce(cmd.market_cap,cmd.fdv) as int64) as market_cap
         from core.coin_market_data cmd
         order by 1,2
     '''
@@ -48,109 +52,15 @@ def retrieve_market_data():
     market_data_df['market_cap'] = pd.to_numeric(market_data_df['market_cap'], downcast='integer')
 
     # Dates as dates
+    market_data_df['date'] = market_data_df['date'].dt.date
     market_data_df['date'] = pd.to_datetime(market_data_df['date'])
 
-    logger.info('retrieved market data with shape %s',market_data_df.shape)
+    logger.info('Retrieved market_data_df with %s unique coins and %s rows after %s seconds',
+                len(set(market_data_df['coin_id'])),
+                len(market_data_df),
+                round(time.time()-start_time,1))
 
     return market_data_df
-
-
-
-def fill_market_data_gaps(market_data_df, max_gap_days):
-    """
-    Forward-fills small gaps in market data for each coin_id. The function first confirms that
-    there are no null values in any metric columns of the df, then uses price to identify dates that
-    need to be filled for all of the metric columns.
-
-    Parameters:
-    - market_data_df: DataFrame containing market data keyed on coin_id-date
-    - max_gap_days: The maximum allowed consecutive missing days for forward-filling.
-
-    Returns:
-    - market_data_filled_df: DataFrame with small gaps forward-filled, excluding coins with gaps
-        too large to fill.
-    - outcomes_df: DataFrame tracking the outcome for each coin_id.
-    """
-    # Confirm there are no null values in the input df
-    if market_data_df.isna().sum().sum() > 0:
-        raise ValueError("Market data df contains null values")
-
-    # Get unique coin_ids
-    unique_coins = market_data_df['coin_id'].unique()
-
-    # List to store results
-    filled_results = []
-
-    # List to track outcomes for each coin
-    outcomes = []
-
-    # Iterate over each coin_id
-    for coin_id in unique_coins:
-        # Step 1: Reindex to create rows for all missing dates
-        coin_df = market_data_df[market_data_df['coin_id'] == coin_id].sort_values('date', ascending=True).copy()
-
-        # Create the full date range
-        full_date_range = pd.date_range(start=coin_df['date'].min(), end=coin_df['date'].max(), freq='D')
-
-        # Reindex to get all dates
-        coin_df = coin_df.set_index('date').reindex(full_date_range).rename_axis('date').reset_index()
-        coin_df['coin_id'] = coin_id  # Fills coin_id in the newly created rows
-
-        # Step 2: Count the number of sequential missing dates
-        missing_values = coin_df['price'].isnull().astype(int)
-        consecutive_groups = coin_df['price'].notnull().cumsum()
-        coin_df['missing_gap'] = missing_values.groupby(consecutive_groups).cumsum()
-
-        # Check if there are no gaps at all
-        if coin_df['missing_gap'].max() == 0:
-            outcomes.append({'coin_id': coin_id, 'outcome': 'no gaps'})
-            filled_results.append(coin_df)
-            continue
-
-        # Check if any gaps exceed max_gap_days
-        if coin_df['missing_gap'].max() > max_gap_days:
-            outcomes.append({'coin_id': coin_id, 'outcome': 'gaps above threshold'})
-            continue
-
-        # Step 3: Forward-fill any gaps that are smaller than max_gap_days
-        coin_df['price'] = coin_df['price'].ffill(limit=max_gap_days)
-        if 'market_cap' in coin_df.columns:
-            coin_df['market_cap'] = coin_df['market_cap'].ffill(limit=max_gap_days)
-        if 'volume' in coin_df.columns:
-            coin_df['volume'] = coin_df['volume'].fillna(0)
-
-        # Remove rows with larger gaps that shouldn't be filled (already handled by check above)
-        coin_df = coin_df[coin_df['missing_gap'] <= max_gap_days]
-
-        # Append to the result list
-        filled_results.append(coin_df)
-        outcomes.append({'coin_id': coin_id, 'outcome': 'gaps below threshold'})
-
-    # Concatenate all results
-    if filled_results:
-        market_data_filled_df = pd.concat(filled_results).reset_index(drop=True)
-    else:
-        market_data_filled_df = pd.DataFrame()  # Handle case where no coins were filled
-
-    # Drop the temporary 'missing_gap' column
-    market_data_filled_df = market_data_filled_df.drop(columns=['missing_gap'])
-
-    # coin_id as categorical
-    market_data_filled_df['coin_id'] = market_data_filled_df['coin_id'].astype('category')
-
-    # Convert outcomes to DataFrame
-    outcomes_df = pd.DataFrame(outcomes)
-
-    # Log summary based on outcomes_df
-    no_gaps_count = len(outcomes_df[outcomes_df['outcome'] == 'no gaps'])
-    gaps_below_threshold_count = len(outcomes_df[outcomes_df['outcome'] == 'gaps below threshold'])
-    gaps_above_threshold_count = len(outcomes_df[outcomes_df['outcome'] == 'gaps above threshold'])
-
-    logger.debug("retained %s coins.", no_gaps_count + gaps_below_threshold_count)
-    logger.info("%s coins had no gaps, %s coins had gaps filled, and %s coins were dropped due to large gaps.",
-                no_gaps_count, gaps_below_threshold_count, gaps_above_threshold_count)
-
-    return market_data_filled_df, outcomes_df
 
 
 
@@ -350,17 +260,20 @@ def retrieve_transfers_data(training_period_start,modeling_period_start,modeling
     logger.debug('retrieving transfers data...')
     transfers_df = dgc().run_sql(query_sql)
 
-    # Convert column types
+    # Convert column types to memory efficient ones
     transfers_df['coin_id'] = transfers_df['coin_id'].astype('category')
     transfers_df['wallet_address'] = transfers_df['wallet_address'].astype('category')
+    transfers_df['wallet_address'] = transfers_df['wallet_address'].cat.codes.astype('uint32')
     transfers_df['date'] = pd.to_datetime(transfers_df['date'])
 
     # Attempt to downcast to float32 to reduce memory usage
     transfers_df['net_transfers'] = pd.to_numeric(transfers_df['net_transfers'], downcast='float')
     transfers_df['balance'] = pd.to_numeric(transfers_df['balance'], downcast='float')
 
-    logger.info('retrieved transfers_df with shape %s after %s seconds.',
-                transfers_df.shape, round(time.time()-start_time,1))
+    logger.info('Retrieved transfers_df with %s unique coins and %s rows after %s seconds',
+                len(set(transfers_df['coin_id'])),
+                len(transfers_df),
+                round(time.time()-start_time,1))
 
     return transfers_df
 
@@ -417,8 +330,7 @@ def prepare_profits_data(transfers_df, prices_df):
 
     # merge datasets and confirm coin_id is categorical
     profits_df = pd.merge(transfers_df, prices_df, on=['coin_id', 'date'], how='inner')
-    profits_df['coin_id'] = profits_df['coin_id'].astype('category')
-    profits_df['wallet_address'] = profits_df['wallet_address'].astype('category')
+    profits_df = recategorize_columns(profits_df)
 
     logger.debug(f"<Step 1> merge transfers and prices: {time.time() - start_time:.2f} seconds")
     step_time = time.time()
@@ -432,6 +344,7 @@ def prepare_profits_data(transfers_df, prices_df):
         'price': 'first'  # Assuming we want the first available price on the first_price_date
     }).reset_index()
     first_prices_df.columns = ['coin_id', 'first_price_date', 'first_price']
+    first_prices_df['coin_id'] = first_prices_df['coin_id'].astype('category')
 
     # Merge the first price data into profits_df
     profits_df = profits_df.merge(first_prices_df, on='coin_id', how='inner')
@@ -450,6 +363,7 @@ def prepare_profits_data(transfers_df, prices_df):
         'balance': 'last',  # Get the balance as of the latest transfer before first_price_date
         'first_price': 'first'  # Retrieve the first price for this coin
     }).reset_index()
+    grouped_pre_price_transfers = recategorize_columns(grouped_pre_price_transfers)
 
     # Create the new records to reflect transfer in of balance as of first_price_date
     new_records = grouped_pre_price_transfers.copy()
@@ -486,6 +400,7 @@ def prepare_profits_data(transfers_df, prices_df):
     # calculate cumulative token inflows
     profits_df['token_inflows'] = profits_df['net_transfers'].clip(lower=0)
     profits_df['token_inflows_cumulative'] = profits_df.groupby(['coin_id', 'wallet_address'],observed=True)['token_inflows'].cumsum()
+    profits_df = recategorize_columns(profits_df)
 
     # remove records prior to positive token_inflows
     profits_df = profits_df[profits_df['token_inflows_cumulative']>0]
@@ -548,19 +463,23 @@ def calculate_wallet_profitability(profits_df):
 
     # Raise an error if there are any missing prices
     if profits_df['price'].isnull().any():
-        raise ValueError("Missing prices found for some transfer dates. This indicates an issue with the price data generation.")
+        raise ValueError("Missing prices found for transfer dates which should not be possible.")
 
     # create offset price and balance rows to easily calculate changes between periods
-    profits_df['previous_price'] = profits_df.groupby(['coin_id', 'wallet_address'],observed=True)['price'].shift(1)
+    profits_df['previous_price'] = profits_df.groupby(['coin_id', 'wallet_address'], observed=True)['price'].shift(1)
     profits_df['previous_price'] = profits_df['previous_price'].fillna(profits_df['price'])
-    profits_df['previous_balance'] = profits_df.groupby(['coin_id', 'wallet_address'],observed=True)['balance'].shift(1).fillna(0)
+    profits_df = recategorize_columns(profits_df)
+
+    profits_df['previous_balance'] = profits_df.groupby(['coin_id', 'wallet_address'], observed=True)['balance'].shift(1).fillna(0)
+    profits_df = recategorize_columns(profits_df)
 
     logger.debug(f"Offset prices and balances for profitability logic: {time.time() - start_time:.2f} seconds")
     step_time = time.time()
 
     # calculate the profitability change in each period and sum them to get cumulative profitability
     profits_df['profits_change'] = (profits_df['price'] - profits_df['previous_price']) * profits_df['previous_balance']
-    profits_df['profits_cumulative'] = profits_df.groupby(['coin_id', 'wallet_address'],observed=True)['profits_change'].cumsum()
+    profits_df['profits_cumulative'] = profits_df.groupby(['coin_id', 'wallet_address'], observed=True)['profits_change'].cumsum()
+    profits_df = recategorize_columns(profits_df)
 
     logger.debug(f"Calculate profitability: {time.time() - step_time:.2f} seconds")
     step_time = time.time()
@@ -569,8 +488,15 @@ def calculate_wallet_profitability(profits_df):
     profits_df['usd_balance'] = profits_df['balance'] * profits_df['price']
     profits_df['usd_net_transfers'] = profits_df['net_transfers'] * profits_df['price']
     profits_df['usd_inflows'] = profits_df['usd_net_transfers'].where(profits_df['usd_net_transfers'] > 0, 0)
-    profits_df['usd_inflows_cumulative'] = profits_df.groupby(['coin_id', 'wallet_address'],observed=True)['usd_inflows'].cumsum()
-    profits_df['total_return'] = profits_df['profits_cumulative'] / profits_df['usd_inflows_cumulative'].where(profits_df['usd_inflows_cumulative'] != 0, np.nan)
+    profits_df['usd_inflows_cumulative'] = profits_df.groupby(['coin_id', 'wallet_address'], observed=True)['usd_inflows'].cumsum()
+    profits_df['total_return'] = (
+        profits_df['profits_cumulative']
+        / profits_df['usd_inflows_cumulative']
+        .where(profits_df['usd_inflows_cumulative'] != 0, np.nan)
+    )
+
+    # Final recategorization
+    profits_df = recategorize_columns(profits_df)
 
     logger.debug(f"Calculate rate of return {time.time() - step_time:.2f} seconds")
     step_time = time.time()
@@ -579,6 +505,24 @@ def calculate_wallet_profitability(profits_df):
     profits_df.drop(columns=['previous_price', 'previous_balance'], inplace=True)
 
     return profits_df
+
+def recategorize_columns(df):
+    """
+    Helper function to reoptimize column dtypes after groupby operations. This can reduce
+    memory usage by up to 75% in some cases.
+
+    Params: df (DataFrame): dataframe with wallet_address and coin_id columns
+    Returns: df (DataFrame): dataframe with wallet_address and coin_id columns formatted
+        as categories
+    """
+    recat_time = time.time()
+    df['coin_id'] = df['coin_id'].astype('category')
+    df['wallet_address'] = df['wallet_address'].astype('category')
+    df['wallet_address'] = df['wallet_address'].cat.codes.astype('uint32')
+    df['date'] = df['date'].dt.date
+    logger.debug(f"Recategorization took {time.time() - recat_time:.2f} seconds.")
+
+    return df
 
 
 @timing_decorator

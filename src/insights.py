@@ -87,7 +87,6 @@ def run_experiment(modeling_config):
     # Retrieve all base datasets
     config = u.load_config(os.path.join(config_folder, 'config.yaml'))
     market_data_df = td.retrieve_market_data()
-    market_data_df, _ = td.fill_market_data_gaps(market_data_df, config['data_cleaning']['max_gap_days'])
     prices_df = market_data_df[['coin_id','date','price']].copy()
     profits_df = rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_df=None)
 

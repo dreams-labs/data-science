@@ -2,7 +2,7 @@
 Validation logic for items in experiments_config.yaml
 """
 from enum import Enum
-from typing import Optional, List, Dict
+from typing import Optional, Dict
 from typing_extensions import Annotated
 from pydantic import BaseModel, Field
 
