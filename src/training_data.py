@@ -212,21 +212,6 @@ def retrieve_profits_data(start_date,end_date):
 
     return profits_df
 
-def worker(partition, prices_df, target_date, result_queue):
-    """
-    Worker function to process a partition and put the result in the queue.
-    """
-    # Temporarily increase the log level to suppress most logs
-    original_level = logger.level
-    logger.setLevel(logging.ERROR)
-
-    try:
-        result = impute_profits_df_rows(partition, prices_df, target_date)
-        result_queue.put(result)
-    finally:
-        # Restore the original log level
-        logger.setLevel(original_level)
-
 
 
 @timing_decorator
@@ -348,9 +333,6 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
     # Convert date to datetime
     target_date = pd.to_datetime(target_date)
 
-    # Store shape for logging purposes
-    start_shape = profits_df.shape
-
     # Create indices so we can use vectorized operations
     profits_df = profits_df.set_index(['coin_id', 'wallet_address', 'date'])
     prices_df = prices_df.set_index(['coin_id', 'date'])
@@ -363,7 +345,7 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
         drop_level=False)
     profits_df = profits_df.xs(slice(None, target_date), level=2, drop_level=False)
 
-    logger.debug("%s <Step 1> Split profits_df into %s rows through the target_date and %s after"
+    logger.debug("%s <Step 1> Split profits_df into %s rows through the target_date and %s after "
                  "target_date: %.2f seconds",
                  profits_df.shape,
                  len(profits_df),
@@ -431,7 +413,7 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
                              prejoin_size-len(profits_df),
                              len(profits_df)))
 
-    logger.debug("%s <Step 4> Joined prices_df and added price and previous_price helper"
+    logger.debug("%s <Step 4> Joined prices_df and added price and previous_price helper "
                  "columns: %.2f seconds",
                  profits_df.shape,
                  time.time() - step_time)
@@ -468,33 +450,74 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
     new_rows_df = new_rows_df.reset_index(level='date', drop=True)
     new_rows_df = new_rows_df.reset_index().set_index(['coin_id', 'wallet_address', 'date'])
 
-    profits_df_filled = pd.concat([profits_df, new_rows_df])
-
     logger.debug("%s <Step 6> Reset indices and added new rows to profits_df: %.2f seconds",
-                    profits_df.shape,
+                    new_rows_df.shape,
                     time.time() - step_time)
-    logger.info("%s Successfully merged profits_df %s with new_rows_df %s to get profits_df_filled"
-                "%s after %.2f total seconds.",
-                profits_df_filled.shape,
-                start_shape,
+    logger.info("%s Successfully generated new_rows_df with shape %s after %.2f total seconds.",
                 new_rows_df.shape,
-                profits_df_filled.shape,
+                new_rows_df.shape,
                 time.time() - start_time)
 
-    return profits_df_filled
+    return new_rows_df
 
-def multithreaded_impute_profits(profits_df_partitions, prices_df, target_date):
+def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
     """
-    Process partitions using multithreading and merge results.
+    Wrapper function to impute profits for multiple dates using multithreaded processing.
 
     Args:
-        profits_df_partitions (list): Partitions of profits_df, split on coin_id
+        profits_df (pd.DataFrame): DataFrame containing dated profits data for coin-wallet pairs
         prices_df (pd.DataFrame): DataFrame containing price information
-        target_date (str or datetime): The date for which to impute rows
+        dates (list): List of dates (str or datetime) for which to impute rows
+        n_threads (int): The number of threads to use for imputation
 
     Returns:
-        all_profits_df (pd.DataFrame): Merged result of all processed partitions
+        pd.DataFrame: Updated profits_df with imputed rows for all specified dates
     """
+    logger = logging.getLogger(__name__)
+
+    start_time = time.time()
+    logger.info("Starting profits_df imputation for %s dates...", len(dates))
+
+    new_rows_list = []
+
+    for date in dates:
+        new_rows_df = td.multithreaded_impute_profits_rows(profits_df, prices_df, date, n_threads)
+        new_rows_list.append(new_rows_df)
+
+    # Concatenate all new rows at once
+    all_new_rows = pd.concat(new_rows_list, ignore_index=True)
+
+    # Append all new rows to profits_df
+    updated_profits_df = pd.concat([profits_df, all_new_rows], ignore_index=True)
+
+    logger.info("Completed new row generation after %.2f seconds. Total rows after imputation: %s",
+                time.time() - start_time,
+                updated_profits_df.shape[0])
+
+    return updated_profits_df
+
+def multithreaded_impute_profits_rows(profits_df, prices_df, target_date, n_threads):
+    """
+    Imputes new profits_df rows as of the taget_date by using multithreading to maximize
+    performance, and then merges and returns the results. First, profits_df is split on coin_id
+    into n_threads partitions. Then a thread is started and impute_profits_df_rows() is
+    calculated by all threads before being merged into all_new_rows_df.
+
+    Args:
+        profits_df (pd.DataFrame): DataFrame containing dated profits data for coin-wallet pairs
+        prices_df (pd.DataFrame): DataFrame containing price information
+        target_date (str or datetime): The date for which to impute rows
+        n_threads (int): The number of threads to run impute_profits_df_rows() with
+
+    Returns:
+        all_new_rows_df (pd.DataFrame): The set of new rows to be added to profits_df to
+            ensure that every coin-wallet pair has a record on the given date.
+    """
+    # Partition profits_df on coin_id
+    logger.info("Splitting profits_df into %s partitions for date %s...",n_threads,target_date)
+
+    profits_df_partitions = create_partitions(profits_df, n_threads)
+
     # Create a thread-safe queue to store results
     result_queue = queue.Queue()
 
@@ -502,6 +525,12 @@ def multithreaded_impute_profits(profits_df_partitions, prices_df, target_date):
     threads = []
 
     # Create and start a thread for each partition
+    logger.info("Initiating multithreading calculations for date %s...",target_date)
+
+    # Temporarily increase the log level to suppress most logs from multithread workers
+    original_level = logger.level
+    logger.setLevel(logging.ERROR)
+
     for partition in profits_df_partitions:
         thread = threading.Thread(
             target=worker,
@@ -514,15 +543,21 @@ def multithreaded_impute_profits(profits_df_partitions, prices_df, target_date):
     for thread in threads:
         thread.join()
 
+    # Restore the original log level
+    logger.setLevel(original_level)
+
     # Collect results
     results = []
     while not result_queue.empty():
         results.append(result_queue.get())
 
     # Merge results
-    all_profits_df = pd.concat(results, ignore_index=True)
+    all_new_rows_df = pd.concat(results, ignore_index=True)
+    logger.info("Generated %s new rows for date %s.",
+                len(all_new_rows_df),
+                target_date)
 
-    return all_profits_df
+    return all_new_rows_df
 
 def create_partitions(profits_df, n_partitions):
     """
@@ -558,9 +593,19 @@ def create_partitions(profits_df, n_partitions):
         mask = profits_df['coin_id'].isin(partition_coin_ids)
 
         # Add the partition to the list
-        partition_dfs.append(profits_df[mask])
+        partition_dfs.append(profits_df[mask].copy(deep=True))
 
     return partition_dfs
+
+def worker(partition, prices_df, target_date, result_queue):
+    """
+    Worker function to process a partition and put the result in the queue.
+    """
+    # Call impute_profits_df_rows with the copy
+    result = impute_profits_df_rows(partition, prices_df, target_date)
+
+    # Put the result in the queue
+    result_queue.put(result)
 
 def test_partition_performance(profits_df, prices_df, target_date, partition_numbers):
     """
@@ -595,7 +640,11 @@ def test_partition_performance(profits_df, prices_df, target_date, partition_num
         start_time = time.time()
 
         partitions = create_partitions(profits_df, n_partitions)
-        result = multithreaded_impute_profits(partitions, prices_df, target_date)
+        result = multithreaded_impute_profits_rows(
+            partitions,
+            prices_df,
+            target_date,
+            partition_numbers)
 
         # Check size consistency
         current_size = result.shape[0]
