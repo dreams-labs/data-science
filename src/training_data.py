@@ -2,7 +2,12 @@
 functions used in generating training data for the models
 """
 import time
+import logging
+import threading
+import queue
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 from dreams_core.googlecloud import GoogleCloud as dgc
 from dreams_core import core as dc
 
@@ -207,6 +212,162 @@ def retrieve_profits_data(start_date,end_date):
 
     return profits_df
 
+def worker(partition, prices_df, target_date, result_queue):
+    """
+    Worker function to process a partition and put the result in the queue.
+    """
+    # Temporarily increase the log level to suppress most logs
+    original_level = logger.level
+    logger.setLevel(logging.ERROR)
+
+    try:
+        result = impute_profits_df_rows(partition, prices_df, target_date)
+        result_queue.put(result)
+    finally:
+        # Restore the original log level
+        logger.setLevel(original_level)
+
+def multithreaded_impute_profits(partitions, prices_df, target_date):
+    """
+    Process partitions using multithreading and merge results.
+
+    Args:
+        partitions (list): List of DataFrame partitions
+        prices_df (pd.DataFrame): DataFrame containing price information
+        target_date (str or datetime): The date for which to impute rows
+
+    Returns:
+        pd.DataFrame: Merged result of all processed partitions
+    """
+    # Create a thread-safe queue to store results
+    result_queue = queue.Queue()
+
+    # Create a list to hold thread objects
+    threads = []
+
+    # Create and start a thread for each partition
+    for partition in partitions:
+        thread = threading.Thread(
+            target=worker,
+            args=(partition, prices_df, target_date, result_queue)
+        )
+        thread.start()
+        threads.append(thread)
+
+    # Wait for all threads to complete
+    for thread in threads:
+        thread.join()
+
+    # Collect results
+    results = []
+    while not result_queue.empty():
+        results.append(result_queue.get())
+
+    # Merge results
+    all_profits_df = pd.concat(results, ignore_index=True)
+
+    return all_profits_df
+
+def create_partitions(profits_df, n_partitions):
+    """
+    Partition a DataFrame into multiple subsets based on unique coin_ids.
+
+    Parameters:
+    - profits_df (pd.DataFrame): The input DataFrame to be partitioned. Must contain
+        a 'coin_id' column.
+    - n_partitions (int): The number of partitions to create.
+
+    Returns:
+    - partition_dfs (List[pd.DataFrame]): A list of DataFrames, each representing
+        a partition of the original data.
+    """
+    # Get unique coin_ids and convert to a regular list
+    unique_coin_ids = profits_df['coin_id'].unique().tolist()
+
+    # Shuffle the list of coin_ids
+    np.random.seed(88)
+    np.random.shuffle(unique_coin_ids)
+
+    # Calculate the number of coin_ids per partition
+    coins_per_partition = len(unique_coin_ids) // n_partitions
+
+    # Create partitions
+    partition_dfs = []
+    for i in range(n_partitions):
+        start_idx = i * coins_per_partition
+        end_idx = start_idx + coins_per_partition if i < n_partitions - 1 else None
+        partition_coin_ids = unique_coin_ids[start_idx:end_idx]
+
+        # Create a boolean mask for the current partition
+        mask = profits_df['coin_id'].isin(partition_coin_ids)
+
+        # Add the partition to the list
+        partition_dfs.append(profits_df[mask])
+
+    return partition_dfs
+
+def test_partition_performance(profits_df, prices_df, target_date, partition_numbers):
+    """
+    Test the performance of the multithreaded_impute_profits function with different
+    numbers of partitions.
+
+    This function iterates through the provided partition numbers, running the
+    multithreaded_impute_profits function for each. It measures the execution time, logs
+    the result size, and generates a performance plot.
+
+    Args:
+        profits_df (pd.DataFrame): The input DataFrame containing profit information.
+        prices_df (pd.DataFrame): The input DataFrame containing price information.
+        target_date (str or datetime): The target date for imputation.
+        partition_numbers (list of int): A list of partition numbers to test.
+
+    Returns:
+        list of tuple: A list of (partition_number, execution_time) tuples.
+
+    Raises:
+        ValueError: If the size of any result DataFrame differs from the others.
+
+    Side effects:
+        - Prints the execution time for each partition number to the console.
+        - Logs the size of the result DataFrame for each partition number.
+        - Generates and displays a plot of execution time vs. number of partitions.
+    """
+    results = []
+    expected_size = None
+
+    for n_partitions in partition_numbers:
+        start_time = time.time()
+
+        partitions = create_partitions(profits_df, n_partitions)
+        result = multithreaded_impute_profits(partitions, prices_df, target_date)
+
+        # Check size consistency
+        current_size = result.shape[0]
+        if expected_size is None:
+            expected_size = current_size
+        elif current_size != expected_size:
+            raise ValueError(f"Inconsistent result size detected. Expected {expected_size} rows, "
+                             f"but got {current_size} rows for {n_partitions} partitions.")
+
+        end_time = time.time()
+        execution_time = end_time - start_time
+
+        results.append((n_partitions, execution_time))
+        logger.info("Partitions: %s, Result Shape: %s , Time: %.2f seconds"
+                    ,n_partitions
+                    ,result.shape
+                    ,execution_time)
+
+    # Generate the plot
+    partitions, times = zip(*results)
+    plt.plot(partitions, times, marker='o')
+    plt.xlabel('Number of Partitions')
+    plt.ylabel('Execution Time (seconds)')
+    plt.title('Performance vs Number of Partitions')
+    plt.show()
+
+    return results
+
 
 
 @timing_decorator
@@ -324,7 +485,6 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
     logger.info('%s Imputing rows for all coin-wallet pairs in profits_df on %s...',
                 profits_df.shape,
                 target_date)
-
 
     # Convert date to datetime
     target_date = pd.to_datetime(target_date)
