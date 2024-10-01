@@ -242,17 +242,17 @@ def cw_filter_df(df, coin_id, wallet_address):
 
 
 
-def df_memory_usage(df):
+def df_mem(df):
     """
     Checks how much memory a dataframe is using
     """
     # Memory usage of each column
-    memory_usage_gb = df.memory_usage(deep=True) / (1024 ** 3)
-    print(memory_usage_gb.round(2))
+    memory_usage = df.memory_usage(deep=True) / (1024 ** 2)
+    print(memory_usage.round(2))
 
     # Total memory usage in bytes
     total_memory = df.memory_usage(deep=True).sum()
-    print(f'Total memory usage: {total_memory / 1024 ** 3:.2f} GB')
+    print(f'Total memory usage: {total_memory / 1024 ** 2:.2f} MB')
 
 
 def memory_usage():
