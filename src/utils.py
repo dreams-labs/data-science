@@ -16,6 +16,9 @@ import pandas as pd
 from pydantic import ValidationError
 import dreams_core.core as dc
 
+
+# pylint: disable=E0401
+# pylint: disable=E0611
 # pydantic config files
 import config_models.config as py_c
 import config_models.metrics_config as py_mc
@@ -243,13 +246,13 @@ def df_memory_usage(df):
     """
     Checks how much memory a dataframe is using
     """
-
     # Memory usage of each column
-    print(df.memory_usage(deep=True))
+    memory_usage_gb = df.memory_usage(deep=True) / (1024 ** 3)
+    print(memory_usage_gb.round(2))
 
     # Total memory usage in bytes
     total_memory = df.memory_usage(deep=True).sum()
-    print(f'Total memory usage: {total_memory / 1024 ** 2:.2f} MB')
+    print(f'Total memory usage: {total_memory / 1024 ** 3:.2f} GB')
 
 
 def memory_usage():

@@ -27,9 +27,8 @@ def retrieve_market_data():
     start_time = time.time()
     logger.debug('Retrieving market data...')
 
-
     # SQL query to retrieve market data
-    query_sql = '''
+    query_sql = """
         select cmd.coin_id
         ,date
         ,cast(cmd.price as float64) as price
@@ -37,7 +36,7 @@ def retrieve_market_data():
         ,cast(coalesce(cmd.market_cap,cmd.fdv) as int64) as market_cap
         from core.coin_market_data cmd
         order by 1,2
-    '''
+    """
 
     # Run the SQL query using dgc's run_sql method
     logger.debug('retrieving market data...')
@@ -64,6 +63,156 @@ def retrieve_market_data():
 
 
 
+def retrieve_profits_data(start_date,end_date):
+    """
+    Retrieves data from the core.coin_wallet_profits table and converts columns to
+    memory-efficient formats. Records prior to the start_date are excluded but a new
+    row is imputed for the coin_id-wallet_address pair that summarizes their historical
+    performance (see Step 2 CTEs).
+
+    Params:
+    - start_date (String): The earliest date to retrieve records for with format 'YYYY-MM-DD'
+    - start_date (String): The latest date to retrieve records for with format 'YYYY-MM-DD'
+
+    Returns:
+    - profits_df (DataFrame): contains coin-wallet-date keyed profits data denominated in USD
+    - wallet_address_mapping (pandas Index): mapping that will allow us to convert wallet_address
+        back to the original strings, rather than the integer values they get mapped to for
+        memory optimization
+    """
+    start_time = time.time()
+    logger.info('Retrieving profits data...')
+
+    # SQL query to retrieve profits data
+    query_sql = f"""
+        -- STEP 1: retrieve profits data through the end of the modeling period
+        -----------------------------------------------------------------------
+        with profits_base as (
+            select coin_id
+            ,date
+            ,wallet_address
+            ,profits_change
+            ,profits_cumulative
+            ,usd_balance
+            ,usd_net_transfers
+            ,usd_inflows
+            ,usd_inflows_cumulative
+            ,total_return
+            from core.coin_wallet_profits
+            where date <= '{end_date}'
+        ),
+
+        -- STEP 2: create new records for all coin-wallet pairs as of the training_period_start
+        ---------------------------------------------------------------------------------------
+        -- compute the starting profits and balances as of the training_period_start
+        training_start_existing_rows as (
+            -- identify coin-wallet pairs that already have a balance as of the period end
+            select *
+            from profits_base
+            where date = '{start_date}'
+        ),
+        training_start_needs_rows as (
+            -- for coin-wallet pairs that don't have existing records, identify the row closest to the period end date
+            select t.*
+            ,cmd_previous.price as price_previous
+            ,cmd_training.price as price_current
+            ,row_number() over (partition by t.coin_id,t.wallet_address order by t.date desc) as rn
+            from profits_base t
+            left join training_start_existing_rows e on e.coin_id = t.coin_id
+                and e.wallet_address = t.wallet_address
+
+            -- obtain the last price used to compute the balance and profits data
+            join core.coin_market_data cmd_previous on cmd_previous.coin_id = t.coin_id and cmd_previous.date = t.date
+
+            -- obtain the training_period_start price so we can update the calculations
+            join core.coin_market_data cmd_training on cmd_training.coin_id = t.coin_id and cmd_training.date = '{start_date}'
+            where t.date < '{start_date}'
+            and e.coin_id is null
+        ),
+        training_start_new_rows as (
+            -- create a new row for the period end date by carrying the balance from the closest existing record
+            select t.coin_id
+            ,cast('{start_date}' as datetime) as date
+            ,t.wallet_address
+
+            -- profits_change is the USD change in price minus the previous usd_balance
+            ,((t.price_current / t.price_previous) * t.usd_balance) - t.usd_balance as profits_change
+            -- profits_cumulative is the previous profits_cumulative + profits_change
+            ,((t.price_current / t.price_previous) * t.usd_balance) - t.usd_balance + t.profits_cumulative as profits_cumulative
+            -- usd_balance is 1+% change in price times previous balance
+            ,(t.price_current / t.price_previous) * t.usd_balance as usd_balance
+            -- there were no transfers
+            ,0 as usd_net_transfers
+            -- there were no inflows
+            ,0 as usd_inflows
+            -- no change since there were no inflows
+            ,usd_inflows_cumulative as usd_inflows_cumulative
+            -- total_return is profits_cumumlative / usd_inflows_cumulative
+            ,(((t.price_current / t.price_previous) * t.usd_balance) - t.usd_balance + t.profits_cumulative) -- profits cumulative
+            / usd_inflows_cumulative
+            as total_return
+
+            from training_start_needs_rows t
+            where rn=1
+            and usd_balance > 0
+        ),
+
+        -- STEP 3: merge all records together and round relevant columns
+        ----------------------------------------------------------------
+        profits_merged as (
+            select * from profits_base
+            -- transfers prior to the training period are summarized in training_start_new_rows
+            where date >= '{start_date}'
+
+            union all
+
+            select * from training_start_new_rows
+        )
+
+        -- round values before exporting to reduce memory usage
+        select coin_id
+        ,date
+        -- replace the memory-intensive address strings with integers
+        ,DENSE_RANK() OVER (ORDER BY wallet_address) as wallet_address
+        ,round(profits_change,2) as profits_change
+        ,round(profits_cumulative,2) as profits_cumulative
+        ,round(usd_balance,2) as usd_balance
+        ,round(usd_net_transfers,2) as usd_net_transfers
+        ,round(usd_inflows,2) as usd_inflows
+        -- set a floor of $0.01 to avoid divide by 0 errors caused by rounding
+        ,greatest(0.01,round(usd_inflows_cumulative,2)) as usd_inflows_cumulative
+        ,round(total_return,5) as total_return
+        from profits_merged
+    """
+
+    # Run the SQL query using dgc's run_sql method
+    profits_df = dgc().run_sql(query_sql)
+
+    logger.info('Converting columns to memory-optimized formats...')
+
+    # Convert coin_id to categorical and date to date
+    profits_df['coin_id'] = profits_df['coin_id'].astype('category')
+    profits_df['date'] = pd.to_datetime(profits_df['date'])
+
+    # Convert all numerical columns to float32
+    profits_df['wallet_address'] = profits_df['wallet_address'].astype('float32')
+    profits_df['profits_change'] = profits_df['profits_change'].astype('float32')
+    profits_df['profits_cumulative'] = profits_df['profits_cumulative'].astype('float32')
+    profits_df['usd_balance'] = profits_df['usd_balance'].astype('float32')
+    profits_df['usd_net_transfers'] = profits_df['usd_net_transfers'].astype('float32')
+    profits_df['usd_inflows'] = profits_df['usd_inflows'].astype('float32')
+    profits_df['usd_inflows_cumulative'] = profits_df['usd_inflows_cumulative'].astype('float32')
+    profits_df['total_return'] = profits_df['total_return'].astype('float32')
+
+    logger.info('Retrieved profits_df with %s unique coins and %s rows after %.2f seconds',
+                len(set(profits_df['coin_id'])),
+                len(profits_df),
+                time.time()-start_time)
+
+    return profits_df
+
+
+
 def retrieve_transfers_data(training_period_start,modeling_period_start,modeling_period_end):
     """
     Retrieves wallet transfers data from the core.coin_wallet_transfers table and converts
@@ -85,7 +234,7 @@ def retrieve_transfers_data(training_period_start,modeling_period_start,modeling
     - transfers_df: DataFrame with columns ['coin_id', 'wallet_address', 'date', 'net_transfers', 'balance']
     """
 
-    query_sql = f'''
+    query_sql = f"""
         -- STEP 1: retrieve transfers data through the end of the modeling period
         -------------------------------------------------------------------------
         with transfers_base as (
@@ -253,7 +402,7 @@ def retrieve_transfers_data(training_period_start,modeling_period_start,modeling
 
         order by coin_id, wallet_address, date
 
-    '''
+    """
 
     # Run the SQL query using dgc's run_sql method
     start_time = time.time()
@@ -277,252 +426,6 @@ def retrieve_transfers_data(training_period_start,modeling_period_start,modeling
 
     return transfers_df
 
-
-@timing_decorator
-def prepare_profits_data(transfers_df, prices_df):
-    """
-    Prepares a DataFrame (profits_df) by merging wallet transfer data with coin price data,
-    ensuring valid pricing data is available for each transaction, and handling cases where
-    wallets had balances prior to the first available pricing data.
-
-    The function performs the following steps:
-    1. Merges the `transfers_df` and `prices_df` on 'coin_id' and 'date'.
-    2. Identifies wallets with transfer records before the first available price for each coin.
-    3. Creates new records for these wallets, treating the balance as a net transfer on the
-       first price date.
-    4. Removes original records with missing price data.
-    5. Appends the newly created records and sorts the resulting DataFrame.
-
-    Parameters:
-    - transfers_df (pd.DataFrame):
-        A DataFrame containing wallet transaction data with columns:
-        - coin_id: The ID of the coin/token.
-        - wallet_address: The unique identifier of the wallet.
-        - date: The date of the transaction.
-        - net_transfers: The net tokens transferred in or out of the wallet on that date.
-        - balance: The token balance in the wallet at the end of the day.
-
-    - prices_df (pd.DataFrame):
-        A DataFrame containing price data with columns:
-        - coin_id: The ID of the coin/token.
-        - date: The date of the price record.
-        - price: The price of the coin/token on that date.
-
-    Returns:
-    - pd.DataFrame:
-        A merged DataFrame containing profitability data, with new records added for wallets
-        that had balances prior to the first available price date for each coin.
-    """
-    start_time = time.time()
-
-    # Raise an error if either df is empty
-    if transfers_df.empty or prices_df.empty:
-        raise ValueError("Input DataFrames cannot be empty.")
-
-    # 1. Format dataframes and merge on 'coin_id' and 'date'
-    # ----------------------------------------------------------
-    # set dates to datetime and coin_ids to categorical
-    transfers_df = transfers_df.copy()
-    prices_df = prices_df.copy()
-
-    transfers_df['date'] = pd.to_datetime(transfers_df['date'])
-    prices_df['date'] = pd.to_datetime(prices_df['date'])
-
-    # merge datasets and confirm coin_id is categorical
-    profits_df = pd.merge(transfers_df, prices_df, on=['coin_id', 'date'], how='inner')
-    profits_df = recategorize_columns(profits_df)
-
-    logger.debug(f"<Step 1> merge transfers and prices: {time.time() - start_time:.2f} seconds")
-    step_time = time.time()
-
-
-    # 2. Attach data showing the first price record of all coins
-    # ----------------------------------------------------------
-    # Identify the earliest pricing data for each coin and merge to get the first price date
-    first_prices_df = prices_df.groupby('coin_id',observed=True).agg({
-        'date': 'min',
-        'price': 'first'  # Assuming we want the first available price on the first_price_date
-    }).reset_index()
-    first_prices_df.columns = ['coin_id', 'first_price_date', 'first_price']
-    first_prices_df['coin_id'] = first_prices_df['coin_id'].astype('category')
-
-    # Merge the first price data into profits_df
-    profits_df = profits_df.merge(first_prices_df, on='coin_id', how='inner')
-    logger.debug(f"<Step 2> identify first prices of coins: {time.time() - step_time:.2f} seconds")
-    step_time = time.time()
-
-
-    # 3. Create new records for the first_price_date for each wallet-coin pair
-    # ------------------------------------------------------------------------
-    # Identify wallets with transfer data before first_price_date
-    pre_price_transfers = profits_df[profits_df['date'] < profits_df['first_price_date']]
-
-    # Group by coin_id and wallet_address to ensure only one record per pair
-    grouped_pre_price_transfers = pre_price_transfers.groupby(['coin_id', 'wallet_address'],observed=True).agg({
-        'first_price_date': 'first',
-        'balance': 'last',  # Get the balance as of the latest transfer before first_price_date
-        'first_price': 'first'  # Retrieve the first price for this coin
-    }).reset_index()
-    grouped_pre_price_transfers = recategorize_columns(grouped_pre_price_transfers)
-
-    # Create the new records to reflect transfer in of balance as of first_price_date
-    new_records = grouped_pre_price_transfers.copy()
-    new_records['date'] = new_records['first_price_date']
-    new_records['net_transfers'] = new_records['balance']  # Treat the balance as a net transfer
-    new_records['price'] = new_records['first_price']  # Use the first price on the first_price_date
-
-    # # Select necessary columns for new records
-    new_records = new_records[['coin_id', 'wallet_address', 'date', 'net_transfers', 'balance', 'price', 'first_price_date', 'first_price']]
-    logger.debug(f"<Step 3> created new records as of the first_price_date: {time.time() - step_time:.2f} seconds")
-    step_time = time.time()
-
-
-    # 4. Remove the rows prior to pricing data append the new records
-    # ---------------------------------------------------------------
-    # Remove original records with no price data (NaN in 'price' column)
-    profits_df = profits_df[profits_df['price'].notna()]
-
-    # Append new records to the original dataframe
-    if not new_records.empty:
-        profits_df = pd.concat([profits_df, new_records], ignore_index=True)
-
-    # Sort by coin_id, wallet_address, and date to maintain order
-    profits_df = profits_df.sort_values(by=['coin_id', 'wallet_address', 'date']).reset_index(drop=True)
-    logger.debug(f"<Step 4> merge new records into profits_df: {time.time() - step_time:.2f} seconds")
-    step_time = time.time()
-
-
-    # 5. Remove all records before a coin-wallet pair has any priced tokens
-    # ---------------------------------------------------------------------
-    # these are artifacts resulting from activity prior to price data availability. if wallets purchased
-    # and sold all coins in these pre-data eras, their first record will be of a zero-balance state.
-
-    # calculate cumulative token inflows
-    profits_df['token_inflows'] = profits_df['net_transfers'].clip(lower=0)
-    profits_df['token_inflows_cumulative'] = profits_df.groupby(['coin_id', 'wallet_address'],observed=True)['token_inflows'].cumsum()
-    profits_df = recategorize_columns(profits_df)
-
-    # remove records prior to positive token_inflows
-    profits_df = profits_df[profits_df['token_inflows_cumulative']>0]
-
-    logger.debug(f"<Step 5> removed records prior to each wallet's first token inflows: {time.time() - step_time:.2f} seconds")
-    step_time = time.time()
-
-
-    # 6. Tidy up and return profits_df
-    # ---------------------------------
-    # remove helper columns
-    profits_df.drop(columns=['first_price_date', 'first_price', 'token_inflows', 'token_inflows_cumulative'], inplace=True)
-
-    # Reset the index
-    profits_df = profits_df.reset_index(drop=True)
-
-    return profits_df
-
-
-
-@timing_decorator
-def calculate_wallet_profitability(profits_df):
-    """
-    Calculates the profitability metrics for each wallet-coin pair by analyzing changes in price
-    and balance over time. The function computes both daily profitability changes and cumulative
-    profitability, along with additional metrics such as USD inflows and returns.
-
-    Process Summary:
-    1. Ensure there are no missing prices in the `profits_df`.
-    2. Calculate the daily profitability based on price changes and previous balances.
-    3. Compute the cumulative profitability for each wallet-coin pair using `cumsum()`.
-    4. Calculate USD balances, net transfers, inflows, and the overall rate of return.
-
-    Parameters:
-    - profits_df (pd.DataFrame):
-        A DataFrame containing merged wallet transaction and price data with columns:
-        - coin_id: The ID of the coin/token.
-        - wallet_address: The unique identifier of the wallet.
-        - date: The date of the transaction.
-        - net_transfers: The net tokens transferred in or out of the wallet on that date.
-        - balance: The token balance in the wallet at the end of the day.
-        - price: The price of the coin/token on that date.
-
-    Returns:
-    - pd.DataFrame:
-        A DataFrame with the following additional columns:
-        - profits_change: The daily change in profitability, calculated as the difference between
-          the current price and the previous price, multiplied by the previous balance.
-        - profits_cumulative: The cumulative profitability for each wallet-coin pair over time.
-        - usd_balance: The USD value of the wallet's balance, based on the current price.
-        - usd_net_transfers: The USD value of the net transfers on a given day.
-        - usd_inflows: The USD value of net transfers into the wallet (positive transfers only).
-        - usd_inflows_cumulative: The cumulative USD inflows for each wallet-coin pair.
-        - total_return: The total return, calculated as cumulative profits divided by total USD inflows.
-
-    Raises:
-    - ValueError: If any missing prices are found in the `profits_df`.
-    """
-    start_time = time.time()
-
-    # Raise an error if there are any missing prices
-    if profits_df['price'].isnull().any():
-        raise ValueError("Missing prices found for transfer dates which should not be possible.")
-
-    # create offset price and balance rows to easily calculate changes between periods
-    profits_df['previous_price'] = profits_df.groupby(['coin_id', 'wallet_address'], observed=True)['price'].shift(1)
-    profits_df['previous_price'] = profits_df['previous_price'].fillna(profits_df['price'])
-    profits_df = recategorize_columns(profits_df)
-
-    profits_df['previous_balance'] = profits_df.groupby(['coin_id', 'wallet_address'], observed=True)['balance'].shift(1).fillna(0)
-    profits_df = recategorize_columns(profits_df)
-
-    logger.debug(f"Offset prices and balances for profitability logic: {time.time() - start_time:.2f} seconds")
-    step_time = time.time()
-
-    # calculate the profitability change in each period and sum them to get cumulative profitability
-    profits_df['profits_change'] = (profits_df['price'] - profits_df['previous_price']) * profits_df['previous_balance']
-    profits_df['profits_cumulative'] = profits_df.groupby(['coin_id', 'wallet_address'], observed=True)['profits_change'].cumsum()
-    profits_df = recategorize_columns(profits_df)
-
-    logger.debug(f"Calculate profitability: {time.time() - step_time:.2f} seconds")
-    step_time = time.time()
-
-    # Calculate USD inflows, balances, and rate of return
-    profits_df['usd_balance'] = profits_df['balance'] * profits_df['price']
-    profits_df['usd_net_transfers'] = profits_df['net_transfers'] * profits_df['price']
-    profits_df['usd_inflows'] = profits_df['usd_net_transfers'].where(profits_df['usd_net_transfers'] > 0, 0)
-    profits_df['usd_inflows_cumulative'] = profits_df.groupby(['coin_id', 'wallet_address'], observed=True)['usd_inflows'].cumsum()
-    profits_df['total_return'] = (
-        profits_df['profits_cumulative']
-        / profits_df['usd_inflows_cumulative']
-        .where(profits_df['usd_inflows_cumulative'] != 0, np.nan)
-    )
-
-    # Final recategorization
-    profits_df = recategorize_columns(profits_df)
-
-    logger.debug(f"Calculate rate of return {time.time() - step_time:.2f} seconds")
-    step_time = time.time()
-
-    # Drop helper columns
-    profits_df.drop(columns=['previous_price', 'previous_balance'], inplace=True)
-
-    return profits_df
-
-def recategorize_columns(df):
-    """
-    Helper function to reoptimize column dtypes after groupby operations. This can reduce
-    memory usage by up to 75% in some cases.
-
-    Params: df (DataFrame): dataframe with wallet_address and coin_id columns
-    Returns: df (DataFrame): dataframe with wallet_address and coin_id columns formatted
-        as categories
-    """
-    recat_time = time.time()
-    df['coin_id'] = df['coin_id'].astype('category')
-    df['wallet_address'] = df['wallet_address'].astype('category')
-    df['wallet_address'] = df['wallet_address'].cat.codes.astype('uint32')
-    df['date'] = df['date'].dt.date
-    logger.debug(f"Recategorization took {time.time() - recat_time:.2f} seconds.")
-
-    return df
 
 
 @timing_decorator
