@@ -155,7 +155,7 @@ def retrieve_profits_data(start_date,end_date):
 
             from training_start_needs_rows t
             where rn=1
-            and usd_balance > 0
+            and round(usd_balance,2) > 0
         ),
 
         -- STEP 3: merge all records together and round relevant columns
@@ -462,7 +462,7 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
 
     # Create indices so we can use vectorized operations
     profits_df = profits_df.set_index(['coin_id', 'wallet_address', 'date'])
-    prices_df = prices_df.set_index(['coin_id', 'date'])
+    prices_df = prices_df.set_index(['coin_id', 'date']).copy(deep=True)
 
     # Step 1: Split profits_df records before and after the target_date
     # -----------------------------------------------------------------
@@ -473,11 +473,11 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
     profits_df = profits_df.xs(slice(None, target_date), level=2, drop_level=False)
 
     logger.debug("%s <Step 1> Split profits_df into %s rows through the target_date and %s after "
-                 "target_date: %.2f seconds",
-                 profits_df.shape,
-                 len(profits_df),
-                 len(profits_df_after_target),
-                 time.time() - start_time)
+                    "target_date: %.2f seconds",
+                    profits_df.shape,
+                    len(profits_df),
+                    len(profits_df_after_target),
+                    time.time() - start_time)
     step_time = time.time()
 
 
@@ -516,9 +516,9 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
     profits_df = profits_df[is_last_date]
 
     logger.debug("%s <Step 3> Filtered profits_df to only the last dates for each coin-wallet "
-                 "pair: %.2f seconds",
-                 profits_df.shape,
-                 time.time() - step_time)
+                    "pair: %.2f seconds",
+                    profits_df.shape,
+                    time.time() - step_time)
     step_time = time.time()
 
 
@@ -535,35 +535,22 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
 
     if len(profits_df) != prejoin_size:
         raise ValueError(str("Inner join to prices_df on coin_id-date removed %s rows from"
-                             "profits_df with original length %s. There should be complete"
-                             "coverage for all rows in profits_df.",
-                             prejoin_size-len(profits_df),
-                             len(profits_df)))
+                                "profits_df with original length %s. There should be complete"
+                                "coverage for all rows in profits_df.",
+                                prejoin_size-len(profits_df),
+                                len(profits_df)))
 
     logger.debug("%s <Step 4> Joined prices_df and added price and previous_price helper "
-                 "columns: %.2f seconds",
-                 profits_df.shape,
-                 time.time() - step_time)
+                    "columns: %.2f seconds",
+                    profits_df.shape,
+                    time.time() - step_time)
     step_time = time.time()
 
 
     # Step 5: Calculate new values for pairs needing rows
     # ---------------------------------------------------
-    new_rows_df = pd.DataFrame(index=profits_df.index)
-    new_rows_df['date'] = target_date
-    new_rows_df['profits_change'] = ((profits_df['price'] / profits_df['price_previous'] - 1)
-                                     * profits_df['usd_balance'])
-    new_rows_df['profits_cumulative'] = (new_rows_df['profits_change']
-                                         + profits_df['profits_cumulative'])
-    new_rows_df['usd_balance'] = ((profits_df['price'] / profits_df['price_previous'])
-                                  * profits_df['usd_balance'])
-    new_rows_df['usd_net_transfers'] = 0
-    new_rows_df['usd_inflows'] = 0
-    new_rows_df['usd_inflows_cumulative'] = profits_df['usd_inflows_cumulative']
-    new_rows_df['total_return'] = (new_rows_df['profits_cumulative']
-                                   / new_rows_df['usd_inflows_cumulative'])
-    new_rows_df['price_previous'] = profits_df['price_previous']
-    new_rows_df['price'] = profits_df['price']
+    # Profits calculations are in a separate helper function
+    new_rows_df = calculate_new_profits_values(profits_df, target_date)
 
     logger.debug("%s <Step 5> Calculated %s new rows: %.2f seconds",
                     profits_df.shape,
@@ -574,8 +561,7 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
 
     # Step 6: Reset MultiIndex and concatenate dfs
     # --------------------------------------------
-    new_rows_df = new_rows_df.reset_index(level='date', drop=True)
-    new_rows_df = new_rows_df.reset_index().set_index(['coin_id', 'wallet_address', 'date'])
+    new_rows_df = new_rows_df.reset_index()
 
     logger.debug("%s <Step 6> Reset indices and added new rows to profits_df: %.2f seconds",
                     new_rows_df.shape,
@@ -584,6 +570,54 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
                 new_rows_df.shape,
                 new_rows_df.shape,
                 time.time() - start_time)
+
+    if new_rows_df.isnull().any().any():
+        raise ValueError("new_rows_df contains empty values after the calculation.")
+
+    return new_rows_df
+
+
+
+def calculate_new_profits_values(profits_df, target_date):
+    """
+    Calculate new financial metrics for imputed rows.
+
+    Args:
+        profits_df (pd.DataFrame): DataFrame with price_previous and price columns
+        target_date (datetime): The date for which to impute rows
+
+    Returns:
+        pd.DataFrame: DataFrame with calculated financial metrics
+    """
+    new_rows_df = pd.DataFrame(index=profits_df.index)
+
+    # the impact of price movements since the last transaction is recognized as change in profits
+    new_rows_df['profits_change'] = ((profits_df['price'] / profits_df['price_previous'] - 1)
+                                     * profits_df['usd_balance'])
+
+    # existing profits_cumulative + new profits_change
+    new_rows_df['profits_cumulative'] = (new_rows_df['profits_change']
+                                         + profits_df['profits_cumulative'])
+
+    # % change in price times the USD balance
+    new_rows_df['usd_balance'] = ((profits_df['price'] / profits_df['price_previous'])
+                                  * profits_df['usd_balance'])
+
+    # these are zero since the transactionless day is being imputed
+    new_rows_df['usd_net_transfers'] = 0
+    new_rows_df['usd_inflows'] = 0
+
+    # no new usd_inflows so cumulative remains the same
+    new_rows_df['usd_inflows_cumulative'] = profits_df['usd_inflows_cumulative']
+
+    # recalculate total_return since profits have changed with price
+    new_rows_df['total_return'] = (new_rows_df['profits_cumulative']
+                                   / new_rows_df['usd_inflows_cumulative'])
+
+    # Set the date index to be the target_date
+    new_rows_df = new_rows_df.reset_index()
+    new_rows_df['date'] = target_date  # pylint: disable=E1137 # df does not support item assignment
+    new_rows_df = new_rows_df.set_index(['coin_id', 'wallet_address', 'date'])
 
     return new_rows_df
 

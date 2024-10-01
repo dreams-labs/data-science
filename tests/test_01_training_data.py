@@ -257,13 +257,31 @@ MODELING_PERIOD_END = config['training_data']['modeling_period_end']
 # ---------------------------------------- #
 
 @pytest.fixture(scope='session')
-def transfers_df():
+def profits_df():
     """
     retrieves transfers_df for data quality checks
     """
     logger.info("Beginning integration testing...")
-    logger.info("Generating transfers_df fixture from production data...")
-    return td.retrieve_transfers_data(TRAINING_PERIOD_START, MODELING_PERIOD_START, MODELING_PERIOD_END)
+    logger.info("Generating profits_df fixture from production data...")
+    # retrieve profits data
+    profits_df = td.retrieve_profits_data(TRAINING_PERIOD_START, MODELING_PERIOD_END)
+    profits_df, _ = cwm.split_dataframe_by_coverage(
+        profits_df,
+        TRAINING_PERIOD_START,
+        MODELING_PERIOD_END,
+        id_column='coin_id'
+    )
+    profits_df, _ = td.clean_profits_df(profits_df, config['data_cleaning'])
+
+    # impute period boundary dates
+    dates_to_impute = [
+        TRAINING_PERIOD_END,
+        MODELING_PERIOD_START,
+        MODELING_PERIOD_END
+    ]
+    profits_df = td.impute_profits_for_multiple_dates(profits_df, prices_df, dates_to_impute, n_threads=24)
+
+    return profits_df
 
 @pytest.mark.integration
 def test_transfers_data_quality(transfers_df):
