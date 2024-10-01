@@ -73,7 +73,7 @@ def generate_time_series_features(
 
         else:
             # if no indicators are needed, pass through coins with complete date coverage
-            value_column_metrics_df, _, _ = cwm.split_dataframe_by_coverage(
+            value_column_metrics_df, _ = cwm.split_dataframe_by_coverage(
                 value_column_df,
                 config['training_data']['training_period_start'],
                 config['training_data']['training_period_end'],

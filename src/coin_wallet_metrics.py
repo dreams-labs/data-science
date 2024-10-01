@@ -415,17 +415,12 @@ def generate_time_series_indicators(
 
     # 3. Split records by complete vs partial time series coverage
     # ------------------------------------------------------------
-    full_indicators_df, partial_time_series_indicators_df, coverage_stats = split_dataframe_by_coverage(
+    full_indicators_df, partial_time_series_indicators_df = split_dataframe_by_coverage(
         time_series_df, training_period_start, training_period_end, id_column
     )
 
     # Logging
-    logger.debug("Generated time series indicators data. Out of %s total series, %s had complete period "
-                 "coverage, %s had partial coverage",
-                 coverage_stats['total_series'],
-                 coverage_stats['full_coverage'],
-                 coverage_stats['partial_coverage']
-    )
+    logger.debug("Generated time series indicators data.")
 
     return full_indicators_df, partial_time_series_indicators_df
 
@@ -435,7 +430,7 @@ def split_dataframe_by_coverage(
         start_date: pd.Timestamp,
         end_date: pd.Timestamp,
         id_column: Optional[str] = 'coin_id'
-    ) -> Tuple[pd.DataFrame, pd.DataFrame, dict]:
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Splits the input DataFrame into full coverage and partial coverage based on date range.
     Works for both multi-series and single-series datasets.
@@ -449,7 +444,6 @@ def split_dataframe_by_coverage(
     Returns:
     - full_coverage_df (pd.DataFrame): DataFrame with series having complete data for the period.
     - partial_coverage_df (pd.DataFrame): DataFrame with series having partial data for the period.
-    - coverage_stats (dict): Dictionary containing coverage statistics.
     """
     # Convert params to datetime
     start_date = pd.to_datetime(start_date)
@@ -469,9 +463,7 @@ def split_dataframe_by_coverage(
         full_duration_series = [0] if has_full_coverage(series_data_range['min'], series_data_range['max']) else []
 
     # Calculate coverage statistics
-    total_series = len(series_data_range)
     full_coverage_count = len(full_duration_series)
-    partial_coverage_count = total_series - full_coverage_count
 
     # Convert id column to categorical to reduce memory usage
     time_series_df[id_column] = time_series_df[id_column].astype('category')
@@ -484,13 +476,15 @@ def split_dataframe_by_coverage(
         full_coverage_df = time_series_df if full_coverage_count else pd.DataFrame(columns=time_series_df.columns)
         partial_coverage_df = time_series_df if not full_coverage_count else pd.DataFrame(columns=time_series_df.columns)
 
-    coverage_stats = {
-        'total_series': total_series,
-        'full_coverage': full_coverage_count,
-        'partial_coverage': partial_coverage_count,
-    }
+    logger.info("Split df with dimensions %s into %s full coverage records and %s partial coverage records.",
+                time_series_df.shape,
+                dc.human_format(len(full_coverage_df)),
+                dc.human_format(len(partial_coverage_df))
+    )
 
-    return full_coverage_df, partial_coverage_df, coverage_stats
+    return full_coverage_df, partial_coverage_df
+
+
 
 def calculate_sma(timeseries: pd.Series, period: int) -> pd.Series:
     """

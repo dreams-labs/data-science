@@ -395,7 +395,7 @@ def market_data_df():
     """
     logger.info("Generating market_data_df from production data...")
     market_data_df = td.retrieve_market_data()
-    market_data_df,_,_ = cwm.split_dataframe_by_coverage(
+    market_data_df, _ = cwm.split_dataframe_by_coverage(
         market_data_df,
         start_date=config['training_data']['training_period_start'],
         end_date=config['training_data']['modeling_period_end'],

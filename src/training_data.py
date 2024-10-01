@@ -1,8 +1,6 @@
 """
 functions used in generating training data for the models
 """
-# pylint: disable=W1203 # fstrings in logs
-# pylint: disable=C0301 # line over 100 chars
 import time
 import pandas as pd
 from dreams_core.googlecloud import GoogleCloud as dgc
@@ -193,7 +191,7 @@ def retrieve_profits_data(start_date,end_date):
     profits_df['date'] = pd.to_datetime(profits_df['date'])
 
     # Convert all numerical columns to float32
-    profits_df['wallet_address'] = profits_df['wallet_address'].astype('float32')
+    profits_df['wallet_address'] = profits_df['wallet_address'].astype('int32')
     profits_df['profits_change'] = profits_df['profits_change'].astype('float32')
     profits_df['profits_cumulative'] = profits_df['profits_cumulative'].astype('float32')
     profits_df['usd_balance'] = profits_df['usd_balance'].astype('float32')
@@ -214,16 +212,18 @@ def retrieve_profits_data(start_date,end_date):
 @timing_decorator
 def clean_profits_df(profits_df, data_cleaning_config):
     """
-    Clean the profits DataFrame by excluding all records for any wallet_addresses that either have:
+    Clean the profits DataFrame by excluding all records for any wallet_addresses that
+    either have:
      - aggregate profitabiilty above profitability_filter (abs value of gains or losses).
      - aggregate USD inflows above the inflows_filter
-    this catches outliers such as minting/burning addresses, contract addresses, etc and ensures
-    they are not included in the wallet behavior training data.
+    this catches outliers such as minting/burning addresses, contract addresses, etc and
+    ensures they are not included in the wallet behavior training data.
 
     Parameters:
-    - profits_df: DataFrame with columns ['coin_id', 'wallet_address', 'date', 'profits_cumulative']
+    - profits_df: DataFrame with columns 'coin_id', 'wallet_address', 'date', 'profits_cumulative'
     - data_cleaning_config:
-        - profitability_filter: Threshold value to exclude pairs with profits or losses exceeding this value
+        - profitability_filter: Threshold value to exclude pairs with profits or losses
+            exceeding this value
         - inflows_filter: Threshold value to exclude pairs with USD inflows
 
     Returns:
@@ -233,7 +233,8 @@ def clean_profits_df(profits_df, data_cleaning_config):
     # 1. Remove wallets with higher or lower total profits than the profitability_filter
     # ----------------------------------------------------------------------------------
     # Group by wallet_address and calculate the total profitability
-    wallet_profits_agg_df = profits_df.groupby('wallet_address', observed=True)['profits_change'].sum().reset_index()
+    wallet_profits_agg_df = profits_df.groupby(
+        'wallet_address', observed=True)['profits_change'].sum().reset_index()
 
     # Identify wallet_addresses with total profitability that exceeds the threshold
     exclusions_profits_df = wallet_profits_agg_df[
@@ -242,14 +243,16 @@ def clean_profits_df(profits_df, data_cleaning_config):
     ][['wallet_address']]
 
     # Merge to filter out the records with those wallet addresses
-    profits_cleaned_df = profits_df.merge(exclusions_profits_df, on='wallet_address', how='left', indicator=True)
+    profits_cleaned_df = profits_df.merge(
+        exclusions_profits_df, on='wallet_address', how='left', indicator=True)
     profits_cleaned_df = profits_cleaned_df[profits_cleaned_df['_merge'] == 'left_only']
     profits_cleaned_df.drop(columns=['_merge'], inplace=True)
 
     # 2. Remove wallets with higher total inflows than the inflows_filter
     # -------------------------------------------------------------------
     # Group by wallet_address and calculate the total inflows
-    wallet_inflows_agg_df = profits_df.groupby('wallet_address', observed=True)['usd_inflows'].sum().reset_index()
+    wallet_inflows_agg_df = profits_df.groupby(
+        'wallet_address', observed=True)['usd_inflows'].sum().reset_index()
 
     # Identify wallet addresses where total inflows exceed the threshold
     exclusions_inflows_df = wallet_inflows_agg_df[
@@ -257,7 +260,8 @@ def clean_profits_df(profits_df, data_cleaning_config):
     ][['wallet_address']]
 
     # Merge to filter out the records with those wallet addresses
-    profits_cleaned_df = profits_cleaned_df.merge(exclusions_inflows_df, on='wallet_address', how='left', indicator=True)
+    profits_cleaned_df = profits_cleaned_df.merge(
+        exclusions_inflows_df, on='wallet_address', how='left', indicator=True)
     profits_cleaned_df = profits_cleaned_df[profits_cleaned_df['_merge'] == 'left_only']
     profits_cleaned_df.drop(columns=['_merge'], inplace=True)
 
@@ -269,19 +273,196 @@ def clean_profits_df(profits_df, data_cleaning_config):
     # prepare exclusions_logs_df
     exclusions_profits_df['profits_exclusion'] = True
     exclusions_inflows_df['inflows_exclusion'] = True
-    exclusions_logs_df = exclusions_profits_df.merge(exclusions_inflows_df, on='wallet_address', how='outer')
+    exclusions_logs_df = exclusions_profits_df.merge(
+        exclusions_inflows_df, on='wallet_address', how='outer')
 
     # Fill NaN values with False for missing exclusions
-    exclusions_logs_df['profits_exclusion'] = exclusions_logs_df['profits_exclusion'].astype(bool).fillna(False)
-    exclusions_logs_df['inflows_exclusion'] = exclusions_logs_df['inflows_exclusion'].astype(bool).fillna(False)
+    exclusions_logs_df['profits_exclusion'] = (exclusions_logs_df['profits_exclusion']
+                                               .astype(bool).fillna(False))
 
+    exclusions_logs_df['inflows_exclusion'] = (exclusions_logs_df['inflows_exclusion']
+                                               .astype(bool).fillna(False))
     # log outputs
-    logger.debug("Identified %s coin-wallet pairs beyond profit threshold of $%s and %s pairs beyond inflows filter of %s.",
-        exclusions_profits_df.shape[0], dc.human_format(data_cleaning_config['profitability_filter']),
-        exclusions_inflows_df.shape[0], dc.human_format(data_cleaning_config['inflows_filter'])
-    )
+    logger.debug("Identified %s coin-wallet pairs beyond profit threshold of $%s and %s pairs"
+                 "beyond inflows filter of %s.",
+                 exclusions_profits_df.shape[0],
+                 dc.human_format(data_cleaning_config['profitability_filter']),
+                 exclusions_inflows_df.shape[0],
+                 dc.human_format(data_cleaning_config['inflows_filter']))
 
     return profits_cleaned_df,exclusions_logs_df
+
+
+
+def impute_profits_df_rows(profits_df, prices_df, target_date):
+    """
+    Impute rows for all coin-wallet pairs in profits_df on the target date using only
+    vectorized functions, i.e. there are no groupby statements or for loops/lambda
+    functions that iterate over each row. This is necessary due to the size and memory
+    requirements of the input df.
+
+    This function performs the following steps:
+    1. Splits profits_df into records before and after the target date
+    2. Filters for pairs needing new rows
+    3. Identifies the last date for each coin-wallet pair
+    4. Appends price columns for the last date and target date
+    5. Calculates new values for pairs needing rows
+    6. Concatenates the new rows with the original dataframe
+
+    Args:
+        profits_df (pd.DataFrame): DataFrame containing profit information
+        prices_df (pd.DataFrame): DataFrame containing price information
+        target_date (str or datetime): The date for which to impute rows
+
+    Returns:
+        profits_df_filled (pd.DataFrame): Updated profits DataFrame with imputed rows
+
+    Raises:
+        ValueError: If joining prices_df removes rows from profits_df
+    """
+    start_time = time.time()
+    logger.info('%s Imputing rows for all coin-wallet pairs in profits_df on %s...',
+                profits_df.shape,
+                target_date)
+
+
+    # Convert date to datetime
+    target_date = pd.to_datetime(target_date)
+
+    # Store shape for logging purposes
+    start_shape = profits_df.shape
+
+    # Create indices so we can use vectorized operations
+    profits_df = profits_df.set_index(['coin_id', 'wallet_address', 'date'])
+    prices_df = prices_df.set_index(['coin_id', 'date'])
+
+    # Step 1: Split profits_df records before and after the target_date
+    # -----------------------------------------------------------------
+    profits_df_after_target = profits_df.xs(
+        slice(target_date + pd.Timedelta('1 day'), None),
+        level=2,
+        drop_level=False)
+    profits_df = profits_df.xs(slice(None, target_date), level=2, drop_level=False)
+
+    logger.debug("%s <Step 1> Split profits_df into %s rows through the target_date and %s after"
+                 "target_date: %.2f seconds",
+                 profits_df.shape,
+                 len(profits_df),
+                 len(profits_df_after_target),
+                 time.time() - start_time)
+    step_time = time.time()
+
+
+    # Step 2: Filter profits_df to only pairs that need new rows
+    # ----------------------------------------------------------
+    # Create a boolean mask for rows at the target_date
+    target_date_mask = profits_df.index.get_level_values('date') == target_date
+
+    # Create a boolean mask for pairs that don't have a row at the target_date
+    pairs_mask = ~profits_df.index.droplevel('date').isin(
+        profits_df[target_date_mask].index.droplevel('date')
+    )
+    profits_df = profits_df[pairs_mask].sort_index()
+
+    logger.debug("%s <Step 2> Identified %s coin-wallet pairs that need imputed rows: %.2f seconds",
+                    profits_df.shape,
+                    len(profits_df),
+                    time.time() - step_time)
+    step_time = time.time()
+
+
+    # Step 3: Identify the last date for each coin-wallet pair
+    # ----------------------------------------------
+    # The logic here is that every row that doesn't have the same coin_id-wallet_address
+    # combination as the previous row must indicate that the previous coin-wallet pair
+    # just had its last date.
+
+    # Create shifted index
+    shifted_index = profits_df.index.to_frame().shift(-1)
+
+    # Create boolean mask for last dates
+    is_last_date = (profits_df.index.get_level_values('coin_id') != shifted_index['coin_id']) | \
+            (profits_df.index.get_level_values('wallet_address') != shifted_index['wallet_address'])
+
+    # Filter for last dates
+    profits_df = profits_df[is_last_date]
+
+    logger.debug("%s <Step 3> Filtered profits_df to only the last dates for each coin-wallet "
+                 "pair: %.2f seconds",
+                 profits_df.shape,
+                 time.time() - step_time)
+    step_time = time.time()
+
+
+    # Step 4: Append columns for previous_price (on last date) and price (on the target_date)
+    # ---------------------------------------------------------------------------------------
+    # Add price_previous by joining the price as of the last date for each coin-wallet pair
+    prejoin_size = len(profits_df)
+    profits_df = profits_df.join(prices_df['price'], on=['coin_id', 'date'], how='inner')
+    profits_df = profits_df.rename(columns={'price': 'price_previous'})
+
+    # Add price by joining the price as of the target_date
+    prices_target_date = prices_df.xs(target_date, level='date')
+    profits_df = profits_df.join(prices_target_date['price'], on='coin_id', how='inner')
+
+    if len(profits_df) != prejoin_size:
+        raise ValueError(str("Inner join to prices_df on coin_id-date removed %s rows from"
+                             "profits_df with original length %s. There should be complete"
+                             "coverage for all rows in profits_df.",
+                             prejoin_size-len(profits_df),
+                             len(profits_df)))
+
+    logger.debug("%s <Step 4> Joined prices_df and added price and previous_price helper"
+                 "columns: %.2f seconds",
+                 profits_df.shape,
+                 time.time() - step_time)
+    step_time = time.time()
+
+
+    # Step 5: Calculate new values for pairs needing rows
+    # ---------------------------------------------------
+    new_rows_df = pd.DataFrame(index=profits_df.index)
+    new_rows_df['date'] = target_date
+    new_rows_df['profits_change'] = ((profits_df['price'] / profits_df['price_previous'] - 1)
+                                     * profits_df['usd_balance'])
+    new_rows_df['profits_cumulative'] = (new_rows_df['profits_change']
+                                         + profits_df['profits_cumulative'])
+    new_rows_df['usd_balance'] = ((profits_df['price'] / profits_df['price_previous'])
+                                  * profits_df['usd_balance'])
+    new_rows_df['usd_net_transfers'] = 0
+    new_rows_df['usd_inflows'] = 0
+    new_rows_df['usd_inflows_cumulative'] = profits_df['usd_inflows_cumulative']
+    new_rows_df['total_return'] = (new_rows_df['profits_cumulative']
+                                   / new_rows_df['usd_inflows_cumulative'])
+    new_rows_df['price_previous'] = profits_df['price_previous']
+    new_rows_df['price'] = profits_df['price']
+
+    logger.debug("%s <Step 5> Calculated %s new rows: %.2f seconds",
+                    profits_df.shape,
+                    len(new_rows_df),
+                    time.time() - step_time)
+    step_time = time.time()
+
+
+    # Step 6: Reset MultiIndex and concatenate dfs
+    # --------------------------------------------
+    new_rows_df = new_rows_df.reset_index(level='date', drop=True)
+    new_rows_df = new_rows_df.reset_index().set_index(['coin_id', 'wallet_address', 'date'])
+
+    profits_df_filled = pd.concat([profits_df, new_rows_df])
+
+    logger.debug("%s <Step 6> Reset indices and added new rows to profits_df: %.2f seconds",
+                    profits_df.shape,
+                    time.time() - step_time)
+    logger.info("%s Successfully merged profits_df %s with new_rows_df %s to get profits_df_filled"
+                "%s after %.2f total seconds.",
+                profits_df_filled.shape,
+                start_shape,
+                new_rows_df.shape,
+                profits_df_filled.shape,
+                time.time() - start_time)
+
+    return profits_df_filled
 
 
 
@@ -360,7 +541,8 @@ def generate_coin_metadata_features(metadata_df, config):
     # Step 3: Return the final DataFrame with boolean columns
     # Keep only relevant columns
     columns_to_keep = ['coin_id'] + [
-        col for col in metadata_df.columns if col.startswith('category_') or col.startswith('chain_')
+        col for col in metadata_df.columns
+        if col.startswith('category_') or col.startswith('chain_')
     ]
     metadata_features_df = metadata_df[columns_to_keep].copy()
     logger.info("Generated coin_metadata_features_df.")
