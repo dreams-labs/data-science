@@ -299,6 +299,130 @@ def clean_profits_df(profits_df, data_cleaning_config):
 
 
 
+def retrieve_metadata_data():
+    """
+    Retrieves metadata from the core.coin_facts_metadata table.
+
+    Returns:
+    - metadata_df: DataFrame containing coin_id-keyed metadata
+    """
+    # SQL query to retrieve prices data
+    query_sql = '''
+        select c.coin_id
+        ,md.categories
+        ,c.chain
+        from core.coins c
+        join core.coin_facts_metadata md on md.coin_id = c.coin_id
+    '''
+
+    # Run the SQL query using dgc's run_sql method
+    logger.debug('retrieving metadata data...')
+    metadata_df = dgc().run_sql(query_sql)
+
+    logger.info('retrieved metadata_df with shape %s',metadata_df.shape)
+
+    return metadata_df
+
+
+
+def generate_coin_metadata_features(metadata_df, config):
+    """
+    Generate model-friendly coin metadata features.
+
+    Args:
+    - metadata_df: DataFrame containing coin_id, categories, and chain information.
+    - config: Configuration dict that includes the chain threshold.
+
+    Returns:
+    - A DataFrame with coin_id, boolean category columns, and boolean chain columns.
+    """
+    metadata_df = metadata_df.copy()
+
+    # Step 1: Create boolean columns for each unique category
+    logger.debug("Creating boolean columns for each category...")
+
+    # Get all unique categories from the categories column
+    all_categories = set(cat for sublist in metadata_df['categories'] for cat in sublist)
+
+    # Create boolean columns for each category
+    for category in all_categories:
+        column_name = f"category_{category.lower()}"
+        metadata_df[column_name] = metadata_df['categories'].apply(
+            lambda cats, category=category: category.lower() in [c.lower() for c in cats]
+        )
+
+    # Step 2: Process chain data and apply threshold
+    logger.debug("Processing chain data and applying chain threshold...")
+
+    # Lowercase chain values
+    metadata_df['chain'] = metadata_df['chain'].str.lower()
+
+    # Count number of coins per chain
+    chain_counts = metadata_df['chain'].value_counts()
+    chain_threshold = config['datasets']['coin_facts']['coin_metadata']['chain_threshold']
+
+    # Create boolean columns for chains above the threshold
+    for chain, count in chain_counts.items():
+        if count >= chain_threshold:
+            metadata_df[f'chain_{chain}'] = metadata_df['chain'] == chain
+
+    # Create chain_other column for chains below the threshold or missing chain data
+    metadata_df['chain_other'] = metadata_df['chain'].apply(
+        lambda x: chain_counts.get(x, 0) < chain_threshold if pd.notna(x) else True
+    )
+
+    # Step 3: Return the final DataFrame with boolean columns
+    # Keep only relevant columns
+    columns_to_keep = ['coin_id'] + [
+        col for col in metadata_df.columns
+        if col.startswith('category_') or col.startswith('chain_')
+    ]
+    metadata_features_df = metadata_df[columns_to_keep].copy()
+    logger.info("Generated coin_metadata_features_df.")
+
+    return metadata_features_df
+
+
+
+def retrieve_google_trends_data():
+    """
+    Retrieves Google Trends data from the macro_trends dataset. Because the data is weekly, it also
+    resamples to daily records using linear interpolation.
+
+    Returns:
+    - google_trends_df: DataFrame keyed on date containing Google Trends values for multiple terms
+    """
+    query_sql = '''
+        select *
+        from `macro_trends.google_trends`
+        order by date
+    '''
+
+    # Run the SQL query using dgc's run_sql method
+    google_trends_df = dgc().run_sql(query_sql)
+    logger.info('retrieved Google Trends data with shape %s',google_trends_df.shape)
+
+    # Convert the date column to datetime format
+    google_trends_df['date'] = pd.to_datetime(google_trends_df['date'])
+
+    # Resample the df to fill in missing days by using date as the index
+    google_trends_df.set_index('date', inplace=True)
+    google_trends_df = google_trends_df.resample('D').interpolate(method='linear')
+    google_trends_df.reset_index(inplace=True)
+
+    return google_trends_df
+
+
+
+# ____________________________________________________________________________
+# ----------------------------------------------------------------------------
+#                  Multi-Threaded profits_df Row Imputation
+# ----------------------------------------------------------------------------
+# ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
+# All functions below this point relate to multi-threaded imputation of new rows
+# for profits_df, which are needed to ensure we have complete data at the start
+# and end of the training and test periods.
+
 def impute_profits_df_rows(profits_df, prices_df, target_date):
     """
     Impute rows for all coin-wallet pairs in profits_df on the target date using only
@@ -460,6 +584,8 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
 
     return new_rows_df
 
+
+
 def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
     """
     Wrapper function to impute profits for multiple dates using multithreaded processing.
@@ -473,15 +599,13 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
     Returns:
         pd.DataFrame: Updated profits_df with imputed rows for all specified dates
     """
-    logger = logging.getLogger(__name__)
-
     start_time = time.time()
     logger.info("Starting profits_df imputation for %s dates...", len(dates))
 
     new_rows_list = []
 
     for date in dates:
-        new_rows_df = td.multithreaded_impute_profits_rows(profits_df, prices_df, date, n_threads)
+        new_rows_df = multithreaded_impute_profits_rows(profits_df, prices_df, date, n_threads)
         new_rows_list.append(new_rows_df)
 
     # Concatenate all new rows at once
@@ -495,6 +619,8 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
                 updated_profits_df.shape[0])
 
     return updated_profits_df
+
+
 
 def multithreaded_impute_profits_rows(profits_df, prices_df, target_date, n_threads):
     """
@@ -559,6 +685,8 @@ def multithreaded_impute_profits_rows(profits_df, prices_df, target_date, n_thre
 
     return all_new_rows_df
 
+
+
 def create_partitions(profits_df, n_partitions):
     """
     Partition a DataFrame into multiple subsets based on unique coin_ids.
@@ -597,6 +725,8 @@ def create_partitions(profits_df, n_partitions):
 
     return partition_dfs
 
+
+
 def worker(partition, prices_df, target_date, result_queue):
     """
     Worker function to process a partition and put the result in the queue.
@@ -606,6 +736,8 @@ def worker(partition, prices_df, target_date, result_queue):
 
     # Put the result in the queue
     result_queue.put(result)
+
+
 
 def test_partition_performance(profits_df, prices_df, target_date, partition_numbers):
     """
@@ -672,118 +804,3 @@ def test_partition_performance(profits_df, prices_df, target_date, partition_num
     plt.show()
 
     return results
-
-
-
-def retrieve_metadata_data():
-    """
-    Retrieves metadata from the core.coin_facts_metadata table.
-
-    Returns:
-    - metadata_df: DataFrame containing coin_id-keyed metadata
-    """
-    # SQL query to retrieve prices data
-    query_sql = '''
-        select c.coin_id
-        ,md.categories
-        ,c.chain
-        from core.coins c
-        join core.coin_facts_metadata md on md.coin_id = c.coin_id
-    '''
-
-    # Run the SQL query using dgc's run_sql method
-    logger.debug('retrieving metadata data...')
-    metadata_df = dgc().run_sql(query_sql)
-
-    logger.info('retrieved metadata_df with shape %s',metadata_df.shape)
-
-    return metadata_df
-
-
-
-def generate_coin_metadata_features(metadata_df, config):
-    """
-    Generate model-friendly coin metadata features.
-
-    Args:
-    - metadata_df: DataFrame containing coin_id, categories, and chain information.
-    - config: Configuration dict that includes the chain threshold.
-
-    Returns:
-    - A DataFrame with coin_id, boolean category columns, and boolean chain columns.
-    """
-    metadata_df = metadata_df.copy()
-
-    # Step 1: Create boolean columns for each unique category
-    logger.debug("Creating boolean columns for each category...")
-
-    # Get all unique categories from the categories column
-    all_categories = set(cat for sublist in metadata_df['categories'] for cat in sublist)
-
-    # Create boolean columns for each category
-    for category in all_categories:
-        column_name = f"category_{category.lower()}"
-        metadata_df[column_name] = metadata_df['categories'].apply(
-            lambda cats, category=category: category.lower() in [c.lower() for c in cats]
-        )
-
-    # Step 2: Process chain data and apply threshold
-    logger.debug("Processing chain data and applying chain threshold...")
-
-    # Lowercase chain values
-    metadata_df['chain'] = metadata_df['chain'].str.lower()
-
-    # Count number of coins per chain
-    chain_counts = metadata_df['chain'].value_counts()
-    chain_threshold = config['datasets']['coin_facts']['coin_metadata']['chain_threshold']
-
-    # Create boolean columns for chains above the threshold
-    for chain, count in chain_counts.items():
-        if count >= chain_threshold:
-            metadata_df[f'chain_{chain}'] = metadata_df['chain'] == chain
-
-    # Create chain_other column for chains below the threshold or missing chain data
-    metadata_df['chain_other'] = metadata_df['chain'].apply(
-        lambda x: chain_counts.get(x, 0) < chain_threshold if pd.notna(x) else True
-    )
-
-    # Step 3: Return the final DataFrame with boolean columns
-    # Keep only relevant columns
-    columns_to_keep = ['coin_id'] + [
-        col for col in metadata_df.columns
-        if col.startswith('category_') or col.startswith('chain_')
-    ]
-    metadata_features_df = metadata_df[columns_to_keep].copy()
-    logger.info("Generated coin_metadata_features_df.")
-
-    return metadata_features_df
-
-
-
-def retrieve_google_trends_data():
-    """
-    Retrieves Google Trends data from the macro_trends dataset. Because the data is weekly, it also
-    resamples to daily records using linear interpolation.
-
-    Returns:
-    - google_trends_df: DataFrame keyed on date containing Google Trends values for multiple terms
-    """
-    query_sql = '''
-        select *
-        from `macro_trends.google_trends`
-        order by date
-    '''
-
-    # Run the SQL query using dgc's run_sql method
-    google_trends_df = dgc().run_sql(query_sql)
-    logger.info('retrieved Google Trends data with shape %s',google_trends_df.shape)
-
-    # Convert the date column to datetime format
-    google_trends_df['date'] = pd.to_datetime(google_trends_df['date'])
-
-    # Resample the df to fill in missing days by using date as the index
-    google_trends_df.set_index('date', inplace=True)
-    google_trends_df = google_trends_df.resample('D').interpolate(method='linear')
-    google_trends_df.reset_index(inplace=True)
-
-    return google_trends_df
