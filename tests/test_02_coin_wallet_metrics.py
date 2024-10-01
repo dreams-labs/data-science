@@ -87,7 +87,7 @@ def test_wallet_cohort_classification(sample_wallet_cohort_profits_df,sample_wal
     sample_config = sample_wallet_cohort_config
 
     # Run classification
-    cohort_wallets_df = cwm.classify_wallet_cohort(sample_profits_df, sample_config)
+    cohort_wallets_df = cwm.classify_wallet_cohort(sample_profits_df, sample_config, 'test_cohort')
 
     # Test 1: Ensure wallets are filtered correctly based on inflows eligibility criteria.
     eligible_wallets = cohort_wallets_df['wallet_address'].unique()
@@ -124,7 +124,7 @@ def test_wallet_maximum_inflows_filter(sample_wallet_cohort_profits_df,sample_wa
     sample_config['wallet_maximum_inflows'] = 15000  # Set a low maximum inflows to test filtering
 
     # Run classification
-    cohort_wallets_df = cwm.classify_wallet_cohort(sample_profits_df, sample_config)
+    cohort_wallets_df = cwm.classify_wallet_cohort(sample_profits_df, sample_config, 'test_cohort')
 
     # Test: Wallet with inflows exceeding the maximum threshold should be excluded
     excluded_wallets = cohort_wallets_df[cohort_wallets_df['usd_inflows'] > sample_config['wallet_maximum_inflows']]['wallet_address'].unique()
@@ -168,7 +168,7 @@ def mock_profits_df():
             '2024-01-01', '2024-01-02',  # wallet4 coin1 (outside cohort)
             '2024-01-01', '2024-01-02', '2024-01-03'  # wallet5 transactions
         ],
-        'balance': [
+        'usd_balance': [
             100, 130, 230, 230, 220,  # wallet1 (coin1)
             200, 180, 230, 190, 190,  # wallet2 (coin2)
             50, 60, 40, 60, 60,  # wallet3 (coin3)
@@ -176,7 +176,7 @@ def mock_profits_df():
             600, 620,  # wallet4 coin1 (outside cohort)
             100, 200, 200  # wallet5 coin1 and coin2 purchases
         ],
-        'net_transfers': [
+        'usd_net_transfers': [
             100, +30, +100, 0, -10,  # wallet1 (coin1)
             200, -20, +50, -40, 0,  # wallet2 (coin2)
             50, +10, -20, +20, 0,  # wallet3 (coin3)
@@ -223,17 +223,17 @@ def test_unit_generate_buysell_metrics_df(mock_profits_df):
     cohort_profits_df = mock_profits_df[mock_profits_df['wallet_address'].isin(cohort_wallets)]
 
     # total_bought should match the sum of positive net_transfers in cohort_profits_df
-    total_bought_mock = cohort_profits_df[cohort_profits_df['net_transfers'] > 0]['net_transfers'].sum()
+    total_bought_mock = cohort_profits_df[cohort_profits_df['usd_net_transfers'] > 0]['usd_net_transfers'].sum()
     total_bought_result = result_df['total_bought'].sum()
     assert total_bought_mock == total_bought_result, f"Total bought does not match: {total_bought_mock} != {total_bought_result}"
 
     # total_sold should match the sum of absolute values of negative net_transfers in cohort_profits_df
-    total_sold_mock = abs(cohort_profits_df[cohort_profits_df['net_transfers'] < 0]['net_transfers'].sum())
+    total_sold_mock = abs(cohort_profits_df[cohort_profits_df['usd_net_transfers'] < 0]['usd_net_transfers'].sum())
     total_sold_result = result_df['total_sold'].sum()
     assert total_sold_mock == total_sold_result, f"Total sold does not match: {total_sold_mock} != {total_sold_result}"
 
     # Assertions for total_balance of coin2 on all 5 days
-    coin2_balances = mock_profits_df[mock_profits_df['coin_id'] == 'coin2'].groupby('date')['balance'].sum()
+    coin2_balances = mock_profits_df[mock_profits_df['coin_id'] == 'coin2'].groupby('date')['usd_balance'].sum()
     for date, expected_balance in coin2_balances.items():
         result_balance = result_df[(result_df['coin_id'] == 'coin2') & (result_df['date'] == date)]['total_balance'].iloc[0]
         assert expected_balance == result_balance, f"Balance mismatch for coin2 on {date}: {expected_balance} != {result_balance}"
@@ -600,7 +600,11 @@ def wallet_cohort_df(cleaned_profits_df, config):
     """
     profits_df = cleaned_profits_df
     first_cohort = next(iter(config['datasets']['wallet_cohorts']))
-    wallet_cohort_df = cwm.classify_wallet_cohort(profits_df, config['datasets']['wallet_cohorts'][first_cohort])
+    wallet_cohort_df = cwm.classify_wallet_cohort(
+        profits_df,
+        config['datasets']['wallet_cohorts'][first_cohort],
+        first_cohort)
+
     return wallet_cohort_df
 
 # Save cohort_summary_df.csv in fixtures/
@@ -693,17 +697,17 @@ def test_integration_buysell_metrics_df(buysell_metrics_df, cleaned_profits_df, 
     ]
 
     # Check that total_bought matches the sum of positive net_transfers in cohort_profits_df
-    total_bought_mock = cohort_profits_df[cohort_profits_df['net_transfers'] > 0]['net_transfers'].sum()
+    total_bought_mock = cohort_profits_df[cohort_profits_df['usd_net_transfers'] > 0]['usd_net_transfers'].sum()
     total_bought_result = buysell_metrics_df['total_bought'].sum()
     assert total_bought_mock == pytest.approx(total_bought_result, rel=1e-9), f"Total bought mismatch: {total_bought_mock} != {total_bought_result}"
 
     # Check that total_sold matches the sum of negative net_transfers in cohort_profits_df
-    total_sold_mock = abs(cohort_profits_df[cohort_profits_df['net_transfers'] < 0]['net_transfers'].sum())
+    total_sold_mock = abs(cohort_profits_df[cohort_profits_df['usd_net_transfers'] < 0]['usd_net_transfers'].sum())
     total_sold_result = buysell_metrics_df['total_sold'].sum()
     assert total_sold_mock == pytest.approx(total_sold_result, rel=1e-9), f"Total sold mismatch: {total_sold_mock} != {total_sold_result}"
 
     # Check that total_net_transfers matches the net of all net_transfers in cohort_profits_df
-    total_net_transfers_mock = cohort_profits_df['net_transfers'].sum()
+    total_net_transfers_mock = cohort_profits_df['usd_net_transfers'].sum()
     total_net_transfers_result = buysell_metrics_df['total_net_transfers'].sum()
     assert total_net_transfers_mock == pytest.approx(total_net_transfers_result, rel=1e-9), f"Total net transfers mismatch: {total_net_transfers_mock} != {total_net_transfers_result}"
 

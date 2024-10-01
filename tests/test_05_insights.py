@@ -281,31 +281,33 @@ logger = dc.setup_logger()
 #         i.prepare_configs(str(config_folder), override_params)
 
 
-
+# pytest: disable=C0116  # no docstrings in fixtures
 # ---------------------------------------------- #
 # rebuild_profits_df_if_necessary() unit tests
 # ---------------------------------------------- #
 # Mock DataFrame to simulate profits_df
 @pytest.fixture
-def mock_profits_df():  # pylint: disable=C0116 # docstring
+def mock_profits_df():
     return pd.DataFrame({
+        'coin_id': ['coin1', 'coin2'],
         'wallet_address': ['wallet1', 'wallet2'],
         'profitability': [1000, 2000]
     })
 
 # Mock DataFrame to simulate prices_df
 @pytest.fixture
-def mock_prices_df():  # pylint: disable=C0116 # docstring
+def mock_prices_df():
     return pd.DataFrame({
         'prices': [100, 200, 300]
     })
 
 # Mock Configuration
 @pytest.fixture
-def mock_config():  # pylint: disable=C0116 # docstring
+def mock_config():
     return {
         'training_data': {
             'training_period_start': '2023-01-01',
+            'training_period_end': '2023-01-31',
             'modeling_period_start': '2023-02-01',
             'modeling_period_end': '2023-03-01'
         },
@@ -314,41 +316,55 @@ def mock_config():  # pylint: disable=C0116 # docstring
         }
     }
 
-@mock.patch('insights.td.retrieve_transfers_data')
-@mock.patch('insights.td.prepare_profits_data')
-@mock.patch('insights.td.calculate_wallet_profitability')
+@mock.patch('insights.td.retrieve_profits_data')
+@mock.patch('insights.cwm.split_dataframe_by_coverage')
 @mock.patch('insights.td.clean_profits_df')
-
-# Correctly patch functions from the module where they are called
+@mock.patch('insights.td.impute_profits_for_multiple_dates')
 @pytest.mark.unit
 def test_rebuild_profits_df_if_necessary(
-    mock_clean_profits_df, mock_calculate_wallet_profitability,
-    mock_prepare_profits_data, mock_retrieve_transfers_data,
-    mock_config, mock_profits_df, mock_prices_df, tmpdir):
+    mock_impute_profits, mock_clean_profits_df, mock_split_dataframe,
+    mock_retrieve_profits_data, mock_config, mock_profits_df, mock_prices_df, tmpdir):
     """
     Test the case where the config changes and profits_df is rebuilt by calling
     the production functions (mocked to avoid time-consuming operations).
     """
 
     # Set up the mock return values
-    mock_retrieve_transfers_data.return_value = pd.DataFrame({'transfers': [1, 2, 3]})
-    mock_prepare_profits_data.return_value = pd.DataFrame({'profits': [1000, 2000]})
-    mock_calculate_wallet_profitability.return_value = mock_profits_df
+    mock_retrieve_profits_data.return_value = mock_profits_df
+    mock_split_dataframe.return_value = (mock_profits_df, None)
     mock_clean_profits_df.return_value = (mock_profits_df, None)
+    mock_impute_profits.return_value = mock_profits_df
 
     # Create a temporary folder for hash checking
     temp_dir = tmpdir.mkdir("modeling")
     temp_folder = os.path.join(temp_dir, "outputs/temp")
     os.makedirs(temp_folder)
 
-    # Call the function to trigger the rebuild with prices_df passed as an argument
+    # Call the function to trigger the rebuild
     new_profits_df = i.rebuild_profits_df_if_necessary(mock_config, str(temp_dir), mock_prices_df, profits_df=None)
 
     # Assertions
-    mock_retrieve_transfers_data.assert_called_once()
-    mock_prepare_profits_data.assert_called_once_with(mock_retrieve_transfers_data.return_value, mock_prices_df)
-    mock_calculate_wallet_profitability.assert_called_once()
-    mock_clean_profits_df.assert_called_once()
+    mock_retrieve_profits_data.assert_called_once_with(
+        mock_config['training_data']['training_period_start'],
+        mock_config['training_data']['modeling_period_end']
+    )
+    mock_split_dataframe.assert_called_once_with(
+        mock_profits_df,
+        mock_config['training_data']['training_period_start'],
+        mock_config['training_data']['modeling_period_end'],
+        id_column='coin_id'
+    )
+    mock_clean_profits_df.assert_called_once_with(mock_profits_df, mock_config['data_cleaning'])
+    mock_impute_profits.assert_called_once_with(
+        mock_profits_df,
+        mock_prices_df,
+        [
+            mock_config['training_data']['training_period_end'],
+            mock_config['training_data']['modeling_period_start'],
+            mock_config['training_data']['modeling_period_end']
+        ],
+        n_threads=24
+    )
 
     assert new_profits_df.equals(mock_profits_df)
 
@@ -367,21 +383,19 @@ def test_return_cached_profits_df(mock_config, mock_profits_df, mock_prices_df, 
     os.makedirs(temp_folder)
 
     # Generate the correct hash for the mock_config using i.generate_config_hash
-    correct_hash = i.generate_config_hash({**mock_config['training_data'], **mock_config['data_cleaning']})
+    relevant_config = {**mock_config['training_data'], **mock_config['data_cleaning']}
+    correct_hash = i.generate_config_hash(relevant_config)
 
     # Create a hash file that matches the mock_config
     with open(os.path.join(temp_folder, 'config_hash.txt'), 'w', encoding='utf-8') as f:
         f.write(correct_hash)
 
-    # pylint: disable=W0718
     # Call the function and verify the profits_df is returned from memory without rebuilding
     try:
-        # Now passing mock_prices_df as an argument
         returned_profits_df = i.rebuild_profits_df_if_necessary(mock_config, str(temp_dir), mock_prices_df, profits_df=mock_profits_df)
         assert returned_profits_df.equals(mock_profits_df)
-    except Exception as e:
+    except Exception as e:  # pylint: disable = W0718
         pytest.fail(f"Test failed due to timeout: {str(e)}")
-
 
 # ======================================================== #
 #                                                          #

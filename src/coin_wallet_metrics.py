@@ -14,7 +14,7 @@ logger = dc.setup_logger()
 
 
 
-def classify_wallet_cohort(profits_df, wallet_cohort_config):
+def classify_wallet_cohort(profits_df, wallet_cohort_config, cohort_name):
     """
     Classifies wallets into a cohort based on their activity across multiple coins.
     The function directly applies the inflows, profitability, and return thresholds at the wallet level.
@@ -28,12 +28,13 @@ def classify_wallet_cohort(profits_df, wallet_cohort_config):
             - 'coin_profits_win_threshold': Minimum total profits for a coin to be considered a "win".
             - 'coin_return_win_threshold': Minimum total return for a coin to be considered a "win".
             - 'wallet_min_coin_wins': Minimum number of coins that meet the "win" threshold for a wallet to join the cohort.
+        cohort_name (string): The name of the cohort which is used for logging purposes
 
     Returns:
         wallet_cohort_df (DataFrame): A DataFrame containing wallets and summary metrics, including:
             - total inflows, total coins, total wins, win rate, and whether the wallet is in the cohort.
     """
-    logger.debug("Classifying wallet cohort '%s' based on coin-level thresholds...", wallet_cohort_config['description'])
+    logger.debug("Classifying wallet cohort '%s' based on coin-level thresholds...", cohort_name)
     start_time = time.time()
 
     # Step 1: Aggregate wallet-level inflows and filter eligible wallets
@@ -116,7 +117,7 @@ def classify_wallet_cohort(profits_df, wallet_cohort_config):
 
     # Log the count of wallets added to the cohort using % syntax
     logger.info("Wallet cohort '%s' classification complete after %.2f seconds.",
-        wallet_cohort_config['description'],
+        cohort_name,
         time.time() - start_time
     )
     logger.info("Out of %s total wallets, %s met inflows requirements and %s met win rate conditions.",

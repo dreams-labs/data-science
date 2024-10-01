@@ -122,7 +122,7 @@ def generate_wallet_cohort_features(
         dataset_config = config['datasets']['wallet_cohorts'][cohort_name]
 
         # identify wallets in the cohort
-        cohort_summary_df = cwm.classify_wallet_cohort(profits_df, dataset_config)
+        cohort_summary_df = cwm.classify_wallet_cohort(profits_df, dataset_config, cohort_name)
         cohort_wallets = cohort_summary_df[cohort_summary_df['in_cohort']]['wallet_address']
 
         # If no cohort members were identified, continue
