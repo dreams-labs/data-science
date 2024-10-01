@@ -129,6 +129,7 @@ def classify_wallet_cohort(profits_df, wallet_cohort_config):
     return wallet_cohort_df
 
 
+
 def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets):
     """
     Generates buysell metrics for all cohort coins by looping through each coin_id and applying
@@ -158,7 +159,8 @@ def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets):
     # during the training period
     profits_df = profits_df[profits_df['date']<=training_period_end]
     cohort_profits_df = profits_df[profits_df['wallet_address'].isin(cohort_wallets)]
-    cohort_profits_df = cohort_profits_df[['coin_id','wallet_address','date','balance','net_transfers']]
+
+    cohort_profits_df = cohort_profits_df[['coin_id','wallet_address','date','usd_balance','usd_net_transfers']]
 
     # Raise an error if the filtered df is empty
     if cohort_profits_df.empty:
@@ -168,15 +170,15 @@ def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets):
     # Step 2: Add buy_sequence and sell_sequence columns
     # --------------------------------------------------
     # Initialize the buy and sell sequence columns
-    cohort_profits_df['buy_sequence'] = np.where(cohort_profits_df['net_transfers'] > 0, 1, np.nan)
-    cohort_profits_df['sell_sequence'] = np.where(cohort_profits_df['net_transfers'] < 0, 1, np.nan)
+    cohort_profits_df['buy_sequence'] = np.where(cohort_profits_df['usd_net_transfers'] > 0, 1, np.nan)
+    cohort_profits_df['sell_sequence'] = np.where(cohort_profits_df['usd_net_transfers'] < 0, 1, np.nan)
 
-    # Calculate cumulative sum to simulate transfer sequence, skipping rows where net_transfers == 0
+    # Calculate cumulative sum to simulate transfer sequence, skipping rows where usd_net_transfers == 0
     cohort_profits_df['buy_sequence'] = cohort_profits_df.groupby(['coin_id', 'wallet_address'], observed=True)['buy_sequence'].cumsum()
     cohort_profits_df['sell_sequence'] = cohort_profits_df.groupby(['coin_id', 'wallet_address'], observed=True)['sell_sequence'].cumsum()
 
-    # Set buy_sequence and sell_sequence to null where net_transfers == 0
-    cohort_profits_df.loc[cohort_profits_df['net_transfers'] == 0, ['buy_sequence', 'sell_sequence']] = np.nan
+    # Set buy_sequence and sell_sequence to null where usd_net_transfers == 0
+    cohort_profits_df.loc[cohort_profits_df['usd_net_transfers'] == 0, ['buy_sequence', 'sell_sequence']] = np.nan
 
 
     # Step 3: Calculate coin metrics
@@ -252,16 +254,16 @@ def generate_coin_buysell_metrics_df(coin_cohort_profits_df):
 
     # Calculate total bought, total sold, total net transfers, and total volume
     transactions_df = coin_cohort_profits_df.groupby('date').agg(
-        total_bought=('net_transfers', lambda x: x[x > 0].sum()),  # Sum of positive net transfers (buys)
-        total_sold=('net_transfers', lambda x: abs(x[x < 0].sum())),  # Sum of negative net transfers (sells as positive)
-        total_net_transfers=('net_transfers', 'sum'),  # Net of all transfers
-        total_volume=('net_transfers', lambda x: x[x > 0].sum() + abs(x[x < 0].sum()))  # Total volume: buys + sells
+        total_bought=('usd_net_transfers', lambda x: x[x > 0].sum()),  # Sum of positive net transfers (buys)
+        total_sold=('usd_net_transfers', lambda x: abs(x[x < 0].sum())),  # Sum of negative net transfers (sells as positive)
+        total_net_transfers=('usd_net_transfers', 'sum'),  # Net of all transfers
+        total_volume=('usd_net_transfers', lambda x: x[x > 0].sum() + abs(x[x < 0].sum()))  # Total volume: buys + sells
     ).reset_index()
 
     # Calculate total holders and total balance
     holders_df = coin_cohort_profits_df.groupby('date').agg(
         total_holders=('wallet_address', 'nunique'),  # Number of unique holders
-        total_balance=('balance', 'sum')  # Sum of balances for all wallets
+        total_balance=('usd_balance', 'sum')  # Sum of balances for all wallets
     ).reset_index()
 
     # Merge buyers, sellers, transactions, and holders dataframes

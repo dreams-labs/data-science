@@ -291,9 +291,9 @@ def clean_profits_df(profits_df, data_cleaning_config):
     logger.debug("Identified %s coin-wallet pairs beyond profit threshold of $%s and %s pairs"
                  "beyond inflows filter of %s.",
                  exclusions_profits_df.shape[0],
-                 dc.human_format(data_cleaning_config['profitability_filter']),
+                 data_cleaning_config['profitability_filter'],
                  exclusions_inflows_df.shape[0],
-                 dc.human_format(data_cleaning_config['inflows_filter']))
+                 data_cleaning_config['inflows_filter'])
 
     return profits_cleaned_df,exclusions_logs_df
 
@@ -421,7 +421,10 @@ def retrieve_google_trends_data():
 # ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
 # All functions below this point relate to multi-threaded imputation of new rows
 # for profits_df, which are needed to ensure we have complete data at the start
-# and end of the training and test periods.
+# and end of the training and test periods. As this is dealing with >10^8 rows,
+# it is computationally expensive and is greatly sped up by using multithreading
+# to split the calculations between cores and by using only vectorized operations
+# to manipulate dfs.
 
 def impute_profits_df_rows(profits_df, prices_df, target_date):
     """

@@ -255,7 +255,7 @@ def df_mem(df):
     print(f'Total memory usage: {total_memory / 1024 ** 2:.2f} MB')
 
 
-def memory_usage():
+def obj_mem():
     """
     Checks how much memory all objects are using
 

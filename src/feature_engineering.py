@@ -13,6 +13,7 @@ import numpy as np
 import dreams_core.core as dc
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
+# pylint: disable=E0401
 # project module imports
 import coin_wallet_metrics as cwm
 
@@ -51,6 +52,7 @@ def generate_time_series_features(
     """
     training_data_tuples = []
     training_data_dfs = []
+
     dataset_metrics_config = metrics_config['time_series'][dataset_name]
 
     # calculate metrics for each value column

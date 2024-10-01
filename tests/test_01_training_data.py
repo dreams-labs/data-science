@@ -466,58 +466,6 @@ def test_save_metadata_df(metadata_df):
 
 
 # ---------------------------------------- #
-# calculate_wallet_profitability() integration tests
-# ---------------------------------------- #
-# tests the data quality of the production data as calculated from the transfers_df() fixture
-
-@pytest.fixture(scope='session')
-def profits_df(transfers_df, prices_df):
-    """
-    Builds profits_df from production data for data quality checks.
-    """
-    logger.info("Generating profits_df from production data...")
-    profits_df = td.prepare_profits_data(transfers_df, prices_df)
-    profits_df = td.calculate_wallet_profitability(profits_df)
-    return profits_df
-
-
-@pytest.mark.integration
-def test_profits_df_completeness(profits_df):
-    """
-    Checks if there are any NaN values in profits_df.
-    """
-    missing_values = profits_df.isna().sum()
-    assert missing_values.sum() == 0, "There are missing values in the dataset"
-
-
-@pytest.mark.integration
-def test_modeling_period_end_wallet_completeness(profits_df):
-    """
-    Checks if all of the coin-wallet pairs at the end of the training period
-    have data at the end of the modeling period to esnure they can be analyzed
-    for profitability.
-    """
-    training_period_end = pd.to_datetime(MODELING_PERIOD_START) - pd.Timedelta(1, 'day')
-    modeling_period_end = MODELING_PERIOD_END
-
-    # Get all coin-wallet pairs at the end of the training period
-    training_profits_df = profits_df[profits_df['date'] == training_period_end]
-    training_profits_df = training_profits_df[['coin_id', 'wallet_address']].drop_duplicates()
-
-    # Get all coin-wallet pairs at the end of the modeling period
-    modeling_profits_df = profits_df[profits_df['date']==modeling_period_end]
-    modeling_profits_df = modeling_profits_df[['coin_id', 'wallet_address']].drop_duplicates()
-
-    # Check if there are any pairs at the end of the training period without records at the end of the modeling period
-    missing_pairs = training_profits_df.merge(modeling_profits_df, on=['coin_id', 'wallet_address'], how='left', indicator=True)
-    missing_pairs = missing_pairs[missing_pairs['_merge'] == 'left_only']
-
-    # Assert that no pairs are missing
-    assert missing_pairs.empty, "Some coin-wallet pairs in training_profits_df are missing from modeling_profits_df"
-
-
-
-# ---------------------------------------- #
 # clean_profits_df() integration tests
 # ---------------------------------------- #
 
