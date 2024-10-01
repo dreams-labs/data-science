@@ -385,7 +385,7 @@ def test_transfers_data_quality(transfers_df):
 
 
 # ---------------------------------------- #
-# retreive_market_data() integration tests
+# retrieve_market_data() integration tests
 # ---------------------------------------- #
 
 @pytest.fixture(scope='session')

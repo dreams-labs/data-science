@@ -5,7 +5,6 @@ functions used in generating training data for the models
 # pylint: disable=C0301 # line over 100 chars
 import time
 import pandas as pd
-import numpy as np
 from dreams_core.googlecloud import GoogleCloud as dgc
 from dreams_core import core as dc
 
@@ -480,7 +479,6 @@ def clean_profits_df(profits_df, data_cleaning_config):
 
     # Convert coin_id to categorical
     profits_df['coin_id'] = profits_df['coin_id'].astype('category')
-    profits_df['wallet_address'] = profits_df['wallet_address'].astype('category')
 
     # 3. Prepare exclusions_df and output logs
     # ----------------------------------------
