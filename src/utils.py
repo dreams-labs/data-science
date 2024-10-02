@@ -16,6 +16,9 @@ import pandas as pd
 from pydantic import ValidationError
 import dreams_core.core as dc
 
+
+# pylint: disable=E0401
+# pylint: disable=E0611
 # pydantic config files
 import config_models.config as py_c
 import config_models.metrics_config as py_mc
@@ -239,20 +242,20 @@ def cw_filter_df(df, coin_id, wallet_address):
 
 
 
-def df_memory_usage(df):
+def df_mem(df):
     """
     Checks how much memory a dataframe is using
     """
-
     # Memory usage of each column
-    print(df.memory_usage(deep=True))
+    memory_usage = df.memory_usage(deep=True) / (1024 ** 2)
+    print(memory_usage.round(2))
 
     # Total memory usage in bytes
     total_memory = df.memory_usage(deep=True).sum()
     print(f'Total memory usage: {total_memory / 1024 ** 2:.2f} MB')
 
 
-def memory_usage():
+def obj_mem():
     """
     Checks how much memory all objects are using
 
@@ -271,3 +274,20 @@ def memory_usage():
     mem_df = pd.DataFrame(objects, columns=['Name', 'Type', 'Size (MB)'])
     mem_df = mem_df.sort_values(by='Size (MB)', ascending=False).reset_index(drop=True)
     return mem_df
+
+
+
+def log_nan_counts(df):
+    """
+    utility function for testing
+    """
+    nan_counts = df.isna().sum()
+    non_zero_nans = nan_counts[nan_counts > 0]
+
+    if len(non_zero_nans) > 0:
+        log_message = "NaN counts in columns:\n" + "\n".join(f"{col}: {count}" for col, count in non_zero_nans.items())
+    else:
+        log_message = "No NaN values found in any column."
+
+    logger.critical(log_message)
+

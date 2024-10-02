@@ -14,7 +14,7 @@ logger = dc.setup_logger()
 
 
 
-def classify_wallet_cohort(profits_df, wallet_cohort_config):
+def classify_wallet_cohort(profits_df, wallet_cohort_config, cohort_name):
     """
     Classifies wallets into a cohort based on their activity across multiple coins.
     The function directly applies the inflows, profitability, and return thresholds at the wallet level.
@@ -28,12 +28,13 @@ def classify_wallet_cohort(profits_df, wallet_cohort_config):
             - 'coin_profits_win_threshold': Minimum total profits for a coin to be considered a "win".
             - 'coin_return_win_threshold': Minimum total return for a coin to be considered a "win".
             - 'wallet_min_coin_wins': Minimum number of coins that meet the "win" threshold for a wallet to join the cohort.
+        cohort_name (string): The name of the cohort which is used for logging purposes
 
     Returns:
         wallet_cohort_df (DataFrame): A DataFrame containing wallets and summary metrics, including:
             - total inflows, total coins, total wins, win rate, and whether the wallet is in the cohort.
     """
-    logger.debug("Classifying wallet cohort '%s' based on coin-level thresholds...", wallet_cohort_config['description'])
+    logger.debug("Classifying wallet cohort '%s' based on coin-level thresholds...", cohort_name)
     start_time = time.time()
 
     # Step 1: Aggregate wallet-level inflows and filter eligible wallets
@@ -116,7 +117,7 @@ def classify_wallet_cohort(profits_df, wallet_cohort_config):
 
     # Log the count of wallets added to the cohort using % syntax
     logger.info("Wallet cohort '%s' classification complete after %.2f seconds.",
-        wallet_cohort_config['description'],
+        cohort_name,
         time.time() - start_time
     )
     logger.info("Out of %s total wallets, %s met inflows requirements and %s met win rate conditions.",
@@ -127,6 +128,7 @@ def classify_wallet_cohort(profits_df, wallet_cohort_config):
 
 
     return wallet_cohort_df
+
 
 
 def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets):
@@ -158,7 +160,8 @@ def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets):
     # during the training period
     profits_df = profits_df[profits_df['date']<=training_period_end]
     cohort_profits_df = profits_df[profits_df['wallet_address'].isin(cohort_wallets)]
-    cohort_profits_df = cohort_profits_df[['coin_id','wallet_address','date','balance','net_transfers']]
+
+    cohort_profits_df = cohort_profits_df[['coin_id','wallet_address','date','usd_balance','usd_net_transfers']]
 
     # Raise an error if the filtered df is empty
     if cohort_profits_df.empty:
@@ -168,15 +171,15 @@ def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets):
     # Step 2: Add buy_sequence and sell_sequence columns
     # --------------------------------------------------
     # Initialize the buy and sell sequence columns
-    cohort_profits_df['buy_sequence'] = np.where(cohort_profits_df['net_transfers'] > 0, 1, np.nan)
-    cohort_profits_df['sell_sequence'] = np.where(cohort_profits_df['net_transfers'] < 0, 1, np.nan)
+    cohort_profits_df['buy_sequence'] = np.where(cohort_profits_df['usd_net_transfers'] > 0, 1, np.nan)
+    cohort_profits_df['sell_sequence'] = np.where(cohort_profits_df['usd_net_transfers'] < 0, 1, np.nan)
 
-    # Calculate cumulative sum to simulate transfer sequence, skipping rows where net_transfers == 0
+    # Calculate cumulative sum to simulate transfer sequence, skipping rows where usd_net_transfers == 0
     cohort_profits_df['buy_sequence'] = cohort_profits_df.groupby(['coin_id', 'wallet_address'], observed=True)['buy_sequence'].cumsum()
     cohort_profits_df['sell_sequence'] = cohort_profits_df.groupby(['coin_id', 'wallet_address'], observed=True)['sell_sequence'].cumsum()
 
-    # Set buy_sequence and sell_sequence to null where net_transfers == 0
-    cohort_profits_df.loc[cohort_profits_df['net_transfers'] == 0, ['buy_sequence', 'sell_sequence']] = np.nan
+    # Set buy_sequence and sell_sequence to null where usd_net_transfers == 0
+    cohort_profits_df.loc[cohort_profits_df['usd_net_transfers'] == 0, ['buy_sequence', 'sell_sequence']] = np.nan
 
 
     # Step 3: Calculate coin metrics
@@ -252,16 +255,16 @@ def generate_coin_buysell_metrics_df(coin_cohort_profits_df):
 
     # Calculate total bought, total sold, total net transfers, and total volume
     transactions_df = coin_cohort_profits_df.groupby('date').agg(
-        total_bought=('net_transfers', lambda x: x[x > 0].sum()),  # Sum of positive net transfers (buys)
-        total_sold=('net_transfers', lambda x: abs(x[x < 0].sum())),  # Sum of negative net transfers (sells as positive)
-        total_net_transfers=('net_transfers', 'sum'),  # Net of all transfers
-        total_volume=('net_transfers', lambda x: x[x > 0].sum() + abs(x[x < 0].sum()))  # Total volume: buys + sells
+        total_bought=('usd_net_transfers', lambda x: x[x > 0].sum()),  # Sum of positive net transfers (buys)
+        total_sold=('usd_net_transfers', lambda x: abs(x[x < 0].sum())),  # Sum of negative net transfers (sells as positive)
+        total_net_transfers=('usd_net_transfers', 'sum'),  # Net of all transfers
+        total_volume=('usd_net_transfers', lambda x: x[x > 0].sum() + abs(x[x < 0].sum()))  # Total volume: buys + sells
     ).reset_index()
 
     # Calculate total holders and total balance
     holders_df = coin_cohort_profits_df.groupby('date').agg(
         total_holders=('wallet_address', 'nunique'),  # Number of unique holders
-        total_balance=('balance', 'sum')  # Sum of balances for all wallets
+        total_balance=('usd_balance', 'sum')  # Sum of balances for all wallets
     ).reset_index()
 
     # Merge buyers, sellers, transactions, and holders dataframes
@@ -415,17 +418,12 @@ def generate_time_series_indicators(
 
     # 3. Split records by complete vs partial time series coverage
     # ------------------------------------------------------------
-    full_indicators_df, partial_time_series_indicators_df, coverage_stats = split_dataframe_by_coverage(
+    full_indicators_df, partial_time_series_indicators_df = split_dataframe_by_coverage(
         time_series_df, training_period_start, training_period_end, id_column
     )
 
     # Logging
-    logger.debug("Generated time series indicators data. Out of %s total series, %s had complete period "
-                 "coverage, %s had partial coverage",
-                 coverage_stats['total_series'],
-                 coverage_stats['full_coverage'],
-                 coverage_stats['partial_coverage']
-    )
+    logger.debug("Generated time series indicators data.")
 
     return full_indicators_df, partial_time_series_indicators_df
 
@@ -435,7 +433,7 @@ def split_dataframe_by_coverage(
         start_date: pd.Timestamp,
         end_date: pd.Timestamp,
         id_column: Optional[str] = 'coin_id'
-    ) -> Tuple[pd.DataFrame, pd.DataFrame, dict]:
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Splits the input DataFrame into full coverage and partial coverage based on date range.
     Works for both multi-series and single-series datasets.
@@ -449,7 +447,6 @@ def split_dataframe_by_coverage(
     Returns:
     - full_coverage_df (pd.DataFrame): DataFrame with series having complete data for the period.
     - partial_coverage_df (pd.DataFrame): DataFrame with series having partial data for the period.
-    - coverage_stats (dict): Dictionary containing coverage statistics.
     """
     # Convert params to datetime
     start_date = pd.to_datetime(start_date)
@@ -469,9 +466,7 @@ def split_dataframe_by_coverage(
         full_duration_series = [0] if has_full_coverage(series_data_range['min'], series_data_range['max']) else []
 
     # Calculate coverage statistics
-    total_series = len(series_data_range)
     full_coverage_count = len(full_duration_series)
-    partial_coverage_count = total_series - full_coverage_count
 
     # Convert id column to categorical to reduce memory usage
     time_series_df[id_column] = time_series_df[id_column].astype('category')
@@ -484,13 +479,15 @@ def split_dataframe_by_coverage(
         full_coverage_df = time_series_df if full_coverage_count else pd.DataFrame(columns=time_series_df.columns)
         partial_coverage_df = time_series_df if not full_coverage_count else pd.DataFrame(columns=time_series_df.columns)
 
-    coverage_stats = {
-        'total_series': total_series,
-        'full_coverage': full_coverage_count,
-        'partial_coverage': partial_coverage_count,
-    }
+    logger.info("Split df with dimensions %s into %s full coverage records and %s partial coverage records.",
+                time_series_df.shape,
+                dc.human_format(len(full_coverage_df)),
+                dc.human_format(len(partial_coverage_df))
+    )
 
-    return full_coverage_df, partial_coverage_df, coverage_stats
+    return full_coverage_df, partial_coverage_df
+
+
 
 def calculate_sma(timeseries: pd.Series, period: int) -> pd.Series:
     """

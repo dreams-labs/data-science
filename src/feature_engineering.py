@@ -13,6 +13,7 @@ import numpy as np
 import dreams_core.core as dc
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
+# pylint: disable=E0401
 # project module imports
 import coin_wallet_metrics as cwm
 
@@ -51,6 +52,7 @@ def generate_time_series_features(
     """
     training_data_tuples = []
     training_data_dfs = []
+
     dataset_metrics_config = metrics_config['time_series'][dataset_name]
 
     # calculate metrics for each value column
@@ -73,7 +75,7 @@ def generate_time_series_features(
 
         else:
             # if no indicators are needed, pass through coins with complete date coverage
-            value_column_metrics_df, _, _ = cwm.split_dataframe_by_coverage(
+            value_column_metrics_df, _ = cwm.split_dataframe_by_coverage(
                 value_column_df,
                 config['training_data']['training_period_start'],
                 config['training_data']['training_period_end'],
@@ -120,7 +122,7 @@ def generate_wallet_cohort_features(
         dataset_config = config['datasets']['wallet_cohorts'][cohort_name]
 
         # identify wallets in the cohort
-        cohort_summary_df = cwm.classify_wallet_cohort(profits_df, dataset_config)
+        cohort_summary_df = cwm.classify_wallet_cohort(profits_df, dataset_config, cohort_name)
         cohort_wallets = cohort_summary_df[cohort_summary_df['in_cohort']]['wallet_address']
 
         # If no cohort members were identified, continue

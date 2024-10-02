@@ -22,6 +22,7 @@ import dreams_core.core as dc
 # project files
 import utils as u
 import training_data as td
+import coin_wallet_metrics as cwm
 import feature_engineering as fe
 import modeling as m
 
@@ -87,7 +88,6 @@ def run_experiment(modeling_config):
     # Retrieve all base datasets
     config = u.load_config(os.path.join(config_folder, 'config.yaml'))
     market_data_df = td.retrieve_market_data()
-    market_data_df, _ = td.fill_market_data_gaps(market_data_df, config['data_cleaning']['max_gap_days'])
     prices_df = market_data_df[['coin_id','date','price']].copy()
     profits_df = rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_df=None)
 
@@ -400,16 +400,22 @@ def rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_
     # Otherwise, rerun time-intensive steps
     logger.debug("Config changes detected or missing profits_df, rerunning time-intensive steps...")
 
-    # Example time-intensive logic to regenerate profits_df
-    transfers_df = td.retrieve_transfers_data(
+    # retrieve profits data
+    profits_df = td.retrieve_profits_data(
         config['training_data']['training_period_start'],
-        config['training_data']['modeling_period_start'],
-        config['training_data']['modeling_period_end']
-    )
-
-    profits_df = td.prepare_profits_data(transfers_df, prices_df)
-    profits_df = td.calculate_wallet_profitability(profits_df)
+        config['training_data']['modeling_period_end'])
+    profits_df, _ = cwm.split_dataframe_by_coverage(
+        profits_df,
+        config['training_data']['training_period_start'],
+        config['training_data']['modeling_period_end'],
+        id_column='coin_id')
     profits_df, _ = td.clean_profits_df(profits_df, config['data_cleaning'])
+    dates_to_impute = [
+        config['training_data']['training_period_end'],
+        config['training_data']['modeling_period_start'],
+        config['training_data']['modeling_period_end'],
+    ]
+    profits_df = td.impute_profits_for_multiple_dates(profits_df, prices_df, dates_to_impute, n_threads=24)
 
     # Save the new hash for future runs
     handle_hash(config_hash, temp_folder, 'save')
@@ -474,8 +480,9 @@ def build_configured_model_input(profits_df, market_data_df, config, metrics_con
     # 1. Generate and merge features for all datasets
     # -------------------------------------
     # Time series features
+    dataset_name = next(iter(metrics_config['time_series'].keys()))
     market_data_tuples, _ = fe.generate_time_series_features(
-            'time_series',
+            dataset_name,
             market_data_df,
             config,
             metrics_config,

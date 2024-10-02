@@ -15,7 +15,6 @@ import logging
 import yaml
 from dotenv import load_dotenv
 import pytest
-from pydantic import ValidationError
 from dreams_core import core as dc
 
 # pyright: reportMissingImports=false
@@ -136,28 +135,24 @@ def temp_config_file_missing_field(tmp_path, config_missing_required_field):
 @pytest.mark.unit
 def test_missing_required_field(temp_config_file_missing_field, caplog):
     """
-    Test that a ValidationError is raised when a required field is missing from the configuration.
+    Test that a ValueError is raised when a required field is missing from the configuration
+    and the error message includes the correct details.
     """
 
     # Suppress error logs during the test by setting the logging level to CRITICAL
     with caplog.at_level(logging.CRITICAL):
         # Attempt to load the configuration using the u.load_config function
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(ValueError) as exc_info:
             u.load_config(file_path=temp_config_file_missing_field)
 
     # Extract the exception information
-    errors = exc_info.value.errors()
+    error_message = str(exc_info.value)
 
-    # Check that the error message indicates 'window_duration' is missing
-    error_found = False
-    for error in errors:
-        if 'window_duration' in error['loc']:
-            error_found = True
-            assert error['type'] == 'missing'
-            assert error['msg'] == 'Field required'
-            break
-
-    assert error_found, "ValidationError for missing 'window_duration' field was not raised as expected"
+    # Check that the error message contains the expected text
+    assert "Validation Error in metrics_config.yaml" in error_message
+    assert "Issue: Field required" in error_message
+    assert "Location: time_series.market_data.price.rolling" in error_message
+    assert "Bad Field: window_duration" in error_message
 
 @pytest.fixture
 def config_invalid_field_type():
@@ -186,28 +181,25 @@ def temp_config_file_invalid_type(tmp_path, config_invalid_field_type):
 @pytest.mark.unit
 def test_invalid_field_type(temp_config_file_invalid_type, caplog):
     """
-    Test that a ValidationError is raised when a field has an invalid data type.
+    Test that a ValueError is raised when a field has an invalid data type
+    and the error message includes the correct details.
     """
 
     # Suppress error logs during the test by setting the logging level to CRITICAL
     with caplog.at_level(logging.CRITICAL):
         # Attempt to load the configuration using the u.load_config function
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(ValueError) as exc_info:
             u.load_config(file_path=temp_config_file_invalid_type)
 
-    # Extract the exception information
-    errors = exc_info.value.errors()
+    # Extract the exception message
+    error_message = str(exc_info.value)
 
-    # Check that the error message indicates 'window_duration' has an invalid type
-    error_found = False
-    for error in errors:
-        if 'window_duration' in error['loc']:
-            error_found = True
-            assert error['type'] == 'int_parsing'
-            assert 'should be a valid integer' in error['msg']
-            break
+    # Check that the error message contains the expected text
+    assert "Validation Error in metrics_config.yaml" in error_message
+    assert "Issue: Input should be a valid integer, unable to parse string as an integer" in error_message
+    assert "Location: time_series.market_data.price.rolling" in error_message
+    assert "Bad Field: window_duration" in error_message
 
-    assert error_found, "ValidationError for invalid 'window_duration' type was not raised as expected"
 
 @pytest.fixture
 def config_unrecognized_top_level_field():
@@ -233,32 +225,26 @@ def temp_config_file_unrecognized_field(tmp_path, config_unrecognized_top_level_
     config_file.write_text(config_unrecognized_top_level_field)
     return str(config_file)
 
-
 @pytest.mark.unit
 def test_unrecognized_top_level_field(temp_config_file_unrecognized_field, caplog):
     """
-    Test that a ValidationError is raised when an unrecognized field is present at the top level of the configuration.
+    Test that a ValueError is raised when an unrecognized field is present at the top level of the configuration.
     """
 
     # Suppress error logs during the test by setting the logging level to CRITICAL
     with caplog.at_level(logging.CRITICAL):
         # Attempt to load the configuration using the u.load_config function
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(ValueError) as exc_info:
             u.load_config(file_path=temp_config_file_unrecognized_field)
 
-    # Extract the exception information
-    errors = exc_info.value.errors()
+    # Extract the exception message
+    error_message = str(exc_info.value)
 
-    # Check that the error message indicates 'unknown_field' is not permitted
-    error_found = False
-    for error in errors:
-        if error['loc'] == ('unknown_field',):
-            error_found = True
-            assert error['type'] == 'extra_forbidden'
-            assert error['msg'] == 'Extra inputs are not permitted'
-            break
+    # Check that the error message contains the expected text
+    assert "Validation Error in metrics_config.yaml" in error_message
+    assert "Issue: Extra inputs are not permitted" in error_message
+    assert "Bad Field: unknown_field" in error_message
 
-    assert error_found, "ValidationError for unrecognized 'unknown_field' at top level was not raised as expected"
 
 @pytest.fixture
 def config_unrecognized_nested_field():
@@ -284,31 +270,26 @@ def temp_config_file_unrecognized_nested_field(tmp_path, config_unrecognized_nes
     config_file.write_text(config_unrecognized_nested_field)
     return str(config_file)
 
-
 @pytest.mark.unit
 def test_unrecognized_nested_field(temp_config_file_unrecognized_nested_field, caplog):
     """
-    Test that a ValidationError is raised when an unrecognized field is present in a nested model.
+    Test that a ValueError is raised when an unrecognized field is present in a nested model.
     """
     # Suppress error logs during the test by setting the logging level to CRITICAL
     with caplog.at_level(logging.CRITICAL):
         # Attempt to load the configuration using the u.load_config function
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(ValueError) as exc_info:
             u.load_config(file_path=temp_config_file_unrecognized_nested_field)
 
-    # Extract the exception information
-    errors = exc_info.value.errors()
+    # Extract the exception message
+    error_message = str(exc_info.value)
 
-    # Check that the error message indicates 'unknown_param' is not permitted under 'max' aggregation
-    error_found = False
-    for error in errors:
-        if 'unknown_param' in error['loc']:
-            error_found = True
-            assert error['type'] == 'extra_forbidden'
-            assert error['msg'] == 'Extra inputs are not permitted'
-            break
+    # Check that the error message contains the expected text
+    assert "Validation Error in metrics_config.yaml" in error_message
+    assert "Issue: Extra inputs are not permitted" in error_message
+    assert "Location: time_series.market_data.price.aggregations.max" in error_message
+    assert "Bad Field: unknown_param" in error_message
 
-    assert error_found, "ValidationError for unrecognized 'unknown_param' in nested model was not raised as expected"
 
 @pytest.fixture
 def config_missing_remainder_bucket():
@@ -353,6 +334,7 @@ def test_missing_remainder_bucket(temp_config_file_missing_remainder, caplog):
     assert "At least one bucket must have the 'remainder' value." in error_message, \
         "ValueError for missing 'remainder' in buckets was not raised as expected"
 
+
 @pytest.fixture
 def config_invalid_scaling_type():
     """
@@ -376,32 +358,26 @@ def temp_config_file_invalid_scaling(tmp_path, config_invalid_scaling_type):
     config_file.write_text(config_invalid_scaling_type)
     return str(config_file)
 
-
 @pytest.mark.unit
 def test_invalid_scaling_type(temp_config_file_invalid_scaling, caplog):
     """
-    Test that a ValidationError is raised when an invalid scaling type is specified.
+    Test that a ValueError is raised when an invalid scaling type is specified.
     """
     # Suppress error logs during the test by setting the logging level to CRITICAL
     with caplog.at_level(logging.CRITICAL):
         # Attempt to load the configuration using the u.load_config function
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(ValueError) as exc_info:
             u.load_config(file_path=temp_config_file_invalid_scaling)
 
-    # Extract the exception information
-    errors = exc_info.value.errors()
+    # Extract the exception message
+    error_message = str(exc_info.value)
 
-    # Check that the error message indicates invalid scaling type
-    error_found = False
-    for error in errors:
-        if 'scaling' in error['loc']:
-            error_found = True
-            assert error['type'] == 'enum'
-            assert "Input should be 'standard'," in error['msg']
-            assert 'invalid_scale' in error['input']
-            break
+    # Check that the error message contains the expected text
+    assert "Validation Error in metrics_config.yaml" in error_message
+    assert "Issue: Input should be 'standard', 'minmax', 'log' or 'none'" in error_message
+    assert "Location: time_series.market_data.price.aggregations.max" in error_message
+    assert "Bad Field: scaling" in error_message
 
-    assert error_found, "ValidationError for invalid 'scaling' type was not raised as expected"
 
 @pytest.fixture
 def config_negative_lookback_periods():
@@ -426,32 +402,26 @@ def temp_config_file_negative_lookback(tmp_path, config_negative_lookback_period
     config_file.write_text(config_negative_lookback_periods)
     return str(config_file)
 
-
 @pytest.mark.unit
 def test_negative_lookback_periods(temp_config_file_negative_lookback, caplog):
     """
-    Test that a ValidationError is raised when 'lookback_periods' is negative.
+    Test that a ValueError is raised when 'lookback_periods' is negative.
     """
     # Suppress error logs during the test by setting the logging level to CRITICAL
     with caplog.at_level(logging.CRITICAL):
         # Attempt to load the configuration using the u.load_config function
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(ValueError) as exc_info:
             u.load_config(file_path=temp_config_file_negative_lookback)
 
-    # Extract the exception information
-    errors = exc_info.value.errors()
+    # Extract the exception message
+    error_message = str(exc_info.value)
 
-    # Check that the error message indicates 'lookback_periods' must be greater than 0
-    error_found = False
-    for error in errors:
-        if 'lookback_periods' in error['loc']:
-            error_found = True
-            # Depending on Pydantic version, adjust the error type and message checks
-            assert error['type'] in ('greater_than', 'value_error.number.not_gt')
-            assert 'greater than 0' in error['msg']
-            break
+    # Check that the error message contains the expected text
+    assert "Validation Error in metrics_config.yaml" in error_message
+    assert "Issue: Input should be greater than 0" in error_message
+    assert "Location: time_series.market_data.price.rolling" in error_message
+    assert "Bad Field: lookback_periods" in error_message
 
-    assert error_found, "ValidationError for negative 'lookback_periods' was not raised as expected"
 
 @pytest.fixture
 def config_missing_scaling_in_comparisons():
@@ -478,19 +448,24 @@ def temp_config_file_missing_scaling(tmp_path, config_missing_scaling_in_compari
     config_file.write_text(config_missing_scaling_in_comparisons)
     return str(config_file)
 
-
 @pytest.mark.unit
 def test_missing_scaling_in_comparisons(temp_config_file_missing_scaling, caplog):
     """
-    Test that a ValidationError is raised when scaling is missing in comparisons.
+    Test that a ValueError is raised when scaling is missing in comparisons.
     """
     with caplog.at_level(logging.CRITICAL):
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(ValueError) as exc_info:
             u.load_config(file_path=temp_config_file_missing_scaling)
+
+    # Extract the exception message
     error_message = str(exc_info.value)
-    # Assert that the error message indicates that 'scaling' field is required
-    assert "Field required" in error_message
-    assert "comparisons.change.scaling" in error_message
+
+    # Assert that the error message contains the expected text
+    assert "Validation Error in metrics_config.yaml" in error_message
+    assert "Issue: Field required" in error_message
+    assert "Location: time_series.market_data.price.rolling.comparisons.change" in error_message
+    assert "Bad Field: scaling" in error_message
+
 
 @pytest.fixture
 def config_invalid_aggregation_type():
@@ -514,20 +489,22 @@ def temp_config_file_invalid_aggregation(tmp_path, config_invalid_aggregation_ty
     config_file.write_text(config_invalid_aggregation_type)
     return str(config_file)
 
-
 @pytest.mark.unit
 def test_invalid_aggregation_type(temp_config_file_invalid_aggregation, caplog):
     """
-    Test that a ValidationError is raised when an invalid aggregation type is specified.
+    Test that a ValueError is raised when an invalid aggregation type is specified.
     """
     with caplog.at_level(logging.CRITICAL):
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(ValueError) as exc_info:
             u.load_config(file_path=temp_config_file_invalid_aggregation)
+
+    # Extract the exception message
     error_message = str(exc_info.value)
-    # Assert that the error message indicates invalid aggregation type
-    assert "average" in error_message
-    assert "aggregations" in error_message
-    assert "Input should be" in error_message
+
+    # Assert that the error message contains the expected text
+    assert "Validation Error in metrics_config.yaml" in error_message
+    assert "Issue: Input should be 'sum', 'mean', 'median', 'std', 'max', 'min', 'first' or 'last'" in error_message
+    assert "Location: time_series.market_data.price.aggregations.average" in error_message
 
 
 @pytest.fixture
@@ -538,7 +515,6 @@ def config_missing_required_sections():
     return """
     # Empty configuration
     """
-
 
 @pytest.fixture
 def config_null_in_required_field():
@@ -569,12 +545,14 @@ def test_null_in_required_field(temp_config_file_null_in_field, caplog):
     Test that a ValidationError is raised when a required field is set to null.
     """
     with caplog.at_level(logging.CRITICAL):
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(ValueError) as exc_info:
             u.load_config(file_path=temp_config_file_null_in_field)
     error_message = str(exc_info.value)
     # Assert that the error message indicates that 'window_duration' must not be null
-    assert "input should be a valid integer" in error_message.lower()
-    assert "window_duration" in error_message
+    assert "Validation Error in metrics_config.yaml" in error_message
+    assert "Issue: Input should be a valid integer" in error_message
+    assert "Location: time_series.market_data.price.rolling" in error_message
+
 
 @pytest.fixture
 def config_with_comments_and_whitespace():
@@ -620,6 +598,7 @@ def test_configuration_with_comments(temp_config_file_with_comments):
     assert 'time_series' in config
     assert 'market_data' in config['time_series']
     assert 'price' in config['time_series']['market_data']
+
 
 @pytest.fixture
 def config_demo_dict():
