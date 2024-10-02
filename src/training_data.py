@@ -97,7 +97,7 @@ def retrieve_profits_data(start_date,end_date):
             -- profits_change to incorporate what happens in between the start_date and the first "real"
             -- record, rather than between the first "real" record and the previous "real" record that
             -- falls outside of the training period.
-            ,null as profits_change   -- this will be computed and filled later
+            ,null as profits_change_override   -- this will be computed and filled later
 
             ,profits_cumulative
             ,usd_balance
@@ -145,7 +145,7 @@ def retrieve_profits_data(start_date,end_date):
             -- profits_change is 0, because we are tracking performance through the start_date only and the starting
             -- price as of the start_date has not changed yet. this is unique to the start_date, as imputed rows in
             -- the middle of the period should include changes in profits from the earlier in-period date.
-            ,0 as profits_change
+            ,0 as profits_change_override
             -- profits_cumulative is the previous profits_cumulative + the change in profits up to the start_date
             ,((t.price_current / t.price_previous) - 1) * t.usd_balance + t.profits_cumulative as profits_cumulative
             -- usd_balance is previous balance * (1 + % change in price)
@@ -164,6 +164,7 @@ def retrieve_profits_data(start_date,end_date):
             from training_start_needs_rows t
             where rn=1
             and round(usd_balance,2) > 0
+
         ),
 
         -- STEP 3: merge all records together and recalculate profits_change
@@ -194,8 +195,9 @@ def retrieve_profits_data(start_date,end_date):
 
         -- recalculate profits_change to ensure accuracy around the imputed row
         ,coalesce(
-            profits_change, -- stays 0 on the start_date
-            profits_cumulative - previous_profits_cumulative
+            profits_change_override, -- stays 0 on the start_date
+            profits_cumulative - previous_profits_cumulative, -- computes profits_change if there are two records available
+            0 -- no profits_change if the record is the first ever for that coin-wallet pair
             ) as profits_change
         ,profits_cumulative
         ,usd_balance
