@@ -858,25 +858,6 @@ class TestProfitsDataQuality:
         missing_values = profits_df.isna().sum()
         assert missing_values.sum() == 0, f"There are missing values in the dataset: {missing_values[missing_values > 0]}"
 
-    # def test_profits_consistency(self, profits_df):
-    #     """Test 6: Profits consistency"""
-    #     profits_df = profits_df.copy()
-    #     profits_df['profits_change_check'] = profits_df.groupby(['coin_id', 'wallet_address'], observed=True)['profits_cumulative'].diff()
-    #     profits_df['diff'] = profits_df['profits_change'] - profits_df['profits_change_check']
-
-    #     threshold = 1e-8
-    #     inconsistent_profits = profits_df[
-    #         (~profits_df['profits_change_check'].isna()) &
-    #         (profits_df['diff'].abs() > threshold)
-    #     ]
-
-    #     if len(inconsistent_profits) > 0:
-    #         logger.warning(f"Found {len(inconsistent_profits)} records with potentially inconsistent profit changes.")
-    #         logger.warning("Sample of inconsistent profits:")
-    #         logger.warning(inconsistent_profits.head().to_string())
-
-    #     assert len(inconsistent_profits) == 0, f"Found {len(inconsistent_profits)} records with potentially inconsistent profit changes. Check logs for details."
-
     def test_records_at_training_period_end_all_wallets(self, profits_df):
         """Test 7: Ensure all applicable wallets have records as of the training_period_end"""
         training_profits_df = profits_df[profits_df['date'] <= TRAINING_PERIOD_END]
