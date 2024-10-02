@@ -11,7 +11,6 @@ tests used to audit the files in the data-science/src folder
 import sys
 import os
 import pandas as pd
-import numpy as np
 from dotenv import load_dotenv
 import pytest
 from dreams_core import core as dc
@@ -35,110 +34,142 @@ logger = dc.setup_logger()
 # ---------------------------------------- #
 # clean_profits_df() unit tests
 # ---------------------------------------- #
-
 @pytest.fixture
 def sample_clean_profits_profits_df():
-    """
-    Fixture to create a sample DataFrame for testing td.clean_profits_df function.
-    """
+    """Fixture to create a sample DataFrame for testing td.clean_profits_df function."""
     data = {
-        'coin_id': ['coin_1', 'coin_2', 'coin_3', 'coin_1', 'coin_2', 'coin_3', 'coin_4', 'coin_1', 'coin_2', 'coin_3', 'coin_1', 'coin_2','coin_1'],
-        'wallet_address': ['wallet_1', 'wallet_1', 'wallet_2', 'wallet_2', 'wallet_3', 'wallet_3', 'wallet_4', 'wallet_4', 'wallet_5', 'wallet_5', 'wallet_6', 'wallet_6','wallet_7'],
-        'profits_change': [2000, 500, 18000, -7000, 5000, 12000, 16000, 1000, 18000, -7000, -10000, -8000, 15000],  # Updated profits for Wallet 4, 5, and added Wallet 6
-        'usd_inflows': [5000, 4000, 7000, 6000, 8000, 9000, 4000, 3000, 5000, 3000, 6000, 3000, 10000]  # Updated inflows and Wallet 6 with 10,000 inflows
+        'coin_id': ['coin_1', 'coin_2', 'coin_3', 'coin_1', 'coin_2', 'coin_3', 'coin_4', 'coin_1',
+                    'coin_2', 'coin_3', 'coin_1', 'coin_2','coin_1'],
+        'wallet_address': ['wallet_1', 'wallet_1', 'wallet_2', 'wallet_2', 'wallet_3', 'wallet_3',
+                           'wallet_4', 'wallet_4', 'wallet_5', 'wallet_5', 'wallet_6', 'wallet_6',
+                           'wallet_7'],
+        'profits_change': [2000, 500, 18000, -7000, 5000, 12000, 16000, 1000, 18000, -7000, -10000,
+                           -8000, 15000],
+        'usd_inflows': [5000, 4000, 7000, 6000, 8000, 9000, 4000, 3000, 5000, 3000, 6000,
+                        3000, 10000]
     }
     return pd.DataFrame(data)
 
 @pytest.fixture
 def sample_clean_profits_data_cleaning_config():
-    """
-    Fixture for the data cleaning configuration.
-    """
+    """Fixture for the data cleaning configuration."""
     return {
-        'profitability_filter': 15000,  # Updated profitability filter
-        'inflows_filter': 10000  # Updated inflows filter
+        'profitability_filter': 15000,
+        'inflows_filter': 10000
     }
 
-# Test Case 1: Basic functionality test
 @pytest.mark.unit
-def test_clean_profits_basic_functionality(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config):
+def test_clean_profits_basic_functionality(
+        sample_clean_profits_profits_df,
+        sample_clean_profits_data_cleaning_config
+        ):
     """
     Test basic functionality where some wallets exceed the thresholds and others do not.
     """
-    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config)
-    assert cleaned_df['wallet_address'].nunique() == 2  # 2 wallets should be excluded: one for profits, one for inflows
-    assert 'wallet_1' in cleaned_df['wallet_address'].values  # wallet_1 stays within limits
-    assert 'wallet_3' not in cleaned_df['wallet_address'].values  # wallet_3 exceeds both thresholds
+    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df,
+                                                    sample_clean_profits_data_cleaning_config)
+    assert cleaned_df['wallet_address'].nunique() == 2
+    assert 'wallet_1' in cleaned_df['wallet_address'].values
+    assert 'wallet_3' not in cleaned_df['wallet_address'].values
 
-# Test Case 2: Wallet with exactly the threshold profitability and inflows
 @pytest.mark.unit
-def test_clean_profits_exact_threshold(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config):
+def test_clean_profits_exact_threshold(
+        sample_clean_profits_profits_df,
+        sample_clean_profits_data_cleaning_config
+        ):
     """
     Test a wallet with exactly the threshold values for profitability and inflows.
     """
-    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config)
-    assert not 'wallet_7' in cleaned_df['wallet_address'].values  # wallet_5 should not be excluded as it's exactly at the threshold
+    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df,
+                                                    sample_clean_profits_data_cleaning_config)
+    assert not 'wallet_7' in cleaned_df['wallet_address'].values
 
-
-# Test Case 3: Wallet with negative profitability exceeding the threshold
 @pytest.mark.unit
-def test_clean_profits_negative_profitability(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config):
+def test_clean_profits_negative_profitability(
+        sample_clean_profits_profits_df,
+        sample_clean_profits_data_cleaning_config
+        ):
     """
     Test exclusion of wallets with negative profitability exceeding the threshold.
     """
-    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config)
-    assert 'wallet_6' not in cleaned_df['wallet_address'].values  # wallet_6 exceeds the negative profitability threshold
+    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df,
+                                                    sample_clean_profits_data_cleaning_config)
+    assert 'wallet_6' not in cleaned_df['wallet_address'].values
 
-# Test Case 4: Multiple wallets with profits and inflows exceeding thresholds
 @pytest.mark.unit
-def test_clean_profits_multiple_exceeding_thresholds(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config):
+def test_clean_profits_multiple_exceeding_thresholds(
+        sample_clean_profits_profits_df,
+        sample_clean_profits_data_cleaning_config
+        ):
     """
     Test exclusion of wallets where either profits or inflows exceed thresholds.
     """
-    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config)
-    assert len(exclusions_df) == 5  # 5 wallets should be excluded based on either profits or inflows
+    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df,
+                                                    sample_clean_profits_data_cleaning_config)
+    assert len(exclusions_df) == 5
 
-# Test Case 5: Wallet with multiple transactions but total profits below thresholds
 @pytest.mark.unit
-def test_clean_profits_multiple_transactions_below_threshold(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config):
+def test_clean_profits_multiple_transactions_below_threshold(
+        sample_clean_profits_profits_df,
+        sample_clean_profits_data_cleaning_config
+        ):
     """
     Test wallet with multiple transactions where total profits remain below thresholds.
     """
-    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config)
-    assert 'wallet_1' in cleaned_df['wallet_address'].values  # wallet_1 remains below threshold and should not be excluded
+    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df,
+                                                    sample_clean_profits_data_cleaning_config)
+    assert 'wallet_1' in cleaned_df['wallet_address'].values
 
-# Test Case 8: Wallet with extreme profits but inflows below the threshold
 @pytest.mark.unit
-def test_clean_profits_extreme_profits_but_low_inflows(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config):
+def test_clean_profits_extreme_profits_but_low_inflows(
+        sample_clean_profits_profits_df,
+        sample_clean_profits_data_cleaning_config
+        ):
     """
     Test exclusion of wallet with extreme profits but inflows below the threshold.
     """
-    sample_clean_profits_profits_df.loc[sample_clean_profits_profits_df['wallet_address'] == 'wallet_4', 'profits_change'] = 16000
-    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config)
-    assert 'wallet_4' not in cleaned_df['wallet_address'].values  # wallet_4 should be excluded based on profits
+    sample_clean_profits_profits_df.loc[
+        sample_clean_profits_profits_df['wallet_address'] == 'wallet_4','profits_change'
+        ] = 16000
+    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df,
+                                                    sample_clean_profits_data_cleaning_config)
+    assert 'wallet_4' not in cleaned_df['wallet_address'].values
 
-# Test Case 9: Wallet with extreme inflows but zero profits
 @pytest.mark.unit
-def test_clean_profits_extreme_inflows_but_zero_profits(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config):
+def test_clean_profits_extreme_inflows_but_zero_profits(
+        sample_clean_profits_profits_df,
+        sample_clean_profits_data_cleaning_config
+        ):
     """
     Test exclusion of wallet with extreme inflows but no significant profits.
     """
-    sample_clean_profits_profits_df.loc[sample_clean_profits_profits_df['wallet_address'] == 'wallet_3', 'profits_change'] = 0
-    sample_clean_profits_profits_df.loc[sample_clean_profits_profits_df['wallet_address'] == 'wallet_3', 'usd_inflows_cumulative'] = 17000
-    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config)
-    assert 'wallet_3' not in cleaned_df['wallet_address'].values  # wallet_3 should be excluded based on inflows
+    sample_clean_profits_profits_df.loc[
+        sample_clean_profits_profits_df['wallet_address'] == 'wallet_3','profits_change'
+        ] = 0
+    sample_clean_profits_profits_df.loc[
+        sample_clean_profits_profits_df['wallet_address'] == 'wallet_3','usd_inflows_cumulative'
+        ] = 17000
+    cleaned_df, _ = td.clean_profits_df(
+        sample_clean_profits_profits_df,
+        sample_clean_profits_data_cleaning_config
+    )
+    assert 'wallet_3' not in cleaned_df['wallet_address'].values
 
-# Test Case 11: Wallet with inflows/profits across multiple coins but aggregate exceeds threshold
 @pytest.mark.unit
-def test_clean_profits_aggregate_inflows_profits_across_coins(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config):
+def test_clean_profits_aggregate_inflows_profits_across_coins(
+        sample_clean_profits_profits_df,
+        sample_clean_profits_data_cleaning_config
+        ):
     """
     Test exclusion of wallet where aggregated inflows/profits across multiple coins exceed thresholds.
     """
-    sample_clean_profits_profits_df.loc[sample_clean_profits_profits_df['wallet_address'] == 'wallet_5', 'profits_change'] = 18000
-    sample_clean_profits_profits_df.loc[sample_clean_profits_profits_df['wallet_address'] == 'wallet_5', 'usd_inflows_cumulative'] = 8000
-    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df, sample_clean_profits_data_cleaning_config)
-    assert 'wallet_5' not in cleaned_df['wallet_address'].values  # wallet_5 should be excluded based on aggregated profits
-
+    sample_clean_profits_profits_df.loc[sample_clean_profits_profits_df['wallet_address'] == 'wallet_5',
+                                        'profits_change'] = 18000
+    sample_clean_profits_profits_df.loc[sample_clean_profits_profits_df['wallet_address'] == 'wallet_5',
+                                        'usd_inflows_cumulative'] = 8000
+    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df,
+                                                    sample_clean_profits_data_cleaning_config)
+    assert 'wallet_5' not in cleaned_df['wallet_address'].values
 
 
 
@@ -240,7 +271,7 @@ def sample_profits_df():
     Fixture to create a sample profits DataFrame for testing.
 
     Returns:
-        pd.DataFrame: A DataFrame with sample data for testing calculate_new_profits_values function.
+        pd.DataFrame: A df with sample data for testing calculate_new_profits_values function.
     """
     return pd.DataFrame({
         'coin_id': ['btc', 'eth', 'btc', 'eth'],
@@ -354,7 +385,8 @@ def test_calculate_new_profits_values_zero_price_change(zero_price_change_df, ta
         assert result_row['usd_net_transfers'] == 0
         assert result_row['usd_inflows'] == 0
         assert result_row['usd_inflows_cumulative'] == original_row['usd_inflows_cumulative']
-        assert result_row['total_return'] == pytest.approx(original_row['profits_cumulative'] / original_row['usd_inflows_cumulative'], abs=1e-4)
+        assert result_row['total_return'] == pytest.approx(
+            original_row['profits_cumulative'] / original_row['usd_inflows_cumulative'], abs=1e-4)
 
     # Check if all rows have the correct target_date
     assert (result.index.get_level_values('date') == target_date).all()
@@ -391,7 +423,8 @@ def test_calculate_new_profits_values_negative_price_change(negative_price_chang
     ensuring that profits decrease and balances are adjusted accordingly.
 
     Args:
-        negative_price_change_df (pd.DataFrame): Fixture providing sample input data with price decreases.
+        negative_price_change_df (pd.DataFrame): Fixture providing sample input data with
+            price decreases.
         target_date (datetime): Fixture providing a target date for imputation.
     """
     result = td.calculate_new_profits_values(negative_price_change_df, target_date)
@@ -420,7 +453,8 @@ def test_calculate_new_profits_values_negative_price_change(negative_price_chang
         assert result_row['usd_net_transfers'] == 0
         assert result_row['usd_inflows'] == 0
         assert result_row['usd_inflows_cumulative'] == original_row['usd_inflows_cumulative']
-        assert result_row['total_return'] == pytest.approx(expected_profits_cumulative / original_row['usd_inflows_cumulative'], abs=1e-4)
+        assert result_row['total_return'] == pytest.approx(
+            expected_profits_cumulative / original_row['usd_inflows_cumulative'], abs=1e-4)
 
         # Additional checks specific to negative price change
         assert result_row['profits_change'] < 0
@@ -486,7 +520,8 @@ def test_calculate_new_profits_values_zero_usd_balance(zero_usd_balance_df, targ
         assert result_row['usd_net_transfers'] == 0
         assert result_row['usd_inflows'] == 0
         assert result_row['usd_inflows_cumulative'] == original_row['usd_inflows_cumulative']
-        assert result_row['total_return'] == pytest.approx(original_row['profits_cumulative'] / original_row['usd_inflows_cumulative'], abs=1e-4)
+        assert result_row['total_return'] == pytest.approx(
+            original_row['profits_cumulative'] / original_row['usd_inflows_cumulative'], abs=1e-4)
 
     # Check if all rows have the correct target_date
     assert (result.index.get_level_values('date') == target_date).all()
@@ -515,7 +550,10 @@ def multiple_coins_wallets_df():
     }).set_index(['coin_id', 'wallet_address', 'date'])
 
 @pytest.mark.unit
-def test_calculate_new_profits_values_multiple_coins_wallets(multiple_coins_wallets_df, target_date):
+def test_calculate_new_profits_values_multiple_coins_wallets(
+        multiple_coins_wallets_df,
+        target_date
+        ):
     """
     Test calculate_new_profits_values function with multiple coin_ids and wallet_addresses.
 
@@ -523,7 +561,8 @@ def test_calculate_new_profits_values_multiple_coins_wallets(multiple_coins_wall
     ensuring that calculations are correct and independent for each unique combination.
 
     Args:
-        multiple_coins_wallets_df (pd.DataFrame): Fixture providing sample input data with various coins and wallets.
+        multiple_coins_wallets_df (pd.DataFrame): Fixture providing sample input data with various
+            coins and wallets.
         target_date (datetime): Fixture providing a target date for imputation.
     """
     result = td.calculate_new_profits_values(multiple_coins_wallets_df, target_date)
@@ -552,7 +591,8 @@ def test_calculate_new_profits_values_multiple_coins_wallets(multiple_coins_wall
         assert result_row['usd_net_transfers'] == 0
         assert result_row['usd_inflows'] == 0
         assert result_row['usd_inflows_cumulative'] == original_row['usd_inflows_cumulative']
-        assert result_row['total_return'] == pytest.approx(expected_profits_cumulative / original_row['usd_inflows_cumulative'], abs=1e-4)
+        assert result_row['total_return'] == pytest.approx(
+            expected_profits_cumulative / original_row['usd_inflows_cumulative'], abs=1e-4)
 
     # Check if all rows have the correct target_date
     assert (result.index.get_level_values('date') == target_date).all()
@@ -561,8 +601,10 @@ def test_calculate_new_profits_values_multiple_coins_wallets(multiple_coins_wall
     assert len(result) == len(multiple_coins_wallets_df.groupby(['coin_id', 'wallet_address']))
 
     # Check if all unique coin_ids and wallet_addresses are preserved
-    assert set(result.index.get_level_values('coin_id')) == set(multiple_coins_wallets_df.index.get_level_values('coin_id'))
-    assert set(result.index.get_level_values('wallet_address')) == set(multiple_coins_wallets_df.index.get_level_values('wallet_address'))
+    assert set(result.index.get_level_values('coin_id')) == set(
+        multiple_coins_wallets_df.index.get_level_values('coin_id'))
+    assert set(result.index.get_level_values('wallet_address')) == set(
+        multiple_coins_wallets_df.index.get_level_values('wallet_address'))
 
 
 
@@ -577,7 +619,8 @@ def sample_profits_df_missing_dates():
     """
     data = {
         'coin_id': ['BTC', 'ETH', 'BTC', 'ETH', 'BTC', 'ETH', 'BTC', 'ETH'],
-        'wallet_address': ['wallet1', 'wallet1', 'wallet2', 'wallet2', 'wallet1', 'wallet1', 'wallet2', 'wallet2'],
+        'wallet_address': ['wallet1', 'wallet1', 'wallet2', 'wallet2',
+                           'wallet1', 'wallet1', 'wallet2', 'wallet2'],
         'date': [
             '2023-01-01', '2023-01-01', '2023-01-01', '2023-01-01',
             '2023-01-05', '2023-01-05', '2023-01-07', '2023-01-07'
@@ -693,33 +736,48 @@ def test_impute_profits_df_rows_base_case(sample_profits_df_missing_dates, sampl
         assert row['usd_net_transfers'] == 0
         assert row['usd_inflows'] == 0
         assert row['usd_inflows_cumulative'] == last_known['usd_inflows_cumulative']
-        assert row['total_return'] == pytest.approx(row['profits_cumulative'] / row['usd_inflows_cumulative'], rel=1e-6)
+        assert row['total_return'] == pytest.approx(
+            row['profits_cumulative'] / row['usd_inflows_cumulative'], rel=1e-6)
 
     # Check handling of multiple coins and wallets
     assert set(result['coin_id']) == {'BTC', 'ETH'}
     assert set(result['wallet_address']) == {'wallet1', 'wallet2'}
 
 @pytest.mark.unit
-def test_impute_profits_df_rows_early_target_date(sample_profits_df_missing_dates, sample_prices_df_missing_dates):
+def test_impute_profits_df_rows_early_target_date(
+        sample_profits_df_missing_dates,sample_prices_df_missing_dates):
     """
-    Test that impute_profits_df_rows raises a ValueError when the target date is earlier than all dates in profits_df.
+    Test that impute_profits_df_rows raises a ValueError when the target date is earlier than all
+    dates in profits_df.
     """
-    early_target_date = pd.Timestamp('2022-12-31')  # Earlier than any date in sample_profits_df_missing_dates
+    # Earlier than any date in sample_profits_df_missing_dates
+    early_target_date = pd.Timestamp('2022-12-31')
 
     with pytest.raises(ValueError) as excinfo:
-        td.impute_profits_df_rows(sample_profits_df_missing_dates, sample_prices_df_missing_dates, early_target_date)
+        td.impute_profits_df_rows(
+            sample_profits_df_missing_dates,
+            sample_prices_df_missing_dates,
+            early_target_date)
 
     assert "Target date is earlier than all dates in profits_df" in str(excinfo.value)
 
 @pytest.mark.unit
-def test_impute_profits_df_rows_late_target_date(sample_profits_df_missing_dates, sample_prices_df_missing_dates):
+def test_impute_profits_df_rows_late_target_date(
+        sample_profits_df_missing_dates,
+        sample_prices_df_missing_dates
+        ):
     """
-    Test that impute_profits_df_rows raises a ValueError when the target date is later than all dates in prices_df.
+    Test that impute_profits_df_rows raises a ValueError when the target date is later than all
+    dates in prices_df.
     """
-    late_target_date = pd.Timestamp('2023-01-08')  # Later than any date in sample_prices_df_missing_dates
+    # Later than any date in sample_prices_df_missing_dates
+    late_target_date = pd.Timestamp('2023-01-08')
 
     with pytest.raises(ValueError) as excinfo:
-        td.impute_profits_df_rows(sample_profits_df_missing_dates, sample_prices_df_missing_dates, late_target_date)
+        td.impute_profits_df_rows(
+            sample_profits_df_missing_dates,
+            sample_prices_df_missing_dates,
+            late_target_date)
 
     assert "Target date is later than all dates in prices_df" in str(excinfo.value)
 
