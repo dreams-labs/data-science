@@ -229,6 +229,339 @@ def test_category_unpacking(mock_metadata_df, mock_config):
 
 
 
+# -------------------------------------------- #
+# calculate_new_profits_values() unit tests
+# -------------------------------------------- #
+
+@pytest.fixture
+def sample_profits_df():
+    """
+    Fixture to create a sample profits DataFrame for testing.
+
+    Returns:
+        pd.DataFrame: A DataFrame with sample data for testing calculate_new_profits_values function.
+    """
+    return pd.DataFrame({
+        'coin_id': ['btc', 'eth', 'btc', 'eth'],
+        'wallet_address': ['addr1', 'addr1', 'addr2', 'addr2'],
+        'date': pd.date_range(start='2023-01-01', periods=4),
+        'price_previous': [9000, 150, 9100, 155],
+        'price': [9500, 160, 9300, 158],
+        'usd_balance': [1000, 2000, 1500, 2500],
+        'profits_cumulative': [100, 200, 150, 250],
+        'usd_inflows_cumulative': [900, 1800, 1350, 2250]
+    }).set_index(['coin_id', 'wallet_address', 'date'])
+
+@pytest.fixture
+def target_date():
+    """
+    Fixture to provide a target date for testing.
+
+    Returns:
+        datetime: A sample target date.
+    """
+    return pd.Timestamp('2023-01-05')
+
+@pytest.mark.unit
+def test_calculate_new_profits_values_normal_data(sample_profits_df, target_date):
+    """
+    Test calculate_new_profits_values function with normal data.
+
+    This test checks if the function correctly calculates new financial metrics
+    for imputed rows using a sample DataFrame with realistic data.
+
+    Args:
+        sample_profits_df (pd.DataFrame): Fixture providing sample input data.
+        target_date (datetime): Fixture providing a target date for imputation.
+    """
+    result = td.calculate_new_profits_values(sample_profits_df, target_date)
+
+    # Check if the result has the correct structure
+    assert isinstance(result, pd.DataFrame)
+    assert result.index.names == ['coin_id', 'wallet_address', 'date']
+    assert set(result.columns) == {
+        'profits_change', 'profits_cumulative', 'usd_balance',
+        'usd_net_transfers', 'usd_inflows', 'usd_inflows_cumulative', 'total_return'
+    }
+
+    # Check if calculations are correct for the first row (btc, addr1)
+    first_row = result.loc[('btc', 'addr1', target_date)]
+    assert first_row['profits_change'] == pytest.approx(55.55555556)  # (9500/9000 - 1) * 1000
+    assert first_row['profits_cumulative'] == pytest.approx(155.55555556)  # 100 + 55.55555556
+    assert first_row['usd_balance'] == pytest.approx(1055.55555556)  # (9500/9000) * 1000
+    assert first_row['usd_net_transfers'] == 0
+    assert first_row['usd_inflows'] == 0
+    assert first_row['usd_inflows_cumulative'] == 900
+    assert first_row['total_return'] == pytest.approx(0.1728, abs=1e-4)  # 155.55555556 / 900
+
+    # Check if all rows have the correct target_date
+    assert (result.index.get_level_values('date') == target_date).all()
+
+    # Check if the number of rows matches the input DataFrame
+    assert len(result) == len(sample_profits_df)
+
+
+@pytest.fixture
+def zero_price_change_df():
+    """
+    Fixture to create a DataFrame with zero price change for testing.
+
+    Returns:
+        pd.DataFrame: A DataFrame with sample data where price equals price_previous.
+    """
+    return pd.DataFrame({
+        'coin_id': ['btc', 'eth', 'btc', 'eth'],
+        'wallet_address': ['addr1', 'addr1', 'addr2', 'addr2'],
+        'date': pd.date_range(start='2023-01-01', periods=4),
+        'price_previous': [9000, 150, 9000, 150],
+        'price': [9000, 150, 9000, 150],
+        'usd_balance': [1000, 2000, 1500, 2500],
+        'profits_cumulative': [100, 200, 150, 250],
+        'usd_inflows_cumulative': [900, 1800, 1350, 2250]
+    }).set_index(['coin_id', 'wallet_address', 'date'])
+
+@pytest.mark.unit
+def test_calculate_new_profits_values_zero_price_change(zero_price_change_df, target_date):
+    """
+    Test calculate_new_profits_values function with zero price change.
+
+    This test checks if the function correctly handles cases where there is no change in price,
+    ensuring that profits and balances remain unchanged.
+
+    Args:
+        zero_price_change_df (pd.DataFrame): Fixture providing sample input data with no price change.
+        target_date (datetime): Fixture providing a target date for imputation.
+    """
+    result = td.calculate_new_profits_values(zero_price_change_df, target_date)
+
+    # Check if the result has the correct structure
+    assert isinstance(result, pd.DataFrame)
+    assert result.index.names == ['coin_id', 'wallet_address', 'date']
+    assert set(result.columns) == {
+        'profits_change', 'profits_cumulative', 'usd_balance',
+        'usd_net_transfers', 'usd_inflows', 'usd_inflows_cumulative', 'total_return'
+    }
+
+    # Check if calculations are correct for all rows
+    for (coin_id, wallet_address), group in zero_price_change_df.groupby(['coin_id', 'wallet_address']):
+        result_row = result.loc[(coin_id, wallet_address, target_date)]
+        original_row = group.iloc[0]  # Take the first row of the group
+
+        assert result_row['profits_change'] == pytest.approx(0, abs=1e-4)
+        assert result_row['profits_cumulative'] == pytest.approx(original_row['profits_cumulative'], abs=1e-4)
+        assert result_row['usd_balance'] == pytest.approx(original_row['usd_balance'], abs=1e-4)
+        assert result_row['usd_net_transfers'] == 0
+        assert result_row['usd_inflows'] == 0
+        assert result_row['usd_inflows_cumulative'] == original_row['usd_inflows_cumulative']
+        assert result_row['total_return'] == pytest.approx(original_row['profits_cumulative'] / original_row['usd_inflows_cumulative'], abs=1e-4)
+
+    # Check if all rows have the correct target_date
+    assert (result.index.get_level_values('date') == target_date).all()
+
+    # Check if the number of rows matches the input DataFrame
+    assert len(result) == len(zero_price_change_df.groupby(['coin_id', 'wallet_address']))
+
+
+@pytest.fixture
+def negative_price_change_df():
+    """
+    Fixture to create a DataFrame with negative price changes for testing.
+
+    Returns:
+        pd.DataFrame: A DataFrame with sample data where price is less than price_previous.
+    """
+    return pd.DataFrame({
+        'coin_id': ['btc', 'eth', 'btc', 'eth'],
+        'wallet_address': ['addr1', 'addr1', 'addr2', 'addr2'],
+        'date': pd.date_range(start='2023-01-01', periods=4),
+        'price_previous': [10000, 200, 10000, 200],
+        'price': [9000, 180, 9500, 190],
+        'usd_balance': [1000, 2000, 1500, 2500],
+        'profits_cumulative': [100, 200, 150, 250],
+        'usd_inflows_cumulative': [900, 1800, 1350, 2250]
+    }).set_index(['coin_id', 'wallet_address', 'date'])
+
+@pytest.mark.unit
+def test_calculate_new_profits_values_negative_price_change(negative_price_change_df, target_date):
+    """
+    Test calculate_new_profits_values function with negative price changes.
+
+    This test checks if the function correctly handles cases where there is a decrease in price,
+    ensuring that profits decrease and balances are adjusted accordingly.
+
+    Args:
+        negative_price_change_df (pd.DataFrame): Fixture providing sample input data with price decreases.
+        target_date (datetime): Fixture providing a target date for imputation.
+    """
+    result = td.calculate_new_profits_values(negative_price_change_df, target_date)
+
+    # Check if the result has the correct structure
+    assert isinstance(result, pd.DataFrame)
+    assert result.index.names == ['coin_id', 'wallet_address', 'date']
+    assert set(result.columns) == {
+        'profits_change', 'profits_cumulative', 'usd_balance',
+        'usd_net_transfers', 'usd_inflows', 'usd_inflows_cumulative', 'total_return'
+    }
+
+    # Check if calculations are correct for all rows
+    for (coin_id, wallet_address), group in negative_price_change_df.groupby(['coin_id', 'wallet_address']):
+        result_row = result.loc[(coin_id, wallet_address, target_date)]
+        original_row = group.iloc[0]  # Take the first row of the group
+
+        price_ratio = original_row['price'] / original_row['price_previous']
+        expected_profits_change = (price_ratio - 1) * original_row['usd_balance']
+        expected_profits_cumulative = original_row['profits_cumulative'] + expected_profits_change
+        expected_usd_balance = price_ratio * original_row['usd_balance']
+
+        assert result_row['profits_change'] == pytest.approx(expected_profits_change, abs=1e-4)
+        assert result_row['profits_cumulative'] == pytest.approx(expected_profits_cumulative, abs=1e-4)
+        assert result_row['usd_balance'] == pytest.approx(expected_usd_balance, abs=1e-4)
+        assert result_row['usd_net_transfers'] == 0
+        assert result_row['usd_inflows'] == 0
+        assert result_row['usd_inflows_cumulative'] == original_row['usd_inflows_cumulative']
+        assert result_row['total_return'] == pytest.approx(expected_profits_cumulative / original_row['usd_inflows_cumulative'], abs=1e-4)
+
+        # Additional checks specific to negative price change
+        assert result_row['profits_change'] < 0
+        assert result_row['profits_cumulative'] < original_row['profits_cumulative']
+        assert result_row['usd_balance'] < original_row['usd_balance']
+
+    # Check if all rows have the correct target_date
+    assert (result.index.get_level_values('date') == target_date).all()
+
+    # Check if the number of rows matches the input DataFrame
+    assert len(result) == len(negative_price_change_df.groupby(['coin_id', 'wallet_address']))
+
+
+@pytest.fixture
+def zero_usd_balance_df():
+    """
+    Fixture to create a DataFrame with zero USD balance for testing.
+
+    Returns:
+        pd.DataFrame: A DataFrame with sample data where usd_balance is zero for all rows.
+    """
+    return pd.DataFrame({
+        'coin_id': ['btc', 'eth', 'btc', 'eth'],
+        'wallet_address': ['addr1', 'addr1', 'addr2', 'addr2'],
+        'date': pd.date_range(start='2023-01-01', periods=4),
+        'price_previous': [9000, 150, 9000, 150],
+        'price': [9500, 160, 9300, 158],
+        'usd_balance': [0, 0, 0, 0],
+        'profits_cumulative': [100, 200, 150, 250],
+        'usd_inflows_cumulative': [900, 1800, 1350, 2250]
+    }).set_index(['coin_id', 'wallet_address', 'date'])
+
+@pytest.mark.unit
+def test_calculate_new_profits_values_zero_usd_balance(zero_usd_balance_df, target_date):
+    """
+    Test calculate_new_profits_values function with zero USD balance.
+
+    This test checks if the function correctly handles cases where the USD balance is zero,
+    ensuring that profits and balances remain zero regardless of price changes.
+
+    Args:
+        zero_usd_balance_df (pd.DataFrame): Fixture providing sample input data with zero USD balances.
+        target_date (datetime): Fixture providing a target date for imputation.
+    """
+    result = td.calculate_new_profits_values(zero_usd_balance_df, target_date)
+
+    # Check if the result has the correct structure
+    assert isinstance(result, pd.DataFrame)
+    assert result.index.names == ['coin_id', 'wallet_address', 'date']
+    assert set(result.columns) == {
+        'profits_change', 'profits_cumulative', 'usd_balance',
+        'usd_net_transfers', 'usd_inflows', 'usd_inflows_cumulative', 'total_return'
+    }
+
+    # Check if calculations are correct for all rows
+    for (coin_id, wallet_address), group in zero_usd_balance_df.groupby(['coin_id', 'wallet_address']):
+        result_row = result.loc[(coin_id, wallet_address, target_date)]
+        original_row = group.iloc[0]  # Take the first row of the group
+
+        assert result_row['profits_change'] == 0
+        assert result_row['profits_cumulative'] == original_row['profits_cumulative']
+        assert result_row['usd_balance'] == 0
+        assert result_row['usd_net_transfers'] == 0
+        assert result_row['usd_inflows'] == 0
+        assert result_row['usd_inflows_cumulative'] == original_row['usd_inflows_cumulative']
+        assert result_row['total_return'] == pytest.approx(original_row['profits_cumulative'] / original_row['usd_inflows_cumulative'], abs=1e-4)
+
+    # Check if all rows have the correct target_date
+    assert (result.index.get_level_values('date') == target_date).all()
+
+    # Check if the number of rows matches the input DataFrame
+    assert len(result) == len(zero_usd_balance_df.groupby(['coin_id', 'wallet_address']))
+
+
+@pytest.fixture
+def multiple_coins_wallets_df():
+    """
+    Fixture to create a DataFrame with multiple coin_ids and wallet_addresses for testing.
+
+    Returns:
+        pd.DataFrame: A DataFrame with sample data for various coins and wallet addresses.
+    """
+    return pd.DataFrame({
+        'coin_id': ['btc', 'eth', 'ltc', 'xrp', 'btc', 'eth', 'ltc', 'xrp'],
+        'wallet_address': ['addr1', 'addr1', 'addr2', 'addr2', 'addr3', 'addr3', 'addr4', 'addr4'],
+        'date': pd.date_range(start='2023-01-01', periods=8),
+        'price_previous': [9000, 150, 50, 0.3, 9100, 155, 52, 0.31],
+        'price': [9500, 160, 48, 0.32, 9300, 158, 51, 0.30],
+        'usd_balance': [1000, 2000, 1500, 2500, 3000, 4000, 3500, 4500],
+        'profits_cumulative': [100, 200, 150, 250, 300, 400, 350, 450],
+        'usd_inflows_cumulative': [900, 1800, 1350, 2250, 2700, 3600, 3150, 4050]
+    }).set_index(['coin_id', 'wallet_address', 'date'])
+
+@pytest.mark.unit
+def test_calculate_new_profits_values_multiple_coins_wallets(multiple_coins_wallets_df, target_date):
+    """
+    Test calculate_new_profits_values function with multiple coin_ids and wallet_addresses.
+
+    This test checks if the function correctly handles a diverse set of coins and wallet addresses,
+    ensuring that calculations are correct and independent for each unique combination.
+
+    Args:
+        multiple_coins_wallets_df (pd.DataFrame): Fixture providing sample input data with various coins and wallets.
+        target_date (datetime): Fixture providing a target date for imputation.
+    """
+    result = td.calculate_new_profits_values(multiple_coins_wallets_df, target_date)
+
+    # Check if the result has the correct structure
+    assert isinstance(result, pd.DataFrame)
+    assert result.index.names == ['coin_id', 'wallet_address', 'date']
+    assert set(result.columns) == {
+        'profits_change', 'profits_cumulative', 'usd_balance',
+        'usd_net_transfers', 'usd_inflows', 'usd_inflows_cumulative', 'total_return'
+    }
+
+    # Check if calculations are correct for all rows
+    for (coin_id, wallet_address), group in multiple_coins_wallets_df.groupby(['coin_id', 'wallet_address']):
+        result_row = result.loc[(coin_id, wallet_address, target_date)]
+        original_row = group.iloc[0]  # Take the first row of the group
+
+        price_ratio = original_row['price'] / original_row['price_previous']
+        expected_profits_change = (price_ratio - 1) * original_row['usd_balance']
+        expected_profits_cumulative = original_row['profits_cumulative'] + expected_profits_change
+        expected_usd_balance = price_ratio * original_row['usd_balance']
+
+        assert result_row['profits_change'] == pytest.approx(expected_profits_change, abs=1e-4)
+        assert result_row['profits_cumulative'] == pytest.approx(expected_profits_cumulative, abs=1e-4)
+        assert result_row['usd_balance'] == pytest.approx(expected_usd_balance, abs=1e-4)
+        assert result_row['usd_net_transfers'] == 0
+        assert result_row['usd_inflows'] == 0
+        assert result_row['usd_inflows_cumulative'] == original_row['usd_inflows_cumulative']
+        assert result_row['total_return'] == pytest.approx(expected_profits_cumulative / original_row['usd_inflows_cumulative'], abs=1e-4)
+
+    # Check if all rows have the correct target_date
+    assert (result.index.get_level_values('date') == target_date).all()
+
+    # Check if the number of rows matches the input DataFrame
+    assert len(result) == len(multiple_coins_wallets_df.groupby(['coin_id', 'wallet_address']))
+
+    # Check if all unique coin_ids and wallet_addresses are preserved
+    assert set(result.index.get_level_values('coin_id')) == set(multiple_coins_wallets_df.index.get_level_values('coin_id'))
+    assert set(result.index.get_level_values('wallet_address')) == set(multiple_coins_wallets_df.index.get_level_values('wallet_address'))
 
 
 
