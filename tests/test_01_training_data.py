@@ -770,6 +770,9 @@ MODELING_PERIOD_END = config['training_data']['modeling_period_end']
 
 @contextlib.contextmanager
 def single_threaded():
+    """
+    helper function to avoid multithreading which breaks in pytest
+    """
     _original_thread_count = threading.active_count()
     yield
     current_thread_count = threading.active_count()
