@@ -653,9 +653,6 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
     # Append all new rows to profits_df
     updated_profits_df = pd.concat([profits_df, all_new_rows], ignore_index=True)
 
-    # # # recompute profits_change now that we have all profits_cumulative rows
-    # updated_profits_df = recalculate_profits_change(updated_profits_df)
-
     logger.info("Completed new row generation after %.2f seconds. Total rows after imputation: %s",
                 time.time() - start_time,
                 updated_profits_df.shape[0])
@@ -779,119 +776,6 @@ def worker(partition, prices_df, target_date, result_queue):
 
     # Put the result in the queue
     result_queue.put(result)
-
-
-
-# def recalculate_profits_change(profits_df):
-#     """
-#     Recalculates the profits_change column for a sorted profits DataFrame.
-
-#     Args:
-#         profits_df (pd.DataFrame): A DataFrame containing profit data
-
-#     Returns:
-#         pd.DataFrame: The updated DataFrame with recalculated profits_change.
-#     """
-#     # Sort the df so we can use shift() functions on timeseries
-#     profits_df = multithreaded_sort_profits_df(profits_df, 24)
-
-#     logger.info("Recalculating profits_change for the full dataframe...")
-
-#     # Set the index for efficient operations
-#     profits_df = profits_df.set_index(['coin_id', 'wallet_address', 'date'])
-
-#     # Create shifted index
-#     shifted_index = profits_df.index.to_frame().shift(1)
-
-#     # Check if the previous row belongs to the same coin-wallet pair
-#     has_previous_records = (
-#         (profits_df.index.get_level_values('coin_id') == shifted_index['coin_id']) &
-#         (profits_df.index.get_level_values('wallet_address') == shifted_index['wallet_address'])
-#     )
-
-#     # Shift profits_cumulative to calculate the profits_change for each row
-#     previous_profits_cumulative = profits_df['profits_cumulative'].shift(1)
-#     previous_profits_cumulative[0] = 0
-
-#     # Calculate profits_change
-#     profits_df['profits_change'] = (
-#         (profits_df['profits_cumulative'] - previous_profits_cumulative)
-#         * has_previous_records  # Sets row to 0 if it is the first record for the coin-wallet pair
-#     )
-
-#     # Reset index to return to the original DataFrame structure
-#     profits_df = profits_df.reset_index()
-
-#     logger.info("Profits_change recalculation completed.")
-
-#     return profits_df
-
-
-
-# def multithreaded_sort_profits_df(profits_df, n_threads):
-#     """
-#     Sort the profits DataFrame using a multithreaded approach.
-
-#     Args:
-#         profits_df (pd.DataFrame): The DataFrame to be sorted.
-#         n_threads (int): The number of threads to use for sorting.
-
-#     Returns:
-#         pd.DataFrame: The sorted DataFrame.
-#     """
-#     start_time = time.time()
-#     logger.info("Starting multithreaded sorting of profits_df with %s threads...", n_threads)
-
-#     # Create partitions
-#     partitions = create_partitions(profits_df, n_threads)
-
-#     # Use ThreadPoolExecutor to manage threads
-#     with ThreadPoolExecutor(max_workers=n_threads) as executor:
-#         # Submit sorting tasks
-#         future_to_partition = {
-#             executor.submit(sort_worker, partition): i for i, partition in enumerate(partitions)
-#             }
-
-#         # Collect results
-#         sorted_partitions = []
-#         for future in as_completed(future_to_partition):
-#             partition_index = future_to_partition[future]
-#             try:
-#                 sorted_partition = future.result()
-#                 sorted_partitions.append(sorted_partition)
-#                 logger.debug("Completed sorting partition %s", partition_index)
-#             except Exception as exc:  # pylint: disable=W0718
-#                 logger.error("Partition %s generated an exception: %s", partition_index, exc)
-
-#     # Merge sorted partitions
-#     sorted_df = pd.concat(sorted_partitions, ignore_index=True)
-
-#     # Final sort to ensure overall ordering
-#     sorted_df = sorted_df.sort_values(by=['coin_id', 'wallet_address', 'date'])
-
-#     logger.info("Completed sorting profits_df after %.2f seconds. Total rows: %s",
-#                 time.time() - start_time, len(sorted_df))
-
-#     return sorted_df
-
-# def sort_worker(partition):
-#     """
-#     Worker function to sort a partition of the DataFrame.
-
-#     Args:
-#         partition (pd.DataFrame): A partition of the profits DataFrame to be sorted.
-
-#     Returns:
-#         pd.DataFrame: The sorted partition.
-#     """
-#     try:
-#         # Sort the partition
-#         sorted_partition = partition.sort_values(by=['coin_id', 'wallet_address', 'date'])
-#         return sorted_partition
-#     except Exception as e:
-#         logger.error("Error in sort_worker: %s", str(e))
-#         raise
-
 
 
 
