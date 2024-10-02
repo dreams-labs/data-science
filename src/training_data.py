@@ -92,7 +92,13 @@ def retrieve_profits_data(start_date,end_date):
             select coin_id
             ,date
             ,wallet_address
-            ,profits_change
+
+            -- because profits_change will be recorded as 0 on the start_date, we need to recalculate
+            -- profits_change to incorporate what happens in between the start_date and the first "real"
+            -- record, rather than between the first "real" record and the previous "real" record that
+            -- falls outside of the training period.
+            ,null as profits_change   -- this will be computed and filled later
+
             ,profits_cumulative
             ,usd_balance
             ,usd_net_transfers
@@ -136,11 +142,13 @@ def retrieve_profits_data(start_date,end_date):
             ,cast('{start_date}' as datetime) as date
             ,t.wallet_address
 
-            -- profits_change is the USD change in price minus the previous usd_balance
-            ,((t.price_current / t.price_previous) * t.usd_balance) - t.usd_balance as profits_change
-            -- profits_cumulative is the previous profits_cumulative + profits_change
-            ,((t.price_current / t.price_previous) * t.usd_balance) - t.usd_balance + t.profits_cumulative as profits_cumulative
-            -- usd_balance is 1+% change in price times previous balance
+            -- profits_change is 0, because we are tracking performance through the start_date only and the starting
+            -- price as of the start_date has not changed yet. this is unique to the start_date, as imputed rows in
+            -- the middle of the period should include changes in profits from the earlier in-period date.
+            ,0 as profits_change
+            -- profits_cumulative is the previous profits_cumulative + the change in profits up to the start_date
+            ,((t.price_current / t.price_previous) - 1) * t.usd_balance + t.profits_cumulative as profits_cumulative
+            -- usd_balance is previous balance * (1 + % change in price)
             ,(t.price_current / t.price_previous) * t.usd_balance as usd_balance
             -- there were no transfers
             ,0 as usd_net_transfers
@@ -158,8 +166,8 @@ def retrieve_profits_data(start_date,end_date):
             and round(usd_balance,2) > 0
         ),
 
-        -- STEP 3: merge all records together and round relevant columns
-        ----------------------------------------------------------------
+        -- STEP 3: merge all records together and recalculate profits_change
+        --------------------------------------------------------------------
         profits_merged as (
             select * from profits_base
             -- transfers prior to the training period are summarized in training_start_new_rows
@@ -168,22 +176,35 @@ def retrieve_profits_data(start_date,end_date):
             union all
 
             select * from training_start_new_rows
+        ),
+
+        -- add the previous profits cumulative so we can acccurately compute profits_change with the new date row
+        profits_recalculated_helper as (
+            select *
+            ,lag(profits_cumulative, 1) over (partition by coin_id,wallet_address order by date asc) as previous_profits_cumulative
+            from profits_merged
         )
 
-        -- round values before exporting to reduce memory usage
+        -- final table selection begins here
         select coin_id
         ,date
+
         -- replace the memory-intensive address strings with integers
         ,DENSE_RANK() OVER (ORDER BY wallet_address) as wallet_address
-        ,round(profits_change,2) as profits_change
-        ,round(profits_cumulative,2) as profits_cumulative
-        ,round(usd_balance,2) as usd_balance
-        ,round(usd_net_transfers,2) as usd_net_transfers
-        ,round(usd_inflows,2) as usd_inflows
+
+        -- recalculate profits_change to ensure accuracy around the imputed row
+        ,coalesce(
+            profits_change, -- stays 0 on the start_date
+            profits_cumulative - previous_profits_cumulative
+            ) as profits_change
+        ,profits_cumulative
+        ,usd_balance
+        ,usd_net_transfers
+        ,usd_inflows
         -- set a floor of $0.01 to avoid divide by 0 errors caused by rounding
-        ,greatest(0.01,round(usd_inflows_cumulative,2)) as usd_inflows_cumulative
-        ,round(total_return,5) as total_return
-        from profits_merged
+        ,greatest(0.01,usd_inflows_cumulative) as usd_inflows_cumulative
+        ,total_return
+        from profits_recalculated_helper
     """
 
     # Run the SQL query using dgc's run_sql method
@@ -644,6 +665,9 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
 
     Returns:
         pd.DataFrame: Updated profits_df with imputed rows for all specified dates
+
+    Raises:
+        ValueError: If any NaN values are found in the new_rows_df DataFrames.
     """
     start_time = time.time()
     logger.info("Starting profits_df imputation for %s dates...", len(dates))
@@ -652,6 +676,11 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
 
     for date in dates:
         new_rows_df = multithreaded_impute_profits_rows(profits_df, prices_df, date, n_threads)
+
+        # Check for NaN values
+        if new_rows_df.isna().any().any():
+            raise ValueError(f"NaN values found in the imputed rows for date: {date}")
+
         new_rows_list.append(new_rows_df)
 
     # Concatenate all new rows at once
