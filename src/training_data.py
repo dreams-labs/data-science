@@ -94,13 +94,6 @@ def retrieve_profits_data(start_date,end_date):
             select coin_id
             ,date
             ,wallet_address
-
-            -- because profits_change will be recorded as 0 on the start_date, we need to recalculate
-            -- profits_change to incorporate what happens in between the start_date and the first "real"
-            -- record, rather than between the first "real" record and the previous "real" record that
-            -- falls outside of the training period.
-            ,null as profits_change_override   -- this will be computed and filled later
-
             ,profits_cumulative
             ,usd_balance
             ,usd_net_transfers
@@ -142,11 +135,6 @@ def retrieve_profits_data(start_date,end_date):
             select t.coin_id
             ,cast('{start_date}' as datetime) as date
             ,t.wallet_address
-
-            -- profits_change is 0, because we are tracking performance through the start_date only and the starting
-            -- price as of the start_date has not changed yet. this is unique to the start_date, as imputed rows in
-            -- the middle of the period should include changes in profits from the earlier in-period date.
-            ,0 as profits_change_override
             -- profits_cumulative is the previous profits_cumulative + the change in profits up to the start_date
             ,((t.price_current / t.price_previous) - 1) * t.usd_balance + t.profits_cumulative as profits_cumulative
             -- usd_balance is previous balance * (1 + % change in price)
@@ -163,8 +151,8 @@ def retrieve_profits_data(start_date,end_date):
 
         ),
 
-        -- STEP 3: merge all records together and recalculate profits_change
-        --------------------------------------------------------------------
+        -- STEP 3: merge all records together
+        -------------------------------------
         profits_merged as (
             select * from profits_base
             -- transfers prior to the training period are summarized in training_start_new_rows
@@ -173,35 +161,21 @@ def retrieve_profits_data(start_date,end_date):
             union all
 
             select * from training_start_new_rows
-        ),
-
-        -- add the previous profits cumulative so we can acccurately compute profits_change with the new date row
-        profits_recalculated_helper as (
-            select *
-            ,lag(profits_cumulative, 1) over (partition by coin_id,wallet_address order by date asc) as previous_profits_cumulative
-            from profits_merged
         )
 
-        -- final table selection begins here
         select coin_id
         ,date
 
         -- replace the memory-intensive address strings with integers
         ,DENSE_RANK() OVER (ORDER BY wallet_address) as wallet_address
 
-        -- recalculate profits_change to ensure accuracy around the imputed row
-        ,coalesce(
-            profits_change_override, -- stays 0 on the start_date
-            profits_cumulative - previous_profits_cumulative, -- computes profits_change if there are two records available
-            0 -- no profits_change if the record is the first ever for that coin-wallet pair
-            ) as profits_change
         ,profits_cumulative
         ,usd_balance
         ,usd_net_transfers
         ,usd_inflows
         -- set a floor of $0.01 to avoid divide by 0 errors caused by rounding
         ,greatest(0.01,usd_inflows_cumulative) as usd_inflows_cumulative
-        from profits_recalculated_helper
+        from profits_merged
     """
 
     # Run the SQL query using dgc's run_sql method
@@ -219,7 +193,6 @@ def retrieve_profits_data(start_date,end_date):
 
     # Convert all numerical columns to float32
     profits_df['wallet_address'] = profits_df['wallet_address'].astype('int32')
-    profits_df['profits_change'] = profits_df['profits_change'].astype('float32')
     profits_df['profits_cumulative'] = profits_df['profits_cumulative'].astype('float32')
     profits_df['usd_balance'] = profits_df['usd_balance'].astype('float32')
     profits_df['usd_net_transfers'] = profits_df['usd_net_transfers'].astype('float32')
@@ -260,13 +233,14 @@ def clean_profits_df(profits_df, data_cleaning_config):
     # 1. Remove wallets with higher or lower total profits than the profitability_filter
     # ----------------------------------------------------------------------------------
     # Group by wallet_address and calculate the total profitability
-    wallet_profits_agg_df = profits_df.groupby(
-        'wallet_address', observed=True)['profits_change'].sum().reset_index()
+    wallet_profits_agg_df = profits_df.sort_values('date').groupby(
+        'wallet_address', observed=True)['profits_cumulative'].last().reset_index()
 
     # Identify wallet_addresses with total profitability that exceeds the threshold
+    # pylint: disable=C0301
     exclusions_profits_df = wallet_profits_agg_df[
-        (wallet_profits_agg_df['profits_change'] >= data_cleaning_config['profitability_filter']) |
-        (wallet_profits_agg_df['profits_change'] <= -data_cleaning_config['profitability_filter'])
+        (wallet_profits_agg_df['profits_cumulative'] >= data_cleaning_config['profitability_filter']) |
+        (wallet_profits_agg_df['profits_cumulative'] <= -data_cleaning_config['profitability_filter'])
     ][['wallet_address']]
 
     # Merge to filter out the records with those wallet addresses
@@ -594,8 +568,8 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
                 new_rows_df.shape,
                 time.time() - start_time)
 
-    # profits_change will need to be recalculated for the full df
-    if new_rows_df.drop(columns=['profits_change']).isna().any().any():
+    # confirm there are no empty values
+    if new_rows_df.isna().any().any():
         raise ValueError("new_rows_df contains unexpected empty values after the calculation.")
 
 
@@ -615,10 +589,6 @@ def calculate_new_profits_values(profits_df, target_date):
         pd.DataFrame: DataFrame with calculated financial metrics
     """
     new_rows_df = pd.DataFrame(index=profits_df.index)
-
-    # this will be calculated after all rows are merged together, because merging in new rows
-    # throws off the following row's profits_change
-    new_rows_df['profits_change'] = np.nan
 
     # new profits_cumulative = (price change * usd_balance) + previous profits_cumulative
     new_rows_df['profits_cumulative'] = (
@@ -673,7 +643,7 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
         new_rows_df = multithreaded_impute_profits_rows(profits_df, prices_df, date, n_threads)
 
         # Check for NaN values
-        if new_rows_df.drop(columns=['profits_change']).isna().any().any():
+        if new_rows_df.isna().any().any():
             raise ValueError(f"NaN values found in the imputed rows for date: {date}")
 
         new_rows_list.append(new_rows_df)
@@ -684,8 +654,8 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
     # Append all new rows to profits_df
     updated_profits_df = pd.concat([profits_df, all_new_rows], ignore_index=True)
 
-    # # recompute profits_change now that we have all profits_cumulative rows
-    updated_profits_df = recalculate_profits_change(updated_profits_df)
+    # # # recompute profits_change now that we have all profits_cumulative rows
+    # updated_profits_df = recalculate_profits_change(updated_profits_df)
 
     logger.info("Completed new row generation after %.2f seconds. Total rows after imputation: %s",
                 time.time() - start_time,
@@ -813,115 +783,115 @@ def worker(partition, prices_df, target_date, result_queue):
 
 
 
-def recalculate_profits_change(profits_df):
-    """
-    Recalculates the profits_change column for a sorted profits DataFrame.
+# def recalculate_profits_change(profits_df):
+#     """
+#     Recalculates the profits_change column for a sorted profits DataFrame.
 
-    Args:
-        profits_df (pd.DataFrame): A DataFrame containing profit data
+#     Args:
+#         profits_df (pd.DataFrame): A DataFrame containing profit data
 
-    Returns:
-        pd.DataFrame: The updated DataFrame with recalculated profits_change.
-    """
-    # Sort the df so we can use shift() functions on timeseries
-    profits_df = multithreaded_sort_profits_df(profits_df, 24)
+#     Returns:
+#         pd.DataFrame: The updated DataFrame with recalculated profits_change.
+#     """
+#     # Sort the df so we can use shift() functions on timeseries
+#     profits_df = multithreaded_sort_profits_df(profits_df, 24)
 
-    logger.info("Recalculating profits_change for the full dataframe...")
+#     logger.info("Recalculating profits_change for the full dataframe...")
 
-    # Set the index for efficient operations
-    profits_df = profits_df.set_index(['coin_id', 'wallet_address', 'date'])
+#     # Set the index for efficient operations
+#     profits_df = profits_df.set_index(['coin_id', 'wallet_address', 'date'])
 
-    # Create shifted index
-    shifted_index = profits_df.index.to_frame().shift(1)
+#     # Create shifted index
+#     shifted_index = profits_df.index.to_frame().shift(1)
 
-    # Check if the previous row belongs to the same coin-wallet pair
-    has_previous_records = (
-        (profits_df.index.get_level_values('coin_id') == shifted_index['coin_id']) &
-        (profits_df.index.get_level_values('wallet_address') == shifted_index['wallet_address'])
-    )
+#     # Check if the previous row belongs to the same coin-wallet pair
+#     has_previous_records = (
+#         (profits_df.index.get_level_values('coin_id') == shifted_index['coin_id']) &
+#         (profits_df.index.get_level_values('wallet_address') == shifted_index['wallet_address'])
+#     )
 
-    # Shift profits_cumulative to calculate the profits_change for each row
-    previous_profits_cumulative = profits_df['profits_cumulative'].shift(1)
-    previous_profits_cumulative[0] = 0
+#     # Shift profits_cumulative to calculate the profits_change for each row
+#     previous_profits_cumulative = profits_df['profits_cumulative'].shift(1)
+#     previous_profits_cumulative[0] = 0
 
-    # Calculate profits_change
-    profits_df['profits_change'] = (
-        (profits_df['profits_cumulative'] - previous_profits_cumulative)
-        * has_previous_records  # Sets row to 0 if it is the first record for the coin-wallet pair
-    )
+#     # Calculate profits_change
+#     profits_df['profits_change'] = (
+#         (profits_df['profits_cumulative'] - previous_profits_cumulative)
+#         * has_previous_records  # Sets row to 0 if it is the first record for the coin-wallet pair
+#     )
 
-    # Reset index to return to the original DataFrame structure
-    profits_df = profits_df.reset_index()
+#     # Reset index to return to the original DataFrame structure
+#     profits_df = profits_df.reset_index()
 
-    logger.info("Profits_change recalculation completed.")
+#     logger.info("Profits_change recalculation completed.")
 
-    return profits_df
+#     return profits_df
 
 
 
-def multithreaded_sort_profits_df(profits_df, n_threads):
-    """
-    Sort the profits DataFrame using a multithreaded approach.
+# def multithreaded_sort_profits_df(profits_df, n_threads):
+#     """
+#     Sort the profits DataFrame using a multithreaded approach.
 
-    Args:
-        profits_df (pd.DataFrame): The DataFrame to be sorted.
-        n_threads (int): The number of threads to use for sorting.
+#     Args:
+#         profits_df (pd.DataFrame): The DataFrame to be sorted.
+#         n_threads (int): The number of threads to use for sorting.
 
-    Returns:
-        pd.DataFrame: The sorted DataFrame.
-    """
-    start_time = time.time()
-    logger.info("Starting multithreaded sorting of profits_df with %s threads...", n_threads)
+#     Returns:
+#         pd.DataFrame: The sorted DataFrame.
+#     """
+#     start_time = time.time()
+#     logger.info("Starting multithreaded sorting of profits_df with %s threads...", n_threads)
 
-    # Create partitions
-    partitions = create_partitions(profits_df, n_threads)
+#     # Create partitions
+#     partitions = create_partitions(profits_df, n_threads)
 
-    # Use ThreadPoolExecutor to manage threads
-    with ThreadPoolExecutor(max_workers=n_threads) as executor:
-        # Submit sorting tasks
-        future_to_partition = {
-            executor.submit(sort_worker, partition): i for i, partition in enumerate(partitions)
-            }
+#     # Use ThreadPoolExecutor to manage threads
+#     with ThreadPoolExecutor(max_workers=n_threads) as executor:
+#         # Submit sorting tasks
+#         future_to_partition = {
+#             executor.submit(sort_worker, partition): i for i, partition in enumerate(partitions)
+#             }
 
-        # Collect results
-        sorted_partitions = []
-        for future in as_completed(future_to_partition):
-            partition_index = future_to_partition[future]
-            try:
-                sorted_partition = future.result()
-                sorted_partitions.append(sorted_partition)
-                logger.debug("Completed sorting partition %s", partition_index)
-            except Exception as exc:  # pylint: disable=W0718
-                logger.error("Partition %s generated an exception: %s", partition_index, exc)
+#         # Collect results
+#         sorted_partitions = []
+#         for future in as_completed(future_to_partition):
+#             partition_index = future_to_partition[future]
+#             try:
+#                 sorted_partition = future.result()
+#                 sorted_partitions.append(sorted_partition)
+#                 logger.debug("Completed sorting partition %s", partition_index)
+#             except Exception as exc:  # pylint: disable=W0718
+#                 logger.error("Partition %s generated an exception: %s", partition_index, exc)
 
-    # Merge sorted partitions
-    sorted_df = pd.concat(sorted_partitions, ignore_index=True)
+#     # Merge sorted partitions
+#     sorted_df = pd.concat(sorted_partitions, ignore_index=True)
 
-    # Final sort to ensure overall ordering
-    sorted_df = sorted_df.sort_values(by=['coin_id', 'wallet_address', 'date'])
+#     # Final sort to ensure overall ordering
+#     sorted_df = sorted_df.sort_values(by=['coin_id', 'wallet_address', 'date'])
 
-    logger.info("Completed sorting profits_df after %.2f seconds. Total rows: %s",
-                time.time() - start_time, len(sorted_df))
+#     logger.info("Completed sorting profits_df after %.2f seconds. Total rows: %s",
+#                 time.time() - start_time, len(sorted_df))
 
-    return sorted_df
+#     return sorted_df
 
-def sort_worker(partition):
-    """
-    Worker function to sort a partition of the DataFrame.
+# def sort_worker(partition):
+#     """
+#     Worker function to sort a partition of the DataFrame.
 
-    Args:
-        partition (pd.DataFrame): A partition of the profits DataFrame to be sorted.
+#     Args:
+#         partition (pd.DataFrame): A partition of the profits DataFrame to be sorted.
 
-    Returns:
-        pd.DataFrame: The sorted partition.
-    """
-    try:
-        # Sort the partition
-        sorted_partition = partition.sort_values(by=['coin_id', 'wallet_address', 'date'])
-        return sorted_partition
-    except Exception as e:
-        logger.error("Error in sort_worker: %s", str(e))
-        raise
+#     Returns:
+#         pd.DataFrame: The sorted partition.
+#     """
+#     try:
+#         # Sort the partition
+#         sorted_partition = partition.sort_values(by=['coin_id', 'wallet_address', 'date'])
+#         return sorted_partition
+#     except Exception as e:
+#         logger.error("Error in sort_worker: %s", str(e))
+#         raise
 
 
 
