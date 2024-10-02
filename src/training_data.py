@@ -104,7 +104,6 @@ def retrieve_profits_data(start_date,end_date):
             ,usd_net_transfers
             ,usd_inflows
             ,usd_inflows_cumulative
-            ,total_return
             from core.coin_wallet_profits
             where date <= '{end_date}'
         ),
@@ -156,14 +155,9 @@ def retrieve_profits_data(start_date,end_date):
             ,0 as usd_inflows
             -- no change since there were no inflows
             ,usd_inflows_cumulative as usd_inflows_cumulative
-            -- total_return is profits_cumumlative / usd_inflows_cumulative
-            ,(((t.price_current / t.price_previous) * t.usd_balance) - t.usd_balance + t.profits_cumulative) -- profits cumulative
-            / usd_inflows_cumulative
-            as total_return
 
             from training_start_needs_rows t
             where rn=1
-            and round(usd_balance,2) > 0
 
         ),
 
@@ -205,7 +199,6 @@ def retrieve_profits_data(start_date,end_date):
         ,usd_inflows
         -- set a floor of $0.01 to avoid divide by 0 errors caused by rounding
         ,greatest(0.01,usd_inflows_cumulative) as usd_inflows_cumulative
-        ,total_return
         from profits_recalculated_helper
     """
 
@@ -226,7 +219,6 @@ def retrieve_profits_data(start_date,end_date):
     profits_df['usd_net_transfers'] = profits_df['usd_net_transfers'].astype('float32')
     profits_df['usd_inflows'] = profits_df['usd_inflows'].astype('float32')
     profits_df['usd_inflows_cumulative'] = profits_df['usd_inflows_cumulative'].astype('float32')
-    profits_df['total_return'] = profits_df['total_return'].astype('float32')
 
     logger.info('Retrieved profits_df with %s unique coins and %s rows after %.2f seconds',
                 len(set(profits_df['coin_id'])),
@@ -641,10 +633,6 @@ def calculate_new_profits_values(profits_df, target_date):
 
     # no new usd_inflows so cumulative remains the same
     new_rows_df['usd_inflows_cumulative'] = profits_df['usd_inflows_cumulative']
-
-    # recalculate total_return since profits have changed with price
-    new_rows_df['total_return'] = (new_rows_df['profits_cumulative']
-                                   / new_rows_df['usd_inflows_cumulative'])
 
     # Set the date index to be the target_date
     new_rows_df = new_rows_df.reset_index()
