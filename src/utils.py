@@ -274,3 +274,20 @@ def obj_mem():
     mem_df = pd.DataFrame(objects, columns=['Name', 'Type', 'Size (MB)'])
     mem_df = mem_df.sort_values(by='Size (MB)', ascending=False).reset_index(drop=True)
     return mem_df
+
+
+
+def log_nan_counts(df):
+    """
+    utility function for testing
+    """
+    nan_counts = df.isna().sum()
+    non_zero_nans = nan_counts[nan_counts > 0]
+
+    if len(non_zero_nans) > 0:
+        log_message = "NaN counts in columns:\n" + "\n".join(f"{col}: {count}" for col, count in non_zero_nans.items())
+    else:
+        log_message = "No NaN values found in any column."
+
+    logger.critical(log_message)
+

@@ -307,6 +307,7 @@ def test_calculate_new_profits_values_normal_data(sample_profits_df, target_date
         target_date (datetime): Fixture providing a target date for imputation.
     """
     result = td.calculate_new_profits_values(sample_profits_df, target_date)
+    result = result.set_index(['coin_id', 'wallet_address', 'date'])
 
     # Check if the result has the correct structure
     assert isinstance(result, pd.DataFrame)
@@ -318,7 +319,6 @@ def test_calculate_new_profits_values_normal_data(sample_profits_df, target_date
 
     # Check if calculations are correct for the first row (btc, addr1)
     first_row = result.loc[('btc', 'addr1', target_date)]
-    assert first_row['profits_change'] == pytest.approx(55.55555556)  # (9500/9000 - 1) * 1000
     assert first_row['profits_cumulative'] == pytest.approx(155.55555556)  # 100 + 55.55555556
     assert first_row['usd_balance'] == pytest.approx(1055.55555556)  # (9500/9000) * 1000
     assert first_row['usd_net_transfers'] == 0
@@ -365,6 +365,7 @@ def test_calculate_new_profits_values_zero_price_change(zero_price_change_df, ta
         target_date (datetime): Fixture providing a target date for imputation.
     """
     result = td.calculate_new_profits_values(zero_price_change_df, target_date)
+    result = result.set_index(['coin_id', 'wallet_address', 'date'])
 
     # Check if the result has the correct structure
     assert isinstance(result, pd.DataFrame)
@@ -374,12 +375,12 @@ def test_calculate_new_profits_values_zero_price_change(zero_price_change_df, ta
         'usd_net_transfers', 'usd_inflows', 'usd_inflows_cumulative', 'total_return'
     }
 
+
     # Check if calculations are correct for all rows
     for (coin_id, wallet_address), group in zero_price_change_df.groupby(['coin_id', 'wallet_address']):
         result_row = result.loc[(coin_id, wallet_address, target_date)]
         original_row = group.iloc[0]  # Take the first row of the group
 
-        assert result_row['profits_change'] == pytest.approx(0, abs=1e-4)
         assert result_row['profits_cumulative'] == pytest.approx(original_row['profits_cumulative'], abs=1e-4)
         assert result_row['usd_balance'] == pytest.approx(original_row['usd_balance'], abs=1e-4)
         assert result_row['usd_net_transfers'] == 0
@@ -428,6 +429,7 @@ def test_calculate_new_profits_values_negative_price_change(negative_price_chang
         target_date (datetime): Fixture providing a target date for imputation.
     """
     result = td.calculate_new_profits_values(negative_price_change_df, target_date)
+    result = result.set_index(['coin_id', 'wallet_address', 'date'])
 
     # Check if the result has the correct structure
     assert isinstance(result, pd.DataFrame)
@@ -436,6 +438,7 @@ def test_calculate_new_profits_values_negative_price_change(negative_price_chang
         'profits_change', 'profits_cumulative', 'usd_balance',
         'usd_net_transfers', 'usd_inflows', 'usd_inflows_cumulative', 'total_return'
     }
+
 
     # Check if calculations are correct for all rows
     for (coin_id, wallet_address), group in negative_price_change_df.groupby(['coin_id', 'wallet_address']):
@@ -447,7 +450,6 @@ def test_calculate_new_profits_values_negative_price_change(negative_price_chang
         expected_profits_cumulative = original_row['profits_cumulative'] + expected_profits_change
         expected_usd_balance = price_ratio * original_row['usd_balance']
 
-        assert result_row['profits_change'] == pytest.approx(expected_profits_change, abs=1e-4)
         assert result_row['profits_cumulative'] == pytest.approx(expected_profits_cumulative, abs=1e-4)
         assert result_row['usd_balance'] == pytest.approx(expected_usd_balance, abs=1e-4)
         assert result_row['usd_net_transfers'] == 0
@@ -457,7 +459,6 @@ def test_calculate_new_profits_values_negative_price_change(negative_price_chang
             expected_profits_cumulative / original_row['usd_inflows_cumulative'], abs=1e-4)
 
         # Additional checks specific to negative price change
-        assert result_row['profits_change'] < 0
         assert result_row['profits_cumulative'] < original_row['profits_cumulative']
         assert result_row['usd_balance'] < original_row['usd_balance']
 
@@ -500,21 +501,13 @@ def test_calculate_new_profits_values_zero_usd_balance(zero_usd_balance_df, targ
         target_date (datetime): Fixture providing a target date for imputation.
     """
     result = td.calculate_new_profits_values(zero_usd_balance_df, target_date)
-
-    # Check if the result has the correct structure
-    assert isinstance(result, pd.DataFrame)
-    assert result.index.names == ['coin_id', 'wallet_address', 'date']
-    assert set(result.columns) == {
-        'profits_change', 'profits_cumulative', 'usd_balance',
-        'usd_net_transfers', 'usd_inflows', 'usd_inflows_cumulative', 'total_return'
-    }
+    result = result.set_index(['coin_id', 'wallet_address', 'date'])
 
     # Check if calculations are correct for all rows
     for (coin_id, wallet_address), group in zero_usd_balance_df.groupby(['coin_id', 'wallet_address']):
         result_row = result.loc[(coin_id, wallet_address, target_date)]
         original_row = group.iloc[0]  # Take the first row of the group
 
-        assert result_row['profits_change'] == 0
         assert result_row['profits_cumulative'] == original_row['profits_cumulative']
         assert result_row['usd_balance'] == 0
         assert result_row['usd_net_transfers'] == 0
@@ -566,14 +559,7 @@ def test_calculate_new_profits_values_multiple_coins_wallets(
         target_date (datetime): Fixture providing a target date for imputation.
     """
     result = td.calculate_new_profits_values(multiple_coins_wallets_df, target_date)
-
-    # Check if the result has the correct structure
-    assert isinstance(result, pd.DataFrame)
-    assert result.index.names == ['coin_id', 'wallet_address', 'date']
-    assert set(result.columns) == {
-        'profits_change', 'profits_cumulative', 'usd_balance',
-        'usd_net_transfers', 'usd_inflows', 'usd_inflows_cumulative', 'total_return'
-    }
+    result = result.set_index(['coin_id', 'wallet_address', 'date'])
 
     # Check if calculations are correct for all rows
     for (coin_id, wallet_address), group in multiple_coins_wallets_df.groupby(['coin_id', 'wallet_address']):
@@ -585,7 +571,6 @@ def test_calculate_new_profits_values_multiple_coins_wallets(
         expected_profits_cumulative = original_row['profits_cumulative'] + expected_profits_change
         expected_usd_balance = price_ratio * original_row['usd_balance']
 
-        assert result_row['profits_change'] == pytest.approx(expected_profits_change, abs=1e-4)
         assert result_row['profits_cumulative'] == pytest.approx(expected_profits_cumulative, abs=1e-4)
         assert result_row['usd_balance'] == pytest.approx(expected_usd_balance, abs=1e-4)
         assert result_row['usd_net_transfers'] == 0
@@ -730,7 +715,6 @@ def test_impute_profits_df_rows_base_case(sample_profits_df_missing_dates, sampl
         expected_profits_cumulative = last_known['profits_cumulative'] + expected_profits_change
         expected_usd_balance = last_known['usd_balance'] * price_ratio
 
-        assert row['profits_change'] == pytest.approx(expected_profits_change, rel=1e-6)
         assert row['profits_cumulative'] == pytest.approx(expected_profits_cumulative, rel=1e-6)
         assert row['usd_balance'] == pytest.approx(expected_usd_balance, rel=1e-6)
         assert row['usd_net_transfers'] == 0
@@ -832,123 +816,98 @@ def profits_df():
 
     return profits_df
 
+
+
 @pytest.mark.integration
-def test_transfers_data_quality(transfers_df):
-    """
-    Retrieves transfers_df and performs comprehensive data quality checks.
-    """
-    logger.info("Testing transfers_df from retrieve_transfers_data()...")
-    transfers_df = transfers_df.copy(deep=False)  # Create a copy to avoid affecting subsequent tests
+class TestProfitsDataQuality:
 
-    # Test 1: No duplicate records
-    # ----------------------------
-    deduped_df = transfers_df[['coin_id', 'wallet_address', 'date']].drop_duplicates()
-    logger.info(f"Original transfers_df length: {len(transfers_df)}, Deduplicated: {len(deduped_df)}")
-    assert len(transfers_df) == len(deduped_df), "There are duplicate rows based on coin_id, wallet_address, and date"
+    def test_no_duplicate_records(self, profits_df):
+        """Test 1: No duplicate records"""
+        deduped_df = profits_df[['coin_id', 'wallet_address', 'date']].drop_duplicates()
+        logger.info(f"Original profits_df length: {len(profits_df)}, Deduplicated: {len(deduped_df)}")
+        assert len(profits_df) == len(deduped_df), "There are duplicate rows based on coin_id, wallet_address, and date"
 
-    # Test 2: All coin-wallet pairs have a record at the end of the training period
-    # ----------------------------------------------------------------------------
-    transfers_df_filtered = transfers_df[transfers_df['date'] < MODELING_PERIOD_START]
-    pairs_in_training_period = transfers_df_filtered[['coin_id', 'wallet_address']].drop_duplicates()
-    period_end_df = transfers_df[transfers_df['date'] == TRAINING_PERIOD_END]
+    def test_records_at_training_period_end(self, profits_df):
+        """Test 2: All coin-wallet pairs have a record at the end of the training period"""
+        profits_df_filtered = profits_df[profits_df['date'] < MODELING_PERIOD_START]
+        pairs_in_training_period = profits_df_filtered[['coin_id', 'wallet_address']].drop_duplicates()
+        period_end_df = profits_df[profits_df['date'] == TRAINING_PERIOD_END]
 
-    logger.info(f"Found {len(pairs_in_training_period)} total pairs in training period with {len(period_end_df)} having data at period end.")
-    assert len(pairs_in_training_period) == len(period_end_df), "Not all training data coin-wallet pairs have a record at the end of the training period"
+        logger.info(f"Found {len(pairs_in_training_period)} total pairs in training period with {len(period_end_df)} having data at period end.")
+        assert len(pairs_in_training_period) == len(period_end_df), "Not all training data coin-wallet pairs have a record at the end of the training period"
 
-    # Test 3: No negative balances
-    # ----------------------------
-    # the threshold is set to -0.1 to account for rounding errors from the dune ingestion pipeline
-    negative_balances = transfers_df[transfers_df['balance'] < -0.1]
-    logger.info(f"Found {len(negative_balances)} records with negative balances.")
-    assert len(negative_balances) == 0, "There are negative balances in the dataset"
+    def test_no_negative_usd_balances(self, profits_df):
+        """Test 3: No negative USD balances"""
+        negative_balances = profits_df[profits_df['usd_balance'] < -0.1]
+        logger.info(f"Found {len(negative_balances)} records with negative USD balances.")
+        assert len(negative_balances) == 0, "There are negative USD balances in the dataset"
 
-    # Test 4: Date range check
-    # ------------------------
-    min_date = transfers_df['date'].min()
-    max_date = transfers_df['date'].max()
-    expected_max_date = pd.to_datetime(MODELING_PERIOD_END)
-    logger.info(f"transfers_df date range: {min_date} to {max_date}")
-    assert max_date == expected_max_date, f"The last date in the dataset should be {expected_max_date}"
+    def test_date_range(self, profits_df):
+        """Test 4: Date range check"""
+        min_date = profits_df['date'].min()
+        max_date = profits_df['date'].max()
+        expected_max_date = pd.to_datetime(MODELING_PERIOD_END)
+        logger.info(f"profits_df date range: {min_date} to {max_date}")
+        assert max_date == expected_max_date, f"The last date in the dataset should be {expected_max_date}"
 
-    # Test 5: No missing values
-    # -------------------------
-    missing_values = transfers_df.isna().sum()
-    assert missing_values.sum() == 0, "There are missing values in the dataset"
+    def test_no_missing_values(self, profits_df):
+        """Test 5: No missing values"""
+        missing_values = profits_df.isna().sum()
+        assert missing_values.sum() == 0, f"There are missing values in the dataset: {missing_values[missing_values > 0]}"
 
-    # Test 6: Balance consistency
-    # ---------------------------
-    transfers_df['balance_change'] = transfers_df.groupby(['coin_id', 'wallet_address'],observed=True)['balance'].diff()
-    transfers_df['expected_change'] = transfers_df['net_transfers']
+    def test_profits_consistency(self, profits_df):
+        """Test 6: Profits consistency"""
+        profits_df = profits_df.copy()
+        profits_df['profits_change_check'] = profits_df.groupby(['coin_id', 'wallet_address'], observed=True)['profits_cumulative'].diff()
+        profits_df['diff'] = profits_df['profits_change'] - profits_df['profits_change_check']
 
-    # Calculate the difference between balance_change and expected_change
-    transfers_df['diff'] = transfers_df['balance_change'] - transfers_df['expected_change']
+        threshold = 1e-8
+        inconsistent_profits = profits_df[
+            (~profits_df['profits_change_check'].isna()) &
+            (profits_df['diff'].abs() > threshold)
+        ]
 
-    # Define a threshold for acceptable discrepancies (e.g., 1e-8)
-    # currently set to 0.1 for coins with values e+13 and e+14 that are showing rounding issues
-    threshold = 0.1
+        if len(inconsistent_profits) > 0:
+            logger.warning(f"Found {len(inconsistent_profits)} records with potentially inconsistent profit changes.")
+            logger.warning("Sample of inconsistent profits:")
+            logger.warning(inconsistent_profits.head().to_string())
 
-    # Find inconsistent balances, ignoring the first record for each coin-wallet pair
-    # and allowing for small discrepancies
-    inconsistent_balances = transfers_df[
-        (~transfers_df['balance_change'].isna()) &  # Ignore first records
-        (transfers_df['diff'].abs() > threshold)    # Allow small discrepancies
-    ]
+        assert len(inconsistent_profits) == 0, f"Found {len(inconsistent_profits)} records with potentially inconsistent profit changes. Check logs for details."
 
-    if len(inconsistent_balances) > 0:
-        logger.warning(f"Found {len(inconsistent_balances)} records with potentially inconsistent balance changes.")
-        logger.warning("Sample of inconsistent balances:")
-        logger.warning(inconsistent_balances.head().to_string())
-    else:
-        logger.info("No significant balance inconsistencies found.")
+    def test_records_at_training_period_end_all_wallets(self, profits_df):
+        """Test 7: Ensure all applicable wallets have records as of the training_period_end"""
+        training_profits_df = profits_df[profits_df['date'] <= TRAINING_PERIOD_END]
+        training_wallets_df = training_profits_df[['coin_id', 'wallet_address']].drop_duplicates()
 
-    # Instead of a hard assertion, we'll log a warning if inconsistencies are found
-    # This allows the test to pass while still alerting us to potential issues
-    assert len(inconsistent_balances) == 0, f"Found {len(inconsistent_balances)} records with potentially inconsistent balance changes. Check logs for details."
+        training_end_df = profits_df[profits_df['date'] == TRAINING_PERIOD_END]
+        training_end_df = training_end_df[['coin_id', 'wallet_address']].drop_duplicates()
 
-    # Test 8: Ensure all applicable wallets have records as of the training_period_end
-    # ------------------------------------------------------------------------------------------
-    # get a list of all coin-wallet pairs as of the training_period_end
-    training_transfers_df = transfers_df[transfers_df['date'] <= TRAINING_PERIOD_END]
-    training_wallets_df = training_transfers_df[['coin_id', 'wallet_address']].drop_duplicates()
+        assert len(training_wallets_df) == len(training_end_df), "Some wallets are missing a record as of the training_period_end"
 
-    # get a list of all coin-wallet pairs on the training_transfers_end date
-    training_end_df = transfers_df[transfers_df['date'] == TRAINING_PERIOD_END]
-    training_end_df = training_end_df[['coin_id', 'wallet_address']].drop_duplicates()
+    def test_records_at_modeling_period_start(self, profits_df):
+        """Test 8: Ensure all wallets have records as of the modeling_period_start"""
+        modeling_profits_df = profits_df[profits_df['date'] <= MODELING_PERIOD_START]
+        modeling_wallets_df = modeling_profits_df[['coin_id', 'wallet_address']].drop_duplicates()
 
-    # confirm that they are the same length
-    assert len(training_wallets_df) == len(training_end_df), "Some wallets are missing a record as of the training_period_end"
+        modeling_start_df = profits_df[profits_df['date'] == MODELING_PERIOD_START]
+        modeling_start_df = modeling_start_df[['coin_id', 'wallet_address']].drop_duplicates()
 
-    # Test 9: Ensure all wallets have records as of the modeling_period_start
-    # ------------------------------------------------------------------------------------------
-    # get a list of all coin-wallet pairs
-    modeling_transfers_df = transfers_df[transfers_df['date'] <= MODELING_PERIOD_START]
-    modeling_wallets_df = modeling_transfers_df[['coin_id', 'wallet_address']].drop_duplicates()
+        assert len(modeling_wallets_df) == len(modeling_start_df), "Some wallets are missing a record as of the modeling_period_start"
 
-    # get a list of all coin-wallet pairs on the modeling_period_start
-    modeling_start_df = transfers_df[transfers_df['date'] == MODELING_PERIOD_START]
-    modeling_start_df = modeling_start_df[['coin_id', 'wallet_address']].drop_duplicates()
+    def test_records_at_modeling_period_end(self, profits_df):
+        """Test 9: Ensure all wallets have records as of the modeling_period_end"""
+        modeling_profits_df = profits_df[profits_df['date'] <= MODELING_PERIOD_END]
+        modeling_wallets_df = modeling_profits_df[['coin_id', 'wallet_address']].drop_duplicates()
 
-    # confirm that they are the same length
-    assert len(modeling_wallets_df) == len(modeling_start_df), "Some wallets are missing a record as of the modeling_period_start"
+        modeling_end_df = profits_df[profits_df['date'] == MODELING_PERIOD_END]
+        modeling_end_df = modeling_end_df[['coin_id', 'wallet_address']].drop_duplicates()
 
-    # Test 9: Ensure all wallets have records as of the modeling_period_end
-    # ------------------------------------------------------------------------------------------
-    # get a list of all coin-wallet pairs
-    modeling_transfers_df = transfers_df[transfers_df['date'] <= MODELING_PERIOD_END]
-    modeling_wallets_df = modeling_transfers_df[['coin_id', 'wallet_address']].drop_duplicates()
+        assert len(modeling_wallets_df) == len(modeling_end_df), "Some wallets are missing a record as of the modeling_period_end"
 
-    # get a list of all coin-wallet pairs on the modeling_period_end
-    modeling_end_df = transfers_df[transfers_df['date'] == MODELING_PERIOD_END]
-    modeling_end_df = modeling_end_df[['coin_id', 'wallet_address']].drop_duplicates()
-
-    # confirm that they are the same length
-    assert len(modeling_wallets_df) == len(modeling_end_df), "Some wallets are missing a record as of the modeling_period_end"
-
-    # Test 10: Confirm no records exist prior to the training period start
-    # ------------------------------------------------------------------------------------------
-    assert len(transfers_df[transfers_df['date']<TRAINING_PERIOD_START]) == 0, "Records prior to training_period_start exist"
-
-    logger.info("All transfers_df data quality checks passed successfully.")
+    def test_no_records_before_training_period_start(self, profits_df):
+        """Test 10: Confirm no records exist prior to the training period start"""
+        early_records = profits_df[profits_df['date'] < TRAINING_PERIOD_START]
+        assert len(early_records) == 0, f"Found {len(early_records)} records prior to training_period_start"
 
 
 # ---------------------------------------- #

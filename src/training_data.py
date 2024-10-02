@@ -3,7 +3,9 @@ functions used in generating training data for the models
 """
 import time
 import logging
+import warnings
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import queue
 import pandas as pd
 import numpy as np
@@ -211,6 +213,10 @@ def retrieve_profits_data(start_date,end_date):
     profits_df['coin_id'] = profits_df['coin_id'].astype('category')
     profits_df['date'] = pd.to_datetime(profits_df['date'])
 
+    # Add total_return column
+    profits_df['total_return'] = (profits_df['profits_cumulative']
+                                   / profits_df['usd_inflows_cumulative'])
+
     # Convert all numerical columns to float32
     profits_df['wallet_address'] = profits_df['wallet_address'].astype('int32')
     profits_df['profits_change'] = profits_df['profits_change'].astype('float32')
@@ -219,6 +225,7 @@ def retrieve_profits_data(start_date,end_date):
     profits_df['usd_net_transfers'] = profits_df['usd_net_transfers'].astype('float32')
     profits_df['usd_inflows'] = profits_df['usd_inflows'].astype('float32')
     profits_df['usd_inflows_cumulative'] = profits_df['usd_inflows_cumulative'].astype('float32')
+    profits_df['total_return'] = profits_df['total_return'].astype('float32')
 
     logger.info('Retrieved profits_df with %s unique coins and %s rows after %.2f seconds',
                 len(set(profits_df['coin_id'])),
@@ -524,7 +531,7 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
 
 
     # Step 3: Identify the last date for each coin-wallet pair
-    # ----------------------------------------------
+    # --------------------------------------------------------
     # The logic here is that every row that doesn't have the same coin_id-wallet_address
     # combination as the previous row must indicate that the previous coin-wallet pair
     # just had its last date.
@@ -582,21 +589,15 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
                     time.time() - step_time)
     step_time = time.time()
 
-
-    # Step 6: Reset MultiIndex and concatenate dfs
-    # --------------------------------------------
-    new_rows_df = new_rows_df.reset_index()
-
-    logger.debug("%s <Step 6> Reset indices and added new rows to profits_df: %.2f seconds",
-                    new_rows_df.shape,
-                    time.time() - step_time)
     logger.info("%s Successfully generated new_rows_df with shape %s after %.2f total seconds.",
                 new_rows_df.shape,
                 new_rows_df.shape,
                 time.time() - start_time)
 
-    if new_rows_df.isnull().any().any():
-        raise ValueError("new_rows_df contains empty values after the calculation.")
+    # profits_change will need to be recalculated for the full df
+    if new_rows_df.drop(columns=['profits_change']).isna().any().any():
+        raise ValueError("new_rows_df contains unexpected empty values after the calculation.")
+
 
     return new_rows_df
 
@@ -615,13 +616,14 @@ def calculate_new_profits_values(profits_df, target_date):
     """
     new_rows_df = pd.DataFrame(index=profits_df.index)
 
-    # the impact of price movements since the last transaction is recognized as change in profits
-    new_rows_df['profits_change'] = ((profits_df['price'] / profits_df['price_previous'] - 1)
-                                     * profits_df['usd_balance'])
+    # this will be calculated after all rows are merged together, because merging in new rows
+    # throws off the following row's profits_change
+    new_rows_df['profits_change'] = np.nan
 
-    # existing profits_cumulative + new profits_change
-    new_rows_df['profits_cumulative'] = (new_rows_df['profits_change']
-                                         + profits_df['profits_cumulative'])
+    # new profits_cumulative = (price change * usd_balance) + previous profits_cumulative
+    new_rows_df['profits_cumulative'] = (
+         ((profits_df['price'] / profits_df['price_previous'] - 1) * profits_df['usd_balance'])
+         + profits_df['profits_cumulative'])
 
     # % change in price times the USD balance
     new_rows_df['usd_balance'] = ((profits_df['price'] / profits_df['price_previous'])
@@ -634,10 +636,13 @@ def calculate_new_profits_values(profits_df, target_date):
     # no new usd_inflows so cumulative remains the same
     new_rows_df['usd_inflows_cumulative'] = profits_df['usd_inflows_cumulative']
 
+    # recalculate total_return since profits have changed with price
+    new_rows_df['total_return'] = (new_rows_df['profits_cumulative']
+                                   / new_rows_df['usd_inflows_cumulative'])
+
     # Set the date index to be the target_date
     new_rows_df = new_rows_df.reset_index()
     new_rows_df['date'] = target_date  # pylint: disable=E1137 # df does not support item assignment
-    new_rows_df = new_rows_df.set_index(['coin_id', 'wallet_address', 'date'])
 
     return new_rows_df
 
@@ -668,7 +673,7 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
         new_rows_df = multithreaded_impute_profits_rows(profits_df, prices_df, date, n_threads)
 
         # Check for NaN values
-        if new_rows_df.isna().any().any():
+        if new_rows_df.drop(columns=['profits_change']).isna().any().any():
             raise ValueError(f"NaN values found in the imputed rows for date: {date}")
 
         new_rows_list.append(new_rows_df)
@@ -678,6 +683,9 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
 
     # Append all new rows to profits_df
     updated_profits_df = pd.concat([profits_df, all_new_rows], ignore_index=True)
+
+    # # recompute profits_change now that we have all profits_cumulative rows
+    updated_profits_df = recalculate_profits_change(updated_profits_df)
 
     logger.info("Completed new row generation after %.2f seconds. Total rows after imputation: %s",
                 time.time() - start_time,
@@ -742,7 +750,8 @@ def multithreaded_impute_profits_rows(profits_df, prices_df, target_date, n_thre
     while not result_queue.empty():
         results.append(result_queue.get())
 
-    # Merge results
+    # Merge results together
+    warnings.simplefilter(action='ignore', category=FutureWarning) # ignore NaN dtype warnings
     all_new_rows_df = pd.concat(results, ignore_index=True)
     logger.info("Generated %s new rows for date %s.",
                 len(all_new_rows_df),
@@ -801,6 +810,119 @@ def worker(partition, prices_df, target_date, result_queue):
 
     # Put the result in the queue
     result_queue.put(result)
+
+
+
+def recalculate_profits_change(profits_df):
+    """
+    Recalculates the profits_change column for a sorted profits DataFrame.
+
+    Args:
+        profits_df (pd.DataFrame): A DataFrame containing profit data
+
+    Returns:
+        pd.DataFrame: The updated DataFrame with recalculated profits_change.
+    """
+    # Sort the df so we can use shift() functions on timeseries
+    profits_df = multithreaded_sort_profits_df(profits_df, 24)
+
+    logger.info("Recalculating profits_change for the full dataframe...")
+
+    # Set the index for efficient operations
+    profits_df = profits_df.set_index(['coin_id', 'wallet_address', 'date'])
+
+    # Create shifted index
+    shifted_index = profits_df.index.to_frame().shift(1)
+
+    # Check if the previous row belongs to the same coin-wallet pair
+    has_previous_records = (
+        (profits_df.index.get_level_values('coin_id') == shifted_index['coin_id']) &
+        (profits_df.index.get_level_values('wallet_address') == shifted_index['wallet_address'])
+    )
+
+    # Shift profits_cumulative to calculate the profits_change for each row
+    previous_profits_cumulative = profits_df['profits_cumulative'].shift(1)
+    previous_profits_cumulative[0] = 0
+
+    # Calculate profits_change
+    profits_df['profits_change'] = (
+        (profits_df['profits_cumulative'] - previous_profits_cumulative)
+        * has_previous_records  # Sets row to 0 if it is the first record for the coin-wallet pair
+    )
+
+    # Reset index to return to the original DataFrame structure
+    profits_df = profits_df.reset_index()
+
+    logger.info("Profits_change recalculation completed.")
+
+    return profits_df
+
+
+
+def multithreaded_sort_profits_df(profits_df, n_threads):
+    """
+    Sort the profits DataFrame using a multithreaded approach.
+
+    Args:
+        profits_df (pd.DataFrame): The DataFrame to be sorted.
+        n_threads (int): The number of threads to use for sorting.
+
+    Returns:
+        pd.DataFrame: The sorted DataFrame.
+    """
+    start_time = time.time()
+    logger.info("Starting multithreaded sorting of profits_df with %s threads...", n_threads)
+
+    # Create partitions
+    partitions = create_partitions(profits_df, n_threads)
+
+    # Use ThreadPoolExecutor to manage threads
+    with ThreadPoolExecutor(max_workers=n_threads) as executor:
+        # Submit sorting tasks
+        future_to_partition = {
+            executor.submit(sort_worker, partition): i for i, partition in enumerate(partitions)
+            }
+
+        # Collect results
+        sorted_partitions = []
+        for future in as_completed(future_to_partition):
+            partition_index = future_to_partition[future]
+            try:
+                sorted_partition = future.result()
+                sorted_partitions.append(sorted_partition)
+                logger.debug("Completed sorting partition %s", partition_index)
+            except Exception as exc:  # pylint: disable=W0718
+                logger.error("Partition %s generated an exception: %s", partition_index, exc)
+
+    # Merge sorted partitions
+    sorted_df = pd.concat(sorted_partitions, ignore_index=True)
+
+    # Final sort to ensure overall ordering
+    sorted_df = sorted_df.sort_values(by=['coin_id', 'wallet_address', 'date'])
+
+    logger.info("Completed sorting profits_df after %.2f seconds. Total rows: %s",
+                time.time() - start_time, len(sorted_df))
+
+    return sorted_df
+
+def sort_worker(partition):
+    """
+    Worker function to sort a partition of the DataFrame.
+
+    Args:
+        partition (pd.DataFrame): A partition of the profits DataFrame to be sorted.
+
+    Returns:
+        pd.DataFrame: The sorted partition.
+    """
+    try:
+        # Sort the partition
+        sorted_partition = partition.sort_values(by=['coin_id', 'wallet_address', 'date'])
+        return sorted_partition
+    except Exception as e:
+        logger.error("Error in sort_worker: %s", str(e))
+        raise
+
 
 
 
