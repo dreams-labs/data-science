@@ -11,6 +11,7 @@ tests used to audit the files in the data-science/src folder
 import sys
 import os
 import pandas as pd
+import numpy as np
 from dotenv import load_dotenv
 import pytest
 from dreams_core import core as dc
@@ -564,6 +565,163 @@ def test_calculate_new_profits_values_multiple_coins_wallets(multiple_coins_wall
     assert set(result.index.get_level_values('wallet_address')) == set(multiple_coins_wallets_df.index.get_level_values('wallet_address'))
 
 
+
+# -------------------------------------------- #
+# impute_profits_df_rows() unit tests
+# -------------------------------------------- #
+
+@pytest.fixture
+def sample_profits_df_missing_dates():
+    """
+    Fixture to create a sample profits DataFrame with missing intermediate dates for testing.
+    """
+    data = {
+        'coin_id': ['BTC', 'ETH', 'BTC', 'ETH', 'BTC', 'ETH', 'BTC', 'ETH'],
+        'wallet_address': ['wallet1', 'wallet1', 'wallet2', 'wallet2', 'wallet1', 'wallet1', 'wallet2', 'wallet2'],
+        'date': [
+            '2023-01-01', '2023-01-01', '2023-01-01', '2023-01-01',
+            '2023-01-05', '2023-01-05', '2023-01-07', '2023-01-07'
+        ],
+        'profits_change': [100, 50, 200, 75, 50, 25, 150, 100],
+        'usd_net_transfers': [0, 0, 0, 0, 50, 25, -100, -50],
+        'usd_inflows': [1000, 500, 2000, 1000, 0, 0, 0, 0]
+    }
+
+    df = pd.DataFrame(data)
+    df['date'] = pd.to_datetime(df['date'])
+
+    # Set the index before calculations
+    df = df.set_index(['coin_id', 'wallet_address', 'date']).sort_index()
+
+    # Calculate cumulative and derived columns
+    df['profits_cumulative'] = df.groupby(['coin_id', 'wallet_address'])['profits_change'].cumsum()
+    df['usd_inflows_cumulative'] = df.groupby(['coin_id', 'wallet_address'])['usd_inflows'].cumsum()
+
+    # Calculate usd_balance
+    df['usd_balance'] = (df['usd_inflows_cumulative'] +
+                         df['profits_cumulative'] +
+                         df.groupby(['coin_id', 'wallet_address'])['usd_net_transfers'].cumsum())
+
+    # Calculate total_return
+    df['total_return'] = df['profits_cumulative'] / df['usd_inflows_cumulative']
+    df = df.reset_index()
+
+    return df
+
+
+@pytest.fixture
+def sample_prices_df_missing_dates():
+    """
+    Fixture to create a sample prices DataFrame with continuous dates for testing.
+    """
+    data = {
+        'coin_id': ['BTC', 'ETH'] * 7,
+        'date': [date for date in pd.date_range(start='2023-01-01', end='2023-01-07') for _ in range(2)],
+        'price': [
+            10000, 200,  # 2023-01-01
+            10100, 205,  # 2023-01-02
+            10200, 210,  # 2023-01-03
+            10300, 215,  # 2023-01-04
+            10400, 220,  # 2023-01-05
+            10500, 225,  # 2023-01-06
+            10600, 230   # 2023-01-07
+        ]
+    }
+
+    df = pd.DataFrame(data)
+    df['date'] = pd.to_datetime(df['date'])
+    return df
+
+@pytest.mark.unit
+def test_impute_profits_df_rows_base_case(sample_profits_df_missing_dates, sample_prices_df_missing_dates):
+    """
+    Test the base case for impute_profits_df_rows function.
+
+    This test checks the basic functionality of the function, including:
+    - Correct output structure
+    - Imputation of missing rows
+    - Correct calculations for imputed rows
+    - Handling of multiple coins and wallets
+    """
+    target_date = pd.Timestamp('2023-01-06')
+
+    result = td.impute_profits_df_rows(sample_profits_df_missing_dates, sample_prices_df_missing_dates, target_date)
+
+    # Check output structure
+    assert isinstance(result, pd.DataFrame)
+    expected_columns = ['coin_id', 'wallet_address', 'date', 'profits_change', 'profits_cumulative',
+                        'usd_balance', 'usd_net_transfers', 'usd_inflows', 'usd_inflows_cumulative', 'total_return']
+    assert set(result.columns) == set(expected_columns)
+
+    # Check that only rows for the target date are returned
+    assert (result['date'] == target_date).all()
+
+    # Check that the correct number of rows are imputed
+    assert len(result) == 4  # 2 coins * 2 wallets
+
+    # Check calculations for imputed rows
+    for _, row in result.iterrows():
+        coin_id = row['coin_id']
+        wallet_address = row['wallet_address']
+
+        # Get the last known values for this coin-wallet pair
+        last_known = sample_profits_df_missing_dates[
+            (sample_profits_df_missing_dates['coin_id'] == coin_id) &
+            (sample_profits_df_missing_dates['wallet_address'] == wallet_address) &
+            (sample_profits_df_missing_dates['date'] < target_date)
+        ].iloc[-1]
+
+        # Get the prices
+        price_previous = sample_prices_df_missing_dates[
+            (sample_prices_df_missing_dates['coin_id'] == coin_id) &
+            (sample_prices_df_missing_dates['date'] == last_known['date'])
+        ]['price'].values[0]
+        price_current = sample_prices_df_missing_dates[
+            (sample_prices_df_missing_dates['coin_id'] == coin_id) &
+            (sample_prices_df_missing_dates['date'] == target_date)
+        ]['price'].values[0]
+
+        # Check calculations
+        price_ratio = price_current / price_previous
+        expected_profits_change = (price_ratio - 1) * last_known['usd_balance']
+        expected_profits_cumulative = last_known['profits_cumulative'] + expected_profits_change
+        expected_usd_balance = last_known['usd_balance'] * price_ratio
+
+        assert row['profits_change'] == pytest.approx(expected_profits_change, rel=1e-6)
+        assert row['profits_cumulative'] == pytest.approx(expected_profits_cumulative, rel=1e-6)
+        assert row['usd_balance'] == pytest.approx(expected_usd_balance, rel=1e-6)
+        assert row['usd_net_transfers'] == 0
+        assert row['usd_inflows'] == 0
+        assert row['usd_inflows_cumulative'] == last_known['usd_inflows_cumulative']
+        assert row['total_return'] == pytest.approx(row['profits_cumulative'] / row['usd_inflows_cumulative'], rel=1e-6)
+
+    # Check handling of multiple coins and wallets
+    assert set(result['coin_id']) == {'BTC', 'ETH'}
+    assert set(result['wallet_address']) == {'wallet1', 'wallet2'}
+
+@pytest.mark.unit
+def test_impute_profits_df_rows_early_target_date(sample_profits_df_missing_dates, sample_prices_df_missing_dates):
+    """
+    Test that impute_profits_df_rows raises a ValueError when the target date is earlier than all dates in profits_df.
+    """
+    early_target_date = pd.Timestamp('2022-12-31')  # Earlier than any date in sample_profits_df_missing_dates
+
+    with pytest.raises(ValueError) as excinfo:
+        td.impute_profits_df_rows(sample_profits_df_missing_dates, sample_prices_df_missing_dates, early_target_date)
+
+    assert "Target date is earlier than all dates in profits_df" in str(excinfo.value)
+
+@pytest.mark.unit
+def test_impute_profits_df_rows_late_target_date(sample_profits_df_missing_dates, sample_prices_df_missing_dates):
+    """
+    Test that impute_profits_df_rows raises a ValueError when the target date is later than all dates in prices_df.
+    """
+    late_target_date = pd.Timestamp('2023-01-08')  # Later than any date in sample_prices_df_missing_dates
+
+    with pytest.raises(ValueError) as excinfo:
+        td.impute_profits_df_rows(sample_profits_df_missing_dates, sample_prices_df_missing_dates, late_target_date)
+
+    assert "Target date is later than all dates in prices_df" in str(excinfo.value)
 
 # ======================================================== #
 #                                                          #

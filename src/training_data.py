@@ -460,6 +460,15 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
     # Convert date to datetime
     target_date = pd.to_datetime(target_date)
 
+    # Check if target_date is earlier than all profits_df dates
+    if target_date < pd.to_datetime(profits_df['date'].min()):
+        raise ValueError("Target date is earlier than all dates in profits_df")
+
+    # Check if target_date is later than all prices_df dates
+    if pd.to_datetime(target_date) >  pd.to_datetime(prices_df['date'].max()):
+        raise ValueError("Target date is later than all dates in prices_df")
+
+
     # Create indices so we can use vectorized operations
     profits_df = profits_df.set_index(['coin_id', 'wallet_address', 'date'])
     prices_df = prices_df.set_index(['coin_id', 'date']).copy(deep=True)
