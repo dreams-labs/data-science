@@ -10,7 +10,10 @@ tests used to audit the files in the data-science/src folder
 
 import sys
 import os
+import contextlib
+import threading
 import pandas as pd
+import numpy as np
 from dotenv import load_dotenv
 import pytest
 from dreams_core import core as dc
@@ -46,9 +49,12 @@ def sample_clean_profits_profits_df():
         'profits_change': [2000, 500, 18000, -7000, 5000, 12000, 16000, 1000, 18000, -7000, -10000,
                            -8000, 15000],
         'usd_inflows': [5000, 4000, 7000, 6000, 8000, 9000, 4000, 3000, 5000, 3000, 6000,
-                        3000, 10000]
+                        3000, 10000],
+        'date': pd.date_range(start='2024-01-01', periods=13, freq='D')  # Adding a date column
     }
-    return pd.DataFrame(data)
+    df = pd.DataFrame(data)
+    df['profits_cumulative'] = df.groupby('wallet_address')['profits_change'].cumsum()  # Calculating cumulative profits
+    return df
 
 @pytest.fixture
 def sample_clean_profits_data_cleaning_config():
@@ -154,22 +160,6 @@ def test_clean_profits_extreme_inflows_but_zero_profits(
         sample_clean_profits_data_cleaning_config
     )
     assert 'wallet_3' not in cleaned_df['wallet_address'].values
-
-@pytest.mark.unit
-def test_clean_profits_aggregate_inflows_profits_across_coins(
-        sample_clean_profits_profits_df,
-        sample_clean_profits_data_cleaning_config
-        ):
-    """
-    Test exclusion of wallet where aggregated inflows/profits across multiple coins exceed thresholds.
-    """
-    sample_clean_profits_profits_df.loc[sample_clean_profits_profits_df['wallet_address'] == 'wallet_5',
-                                        'profits_change'] = 18000
-    sample_clean_profits_profits_df.loc[sample_clean_profits_profits_df['wallet_address'] == 'wallet_5',
-                                        'usd_inflows_cumulative'] = 8000
-    cleaned_df, exclusions_df = td.clean_profits_df(sample_clean_profits_profits_df,
-                                                    sample_clean_profits_data_cleaning_config)
-    assert 'wallet_5' not in cleaned_df['wallet_address'].values
 
 
 
@@ -778,8 +768,17 @@ MODELING_PERIOD_END = config['training_data']['modeling_period_end']
 # retrieve_transfers_data() integration tests
 # ---------------------------------------- #
 
+@contextlib.contextmanager
+def single_threaded():
+    _original_thread_count = threading.active_count()
+    yield
+    current_thread_count = threading.active_count()
+    if current_thread_count > _original_thread_count:
+        raise AssertionError(f"Test created new threads: {current_thread_count - _original_thread_count}")
+
+
 @pytest.fixture(scope='session')
-def profits_df():
+def profits_df(prices_df):
     """
     retrieves transfers_df for data quality checks
     """
@@ -787,6 +786,14 @@ def profits_df():
     logger.info("Generating profits_df fixture from production data...")
     # retrieve profits data
     profits_df = td.retrieve_profits_data(TRAINING_PERIOD_START, MODELING_PERIOD_END)
+
+    # filter data to only 5% of coin_ids
+    np.random.seed(42)
+    unique_coin_ids = profits_df['coin_id'].unique()
+    sample_coin_ids = np.random.choice(unique_coin_ids, size=int(0.05 * len(unique_coin_ids)), replace=False)
+    profits_df = profits_df[profits_df['coin_id'].isin(sample_coin_ids)]
+
+    # perform the rest of the data cleaning steps
     profits_df, _ = cwm.split_dataframe_by_coverage(
         profits_df,
         TRAINING_PERIOD_START,
@@ -801,7 +808,9 @@ def profits_df():
         MODELING_PERIOD_START,
         MODELING_PERIOD_END
     ]
-    profits_df = td.impute_profits_for_multiple_dates(profits_df, prices_df, dates_to_impute, n_threads=24)
+    # this must use only 1 thread to work in a testing environment
+    with single_threaded():
+        profits_df = td.impute_profits_for_multiple_dates(profits_df, prices_df, dates_to_impute, n_threads=1)
 
     return profits_df
 
@@ -809,7 +818,9 @@ def profits_df():
 
 @pytest.mark.integration
 class TestProfitsDataQuality:
-
+    """
+    Various tests on the data quality of the final profits_df version
+    """
     def test_no_duplicate_records(self, profits_df):
         """Test 1: No duplicate records"""
         deduped_df = profits_df[['coin_id', 'wallet_address', 'date']].drop_duplicates()

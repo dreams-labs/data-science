@@ -5,7 +5,6 @@ import time
 import logging
 import warnings
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import queue
 import pandas as pd
 import numpy as np
