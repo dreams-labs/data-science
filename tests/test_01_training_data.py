@@ -1042,21 +1042,21 @@ def test_clean_profits_exclusions(cleaned_profits_df, profits_df_base):
     assert len(exclusions_df) == len(breaches_df), "Some excluded wallets do not breach a threshold."
 
 @pytest.mark.integration
-def test_clean_profits_remaining_count(cleaned_profits_df, profits_df):
+def test_clean_profits_remaining_count(cleaned_profits_df, profits_df_base):
     """
     Test that the count of remaining records in the cleaned DataFrame matches the expected count.
     """
     cleaned_df, exclusions_df = cleaned_profits_df
 
     # Get the total number of unique wallets before and after cleaning
-    input_wallet_count = profits_df['wallet_address'].nunique()
+    input_wallet_count = profits_df_base['wallet_address'].nunique()
     cleaned_wallet_count = cleaned_df['wallet_address'].nunique()
     excluded_wallet_count = exclusions_df['wallet_address'].nunique()
 
     # Assert that the remaining records equal the difference between the input and excluded records
     assert input_wallet_count == cleaned_wallet_count + excluded_wallet_count, \
         "The count of remaining wallets does not match the input minus excluded records."
-
+import pdb
 @pytest.mark.integration
 def test_clean_profits_aggregate_sums(cleaned_profits_df):
     """
@@ -1066,21 +1066,24 @@ def test_clean_profits_aggregate_sums(cleaned_profits_df):
     cleaned_df, _ = cleaned_profits_df
 
     # Aggregate the profits and inflows for the remaining wallets
-    remaining_wallets_agg_df = cleaned_df.sort_values('date').groupby('wallet_address', observed=True).agg({
-        'profits_cumulative': 'last',
-        'usd_inflows': 'sum'
-    }).reset_index()
+    remaining_wallets_agg_df = (cleaned_df.sort_values('date')
+                                            .groupby(['coin_id','wallet_address'], observed=True)
+                                            .agg({
+                                                'profits_cumulative': 'last',
+                                                'usd_inflows_cumulative': 'last'
+                                            })
+                                            .reset_index())
 
     # Apply the thresholds from the config
     profitability_filter = config['data_cleaning']['profitability_filter']
     inflows_filter = config['data_cleaning']['inflows_filter']
-
     # Ensure no remaining wallets exceed the thresholds
     over_threshold_wallets = remaining_wallets_agg_df[
         (remaining_wallets_agg_df['profits_cumulative'] >= profitability_filter) |
         (remaining_wallets_agg_df['profits_cumulative'] <= -profitability_filter) |
-        (remaining_wallets_agg_df['usd_inflows'] >= inflows_filter)
+        (remaining_wallets_agg_df['usd_inflows_cumulative'] >= inflows_filter)
     ]
+    pdb.set_trace()
 
     # Assert that no wallets in the cleaned DataFrame breach the thresholds
     assert over_threshold_wallets.empty, "Some remaining wallets exceed the thresholds."
