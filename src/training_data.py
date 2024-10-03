@@ -273,11 +273,11 @@ def clean_profits_df(profits_df, data_cleaning_config):
     # -------------------------------------------------------------------
     # Group by wallet_address and calculate the total inflows
     wallet_inflows_agg_df = profits_df.groupby(
-        'wallet_address', observed=True)['usd_inflows'].sum().reset_index()
+        'wallet_address', observed=True)['usd_inflows_cumulative'].last().reset_index()
 
     # Identify wallet addresses where total inflows exceed the threshold
     exclusions_inflows_df = wallet_inflows_agg_df[
-        wallet_inflows_agg_df['usd_inflows'] >= data_cleaning_config['inflows_filter']
+        wallet_inflows_agg_df['usd_inflows_cumulative'] >= data_cleaning_config['inflows_filter']
     ][['wallet_address']]
 
     # Merge to filter out the records with those wallet addresses
@@ -287,7 +287,7 @@ def clean_profits_df(profits_df, data_cleaning_config):
     profits_cleaned_df.drop(columns=['_merge'], inplace=True)
 
     # Convert coin_id to categorical
-    profits_df['coin_id'] = profits_df['coin_id'].astype('category')
+    profits_df.loc[:, 'coin_id'] = profits_df['coin_id'].astype('category')
 
     # 3. Prepare exclusions_df and output logs
     # ----------------------------------------
