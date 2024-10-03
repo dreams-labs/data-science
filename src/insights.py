@@ -121,7 +121,7 @@ def run_experiment(modeling_config):
         profits_df = rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_df)
 
         # 3.3 Build the configured model input data (train/test data)
-        X_train, X_test, y_train, y_test, performance_df = build_configured_model_input(
+        X_train, X_test, y_train, y_test, returns_df_test = build_configured_model_input(
                                             profits_df,
                                             market_data_df,
                                             config,
@@ -136,7 +136,7 @@ def run_experiment(modeling_config):
                             modeling_config['modeling']['model_params'])
 
         # 3.5 Evaluate and save the model's performance on the test set to a CSV
-        _ = m.evaluate_model(model, X_test, y_test, model_id, modeling_folder)
+        _ = m.evaluate_model(model, X_test, y_test, model_id, returns_df_test, modeling_config)
 
         # 3.6 Log the trial results for this configuration
         # Include the trial name, metadata, and other relevant details
@@ -548,7 +548,7 @@ def build_configured_model_input(
     # 2. Add target variable to training_data_df
     # ------------------------------------------
     # create the target variable df
-    target_variables_df, performance_df, _ = fe.create_target_variables(
+    target_variables_df, returns_df, _ = fe.create_target_variables(
                                 market_data_df,
                                 config['training_data'],
                                 modeling_config)
@@ -569,8 +569,10 @@ def build_configured_model_input(
         modeling_config['modeling']['train_test_split'],
         modeling_config['modeling']['random_state']
     )
+    # Create returns_df for the test population by matching the X_test index
+    returns_df_test = returns_df.loc[X_test.index].copy()
 
-    return X_train, X_test, y_train, y_test, performance_df
+    return X_train, X_test, y_train, y_test, returns_df_test
 
 
 
@@ -665,19 +667,19 @@ def summarize_feature_performance(trial_df):
         results.append(grouped)
 
     # Concatenate all results and clean up formatting
-    feature_performance_df = pd.concat(results, ignore_index=True)
-    feature_performance_df = feature_performance_df.sort_values(['feature', 'value'])
-    feature_performance_df = feature_performance_df.reset_index(drop=True)
+    feature_returns_df = pd.concat(results, ignore_index=True)
+    feature_returns_df = feature_returns_df.sort_values(['feature', 'value'])
+    feature_returns_df = feature_returns_df.reset_index(drop=True)
 
     # Define the columns that start with 'avg'
     columns_to_format = [f'avg_{metric}' for metric in value_vars]
 
     # Apply conditional formatting to those columns
-    feature_performance_df = feature_performance_df.style.background_gradient(
+    feature_returns_df = feature_returns_df.style.background_gradient(
                                                             subset=columns_to_format,
                                                             cmap='RdYlGn')
 
-    return feature_performance_df
+    return feature_returns_df
 
 
 

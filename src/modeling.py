@@ -164,7 +164,7 @@ def train_model(X_train, y_train, modeling_folder, model_params=None):
 
 
 
-def evaluate_model(model, X_test, y_test, model_id, modeling_config):
+def evaluate_model(model, X_test, y_test, model_id, returns_df, modeling_config):
     """
     Evaluates a trained model on the test set and outputs key metrics and stores predictions.
 
@@ -172,14 +172,14 @@ def evaluate_model(model, X_test, y_test, model_id, modeling_config):
     - model (sklearn model): The trained model.
     - X_test (pd.DataFrame): The test features with 'coin_id' as the index.
     - y_test (pd.Series): The true labels with 'coin_id' as the index.
-    - model_id (str): The unique ID of the model being evaluated.
+    - model_id (str): The unique ID of the model being evaluated
+    - returns_df (pd.DataFrame): The actual returns of each coin
     - modeling_config (str): modeling_config.yaml
 
     Returns:
     - metrics_dict (dict): A dictionary of calculated evaluation metrics.
     """
     modeling_folder = modeling_config['modeling']['modeling_folder']
-    winsorization_cutoff = modeling_config['evaluation']['winsorization_cutoff']
 
     # Construct the performance metrics folder path
     evaluation_folder = os.path.join(modeling_folder, "outputs", "performance_metrics")
@@ -221,8 +221,13 @@ def evaluate_model(model, X_test, y_test, model_id, modeling_config):
         metrics_dict["log_loss"] = log_loss(y_test, y_pred_prob)
     if "confusion_matrix" in metrics_request:
         metrics_dict["confusion_matrix"] = confusion_matrix(y_test, y_pred).tolist()  # stored as list
-    # if "profitability_auc" in metrics_request:
-    #     metrics_dict["profitability_auc"] = calculate_profitability_auc
+    if "profitability_auc" in metrics_request:
+        metrics_dict["profitability_auc"] = calculate_profitability_auc(
+                                                    y_pred_prob,
+                                                    returns_df,
+                                                    metrics_request["profitability_auc"]["top_percentage_filter"],
+                                                    modeling_config["evaluation"]["winsorization_cutoff"]
+                                                    )
 
     # Save metrics to a CSV
     metrics_df = pd.DataFrame([metrics_dict])
@@ -279,7 +284,10 @@ def calculate_running_profitability_score(predictions, returns, winsorization_cu
 
 
 
-def calculate_profitability_auc(predictions, returns, top_percentage_filter=1.0):
+def calculate_profitability_auc(predictions,
+                                returns,
+                                top_percentage_filter=1.0,
+                                winsorization_cutoff=None):
     """
     Calculates the Profitability AUC (Area Under the Curve) metric for the top percentage of predictions.
 
@@ -295,7 +303,7 @@ def calculate_profitability_auc(predictions, returns, top_percentage_filter=1.0)
         raise ValueError("top_percentage_filter must be between 0 and 1")
 
     # Calculate the full range of profitability scores
-    running_scores = calculate_running_profitability_score(predictions, returns)
+    running_scores = calculate_running_profitability_score(predictions, returns, winsorization_cutoff)
 
     # Calculate how many scores to look at based on the percentage filter
     n_top = int(len(predictions) * top_percentage_filter)

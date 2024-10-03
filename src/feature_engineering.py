@@ -936,7 +936,7 @@ def merge_and_fill_training_data(
 
 def create_target_variables(prices_df, training_data_config, modeling_config):
     """
-    Main function to create target variables based on price performance.
+    Main function to create target variables based on coin returns.
 
     Parameters:
     - prices_df: DataFrame containing price data with columns 'coin_id', 'date', and 'price'.
@@ -945,32 +945,32 @@ def create_target_variables(prices_df, training_data_config, modeling_config):
 
     Returns:
     - target_variables_df: DataFrame with target variables.
-    - performance_df: DataFrame with price performance data.
+    - returns_df: DataFrame with coin returns data.
     - outcomes_df: DataFrame tracking outcomes for each coin.
     """
-    performance_df, outcomes_df = calculate_coin_performance(prices_df, training_data_config)
+    returns_df, outcomes_df = calculate_coin_returns(prices_df, training_data_config)
 
     target_variable_type = modeling_config.get('target_variable_type', 'mooncrater')
 
     if target_variable_type == 'mooncrater':
-        target_variables_df = calculate_mooncrater_targets(performance_df, modeling_config)
+        target_variables_df = calculate_mooncrater_targets(returns_df, modeling_config)
     else:
         raise ValueError(f"Unsupported target variable type: {target_variable_type}")
 
 
-    return target_variables_df, performance_df, outcomes_df
+    return target_variables_df, returns_df, outcomes_df
 
 
-def calculate_coin_performance(prices_df, training_data_config):
+def calculate_coin_returns(prices_df, training_data_config):
     """
-    Prepares the data and computes price performance for each coin.
+    Prepares the data and computes price returns for each coin.
 
     Parameters:
     - prices_df: DataFrame containing price data with columns 'coin_id', 'date', and 'price'.
     - training_data_config: Configuration with modeling period dates.
 
     Returns:
-    - performance_df: DataFrame with columns 'coin_id' and 'performance'.
+    - returns_df: DataFrame with columns 'coin_id' and 'returns'.
     - outcomes_df: DataFrame tracking outcomes for each coin.
     """
     prices_df = prices_df.copy()
@@ -993,26 +993,26 @@ def calculate_coin_performance(prices_df, training_data_config):
         missing = ', '.join(map(str, coins_missing_price))
         raise ValueError(f"Missing price for coins at start or end date: {missing}")
 
-    # Compute performance
-    performance = (end_prices[valid_coins] - start_prices[valid_coins]) / start_prices[valid_coins]
-    performance_df = pd.DataFrame({'performance': performance})
+    # Compute returns
+    returns = (end_prices[valid_coins] - start_prices[valid_coins]) / start_prices[valid_coins]
+    returns_df = pd.DataFrame({'returns': returns})
 
     # Create outcomes DataFrame
     outcomes_df = pd.DataFrame({
         'coin_id': valid_coins,
-        'outcome': 'performance calculated'
+        'outcome': 'returns calculated'
     })
 
-    return performance_df, outcomes_df
+    return returns_df, outcomes_df
 
 
 
-def calculate_mooncrater_targets(performance_df, modeling_config):
+def calculate_mooncrater_targets(returns_df, modeling_config):
     """
-    Calculates 'is_moon' and 'is_crater' target variables based on performance.
+    Calculates 'is_moon' and 'is_crater' target variables based on returns.
 
     Parameters:
-    - performance_df: DataFrame with columns 'coin_id' and 'performance'.
+    - returns_df: DataFrame with columns 'coin_id' and 'returns'.
     - modeling_config: Configuration for modeling with target variable thresholds.
 
     Returns:
@@ -1023,9 +1023,9 @@ def calculate_mooncrater_targets(performance_df, modeling_config):
     moon_minimum_percent = modeling_config['target_variables']['moon_minimum_percent']
     crater_minimum_percent = modeling_config['target_variables']['crater_minimum_percent']
 
-    target_variables_df = performance_df.copy().reset_index()
-    target_variables_df['is_moon'] = (target_variables_df['performance'] >= moon_threshold).astype(int)
-    target_variables_df['is_crater'] = (target_variables_df['performance'] <= crater_threshold).astype(int)
+    target_variables_df = returns_df.copy().reset_index()
+    target_variables_df['is_moon'] = (target_variables_df['returns'] >= moon_threshold).astype(int)
+    target_variables_df['is_crater'] = (target_variables_df['returns'] <= crater_threshold).astype(int)
 
     total_coins = len(target_variables_df)
     moons = target_variables_df['is_moon'].sum()
@@ -1034,12 +1034,14 @@ def calculate_mooncrater_targets(performance_df, modeling_config):
     # Ensure minimum percentage for moons and craters
     if moons / total_coins < moon_minimum_percent:
         additional_moons_needed = int(total_coins * moon_minimum_percent) - moons
-        moon_candidates = target_variables_df[target_variables_df['is_moon'] == 0].nlargest(additional_moons_needed, 'performance')
+        moon_candidates = (target_variables_df[target_variables_df['is_moon'] == 0]
+                           .nlargest(additional_moons_needed, 'returns'))
         target_variables_df.loc[moon_candidates.index, 'is_moon'] = 1
 
     if craters / total_coins < crater_minimum_percent:
         additional_craters_needed = int(total_coins * crater_minimum_percent) - craters
-        crater_candidates = target_variables_df[target_variables_df['is_crater'] == 0].nsmallest(additional_craters_needed, 'performance')
+        crater_candidates = (target_variables_df[target_variables_df['is_crater'] == 0]
+                             .nsmallest(additional_craters_needed, 'returns'))
         target_variables_df.loc[crater_candidates.index, 'is_crater'] = 1
 
     # Log results

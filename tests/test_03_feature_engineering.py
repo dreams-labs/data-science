@@ -931,7 +931,7 @@ def test_merge_and_fill_training_data_drop_records():
 
 
 # ------------------------------------------ #
-# calculate_coin_performance() unit tests
+# calculate_coin_returns() unit tests
 # ------------------------------------------ #
 
 @pytest.fixture
@@ -956,14 +956,14 @@ def valid_training_data_config():
     }
 
 @pytest.mark.unit
-def test_calculate_coin_performance_valid_data(valid_prices_df, valid_training_data_config):
+def test_calculate_coin_returns_valid_data(valid_prices_df, valid_training_data_config):
     """
-    Test calculate_coin_performance function with valid data for multiple coins.
+    Test calculate_coin_returns function with valid data for multiple coins.
 
     This test ensures that the function correctly calculates performance and outcomes
     for all coins when given valid input data.
     """
-    performance_df, outcomes_df = fe.calculate_coin_performance(valid_prices_df,
+    returns_df, outcomes_df = fe.calculate_coin_returns(valid_prices_df,
                                                                 valid_training_data_config)
 
     expected_performance = pd.DataFrame({
@@ -976,13 +976,13 @@ def test_calculate_coin_performance_valid_data(valid_prices_df, valid_training_d
         'outcome': ['performance calculated'] * 3
     })
 
-    assert np.all(np.isclose(performance_df['performance'].values,
+    assert np.all(np.isclose(returns_df['performance'].values,
                             expected_performance['performance'].values,
                             rtol=1e-4, atol=1e-4))
     assert np.array_equal(outcomes_df.values, expected_outcomes.values)
 
     # Check if performance values are approximately equal
-    for actual, expected in zip(performance_df['performance'], expected_performance['performance']):
+    for actual, expected in zip(returns_df['performance'], expected_performance['performance']):
         assert actual == pytest.approx(expected, abs=1e-4)
 
 
@@ -998,14 +998,14 @@ def no_change_prices_df():
     })
 
 @pytest.mark.unit
-def test_calculate_coin_performance_no_change(no_change_prices_df, valid_training_data_config):
+def test_calculate_coin_returns_no_change(no_change_prices_df, valid_training_data_config):
     """
-    Test calculate_coin_performance function with no price change for some coins.
+    Test calculate_coin_returns function with no price change for some coins.
 
     This test ensures that the function correctly calculates zero performance for coins
     with no price change and correct performance for others.
     """
-    performance_df, outcomes_df = fe.calculate_coin_performance(no_change_prices_df,
+    returns_df, outcomes_df = fe.calculate_coin_returns(no_change_prices_df,
                                                                 valid_training_data_config)
 
     expected_performance = pd.DataFrame({
@@ -1013,7 +1013,7 @@ def test_calculate_coin_performance_no_change(no_change_prices_df, valid_trainin
         'performance': [0.0, 0.25, 0.0]
     })
 
-    assert (np.isclose(performance_df['performance'].values,
+    assert (np.isclose(returns_df['performance'].values,
                        expected_performance['performance'].values,
                        rtol=1e-4, atol=1e-4)).all()
 
@@ -1037,14 +1037,14 @@ def negative_performance_prices_df():
     })
 
 @pytest.mark.unit
-def test_calculate_coin_performance_negative(negative_performance_prices_df, valid_training_data_config):
+def test_calculate_coin_returns_negative(negative_performance_prices_df, valid_training_data_config):
     """
-    Test calculate_coin_performance function with negative performance for some coins.
+    Test calculate_coin_returns function with negative performance for some coins.
 
     This test ensures that the function correctly calculates negative performance values
     for coins with price decreases and correct performance for others.
     """
-    performance_df, outcomes_df = fe.calculate_coin_performance(negative_performance_prices_df,
+    returns_df, outcomes_df = fe.calculate_coin_returns(negative_performance_prices_df,
                                                                 valid_training_data_config)
 
     expected_performance = pd.DataFrame({
@@ -1052,7 +1052,7 @@ def test_calculate_coin_performance_negative(negative_performance_prices_df, val
         'performance': [-0.1667, 0.25, -0.2]
     })
 
-    assert (np.isclose(performance_df['performance'].values,
+    assert (np.isclose(returns_df['performance'].values,
                        expected_performance['performance'].values,
                        rtol=1e-4, atol=1e-4)).all()
 
@@ -1082,15 +1082,15 @@ def multiple_datapoints_prices_df():
     })
 
 @pytest.mark.unit
-def test_calculate_coin_performance_multiple_datapoints(multiple_datapoints_prices_df,
+def test_calculate_coin_returns_multiple_datapoints(multiple_datapoints_prices_df,
                                                         valid_training_data_config):
     """
-    Test calculate_coin_performance function with multiple data points between start and end dates.
+    Test calculate_coin_returns function with multiple data points between start and end dates.
 
     This test ensures that the function correctly calculates performance using only start and end dates,
     ignoring intermediate data points.
     """
-    performance_df, outcomes_df = fe.calculate_coin_performance(multiple_datapoints_prices_df,
+    returns_df, outcomes_df = fe.calculate_coin_returns(multiple_datapoints_prices_df,
                                                                 valid_training_data_config)
 
     expected_performance = pd.DataFrame({
@@ -1098,7 +1098,7 @@ def test_calculate_coin_performance_multiple_datapoints(multiple_datapoints_pric
         'performance': [0.1667, 0.25, 0.2]
     })
 
-    assert (np.isclose(performance_df['performance'].values,
+    assert (np.isclose(returns_df['performance'].values,
                        expected_performance['performance'].values,
                        rtol=1e-4, atol=1e-4)).all()
 
@@ -1126,7 +1126,7 @@ def test_calculate_mooncrater_targets():
         # 5% increase, 55% increase, 5% decrease, 55% decrease, 50% increase
         'performance': [0.05, 0.55, -0.05, -0.55, 0.50]
     }
-    performance_df = pd.DataFrame(data)
+    returns_df = pd.DataFrame(data)
 
     # Mock configuration
     modeling_config = {
@@ -1139,7 +1139,7 @@ def test_calculate_mooncrater_targets():
     }
 
     # Call the function being tested
-    target_variables_df = fe.calculate_mooncrater_targets(performance_df, modeling_config)
+    target_variables_df = fe.calculate_mooncrater_targets(returns_df, modeling_config)
 
     # Assertions
     assert len(target_variables_df) == 5
