@@ -51,12 +51,14 @@ class TargetVariablesConfig(BaseModel):
 class ModelType(str, Enum):
     """The model to train"""
     RANDOMFORESTCLASSIFIER = "RandomForestClassifier"
+    RANDOMFORESTREGRESSOR = "RandomForestRegressor"
 
 
 class TargetColumn(str, Enum):
     """Enum for target_column values."""
     IS_MOON = "is_moon"
     IS_CRATER = "is_crater"
+    RETURNS = "returns"
 
 
 class ModelingSettings(NoExtrasBaseModel):
@@ -67,7 +69,7 @@ class ModelingSettings(NoExtrasBaseModel):
     train_test_split: Annotated[float, Field(gt=0, lt=1)] = Field(default=0.25)
     random_state: Annotated[int, Field(ge=0)] = Field(default=45)
     model_type: ModelType
-    model_params: 'ModelParams'
+    model_params: Optional['ModelParams'] = None
 
 class ModelParams(NoExtrasBaseModel):
     """Parameters for the model."""

@@ -11,9 +11,11 @@ import pandas as pd
 import numpy as np
 import dreams_core.core as dc
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.metrics import roc_auc_score, confusion_matrix, log_loss
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, explained_variance_score, max_error
+
 
 # project files
 from utils import timing_decorator  # pylint: disable=E0401 # can't find utils import
@@ -102,7 +104,7 @@ def split_model_input(model_input_df, target_column, test_size=0.2, random_state
 @timing_decorator
 def train_model(X_train, y_train, modeling_folder, modeling_config):
     """
-    Trains a model on the training data and saves the model, logs, and feature importance.
+    Trains a model (classifier or regressor) on the training data and saves the model, logs, and feature importance.
     Uses a UUID to uniquely identify the model files.
 
     Args:
@@ -113,18 +115,24 @@ def train_model(X_train, y_train, modeling_folder, modeling_config):
 
     Returns:
     - model (sklearn model): The trained model.
+    - model_id (str): The UUID of the trained model.
     """
     # Generate a UUID for this model instance
     model_id = str(uuid.uuid4())
 
     # Initialize model with default params if none provided
-    model_params = modeling_config["modeling"]["model_params"]
+    model_params = modeling_config["modeling"].get("model_params", None)
     if model_params is None:
         model_params = {"n_estimators": 100, "random_state": 42}
 
     # Initialize the model
-    if modeling_config["modeling"]["model_type"] == "RandomForestClassifier":
+    model_type = modeling_config["modeling"]["model_type"]
+    if model_type == "RandomForestClassifier":
         model = RandomForestClassifier(**model_params)
+    elif model_type == "RandomForestRegressor":
+        model = RandomForestRegressor(**model_params)
+    else:
+        raise ValueError(f"Unsupported model type: {model_type}")
 
     # Train the model
     model.fit(X_train, y_train)
@@ -146,6 +154,7 @@ def train_model(X_train, y_train, modeling_folder, modeling_config):
     # Step 2: Log the model parameters and UUID in JSON format
     log_data = {
         "Model ID": model_id,
+        "Model type": model_type,
         "Model parameters": model_params,
     }
     log_filename = os.path.join(logs_path, f"log_{model_id}.json")
@@ -165,15 +174,14 @@ def train_model(X_train, y_train, modeling_folder, modeling_config):
     return model, model_id
 
 
-
 def evaluate_model(model, X_test, y_test, model_id, returns_test, modeling_config):
     """
-    Evaluates a trained model on the test set and outputs key metrics and stores predictions.
+    Evaluates a trained model (classification or regression) on the test set and outputs key metrics and stores predictions.
 
     Args:
     - model (sklearn model): The trained model.
     - X_test (pd.DataFrame): The test features with 'coin_id' as the index.
-    - y_test (pd.Series): The true labels with 'coin_id' as the index.
+    - y_test (pd.Series): The true labels/values with 'coin_id' as the index.
     - model_id (str): The unique ID of the model being evaluated
     - returns_test (pd.DataFrame): The actual returns of each coin in the test set
     - modeling_config (str): modeling_config.yaml
@@ -193,15 +201,24 @@ def evaluate_model(model, X_test, y_test, model_id, returns_test, modeling_confi
     if not os.path.exists(predictions_folder):
         raise FileNotFoundError(f"The predictions folder '{predictions_folder}' does not exist.")
 
-    # Predict the probabilities and the labels
-    y_pred_prob = model.predict_proba(X_test)[:, 1]  # Probabilities for the positive class
-    y_pred = model.predict(X_test)
+    # Check if the model is a classifier or regressor
+    is_classifier = hasattr(model, "predict_proba")
+
+    # Predict the values
+    if is_classifier:
+        y_pred_prob = model.predict_proba(X_test)[:, 1]  # Probabilities for the positive class
+        y_pred = model.predict(X_test)
+        predictions_df = pd.DataFrame({
+            "y_pred_prob": y_pred_prob,
+            "y_pred": y_pred
+        }, index=X_test.index)
+    else:
+        y_pred = model.predict(X_test)
+        predictions_df = pd.DataFrame({
+            "y_pred": y_pred
+        }, index=X_test.index)
 
     # Save predictions to CSV with 'coin_id' as the index
-    predictions_df = pd.DataFrame({
-        "y_pred_prob": y_pred_prob,
-        "y_pred": y_pred
-    }, index=X_test.index)  # Use the index which includes 'coin_id'
     predictions_filename = os.path.join(predictions_folder, f"predictions_{model_id}.csv")
     predictions_df.to_csv(predictions_filename, index=True)
 
@@ -209,34 +226,62 @@ def evaluate_model(model, X_test, y_test, model_id, returns_test, modeling_confi
     metrics_request = modeling_config['evaluation']['metrics']
     metrics_dict = {}
 
-    if "accuracy" in metrics_request:
-        metrics_dict["accuracy"] = accuracy_score(y_test, y_pred)
-    if "precision" in metrics_request:
-        metrics_dict["precision"] = precision_score(y_test, y_pred)
-    if "recall" in metrics_request:
-        metrics_dict["recall"] = recall_score(y_test, y_pred)
-    if "f1_score" in metrics_request:
-        metrics_dict["f1_score"] = f1_score(y_test, y_pred)
-    if "roc_auc" in metrics_request:
-        metrics_dict["roc_auc"] = roc_auc_score(y_test, y_pred_prob)
-    if "log_loss" in metrics_request:
-        metrics_dict["log_loss"] = log_loss(y_test, y_pred_prob)
-    if "confusion_matrix" in metrics_request:
-        metrics_dict["confusion_matrix"] = confusion_matrix(y_test, y_pred).tolist()  # stored as list
-    if "profitability_auc" in metrics_request:
-        metrics_dict["profitability_auc"] = calculate_profitability_auc(
-                                                    y_pred_prob,
-                                                    returns_test,
-                                                    metrics_request["profitability_auc"]["top_percentage_filter"],
-                                                    modeling_config["evaluation"]["winsorization_cutoff"]
-                                                    )
-    if "downside_profitability_auc" in metrics_request:
-        metrics_dict["downside_profitability_auc"] = calculate_downside_profitability_auc(
-                                                    y_pred_prob,
-                                                    returns_test,
-                                                    metrics_request["profitability_auc"]["top_percentage_filter"],
-                                                    modeling_config["evaluation"]["winsorization_cutoff"]
-                                                    )
+    if is_classifier:
+        if "accuracy" in metrics_request:
+            metrics_dict["accuracy"] = accuracy_score(y_test, y_pred)
+        if "precision" in metrics_request:
+            metrics_dict["precision"] = precision_score(y_test, y_pred)
+        if "recall" in metrics_request:
+            metrics_dict["recall"] = recall_score(y_test, y_pred)
+        if "f1_score" in metrics_request:
+            metrics_dict["f1_score"] = f1_score(y_test, y_pred)
+        if "roc_auc" in metrics_request:
+            metrics_dict["roc_auc"] = roc_auc_score(y_test, y_pred_prob)
+        if "log_loss" in metrics_request:
+            metrics_dict["log_loss"] = log_loss(y_test, y_pred_prob)
+        if "confusion_matrix" in metrics_request:
+            metrics_dict["confusion_matrix"] = confusion_matrix(y_test, y_pred).tolist()
+        if "profitability_auc" in metrics_request:
+            metrics_dict["profitability_auc"] = calculate_profitability_auc(
+                                                        y_pred_prob,
+                                                        returns_test,
+                                                        metrics_request["profitability_auc"]["top_percentage_filter"],
+                                                        modeling_config["evaluation"]["winsorization_cutoff"]
+                                                        )
+        if "downside_profitability_auc" in metrics_request:
+            metrics_dict["downside_profitability_auc"] = calculate_downside_profitability_auc(
+                                                        y_pred_prob,
+                                                        returns_test,
+                                                        metrics_request["profitability_auc"]["top_percentage_filter"],
+                                                        modeling_config["evaluation"]["winsorization_cutoff"]
+                                                        )
+    else:  # Regression metrics
+        if "mse" in metrics_request:
+            metrics_dict["mse"] = mean_squared_error(y_test, y_pred)
+        if "rmse" in metrics_request:
+            metrics_dict["rmse"] = np.sqrt(mean_squared_error(y_test, y_pred))
+        if "mae" in metrics_request:
+            metrics_dict["mae"] = mean_absolute_error(y_test, y_pred)
+        if "r2" in metrics_request:
+            metrics_dict["r2"] = r2_score(y_test, y_pred)
+        if "explained_variance" in metrics_request:
+            metrics_dict["explained_variance"] = explained_variance_score(y_test, y_pred)
+        if "max_error" in metrics_request:
+            metrics_dict["max_error"] = max_error(y_test, y_pred)
+        if "profitability_auc" in metrics_request:
+            metrics_dict["profitability_auc"] = calculate_profitability_auc(
+                                                        y_pred,
+                                                        returns_test,
+                                                        metrics_request["profitability_auc"]["top_percentage_filter"],
+                                                        modeling_config["evaluation"]["winsorization_cutoff"]
+                                                        )
+        if "downside_profitability_auc" in metrics_request:
+            metrics_dict["downside_profitability_auc"] = calculate_downside_profitability_auc(
+                                                        y_pred,
+                                                        returns_test,
+                                                        metrics_request["profitability_auc"]["top_percentage_filter"],
+                                                        modeling_config["evaluation"]["winsorization_cutoff"]
+                                                        )
 
     # Save metrics to a CSV
     metrics_df = pd.DataFrame([metrics_dict])
