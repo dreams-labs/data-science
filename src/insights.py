@@ -1,7 +1,6 @@
 """
 functions used to build coin-level features from training data
 """
-# pylint: disable=C0301 # line over 100 chars
 # pylint: disable=C0103 # X_train violates camelcase
 # pylint: disable=E0401 # can't find utils import
 # pyright: reportMissingImports=false
@@ -55,12 +54,9 @@ def run_experiment(modeling_config):
 
     # Extract metadata and experiment details from experiments_config
     metadata = experiments_config['metadata']
-    experiment_name = metadata['experiment_name']
-    search_method = metadata['search_method']
-    max_evals = metadata['max_evals']
 
     # Add experiment_id and timestamp to the metadata
-    experiment_id = f"{experiment_name}_{uuid.uuid4()}"
+    experiment_id = f"{metadata['experiment_name']}_{uuid.uuid4()}"
     metadata['experiment_id'] = experiment_id
     metadata['start_time'] = datetime.now().isoformat()
     metadata['trial_logs'] = []  # Initialize the array for trial log filenames
@@ -79,7 +75,10 @@ def run_experiment(modeling_config):
     # 2. Initialize trial configurations and initial variables
     # -------------------------------------------------------------------------
     # Generate the trial configurations based on variable_overrides
-    trial_configurations = generate_experiment_configurations(config_folder, method=search_method, max_evals=max_evals)
+    trial_configurations = generate_experiment_configurations(
+                            config_folder,
+                            method=metadata['search_method'],
+                            max_evals=metadata['max_evals'])
 
     # Cap the number of trials if 'max_evals' is set
     max_evals = experiments_config['metadata'].get('max_evals', len(trial_configurations))
@@ -89,7 +88,11 @@ def run_experiment(modeling_config):
     config = u.load_config(os.path.join(config_folder, 'config.yaml'))
     market_data_df = td.retrieve_market_data()
     prices_df = market_data_df[['coin_id','date','price']].copy()
-    profits_df = rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_df=None)
+    profits_df = rebuild_profits_df_if_necessary(
+                    config,
+                    modeling_folder,
+                    prices_df,
+                    profits_df=None)
 
     # remove records from market_data_df that don't have transfers if configured to do so
     if config['data_cleaning']['exclude_coins_without_transfers']:
@@ -118,10 +121,19 @@ def run_experiment(modeling_config):
         profits_df = rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_df)
 
         # 3.3 Build the configured model input data (train/test data)
-        X_train, X_test, y_train, y_test = build_configured_model_input(profits_df, market_data_df, config, metrics_config, modeling_config)
+        X_train, X_test, y_train, y_test = build_configured_model_input(
+                                            profits_df,
+                                            market_data_df,
+                                            config,
+                                            metrics_config,
+                                            modeling_config)
 
         # 3.4 Train the model using the current configuration and log the results
-        model, model_id = m.train_model(X_train, y_train, modeling_folder, modeling_config['modeling']['model_params'])
+        model, model_id = m.train_model(
+                            X_train,
+                            y_train,
+                            modeling_folder,
+                            modeling_config['modeling']['model_params'])
 
         # 3.5 Evaluate and save the model's performance on the test set to a CSV
         _ = m.evaluate_model(model, X_test, y_test, model_id, modeling_folder)
@@ -163,7 +175,8 @@ def run_experiment(modeling_config):
 @u.timing_decorator
 def generate_experiment_configurations(config_folder, method='grid', max_evals=50):
     """
-    Generates experiment configurations based on the validated experiment config YAML file and the search method.
+    Generates experiment configurations based on the validated experiment config YAML file and
+    the search method.
 
     Args:
     - config_folder (str): Path to the folder containing the config files.
@@ -177,7 +190,8 @@ def generate_experiment_configurations(config_folder, method='grid', max_evals=5
     # Load and validate the experiment configuration
     experiment_config = validate_experiments_yaml(config_folder)
 
-    # Flatten the experiment configuration into a dictionary that can be used for grid/random search
+    # Flatten the experiment configuration into a dictionary that can be used to generate \
+    # configs for grid/random search
     param_grid = {}
 
     # Flatten the config dictionary so it can be used for the search
@@ -190,7 +204,10 @@ def generate_experiment_configurations(config_folder, method='grid', max_evals=5
         configurations = list(ParameterGrid(param_grid))
     elif method == 'random':
         # Random search: sample a subset of combinations
-        configurations = list(ParameterSampler(param_grid, n_iter=max_evals, random_state=random.randint(1, 100)))
+        configurations = list(ParameterSampler(
+                            param_grid,
+                            n_iter=max_evals,
+                            random_state=random.randint(1, 100)))
     else:
         raise ValueError(f"Invalid method: {method}. Must be 'grid' or 'random'.")
 
@@ -226,10 +243,12 @@ def validate_experiments_yaml(config_folder):
     map correctly to the specified config files.
 
     Args:
-    - config_folder (str): Path to the folder containing all config files, including experiments_config.yaml.
+    - config_folder (str): Path to the folder containing all config files, including the
+        experiments_config.yaml.
 
     Returns:
-    - configurations (list): List of valid configurations or raises an error if any issues are found.
+    - configurations (list): List of valid configurations or raises an error if any
+        issues are found.
     """
 
     # Path to the experiments_config.yaml file
@@ -259,7 +278,8 @@ def validate_experiments_yaml(config_folder):
     # Validate that each variable in variable_overrides maps correctly to the loaded config files
     for section, section_values in variable_overrides.items():
         if section not in loaded_configs:
-            raise ValueError(f"Section '{section}' in variable_overrides not found in any loaded config file.")
+            raise ValueError(f"Section '{section}' in variable_overrides not found in any \
+                              loaded config file.")
 
         # Get the corresponding config file for this section
         corresponding_config = loaded_configs[section]
@@ -272,7 +292,8 @@ def validate_experiments_yaml(config_folder):
             # Ensure the values are valid in the corresponding config
             for value in values:
                 if value not in corresponding_config[key]:
-                    raise ValueError(f"Value '{value}' for key '{key}' in variable_overrides is invalid.")
+                    raise ValueError(f"Value '{value}' for key '{key}' in variable_overrides \
+                                      is invalid.")
 
     # If all checks pass, return configurations
     return list(variable_overrides.items())
@@ -281,8 +302,8 @@ def validate_experiments_yaml(config_folder):
 
 def prepare_configs(config_folder, override_params):
     """
-    Loads config files from the config_folder using load_config and applies overrides specified in override_params.
-    Raises KeyError if any key from override_params does not match an existing key in the corresponding config.
+    Loads config files from the config_folder using load_config and applies overrides specified
+    in override_params.
 
     Args:
     - config_folder (str): Path to the folder containing the configuration files.
@@ -292,6 +313,10 @@ def prepare_configs(config_folder, override_params):
     - config (dict): The main config file with overrides applied.
     - metrics_config (dict): The metrics configuration with overrides applied.
     - modeling_config (dict): The modeling configuration with overrides applied.
+
+    Raises:
+    - KeyError: if any key from override_params does not match an existing key in the
+        corresponding config.
     """
 
     # Load the main config files using load_config
@@ -349,7 +374,8 @@ def validate_key_in_config(config, key_path):
 
     Args:
     - config (dict): The configuration dictionary to validate.
-    - key_path (str): The flattened key path to check (e.g., 'config.data_cleaning.inflows_filter').
+    - key_path (str): The flattened key path to check.
+        (e.g. 'config.data_cleaning.inflows_filter')
 
     Raises:
     - KeyError: If the key path does not exist in the config.
@@ -358,10 +384,12 @@ def validate_key_in_config(config, key_path):
     sub_dict = config
     for key in keys[:-1]:  # Traverse down to the second-to-last key
         if key not in sub_dict:
-            raise KeyError(f"Key '{key}' not found in config at level '{'.'.join(keys[:-1])}'")
+            raise KeyError(
+                f"Key '{key}' not found in config at level '{'.'.join(keys[:-1])}'")
         sub_dict = sub_dict[key]
     if keys[-1] not in sub_dict:
-        raise KeyError(f"Key '{keys[-1]}' not found in config at final level '{'.'.join(keys[:-1])}'")
+        raise KeyError(
+            f"Key '{keys[-1]}' not found in config at final level '{'.'.join(keys[:-1])}'")
 
 
 
@@ -415,7 +443,11 @@ def rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_
         config['training_data']['modeling_period_start'],
         config['training_data']['modeling_period_end'],
     ]
-    profits_df = td.impute_profits_for_multiple_dates(profits_df, prices_df, dates_to_impute, n_threads=24)
+    profits_df = td.impute_profits_for_multiple_dates(
+                    profits_df,
+                    prices_df,
+                    dates_to_impute,
+                    n_threads=24)
 
     # Save the new hash for future runs
     handle_hash(config_hash, temp_folder, 'save')
@@ -452,21 +484,31 @@ def handle_hash(config_hash, temp_folder, operation='load'):
     hash_file = os.path.join(temp_folder, 'config_hash.txt')
 
     if operation == 'load':
-        return open(hash_file, 'r', encoding='utf-8').read() if os.path.exists(hash_file) else None
+        if os.path.exists(hash_file):
+            with open(hash_file, 'r', encoding='utf-8') as f:
+                return f.read()
+        else:
+            return None
     elif operation == 'save':
         with open(hash_file, 'w', encoding='utf-8') as f:
             f.write(config_hash)
 
 
 
-def build_configured_model_input(profits_df, market_data_df, config, metrics_config, modeling_config):
+def build_configured_model_input(
+        profits_df,
+        market_data_df,
+        config,
+        metrics_config,
+        modeling_config):
     """
     Build the model input data (train/test sets) based on the configuration settings.
 
     Args:
     - profits_df (DataFrame): DataFrame containing profits information for wallets.
     - market_data_df (DataFrame): DataFrame containing market data for coins.
-    - config (dict): Overall configuration containing details for wallet cohorts and training data periods.
+    - config (dict): Overall configuration containing details for wallet cohorts and training
+        data periods.
     - metrics_config (dict): Configuration for metric generation.
     - modeling_config (dict): Configuration for model training parameters.
 
@@ -499,16 +541,24 @@ def build_configured_model_input(profits_df, market_data_df, config, metrics_con
 
     # Merge all the features
     training_data_tuples = market_data_tuples + wallet_cohort_tuples
-    training_data_df, _ = fe.create_training_data_df(modeling_config['modeling']['modeling_folder'], training_data_tuples)
+    training_data_df, _ = fe.create_training_data_df(
+                            modeling_config['modeling']['modeling_folder'],
+                            training_data_tuples)
 
 
     # 2. Add target variable to training_data_df
     # ------------------------------------------
     # create the target variable df
-    target_variable_df,_ = fe.create_target_variables_mooncrater(market_data_df, config['training_data'], modeling_config)
+    target_variable_df,_ = fe.create_target_variables_mooncrater(
+                                market_data_df,
+                                config['training_data'],
+                                modeling_config)
 
     # merge the two into the final model input df
-    model_input_df = fe.prepare_model_input_df(training_data_df, target_variable_df, modeling_config['modeling']['target_column'])
+    model_input_df = fe.prepare_model_input_df(
+                                training_data_df,
+                                target_variable_df,
+                                modeling_config['modeling']['target_column'])
 
 
     # 3. Split into train/test datasets
@@ -529,7 +579,8 @@ def build_configured_model_input(profits_df, market_data_df, config, metrics_con
 
 def generate_trial_df(modeling_folder, experiment_id):
     """
-    Generates a DataFrame by loading and processing trial logs from a specified modeling folder and experiment ID.
+    Generates a DataFrame by loading and processing trial logs from a specified modeling folder
+    and experiment ID.
 
     Parameters:
     - modeling_folder: The path to the folder where model data is stored.
@@ -540,10 +591,10 @@ def generate_trial_df(modeling_folder, experiment_id):
     """
 
     # 1. Construct the path to the experiment metadata file
-    experiment_metadata_path = os.path.join(modeling_folder, "experiment_metadata", f"{experiment_id}.json")
+    metadata_path = os.path.join(modeling_folder, "experiment_metadata", f"{experiment_id}.json")
 
     # 2. Load the experiment metadata
-    with open(experiment_metadata_path, 'r', encoding='utf-8') as f:
+    with open(metadata_path, 'r', encoding='utf-8') as f:
         experiment_metadata = json.load(f)
 
     # Retrieve trial log filenames
@@ -607,7 +658,8 @@ def summarize_feature_performance(trial_df):
         grouped['feature'] = feature
 
         # Reorder columns
-        column_order = ['feature', 'value', 'model_count'] + [f'avg_{metric}' for metric in value_vars]
+        column_order = (['feature', 'value', 'model_count'] +
+                        [f'avg_{metric}' for metric in value_vars])
         grouped = grouped[column_order]
 
         # Append to results
@@ -622,7 +674,9 @@ def summarize_feature_performance(trial_df):
     columns_to_format = [f'avg_{metric}' for metric in value_vars]
 
     # Apply conditional formatting to those columns
-    feature_performance_df = feature_performance_df.style.background_gradient(subset=columns_to_format, cmap='RdYlGn')
+    feature_performance_df = feature_performance_df.style.background_gradient(
+                                                            subset=columns_to_format,
+                                                            cmap='RdYlGn')
 
     return feature_performance_df
 
@@ -638,14 +692,16 @@ def plot_roc_auc_performance(trial_df, top_n):
     - trial_df: DataFrame containing trial data with columns to be grouped and evaluated.
     - top_n: The number of top features based on average ROC AUC to plot.
     """
-    # Ensure all columns are converted to strings to handle arrays, lists, and other non-numeric data types
+    # Ensure all columns are converted to strings to handle lists and other non-numeric data types
     trial_df = trial_df.applymap(lambda x: str(x) if isinstance(x, (list, dict, tuple)) else x)
 
     # Calculate mean roc_auc for each category in the relevant columns
     roc_auc_means = pd.DataFrame()
 
+    metric_columns = ['accuracy', 'precision', 'recall', 'f1_score', 'roc_auc',
+                      'log_loss', 'confusion_matrix']
     for column in trial_df.columns:
-        if column not in ['accuracy', 'precision', 'recall', 'f1_score', 'roc_auc', 'log_loss', 'confusion_matrix']:
+        if column not in metric_columns:
             grouped = trial_df.groupby(column)['roc_auc'].mean().reset_index()
             grouped['feature'] = column
             roc_auc_means = pd.concat([roc_auc_means, grouped], ignore_index=True)
@@ -677,10 +733,10 @@ def plot_top_feature_importance(modeling_folder, experiment_id, top_n=10):
     most important features.
     """
     # 1. Construct the path to the experiment metadata file
-    experiment_metadata_path = os.path.join(modeling_folder, "experiment_metadata", f"{experiment_id}.json")
+    metadata_path = os.path.join(modeling_folder, "experiment_metadata", f"{experiment_id}.json")
 
     # Load the experiment metadata to retrieve trial logs
-    with open(experiment_metadata_path, 'r', encoding='utf-8') as f:
+    with open(metadata_path, 'r', encoding='utf-8') as f:
         experiment_metadata = json.load(f)
 
     # Retrieve trial log filenames
@@ -696,7 +752,8 @@ def plot_top_feature_importance(modeling_folder, experiment_id, top_n=10):
 
         # Extract feature importance and convert to DataFrame
         feature_importance = trial_log_data['feature_importance']
-        feature_importance_df = pd.DataFrame(list(feature_importance.items()), columns=['feature', 'importance'])
+        feature_importance_df = pd.DataFrame(list(feature_importance.items()),
+                                             columns=['feature', 'importance'])
 
         # Append the DataFrame to the list
         all_feature_importances.append(feature_importance_df)
@@ -705,13 +762,20 @@ def plot_top_feature_importance(modeling_folder, experiment_id, top_n=10):
     combined_feature_importance_df = pd.concat(all_feature_importances)
 
     # Group by feature and calculate mean importance
-    feature_stats = combined_feature_importance_df.groupby('feature')['importance'].agg(['mean', 'var', 'std']).reset_index()
+    feature_stats = (combined_feature_importance_df
+                     .groupby('feature')['importance']
+                     .agg(['mean', 'var', 'std'])
+                     .reset_index())
 
     # Sort by mean importance
     sorted_features = feature_stats.sort_values(by='mean', ascending=False)
 
     # Plot the top features by importance
-    sorted_features.head(top_n).sort_values(by='mean',ascending=True).plot(kind='barh', x='feature', y='mean', title=f'Top {top_n} Features by Mean Importance')
+    sorted_features.head(top_n).sort_values(by='mean',ascending=True).plot(
+                                                kind='barh',
+                                                x='feature',
+                                                y='mean',
+                                                title=f'Top {top_n} Features by Mean Importance')
 
     # Display the plot
     plt.xlabel('Mean Importance')
