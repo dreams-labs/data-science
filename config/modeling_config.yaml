@@ -4,14 +4,14 @@ preprocessing:
 target_variables:
   moon_threshold: 0.25  # Minimum price % increase for a coin to be is_moon
   moon_minimum_percent: 0.1  # Minimum percentage of coins tagged as is_moon
-    # If the % of coins that meet the moon_threshold is below this
-    # value, additional coins are added in order of price performance
-    # until this % is reached
-  crater_threshold: -0.25  # Minimum price % decrease for a coin to be is_crater
-  crater_minimum_percent: 0.1  # Minimum percentage of coins tagged as is_crater
-    # If the % of coins that meet the crater_threshold is below this
-    # value, additional coins are added in order of price performance
-    # until this % is reached
+  #   # If the % of coins that meet the moon_threshold is below this
+  #   # value, additional coins are added in order of price performance
+  #   # until this % is reached
+  # crater_threshold: -0.25  # Minimum price % decrease for a coin to be is_crater
+  # crater_minimum_percent: 0.1  # Minimum percentage of coins tagged as is_crater
+  #   # If the % of coins that meet the crater_threshold is below this
+  #   # value, additional coins are added in order of price performance
+  #   # until this % is reached
 
 modeling:
   target_column: "is_moon"  # "is_moon" or "is_crater" depending on the experiment

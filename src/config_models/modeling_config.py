@@ -35,12 +35,14 @@ class PreprocessingConfig(NoExtrasBaseModel):
 
 # Target Variables section
 # ------------------------
-class TargetVariablesConfig(NoExtrasBaseModel):
-    """Configuration for target variables."""
-    moon_threshold: Annotated[float, Field(ge=0, le=1)] = Field(default=0.3)
-    moon_minimum_percent: Annotated[float, Field(ge=0, le=1)] = Field(default=0.1)
-    crater_threshold: Annotated[float, Field(ge=-1, le=0)] = Field(default=-0.3)
-    crater_minimum_percent: Annotated[float, Field(ge=0, le=1)] = Field(default=0.1)
+class TargetVariablesConfig(BaseModel):
+    """
+    Configuration for target variables.
+    """
+    moon_threshold: Optional[Annotated[float, Field(ge=0, le=1)]] = Field(default=0.3)
+    moon_minimum_percent: Optional[Annotated[float, Field(ge=0, le=1)]] = Field(default=0.1)
+    crater_threshold: Optional[Annotated[float, Field(ge=-1, le=0)]] = Field(default=-0.3)
+    crater_minimum_percent: Optional[Annotated[float, Field(ge=0, le=1)]] = Field(default=0.1)
 
 
 # Modeling section
