@@ -121,7 +121,7 @@ def run_experiment(modeling_config):
         profits_df = rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_df)
 
         # 3.3 Build the configured model input data (train/test data)
-        X_train, X_test, y_train, y_test = build_configured_model_input(
+        X_train, X_test, y_train, y_test, performance_df = build_configured_model_input(
                                             profits_df,
                                             market_data_df,
                                             config,
@@ -549,7 +549,7 @@ def build_configured_model_input(
     # 2. Add target variable to training_data_df
     # ------------------------------------------
     # create the target variable df
-    target_variable_df,_ = fe.create_target_variables_mooncrater(
+    target_variables_df, performance_df, _ = fe.create_target_variables(
                                 market_data_df,
                                 config['training_data'],
                                 modeling_config)
@@ -557,7 +557,7 @@ def build_configured_model_input(
     # merge the two into the final model input df
     model_input_df = fe.prepare_model_input_df(
                                 training_data_df,
-                                target_variable_df,
+                                target_variables_df,
                                 modeling_config['modeling']['target_column'])
 
 
@@ -571,7 +571,7 @@ def build_configured_model_input(
         modeling_config['modeling']['random_state']
     )
 
-    return X_train, X_test, y_train, y_test
+    return X_train, X_test, y_train, y_test, performance_df
 
 
 

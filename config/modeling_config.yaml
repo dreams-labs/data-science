@@ -18,8 +18,8 @@ modeling:
   modeling_folder: "..//modeling"  # location of the modeling folder where outputs will be saved
   config_folder: "..//config"  # location of the config folder where base case config files are
   train_test_split: 0.25  # Size of the test set as a proportion of the data
-  random_state: 45  # Random seed for reproducibility
+  random_state: 3  # Random seed for reproducibility
 
   model_params:
     n_estimators: 100  # Number of trees in the model
-    random_state: 45  # Random seed for reproducibility
+    random_state: 8  # Random seed for reproducibility

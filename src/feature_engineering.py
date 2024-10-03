@@ -4,6 +4,7 @@ functions used to build coin-level features from training data
 # pylint: disable=C0302
 
 import os
+import logging
 from datetime import datetime
 import time
 import copy
@@ -75,12 +76,14 @@ def generate_time_series_features(
 
         else:
             # if no indicators are needed, pass through coins with complete date coverage
+            logging.getLogger().setLevel(logging.WARNING)
             value_column_metrics_df, _ = cwm.split_dataframe_by_coverage(
                 value_column_df,
                 config['training_data']['training_period_start'],
                 config['training_data']['training_period_end'],
                 id_column='coin_id'
             )
+            logging.getLogger().setLevel(logging.INFO)
 
         # generate features from the metrics
         value_column_features_df, value_column_tuple = convert_dataset_metrics_to_features(
@@ -930,7 +933,35 @@ def merge_and_fill_training_data(
     return training_data_df, merge_logs_df
 
 
-def prepare_and_compute_performance(prices_df, training_data_config):
+
+def create_target_variables(prices_df, training_data_config, modeling_config):
+    """
+    Main function to create target variables based on price performance.
+
+    Parameters:
+    - prices_df: DataFrame containing price data with columns 'coin_id', 'date', and 'price'.
+    - training_data_config: Configuration with modeling period dates.
+    - modeling_config: Configuration for modeling with target variable settings.
+
+    Returns:
+    - target_variables_df: DataFrame with target variables.
+    - performance_df: DataFrame with price performance data.
+    - outcomes_df: DataFrame tracking outcomes for each coin.
+    """
+    performance_df, outcomes_df = calculate_coin_performance(prices_df, training_data_config)
+
+    target_variable_type = modeling_config.get('target_variable_type', 'mooncrater')
+
+    if target_variable_type == 'mooncrater':
+        target_variables_df = calculate_mooncrater_targets(performance_df, modeling_config)
+    else:
+        raise ValueError(f"Unsupported target variable type: {target_variable_type}")
+
+
+    return target_variables_df, performance_df, outcomes_df
+
+
+def calculate_coin_performance(prices_df, training_data_config):
     """
     Prepares the data and computes price performance for each coin.
 
@@ -1012,6 +1043,17 @@ def calculate_mooncrater_targets(performance_df, modeling_config):
         additional_craters_needed = int(total_coins * crater_minimum_percent) - craters
         crater_candidates = target_variables_df[target_variables_df['is_crater'] == 0].nsmallest(additional_craters_needed, 'performance')
         target_variables_df.loc[crater_candidates.index, 'is_crater'] = 1
+
+    # Log results
+    total_coins = len(target_variables_df)
+    moons = target_variables_df['is_moon'].sum()
+    craters = target_variables_df['is_crater'].sum()
+
+    logger.info(
+        "Target variables created for %s coins with %s/%s (%s) moons and %s/%s (%s) craters.",
+        total_coins, moons, total_coins, f"{moons/total_coins:.2%}",
+        craters, total_coins, f"{craters/total_coins:.2%}"
+    )
 
     return target_variables_df[['coin_id', 'is_moon', 'is_crater']]
 

@@ -1,7 +1,6 @@
 """
 tests used to audit the files in the data-science/src folder
 """
-# pylint: disable=C0301 # line over 100 chars
 # pylint: disable=C0302 # over 1000 lines
 # pylint: disable=C0413 # import not at top of doc (due to local import)
 # pylint: disable=W0612 # unused variables (due to test reusing functions with 2 outputs)
@@ -139,25 +138,29 @@ def test_fe_calculate_rolling_window_features():
     Test Cases:
     1. **Multiple periods with complete windows**:
     - Uses 10 records with a window duration of 3 and 3 lookback periods.
-    - Verifies that all requested statistics ('sum', 'max', 'min', 'median', 'std') are calculated correctly for complete periods.
+    - Verifies that all requested statistics ('sum', 'max', 'min', 'median', 'std') are calculated
+        correctly for complete periods.
     - Also checks for valid 'change' and 'pct_change' calculations.
 
     2. **Non-divisible records**:
     - Uses 8 records with a window duration of 3.
     - Verifies that only complete periods are processed and earlier incomplete data is disregarded.
-    - Ensures that 'period_3' is not calculated, and correct results for 'sum' and 'change' are returned for periods 1 and 2.
+    - Ensures that 'period_3' is not calculated, and correct results for 'sum' and 'change' are
+        returned for periods 1 and 2.
 
     3. **Small dataset**:
     - Uses only 2 records, which is smaller than the window size.
     - Ensures that the function handles small datasets gracefully and returns an empty dictionary.
 
     4. **Standard deviation and median checks**:
-    - Specifically tests the calculation of 'std' and 'median' over the last 3 periods for valid rolling windows.
+    - Specifically tests the calculation of 'std' and 'median' over the last 3 periods for valid
+        rolling windows.
     - Verifies that these statistics are calculated accurately for both period 1 and period 2.
 
     5. **Percentage change with impute_value logic**:
     - Tests how the function handles a time series containing zeros.
-    - Ensures that the 'pct_change' is calculated correctly, handling cases where the start value is 0 using the impute logic, and verifies that large percentage changes are capped at 1000%.
+    - Ensures that the 'pct_change' is calculated correctly, handling cases where the start value is 0
+        using the impute logic, and verifies that large percentage changes are capped at 1000%.
     """
 
     # Sample data for testing
@@ -446,7 +449,7 @@ def test_fe_flatten_date_features_bucketing():
     metrics_config = {
         'buyers_new': {
             'aggregations': {
-                'sum': {'buckets': [{'low': 100}, {'medium': 200}, {'high': 'remainder'}]},  # Define the bucket ranges
+                'sum': {'buckets': [{'low': 100}, {'medium': 200}, {'high': 'remainder'}]},  # Define bucket ranges
                 'mean': {'scaling': 'none'}
             }
         }
@@ -501,7 +504,10 @@ def test_save_flattened_outputs(mock_coin_df):
     modeling_period_start = '2024-04-01'
 
     # Call the function to save the CSV and get the DataFrame and output path
-    _, saved_file_path = fe.save_flattened_outputs(mock_coin_df, test_output_path, metric_description, modeling_period_start)
+    _, saved_file_path = fe.save_flattened_outputs(mock_coin_df,
+                                                   test_output_path,
+                                                   metric_description,
+                                                   modeling_period_start)
 
     # Assert that the file was created
     assert os.path.exists(saved_file_path), f"File was not saved at {saved_file_path}"
@@ -520,7 +526,10 @@ def test_save_flattened_outputs_non_unique_coin_id(mock_non_unique_coin_id_df):
 
     # Check for the ValueError due to non-unique 'coin_id' values
     with pytest.raises(ValueError, match="The 'coin_id' column must have fully unique values."):
-        fe.save_flattened_outputs(mock_non_unique_coin_id_df, test_output_path, metric_description, modeling_period_start)
+        fe.save_flattened_outputs(mock_non_unique_coin_id_df,
+                                  test_output_path,
+                                  metric_description,
+                                  modeling_period_start)
 
 
 
@@ -745,7 +754,9 @@ def test_missing_coin_id(mock_input_files):
     # Create a DataFrame missing the 'coin_id' column
     df_missing_coin_id = pd.DataFrame({'buyers_new': [100, 200]})
     preprocessed_output_dir = os.path.join(tmpdir, 'outputs', 'preprocessed_outputs')
-    df_missing_coin_id.to_csv(os.path.join(preprocessed_output_dir, 'file_missing_coin_id_2024-09-13_14-47.csv'), index=False)
+    df_missing_coin_id.to_csv(os.path.join(preprocessed_output_dir,
+                                           'file_missing_coin_id_2024-09-13_14-47.csv'),
+                                           index=False)
 
     filenames.append(('file_missing_coin_id_2024-09-13_14-47.csv', 'fill_zeros'))
 
@@ -920,7 +931,7 @@ def test_merge_and_fill_training_data_drop_records():
 
 
 # ------------------------------------------ #
-# prepare_and_compute_performance() unit tests
+# calculate_coin_performance() unit tests
 # ------------------------------------------ #
 
 @pytest.fixture
@@ -945,14 +956,15 @@ def valid_training_data_config():
     }
 
 @pytest.mark.unit
-def test_prepare_and_compute_performance_valid_data(valid_prices_df, valid_training_data_config):
+def test_calculate_coin_performance_valid_data(valid_prices_df, valid_training_data_config):
     """
-    Test prepare_and_compute_performance function with valid data for multiple coins.
+    Test calculate_coin_performance function with valid data for multiple coins.
 
     This test ensures that the function correctly calculates performance and outcomes
     for all coins when given valid input data.
     """
-    performance_df, outcomes_df = fe.prepare_and_compute_performance(valid_prices_df, valid_training_data_config)
+    performance_df, outcomes_df = fe.calculate_coin_performance(valid_prices_df,
+                                                                valid_training_data_config)
 
     expected_performance = pd.DataFrame({
         'coin_id': ['BTC', 'ETH', 'XRP'],
@@ -986,21 +998,24 @@ def no_change_prices_df():
     })
 
 @pytest.mark.unit
-def test_prepare_and_compute_performance_no_change(no_change_prices_df, valid_training_data_config):
+def test_calculate_coin_performance_no_change(no_change_prices_df, valid_training_data_config):
     """
-    Test prepare_and_compute_performance function with no price change for some coins.
+    Test calculate_coin_performance function with no price change for some coins.
 
     This test ensures that the function correctly calculates zero performance for coins
     with no price change and correct performance for others.
     """
-    performance_df, outcomes_df = fe.prepare_and_compute_performance(no_change_prices_df, valid_training_data_config)
+    performance_df, outcomes_df = fe.calculate_coin_performance(no_change_prices_df,
+                                                                valid_training_data_config)
 
     expected_performance = pd.DataFrame({
         'coin_id': ['BTC', 'ETH', 'XRP'],
         'performance': [0.0, 0.25, 0.0]
     })
 
-    assert (np.isclose(performance_df['performance'].values, expected_performance['performance'].values, rtol=1e-4, atol=1e-4)).all()
+    assert (np.isclose(performance_df['performance'].values,
+                       expected_performance['performance'].values,
+                       rtol=1e-4, atol=1e-4)).all()
 
     expected_outcomes = pd.DataFrame({
         'coin_id': ['BTC', 'ETH', 'XRP'],
@@ -1022,21 +1037,24 @@ def negative_performance_prices_df():
     })
 
 @pytest.mark.unit
-def test_prepare_and_compute_performance_negative(negative_performance_prices_df, valid_training_data_config):
+def test_calculate_coin_performance_negative(negative_performance_prices_df, valid_training_data_config):
     """
-    Test prepare_and_compute_performance function with negative performance for some coins.
+    Test calculate_coin_performance function with negative performance for some coins.
 
     This test ensures that the function correctly calculates negative performance values
     for coins with price decreases and correct performance for others.
     """
-    performance_df, outcomes_df = fe.prepare_and_compute_performance(negative_performance_prices_df, valid_training_data_config)
+    performance_df, outcomes_df = fe.calculate_coin_performance(negative_performance_prices_df,
+                                                                valid_training_data_config)
 
     expected_performance = pd.DataFrame({
         'coin_id': ['BTC', 'ETH', 'XRP'],
         'performance': [-0.1667, 0.25, -0.2]
     })
 
-    assert (np.isclose(performance_df['performance'].values, expected_performance['performance'].values, rtol=1e-4, atol=1e-4)).all()
+    assert (np.isclose(performance_df['performance'].values,
+                       expected_performance['performance'].values,
+                       rtol=1e-4, atol=1e-4)).all()
 
     expected_outcomes = pd.DataFrame({
         'coin_id': ['BTC', 'ETH', 'XRP'],
@@ -1064,21 +1082,25 @@ def multiple_datapoints_prices_df():
     })
 
 @pytest.mark.unit
-def test_prepare_and_compute_performance_multiple_datapoints(multiple_datapoints_prices_df, valid_training_data_config):
+def test_calculate_coin_performance_multiple_datapoints(multiple_datapoints_prices_df,
+                                                        valid_training_data_config):
     """
-    Test prepare_and_compute_performance function with multiple data points between start and end dates.
+    Test calculate_coin_performance function with multiple data points between start and end dates.
 
     This test ensures that the function correctly calculates performance using only start and end dates,
     ignoring intermediate data points.
     """
-    performance_df, outcomes_df = fe.prepare_and_compute_performance(multiple_datapoints_prices_df, valid_training_data_config)
+    performance_df, outcomes_df = fe.calculate_coin_performance(multiple_datapoints_prices_df,
+                                                                valid_training_data_config)
 
     expected_performance = pd.DataFrame({
         'coin_id': ['BTC', 'ETH', 'XRP'],
         'performance': [0.1667, 0.25, 0.2]
     })
 
-    assert (np.isclose(performance_df['performance'].values, expected_performance['performance'].values, rtol=1e-4, atol=1e-4)).all()
+    assert (np.isclose(performance_df['performance'].values,
+                       expected_performance['performance'].values,
+                       rtol=1e-4, atol=1e-4)).all()
 
     expected_outcomes = pd.DataFrame({
         'coin_id': ['BTC', 'ETH', 'XRP'],
@@ -1101,7 +1123,8 @@ def test_calculate_mooncrater_targets():
     # Mock data
     data = {
         'coin_id': ['coin1', 'coin2', 'coin3', 'coin4', 'coin5'],
-        'performance': [0.05, 0.55, -0.05, -0.55, 0.50]  # 5% increase, 55% increase, 5% decrease, 55% decrease, 50% increase
+        # 5% increase, 55% increase, 5% decrease, 55% decrease, 50% increase
+        'performance': [0.05, 0.55, -0.05, -0.55, 0.50]
     }
     performance_df = pd.DataFrame(data)
 
@@ -1140,8 +1163,10 @@ def test_calculate_mooncrater_targets():
 
     # Check minimum percentages
     total_coins = len(target_variables_df)
-    assert target_variables_df['is_moon'].sum() / total_coins >= modeling_config['target_variables']['moon_minimum_percent']
-    assert target_variables_df['is_crater'].sum() / total_coins >= modeling_config['target_variables']['crater_minimum_percent']
+    assert (target_variables_df['is_moon'].sum() /
+            total_coins >= modeling_config['target_variables']['moon_minimum_percent'])
+    assert (target_variables_df['is_crater'].sum() /
+            total_coins >= modeling_config['target_variables']['crater_minimum_percent'])
 
     # Ensure no coin is both a moon and a crater
     assert not any((target_variables_df['is_moon'] == 1) & (target_variables_df['is_crater'] == 1))
@@ -1220,11 +1245,15 @@ def test_aggregation_methods(buysell_metrics_df, df_metrics_config, config):
     sum matches the expected result.
     """
     # Flatten the buysell metrics DataFrame to the coin_id level
-    flattened_buysell_metrics_df = fe.flatten_coin_date_df(buysell_metrics_df, df_metrics_config, config['training_data']['training_period_end'])
+    flattened_buysell_metrics_df = fe.flatten_coin_date_df(buysell_metrics_df,
+                                                           df_metrics_config,
+                                                           config['training_data']['training_period_end'])
 
     # Example: Verify that total_bought_sum is aggregated correctly at the coin_id level
     # Manually group the original buysell_metrics_df by coin_id to compute expected sums
-    expected_total_bought_sum = buysell_metrics_df.groupby('coin_id')['total_bought'].sum().reset_index(name='total_bought_sum')
+    expected_total_bought_sum = (buysell_metrics_df.groupby('coin_id')['total_bought']
+                                                   .sum()
+                                                   .reset_index(name='total_bought_sum'))
 
     # Extract the result from the flattened DataFrame
     result_total_bought_sum = flattened_buysell_metrics_df[['coin_id', 'total_bought_sum']]
@@ -1249,10 +1278,13 @@ def test_outlier_handling(buysell_metrics_df, df_metrics_config, config):
     outlier_df.loc[0, 'total_bought'] = 1e12  # Extreme value
 
     # Flatten the modified DataFrame
-    flattened_buysell_metrics_df = fe.flatten_coin_date_df(outlier_df, df_metrics_config, config['training_data']['training_period_end'])
+    flattened_buysell_metrics_df = fe.flatten_coin_date_df(outlier_df,
+                                                           df_metrics_config,
+                                                           config['training_data']['training_period_end'])
 
     # Ensure the extreme value is handled and aggregated correctly
-    assert flattened_buysell_metrics_df['total_bought_sum'].max() >= 1e12, "Outlier in total_bought not handled correctly"
+    assert (flattened_buysell_metrics_df['total_bought_sum'].max() >= 1e12
+            ),"Outlier in total_bought not handled correctly"
 
 
 @pytest.mark.integration
@@ -1266,7 +1298,9 @@ def test_all_coin_ids_present(buysell_metrics_df, df_metrics_config, config):
     """
 
     # Flatten the buysell metrics DataFrame to the coin_id level
-    flattened_buysell_metrics_df = fe.flatten_coin_date_df(buysell_metrics_df, df_metrics_config, config['training_data']['training_period_end'])
+    flattened_buysell_metrics_df = fe.flatten_coin_date_df(buysell_metrics_df,
+                                                           df_metrics_config,
+                                                           config['training_data']['training_period_end'])
 
     # Get unique coin_ids from the original DataFrame
     expected_coin_ids = buysell_metrics_df['coin_id'].unique()
