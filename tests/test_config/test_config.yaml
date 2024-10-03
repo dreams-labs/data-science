@@ -71,3 +71,6 @@ data_cleaning:
   # prices_df filters: Define how to handle missing price data
   max_gap_days: 10  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
   exclude_coins_without_transfers: True  # determines whether to create price features for coins without transfers data
+
+  # The amount of total USD inflows a wallet must have to be included in the training data
+  minimum_wallet_inflows: 10

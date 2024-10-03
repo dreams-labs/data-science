@@ -471,6 +471,42 @@ def test_log_trial_results_trial_overrides_handling(mock_modeling_folder, mock_l
     assert trial_log["trial_overrides"] == {"learning_rate": 0.01}
 
 
+# ---------------------------------------------- #
+# calculate_running_profitability_score() unit tests
+# ---------------------------------------------- #
+
+@pytest.fixture
+def perfect_predictions_input_data():
+    """
+    Fixture to provide standard input data for testing.
+
+    Returns:
+        tuple: Containing predictions and performances as numpy arrays.
+    """
+    predictions = np.array([0.7, 0.3, 0.5, 0.9, 0.1])
+    performances = np.array([1, 0, 1, 1, 0])
+    return predictions, performances
+
+
+@pytest.mark.unit
+def test_calculate_running_profitability_score_perfect_case(perfect_predictions_input_data):
+    """
+    Test the calculate_running_profitability_score function with standard input.
+
+    This test verifies that the function correctly calculates running profitability
+    scores for a typical set of predictions and performances.
+    """
+    predictions, performances = perfect_predictions_input_data
+
+    x_values, y_values = m.calculate_running_profitability_score(predictions, performances)
+
+    expected_x = np.array([0.2, 0.4, 0.6, 0.8, 1.0])
+    expected_y = np.array([1.0, 1.0, 1.0, 1.0, 1.0])
+
+    assert np.array_equal(x_values, expected_x)
+    assert np.allclose(y_values, expected_y, atol=1e-4)
+
+
 # ======================================================== #
 #                                                          #
 #            I N T E G R A T I O N   T E S T S             #

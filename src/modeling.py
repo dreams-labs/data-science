@@ -164,7 +164,7 @@ def train_model(X_train, y_train, modeling_folder, model_params=None):
 
 
 
-def evaluate_model(model, X_test, y_test, model_id, modeling_folder):
+def evaluate_model(model, X_test, y_test, model_id, modeling_config):
     """
     Evaluates a trained model on the test set and outputs key metrics and stores predictions.
 
@@ -173,11 +173,14 @@ def evaluate_model(model, X_test, y_test, model_id, modeling_folder):
     - X_test (pd.DataFrame): The test features with 'coin_id' as the index.
     - y_test (pd.Series): The true labels with 'coin_id' as the index.
     - model_id (str): The unique ID of the model being evaluated.
-    - modeling_folder (str): The base folder for saving outputs.
+    - modeling_config (str): modeling_config.yaml
 
     Returns:
     - metrics_dict (dict): A dictionary of calculated evaluation metrics.
     """
+    modeling_folder = modeling_config['modeling']['modeling_folder']
+    winsorization_cutoff = modeling_config['evaluation']['winsorization_cutoff']
+
     # Construct the performance metrics folder path
     evaluation_folder = os.path.join(modeling_folder, "outputs", "performance_metrics")
     predictions_folder = os.path.join(modeling_folder, "outputs", "predictions")
@@ -217,6 +220,72 @@ def evaluate_model(model, X_test, y_test, model_id, modeling_folder):
     metrics_df.to_csv(metrics_filename, index=False)
 
     return metrics_dict
+
+
+
+def calculate_running_profitability_score(predictions, performances):
+    """
+    Calculates the running profitability score for the entire series.
+
+    Args:
+    - predictions (numpy.array or pandas.Series): The model's predictions (probabilities or values).
+    - performances (numpy.array or pandas.Series): The actual performance values.
+
+    Returns:
+    - running_profitability_scores: The model's cumulative profitability score through the array length,
+        e.g. the first score is through 1 coin, the second score is through 2 coins, etc
+
+    Raises:
+    - ValueError: If predictions and performances have different lengths.
+    """
+    if len(predictions) != len(performances):
+        raise ValueError("Predictions and performances must have the same length")
+
+    # Create a DataFrame with predictions and performances
+    df = pd.DataFrame({'predictions': predictions, 'performances': performances})
+
+    # Sort by predictions in descending order
+    df_sorted = df.sort_values('predictions', ascending=False)
+
+    cumulative_model_returns = np.cumsum(df_sorted['performances'])
+
+    # Calculate best possible returns for each number of picks
+    best_possible_returns = np.sort(performances)[::-1]  # Sort performances in descending order
+    cumulative_best_returns = np.cumsum(best_possible_returns)
+
+    # Calculate running profitability scores
+    running_profitability_scores = np.divide(
+        cumulative_model_returns,
+        cumulative_best_returns,
+        out=np.zeros_like(cumulative_model_returns),
+        where=cumulative_best_returns != 0
+    )
+
+    return running_profitability_scores
+
+
+
+def winsorize(data, cutoff):
+    """
+    Applies winsorization to the input data.
+
+    Args:
+    - data (numpy.array or pandas.Series): The data to be winsorized.
+    - cutoff (float): The percentile at which to winsorize (e.g., 0.05 for 5th and 95th percentiles).
+
+    Returns:
+    - numpy.array: The winsorized data.
+
+    Raises:
+    - ValueError: If cutoff is not between 0 and 0.5.
+    """
+    if not 0 < cutoff < 0.5:
+        raise ValueError("Cutoff must be between 0 and 0.5")
+
+    lower_bound = np.percentile(data, cutoff * 100)
+    upper_bound = np.percentile(data, (1 - cutoff) * 100)
+
+    return np.clip(data, lower_bound, upper_bound)
 
 
 

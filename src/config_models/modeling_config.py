@@ -72,12 +72,7 @@ class ModelParams(NoExtrasBaseModel):
 # ---------------------
 class EvaluationConfig(BaseModel):
     """Configuration for model evaluation step."""
-    profitability_score: Optional['ProfitabilityScoreConfig'] = None
-
-class ProfitabilityScoreConfig(BaseModel):
-    """Parameters for the custom profitability_score"""
     winsorization_cutoff: Optional[float] = None
-
 
 # ============================================================================
 # Model Rebuilding

@@ -995,9 +995,7 @@ def calculate_coin_performance(prices_df, training_data_config):
 
     # Compute performance
     performance = (end_prices[valid_coins] - start_prices[valid_coins]) / start_prices[valid_coins]
-    performance_df = pd.DataFrame({'coin_id': valid_coins,
-                                   'performance': performance}
-                                   ).reset_index(drop=True)
+    performance_df = pd.DataFrame({'performance': performance})
 
     # Create outcomes DataFrame
     outcomes_df = pd.DataFrame({
@@ -1025,7 +1023,7 @@ def calculate_mooncrater_targets(performance_df, modeling_config):
     moon_minimum_percent = modeling_config['target_variables']['moon_minimum_percent']
     crater_minimum_percent = modeling_config['target_variables']['crater_minimum_percent']
 
-    target_variables_df = performance_df.copy()
+    target_variables_df = performance_df.copy().reset_index()
     target_variables_df['is_moon'] = (target_variables_df['performance'] >= moon_threshold).astype(int)
     target_variables_df['is_crater'] = (target_variables_df['performance'] <= crater_threshold).astype(int)
 

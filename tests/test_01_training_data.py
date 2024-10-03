@@ -788,7 +788,9 @@ def profits_df(prices_df):
     logger.info("Beginning integration testing...")
     logger.info("Generating profits_df fixture from production data...")
     # retrieve profits data
-    profits_df = td.retrieve_profits_data(TRAINING_PERIOD_START, MODELING_PERIOD_END)
+    profits_df = td.retrieve_profits_data(TRAINING_PERIOD_START,
+                                          MODELING_PERIOD_END,
+                                          config['data_cleaning']['minimum_wallet_inflows'])
 
     # filter data to only 5% of coin_ids
     np.random.seed(42)

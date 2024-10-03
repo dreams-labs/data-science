@@ -24,5 +24,4 @@ modeling:
     n_estimators: 100  # Number of trees in the model
 
 evaluation:
-  profitability_score:
-    winsorization_cutoff: 0.9
+  winsorization_cutoff: 0.05
