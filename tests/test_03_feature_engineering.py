@@ -1094,56 +1094,57 @@ def test_prepare_and_compute_performance_multiple_datapoints(multiple_datapoints
 # ------------------------------------------ #
 
 @pytest.mark.unit
-def test_create_target_variables_mooncrater():
+def test_calculate_mooncrater_targets():
     """
-    tests whether ths is_moon and is_crater target variables are calculated correctly.
+    Tests whether the is_moon and is_crater target variables are calculated correctly.
     """
     # Mock data
     data = {
-        'coin_id': ['coin1', 'coin2', 'coin3', 'coin4', 'coin5', 'coin1', 'coin2', 'coin3', 'coin4', 'coin5'],
-        'date': [
-            '2024-01-01', '2024-01-01', '2024-01-01', '2024-01-01', '2024-01-01',
-            '2024-12-31', '2024-12-31', '2024-12-31', '2024-12-31', '2024-12-31'
-        ],
-        'price': [
-            100, 100, 100, 100, 100,   # Start prices
-            105, 150, 95, 50, 150      # End prices: slightly positive, >moon, slightly negative, <crater, at moon threshold
-        ]
+        'coin_id': ['coin1', 'coin2', 'coin3', 'coin4', 'coin5'],
+        'performance': [0.05, 0.55, -0.05, -0.55, 0.50]  # 5% increase, 55% increase, 5% decrease, 55% decrease, 50% increase
     }
-    prices_df = pd.DataFrame(data)
-    prices_df['date'] = pd.to_datetime(prices_df['date'])
+    performance_df = pd.DataFrame(data)
 
     # Mock configuration
-    training_data_config = {
-        'modeling_period_start': '2024-01-01',
-        'modeling_period_end': '2024-12-31',
-    }
-
     modeling_config = {
         'target_variables': {
             'moon_threshold': 0.5,  # 50% increase
-            'moon_minimum_percent': 0.0,
+            'moon_minimum_percent': 0.2,  # 20% of coins should be moons
             'crater_threshold': -0.5,  # 50% decrease
-            'crater_minimum_percent': 0.0
+            'crater_minimum_percent': 0.2  # 20% of coins should be craters
         }
     }
 
     # Call the function being tested
-    target_variables_df, outcomes_df = fe.create_target_variables_mooncrater(prices_df, training_data_config, modeling_config)
+    target_variables_df = fe.calculate_mooncrater_targets(performance_df, modeling_config)
 
-    # Assertions for target variables
+    # Assertions
+    assert len(target_variables_df) == 5
+    assert list(target_variables_df.columns) == ['coin_id', 'is_moon', 'is_crater']
+
+    # Check individual results
     assert target_variables_df[target_variables_df['coin_id'] == 'coin1']['is_moon'].values[0] == 0
-    assert target_variables_df[target_variables_df['coin_id'] == 'coin2']['is_moon'].values[0] == 1
-    assert target_variables_df[target_variables_df['coin_id'] == 'coin3']['is_crater'].values[0] == 0
-    assert target_variables_df[target_variables_df['coin_id'] == 'coin4']['is_crater'].values[0] == 1
-    assert target_variables_df[target_variables_df['coin_id'] == 'coin5']['is_moon'].values[0] == 1  # Exactly at moon threshold
+    assert target_variables_df[target_variables_df['coin_id'] == 'coin1']['is_crater'].values[0] == 0
 
-    # Assertions for outcomes
-    assert outcomes_df[outcomes_df['coin_id'] == 'coin1']['outcome'].values[0] == 'target variable created'
-    assert outcomes_df[outcomes_df['coin_id'] == 'coin2']['outcome'].values[0] == 'target variable created'
-    assert outcomes_df[outcomes_df['coin_id'] == 'coin3']['outcome'].values[0] == 'target variable created'
-    assert outcomes_df[outcomes_df['coin_id'] == 'coin4']['outcome'].values[0] == 'target variable created'
-    assert outcomes_df[outcomes_df['coin_id'] == 'coin5']['outcome'].values[0] == 'target variable created'
+    assert target_variables_df[target_variables_df['coin_id'] == 'coin2']['is_moon'].values[0] == 1
+    assert target_variables_df[target_variables_df['coin_id'] == 'coin2']['is_crater'].values[0] == 0
+
+    assert target_variables_df[target_variables_df['coin_id'] == 'coin3']['is_moon'].values[0] == 0
+    assert target_variables_df[target_variables_df['coin_id'] == 'coin3']['is_crater'].values[0] == 0
+
+    assert target_variables_df[target_variables_df['coin_id'] == 'coin4']['is_moon'].values[0] == 0
+    assert target_variables_df[target_variables_df['coin_id'] == 'coin4']['is_crater'].values[0] == 1
+
+    assert target_variables_df[target_variables_df['coin_id'] == 'coin5']['is_moon'].values[0] == 1
+    assert target_variables_df[target_variables_df['coin_id'] == 'coin5']['is_crater'].values[0] == 0
+
+    # Check minimum percentages
+    total_coins = len(target_variables_df)
+    assert target_variables_df['is_moon'].sum() / total_coins >= modeling_config['target_variables']['moon_minimum_percent']
+    assert target_variables_df['is_crater'].sum() / total_coins >= modeling_config['target_variables']['crater_minimum_percent']
+
+    # Ensure no coin is both a moon and a crater
+    assert not any((target_variables_df['is_moon'] == 1) & (target_variables_df['is_crater'] == 1))
 
 
 

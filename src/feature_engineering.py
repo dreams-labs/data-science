@@ -978,137 +978,42 @@ def prepare_and_compute_performance(prices_df, training_data_config):
 
 
 
-def create_target_variables_mooncrater(prices_df, training_data_config, modeling_config):
+def calculate_mooncrater_targets(performance_df, modeling_config):
     """
-    Creates a DataFrame with target variables 'is_moon' and 'is_crater' based on price performance
-    during the modeling period, using the thresholds from modeling_config.
+    Calculates 'is_moon' and 'is_crater' target variables based on performance.
 
     Parameters:
-    - prices_df: DataFrame containing price data with columns 'coin_id', 'date', and 'price'.
-    - config: General configuration file with modeling period dates.
+    - performance_df: DataFrame with columns 'coin_id' and 'performance'.
     - modeling_config: Configuration for modeling with target variable thresholds.
 
     Returns:
-    - target_variable_df: DataFrame with columns 'coin_id', 'is_moon', and 'is_crater'.
-    - outcomes_df: DataFrame tracking outcomes for each coin.
+    - target_variables_df: DataFrame with columns 'coin_id', 'is_moon', and 'is_crater'.
     """
-    # 1. Retrieve Variables and Prepare DataFrame
-    # -------------------------------------------
-    prices_df = prices_df.copy()
-    prices_df['date'] = pd.to_datetime(prices_df['date'])
-    modeling_period_start = pd.to_datetime(training_data_config['modeling_period_start'])
-    modeling_period_end = pd.to_datetime(training_data_config['modeling_period_end'])
-
-    modeling_period_df = prices_df.loc[
-        prices_df['date'].between(modeling_period_start, modeling_period_end)
-    ]
-
-    # Raise an exception if any coins are missing a price at the start or end date
-    start_price_coins = modeling_period_df[
-        modeling_period_df['date'] == modeling_period_start
-    ]['coin_id'].unique()
-
-    end_price_coins = modeling_period_df[
-        modeling_period_df['date'] == modeling_period_end
-    ]['coin_id'].unique()
-
-    all_coins = modeling_period_df['coin_id'].unique()
-    coins_missing_price = set(all_coins) - set(start_price_coins) - set(end_price_coins)
-
-    if coins_missing_price:
-        missing = ', '.join(map(str, coins_missing_price))
-        raise ValueError(f"Missing price for coins at start or end date: {missing}")
-
-
-    # 2. Generate Target Variables
-    # ----------------------------
     moon_threshold = modeling_config['target_variables']['moon_threshold']
     crater_threshold = modeling_config['target_variables']['crater_threshold']
     moon_minimum_percent = modeling_config['target_variables']['moon_minimum_percent']
     crater_minimum_percent = modeling_config['target_variables']['crater_minimum_percent']
 
-    # Process coins with data
-    target_data = []
-    outcomes = []
-    price_performance = []
-    for coin_id, group in modeling_period_df.groupby('coin_id', observed=True):
-        # Get the price on the start and end dates
-        price_start = group[group['date'] == modeling_period_start]['price'].values
-        price_end = group[group['date'] == modeling_period_end]['price'].values
-
-        # Check if both start and end prices exist
-        if len(price_start) > 0 and len(price_end) > 0:
-            price_start = price_start[0]
-            price_end = price_end[0]
-            performance = (price_end - price_start) / price_start
-            is_moon = int(performance >= moon_threshold)
-            is_crater = int(performance <= crater_threshold)
-            target_data.append({'coin_id': coin_id, 'is_moon': is_moon, 'is_crater': is_crater})
-            outcomes.append({'coin_id': coin_id, 'outcome': 'target variable created'})
-            price_performance.append({'coin_id': coin_id, 'performance': performance})
-
-        else:
-            if len(price_start) == 0 and len(price_end) == 0:
-                outcomes.append({'coin_id': coin_id, 'outcome': 'missing both'})
-            elif len(price_start) == 0:
-                outcomes.append({'coin_id': coin_id, 'outcome': 'missing start price'})
-            else:
-                outcomes.append({'coin_id': coin_id, 'outcome': 'missing end price'})
-
-
-    # 3. Ensure minimum percentage for moon and crater
-    # ------------------------------------------------
-    target_variables_df = pd.DataFrame(target_data)
-    price_performance_df = pd.DataFrame(price_performance)
-
-    # Sort by performance for filling the remaining moons and craters
-    price_performance_df = price_performance_df.sort_values(by='performance', ascending=False)
+    target_variables_df = performance_df.copy()
+    target_variables_df['is_moon'] = (target_variables_df['performance'] >= moon_threshold).astype(int)
+    target_variables_df['is_crater'] = (target_variables_df['performance'] <= crater_threshold).astype(int)
 
     total_coins = len(target_variables_df)
-    moons = target_variables_df[target_variables_df['is_moon'] == 1].shape[0]
-    craters = target_variables_df[target_variables_df['is_crater'] == 1].shape[0]
+    moons = target_variables_df['is_moon'].sum()
+    craters = target_variables_df['is_crater'].sum()
 
-    # Check if moons meet minimum percentage
+    # Ensure minimum percentage for moons and craters
     if moons / total_coins < moon_minimum_percent:
         additional_moons_needed = int(total_coins * moon_minimum_percent) - moons
-        # Mark additional top-performing coins as moons
-        moon_candidates = price_performance_df[~price_performance_df['coin_id'].isin(  # pylint: disable=E1136
-            target_variables_df[target_variables_df['is_moon'] == 1]['coin_id']
-            )].head(additional_moons_needed)
-        target_variables_df.loc[
-            target_variables_df['coin_id'].isin(moon_candidates['coin_id']), 'is_moon'
-            ] = 1
+        moon_candidates = target_variables_df[target_variables_df['is_moon'] == 0].nlargest(additional_moons_needed, 'performance')
+        target_variables_df.loc[moon_candidates.index, 'is_moon'] = 1
 
-    # Check if craters meet minimum percentage
     if craters / total_coins < crater_minimum_percent:
         additional_craters_needed = int(total_coins * crater_minimum_percent) - craters
-        # Mark additional worst-performing coins as craters
-        crater_candidates = price_performance_df[~price_performance_df['coin_id'].isin(  # pylint: disable=E1136
-            target_variables_df[target_variables_df['is_crater'] == 1]['coin_id']
-            )].tail(additional_craters_needed)
-        target_variables_df.loc[
-            target_variables_df['coin_id'].isin(crater_candidates['coin_id']), 'is_crater'
-            ] = 1
+        crater_candidates = target_variables_df[target_variables_df['is_crater'] == 0].nsmallest(additional_craters_needed, 'performance')
+        target_variables_df.loc[crater_candidates.index, 'is_crater'] = 1
 
-
-    # 4. Log and Format Output DataFrame
-    # ----------------------------------
-    outcomes_df = pd.DataFrame(outcomes)
-
-    logger.info(
-        "Target variables created for %s coins with %s/%s (%s) moons and %s/%s (%s) craters.",
-        len(target_variables_df),
-        target_variables_df[target_variables_df['is_moon'] == 1].shape[0], total_coins,
-        dc.human_format(
-            100 * target_variables_df[target_variables_df['is_moon'] == 1].shape[0] / total_coins
-            ) + '%',
-        target_variables_df[target_variables_df['is_crater'] == 1].shape[0], total_coins,
-        dc.human_format(
-            100 * target_variables_df[target_variables_df['is_crater'] == 1].shape[0] / total_coins
-            ) + '%'
-    )
-
-    return target_variables_df, outcomes_df
+    return target_variables_df[['coin_id', 'is_moon', 'is_crater']]
 
 
 
