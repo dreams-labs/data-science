@@ -2,7 +2,7 @@
 Validation logic for items in modeling_config.yaml
 """
 from enum import Enum
-from typing import Optional, List
+from typing import Optional, List, Dict
 from typing_extensions import Annotated
 from pydantic import BaseModel, Field
 
@@ -70,9 +70,24 @@ class ModelParams(NoExtrasBaseModel):
 
 # Evaluation section
 # ---------------------
-class EvaluationConfig(BaseModel):
+
+class EvaluationMetric(str, Enum):
+    """
+    Evaluation Metrics
+    """
+    ACCURACY = "accuracy"
+    PRECISION = "precision"
+    RECALL = "recall"
+    F1_SCORE = "f1_score"
+    ROC_AUC = "roc_auc"
+    LOG_LOSS = "log_loss"
+    CONFUSION_MATRIX = "confusion_matrix"
+    PROFITABILITY_AUC = "profitability_auc"
+
+class EvaluationConfig(NoExtrasBaseModel):
     """Configuration for model evaluation step."""
-    winsorization_cutoff: Optional[float] = None
+    metrics: Dict[EvaluationMetric, Optional[dict]]
+    winsorization_cutoff: Optional[float]
 
 # ============================================================================
 # Model Rebuilding
