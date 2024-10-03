@@ -475,37 +475,60 @@ def test_log_trial_results_trial_overrides_handling(mock_modeling_folder, mock_l
 # calculate_running_profitability_score() unit tests
 # ---------------------------------------------- #
 
-@pytest.fixture
-def perfect_predictions_input_data():
+def test_calculate_running_profitability_score():
     """
-    Fixture to provide standard input data for testing.
+    Test the calculate_running_profitability_score function with a predefined set of
+    predictions and performances. This test ensures that:
 
-    Returns:
-        tuple: Containing predictions and performances as numpy arrays.
+    1. The function correctly sorts predictions and corresponding performances.
+    2. The cumulative model returns are accurately calculated.
+    3. The best possible returns are sorted and accumulated.
+    4. The running profitability scores are correctly computed by comparing the
+       cumulative model returns to the best possible returns.
+
+    The expected output is compared against manually calculated running profitability
+    scores, accounting for possible floating-point precision issues.
     """
-    predictions = np.array([0.7, 0.3, 0.5, 0.9, 0.1])
-    performances = np.array([1, 0, 1, 1, 0])
-    return predictions, performances
+    # Test inputs
+    predictions = [0.55, 0.07, 0.14, 0.02, 0.07, 0.64, 0.04, 0.00, 0.02, 0.39]
+    performances = [0.46, -0.1, -0.09, -0.09, -0.01, 0.57, -0.1, -0.01, -0.02, 2.62]
+
+    # Expected outputs
+    expected_running_scores = [0.2176, 0.3223, 1.0, 0.9780, 0.9532, 0.9557, 0.9517, 0.9505, 0.9729, 1.0]
+
+    # Call the function
+    running_scores = m.calculate_running_profitability_score(predictions, performances)
+
+    # Assert equality (with some tolerance for floating-point precision)
+    np.testing.assert_almost_equal(running_scores, expected_running_scores, decimal=3)
 
 
-@pytest.mark.unit
-def test_calculate_running_profitability_score_perfect_case(perfect_predictions_input_data):
+def test_calculate_running_profitability_score_with_negative_top_performance():
     """
-    Test the calculate_running_profitability_score function with standard input.
+    Test the calculate_running_profitability_score function with a predefined set of
+    predictions and performances where the top-scoring prediction has a negative return.
 
-    This test verifies that the function correctly calculates running profitability
-    scores for a typical set of predictions and performances.
+    This test ensures that:
+    1. The function correctly handles negative returns in top-scoring predictions.
+    2. The cumulative model returns and best possible returns are calculated correctly.
+    3. The running profitability scores are computed accurately, even when the top
+       performer is negative.
+
+    The expected output is compared against manually calculated running profitability
+    scores, accounting for possible floating-point precision issues.
     """
-    predictions, performances = perfect_predictions_input_data
+    # Test inputs
+    predictions = [0.55, 0.07, 0.14, 0.02, 0.07, 0.64, 0.04, 0.00, 0.02, 0.39]
+    performances = [0.46, -0.1, -0.09, -0.09, -0.01, -0.57, -0.1, -0.01, -0.02, 2.62]
 
-    x_values, y_values = m.calculate_running_profitability_score(predictions, performances)
+    # Expected outputs (running scores manually calculated)
+    expected_running_scores = [-0.2176, -0.0357, 0.8176, 0.7909, 0.7632]  # Adjusted for this scenario
 
-    expected_x = np.array([0.2, 0.4, 0.6, 0.8, 1.0])
-    expected_y = np.array([1.0, 1.0, 1.0, 1.0, 1.0])
+    # Call the function
+    running_scores = m.calculate_running_profitability_score(predictions, performances)
 
-    assert np.array_equal(x_values, expected_x)
-    assert np.allclose(y_values, expected_y, atol=1e-4)
-
+    # Assert equality (with some tolerance for floating-point precision)
+    np.testing.assert_almost_equal(running_scores[:5], expected_running_scores, decimal=3)
 
 # ======================================================== #
 #                                                          #

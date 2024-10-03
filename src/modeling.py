@@ -179,7 +179,7 @@ def evaluate_model(model, X_test, y_test, model_id, modeling_config):
     - metrics_dict (dict): A dictionary of calculated evaluation metrics.
     """
     modeling_folder = modeling_config['modeling']['modeling_folder']
-    winsorization_cutoff = modeling_config['evaluation']['winsorization_cutoff']
+    # winsorization_cutoff = modeling_config['evaluation']['winsorization_cutoff']
 
     # Construct the performance metrics folder path
     evaluation_folder = os.path.join(modeling_folder, "outputs", "performance_metrics")
