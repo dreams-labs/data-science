@@ -203,16 +203,26 @@ def evaluate_model(model, X_test, y_test, model_id, modeling_config):
     predictions_filename = os.path.join(predictions_folder, f"predictions_{model_id}.csv")
     predictions_df.to_csv(predictions_filename, index=True)
 
-    # Calculate metrics
-    metrics_dict = {
-        "accuracy": accuracy_score(y_test, y_pred),
-        "precision": precision_score(y_test, y_pred),
-        "recall": recall_score(y_test, y_pred),
-        "f1_score": f1_score(y_test, y_pred),
-        "roc_auc": roc_auc_score(y_test, y_pred_prob),
-        "log_loss": log_loss(y_test, y_pred_prob),
-        "confusion_matrix": confusion_matrix(y_test, y_pred).tolist()  # stored as list
-    }
+    # Calculate requested metrics
+    metrics_request = modeling_config['evaluation']['metrics']
+    metrics_dict = {}
+
+    if "accuracy" in metrics_request:
+        metrics_dict["accuracy"] = accuracy_score(y_test, y_pred)
+    if "precision" in metrics_request:
+        metrics_dict["precision"] = precision_score(y_test, y_pred)
+    if "recall" in metrics_request:
+        metrics_dict["recall"] = recall_score(y_test, y_pred)
+    if "f1_score" in metrics_request:
+        metrics_dict["f1_score"] = f1_score(y_test, y_pred)
+    if "roc_auc" in metrics_request:
+        metrics_dict["roc_auc"] = roc_auc_score(y_test, y_pred_prob)
+    if "log_loss" in metrics_request:
+        metrics_dict["log_loss"] = log_loss(y_test, y_pred_prob)
+    if "confusion_matrix" in metrics_request:
+        metrics_dict["confusion_matrix"] = confusion_matrix(y_test, y_pred).tolist()  # stored as list
+    # if "profitability_auc" in metrics_request:
+    #     metrics_dict["profitability_auc"] = calculate_profitability_auc
 
     # Save metrics to a CSV
     metrics_df = pd.DataFrame([metrics_dict])
@@ -223,13 +233,15 @@ def evaluate_model(model, X_test, y_test, model_id, modeling_config):
 
 
 
-def calculate_running_profitability_score(predictions, returns):
+def calculate_running_profitability_score(predictions, returns, winsorization_cutoff=None):
     """
     Calculates the running profitability score for the entire series.
 
     Args:
     - predictions (numpy.array or pandas.Series): The model's predictions (probabilities or values).
     - returns (numpy.array or pandas.Series): The coin's actual gains or losses during the period.
+    - winsorization_cutoff (float): Returns in the top and bottom n% of the array will be capped at
+        the value as of the cutoff point
 
     Returns:
     - running_profitability_scores: The model's cumulative profitability score through the array length,
@@ -240,6 +252,9 @@ def calculate_running_profitability_score(predictions, returns):
     """
     if len(predictions) != len(returns):
         raise ValueError("Predictions and returns must have the same length")
+
+    if winsorization_cutoff:
+        returns = winsorize(returns, winsorization_cutoff)
 
     # Create a DataFrame with predictions and returns
     df = pd.DataFrame({'predictions': predictions, 'returns': returns})
@@ -314,7 +329,7 @@ def winsorize(data, cutoff):
     Raises:
     - ValueError: If cutoff is not between 0 and 0.5.
     """
-    if not 0 < cutoff < 0.5:
+    if not 0 < cutoff <= 0.5:
         raise ValueError("Cutoff must be between 0 and 0.5")
 
     lower_bound = np.percentile(data, cutoff * 100)
