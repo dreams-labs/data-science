@@ -179,7 +179,7 @@ def evaluate_model(model, X_test, y_test, model_id, modeling_config):
     - metrics_dict (dict): A dictionary of calculated evaluation metrics.
     """
     modeling_folder = modeling_config['modeling']['modeling_folder']
-    # winsorization_cutoff = modeling_config['evaluation']['winsorization_cutoff']
+    winsorization_cutoff = modeling_config['evaluation']['winsorization_cutoff']
 
     # Construct the performance metrics folder path
     evaluation_folder = os.path.join(modeling_folder, "outputs", "performance_metrics")
@@ -223,34 +223,33 @@ def evaluate_model(model, X_test, y_test, model_id, modeling_config):
 
 
 
-def calculate_running_profitability_score(predictions, performances):
+def calculate_running_profitability_score(predictions, returns):
     """
     Calculates the running profitability score for the entire series.
 
     Args:
     - predictions (numpy.array or pandas.Series): The model's predictions (probabilities or values).
-    - performances (numpy.array or pandas.Series): The actual performance values.
+    - returns (numpy.array or pandas.Series): The coin's actual gains or losses during the period.
 
     Returns:
     - running_profitability_scores: The model's cumulative profitability score through the array length,
         e.g. the first score is through 1 coin, the second score is through 2 coins, etc
 
     Raises:
-    - ValueError: If predictions and performances have different lengths.
+    - ValueError: If predictions and returns have different lengths.
     """
-    if len(predictions) != len(performances):
-        raise ValueError("Predictions and performances must have the same length")
+    if len(predictions) != len(returns):
+        raise ValueError("Predictions and returns must have the same length")
 
-    # Create a DataFrame with predictions and performances
-    df = pd.DataFrame({'predictions': predictions, 'performances': performances})
+    # Create a DataFrame with predictions and returns
+    df = pd.DataFrame({'predictions': predictions, 'returns': returns})
 
-    # Sort by predictions in descending order
+    # Calculate the cumulative profits of the model predictions
     df_sorted = df.sort_values('predictions', ascending=False)
-
-    cumulative_model_returns = np.cumsum(df_sorted['performances'])
+    cumulative_model_returns = np.cumsum(df_sorted['returns'])
 
     # Calculate best possible returns for each number of picks
-    best_possible_returns = np.sort(performances)[::-1]  # Sort performances in descending order
+    best_possible_returns = np.sort(returns)[::-1]  # Sort returns in descending order
     cumulative_best_returns = np.cumsum(best_possible_returns)
 
     # Calculate running profitability scores
@@ -258,10 +257,46 @@ def calculate_running_profitability_score(predictions, performances):
         cumulative_model_returns,
         cumulative_best_returns,
         out=np.zeros_like(cumulative_model_returns),
-        where=cumulative_best_returns != 0
+        where=cumulative_best_returns != 0  # if cumulative profit is 0, return 0 instead of a div0 error
     )
 
     return running_profitability_scores
+
+
+
+def calculate_profitability_auc(predictions, returns, top_percentage_filter=1.0):
+    """
+    Calculates the Profitability AUC (Area Under the Curve) metric for the top percentage of predictions.
+
+    Args:
+    - predictions (numpy.array or pandas.Series): The model's predictions (probabilities or values).
+    - returns (numpy.array or pandas.Series): The actual performance values.
+    - top_percentage_filter (float): The top percentage of predictions to consider, between 0 and 1.
+
+    Returns:
+    - profitability_auc (float): The Profitability AUC score for the filtered data, ranging from 0 to 1.
+    """
+    if not 0 < top_percentage_filter <= 1:
+        raise ValueError("top_percentage_filter must be between 0 and 1")
+
+    # Calculate the full range of profitability scores
+    running_scores = calculate_running_profitability_score(predictions, returns)
+
+    # Calculate how many scores to look at based on the percentage filter
+    n_top = int(len(predictions) * top_percentage_filter)
+    if n_top < 2:
+        raise ValueError("Filtered dataset is too small for meaningful calculation")
+
+    # Limit the scores for AUC calculation to the percentile input
+    filtered_running_scores = running_scores[:n_top]
+
+    # Create x-axis values (fraction of filtered predictions)
+    x = np.linspace(0, 1, len(filtered_running_scores))
+
+    # Calculate the area under the curve using NumPy's trapezoidal rule
+    auc = np.trapezoid(filtered_running_scores, x)
+
+    return auc
 
 
 
