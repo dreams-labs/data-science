@@ -430,13 +430,13 @@ def rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_
 
     # retrieve profits data
     profits_df = td.retrieve_profits_data(
-        config['training_data']['training_period_start'],
-        config['training_data']['modeling_period_end'])
+                    config['training_data']['training_period_start'],
+                    config['training_data']['modeling_period_end'])
     profits_df, _ = cwm.split_dataframe_by_coverage(
-        profits_df,
-        config['training_data']['training_period_start'],
-        config['training_data']['modeling_period_end'],
-        id_column='coin_id')
+                        profits_df,
+                        config['training_data']['training_period_start'],
+                        config['training_data']['modeling_period_end'],
+                        id_column='coin_id')
     profits_df, _ = td.clean_profits_df(profits_df, config['data_cleaning'])
     dates_to_impute = [
         config['training_data']['training_period_end'],

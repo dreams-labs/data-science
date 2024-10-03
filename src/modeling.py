@@ -1,7 +1,6 @@
 """
 functions used to build coin-level features from training data
 """
-# pylint: disable=C0301 # line over 100 chars
 # pylint: disable=C0103 # X_train violates camelcase
 
 import os
@@ -46,33 +45,41 @@ def split_model_input(model_input_df, target_column, test_size=0.2, random_state
     - ValueError: If the dataset is too small to perform a meaningful split.
     - ValueError: If the target is heavily imbalanced (over 95% in one class).
     - ValueError: If any features are non-numeric and require encoding.
-    - ValueError: If y_train or y_test contains only one unique class, which is unsuitable for model training.
+    - ValueError: If y_train or y_test contains only one unique class, which is unsuitable for
+        model training.
     """
     # Check for 'coin_id' column
     if 'coin_id' not in model_input_df.columns:
         raise ValueError("'coin_id' column is required in the DataFrame.")
 
     # Separate the features and the target
-    X = model_input_df.drop(columns=[target_column]).set_index('coin_id')  # Set 'coin_id' as index for X
-    y = model_input_df[target_column]  # Extract target as Series, it will retain the index from model_input_df
+    # Set 'coin_id' as index for X
+    X = model_input_df.drop(columns=[target_column]).set_index('coin_id')
+    # Extract target as Series, it will retain the index from model_input_df
+    y = model_input_df[target_column]
 
     # Check for missing values in features or target
     if X.isnull().values.any():
-        raise ValueError("Features contain missing values. Please handle missing data before splitting.")
+        raise ValueError("Features contain missing values. Please handle missing data \
+                         before splitting.")
     if y.isnull().values.any():
-        raise ValueError("Target column contains missing values. Please handle missing data before splitting.")
+        raise ValueError("Target column contains missing values. Please handle missing \
+                         data before splitting.")
 
     # Check if dataset is too small
     if len(X) < 10:
-        raise ValueError("Dataset is too small to perform a meaningful split. Need at least 10 data points.")
+        raise ValueError("Dataset is too small to perform a meaningful split. Need at \
+                         least 10 data points.")
 
     # Check for imbalanced target (for classification problems)
     if y.value_counts(normalize=True).max() > 0.95:
-        raise ValueError("Target is heavily imbalanced. Consider rebalancing or using specialized techniques.")
+        raise ValueError("Target is heavily imbalanced. Consider rebalancing or using \
+                         specialized techniques.")
 
     # Check for non-numeric features
     if not all(np.issubdtype(dtype, np.number) for dtype in X.dtypes):
-        raise ValueError("Features contain non-numeric data. Consider encoding categorical features.")
+        raise ValueError("Features contain non-numeric data. Consider encoding categorical \
+                         features.")
 
     # Split into train and test sets
     X_train, X_test, y_train, y_test = train_test_split(
@@ -80,11 +87,13 @@ def split_model_input(model_input_df, target_column, test_size=0.2, random_state
     )
 
     # Log the size and number of positives for y_train and y_test
-    logger.info("y_train: %d/%d positives, y_test: %d/%d positives", y_train.sum(), len(y_train), y_test.sum(), len(y_test))
+    logger.info("y_train: %d/%d positives, y_test: %d/%d positives",
+                y_train.sum(), len(y_train), y_test.sum(), len(y_test))
 
     # Check if y_train or y_test contains only one unique value
     if len(np.unique(y_train)) <= 1 or len(np.unique(y_test)) <= 1:
-        raise ValueError("y_train or y_test contains only one class, which is not suitable for model training.")
+        raise ValueError("y_train or y_test contains only one class, which is not suitable \
+                         for model training.")
 
     return X_train, X_test, y_train, y_test
 
@@ -147,7 +156,8 @@ def train_model(X_train, y_train, modeling_folder, model_params=None):
             'feature': X_train.columns,
             'importance': model.feature_importances_
         })
-        feature_importances_filename = os.path.join(feature_importance_path, f"feature_importance_{model_id}.csv")
+        feature_importances_filename = os.path.join(
+            feature_importance_path, f"feature_importance_{model_id}.csv")
         feature_importances.to_csv(feature_importances_filename, index=False)
 
     return model, model_id
@@ -156,7 +166,7 @@ def train_model(X_train, y_train, modeling_folder, model_params=None):
 
 def evaluate_model(model, X_test, y_test, model_id, modeling_folder):
     """
-    Evaluates a trained model on the test set and outputs key metrics, including storing predictions.
+    Evaluates a trained model on the test set and outputs key metrics and stores predictions.
 
     Args:
     - model (sklearn model): The trained model.
@@ -198,7 +208,7 @@ def evaluate_model(model, X_test, y_test, model_id, modeling_folder):
         "f1_score": f1_score(y_test, y_pred),
         "roc_auc": roc_auc_score(y_test, y_pred_prob),
         "log_loss": log_loss(y_test, y_pred_prob),
-        "confusion_matrix": confusion_matrix(y_test, y_pred).tolist()  # Store confusion matrix as a list
+        "confusion_matrix": confusion_matrix(y_test, y_pred).tolist()  # stored as list
     }
 
     # Save metrics to a CSV
@@ -261,10 +271,12 @@ def log_trial_results(modeling_folder, model_id, experiment_id=None, trial_overr
         raise FileNotFoundError(f"Performance metrics not found for model {model_id}.")
 
     # Step 4: Read the feature importance if available and store as a dict
-    feature_importance_filename = os.path.join(feature_importance_path, f"feature_importance_{model_id}.csv")
+    feature_importance_filename = os.path.join(feature_importance_path,
+                                               f"feature_importance_{model_id}.csv")
     if os.path.exists(feature_importance_filename):
         feature_importance_df = pd.read_csv(feature_importance_filename)
-        feature_importance_dict = dict(zip(feature_importance_df['feature'], feature_importance_df['importance']))
+        feature_importance_dict = dict(zip(feature_importance_df['feature'],
+                                           feature_importance_df['importance']))
         trial_log["feature_importance"] = feature_importance_dict
     else:
         trial_log["feature_importance"] = "N/A"
