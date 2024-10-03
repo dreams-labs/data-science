@@ -121,7 +121,7 @@ def run_experiment(modeling_config):
         profits_df = rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_df)
 
         # 3.3 Build the configured model input data (train/test data)
-        X_train, X_test, y_train, y_test, returns_df_test = build_configured_model_input(
+        X_train, X_test, y_train, y_test, returns_test = build_configured_model_input(
                                             profits_df,
                                             market_data_df,
                                             config,
@@ -136,7 +136,7 @@ def run_experiment(modeling_config):
                             modeling_config['modeling']['model_params'])
 
         # 3.5 Evaluate and save the model's performance on the test set to a CSV
-        _ = m.evaluate_model(model, X_test, y_test, model_id, returns_df_test, modeling_config)
+        _ = m.evaluate_model(model, X_test, y_test, model_id, returns_test, modeling_config)
 
         # 3.6 Log the trial results for this configuration
         # Include the trial name, metadata, and other relevant details
@@ -516,6 +516,7 @@ def build_configured_model_input(
     - X_test (DataFrame): Testing feature set.
     - y_train (Series): Training target variable.
     - y_test (Series): Testing target variable.
+    - returns_test (Series): The actual returns of the test set
     """
 
     # 1. Generate and merge features for all datasets
@@ -571,8 +572,9 @@ def build_configured_model_input(
     )
     # Create returns_df for the test population by matching the X_test index
     returns_df_test = returns_df.loc[X_test.index].copy()
+    returns_test = returns_df_test['returns']
 
-    return X_train, X_test, y_train, y_test, returns_df_test
+    return X_train, X_test, y_train, y_test, returns_test
 
 
 

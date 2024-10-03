@@ -100,7 +100,7 @@ def split_model_input(model_input_df, target_column, test_size=0.2, random_state
 
 
 @timing_decorator
-def train_model(X_train, y_train, modeling_folder, model_params=None):
+def train_model(X_train, y_train, modeling_folder, modeling_config):
     """
     Trains a model on the training data and saves the model, logs, and feature importance.
     Uses a UUID to uniquely identify the model files.
@@ -109,7 +109,7 @@ def train_model(X_train, y_train, modeling_folder, model_params=None):
     - X_train (pd.DataFrame): The training features.
     - y_train (pd.Series): The training target.
     - modeling_folder (str): The base folder for saving models, logs, and feature importance.
-    - model_params (dict): Parameters to pass to the model (optional).
+    - modeling_config (dict): modeling_config.yaml
 
     Returns:
     - model (sklearn model): The trained model.
@@ -118,11 +118,13 @@ def train_model(X_train, y_train, modeling_folder, model_params=None):
     model_id = str(uuid.uuid4())
 
     # Initialize model with default params if none provided
+    model_params = modeling_config["modeling"]["model_params"]
     if model_params is None:
         model_params = {"n_estimators": 100, "random_state": 42}
 
     # Initialize the model
-    model = RandomForestClassifier(**model_params)
+    if modeling_config["modeling"]["model_type"] == "RandomForestClassifier":
+        model = RandomForestClassifier(**model_params)
 
     # Train the model
     model.fit(X_train, y_train)
@@ -147,14 +149,14 @@ def train_model(X_train, y_train, modeling_folder, model_params=None):
         "Model parameters": model_params,
     }
     log_filename = os.path.join(logs_path, f"log_{model_id}.json")
-    with open(log_filename, 'w', encoding='utf-8') as log_file:
+    with open(log_filename, "w", encoding="utf-8") as log_file:
         json.dump(log_data, log_file, indent=4)
 
     # Step 3: Save feature importance (if available)
-    if hasattr(model, 'feature_importances_'):
+    if hasattr(model, "feature_importances_"):
         feature_importances = pd.DataFrame({
-            'feature': X_train.columns,
-            'importance': model.feature_importances_
+            "feature": X_train.columns,
+            "importance": model.feature_importances_
         })
         feature_importances_filename = os.path.join(
             feature_importance_path, f"feature_importance_{model_id}.csv")
@@ -164,7 +166,7 @@ def train_model(X_train, y_train, modeling_folder, model_params=None):
 
 
 
-def evaluate_model(model, X_test, y_test, model_id, returns_df, modeling_config):
+def evaluate_model(model, X_test, y_test, model_id, returns_test, modeling_config):
     """
     Evaluates a trained model on the test set and outputs key metrics and stores predictions.
 
@@ -173,7 +175,7 @@ def evaluate_model(model, X_test, y_test, model_id, returns_df, modeling_config)
     - X_test (pd.DataFrame): The test features with 'coin_id' as the index.
     - y_test (pd.Series): The true labels with 'coin_id' as the index.
     - model_id (str): The unique ID of the model being evaluated
-    - returns_df (pd.DataFrame): The actual returns of each coin
+    - returns_test (pd.DataFrame): The actual returns of each coin in the test set
     - modeling_config (str): modeling_config.yaml
 
     Returns:
@@ -224,7 +226,14 @@ def evaluate_model(model, X_test, y_test, model_id, returns_df, modeling_config)
     if "profitability_auc" in metrics_request:
         metrics_dict["profitability_auc"] = calculate_profitability_auc(
                                                     y_pred_prob,
-                                                    returns_df,
+                                                    returns_test,
+                                                    metrics_request["profitability_auc"]["top_percentage_filter"],
+                                                    modeling_config["evaluation"]["winsorization_cutoff"]
+                                                    )
+    if "downside_profitability_auc" in metrics_request:
+        metrics_dict["downside_profitability_auc"] = calculate_downside_profitability_auc(
+                                                    y_pred_prob,
+                                                    returns_test,
                                                     metrics_request["profitability_auc"]["top_percentage_filter"],
                                                     modeling_config["evaluation"]["winsorization_cutoff"]
                                                     )
@@ -321,6 +330,29 @@ def calculate_profitability_auc(predictions,
 
     return auc
 
+
+
+def calculate_downside_profitability_auc(predictions,
+                                         returns_test,
+                                         top_percentage_filter=1.0,
+                                         winsorization_cutoff=None):
+    """
+    Calculates the Profitability AUC (Area Under the Curve) metric for the bottom percentage of
+    predictions by inverting returns and predictions.
+    """
+    # make negative returns the highest values
+    returns = returns_test * -1
+
+    # find the inverse of model predictions
+    predictions = 1 - predictions
+
+    # calculate the normal AUC on inverted numbers
+    downside_auc = calculate_profitability_auc(predictions,
+                                returns,
+                                top_percentage_filter,
+                                winsorization_cutoff)
+
+    return downside_auc
 
 
 def winsorize(data, cutoff):
