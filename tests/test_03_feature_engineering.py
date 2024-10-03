@@ -960,29 +960,29 @@ def test_calculate_coin_returns_valid_data(valid_prices_df, valid_training_data_
     """
     Test calculate_coin_returns function with valid data for multiple coins.
 
-    This test ensures that the function correctly calculates performance and outcomes
+    This test ensures that the function correctly calculates returns and outcomes
     for all coins when given valid input data.
     """
     returns_df, outcomes_df = fe.calculate_coin_returns(valid_prices_df,
                                                                 valid_training_data_config)
 
-    expected_performance = pd.DataFrame({
+    expected_returns = pd.DataFrame({
         'coin_id': ['BTC', 'ETH', 'XRP'],
-        'performance': [0.166667, 0.25, 0.2]
+        'returns': [0.166667, 0.25, 0.2]
     })
 
     expected_outcomes = pd.DataFrame({
         'coin_id': ['BTC', 'ETH', 'XRP'],
-        'outcome': ['performance calculated'] * 3
+        'outcome': ['returns calculated'] * 3
     })
 
-    assert np.all(np.isclose(returns_df['performance'].values,
-                            expected_performance['performance'].values,
+    assert np.all(np.isclose(returns_df['returns'].values,
+                            expected_returns['returns'].values,
                             rtol=1e-4, atol=1e-4))
     assert np.array_equal(outcomes_df.values, expected_outcomes.values)
 
-    # Check if performance values are approximately equal
-    for actual, expected in zip(returns_df['performance'], expected_performance['performance']):
+    # Check if returns values are approximately equal
+    for actual, expected in zip(returns_df['returns'], expected_returns['returns']):
         assert actual == pytest.approx(expected, abs=1e-4)
 
 
@@ -1002,33 +1002,33 @@ def test_calculate_coin_returns_no_change(no_change_prices_df, valid_training_da
     """
     Test calculate_coin_returns function with no price change for some coins.
 
-    This test ensures that the function correctly calculates zero performance for coins
-    with no price change and correct performance for others.
+    This test ensures that the function correctly calculates zero returns for coins
+    with no price change and correct returns for others.
     """
     returns_df, outcomes_df = fe.calculate_coin_returns(no_change_prices_df,
                                                                 valid_training_data_config)
 
-    expected_performance = pd.DataFrame({
+    expected_returns = pd.DataFrame({
         'coin_id': ['BTC', 'ETH', 'XRP'],
-        'performance': [0.0, 0.25, 0.0]
+        'returns': [0.0, 0.25, 0.0]
     })
 
-    assert (np.isclose(returns_df['performance'].values,
-                       expected_performance['performance'].values,
+    assert (np.isclose(returns_df['returns'].values,
+                       expected_returns['returns'].values,
                        rtol=1e-4, atol=1e-4)).all()
 
     expected_outcomes = pd.DataFrame({
         'coin_id': ['BTC', 'ETH', 'XRP'],
-        'outcome': ['performance calculated'] * 3
+        'outcome': ['returns calculated'] * 3
     })
 
     assert np.array_equal(outcomes_df.values, expected_outcomes.values)
 
 
 @pytest.fixture
-def negative_performance_prices_df():
+def negative_returns_prices_df():
     """
-    Fixture to create a sample DataFrame with negative performance for some coins.
+    Fixture to create a sample DataFrame with negative returns for some coins.
     """
     return pd.DataFrame({
         'coin_id': ['BTC', 'ETH', 'XRP'] * 2,
@@ -1037,28 +1037,28 @@ def negative_performance_prices_df():
     })
 
 @pytest.mark.unit
-def test_calculate_coin_returns_negative(negative_performance_prices_df, valid_training_data_config):
+def test_calculate_coin_returns_negative(negative_returns_prices_df, valid_training_data_config):
     """
-    Test calculate_coin_returns function with negative performance for some coins.
+    Test calculate_coin_returns function with negative returns for some coins.
 
-    This test ensures that the function correctly calculates negative performance values
-    for coins with price decreases and correct performance for others.
+    This test ensures that the function correctly calculates negative returns values
+    for coins with price decreases and correct returns for others.
     """
-    returns_df, outcomes_df = fe.calculate_coin_returns(negative_performance_prices_df,
+    returns_df, outcomes_df = fe.calculate_coin_returns(negative_returns_prices_df,
                                                                 valid_training_data_config)
 
-    expected_performance = pd.DataFrame({
+    expected_returns = pd.DataFrame({
         'coin_id': ['BTC', 'ETH', 'XRP'],
-        'performance': [-0.1667, 0.25, -0.2]
+        'returns': [-0.1667, 0.25, -0.2]
     })
 
-    assert (np.isclose(returns_df['performance'].values,
-                       expected_performance['performance'].values,
+    assert (np.isclose(returns_df['returns'].values,
+                       expected_returns['returns'].values,
                        rtol=1e-4, atol=1e-4)).all()
 
     expected_outcomes = pd.DataFrame({
         'coin_id': ['BTC', 'ETH', 'XRP'],
-        'outcome': ['performance calculated'] * 3
+        'outcome': ['returns calculated'] * 3
     })
 
     assert np.array_equal(outcomes_df.values, expected_outcomes.values)
@@ -1087,24 +1087,24 @@ def test_calculate_coin_returns_multiple_datapoints(multiple_datapoints_prices_d
     """
     Test calculate_coin_returns function with multiple data points between start and end dates.
 
-    This test ensures that the function correctly calculates performance using only start and end dates,
+    This test ensures that the function correctly calculates returns using only start and end dates,
     ignoring intermediate data points.
     """
     returns_df, outcomes_df = fe.calculate_coin_returns(multiple_datapoints_prices_df,
                                                                 valid_training_data_config)
 
-    expected_performance = pd.DataFrame({
+    expected_returns = pd.DataFrame({
         'coin_id': ['BTC', 'ETH', 'XRP'],
-        'performance': [0.1667, 0.25, 0.2]
+        'returns': [0.1667, 0.25, 0.2]
     })
 
-    assert (np.isclose(returns_df['performance'].values,
-                       expected_performance['performance'].values,
+    assert (np.isclose(returns_df['returns'].values,
+                       expected_returns['returns'].values,
                        rtol=1e-4, atol=1e-4)).all()
 
     expected_outcomes = pd.DataFrame({
         'coin_id': ['BTC', 'ETH', 'XRP'],
-        'outcome': ['performance calculated'] * 3
+        'outcome': ['returns calculated'] * 3
     })
 
     assert np.array_equal(outcomes_df.values, expected_outcomes.values)
@@ -1124,7 +1124,7 @@ def test_calculate_mooncrater_targets():
     data = {
         'coin_id': ['coin1', 'coin2', 'coin3', 'coin4', 'coin5'],
         # 5% increase, 55% increase, 5% decrease, 55% decrease, 50% increase
-        'performance': [0.05, 0.55, -0.05, -0.55, 0.50]
+        'returns': [0.05, 0.55, -0.05, -0.55, 0.50]
     }
     returns_df = pd.DataFrame(data)
 
@@ -1135,6 +1135,9 @@ def test_calculate_mooncrater_targets():
             'moon_minimum_percent': 0.2,  # 20% of coins should be moons
             'crater_threshold': -0.5,  # 50% decrease
             'crater_minimum_percent': 0.2  # 20% of coins should be craters
+        },
+        'modeling': {
+            'target_column': 'is_moon'
         }
     }
 
@@ -1143,34 +1146,19 @@ def test_calculate_mooncrater_targets():
 
     # Assertions
     assert len(target_variables_df) == 5
-    assert list(target_variables_df.columns) == ['coin_id', 'is_moon', 'is_crater']
+    assert list(target_variables_df.columns) == ['coin_id', 'is_moon']
 
     # Check individual results
     assert target_variables_df[target_variables_df['coin_id'] == 'coin1']['is_moon'].values[0] == 0
-    assert target_variables_df[target_variables_df['coin_id'] == 'coin1']['is_crater'].values[0] == 0
-
     assert target_variables_df[target_variables_df['coin_id'] == 'coin2']['is_moon'].values[0] == 1
-    assert target_variables_df[target_variables_df['coin_id'] == 'coin2']['is_crater'].values[0] == 0
-
     assert target_variables_df[target_variables_df['coin_id'] == 'coin3']['is_moon'].values[0] == 0
-    assert target_variables_df[target_variables_df['coin_id'] == 'coin3']['is_crater'].values[0] == 0
-
     assert target_variables_df[target_variables_df['coin_id'] == 'coin4']['is_moon'].values[0] == 0
-    assert target_variables_df[target_variables_df['coin_id'] == 'coin4']['is_crater'].values[0] == 1
-
     assert target_variables_df[target_variables_df['coin_id'] == 'coin5']['is_moon'].values[0] == 1
-    assert target_variables_df[target_variables_df['coin_id'] == 'coin5']['is_crater'].values[0] == 0
 
     # Check minimum percentages
     total_coins = len(target_variables_df)
     assert (target_variables_df['is_moon'].sum() /
             total_coins >= modeling_config['target_variables']['moon_minimum_percent'])
-    assert (target_variables_df['is_crater'].sum() /
-            total_coins >= modeling_config['target_variables']['crater_minimum_percent'])
-
-    # Ensure no coin is both a moon and a crater
-    assert not any((target_variables_df['is_moon'] == 1) & (target_variables_df['is_crater'] == 1))
-
 
 
 
