@@ -24,7 +24,7 @@ class ModelingConfig(NoExtrasBaseModel):
     preprocessing: Optional['PreprocessingConfig'] = Field(default=None)
     target_variables: 'TargetVariablesConfig'
     modeling: 'ModelingSettings'  # Modeling section is now its own object
-
+    evaluation: Optional['EvaluationConfig'] = Field(default=None)
 
 # Preprocessing section
 # ---------------------
@@ -66,6 +66,17 @@ class ModelParams(NoExtrasBaseModel):
     """Parameters for the model."""
     n_estimators: Annotated[int, Field(ge=1)] = Field(default=100)
     random_state: Annotated[int, Field(ge=0)] = Field(default=45)
+
+
+# Evaluation section
+# ---------------------
+class EvaluationConfig(BaseModel):
+    """Configuration for model evaluation step."""
+    profitability_score: Optional['ProfitabilityScoreConfig'] = None
+
+class ProfitabilityScoreConfig(BaseModel):
+    """Parameters for the custom profitability_score"""
+    winsorization_cutoff: Optional[float] = None
 
 
 # ============================================================================
