@@ -100,9 +100,16 @@ def classify_wallet_cohort(profits_df, wallet_cohort_config, cohort_name):
     logger.debug("<Step 6a> Merge wallet inflows and coins: %.2f seconds", time.time() - step_time)
     step_time = time.time()
 
-    # # Calculate total profits (USD value)
-    # wallet_profits_df = profits_df.groupby('wallet_address', observed=True)['profits_cumulative'].sum().reset_index()
-    # wallet_profits_df.columns = ['wallet_address', 'total_profits']
+    # Calculate total profits (USD value)
+    # Calculate profits for each coin that each wallet owns
+    wallet_coin_profits_df = (profits_df.groupby(['wallet_address','coin_id'], observed=True)
+                                   ['profits_cumulative'].last()
+                                   .reset_index())
+    # Sum each wallet's coin profits to get their total profits
+    wallet_profits_df = (wallet_coin_profits_df.groupby('wallet_address')
+                                               ['profits_cumulative'].sum()
+                                               .reset_index())
+    wallet_profits_df.columns = ['wallet_address', 'total_profits']
 
     # Calculate return rate: total profits / total inflows
     wallet_return_rate_df = wallet_profits_df.merge(wallet_inflows_df, on='wallet_address')
