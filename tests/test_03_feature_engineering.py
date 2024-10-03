@@ -920,6 +920,176 @@ def test_merge_and_fill_training_data_drop_records():
 
 
 # ------------------------------------------ #
+# prepare_and_compute_performance() unit tests
+# ------------------------------------------ #
+
+@pytest.fixture
+def valid_prices_df():
+    """
+    Fixture to create a sample DataFrame with valid price data for multiple coins.
+    """
+    return pd.DataFrame({
+        'coin_id': ['BTC', 'ETH', 'XRP'] * 2,
+        'date': ['2023-01-01', '2023-01-01', '2023-01-01', '2023-12-31', '2023-12-31', '2023-12-31'],
+        'price': [30000, 2000, 0.5, 35000, 2500, 0.6]
+    })
+
+@pytest.fixture
+def valid_training_data_config():
+    """
+    Fixture to create a sample training data configuration.
+    """
+    return {
+        'modeling_period_start': '2023-01-01',
+        'modeling_period_end': '2023-12-31'
+    }
+
+@pytest.mark.unit
+def test_prepare_and_compute_performance_valid_data(valid_prices_df, valid_training_data_config):
+    """
+    Test prepare_and_compute_performance function with valid data for multiple coins.
+
+    This test ensures that the function correctly calculates performance and outcomes
+    for all coins when given valid input data.
+    """
+    performance_df, outcomes_df = fe.prepare_and_compute_performance(valid_prices_df, valid_training_data_config)
+
+    expected_performance = pd.DataFrame({
+        'coin_id': ['BTC', 'ETH', 'XRP'],
+        'performance': [0.166667, 0.25, 0.2]
+    })
+
+    expected_outcomes = pd.DataFrame({
+        'coin_id': ['BTC', 'ETH', 'XRP'],
+        'outcome': ['performance calculated'] * 3
+    })
+
+    assert np.all(np.isclose(performance_df['performance'].values,
+                            expected_performance['performance'].values,
+                            rtol=1e-4, atol=1e-4))
+    assert np.array_equal(outcomes_df.values, expected_outcomes.values)
+
+    # Check if performance values are approximately equal
+    for actual, expected in zip(performance_df['performance'], expected_performance['performance']):
+        assert actual == pytest.approx(expected, abs=1e-4)
+
+
+@pytest.fixture
+def no_change_prices_df():
+    """
+    Fixture to create a sample DataFrame with no price change for some coins.
+    """
+    return pd.DataFrame({
+        'coin_id': ['BTC', 'ETH', 'XRP'] * 2,
+        'date': ['2023-01-01', '2023-01-01', '2023-01-01', '2023-12-31', '2023-12-31', '2023-12-31'],
+        'price': [30000, 2000, 0.5, 30000, 2500, 0.5]
+    })
+
+@pytest.mark.unit
+def test_prepare_and_compute_performance_no_change(no_change_prices_df, valid_training_data_config):
+    """
+    Test prepare_and_compute_performance function with no price change for some coins.
+
+    This test ensures that the function correctly calculates zero performance for coins
+    with no price change and correct performance for others.
+    """
+    performance_df, outcomes_df = fe.prepare_and_compute_performance(no_change_prices_df, valid_training_data_config)
+
+    expected_performance = pd.DataFrame({
+        'coin_id': ['BTC', 'ETH', 'XRP'],
+        'performance': [0.0, 0.25, 0.0]
+    })
+
+    assert (np.isclose(performance_df['performance'].values, expected_performance['performance'].values, rtol=1e-4, atol=1e-4)).all()
+
+    expected_outcomes = pd.DataFrame({
+        'coin_id': ['BTC', 'ETH', 'XRP'],
+        'outcome': ['performance calculated'] * 3
+    })
+
+    assert np.array_equal(outcomes_df.values, expected_outcomes.values)
+
+
+@pytest.fixture
+def negative_performance_prices_df():
+    """
+    Fixture to create a sample DataFrame with negative performance for some coins.
+    """
+    return pd.DataFrame({
+        'coin_id': ['BTC', 'ETH', 'XRP'] * 2,
+        'date': ['2023-01-01', '2023-01-01', '2023-01-01', '2023-12-31', '2023-12-31', '2023-12-31'],
+        'price': [30000, 2000, 0.5, 25000, 2500, 0.4]
+    })
+
+@pytest.mark.unit
+def test_prepare_and_compute_performance_negative(negative_performance_prices_df, valid_training_data_config):
+    """
+    Test prepare_and_compute_performance function with negative performance for some coins.
+
+    This test ensures that the function correctly calculates negative performance values
+    for coins with price decreases and correct performance for others.
+    """
+    performance_df, outcomes_df = fe.prepare_and_compute_performance(negative_performance_prices_df, valid_training_data_config)
+
+    expected_performance = pd.DataFrame({
+        'coin_id': ['BTC', 'ETH', 'XRP'],
+        'performance': [-0.1667, 0.25, -0.2]
+    })
+
+    assert (np.isclose(performance_df['performance'].values, expected_performance['performance'].values, rtol=1e-4, atol=1e-4)).all()
+
+    expected_outcomes = pd.DataFrame({
+        'coin_id': ['BTC', 'ETH', 'XRP'],
+        'outcome': ['performance calculated'] * 3
+    })
+
+    assert np.array_equal(outcomes_df.values, expected_outcomes.values)
+
+
+@pytest.fixture
+def multiple_datapoints_prices_df():
+    """
+    Fixture to create a sample DataFrame with multiple data points between start and end dates.
+    """
+    return pd.DataFrame({
+        'coin_id': ['BTC', 'ETH', 'XRP'] * 4,
+        'date': ['2023-01-01', '2023-01-01', '2023-01-01',
+                 '2023-06-15', '2023-06-15', '2023-06-15',
+                 '2023-09-30', '2023-09-30', '2023-09-30',
+                 '2023-12-31', '2023-12-31', '2023-12-31'],
+        'price': [30000, 2000, 0.5,
+                  32000, 2200, 0.55,
+                  34000, 2400, 0.58,
+                  35000, 2500, 0.6]
+    })
+
+@pytest.mark.unit
+def test_prepare_and_compute_performance_multiple_datapoints(multiple_datapoints_prices_df, valid_training_data_config):
+    """
+    Test prepare_and_compute_performance function with multiple data points between start and end dates.
+
+    This test ensures that the function correctly calculates performance using only start and end dates,
+    ignoring intermediate data points.
+    """
+    performance_df, outcomes_df = fe.prepare_and_compute_performance(multiple_datapoints_prices_df, valid_training_data_config)
+
+    expected_performance = pd.DataFrame({
+        'coin_id': ['BTC', 'ETH', 'XRP'],
+        'performance': [0.1667, 0.25, 0.2]
+    })
+
+    assert (np.isclose(performance_df['performance'].values, expected_performance['performance'].values, rtol=1e-4, atol=1e-4)).all()
+
+    expected_outcomes = pd.DataFrame({
+        'coin_id': ['BTC', 'ETH', 'XRP'],
+        'outcome': ['performance calculated'] * 3
+    })
+
+    assert np.array_equal(outcomes_df.values, expected_outcomes.values)
+
+
+
+# ------------------------------------------ #
 # create_target_variables_mooncrater() unit tests
 # ------------------------------------------ #
 

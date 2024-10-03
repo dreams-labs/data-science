@@ -930,6 +930,53 @@ def merge_and_fill_training_data(
     return training_data_df, merge_logs_df
 
 
+def prepare_and_compute_performance(prices_df, training_data_config):
+    """
+    Prepares the data and computes price performance for each coin.
+
+    Parameters:
+    - prices_df: DataFrame containing price data with columns 'coin_id', 'date', and 'price'.
+    - training_data_config: Configuration with modeling period dates.
+
+    Returns:
+    - performance_df: DataFrame with columns 'coin_id' and 'performance'.
+    - outcomes_df: DataFrame tracking outcomes for each coin.
+    """
+    prices_df = prices_df.copy()
+    prices_df['date'] = pd.to_datetime(prices_df['date'])
+    modeling_period_start = pd.to_datetime(training_data_config['modeling_period_start'])
+    modeling_period_end = pd.to_datetime(training_data_config['modeling_period_end'])
+
+    # Filter data for start and end dates
+    start_prices = prices_df[prices_df['date'] == modeling_period_start].set_index('coin_id')['price']
+    end_prices = prices_df[prices_df['date'] == modeling_period_end].set_index('coin_id')['price']
+
+    # Identify coins with both start and end prices
+    valid_coins = start_prices.index.intersection(end_prices.index)
+
+    # Check for missing data
+    all_coins = prices_df['coin_id'].unique()
+    coins_missing_price = set(all_coins) - set(valid_coins)
+
+    if coins_missing_price:
+        missing = ', '.join(map(str, coins_missing_price))
+        raise ValueError(f"Missing price for coins at start or end date: {missing}")
+
+    # Compute performance
+    performance = (end_prices[valid_coins] - start_prices[valid_coins]) / start_prices[valid_coins]
+    performance_df = pd.DataFrame({'coin_id': valid_coins,
+                                   'performance': performance}
+                                   ).reset_index(drop=True)
+
+    # Create outcomes DataFrame
+    outcomes_df = pd.DataFrame({
+        'coin_id': valid_coins,
+        'outcome': 'performance calculated'
+    })
+
+    return performance_df, outcomes_df
+
+
 
 def create_target_variables_mooncrater(prices_df, training_data_config, modeling_config):
     """
