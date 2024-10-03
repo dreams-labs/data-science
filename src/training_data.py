@@ -228,7 +228,6 @@ def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows):
     return profits_df
 
 
-
 @timing_decorator
 def clean_profits_df(profits_df, data_cleaning_config):
     """
@@ -254,21 +253,21 @@ def clean_profits_df(profits_df, data_cleaning_config):
     # -----------------------------------------------------------------------
     # Group by wallet-coin pair and calculate the ending total inflows and profits
     wallet_coin_agg_df = (profits_df.sort_values('date')
-                                .groupby(['wallet_address','coin_id'], observed=True)
-                                .agg({
-                                    'usd_inflows_cumulative': 'last',
-                                    'profits_cumulative': 'last'
-                                })
-                                .reset_index())
+                                    .groupby(['wallet_address','coin_id'], observed=True)
+                                    .agg({
+                                        'usd_inflows_cumulative': 'last',
+                                        'profits_cumulative': 'last'
+                                    })
+                                    .reset_index())
 
 
     # Sum the profits and inflows of all coins associated with each wallet
     wallet_agg_df = (wallet_coin_agg_df.groupby('wallet_address')
-                                            .agg({
-                                                'usd_inflows_cumulative': 'sum',
-                                                'profits_cumulative': 'sum'
-                                            })
-                                            .reset_index())
+                                       .agg({
+                                           'usd_inflows_cumulative': 'sum',
+                                           'profits_cumulative': 'sum'
+                                       })
+                                       .reset_index())
 
     # 2. Identify the wallets to be excluded
     # --------------------------------------
