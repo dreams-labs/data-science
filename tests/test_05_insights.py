@@ -37,248 +37,254 @@ logger = dc.setup_logger()
 #                                                       #
 # ===================================================== #
 
-# # ---------------------------------------------- #
-# # validate_experiments_yaml() unit tests
-# # ---------------------------------------------- #
+# ---------------------------------------------- #
+# validate_experiments_yaml() unit tests
+# ---------------------------------------------- #
 
-# @pytest.mark.unit
-# def test_validate_experiments_yaml_success(tmpdir):
-#     """Unit Test: Success case where variables from 2 different config files are retrieved correctly."""
+@pytest.mark.xfail
+# these will be redone once the next experiment is run
+@pytest.mark.unit
+def test_validate_experiments_yaml_success(tmpdir):
+    """Unit Test: Success case where variables from 2 different config files are retrieved correctly."""
 
-#     # Create the config folder and files
-#     config_folder = tmpdir.mkdir("config_folder")
+    # Create the config folder and files
+    config_folder = tmpdir.mkdir("config_folder")
 
-#     # Create experiments_config.yaml with variable_overrides
-#     experiment_config = """
-#     variable_overrides:
-#       config:
-#         training_data:
-#           modeling_period_duration:
-#             - 14
-#             - 30
-#       modeling_config:
-#         learning_rate:
-#           - 0.001
-#         batch_size:
-#           - 16
-#     """
-#     config_folder.join("experiments_config.yaml").write(experiment_config)
+    # Create experiments_config.yaml with variable_overrides
+    experiment_config = """
+    variable_overrides:
+      config:
+        training_data:
+          modeling_period_duration:
+            - 14
+            - 30
+      modeling_config:
+        learning_rate:
+          - 0.001
+        batch_size:
+          - 16
+    """
+    config_folder.join("experiments_config.yaml").write(experiment_config)
 
-#     # Create config.yaml
-#     config = """
-#     training_data:
-#       modeling_period_duration:
-#         - 14
-#         - 30
-#     """
-#     config_folder.join("config.yaml").write(config)
+    # Create config.yaml
+    config = """
+    training_data:
+      modeling_period_duration:
+        - 14
+        - 30
+    """
+    config_folder.join("config.yaml").write(config)
 
-#     # Create modeling_config.yaml
-#     modeling_config = """
-#     learning_rate:
-#       - 0.001
-#     batch_size:
-#       - 16
-#     """
-#     config_folder.join("modeling_config.yaml").write(modeling_config)
+    # Create modeling_config.yaml
+    modeling_config = """
+    learning_rate:
+      - 0.001
+    batch_size:
+      - 16
+    """
+    config_folder.join("modeling_config.yaml").write(modeling_config)
 
-#     # Run the function and verify no errors
-#     configurations = i.validate_experiments_yaml(str(config_folder))
+    # Run the function and verify no errors
+    configurations = i.validate_experiments_yaml(str(config_folder))
 
-#     # Assert that both config and modeling_config sections are validated
-#     assert len(configurations) == 2  # Two sections: config and modeling_config
+    # Assert that both config and modeling_config sections are validated
+    assert len(configurations) == 2  # Two sections: config and modeling_config
 
-#     # Check the overrides for 'config'
-#     config_overrides = dict(configurations)["config"]
-#     assert "training_data" in config_overrides
-#     assert config_overrides["training_data"]["modeling_period_duration"] == [14, 30]
+    # Check the overrides for 'config'
+    config_overrides = dict(configurations)["config"]
+    assert "training_data" in config_overrides
+    assert config_overrides["training_data"]["modeling_period_duration"] == [14, 30]
 
-#     # Check the overrides for 'modeling_config'
-#     modeling_overrides = dict(configurations)["modeling_config"]
-#     assert "learning_rate" in modeling_overrides
-#     assert modeling_overrides["learning_rate"] == [0.001]
-#     assert modeling_overrides["batch_size"] == [16]
+    # Check the overrides for 'modeling_config'
+    modeling_overrides = dict(configurations)["modeling_config"]
+    assert "learning_rate" in modeling_overrides
+    assert modeling_overrides["learning_rate"] == [0.001]
+    assert modeling_overrides["batch_size"] == [16]
 
+@pytest.mark.xfail
+# these will be redone once the next experiment is run
+@pytest.mark.unit
+def test_validate_experiments_yaml_missing_file(tmpdir):
+    """Unit Test: Failure case where a referenced config file does not exist."""
 
-# @pytest.mark.unit
-# def test_validate_experiments_yaml_missing_file(tmpdir):
-#     """Unit Test: Failure case where a referenced config file does not exist."""
+    # Create the config folder and files
+    config_folder = tmpdir.mkdir("config_folder")
 
-#     # Create the config folder and files
-#     config_folder = tmpdir.mkdir("config_folder")
+    # Create experiments_config.yaml referencing a non-existent file in variable_overrides
+    experiment_config = """
+    variable_overrides:
+      config:
+        training_data:
+          modeling_period_duration:
+            - 14
+      config_missing:
+        param_x:
+          - value
+    """
+    config_folder.join("experiments_config.yaml").write(experiment_config)
 
-#     # Create experiments_config.yaml referencing a non-existent file in variable_overrides
-#     experiment_config = """
-#     variable_overrides:
-#       config:
-#         training_data:
-#           modeling_period_duration:
-#             - 14
-#       config_missing:
-#         param_x:
-#           - value
-#     """
-#     config_folder.join("experiments_config.yaml").write(experiment_config)
+    # Create config.yaml
+    config = """
+    training_data:
+      modeling_period_duration:
+        - 14
+    """
+    config_folder.join("config.yaml").write(config)
 
-#     # Create config.yaml
-#     config = """
-#     training_data:
-#       modeling_period_duration:
-#         - 14
-#     """
-#     config_folder.join("config.yaml").write(config)
+    # Verify that it raises FileNotFoundError for the missing config file
+    with pytest.raises(FileNotFoundError, match="config_missing.yaml not found in"):
+        i.validate_experiments_yaml(str(config_folder))
 
-#     # Verify that it raises FileNotFoundError for the missing config file
-#     with pytest.raises(FileNotFoundError, match="config_missing.yaml not found in"):
-#         i.validate_experiments_yaml(str(config_folder))
+@pytest.mark.xfail
+# these will be redone once the next experiment is run
+@pytest.mark.unit
+def test_validate_experiments_yaml_invalid_key(tmpdir):
+    """Unit Test: Failure case where a referenced key in variable_overrides doesn't exist in the config files."""
 
+    # Create the config folder and files
+    config_folder = tmpdir.mkdir("config_folder")
 
-# @pytest.mark.unit
-# def test_validate_experiments_yaml_invalid_key(tmpdir):
-#     """Unit Test: Failure case where a referenced key in variable_overrides doesn't exist in the config files."""
+    # Create experiments_config.yaml with an invalid key
+    experiment_config = """
+    variable_overrides:
+      config:
+        training_data:
+          modeling_period_duration:
+            - 14
+        invalid_key:
+            - non_existent
+    """
+    config_folder.join("experiments_config.yaml").write(experiment_config)
 
-#     # Create the config folder and files
-#     config_folder = tmpdir.mkdir("config_folder")
+    # Create config.yaml
+    config = """
+    training_data:
+      modeling_period_duration:
+        - 14
+    """
+    config_folder.join("config.yaml").write(config)
 
-#     # Create experiments_config.yaml with an invalid key
-#     experiment_config = """
-#     variable_overrides:
-#       config:
-#         training_data:
-#           modeling_period_duration:
-#             - 14
-#         invalid_key:
-#             - non_existent
-#     """
-#     config_folder.join("experiments_config.yaml").write(experiment_config)
+    # Verify that it raises a ValueError for the invalid key
+    with pytest.raises(ValueError, match="Key 'invalid_key' in variable_overrides not found in config.yaml"):
+        i.validate_experiments_yaml(str(config_folder))
 
-#     # Create config.yaml
-#     config = """
-#     training_data:
-#       modeling_period_duration:
-#         - 14
-#     """
-#     config_folder.join("config.yaml").write(config)
+@pytest.mark.xfail
+# these will be redone once the next experiment is run
+@pytest.mark.unit
+def test_prepare_configs_success(tmpdir):
+    """
+    Test the success case for prepare_configs with valid override parameters.
+    """
 
-#     # Verify that it raises a ValueError for the invalid key
-#     with pytest.raises(ValueError, match="Key 'invalid_key' in variable_overrides not found in config.yaml"):
-#         i.validate_experiments_yaml(str(config_folder))
+    # Create a temporary config folder
+    config_folder = tmpdir.mkdir("config_folder")
 
+    # Create mock config files
+    config_yaml = """
+    data_cleaning:
+      inflows_filter: 5000000
+      profitability_filter: 10000000
+    training_data:
+      modeling_period_duration: 30
+      wallet_min_coins: 2
+    """
+    metrics_config_yaml = """
+    wallet_cohorts:
+      sharks:
+        buyers_new:
+          aggregations:
+            mean:
+              scaling: None
+    """
+    modeling_config_yaml = """
+    preprocessing:
+      drop_features: ['total_sellers_sum']
+    target_variables:
+      moon_threshold: 0.5
+    """
 
-# @pytest.mark.unit
-# def test_prepare_configs_success(tmpdir):
-#     """
-#     Test the success case for prepare_configs with valid override parameters.
-#     """
+    # Write these config files to the temporary directory
+    config_file = config_folder.join("config.yaml")
+    config_file.write(config_yaml)
 
-#     # Create a temporary config folder
-#     config_folder = tmpdir.mkdir("config_folder")
+    metrics_file = config_folder.join("metrics_config.yaml")
+    metrics_file.write(metrics_config_yaml)
 
-#     # Create mock config files
-#     config_yaml = """
-#     data_cleaning:
-#       inflows_filter: 5000000
-#       profitability_filter: 10000000
-#     training_data:
-#       modeling_period_duration: 30
-#       wallet_min_coins: 2
-#     """
-#     metrics_config_yaml = """
-#     wallet_cohorts:
-#       sharks:
-#         buyers_new:
-#           aggregations:
-#             mean:
-#               scaling: None
-#     """
-#     modeling_config_yaml = """
-#     preprocessing:
-#       drop_features: ['total_sellers_sum']
-#     target_variables:
-#       moon_threshold: 0.5
-#     """
+    modeling_file = config_folder.join("modeling_config.yaml")
+    modeling_file.write(modeling_config_yaml)
 
-#     # Write these config files to the temporary directory
-#     config_file = config_folder.join("config.yaml")
-#     config_file.write(config_yaml)
+    # Valid override parameters
+    override_params = {
+        'config.data_cleaning.inflows_filter': 10000000,
+        'config.training_data.modeling_period_duration': 14,
+        'metrics_config.wallet_cohorts.sharks.buyers_new.aggregations.mean.scaling': 'standard',
+        'modeling_config.preprocessing.drop_features': ['buyers_new_median'],
+        'modeling_config.target_variables.moon_threshold': 0.3
+    }
 
-#     metrics_file = config_folder.join("metrics_config.yaml")
-#     metrics_file.write(metrics_config_yaml)
+    # Run the function
+    config, metrics_config, modeling_config = i.prepare_configs(str(config_folder), override_params)
 
-#     modeling_file = config_folder.join("modeling_config.yaml")
-#     modeling_file.write(modeling_config_yaml)
+    # Assert the overrides were applied correctly
+    assert config['data_cleaning']['inflows_filter'] == 10000000
+    assert config['training_data']['modeling_period_duration'] == 14
+    assert metrics_config['wallet_cohorts']['sharks']['buyers_new']['aggregations']['mean']['scaling'] == 'standard'
+    assert modeling_config['preprocessing']['drop_features'] == ['buyers_new_median']
+    assert modeling_config['target_variables']['moon_threshold'] == 0.3
 
-#     # Valid override parameters
-#     override_params = {
-#         'config.data_cleaning.inflows_filter': 10000000,
-#         'config.training_data.modeling_period_duration': 14,
-#         'metrics_config.wallet_cohorts.sharks.buyers_new.aggregations.mean.scaling': 'standard',
-#         'modeling_config.preprocessing.drop_features': ['buyers_new_median'],
-#         'modeling_config.target_variables.moon_threshold': 0.3
-#     }
+@pytest.mark.xfail
+# these will be redone once the next experiment is run
+@pytest.mark.unit
+def test_prepare_configs_failure(tmpdir):
+    """
+    Test the failure case for prepare_configs when an invalid key is used in override_params.
+    """
 
-#     # Run the function
-#     config, metrics_config, modeling_config = i.prepare_configs(str(config_folder), override_params)
+    # Create a temporary config folder
+    config_folder = tmpdir.mkdir("config_folder")
 
-#     # Assert the overrides were applied correctly
-#     assert config['data_cleaning']['inflows_filter'] == 10000000
-#     assert config['training_data']['modeling_period_duration'] == 14
-#     assert metrics_config['wallet_cohorts']['sharks']['buyers_new']['aggregations']['mean']['scaling'] == 'standard'
-#     assert modeling_config['preprocessing']['drop_features'] == ['buyers_new_median']
-#     assert modeling_config['target_variables']['moon_threshold'] == 0.3
+    # Create mock config files
+    config_yaml = """
+    data_cleaning:
+      inflows_filter: 5000000
+      profitability_filter: 10000000
+    training_data:
+      modeling_period_duration: 30
+      wallet_min_coins: 2
+    """
+    metrics_config_yaml = """
+    wallet_cohorts:
+      sharks:
+        buyers_new:
+          aggregations:
+            mean:
+              scaling: None
+    """
+    modeling_config_yaml = """
+    preprocessing:
+      drop_features: ['total_sellers_sum']
+    target_variables:
+      moon_threshold: 0.5
+    """
 
+    # Write these config files to the temporary directory
+    config_file = config_folder.join("config.yaml")
+    config_file.write(config_yaml)
 
-# @pytest.mark.unit
-# def test_prepare_configs_failure(tmpdir):
-#     """
-#     Test the failure case for prepare_configs when an invalid key is used in override_params.
-#     """
+    metrics_file = config_folder.join("metrics_config.yaml")
+    metrics_file.write(metrics_config_yaml)
 
-#     # Create a temporary config folder
-#     config_folder = tmpdir.mkdir("config_folder")
+    modeling_file = config_folder.join("modeling_config.yaml")
+    modeling_file.write(modeling_config_yaml)
 
-#     # Create mock config files
-#     config_yaml = """
-#     data_cleaning:
-#       inflows_filter: 5000000
-#       profitability_filter: 10000000
-#     training_data:
-#       modeling_period_duration: 30
-#       wallet_min_coins: 2
-#     """
-#     metrics_config_yaml = """
-#     wallet_cohorts:
-#       sharks:
-#         buyers_new:
-#           aggregations:
-#             mean:
-#               scaling: None
-#     """
-#     modeling_config_yaml = """
-#     preprocessing:
-#       drop_features: ['total_sellers_sum']
-#     target_variables:
-#       moon_threshold: 0.5
-#     """
+    # Invalid override parameters (this key doesn't exist in the config)
+    override_params = {
+        'config.data_cleaning.non_existent_filter': 99999  # This will raise an error
+    }
 
-#     # Write these config files to the temporary directory
-#     config_file = config_folder.join("config.yaml")
-#     config_file.write(config_yaml)
-
-#     metrics_file = config_folder.join("metrics_config.yaml")
-#     metrics_file.write(metrics_config_yaml)
-
-#     modeling_file = config_folder.join("modeling_config.yaml")
-#     modeling_file.write(modeling_config_yaml)
-
-#     # Invalid override parameters (this key doesn't exist in the config)
-#     override_params = {
-#         'config.data_cleaning.non_existent_filter': 99999  # This will raise an error
-#     }
-
-#     # Run the function and expect a KeyError
-#     with pytest.raises(KeyError, match="Key 'non_existent_filter' not found"):
-#         i.prepare_configs(str(config_folder), override_params)
+    # Run the function and expect a KeyError
+    with pytest.raises(KeyError, match="Key 'non_existent_filter' not found"):
+        i.prepare_configs(str(config_folder), override_params)
 
 
 # pytest: disable=C0116  # no docstrings in fixtures
@@ -312,7 +318,8 @@ def mock_config():
             'modeling_period_end': '2023-03-01'
         },
         'data_cleaning': {
-            'max_gap_days': 7
+            'max_gap_days': 7,
+            'minimum_wallet_inflows': 10
         }
     }
 
@@ -346,7 +353,8 @@ def test_rebuild_profits_df_if_necessary(
     # Assertions
     mock_retrieve_profits_data.assert_called_once_with(
         mock_config['training_data']['training_period_start'],
-        mock_config['training_data']['modeling_period_end']
+        mock_config['training_data']['modeling_period_end'],
+        mock_config['data_cleaning']['minimum_wallet_inflows']
     )
     mock_split_dataframe.assert_called_once_with(
         mock_profits_df,
@@ -481,19 +489,19 @@ def test_build_configured_model_input(config, metrics_config, modeling_config, p
     DataFrame and the final training feature set (X_train).
     """
 
-    # Override preprocessing/drop_features to have no columns specified
-    modeling_config['preprocessing']['drop_features'] = []
+    # # Override preprocessing/drop_features to have no columns specified
+    # modeling_config['preprocessing']['drop_features'] = []
 
-    # 1. Identify cohort of wallets (e.g., sharks) based on the cohort classification logic
-    cohort_summary_df = cwm.classify_wallet_cohort(profits_df, config['datasets']['wallet_cohorts']['sharks'])
+    # # 1. Identify cohort of wallets (e.g., sharks) based on the cohort classification logic
+    # cohort_summary_df = cwm.classify_wallet_cohort(profits_df, config['datasets']['wallet_cohorts']['sharks'])
 
-    # 2. Generate buysell metrics for wallets in the identified cohort
-    cohort_wallets = cohort_summary_df[cohort_summary_df['in_cohort']]['wallet_address']
-    buysell_metrics_df = cwm.generate_buysell_metrics_df(
-        profits_df,
-        config['training_data']['training_period_end'],
-        cohort_wallets
-    )
+    # # 2. Generate buysell metrics for wallets in the identified cohort
+    # cohort_wallets = cohort_summary_df[cohort_summary_df['in_cohort']]['wallet_address']
+    # buysell_metrics_df = cwm.generate_buysell_metrics_df(
+    #     profits_df,
+    #     config['training_data']['training_period_end'],
+    #     cohort_wallets
+    # )
 
     # Retrieve the metrics configuration for the first df
     _, df_metrics_config = next(iter(metrics_config['wallet_cohorts'].items()))

@@ -950,13 +950,14 @@ def create_target_variables(prices_df, training_data_config, modeling_config):
     """
     returns_df, outcomes_df = calculate_coin_returns(prices_df, training_data_config)
 
-    target_variable_type = modeling_config.get('target_variable_type', 'mooncrater')
+    target_variable = modeling_config['modeling']['target_column']
 
-    if target_variable_type == 'mooncrater':
+    if target_variable in ['is_moon','is_crater']:
         target_variables_df = calculate_mooncrater_targets(returns_df, modeling_config)
+    elif target_variable == 'returns':
+        target_variables_df = returns_df.reset_index()
     else:
-        raise ValueError(f"Unsupported target variable type: {target_variable_type}")
-
+        raise ValueError(f"Unsupported target variable type: {target_variable}")
 
     return target_variables_df, returns_df, outcomes_df
 
@@ -1055,7 +1056,14 @@ def calculate_mooncrater_targets(returns_df, modeling_config):
         craters, total_coins, f"{craters/total_coins:.2%}"
     )
 
-    return target_variables_df[['coin_id', 'is_moon', 'is_crater']]
+    if modeling_config['modeling']['target_column']=="is_moon":
+        target_column_df = target_variables_df[['coin_id', 'is_moon']]
+    elif modeling_config['modeling']['target_column']=="is_crater":
+        target_column_df = target_variables_df[['coin_id', 'is_crater']]
+    else:
+        raise KeyError("Cannot run calculate_mooncrater_targets() if target column is not 'is_moon' or 'is_crater'.")
+
+    return target_column_df
 
 
 

@@ -47,10 +47,19 @@ class TargetVariablesConfig(BaseModel):
 
 # Modeling section
 # ----------------
+
+class ModelType(str, Enum):
+    """The model to train"""
+    RANDOMFORESTCLASSIFIER = "RandomForestClassifier"
+    RANDOMFORESTREGRESSOR = "RandomForestRegressor"
+    GRADIENTBOOSTINGREGRESSOR = "GradientBoostingRegressor"
+
+
 class TargetColumn(str, Enum):
     """Enum for target_column values."""
     IS_MOON = "is_moon"
     IS_CRATER = "is_crater"
+    RETURNS = "returns"
 
 
 class ModelingSettings(NoExtrasBaseModel):
@@ -60,7 +69,8 @@ class ModelingSettings(NoExtrasBaseModel):
     config_folder: str = Field(default="../config")
     train_test_split: Annotated[float, Field(gt=0, lt=1)] = Field(default=0.25)
     random_state: Annotated[int, Field(ge=0)] = Field(default=45)
-    model_params: 'ModelParams'
+    model_type: ModelType
+    model_params: Optional['ModelParams'] = None
 
 class ModelParams(NoExtrasBaseModel):
     """Parameters for the model."""
@@ -83,6 +93,14 @@ class EvaluationMetric(str, Enum):
     LOG_LOSS = "log_loss"
     CONFUSION_MATRIX = "confusion_matrix"
     PROFITABILITY_AUC = "profitability_auc"
+    DOWNSIDE_PROFITABILITY_AUC = "downside_profitability_auc"
+    MSE = "mse"
+    RMSE = "rmse"
+    MAE = "mae"
+    R2 = "r2"
+    EXPLAINED_VARIANCE = "explained_variance"
+    MAX_ERROR = "max_error"
+
 
 class EvaluationConfig(NoExtrasBaseModel):
     """Configuration for model evaluation step."""

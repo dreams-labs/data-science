@@ -71,7 +71,9 @@ def test_missing_values_in_features():
     Test if ValueError is raised when features contain missing values.
     """
     # Create a DataFrame with missing values in features
-    data = create_dataframe({'feature1': [1, 2, np.nan, 4, 5, 6, 7, 8, 9, 10], 'feature2': [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]}, [0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
+    data = create_dataframe({'feature1': [1, 2, np.nan, 4, 5, 6, 7, 8, 9, 10],
+                             'feature2': [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]},
+                             [0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
 
     with pytest.raises(ValueError, match="Features contain missing values"):
         m.split_model_input(data, 'target')
@@ -82,7 +84,9 @@ def test_missing_values_in_target():
     Test if ValueError is raised when the target contains missing values.
     """
     # Create a DataFrame with missing values in the target
-    data = create_dataframe({'feature1': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 'feature2': [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]}, [0, np.nan, 1, 0, 1, 0, 1, 0, 1, 0])
+    data = create_dataframe({'feature1': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                             'feature2': [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]},
+                             [0, np.nan, 1, 0, 1, 0, 1, 0, 1, 0])
 
     with pytest.raises(ValueError, match="Target column contains missing values"):
         m.split_model_input(data, 'target')
@@ -104,7 +108,9 @@ def test_imbalanced_target():
     Test if ValueError is raised when the target is heavily imbalanced.
     """
     # Create a DataFrame with an imbalanced target and 10 rows
-    data = create_dataframe({'feature1': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 'feature2': [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]}, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+    data = create_dataframe({'feature1': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                             'feature2': [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]},
+                             [1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
 
     with pytest.raises(ValueError, match="Target is heavily imbalanced"):
         m.split_model_input(data, 'target')
@@ -115,7 +121,9 @@ def test_non_numeric_features():
     Test if ValueError is raised when features contain non-numeric data.
     """
     # Create a DataFrame with non-numeric features and 10 rows
-    data = create_dataframe({'feature1': ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'], 'feature2': ['x', 'y', 'z', 'a', 'b', 'c', 'd', 'e', 'f', 'g']}, [0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
+    data = create_dataframe({'feature1': ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'],
+                             'feature2': ['x', 'y', 'z', 'a', 'b', 'c', 'd', 'e', 'f', 'g']},
+                             [0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
 
     with pytest.raises(ValueError, match="Features contain non-numeric data"):
         m.split_model_input(data, 'target')
@@ -126,7 +134,8 @@ def test_one_class_in_target():
     Test if ValueError is raised when the target has only one class in y_train or y_test.
     """
     # Create a DataFrame where the target has only one class and 10 rows
-    data = create_dataframe({'feature1': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 'feature2': [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]}, [1, 0, 1, 1, 1, 1, 1, 1, 1, 1])
+    data = create_dataframe({'feature1': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                             'feature2': [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]}, [1, 0, 1, 1, 1, 1, 1, 1, 1, 1])
 
     with pytest.raises(ValueError, match="y_train or y_test contains only one class"):
         m.split_model_input(data, 'target')
@@ -169,10 +178,19 @@ def setup_modeling_folders(modeling_folder):
     os.makedirs(os.path.join(modeling_folder, "logs"), exist_ok=True)
     os.makedirs(os.path.join(modeling_folder, "models"), exist_ok=True)
 
+@pytest.fixture
+def sample_modeling_config():
+    return {
+        "modeling": {
+            "model_type": "RandomForestClassifier"
+        }
+    }
+
 @pytest.mark.unit
 @mock.patch('joblib.dump')  # Only mock saving the model, not folder creation
 @mock.patch('builtins.open', new_callable=mock.mock_open)  # Mock the open function for file writing
-def test_basic_functionality(mock_open, mock_dump, sample_data, modeling_folder):
+def test_basic_functionality(mock_open, mock_dump, sample_data, modeling_folder,
+                             sample_modeling_config):
     """
     Test basic functionality of the train_model function.
     Ensures model is trained, files are saved, and a model ID is generated.
@@ -180,7 +198,7 @@ def test_basic_functionality(mock_open, mock_dump, sample_data, modeling_folder)
     X_train, y_train = sample_data
 
     # Call the function to test
-    model, model_id = m.train_model(X_train, y_train, modeling_folder)
+    model, model_id = m.train_model(X_train, y_train, modeling_folder, sample_modeling_config)
 
     # Assert the model is a RandomForestClassifier instance
     assert isinstance(model, RandomForestClassifier)
@@ -195,15 +213,17 @@ def test_basic_functionality(mock_open, mock_dump, sample_data, modeling_folder)
 @pytest.mark.unit
 @mock.patch('joblib.dump')
 @mock.patch('builtins.open', new_callable=mock.mock_open)
-def test_custom_model_parameters(mock_open, mock_dump, sample_data, setup_modeling_folders, modeling_folder):
+def test_custom_model_parameters(mock_open, mock_dump, sample_data, sample_modeling_config,
+                                 setup_modeling_folders, modeling_folder):
     """
     Test train_model with custom model parameters.
     Ensures the model is trained with specified parameters.
     """
     X_train, y_train = sample_data
     custom_params = {"n_estimators": 50, "random_state": 10}
+    sample_modeling_config['modeling']['model_params'] = custom_params
 
-    model, model_id = m.train_model(X_train, y_train, modeling_folder, model_params=custom_params)
+    model, model_id = m.train_model(X_train, y_train, modeling_folder, sample_modeling_config)
 
     # Assert the model is trained with custom parameters
     assert model.n_estimators == 50
@@ -220,17 +240,19 @@ def test_custom_model_parameters(mock_open, mock_dump, sample_data, setup_modeli
 @pytest.mark.unit
 @mock.patch('joblib.dump')
 @mock.patch('builtins.open', new_callable=mock.mock_open)
-def test_invalid_model_parameters(mock_open, mock_dump, sample_data, setup_modeling_folders, modeling_folder):
+def test_invalid_model_parameters(mock_open, mock_dump, sample_data, sample_modeling_config,
+                                  setup_modeling_folders, modeling_folder):
     """
     Test train_model with invalid model parameters.
     Ensures the function raises a TypeError when invalid parameters are passed.
     """
     X_train, y_train = sample_data
     invalid_params = {"invalid_param": 100}
+    sample_modeling_config['modeling']['model_params'] = invalid_params
 
     # Expect TypeError due to invalid parameter
     with pytest.raises(TypeError):
-        m.train_model(X_train, y_train, modeling_folder, model_params=invalid_params)
+        m.train_model(X_train, y_train, modeling_folder, sample_modeling_config)
 
 # Unit Test: Feature Importance Validation
 @pytest.mark.unit
@@ -238,7 +260,8 @@ def test_invalid_model_parameters(mock_open, mock_dump, sample_data, setup_model
 @mock.patch('pandas.read_csv')  # Mock the read_csv function
 @mock.patch('joblib.dump')
 @mock.patch('builtins.open', new_callable=mock.mock_open)
-def test_feature_importance_validation(mock_open, mock_dump, mock_read_csv, mock_to_csv, sample_data, setup_modeling_folders, modeling_folder):
+def test_feature_importance_validation(mock_open, mock_dump, mock_read_csv, mock_to_csv, sample_data,
+                                       sample_modeling_config, setup_modeling_folders, modeling_folder):
     """
     Test the accuracy of feature importance saved by train_model.
     Ensures the saved feature importance matches the model's internal feature importance.
@@ -258,10 +281,12 @@ def test_feature_importance_validation(mock_open, mock_dump, mock_read_csv, mock
     mock_read_csv.return_value = expected_feature_importances
 
     # Call the function to test
-    model, model_id = m.train_model(X_train, y_train, modeling_folder)
+    model, model_id = m.train_model(X_train, y_train, modeling_folder, sample_modeling_config)
 
     # Mock reading the feature importance CSV file
-    feature_importances_path = os.path.join(modeling_folder, "outputs", "feature_importance", f"feature_importance_{model_id}.csv")
+    feature_importances_path = os.path.join(modeling_folder,
+                                             "outputs", "feature_importance",
+                                             f"feature_importance_{model_id}.csv")
 
     # Now check that the read content matches the expected importances
     feature_importances = pd.read_csv(feature_importances_path)
@@ -333,7 +358,9 @@ def mock_predictions_file(mock_modeling_folder, model_id):
     return predictions_path
 
 @pytest.mark.unit
-def test_log_trial_results_normal_case(mock_modeling_folder, mock_log_file, mock_metrics_file, mock_feature_importance_file, mock_predictions_file, model_id, experiment_id):
+def test_log_trial_results_normal_case(mock_modeling_folder, mock_log_file, mock_metrics_file,
+                                       mock_feature_importance_file, mock_predictions_file,
+                                       model_id, experiment_id):
     """
     Test normal case where all necessary files exist, and ensure that
     the function correctly logs the trial results.

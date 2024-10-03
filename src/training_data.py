@@ -228,7 +228,6 @@ def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows):
     return profits_df
 
 
-
 @timing_decorator
 def clean_profits_df(profits_df, data_cleaning_config):
     """
@@ -250,69 +249,63 @@ def clean_profits_df(profits_df, data_cleaning_config):
     - Cleaned DataFrame with records for coin_id-wallet_address pairs filtered out.
     """
 
-    # 1. Remove wallets with higher or lower total profits than the profitability_filter
-    # ----------------------------------------------------------------------------------
-    # Group by wallet_address and calculate the total profitability
-    wallet_profits_agg_df = profits_df.sort_values('date').groupby(
-        'wallet_address', observed=True)['profits_cumulative'].last().reset_index()
+    # 1. Calculate total profits and inflows for each wallet across all coins
+    # -----------------------------------------------------------------------
+    # Group by wallet-coin pair and calculate the ending total inflows and profits
+    wallet_coin_agg_df = (profits_df.sort_values('date')
+                                    .groupby(['wallet_address','coin_id'], observed=True)
+                                    .agg({
+                                        'usd_inflows_cumulative': 'last',
+                                        'profits_cumulative': 'last'
+                                    })
+                                    .reset_index())
 
+
+    # Sum the profits and inflows of all coins associated with each wallet
+    wallet_agg_df = (wallet_coin_agg_df.groupby('wallet_address')
+                                       .agg({
+                                           'usd_inflows_cumulative': 'sum',
+                                           'profits_cumulative': 'sum'
+                                       })
+                                       .reset_index())
+
+    # 2. Identify the wallets to be excluded
+    # --------------------------------------
     # Identify wallet_addresses with total profitability that exceeds the threshold
-    # pylint: disable=C0301
-    exclusions_profits_df = wallet_profits_agg_df[
-        (wallet_profits_agg_df['profits_cumulative'] >= data_cleaning_config['profitability_filter']) |
-        (wallet_profits_agg_df['profits_cumulative'] <= -data_cleaning_config['profitability_filter'])
-    ][['wallet_address']]
-
-    # Merge to filter out the records with those wallet addresses
-    profits_cleaned_df = profits_df.merge(
-        exclusions_profits_df, on='wallet_address', how='left', indicator=True)
-    profits_cleaned_df = profits_cleaned_df[profits_cleaned_df['_merge'] == 'left_only']
-    profits_cleaned_df.drop(columns=['_merge'], inplace=True)
-
-    # 2. Remove wallets with higher total inflows than the inflows_filter
-    # -------------------------------------------------------------------
-    # Group by wallet_address and calculate the total inflows
-    wallet_inflows_agg_df = profits_df.groupby(
-        'wallet_address', observed=True)['usd_inflows'].sum().reset_index()
+    wallet_exclusions_profits = wallet_agg_df[
+        (wallet_agg_df['profits_cumulative'] >= data_cleaning_config['profitability_filter']) |
+        (wallet_agg_df['profits_cumulative'] <= -data_cleaning_config['profitability_filter'])
+    ]['wallet_address']
 
     # Identify wallet addresses where total inflows exceed the threshold
-    exclusions_inflows_df = wallet_inflows_agg_df[
-        wallet_inflows_agg_df['usd_inflows'] >= data_cleaning_config['inflows_filter']
-    ][['wallet_address']]
+    wallet_exclusions_inflows = wallet_agg_df[
+        wallet_agg_df['usd_inflows_cumulative'] >= data_cleaning_config['inflows_filter']
+    ]['wallet_address']
 
-    # Merge to filter out the records with those wallet addresses
-    profits_cleaned_df = profits_cleaned_df.merge(
-        exclusions_inflows_df, on='wallet_address', how='left', indicator=True)
-    profits_cleaned_df = profits_cleaned_df[profits_cleaned_df['_merge'] == 'left_only']
-    profits_cleaned_df.drop(columns=['_merge'], inplace=True)
+    # Combine the two exclusion lists
+    wallet_exclusions_combined = pd.concat([wallet_exclusions_profits, wallet_exclusions_inflows]).unique()
 
-    # Convert coin_id to categorical
-    profits_df['coin_id'] = profits_df['coin_id'].astype('category')
+    # Remove records from profits_df where wallet_address is in the exclusion list
+    profits_cleaned_df = profits_df[~profits_df['wallet_address'].isin(wallet_exclusions_combined)]
 
     # 3. Prepare exclusions_df and output logs
     # ----------------------------------------
     # prepare exclusions_logs_df
-    exclusions_profits_df['profits_exclusion'] = True
-    exclusions_inflows_df['inflows_exclusion'] = True
-    exclusions_logs_df = exclusions_profits_df.merge(
-        exclusions_inflows_df, on='wallet_address', how='outer')
+    exclusions_logs_df = pd.DataFrame({
+        'wallet_address': pd.concat([wallet_exclusions_profits, wallet_exclusions_inflows]).unique()
+    })
+    exclusions_logs_df['profits_exclusion'] = exclusions_logs_df['wallet_address'].isin(wallet_exclusions_profits)
+    exclusions_logs_df['inflows_exclusion'] = exclusions_logs_df['wallet_address'].isin(wallet_exclusions_inflows)
 
-    # Fill NaN values with False for missing exclusions
-    exclusions_logs_df['profits_exclusion'] = (exclusions_logs_df['profits_exclusion']
-                                               .astype(bool).fillna(False))
-
-    exclusions_logs_df['inflows_exclusion'] = (exclusions_logs_df['inflows_exclusion']
-                                               .astype(bool).fillna(False))
     # log outputs
     logger.debug("Identified %s coin-wallet pairs beyond profit threshold of $%s and %s pairs"
-                 "beyond inflows filter of %s.",
-                 exclusions_profits_df.shape[0],
-                 data_cleaning_config['profitability_filter'],
-                 exclusions_inflows_df.shape[0],
-                 data_cleaning_config['inflows_filter'])
+                    "beyond inflows filter of %s.",
+                    len(wallet_exclusions_profits),
+                    dc.human_format(data_cleaning_config['profitability_filter']),
+                    len(wallet_exclusions_inflows),
+                    dc.human_format(data_cleaning_config['inflows_filter']))
 
     return profits_cleaned_df,exclusions_logs_df
-
 
 
 def retrieve_metadata_data():

@@ -20,12 +20,16 @@ modeling:
   train_test_split: 0.25  # Size of the test set as a proportion of the data
   random_state: 3  # Random seed for reproducibility
 
-  model_params:
-    n_estimators: 100  # Number of trees in the model
+  # model_type: "GradientBoostingRegressor"
+  model_type: "RandomForestRegressor"
+  # model_type: "RandomForestClassifier"
+  # model_params:
+  #   n_estimators: 100  # Number of trees in the model
 
 evaluation:
-  winsorization_cutoff: 0.02
+  winsorization_cutoff: 0.05
   metrics:
+  # # Classifier Metrics
     accuracy:
     precision:
     recall:
@@ -33,5 +37,16 @@ evaluation:
     roc_auc:
     log_loss:
     confusion_matrix:
+
+  # # Regressor Metrics
+    mse:
+    rmse:
+    mae:
+    r2:
+    explained_variance:
+
+  # Profitability AUC
     profitability_auc:
+      top_percentage_filter: 0.1
+    downside_profitability_auc:
       top_percentage_filter: 0.1
