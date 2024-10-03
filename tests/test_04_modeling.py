@@ -471,6 +471,114 @@ def test_log_trial_results_trial_overrides_handling(mock_modeling_folder, mock_l
     assert trial_log["trial_overrides"] == {"learning_rate": 0.01}
 
 
+# ---------------------------------------------- #
+# calculate_running_profitability_score() unit tests
+# ---------------------------------------------- #
+
+@pytest.mark.unit
+def test_calculate_running_profitability_score():
+    """
+    Test the calculate_running_profitability_score function with a predefined set of
+    predictions and returns. This test ensures that:
+
+    1. The function correctly sorts predictions and corresponding returns.
+    2. The cumulative model returns are accurately calculated.
+    3. The best possible returns are sorted and accumulated.
+    4. The running profitability scores are correctly computed by comparing the
+       cumulative model returns to the best possible returns.
+
+    The expected output is compared against manually calculated running profitability
+    scores, accounting for possible floating-point precision issues.
+    """
+    # Test inputs
+    predictions = [0.55, 0.07, 0.14, 0.02, 0.07, 0.64, 0.04, 0.00, 0.02, 0.39]
+    returns = [0.46, -0.1, -0.09, -0.09, -0.01, 0.57, -0.1, -0.01, -0.02, 2.62]
+
+    # Expected outputs
+    expected_running_scores = [0.2176, 0.3223, 1.0, 0.9780, 0.9532, 0.9557, 0.9517, 0.9505, 0.9729, 1.0]
+
+    # Call the function
+    running_scores = m.calculate_running_profitability_score(predictions, returns)
+
+    # Assert equality (with some tolerance for floating-point precision)
+    np.testing.assert_almost_equal(running_scores, expected_running_scores, decimal=3)
+
+@pytest.mark.unit
+def test_calculate_running_profitability_score_with_negative_top_performance():
+    """
+    Test the calculate_running_profitability_score function with a predefined set of
+    predictions and returns where the top-scoring prediction has a negative return.
+
+    This test ensures that:
+    1. The function correctly handles negative returns in top-scoring predictions.
+    2. The cumulative model returns and best possible returns are calculated correctly.
+    3. The running profitability scores are computed accurately, even when the top
+       performer is negative.
+
+    The expected output is compared against manually calculated running profitability
+    scores, accounting for possible floating-point precision issues.
+    """
+    # Test inputs
+    predictions = [0.55, 0.07, 0.14, 0.02, 0.07, 0.64, 0.04, 0.00, 0.02, 0.39]
+    returns = [0.46, -0.1, -0.09, -0.09, -0.01, -0.57, -0.1, -0.01, -0.02, 2.62]
+
+    # Expected outputs (running scores manually calculated)
+    expected_running_scores = [-0.2176, -0.0357, 0.8176, 0.7909, 0.7632]  # Adjusted for this scenario
+
+    # Call the function
+    running_scores = m.calculate_running_profitability_score(predictions, returns)
+
+    # Assert equality (with some tolerance for floating-point precision)
+    np.testing.assert_almost_equal(running_scores[:5], expected_running_scores, decimal=3)
+
+
+@pytest.mark.unit
+def test_calculate_profitability_auc_top_20_percent():
+    """
+    Runs through the logical steps to calculate the percentiled AUC and confirms that the
+    function results in the same value.
+    """
+    predictions = np.array([0.55, 0.07, 0.14, 0.02, 0.07, 0.64, 0.04, 0.00, 0.02, 0.39])
+    performances = np.array([0.46, -0.1, -0.09, -0.09, -0.01, 0.57, -0.1, -0.01, -0.02, 2.62])
+    top_percentage_filter = 0.2
+
+    # Step 1: Sort predictions and performances
+    sorted_indices = np.argsort(predictions)[::-1]
+    sorted_predictions = predictions[sorted_indices]
+    sorted_performances = performances[sorted_indices]
+
+    # Step 2: Determine the number of top predictions to consider
+    n_top = int(len(predictions) * top_percentage_filter)
+    assert n_top == 2
+
+    # Step 3: Filter the top predictions and performances
+    top_predictions = np.round(sorted_predictions[:n_top], 3)
+    top_performances = np.round(sorted_performances[:n_top], 3)
+    np.testing.assert_array_equal(top_predictions, np.array([0.640, 0.550]))
+    np.testing.assert_array_equal(top_performances, np.array([0.570, 0.460]))
+
+    # Step 4: Calculate running profitability scores
+    cumulative_model_returns = np.round(np.cumsum(top_performances), 3)
+    best_possible_returns = np.round(np.sort(performances)[::-1][:n_top], 3)
+    cumulative_best_returns = np.round(np.cumsum(best_possible_returns), 3)
+    running_profitability_scores = np.round(cumulative_model_returns / cumulative_best_returns, 3)
+    np.testing.assert_allclose(cumulative_model_returns, np.array([0.570, 1.030]))
+    np.testing.assert_allclose(best_possible_returns, np.array([2.620, 0.570]))
+    np.testing.assert_allclose(cumulative_best_returns, np.array([2.620, 3.190]))
+    np.testing.assert_allclose(running_profitability_scores, np.array([0.218, 0.323]))
+
+    # Step 5: Calculate the area under the curve
+    x = np.linspace(0, 1, n_top)
+    expected_auc = np.trapezoid(running_profitability_scores, x)
+    np.testing.assert_almost_equal(expected_auc, 0.27025, decimal=3)
+
+    # Final step: Compare with the function output
+    calculated_auc = m.calculate_profitability_auc(predictions, performances, top_percentage_filter)
+    np.testing.assert_almost_equal(calculated_auc, expected_auc, decimal=3,
+                                   err_msg="Calculated Profitability AUC doesn't match expected value")
+
+
+
 # ======================================================== #
 #                                                          #
 #            I N T E G R A T I O N   T E S T S             #

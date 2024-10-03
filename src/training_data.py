@@ -65,7 +65,7 @@ def retrieve_market_data():
 
 
 
-def retrieve_profits_data(start_date,end_date):
+def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows):
     """
     Retrieves data from the core.coin_wallet_profits table and converts columns to
     memory-efficient formats. Records prior to the start_date are excluded but a new
@@ -75,6 +75,8 @@ def retrieve_profits_data(start_date,end_date):
     Params:
     - start_date (String): The earliest date to retrieve records for with format 'YYYY-MM-DD'
     - start_date (String): The latest date to retrieve records for with format 'YYYY-MM-DD'
+    - minimum_wallet_inflows (Float): Wallet-coin pairs with fewer than this amount of total
+        USD inflows will be removed from the profits_df dataset
 
     Returns:
     - profits_df (DataFrame): contains coin-wallet-date keyed profits data denominated in USD
@@ -87,8 +89,8 @@ def retrieve_profits_data(start_date,end_date):
 
     # SQL query to retrieve profits data
     query_sql = f"""
-        -- STEP 1: retrieve profits data through the end of the modeling period
-        -----------------------------------------------------------------------
+        -- STEP 1: retrieve profits data and apply USD inflows filter
+        -------------------------------------------------------------
         with profits_base as (
             select coin_id
             ,date
@@ -102,13 +104,32 @@ def retrieve_profits_data(start_date,end_date):
             where date <= '{end_date}'
         ),
 
+        usd_inflows_filter as (
+            select coin_id
+            ,wallet_address
+            ,max(usd_inflows_cumulative) as total_usd_inflows
+            from profits_base
+            -- we don't need to include coin-wallet pairs that have no transactions between
+            -- the start and end dates
+            group by 1,2
+        ),
+
+        profits_base_filtered as (
+            select pb.*
+            from profits_base pb
+            join usd_inflows_filter f on f.coin_id = pb.coin_id
+                and f.wallet_address = pb.wallet_address
+            where f.total_usd_inflows >= {minimum_wallet_inflows}
+        ),
+
+
         -- STEP 2: create new records for all coin-wallet pairs as of the training_period_start
         ---------------------------------------------------------------------------------------
         -- compute the starting profits and balances as of the training_period_start
         training_start_existing_rows as (
             -- identify coin-wallet pairs that already have a balance as of the period end
             select *
-            from profits_base
+            from profits_base_filtered
             where date = '{start_date}'
         ),
         training_start_needs_rows as (
@@ -117,7 +138,7 @@ def retrieve_profits_data(start_date,end_date):
             ,cmd_previous.price as price_previous
             ,cmd_training.price as price_current
             ,row_number() over (partition by t.coin_id,t.wallet_address order by t.date desc) as rn
-            from profits_base t
+            from profits_base_filtered t
             left join training_start_existing_rows e on e.coin_id = t.coin_id
                 and e.wallet_address = t.wallet_address
 
@@ -153,7 +174,7 @@ def retrieve_profits_data(start_date,end_date):
         -- STEP 3: merge all records together
         -------------------------------------
         profits_merged as (
-            select * from profits_base
+            select * from profits_base_filtered
             -- transfers prior to the training period are summarized in training_start_new_rows
             where date >= '{start_date}'
 

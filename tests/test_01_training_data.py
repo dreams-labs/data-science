@@ -781,14 +781,16 @@ def single_threaded():
 
 
 @pytest.fixture(scope='session')
-def profits_df(prices_df):
+def profits_df_base():
     """
     retrieves transfers_df for data quality checks
     """
     logger.info("Beginning integration testing...")
     logger.info("Generating profits_df fixture from production data...")
     # retrieve profits data
-    profits_df = td.retrieve_profits_data(TRAINING_PERIOD_START, MODELING_PERIOD_END)
+    profits_df = td.retrieve_profits_data(TRAINING_PERIOD_START,
+                                          MODELING_PERIOD_END,
+                                          config['data_cleaning']['minimum_wallet_inflows'])
 
     # filter data to only 5% of coin_ids
     np.random.seed(42)
@@ -803,7 +805,24 @@ def profits_df(prices_df):
         MODELING_PERIOD_END,
         id_column='coin_id'
     )
-    profits_df, _ = td.clean_profits_df(profits_df, config['data_cleaning'])
+    return profits_df
+
+@pytest.fixture(scope='session')
+def cleaned_profits_df(profits_df_base):
+    """
+    Fixture to run clean_profits_df() and return both the cleaned DataFrame and exclusions DataFrame.
+    Uses thresholds from the config file.
+    """
+    logger.info("Generating cleaned_profits_df from clean_profits_df()...")
+    cleaned_df, exclusions_df = td.clean_profits_df(profits_df_base, config['data_cleaning'])
+    return cleaned_df, exclusions_df
+
+@pytest.fixture(scope='session')
+def profits_df(prices_df,cleaned_profits_df):
+    """
+    Returns the final profits_df after the full processing sequence.
+    """
+    profits_df, _ = cleaned_profits_df
 
     # impute period boundary dates
     dates_to_impute = [
@@ -816,6 +835,21 @@ def profits_df(prices_df):
         profits_df = td.impute_profits_for_multiple_dates(profits_df, prices_df, dates_to_impute, n_threads=1)
 
     return profits_df
+
+# Save profits_df.csv in fixtures/
+# ----------------------------------------
+def test_save_profits_df(profits_df):
+    """
+    This is not a test! This function saves a cleaned_profits_df.csv in the fixtures folder so it can be \
+    used for integration tests in other modules.
+    """
+
+    # Save the cleaned DataFrame to the fixtures folder
+    profits_df.to_csv('tests/fixtures/cleaned_profits_df.csv', index=False)
+
+    # Add some basic assertions to ensure the data was saved correctly
+    assert profits_df is not None
+    assert len(profits_df) > 0
 
 
 
@@ -974,39 +1008,12 @@ def test_save_metadata_df(metadata_df):
     assert metadata_df['coin_id'].is_unique, "coin_id is not unique in metadata_df"
 
 
-
 # ---------------------------------------- #
 # clean_profits_df() integration tests
 # ---------------------------------------- #
 
-@pytest.fixture(scope='session')
-def cleaned_profits_df(profits_df):
-    """
-    Fixture to run clean_profits_df() and return both the cleaned DataFrame and exclusions DataFrame.
-    Uses thresholds from the config file.
-    """
-    logger.info("Generating cleaned_profits_df from clean_profits_df()...")
-    cleaned_df, exclusions_df = td.clean_profits_df(profits_df, config['data_cleaning'])
-    return cleaned_df, exclusions_df
-
-# Save cleaned_profits_df.csv in fixtures/
-# ----------------------------------------
-def test_save_cleaned_profits_df(cleaned_profits_df):
-    """
-    This is not a test! This function saves a cleaned_profits_df.csv in the fixtures folder so it can be \
-    used for integration tests in other modules.
-    """
-    cleaned_df,_ = cleaned_profits_df
-
-    # Save the cleaned DataFrame to the fixtures folder
-    cleaned_df.to_csv('tests/fixtures/cleaned_profits_df.csv', index=False)
-
-    # Add some basic assertions to ensure the data was saved correctly
-    assert cleaned_df is not None
-    assert len(cleaned_df) > 0
-
 @pytest.mark.integration
-def test_clean_profits_exclusions(cleaned_profits_df, profits_df):
+def test_clean_profits_exclusions(cleaned_profits_df, profits_df_base):
     """
     Test that all excluded wallets breach either the profitability or inflows threshold.
     Uses thresholds from the config file.
@@ -1014,7 +1021,7 @@ def test_clean_profits_exclusions(cleaned_profits_df, profits_df):
     cleaned_df, exclusions_df = cleaned_profits_df
 
     # Check that every excluded wallet breached at least one threshold
-    exclusions_with_breaches = exclusions_df.merge(profits_df, on='wallet_address', how='inner')
+    exclusions_with_breaches = exclusions_df.merge(profits_df_base, on='wallet_address', how='inner')
 
     # Calculate the total profits and inflows per wallet
     wallet_agg_df = exclusions_with_breaches.sort_values('date').groupby('wallet_address', observed=True).agg({
@@ -1031,7 +1038,6 @@ def test_clean_profits_exclusions(cleaned_profits_df, profits_df):
         (wallet_agg_df['profits_cumulative'] <= -profitability_filter) |
         (wallet_agg_df['usd_inflows'] >= inflows_filter)
     ]
-
     # Assert that all excluded wallets breached a threshold
     assert len(exclusions_df) == len(breaches_df), "Some excluded wallets do not breach a threshold."
 

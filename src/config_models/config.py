@@ -5,9 +5,6 @@ from datetime import date
 from typing import Dict, Optional
 from pydantic import BaseModel, Field
 
-# pylint: disable=C0115  # no docstring for class Config
-# pylint: disable=R0903  # too few methods for class Config
-
 # Custom base model to disable extra fields in all sections
 class NoExtrasBaseModel(BaseModel):
     """Custom BaseModel to apply config settings globally."""
@@ -106,6 +103,7 @@ class DataCleaningConfig(NoExtrasBaseModel):
     inflows_filter: float = Field(..., gt=0)
     max_gap_days: int = Field(..., gt=0)
     exclude_coins_without_transfers: bool = Field(False)
+    minimum_wallet_inflows: float = Field(..., gt=0)
 
 
 # ============================================================================

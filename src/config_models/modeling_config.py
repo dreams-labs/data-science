@@ -2,7 +2,7 @@
 Validation logic for items in modeling_config.yaml
 """
 from enum import Enum
-from typing import Optional, List
+from typing import Optional, List, Dict
 from typing_extensions import Annotated
 from pydantic import BaseModel, Field
 
@@ -24,7 +24,7 @@ class ModelingConfig(NoExtrasBaseModel):
     preprocessing: Optional['PreprocessingConfig'] = Field(default=None)
     target_variables: 'TargetVariablesConfig'
     modeling: 'ModelingSettings'  # Modeling section is now its own object
-
+    evaluation: Optional['EvaluationConfig'] = Field(default=None)
 
 # Preprocessing section
 # ---------------------
@@ -35,12 +35,14 @@ class PreprocessingConfig(NoExtrasBaseModel):
 
 # Target Variables section
 # ------------------------
-class TargetVariablesConfig(NoExtrasBaseModel):
-    """Configuration for target variables."""
-    moon_threshold: Annotated[float, Field(ge=0, le=1)] = Field(default=0.3)
-    moon_minimum_percent: Annotated[float, Field(ge=0, le=1)] = Field(default=0.1)
-    crater_threshold: Annotated[float, Field(ge=-1, le=0)] = Field(default=-0.3)
-    crater_minimum_percent: Annotated[float, Field(ge=0, le=1)] = Field(default=0.1)
+class TargetVariablesConfig(BaseModel):
+    """
+    Configuration for target variables.
+    """
+    moon_threshold: Optional[Annotated[float, Field(ge=0, le=1)]] = Field(default=0.3)
+    moon_minimum_percent: Optional[Annotated[float, Field(ge=0, le=1)]] = Field(default=0.1)
+    crater_threshold: Optional[Annotated[float, Field(ge=-1, le=0)]] = Field(default=-0.3)
+    crater_minimum_percent: Optional[Annotated[float, Field(ge=0, le=1)]] = Field(default=0.1)
 
 
 # Modeling section
@@ -65,6 +67,27 @@ class ModelParams(NoExtrasBaseModel):
     n_estimators: Annotated[int, Field(ge=1)] = Field(default=100)
     random_state: Annotated[int, Field(ge=0)] = Field(default=45)
 
+
+# Evaluation section
+# ---------------------
+
+class EvaluationMetric(str, Enum):
+    """
+    Evaluation Metrics
+    """
+    ACCURACY = "accuracy"
+    PRECISION = "precision"
+    RECALL = "recall"
+    F1_SCORE = "f1_score"
+    ROC_AUC = "roc_auc"
+    LOG_LOSS = "log_loss"
+    CONFUSION_MATRIX = "confusion_matrix"
+    PROFITABILITY_AUC = "profitability_auc"
+
+class EvaluationConfig(NoExtrasBaseModel):
+    """Configuration for model evaluation step."""
+    metrics: Dict[EvaluationMetric, Optional[dict]]
+    winsorization_cutoff: Optional[float]
 
 # ============================================================================
 # Model Rebuilding
