@@ -52,6 +52,7 @@ class ModelType(str, Enum):
     """The model to train"""
     RANDOMFORESTCLASSIFIER = "RandomForestClassifier"
     RANDOMFORESTREGRESSOR = "RandomForestRegressor"
+    GRADIENTBOOSTINGREGRESSOR = "GradientBoostingRegressor"
 
 
 class TargetColumn(str, Enum):
@@ -93,6 +94,13 @@ class EvaluationMetric(str, Enum):
     CONFUSION_MATRIX = "confusion_matrix"
     PROFITABILITY_AUC = "profitability_auc"
     DOWNSIDE_PROFITABILITY_AUC = "downside_profitability_auc"
+    MSE = "mse"
+    RMSE = "rmse"
+    MAE = "mae"
+    R2 = "r2"
+    EXPLAINED_VARIANCE = "explained_variance"
+    MAX_ERROR = "max_error"
+
 
 class EvaluationConfig(NoExtrasBaseModel):
     """Configuration for model evaluation step."""

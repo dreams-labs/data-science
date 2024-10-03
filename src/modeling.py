@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 import dreams_core.core as dc
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingRegressor
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.metrics import roc_auc_score, confusion_matrix, log_loss
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, explained_variance_score, max_error
@@ -131,6 +131,8 @@ def train_model(X_train, y_train, modeling_folder, modeling_config):
         model = RandomForestClassifier(**model_params)
     elif model_type == "RandomForestRegressor":
         model = RandomForestRegressor(**model_params)
+    elif model_type == "GradientBoostingRegressor":
+        model = GradientBoostingRegressor(**model_params)
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
 
@@ -206,14 +208,15 @@ def evaluate_model(model, X_test, y_test, model_id, returns_test, modeling_confi
 
     # Predict the values
     if is_classifier:
-        y_pred_prob = model.predict_proba(X_test)[:, 1]  # Probabilities for the positive class
         y_pred = model.predict(X_test)
+        y_pred_prob = model.predict_proba(X_test)[:, 1]  # Probabilities for the positive class
         predictions_df = pd.DataFrame({
             "y_pred_prob": y_pred_prob,
             "y_pred": y_pred
         }, index=X_test.index)
     else:
         y_pred = model.predict(X_test)
+        y_pred_prob = None
         predictions_df = pd.DataFrame({
             "y_pred": y_pred
         }, index=X_test.index)
@@ -288,7 +291,7 @@ def evaluate_model(model, X_test, y_test, model_id, returns_test, modeling_confi
     metrics_filename = os.path.join(evaluation_folder, f"metrics_{model_id}.csv")
     metrics_df.to_csv(metrics_filename, index=False)
 
-    return metrics_dict
+    return metrics_dict, y_pred, y_pred_prob
 
 
 

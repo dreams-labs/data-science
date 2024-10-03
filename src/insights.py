@@ -136,7 +136,7 @@ def run_experiment(modeling_config):
                             modeling_config['modeling']['model_params'])
 
         # 3.5 Evaluate and save the model's performance on the test set to a CSV
-        _ = m.evaluate_model(model, X_test, y_test, model_id, returns_test, modeling_config)
+        _, _, _ = m.evaluate_model(model, X_test, y_test, model_id, returns_test, modeling_config)
 
         # 3.6 Log the trial results for this configuration
         # Include the trial name, metadata, and other relevant details
