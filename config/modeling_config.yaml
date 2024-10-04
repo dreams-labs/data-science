@@ -27,7 +27,7 @@ modeling:
   #   n_estimators: 100  # Number of trees in the model
 
 evaluation:
-  winsorization_cutoff: 0.05
+  winsorization_cutoff: 0.1
   metrics:
   # # Classifier Metrics
     accuracy:

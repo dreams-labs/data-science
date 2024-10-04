@@ -10,7 +10,7 @@ training_data:
 
   # The entire training data generation pipeline will be run for this many additional \
   # windows, with the periods moved back the full modeling+training duration time
-  additional_windows: 0
+  additional_windows: 1
 
 datasets:
 
@@ -68,8 +68,12 @@ datasets:
   macro_trends:
 
     google_trends:
-      description: 'google_trends'
-      fill_method: 'fill_zeros'
+      cryptocurrency_worldwide:
+        description: 'cryptocurrency_worldwide'
+        fill_method: 'extend'
+      altcoin_worldwide:
+        description: 'altcoin_worldwide'
+        fill_method: 'extend'
 
 data_cleaning:
   # Variables used to clean and filter raw data before training data is built

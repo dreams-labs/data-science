@@ -88,6 +88,7 @@ def run_experiment(modeling_config):
     config = u.load_config(os.path.join(config_folder, 'config.yaml'))
     market_data_df = td.retrieve_market_data()
     prices_df = market_data_df[['coin_id','date','price']].copy()
+    google_trends_df = td.retrieve_google_trends_data()
 
     # Make profits_df the first time (it will always be necessary)
     profits_df = rebuild_profits_df_if_necessary(
@@ -126,6 +127,7 @@ def run_experiment(modeling_config):
         X_train, X_test, y_train, y_test, returns_test = build_configured_model_input(
                                             profits_df,
                                             market_data_df,
+                                            google_trends_df,
                                             config,
                                             metrics_config,
                                             modeling_config)
@@ -424,11 +426,11 @@ def rebuild_profits_df_if_necessary(config, modeling_folder, prices_df, profits_
 
     # If the hash hasn't changed and profits_df is passed, skip rerun
     if config_hash == previous_hash and profits_df is not None:
-        logger.debug("Using passed profits_df from memory.")
+        logger.info("Using passed profits_df from memory.")
         return profits_df
 
     # Otherwise, rerun time-intensive steps
-    logger.debug("Config changes detected or missing profits_df, rerunning time-intensive steps...")
+    logger.info("Config changes detected or missing profits_df, rebuilding profits_df...")
 
     # retrieve profits data
     profits_df = td.retrieve_profits_data(config['training_data']['training_period_start'],
@@ -499,6 +501,7 @@ def handle_hash(config_hash, temp_folder, operation='load'):
 def build_configured_model_input(
         profits_df,
         market_data_df,
+        google_trends_df,
         config,
         metrics_config,
         modeling_config):
@@ -508,6 +511,7 @@ def build_configured_model_input(
     Args:
     - profits_df (DataFrame): DataFrame containing profits information for wallets.
     - market_data_df (DataFrame): DataFrame containing market data for coins.
+    - google_trends_df (DataFrame): DataFrame containing Google Trends data for coins.
     - config (dict): Overall configuration containing details for wallet cohorts and training
         data periods.
     - metrics_config (dict): Configuration for metric generation.
@@ -520,32 +524,43 @@ def build_configured_model_input(
     - y_test (Series): Testing target variable.
     - returns_test (Series): The actual returns of the test set
     """
+    training_data_tuples = []
 
     # 1. Generate and merge features for all datasets
     # -------------------------------------
     # Time series features
-    dataset_name = next(iter(metrics_config['time_series'].keys()))
+    dataset_name = 'market_data'  # update to loop through all time series
     market_data_tuples, _ = fe.generate_time_series_features(
             dataset_name,
             market_data_df,
             config,
             metrics_config,
-            modeling_config
-        )
+            modeling_config)
+    training_data_tuples.extend(market_data_tuples)
 
     # Wallet cohort features
     wallet_cohort_tuples, _ = fe.generate_wallet_cohort_features(
             profits_df,
             config,
             metrics_config,
-            modeling_config
-        )
+            modeling_config)
+    training_data_tuples.extend(wallet_cohort_tuples)
+
+    # Google trends features
+    dataset_name = 'google_trends'  # update to loop through all macro trends
+    google_trends_tuples, _ = fe.generate_macro_trends_features(
+            dataset_name,
+            google_trends_df,
+            config,
+            metrics_config,
+            modeling_config)
+    training_data_tuples.extend(google_trends_tuples)
 
     # Merge all the features
-    training_data_tuples = market_data_tuples + wallet_cohort_tuples
     training_data_df, _ = fe.create_training_data_df(
                             modeling_config['modeling']['modeling_folder'],
                             training_data_tuples)
+
 
 
     # 2. Add target variable to training_data_df

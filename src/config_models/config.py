@@ -1,6 +1,7 @@
 """
 Validation logic for items in config.yaml
 """
+from enum import Enum
 from datetime import date
 from typing import Dict, Optional
 from pydantic import BaseModel, Field
@@ -45,6 +46,16 @@ class TrainingDataConfig(NoExtrasBaseModel):
 # ----------------------------------------------------------------------------
 # Datasets Section
 # ----------------------------------------------------------------------------
+class FillMethod(str, Enum):
+    """
+    These dicatates what to do if the dataset doesn't have rows for every coin_id in other
+    datasets.
+    """
+    FILL_ZEROS = "fill_zeros"   # any missing rows are filled with 0
+    DROP_RECORDS = "drop_records"     # any missing rows are dropped from the training set
+    EXTEND = "extend"           # used for macro series; copies the features to all coins
+
+
 class DatasetsConfig(NoExtrasBaseModel):
     """
     These items represent categories of datasets that will be converted to features and used
@@ -53,7 +64,7 @@ class DatasetsConfig(NoExtrasBaseModel):
     wallet_cohorts: Optional[Dict[str, 'WalletCohortConfig']] = None
     time_series: Optional[Dict[str, Dict[str, 'TimeSeriesDataConfig']]] = None
     coin_facts: Optional[Dict[str, 'CoinFactsConfig']] = None
-    macro_trends: Optional[Dict[str, 'MacroTrendsConfig']] = None
+    macro_trends: Optional[Dict[str, Dict[str, 'MacroTrendsConfig']]] = None
 
 # Wallet Cohorts Configuration
 # ---------------------------
@@ -63,7 +74,7 @@ class WalletCohortConfig(NoExtrasBaseModel):
     of wallets, which are defined using the variables within.
     """
     description: str = Field(...)
-    fill_method: str = Field(...)
+    fill_method: FillMethod = Field(...)
     sameness_threshold: float = Field(..., ge=0, le=1)
     wallet_minimum_inflows: float = Field(..., ge=0)
     wallet_maximum_inflows: float = Field(..., gt=0)
@@ -78,7 +89,7 @@ class TimeSeriesDataConfig(NoExtrasBaseModel):
     This data category includes any dataset keyed on both coin_id and date.
     """
     description: str = Field(...)
-    fill_method: str = Field(...)
+    fill_method: FillMethod = Field(...)
     sameness_threshold: float = Field(..., ge=0, le=1)
 
 # Coin Facts Configuration
@@ -90,7 +101,7 @@ class CoinFactsConfig(NoExtrasBaseModel):
     fee structure, etc.
     """
     description: str = Field(...)
-    fill_method: str = Field(...)
+    fill_method: FillMethod = Field(...)
     sameness_threshold: float = Field(..., ge=0, le=1)
     chain_threshold: Optional[int] = Field(None, ge=0)
 
@@ -103,7 +114,7 @@ class MacroTrendsConfig(NoExtrasBaseModel):
     fee structure, etc.
     """
     description: str = Field(...)
-    fill_method: str = Field(...)
+    fill_method: FillMethod = Field(...)
 
 
 # ----------------------------------------------------------------------------
