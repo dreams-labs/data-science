@@ -88,6 +88,8 @@ def run_experiment(modeling_config):
     config = u.load_config(os.path.join(config_folder, 'config.yaml'))
     market_data_df = td.retrieve_market_data()
     prices_df = market_data_df[['coin_id','date','price']].copy()
+
+    # Make profits_df the first time (it will always be necessary)
     profits_df = rebuild_profits_df_if_necessary(
                     config,
                     modeling_folder,

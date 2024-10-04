@@ -38,6 +38,8 @@ class TrainingDataConfig(NoExtrasBaseModel):
     modeling_period_duration: int = Field(..., gt=0)
     modeling_period_start: date = Field(...)
     modeling_period_end: date = Field(...)
+    additional_windows: int = Field(..., ge=0)
+
 
 
 # ----------------------------------------------------------------------------
@@ -48,9 +50,10 @@ class DatasetsConfig(NoExtrasBaseModel):
     These items represent categories of datasets that will be converted to features and used
     by the model. Each category must contain at least one item.
     """
-    wallet_cohorts: Dict[str, 'WalletCohortConfig'] = Field(..., min_length=1)
-    time_series: Dict[str, Dict[str, 'TimeSeriesDataConfig']] = Field(..., min_length=1)
-    coin_facts: Dict[str, 'CoinFactsConfig'] = Field(..., min_length=1)
+    wallet_cohorts: Optional[Dict[str, 'WalletCohortConfig']] = None
+    time_series: Optional[Dict[str, Dict[str, 'TimeSeriesDataConfig']]] = None
+    coin_facts: Optional[Dict[str, 'CoinFactsConfig']] = None
+    macro_trends: Optional[Dict[str, 'CoinFactsConfig']] = None
 
 # Wallet Cohorts Configuration
 # ---------------------------
@@ -90,6 +93,17 @@ class CoinFactsConfig(NoExtrasBaseModel):
     fill_method: str = Field(...)
     sameness_threshold: float = Field(..., ge=0, le=1)
     chain_threshold: Optional[int] = Field(None, ge=0)
+
+# Macro Trends Configuration
+# ------------------------
+class MacroTrendsConfig(NoExtrasBaseModel):
+    """
+    This data category includes items only keyed on coin_id and not date, meaning that they
+    do not generally change over time. Examples include a token's category, blockchain,
+    fee structure, etc.
+    """
+    description: str = Field(...)
+    fill_method: str = Field(...)
 
 
 # ----------------------------------------------------------------------------

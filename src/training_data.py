@@ -552,11 +552,11 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
     profits_df = profits_df.join(prices_target_date['price'], on='coin_id', how='inner')
 
     if len(profits_df) != prejoin_size:
-        raise ValueError(str("Inner join to prices_df on coin_id-date removed %s rows from"
-                                "profits_df with original length %s. There should be complete"
-                                "coverage for all rows in profits_df.",
-                                prejoin_size-len(profits_df),
-                                len(profits_df)))
+        raise ValueError(
+            f"Inner join to prices_df on coin_id-date removed {prejoin_size - len(profits_df)} rows "
+            f"from profits_df with original length {len(profits_df)}. There should be complete coverage "
+            "for all rows in profits_df."
+        )
 
     logger.debug("%s <Step 4> Joined prices_df and added price and previous_price helper "
                     "columns: %.2f seconds",
