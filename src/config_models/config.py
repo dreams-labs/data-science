@@ -53,7 +53,7 @@ class DatasetsConfig(NoExtrasBaseModel):
     wallet_cohorts: Optional[Dict[str, 'WalletCohortConfig']] = None
     time_series: Optional[Dict[str, Dict[str, 'TimeSeriesDataConfig']]] = None
     coin_facts: Optional[Dict[str, 'CoinFactsConfig']] = None
-    macro_trends: Optional[Dict[str, 'CoinFactsConfig']] = None
+    macro_trends: Optional[Dict[str, 'MacroTrendsConfig']] = None
 
 # Wallet Cohorts Configuration
 # ---------------------------
