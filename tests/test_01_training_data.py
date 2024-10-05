@@ -20,7 +20,8 @@ from dreams_core import core as dc
 
 # pyright: reportMissingImports=false
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
-import training_data as td
+import training_data.data_retrieval as dr
+import training_data.profits_row_imputation as ri
 import coin_wallet_metrics as cwm
 from utils import load_config
 
@@ -67,7 +68,7 @@ def test_multiple_coins_per_wallet(sample_profits_df_for_cleaning, sample_data_c
     Test scenario where wallets own multiple coins, some exceeding thresholds when aggregated.
     """
     # Call the function
-    cleaned_df, exclusions_logs_df = td.clean_profits_df(sample_profits_df_for_cleaning,
+    cleaned_df, exclusions_logs_df = dr.clean_profits_df(sample_profits_df_for_cleaning,
                                                          sample_data_cleaning_config)
 
     # Expected results
@@ -120,7 +121,7 @@ def test_profits_exactly_at_threshold(profits_at_threshold_df, profits_at_thresh
     Test scenario where some wallets have profits exactly at the threshold value.
     """
     # Call the function
-    cleaned_df, exclusions_logs_df = td.clean_profits_df(profits_at_threshold_df,
+    cleaned_df, exclusions_logs_df = dr.clean_profits_df(profits_at_threshold_df,
                                                          profits_at_threshold_config)
 
     # Expected results
@@ -181,7 +182,7 @@ def test_negative_profits_losses(negative_profits_df, negative_profits_config):
     Test scenario where some wallets have significant negative profits (losses).
     """
     # Call the function
-    cleaned_df, exclusions_logs_df = td.clean_profits_df(negative_profits_df,
+    cleaned_df, exclusions_logs_df = dr.clean_profits_df(negative_profits_df,
                                                          negative_profits_config)
 
     # Expected results
@@ -261,7 +262,7 @@ def test_chain_threshold(mock_metadata_df, mock_config):
     - Chain 'ethereum' has 1 coin (below the threshold).
     - Chain 'binance' and 'base' have 1 coin (below the threshold).
     """
-    result_df = td.generate_coin_metadata_features(mock_metadata_df, mock_config)
+    result_df = dr.generate_coin_metadata_features(mock_metadata_df, mock_config)
 
     # Assert solana is included as a boolean column
     assert 'chain_solana' in result_df.columns
@@ -285,7 +286,7 @@ def test_category_unpacking(mock_metadata_df, mock_config):
     - Coins with 1 category.
     - Coins with 2+ categories.
     """
-    result_df = td.generate_coin_metadata_features(mock_metadata_df, mock_config)
+    result_df = dr.generate_coin_metadata_features(mock_metadata_df, mock_config)
 
     # Assert correct category columns exist
     assert 'category_meme' in result_df.columns
@@ -353,7 +354,7 @@ def test_calculate_new_profits_values_normal_data(sample_profits_df, target_date
         sample_profits_df (pd.DataFrame): Fixture providing sample input data.
         target_date (datetime): Fixture providing a target date for imputation.
     """
-    result = td.calculate_new_profits_values(sample_profits_df, target_date)
+    result = ri.calculate_new_profits_values(sample_profits_df, target_date)
     result = result.set_index(['coin_id', 'wallet_address', 'date'])
 
     # Check if the result has the correct structure
@@ -411,7 +412,7 @@ def test_calculate_new_profits_values_zero_price_change(zero_price_change_df, ta
         zero_price_change_df (pd.DataFrame): Fixture providing sample input data with no price change.
         target_date (datetime): Fixture providing a target date for imputation.
     """
-    result = td.calculate_new_profits_values(zero_price_change_df, target_date)
+    result = ri.calculate_new_profits_values(zero_price_change_df, target_date)
     result = result.set_index(['coin_id', 'wallet_address', 'date'])
 
     # Check if the result has the correct structure
@@ -469,7 +470,7 @@ def test_calculate_new_profits_values_negative_price_change(negative_price_chang
             price decreases.
         target_date (datetime): Fixture providing a target date for imputation.
     """
-    result = td.calculate_new_profits_values(negative_price_change_df, target_date)
+    result = ri.calculate_new_profits_values(negative_price_change_df, target_date)
     result = result.set_index(['coin_id', 'wallet_address', 'date'])
 
     # Check if the result has the correct structure
@@ -535,7 +536,7 @@ def test_calculate_new_profits_values_zero_usd_balance(zero_usd_balance_df, targ
         zero_usd_balance_df (pd.DataFrame): Fixture providing sample input data with zero USD balances.
         target_date (datetime): Fixture providing a target date for imputation.
     """
-    result = td.calculate_new_profits_values(zero_usd_balance_df, target_date)
+    result = ri.calculate_new_profits_values(zero_usd_balance_df, target_date)
     result = result.set_index(['coin_id', 'wallet_address', 'date'])
 
     # Check if calculations are correct for all rows
@@ -593,7 +594,7 @@ def test_calculate_new_profits_values_multiple_coins_wallets(
             coins and wallets.
         target_date (datetime): Fixture providing a target date for imputation.
     """
-    result = td.calculate_new_profits_values(multiple_coins_wallets_df, target_date)
+    result = ri.calculate_new_profits_values(multiple_coins_wallets_df, target_date)
     result = result.set_index(['coin_id', 'wallet_address', 'date'])
 
     # Check if calculations are correct for all rows
@@ -711,7 +712,7 @@ def test_impute_profits_df_rows_base_case(sample_profits_df_missing_dates,
     """
     target_date = pd.Timestamp('2023-01-06')
 
-    result = td.impute_profits_df_rows(sample_profits_df_missing_dates,
+    result = ri.impute_profits_df_rows(sample_profits_df_missing_dates,
                                        sample_prices_df_missing_dates,
                                        target_date)
 
@@ -779,7 +780,7 @@ def test_impute_profits_df_rows_early_target_date(
     early_target_date = pd.Timestamp('2022-12-31')
 
     with pytest.raises(ValueError) as excinfo:
-        td.impute_profits_df_rows(
+        ri.impute_profits_df_rows(
             sample_profits_df_missing_dates,
             sample_prices_df_missing_dates,
             early_target_date)
@@ -799,7 +800,7 @@ def test_impute_profits_df_rows_late_target_date(
     late_target_date = pd.Timestamp('2023-01-08')
 
     with pytest.raises(ValueError) as excinfo:
-        td.impute_profits_df_rows(
+        ri.impute_profits_df_rows(
             sample_profits_df_missing_dates,
             sample_prices_df_missing_dates,
             late_target_date)
@@ -850,7 +851,7 @@ def profits_df_base():
     logger.info("Beginning integration testing...")
     logger.info("Generating profits_df fixture from production data...")
     # retrieve profits data
-    profits_df = td.retrieve_profits_data(TRAINING_PERIOD_START,
+    profits_df = dr.retrieve_profits_data(TRAINING_PERIOD_START,
                                           MODELING_PERIOD_END,
                                           config['data_cleaning']['minimum_wallet_inflows'])
 
@@ -876,7 +877,7 @@ def cleaned_profits_df(profits_df_base):
     Uses thresholds from the config file.
     """
     logger.info("Generating cleaned_profits_df from clean_profits_df()...")
-    cleaned_df, exclusions_df = td.clean_profits_df(profits_df_base, config['data_cleaning'])
+    cleaned_df, exclusions_df = dr.clean_profits_df(profits_df_base, config['data_cleaning'])
     return cleaned_df, exclusions_df
 
 @pytest.fixture(scope='session')
@@ -894,7 +895,7 @@ def profits_df(prices_df,cleaned_profits_df):
     ]
     # this must use only 1 thread to work in a testing environment
     with single_threaded():
-        profits_df = td.impute_profits_for_multiple_dates(profits_df, prices_df, dates_to_impute, n_threads=1)
+        profits_df = ri.impute_profits_for_multiple_dates(profits_df, prices_df, dates_to_impute, n_threads=1)
 
     return profits_df
 
@@ -1009,7 +1010,7 @@ def market_data_df():
     Retrieve and preprocess the market_data_df, filling gaps as needed.
     """
     logger.info("Generating market_data_df from production data...")
-    market_data_df = td.retrieve_market_data()
+    market_data_df = dr.retrieve_market_data()
     market_data_df, _ = cwm.split_dataframe_by_coverage(
         market_data_df,
         start_date=config['training_data']['training_period_start'],
@@ -1058,7 +1059,7 @@ def metadata_df():
     Retrieve and preprocess the metadata_df.
     """
     logger.info("Generating metadata_df from production data...")
-    metadata_df = td.retrieve_metadata_data()
+    metadata_df = dr.retrieve_metadata_data()
     return metadata_df
 
 # Save metadata_df.csv in fixtures/
