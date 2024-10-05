@@ -6,7 +6,6 @@ import logging
 import warnings
 import threading
 import queue
-from datetime import timedelta
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -422,32 +421,6 @@ def retrieve_google_trends_data():
 
     return google_trends_df
 
-
-def generate_time_windows(config):
-    """
-    Generates the parameter dicts used by i.prepare_configs() to generate the full set
-    of config files.
-
-    Params:
-        config (dict): config.yaml
-
-    Returns:
-        time_windows (list of dicts): a list of dicts that can be used to override the
-        config.yaml settings for each time window.
-    """
-    start_date = pd.to_datetime(config['training_data']['modeling_period_start'])
-    window_duration = timedelta(days=config['training_data']['training_period_duration'] +
-                                     config['training_data']['modeling_period_duration'])
-
-    time_windows = [
-        {'config.training_data.modeling_period_start': start_date.strftime('%Y-%m-%d')}
-    ]
-
-    for _ in range(config['training_data']['additional_windows']):
-        start_date -= window_duration
-        time_windows.append({'config.training_data.modeling_period_start': start_date.strftime('%Y-%m-%d')})
-
-    return time_windows
 
 
 # ____________________________________________________________________________

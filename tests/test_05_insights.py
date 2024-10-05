@@ -23,8 +23,8 @@ from dreams_core import core as dc
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 from utils import load_config
 import feature_engineering as fe
-import coin_wallet_metrics as cwm
-import insights as i
+# import coin_wallet_metrics as cwm
+import insights.insights as i
 
 load_dotenv()
 logger = dc.setup_logger()
