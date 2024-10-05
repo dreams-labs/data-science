@@ -184,77 +184,77 @@ def generate_macro_trends_features(
     - training_data_dfs (list of pd.DataFrames): A list of preprocessed DataFrames for each
         value_column included in the dataset_metrics_config.
         """
-    # # function variables we want to reference
-    # dataset_category = 'macro_trends'
-    # id_column=None
-    # dataset_metrics_config = metrics_config[dataset_category]
+    # function variables we want to reference
+    dataset_category = 'macro_trends'
+    id_column=None
+    dataset_metrics_config = metrics_config[dataset_category]
 
-    # # Model-ready tuples and dfs will go here
-    # training_data_tuples = []
-    # training_data_dfs = []
-
-
-    # # calculate metrics for each value column
-    # for value_column in list(dataset_metrics_config.keys()):
-
-    #     # a value_column-specific df will be used for feature generation
-    #     value_column_config = config['datasets'][dataset_category][value_column]
-    #     value_column_metrics_config = dataset_metrics_config[value_column]
-    #     value_column_df = dataset_df[['date',value_column]].copy()
-    #     # check if there are any time series indicators to add, e.g. sma, ema, etc
-    #     if 'indicators' in value_column_metrics_config:
-    #         value_column_metrics_df, _ = cwm.generate_time_series_indicators(
-    #             value_column_df,
-    #             config,
-    #             value_column_metrics_config['indicators'],
-    #             value_column,
-    #             id_column
-    #         )
-
-    #     else:
-    #         # if no indicators are needed, pass through coins with complete date coverage
-    #         logging.getLogger().setLevel(logging.WARNING) # suppress INFO logs about splits
-    #         value_column_metrics_df, _ = cwm.split_dataframe_by_coverage(
-    #             value_column_df,
-    #             config['training_data']['training_period_start'],
-    #             config['training_data']['training_period_end'],
-    #             id_column
-    #         )
-    #         logging.getLogger().setLevel(logging.INFO) # could be updated to use original level
+    # Model-ready tuples and dfs will go here
+    training_data_tuples = []
+    training_data_dfs = []
 
 
-    #     # flatten metrics
-    #     flattened_features = flatten_date_features(value_column_metrics_df,dataset_metrics_config)
-    #     flattened_macro_trends_df = pd.DataFrame([flattened_features])
+    # calculate metrics for each value column
+    for value_column in list(dataset_metrics_config.keys()):
 
-    #     # save flattened metrics
-    #     flattened_macro_trends_df, flattened_macro_trends_filepath = save_flattened_outputs(
-    #         flattened_macro_trends_df,
-    #         os.path.join(
-    #             modeling_config['modeling']['modeling_folder'],  # Folder to store flattened outputs
-    #             'outputs/flattened_outputs'
-    #         ),
-    #         value_column_config['description'],  # Descriptive metadata for the dataset
-    #         config['training_data']['modeling_period_start']  # Ensure data starts from modeling period
-    #     )
+        # a value_column-specific df will be used for feature generation
+        value_column_config = config['datasets'][dataset_category][value_column]
+        value_column_metrics_config = dataset_metrics_config[value_column]
+        value_column_df = dataset_df[['date',value_column]].copy()
+        # check if there are any time series indicators to add, e.g. sma, ema, etc
+        if 'indicators' in value_column_metrics_config:
+            value_column_metrics_df, _ = cwm.generate_time_series_indicators(
+                value_column_df,
+                config,
+                value_column_metrics_config['indicators'],
+                value_column,
+                id_column
+            )
 
-    #     # preprocess metrics
-    #     macro_trends_preprocessed_df, macro_trends_preprocessed_filepath = preprocess_coin_df(
-    #         flattened_macro_trends_filepath
-    #         ,modeling_config
-    #         ,value_column_config
-    #         ,value_column_metrics_config
-    #     )
-
-    #     macro_trends_tuple = (macro_trends_preprocessed_filepath.split('preprocessed_outputs/')[1],
-    #                             value_column_config['fill_method'])
-    #     logger.info('Generated features for %s.%s',
-    #                 dataset_category, value_column)
-
-    #     training_data_tuples.append(macro_trends_tuple)
-    #     training_data_dfs.append(macro_trends_preprocessed_df)
+        else:
+            # if no indicators are needed, pass through coins with complete date coverage
+            logging.getLogger().setLevel(logging.WARNING) # suppress INFO logs about splits
+            value_column_metrics_df, _ = cwm.split_dataframe_by_coverage(
+                value_column_df,
+                config['training_data']['training_period_start'],
+                config['training_data']['training_period_end'],
+                id_column
+            )
+            logging.getLogger().setLevel(logging.INFO) # could be updated to use original level
 
 
+        # flatten metrics
+        flattened_features = flatten_date_features(value_column_metrics_df,dataset_metrics_config)
+        flattened_macro_trends_df = pd.DataFrame([flattened_features])
+
+        # save flattened metrics
+        flattened_macro_trends_df, flattened_macro_trends_filepath = save_flattened_outputs(
+            flattened_macro_trends_df,
+            os.path.join(
+                modeling_config['modeling']['modeling_folder'],  # Folder to store flattened outputs
+                'outputs/flattened_outputs'
+            ),
+            value_column_config['description'],  # Descriptive metadata for the dataset
+            config['training_data']['modeling_period_start']  # Ensure data starts from modeling period
+        )
+
+        # preprocess metrics
+        macro_trends_preprocessed_df, macro_trends_preprocessed_filepath = preprocess_coin_df(
+            flattened_macro_trends_filepath
+            ,modeling_config
+            ,value_column_config
+            ,value_column_metrics_config
+        )
+
+        macro_trends_tuple = (macro_trends_preprocessed_filepath.split('preprocessed_outputs/')[1],
+                                value_column_config['fill_method'])
+        logger.info('Generated features for %s.%s',
+                    dataset_category, value_column)
+
+        training_data_tuples.append(macro_trends_tuple)
+        training_data_dfs.append(macro_trends_preprocessed_df)
+
+    return training_data_tuples, training_data_dfs
 
 
 

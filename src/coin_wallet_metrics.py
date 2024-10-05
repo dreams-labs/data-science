@@ -574,3 +574,42 @@ def generate_coin_metadata_features(metadata_df, config):
     logger.info("Generated coin_metadata_features_df.")
 
     return metadata_features_df
+
+
+
+def generate_macro_trends_features(macro_trends_df, config):
+    """
+    Generate model-friendly macro trends features. This means filtering the df to only
+    include columns with metrics configurations and trimming the dataset to the period
+    range.
+
+    Params:
+    - macro_trends_df (DataFrame): DataFrame with macro trends columns for all available
+        metrics and rows for all available dates
+    - config (dict): config.yaml
+    """
+    # Retrieve config variables
+    selected_columns = config['datasets']['macro_trends'].keys()
+    start_date = config['training_data']['training_period_start']
+    end_date = config['training_data']['modeling_period_end']
+
+    # Filter to only the columns with metrics configurations
+    macro_trends_df = macro_trends_df[macro_trends_df.columns.intersection(selected_columns)]
+
+    # Filter to only current window
+    macro_trends_df = macro_trends_df.loc[start_date:end_date]
+    columns_with_missing = macro_trends_df.columns[macro_trends_df.isnull().any()].tolist()
+
+    # If there are columns with missing values, log a warning and drop them
+    if columns_with_missing:
+        for column in columns_with_missing:
+            logger.warning(
+                "Dropping macro trends column '%s' due to missing values "
+                "in time window %s to %s.",
+                column, start_date, end_date)
+
+        macro_trends_df = macro_trends_df.drop(columns=columns_with_missing)
+
+    macro_trends_df = macro_trends_df.reset_index()
+
+    return macro_trends_df

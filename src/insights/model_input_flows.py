@@ -6,18 +6,25 @@ functions used to perform high level analysis and performance assessments
 # pyright: reportMissingModuleSource=false
 
 import os
+import sys
 from datetime import timedelta
 import hashlib
 import json
 import pandas as pd
 import dreams_core.core as dc
 
+# pylint: disable=E0401  # unable to import modules from parent folders
+# pylint: disable=C0413  # wrong import position
 # project files
 import utils as u
-import training_data as td
 import coin_wallet_metrics as cwm
 import feature_engineering as fe
 import modeling as m
+sys.path.append('..')
+from training_data import data_retrieval as dr
+from training_data import profits_row_imputation as ri
+
+
 
 # set up logger at the module level
 logger = dc.setup_logger()
@@ -80,12 +87,13 @@ def build_time_window_model_input(n, window, config, metrics_config, modeling_co
     end_date = config['training_data']['modeling_period_end']
 
     # Rebuild market data
-    market_data_df = td.retrieve_market_data()
+    market_data_df = dr.retrieve_market_data()
     market_data_df, _ = cwm.split_dataframe_by_coverage(market_data_df, start_date, end_date, id_column='coin_id')
     prices_df = market_data_df[['coin_id','date','price']].copy()
 
     # Retrieve macro trends data
-    google_trends_df = td.retrieve_google_trends_data()
+    macro_trends_df = dr.retrieve_macro_trends_data()
+    macro_trends_df = cwm.generate_macro_trends_features(macro_trends_df, config)
 
     # Rebuild profits_df
     if 'profits_df' not in locals():
@@ -96,7 +104,7 @@ def build_time_window_model_input(n, window, config, metrics_config, modeling_co
     X_train, X_test, y_train, y_test, returns_test = build_configured_model_input(
                                         profits_df,
                                         market_data_df,
-                                        google_trends_df,
+                                        macro_trends_df,
                                         config,
                                         metrics_config,
                                         modeling_config)
@@ -243,20 +251,20 @@ def rebuild_profits_df_if_necessary(config, prices_df, profits_df=None):
         logger.info("Config changes detected, rebuilding profits_df...")
 
     # retrieve profits data
-    profits_df = td.retrieve_profits_data(config['training_data']['training_period_start'],
+    profits_df = dr.retrieve_profits_data(config['training_data']['training_period_start'],
                                           config['training_data']['modeling_period_end'],
                                           config['data_cleaning']['minimum_wallet_inflows'])
     profits_df, _ = cwm.split_dataframe_by_coverage(profits_df,
                                                     config['training_data']['training_period_start'],
                                                     config['training_data']['modeling_period_end'],
                                                     id_column='coin_id')
-    profits_df, _ = td.clean_profits_df(profits_df, config['data_cleaning'])
+    profits_df, _ = dr.clean_profits_df(profits_df, config['data_cleaning'])
     dates_to_impute = [
         config['training_data']['training_period_end'],
         config['training_data']['modeling_period_start'],
         config['training_data']['modeling_period_end'],
     ]
-    profits_df = td.impute_profits_for_multiple_dates(
+    profits_df = ri.impute_profits_for_multiple_dates(
                     profits_df,
                     prices_df,
                     dates_to_impute,
@@ -313,7 +321,7 @@ def handle_hash(config_hash, temp_folder, operation='load'):
 def build_configured_model_input(
         profits_df,
         market_data_df,
-        google_trends_df,
+        macro_trends_df,
         config,
         metrics_config,
         modeling_config):
@@ -323,7 +331,7 @@ def build_configured_model_input(
     Args:
     - profits_df (DataFrame): DataFrame containing profits information for wallets.
     - market_data_df (DataFrame): DataFrame containing market data for coins.
-    - google_trends_df (DataFrame): DataFrame containing Google Trends data for coins.
+    - macro_trends_df (DataFrame): DataFrame containing macro trends data for dates.
     - config (dict): Overall configuration containing details for wallet cohorts and training
         data periods.
     - metrics_config (dict): Configuration for metric generation.
@@ -359,21 +367,19 @@ def build_configured_model_input(
             modeling_config)
     training_data_tuples.extend(wallet_cohort_tuples)
 
-    # Google trends features
-    dataset_name = 'google_trends'  # update to loop through all macro trends
-    google_trends_tuples, _ = fe.generate_macro_trends_features(
-            dataset_name,
-            google_trends_df,
+    # Macro trends features
+    macro_trends_tuples, _ = fe.generate_macro_trends_features(
+            macro_trends_df,
             config,
             metrics_config,
-            modeling_config)
-    training_data_tuples.extend(google_trends_tuples)
+            modeling_config
+        )
+    training_data_tuples.extend(macro_trends_tuples)
 
     # Merge all the features
     training_data_df, _ = fe.create_training_data_df(
                             modeling_config['modeling']['modeling_folder'],
                             training_data_tuples)
-
 
 
     # 2. Add target variable to training_data_df
