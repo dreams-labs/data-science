@@ -441,7 +441,7 @@ def retrieve_macro_trends_data():
     macro_trends_df['date'] = pd.to_datetime(macro_trends_df['date'])
 
     # Resample the df to fill in missing days by using date as the index
-    macro_trends_df.set_index('date', inplace=True)
-    macro_trends_df.resample('D').interpolate(method='time', limit_area='inside')
+    macro_trends_df = macro_trends_df.set_index('date')
+    macro_trends_df = macro_trends_df.resample('D').interpolate(method='time', limit_area='inside')
 
     return macro_trends_df

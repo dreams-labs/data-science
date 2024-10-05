@@ -77,7 +77,7 @@ class TimeSeriesValueColumn(RootModel[Dict[str, 'Metric']]):
 
 # Macro Trends Metrics
 # -------------------
-class MacroTrendsValueColumn(RootModel[Dict[str, 'Metric']]):
+class MacroTrendsValueColumn(RootModel['Metric']):
     """
     Represents a dataset that contains a value_column such as price, volume, etc. and their
     corresponding metrics flattening definitions.

@@ -1,8 +1,6 @@
 """
 functions used to build coin-level features from training data
 """
-# pylint: disable=C0302  # over 1000 lines
-
 import os
 import logging
 from datetime import datetime
