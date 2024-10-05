@@ -105,24 +105,18 @@ time_series:
 # Time series keyed on only date
 macro_trends:
 
-  google_trends:
+  all_trends:
     altcoin_worldwide:
-      aggregations:
-        last:
-          scaling: "none"
       rolling:
         comparisons:
           pct_change:
             scaling: "none"
-        window_duration: 15
+        window_duration: 10
         lookback_periods: 3
     cryptocurrency_worldwide:
-      aggregations:
-        last:
-          scaling: "none"
       rolling:
         comparisons:
           pct_change:
             scaling: "none"
-        window_duration: 15
+        window_duration: 10
         lookback_periods: 3

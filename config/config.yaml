@@ -67,7 +67,7 @@ datasets:
   # Keyed on only date
   macro_trends:
 
-    google_trends:
+    all_trends:
       cryptocurrency_worldwide:
         description: 'cryptocurrency_worldwide'
         fill_method: 'extend'
