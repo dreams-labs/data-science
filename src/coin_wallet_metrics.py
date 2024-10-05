@@ -514,3 +514,63 @@ def calculate_sma(timeseries: pd.Series, period: int) -> pd.Series:
 def calculate_ema(timeseries: pd.Series, period: int) -> pd.Series:
     """Calculates Exponential Moving Average (EMA) for a given time series."""
     return timeseries.ewm(span=period, adjust=False).mean()
+
+
+
+
+def generate_coin_metadata_features(metadata_df, config):
+    """
+    Generate model-friendly coin metadata features.
+
+    Args:
+    - metadata_df: DataFrame containing coin_id, categories, and chain information.
+    - config: Configuration dict that includes the chain threshold.
+
+    Returns:
+    - A DataFrame with coin_id, boolean category columns, and boolean chain columns.
+    """
+    metadata_df = metadata_df.copy()
+
+    # Step 1: Create boolean columns for each unique category
+    logger.debug("Creating boolean columns for each category...")
+
+    # Get all unique categories from the categories column
+    all_categories = set(cat for sublist in metadata_df['categories'] for cat in sublist)
+
+    # Create boolean columns for each category
+    for category in all_categories:
+        column_name = f"category_{category.lower()}"
+        metadata_df[column_name] = metadata_df['categories'].apply(
+            lambda cats, category=category: category.lower() in [c.lower() for c in cats]
+        )
+
+    # Step 2: Process chain data and apply threshold
+    logger.debug("Processing chain data and applying chain threshold...")
+
+    # Lowercase chain values
+    metadata_df['chain'] = metadata_df['chain'].str.lower()
+
+    # Count number of coins per chain
+    chain_counts = metadata_df['chain'].value_counts()
+    chain_threshold = config['datasets']['coin_facts']['coin_metadata']['chain_threshold']
+
+    # Create boolean columns for chains above the threshold
+    for chain, count in chain_counts.items():
+        if count >= chain_threshold:
+            metadata_df[f'chain_{chain}'] = metadata_df['chain'] == chain
+
+    # Create chain_other column for chains below the threshold or missing chain data
+    metadata_df['chain_other'] = metadata_df['chain'].apply(
+        lambda x: chain_counts.get(x, 0) < chain_threshold if pd.notna(x) else True
+    )
+
+    # Step 3: Return the final DataFrame with boolean columns
+    # Keep only relevant columns
+    columns_to_keep = ['coin_id'] + [
+        col for col in metadata_df.columns
+        if col.startswith('category_') or col.startswith('chain_')
+    ]
+    metadata_features_df = metadata_df[columns_to_keep].copy()
+    logger.info("Generated coin_metadata_features_df.")
+
+    return metadata_features_df

@@ -67,7 +67,7 @@ datasets:
   # Keyed on only date
   macro_trends:
 
-    cryptocurrency_worldwide:
+    gtrends_cryptocurrency_worldwide:
       description: 'cryptocurrency_worldwide'
       fill_method: 'extend'
     btc_cdd_terminal_adjusted_90dma:
