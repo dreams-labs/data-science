@@ -101,6 +101,18 @@ def load_config(file_path='../notebooks/config.yaml'):
     return config
 
 
+def load_all_configs(config_folder):
+    """
+    Loads and returns all config files
+    """
+    config = load_config(f'{config_folder}/config.yaml')
+    metrics_config = load_config(f'{config_folder}/metrics_config.yaml')
+    modeling_config = load_config(f'{config_folder}/modeling_config.yaml')
+    experiments_config = load_config(f'{config_folder}/experiments_config.yaml')
+
+    return config, metrics_config, modeling_config, experiments_config
+
+
 
 def timing_decorator(func):
     """
@@ -290,4 +302,3 @@ def log_nan_counts(df):
         log_message = "No NaN values found in any column."
 
     logger.critical(log_message)
-
