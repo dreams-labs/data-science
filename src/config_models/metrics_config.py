@@ -34,7 +34,7 @@ class MetricsConfig(NoExtrasBaseModel):
     """
     wallet_cohorts: Optional[Dict[str, 'WalletCohort']] = Field(default=None)
     time_series: Optional[Dict[str, 'TimeSeriesValueColumn']] = Field(default=None)
-    macro_trends: Optional[Dict[str, 'MacroTrendsValueColumn']] = Field(default=None)
+    macro_trends: Optional[Dict['MacroTrendMetric', 'Metric']] = Field(default=None)
 
 
 # Wallet Cohort Metrics
@@ -77,14 +77,32 @@ class TimeSeriesValueColumn(RootModel[Dict[str, 'Metric']]):
 
 # Macro Trends Metrics
 # -------------------
-class MacroTrendsValueColumn(RootModel[Dict[str, 'Metric']]):
+class MacroTrendMetric(str, Enum):
     """
-    Represents a dataset that contains a value_column such as price, volume, etc. and their
-    corresponding metrics flattening definitions.
+    A list of all valid names of macro trend metrics.
+    """
+    BTC_PRICE = "btc_price"
+    BTC_CDD_TERMINAL_ADJUSTED_90DMA = "btc_cdd_terminal_adjusted_90dma"
+    BTC_FEAR_AND_GREED = "btc_fear_and_greed"
+    BTC_MVRV_Z_SCORE = "btc_mvrv_z_score"
+    BTC_VDD_MULTIPLE = "btc_vdd_multiple"
+    GLOBAL_MARKET_CAP = "global_market_cap"
+    GLOBAL_VOLUME = "global_volume"
+    GTRENDS_ALTCOIN_WORLDWIDE = "gtrends_altcoin_worldwide"
+    GTRENDS_CRYPTOCURRENCY_WORLDWIDE = "gtrends_cryptocurrency_worldwide"
+    GTRENDS_SOLANA_US = "gtrends_solana_us"
+    GTRENDS_CRYPTOCURRENCY_US = "gtrends_cryptocurrency_us"
+    GTRENDS_BITCOIN_US = "gtrends_bitcoin_us"
+    GTRENDS_SOLANA_WORLDWIDE = "gtrends_solana_worldwide"
+    GTRENDS_COINBASE_US = "gtrends_coinbase_us"
+    GTRENDS_BITCOIN_WORLDWIDE = "gtrends_bitcoin_worldwide"
+    GTRENDS_ETHEREUM_WORLDWIDE = "gtrends_ethereum_worldwide"
+    GTRENDS_ETHEREUM_US = "gtrends_ethereum_us"
+    GTRENDS_ALTCOIN_US = "gtrends_altcoin_us"
+    GTRENDS_COINBASE_WORLDWIDE = "gtrends_coinbase_worldwide"
+    GTRENDS_MEMECOIN_WORLDWIDE = "gtrends_memecoin_worldwide"
+    GTRENDS_MEMECOIN_US = "gtrends_memecoin_us"
 
-    RootModel is used to define a class that acts as a wrapper around a dictionary.
-    """
-    pass
 
 
 

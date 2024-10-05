@@ -3,7 +3,7 @@ preprocessing:
 
 target_variables:
   moon_threshold: 0.25  # Minimum price % increase for a coin to be is_moon
-  moon_minimum_percent: 0.1  # Minimum percentage of coins tagged as is_moon
+  moon_minimum_percent: 0.05  # Minimum percentage of coins tagged as is_moon
   #   # If the % of coins that meet the moon_threshold is below this
   #   # value, additional coins are added in order of price performance
   #   # until this % is reached
@@ -14,20 +14,23 @@ target_variables:
   #   # until this % is reached
 
 modeling:
-  target_column: "is_moon"  # "is_moon" or "is_crater" depending on the experiment
+  # model_type: "GradientBoostingRegressor"
+  model_type: "RandomForestRegressor"
+  # model_type: "RandomForestClassifier"
+  # model_params:
+  #   n_estimators: 100  # Number of trees in the model
+
+  # target_column: "is_moon"  # "is_moon" or "is_crater" depending on the experiment
+  target_column: "returns"  # "is_moon" or "is_crater" depending on the experiment
+
+
   modeling_folder: "..//modeling"  # location of the modeling folder where outputs will be saved
   config_folder: "..//config"  # location of the config folder where base case config files are
   train_test_split: 0.25  # Size of the test set as a proportion of the data
   random_state: 3  # Random seed for reproducibility
 
-  # model_type: "GradientBoostingRegressor"
-  # model_type: "RandomForestRegressor"
-  model_type: "RandomForestClassifier"
-  # model_params:
-  #   n_estimators: 100  # Number of trees in the model
-
 evaluation:
-  winsorization_cutoff: 0.05
+  winsorization_cutoff: 0.01
   metrics:
   # # Classifier Metrics
     accuracy:

@@ -101,6 +101,72 @@ def load_config(file_path='../notebooks/config.yaml'):
     return config
 
 
+def load_all_configs(config_folder):
+    """
+    Loads and returns all config files
+    """
+    config = load_config(f'{config_folder}/config.yaml')
+    metrics_config = load_config(f'{config_folder}/metrics_config.yaml')
+    modeling_config = load_config(f'{config_folder}/modeling_config.yaml')
+    experiments_config = load_config(f'{config_folder}/experiments_config.yaml')
+
+    # Confirm that all datasets and metrics match across config and metrics_config
+    validate_config_consistency(config,metrics_config)
+
+    return config, metrics_config, modeling_config, experiments_config
+
+
+def validate_config_consistency(config,metrics_config):
+    """
+    Validates the consistency between config.yaml and metrics_config.yaml.
+
+    Args:
+        config (Dict[str, Any]): Loaded config.yaml.
+        metrics_config (Dict[str, Any]): Loaded metrics_config.yaml.
+
+    Raises:
+        ValueError: If there are inconsistencies between the configs.
+    """
+    config_datasets = config.get('datasets', {})
+
+    # Check if top-level keys match
+    config_dataset_keys = set(config_datasets.keys())
+    metrics_config_keys = set(metrics_config.keys())
+
+    missing_in_metrics = config_dataset_keys - metrics_config_keys
+    missing_in_config = metrics_config_keys - config_dataset_keys
+
+    if missing_in_metrics or missing_in_config:
+        error_msg = []
+        if missing_in_metrics:
+            error_msg.append(f"Missing in metrics_config.yaml: {', '.join(missing_in_metrics)}")
+        if missing_in_config:
+            error_msg.append(f"Missing in config.yaml datasets: {', '.join(missing_in_config)}")
+        raise ValueError("Inconsistency between config files:\n" + "\n".join(error_msg))
+
+    # Check if next-level keys match for each top-level key
+    for key in config_dataset_keys:
+        if key not in metrics_config:
+            continue  # This case is already handled in the top-level check
+
+        config_subkeys = set(config_datasets[key].keys())
+        metrics_subkeys = set(metrics_config[key].keys())
+
+        missing_in_metrics = config_subkeys - metrics_subkeys
+        missing_in_config = metrics_subkeys - config_subkeys
+
+        if missing_in_metrics or missing_in_config:
+            error_msg = []
+            if missing_in_metrics:
+                error_msg.append(f"Missing in metrics_config.yaml[{key}]: {', '.join(missing_in_metrics)}")
+            if missing_in_config:
+                error_msg.append(f"Missing in config.yaml datasets[{key}]: {', '.join(missing_in_config)}")
+            raise ValueError(f"Inconsistency in {key}:\n" + "\n".join(error_msg))
+
+    # If we've made it this far, the configs are consistent
+    logger.debug("Config files are consistent.")
+
+
 
 def timing_decorator(func):
     """
@@ -290,4 +356,3 @@ def log_nan_counts(df):
         log_message = "No NaN values found in any column."
 
     logger.critical(log_message)
-

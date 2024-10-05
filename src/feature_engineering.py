@@ -1,8 +1,6 @@
 """
 functions used to build coin-level features from training data
 """
-# pylint: disable=C0302  # over 1000 lines
-
 import os
 import logging
 from datetime import datetime
@@ -162,7 +160,6 @@ def generate_wallet_cohort_features(
 
 
 def generate_macro_trends_features(
-        dataset_name,
         dataset_df,
         config,
         metrics_config,
@@ -174,8 +171,6 @@ def generate_macro_trends_features(
     use flatten_date_features() instead of convert_dataset_metrics_to_features().
 
     Params:
-    - dataset_name (string): the key of the dataset,
-        e.g. config['datasets']['macro_trends'][{dataset_name}]
     - dataset_df (pd.DataFrame): the dataframe containing the columns with defined metrics,
         e.g. a column for each of metrics_config['time_series'][{dataset_name}].keys()
     - config (dict): config.yaml
@@ -192,7 +187,7 @@ def generate_macro_trends_features(
     # function variables we want to reference
     dataset_category = 'macro_trends'
     id_column=None
-    dataset_metrics_config = metrics_config[dataset_category][dataset_name]
+    dataset_metrics_config = metrics_config[dataset_category]
 
     # Model-ready tuples and dfs will go here
     training_data_tuples = []
@@ -203,10 +198,9 @@ def generate_macro_trends_features(
     for value_column in list(dataset_metrics_config.keys()):
 
         # a value_column-specific df will be used for feature generation
-        value_column_config = config['datasets'][dataset_category][dataset_name][value_column]
+        value_column_config = config['datasets'][dataset_category][value_column]
         value_column_metrics_config = dataset_metrics_config[value_column]
         value_column_df = dataset_df[['date',value_column]].copy()
-
         # check if there are any time series indicators to add, e.g. sma, ema, etc
         if 'indicators' in value_column_metrics_config:
             value_column_metrics_df, _ = cwm.generate_time_series_indicators(
@@ -253,15 +247,14 @@ def generate_macro_trends_features(
         )
 
         macro_trends_tuple = (macro_trends_preprocessed_filepath.split('preprocessed_outputs/')[1],
-                              value_column_config['fill_method'])
-        logger.info('Generated features for %s.%s.%s',
-                    dataset_category, dataset_name, value_column)
+                                value_column_config['fill_method'])
+        logger.info('Generated features for %s.%s',
+                    dataset_category, value_column)
 
         training_data_tuples.append(macro_trends_tuple)
         training_data_dfs.append(macro_trends_preprocessed_df)
 
     return training_data_tuples, training_data_dfs
-
 
 
 

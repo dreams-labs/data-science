@@ -67,13 +67,19 @@ datasets:
   # Keyed on only date
   macro_trends:
 
-    google_trends:
-      cryptocurrency_worldwide:
-        description: 'cryptocurrency_worldwide'
-        fill_method: 'extend'
-      altcoin_worldwide:
-        description: 'altcoin_worldwide'
-        fill_method: 'extend'
+    gtrends_cryptocurrency_worldwide:
+      description: 'cryptocurrency_worldwide'
+      fill_method: 'extend'
+    btc_mvrv_z_score:
+      description: 'btc_mvrv_z_score'
+      fill_method: 'extend'
+    btc_vdd_multiple:
+      description: 'btc_vdd_multiple'
+      fill_method: 'extend'
+    global_volume:
+      description: 'global_volume'
+      fill_method: 'extend'
+
 
 data_cleaning:
   # Variables used to clean and filter raw data before training data is built

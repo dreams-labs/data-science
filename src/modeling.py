@@ -102,7 +102,7 @@ def split_model_input(model_input_df, target_column, test_size=0.2, random_state
 
 
 @timing_decorator
-def train_model(X_train, y_train, modeling_folder, modeling_config):
+def train_model(X_train, y_train, modeling_config):
     """
     Trains a model (classifier or regressor) on the training data and saves the model, logs, and feature importance.
     Uses a UUID to uniquely identify the model files.
@@ -110,7 +110,6 @@ def train_model(X_train, y_train, modeling_folder, modeling_config):
     Args:
     - X_train (pd.DataFrame): The training features.
     - y_train (pd.Series): The training target.
-    - modeling_folder (str): The base folder for saving models, logs, and feature importance.
     - modeling_config (dict): modeling_config.yaml
 
     Returns:
@@ -119,6 +118,7 @@ def train_model(X_train, y_train, modeling_folder, modeling_config):
     """
     # Generate a UUID for this model instance
     model_id = str(uuid.uuid4())
+    modeling_folder = modeling_config['modeling']['modeling_folder']
 
     # Initialize model with default params if none provided
     model_params = modeling_config["modeling"].get("model_params", None)
