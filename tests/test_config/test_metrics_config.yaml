@@ -105,24 +105,67 @@ time_series:
 # Time series keyed on only date
 macro_trends:
 
-  google_trends:
-    altcoin_worldwide:
-      aggregations:
-        last:
+  gtrends_cryptocurrency_worldwide:
+    aggregations:
+      last:
+        scaling: "none"
+  btc_cdd_terminal_adjusted_90dma:
+    aggregations:
+      last:
+        scaling: "none"
+    rolling:
+      comparisons:
+        pct_change:
           scaling: "none"
-      rolling:
-        comparisons:
-          pct_change:
-            scaling: "none"
-        window_duration: 15
-        lookback_periods: 3
-    cryptocurrency_worldwide:
-      aggregations:
-        last:
+      window_duration: 15
+      lookback_periods: 2
+  btc_fear_and_greed:
+    aggregations:
+      last:
+        scaling: "none"
+    rolling:
+      comparisons:
+        pct_change:
           scaling: "none"
-      rolling:
-        comparisons:
-          pct_change:
-            scaling: "none"
-        window_duration: 15
-        lookback_periods: 3
+      window_duration: 15
+      lookback_periods: 2
+  btc_mvrv_z_score:
+    aggregations:
+      last:
+        scaling: "none"
+    rolling:
+      comparisons:
+        pct_change:
+          scaling: "none"
+      window_duration: 15
+      lookback_periods: 2
+  btc_vdd_multiple:
+    aggregations:
+      last:
+        scaling: "none"
+    rolling:
+      comparisons:
+        pct_change:
+          scaling: "none"
+      window_duration: 15
+      lookback_periods: 2
+  global_market_cap:
+    aggregations:
+      last:
+        scaling: "none"
+    rolling:
+      comparisons:
+        pct_change:
+          scaling: "none"
+      window_duration: 15
+      lookback_periods: 2
+  global_volume:
+    aggregations:
+      last:
+        scaling: "none"
+    rolling:
+      comparisons:
+        pct_change:
+          scaling: "none"
+      window_duration: 15
+      lookback_periods: 2

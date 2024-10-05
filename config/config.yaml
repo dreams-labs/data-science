@@ -70,23 +70,14 @@ datasets:
     gtrends_cryptocurrency_worldwide:
       description: 'cryptocurrency_worldwide'
       fill_method: 'extend'
-    btc_cdd_terminal_adjusted_90dma:
-      description: 'btc_cdd_terminal_adjusted_90dmae'
-      fill_method: 'extend'
-    btc_fear_and_greed:
-      description: 'btc_fear_and_greed'
-      fill_method: 'extend'
-    global_market_cap:
-      description: 'global_market_cap'
-      fill_method: 'extend'
-    global_volume:
-      description: 'global_volume'
+    btc_mvrv_z_score:
+      description: 'btc_mvrv_z_score'
       fill_method: 'extend'
     btc_vdd_multiple:
       description: 'btc_vdd_multiple'
       fill_method: 'extend'
-    btc_mvrv_z_score:
-      description: 'btc_mvrv_z_score'
+    global_volume:
+      description: 'global_volume'
       fill_method: 'extend'
 
 
