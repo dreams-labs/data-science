@@ -179,10 +179,14 @@ def setup_modeling_folders(modeling_folder):
     os.makedirs(os.path.join(modeling_folder, "models"), exist_ok=True)
 
 @pytest.fixture
-def sample_modeling_config():
+def sample_modeling_config(modeling_folder):
+    """
+    Fixture that contains the bare bones of the modeling_config
+    """
     return {
         "modeling": {
-            "model_type": "RandomForestClassifier"
+            "model_type": "RandomForestClassifier",
+            "modeling_folder": modeling_folder
         }
     }
 
@@ -198,7 +202,7 @@ def test_basic_functionality(mock_open, mock_dump, sample_data, modeling_folder,
     X_train, y_train = sample_data
 
     # Call the function to test
-    model, model_id = m.train_model(X_train, y_train, modeling_folder, sample_modeling_config)
+    model, model_id = m.train_model(X_train, y_train, sample_modeling_config)
 
     # Assert the model is a RandomForestClassifier instance
     assert isinstance(model, RandomForestClassifier)
@@ -223,7 +227,7 @@ def test_custom_model_parameters(mock_open, mock_dump, sample_data, sample_model
     custom_params = {"n_estimators": 50, "random_state": 10}
     sample_modeling_config['modeling']['model_params'] = custom_params
 
-    model, model_id = m.train_model(X_train, y_train, modeling_folder, sample_modeling_config)
+    model, model_id = m.train_model(X_train, y_train, sample_modeling_config)
 
     # Assert the model is trained with custom parameters
     assert model.n_estimators == 50
@@ -240,8 +244,7 @@ def test_custom_model_parameters(mock_open, mock_dump, sample_data, sample_model
 @pytest.mark.unit
 @mock.patch('joblib.dump')
 @mock.patch('builtins.open', new_callable=mock.mock_open)
-def test_invalid_model_parameters(mock_open, mock_dump, sample_data, sample_modeling_config,
-                                  setup_modeling_folders, modeling_folder):
+def test_invalid_model_parameters(mock_open, mock_dump, sample_data, sample_modeling_config):
     """
     Test train_model with invalid model parameters.
     Ensures the function raises a TypeError when invalid parameters are passed.
@@ -252,7 +255,7 @@ def test_invalid_model_parameters(mock_open, mock_dump, sample_data, sample_mode
 
     # Expect TypeError due to invalid parameter
     with pytest.raises(TypeError):
-        m.train_model(X_train, y_train, modeling_folder, sample_modeling_config)
+        m.train_model(X_train, y_train, sample_modeling_config)
 
 # Unit Test: Feature Importance Validation
 @pytest.mark.unit
@@ -261,7 +264,7 @@ def test_invalid_model_parameters(mock_open, mock_dump, sample_data, sample_mode
 @mock.patch('joblib.dump')
 @mock.patch('builtins.open', new_callable=mock.mock_open)
 def test_feature_importance_validation(mock_open, mock_dump, mock_read_csv, mock_to_csv, sample_data,
-                                       sample_modeling_config, setup_modeling_folders, modeling_folder):
+                                       sample_modeling_config, modeling_folder):
     """
     Test the accuracy of feature importance saved by train_model.
     Ensures the saved feature importance matches the model's internal feature importance.
@@ -281,7 +284,7 @@ def test_feature_importance_validation(mock_open, mock_dump, mock_read_csv, mock
     mock_read_csv.return_value = expected_feature_importances
 
     # Call the function to test
-    model, model_id = m.train_model(X_train, y_train, modeling_folder, sample_modeling_config)
+    model, model_id = m.train_model(X_train, y_train, sample_modeling_config)
 
     # Mock reading the feature importance CSV file
     feature_importances_path = os.path.join(modeling_folder,
