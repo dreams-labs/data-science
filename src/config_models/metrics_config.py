@@ -34,6 +34,7 @@ class MetricsConfig(NoExtrasBaseModel):
     """
     wallet_cohorts: Optional[Dict[str, 'WalletCohort']] = Field(default=None)
     time_series: Optional[Dict[str, 'TimeSeriesValueColumn']] = Field(default=None)
+    macro_trends: Optional[Dict[str, 'MacroTrendsValueColumn']] = Field(default=None)
 
 
 # Wallet Cohort Metrics
@@ -65,6 +66,18 @@ class WalletCohort(RootModel[Dict['WalletCohortMetric', 'Metric']]):
 # Time Series Metrics
 # -------------------
 class TimeSeriesValueColumn(RootModel[Dict[str, 'Metric']]):
+    """
+    Represents a dataset that contains a value_column such as price, volume, etc. and their
+    corresponding metrics flattening definitions.
+
+    RootModel is used to define a class that acts as a wrapper around a dictionary.
+    """
+    pass
+
+
+# Macro Trends Metrics
+# -------------------
+class MacroTrendsValueColumn(RootModel[Dict[str, 'Metric']]):
     """
     Represents a dataset that contains a value_column such as price, volume, etc. and their
     corresponding metrics flattening definitions.

@@ -22,9 +22,9 @@ from dreams_core import core as dc
 # pyright: reportMissingImports=false
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 from utils import load_config
-import feature_engineering as fe
-import coin_wallet_metrics as cwm
-import insights as i
+# import feature_engineering as fe
+# import coin_wallet_metrics as cwm
+import insights.model_input_flows as mf
 
 load_dotenv()
 logger = dc.setup_logger()
@@ -85,7 +85,7 @@ def test_validate_experiments_yaml_success(tmpdir):
     config_folder.join("modeling_config.yaml").write(modeling_config)
 
     # Run the function and verify no errors
-    configurations = i.validate_experiments_yaml(str(config_folder))
+    configurations = mf.validate_experiments_yaml(str(config_folder))
 
     # Assert that both config and modeling_config sections are validated
     assert len(configurations) == 2  # Two sections: config and modeling_config
@@ -133,7 +133,7 @@ def test_validate_experiments_yaml_missing_file(tmpdir):
 
     # Verify that it raises FileNotFoundError for the missing config file
     with pytest.raises(FileNotFoundError, match="config_missing.yaml not found in"):
-        i.validate_experiments_yaml(str(config_folder))
+        mf.validate_experiments_yaml(str(config_folder))
 
 @pytest.mark.xfail
 # these will be redone once the next experiment is run
@@ -166,7 +166,7 @@ def test_validate_experiments_yaml_invalid_key(tmpdir):
 
     # Verify that it raises a ValueError for the invalid key
     with pytest.raises(ValueError, match="Key 'invalid_key' in variable_overrides not found in config.yaml"):
-        i.validate_experiments_yaml(str(config_folder))
+        mf.validate_experiments_yaml(str(config_folder))
 
 @pytest.mark.xfail
 # these will be redone once the next experiment is run
@@ -223,7 +223,7 @@ def test_prepare_configs_success(tmpdir):
     }
 
     # Run the function
-    config, metrics_config, modeling_config = i.prepare_configs(str(config_folder), override_params)
+    config, metrics_config, modeling_config = mf.prepare_configs(str(config_folder), override_params)
 
     # Assert the overrides were applied correctly
     assert config['data_cleaning']['inflows_filter'] == 10000000
@@ -284,32 +284,32 @@ def test_prepare_configs_failure(tmpdir):
 
     # Run the function and expect a KeyError
     with pytest.raises(KeyError, match="Key 'non_existent_filter' not found"):
-        i.prepare_configs(str(config_folder), override_params)
+        mf.prepare_configs(str(config_folder), override_params)
 
 
 # pytest: disable=C0116  # no docstrings in fixtures
 # ---------------------------------------------- #
 # rebuild_profits_df_if_necessary() unit tests
 # ---------------------------------------------- #
-# Mock DataFrame to simulate profits_df
 @pytest.fixture
 def mock_profits_df():
+    """Mock DataFrame to simulate profits_df"""
     return pd.DataFrame({
         'coin_id': ['coin1', 'coin2'],
         'wallet_address': ['wallet1', 'wallet2'],
         'profitability': [1000, 2000]
     })
 
-# Mock DataFrame to simulate prices_df
 @pytest.fixture
 def mock_prices_df():
+    """Mock DataFrame to simulate prices_df"""
     return pd.DataFrame({
         'prices': [100, 200, 300]
     })
 
-# Mock Configuration
 @pytest.fixture
 def mock_config():
+    """Mock Configuration"""
     return {
         'training_data': {
             'training_period_start': '2023-01-01',
@@ -323,10 +323,10 @@ def mock_config():
         }
     }
 
-@mock.patch('insights.td.retrieve_profits_data')
-@mock.patch('insights.cwm.split_dataframe_by_coverage')
-@mock.patch('insights.td.clean_profits_df')
-@mock.patch('insights.td.impute_profits_for_multiple_dates')
+@mock.patch('training_data.retrieve_profits_data')
+@mock.patch('coin_wallet_metrics.split_dataframe_by_coverage')
+@mock.patch('training_data.clean_profits_df')
+@mock.patch('training_data.impute_profits_for_multiple_dates')
 @pytest.mark.unit
 def test_rebuild_profits_df_if_necessary(
     mock_impute_profits, mock_clean_profits_df, mock_split_dataframe,
@@ -348,7 +348,7 @@ def test_rebuild_profits_df_if_necessary(
     os.makedirs(temp_folder)
 
     # Call the function to trigger the rebuild
-    new_profits_df = i.rebuild_profits_df_if_necessary(mock_config, str(temp_dir), mock_prices_df, profits_df=None)
+    new_profits_df = mf.rebuild_profits_df_if_necessary(mock_config, mock_prices_df, profits_df=None)
 
     # Assertions
     mock_retrieve_profits_data.assert_called_once_with(
@@ -380,30 +380,25 @@ def test_rebuild_profits_df_if_necessary(
 # Test using pytest timeout decorator
 @pytest.mark.timeout(1)  # Set timeout limit of 1 second
 @pytest.mark.unit
-def test_return_cached_profits_df(mock_config, mock_profits_df, mock_prices_df, tmpdir):
+def test_return_cached_profits_df(mock_config, mock_profits_df, mock_prices_df):
     """
     Test the case where the config has not changed and the cached profits_df is returned from memory.
     """
 
-    # Create a temporary folder for hash checking
-    temp_dir = tmpdir.mkdir("modeling")
-    temp_folder = os.path.join(temp_dir, "outputs/temp")
-    os.makedirs(temp_folder)
-
-    # Generate the correct hash for the mock_config using i.generate_config_hash
+    # Generate the correct hash for the mock_config using mf.generate_config_hash
     relevant_config = {**mock_config['training_data'], **mock_config['data_cleaning']}
-    correct_hash = i.generate_config_hash(relevant_config)
+    correct_hash = mf.generate_config_hash(relevant_config)
 
-    # Create a hash file that matches the mock_config
-    with open(os.path.join(temp_folder, 'config_hash.txt'), 'w', encoding='utf-8') as f:
-        f.write(correct_hash)
+    # Simulate the hash being cached in memory by directly assigning it to the global cache or the dictionary cache
+    mf.config_cache = {"hash": correct_hash}  # Use the cache dictionary instead of file-based hash
 
     # Call the function and verify the profits_df is returned from memory without rebuilding
     try:
-        returned_profits_df = i.rebuild_profits_df_if_necessary(mock_config, str(temp_dir), mock_prices_df, profits_df=mock_profits_df)
+        returned_profits_df = mf.rebuild_profits_df_if_necessary(mock_config, mock_prices_df, profits_df=mock_profits_df)
         assert returned_profits_df.equals(mock_profits_df)
     except Exception as e:  # pylint: disable = W0718
         pytest.fail(f"Test failed due to timeout: {str(e)}")
+
 
 # ======================================================== #
 #                                                          #
@@ -478,16 +473,16 @@ def profits_df():
 # ----------------------------------------------- #
 
 
-@pytest.mark.xfail
-# this function will be refactored after additional functionality is added \
-# to feature eng and modeling
-@pytest.mark.integration
-def test_build_configured_model_input(config, metrics_config, modeling_config, prices_df, profits_df):
-    """
-    Runs build_configured_model_input() with the provided config, metrics_config, modeling_config, prices_df,
-    and cleaned_profits_df, and ensures that no columns are inadvertently lost between the flattened
-    DataFrame and the final training feature set (X_train).
-    """
+# @pytest.mark.xfail
+# # this function will be refactored after additional functionality is added \
+# # to feature eng and modeling
+# @pytest.mark.integration
+# def test_build_configured_model_input(config, metrics_config, modeling_config, prices_df, profits_df):
+#     """
+#     Runs build_configured_model_input() with the provided config, metrics_config, modeling_config, prices_df,
+#     and cleaned_profits_df, and ensures that no columns are inadvertently lost between the flattened
+#     DataFrame and the final training feature set (X_train).
+#     """
 
     # # Override preprocessing/drop_features to have no columns specified
     # modeling_config['preprocessing']['drop_features'] = []
@@ -503,24 +498,24 @@ def test_build_configured_model_input(config, metrics_config, modeling_config, p
     #     cohort_wallets
     # )
 
-    # Retrieve the metrics configuration for the first df
-    _, df_metrics_config = next(iter(metrics_config['wallet_cohorts'].items()))
+    # # Retrieve the metrics configuration for the first df
+    # _, df_metrics_config = next(iter(metrics_config['wallet_cohorts'].items()))
 
 
-    flattened_buysell_metrics_df = fe.flatten_coin_date_df(
-        buysell_metrics_df,
-        df_metrics_config,
-        config['training_data']['training_period_end']
-    )
-    logger.debug(f"Shape of flattened_buysell_metrics_df: {flattened_buysell_metrics_df.shape}")
+    # flattened_buysell_metrics_df = fe.flatten_coin_date_df(
+    #     buysell_metrics_df,
+    #     df_metrics_config,
+    #     config['training_data']['training_period_end']
+    # )
+    # logger.debug(f"Shape of flattened_buysell_metrics_df: {flattened_buysell_metrics_df.shape}")
 
-    # Run build_configured_model_input
-    X_train, X_test, y_train, y_test = i.build_configured_model_input(
-        profits_df, prices_df, config, df_metrics_config, modeling_config
-    )
+    # # Run build_configured_model_input
+    # X_train, X_test, y_train, y_test = mf.build_configured_model_input(
+    #     profits_df, prices_df, config, df_metrics_config, modeling_config
+    # )
 
-    # Assert that the column count in flattened_buysell_metrics_df is 1 more than X_train
-    assert flattened_buysell_metrics_df.shape[1] == X_train.shape[1] + 1, \
-        "Column count mismatch: flattened_buysell_metrics_df should have 1 more column than X_train"
+    # # Assert that the column count in flattened_buysell_metrics_df is 1 more than X_train
+    # assert flattened_buysell_metrics_df.shape[1] == X_train.shape[1] + 1, \
+    #     "Column count mismatch: flattened_buysell_metrics_df should have 1 more column than X_train"
 
-    logger.debug(f"Shape of X_train: {X_train.shape}")
+    # logger.debug(f"Shape of X_train: {X_train.shape}")

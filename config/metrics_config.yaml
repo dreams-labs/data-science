@@ -10,7 +10,9 @@
 # lookback_periods:
 #   - Defines how many periods to look back when calculating rolling stats (e.g., 8 means calculate rolling stats over 8 previous periods)
 
+# Keyed on coin_id-date
 wallet_cohorts:
+
   whales:
     buyers_new:
       aggregations:
@@ -75,6 +77,7 @@ wallet_cohorts:
 
 # Time series keyed on coin_id-date
 time_series:
+
   market_data:
     price:
       rolling:
@@ -97,3 +100,29 @@ time_series:
       aggregations:
         last:
           scaling: "log"
+
+
+# Time series keyed on only date
+macro_trends:
+
+  google_trends:
+    altcoin_worldwide:
+      aggregations:
+        last:
+          scaling: "none"
+      rolling:
+        comparisons:
+          pct_change:
+            scaling: "none"
+        window_duration: 15
+        lookback_periods: 3
+    cryptocurrency_worldwide:
+      aggregations:
+        last:
+          scaling: "none"
+      rolling:
+        comparisons:
+          pct_change:
+            scaling: "none"
+        window_duration: 15
+        lookback_periods: 3

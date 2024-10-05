@@ -1,7 +1,7 @@
 """
 functions used to build coin-level features from training data
 """
-# pylint: disable=C0302
+# pylint: disable=C0302  # over 1000 lines
 
 import os
 import logging
@@ -76,14 +76,14 @@ def generate_time_series_features(
 
         else:
             # if no indicators are needed, pass through coins with complete date coverage
-            logging.getLogger().setLevel(logging.WARNING)
+            logging.getLogger().setLevel(logging.WARNING) # raise level to avoid INFO logs about this split
             value_column_metrics_df, _ = cwm.split_dataframe_by_coverage(
                 value_column_df,
                 config['training_data']['training_period_start'],
                 config['training_data']['training_period_end'],
                 id_column='coin_id'
             )
-            logging.getLogger().setLevel(logging.INFO)
+            logging.getLogger().setLevel(logging.INFO) # reset to INFO, could be updated to use original level
 
         # generate features from the metrics
         value_column_features_df, value_column_tuple = convert_dataset_metrics_to_features(
@@ -158,6 +158,110 @@ def generate_wallet_cohort_features(
         wallet_data_dfs.append(dataset_features_df)
 
     return wallet_cohort_tuples, wallet_data_dfs
+
+
+
+def generate_macro_trends_features(
+        dataset_name,
+        dataset_df,
+        config,
+        metrics_config,
+        modeling_config
+    ):
+    """
+    Generates features for a macro series datasets. The primary difference between this and
+    generate_time_series_features() are that these datasets do not have coin_ids, and so
+    use flatten_date_features() instead of convert_dataset_metrics_to_features().
+
+    Params:
+    - dataset_name (string): the key of the dataset,
+        e.g. config['datasets']['macro_trends'][{dataset_name}]
+    - dataset_df (pd.DataFrame): the dataframe containing the columns with defined metrics,
+        e.g. a column for each of metrics_config['time_series'][{dataset_name}].keys()
+    - config (dict): config.yaml
+    - metrics_config (dict): metrics_config.yaml
+    - modeling_config (dict): modeling_config.yaml
+
+    Returns:
+    - training_data_tuples (list of tuples): Each tuple contains the preprocessed file name
+        and fill method for the value column contained in dataset_metrics_config, formatted for
+        input to fe.create_training_data_df().
+    - training_data_dfs (list of pd.DataFrames): A list of preprocessed DataFrames for each
+        value_column included in the dataset_metrics_config.
+        """
+    # function variables we want to reference
+    dataset_category = 'macro_trends'
+    id_column=None
+    dataset_metrics_config = metrics_config[dataset_category][dataset_name]
+
+    # Model-ready tuples and dfs will go here
+    training_data_tuples = []
+    training_data_dfs = []
+
+
+    # calculate metrics for each value column
+    for value_column in list(dataset_metrics_config.keys()):
+
+        # a value_column-specific df will be used for feature generation
+        value_column_config = config['datasets'][dataset_category][dataset_name][value_column]
+        value_column_metrics_config = dataset_metrics_config[value_column]
+        value_column_df = dataset_df[['date',value_column]].copy()
+
+        # check if there are any time series indicators to add, e.g. sma, ema, etc
+        if 'indicators' in value_column_metrics_config:
+            value_column_metrics_df, _ = cwm.generate_time_series_indicators(
+                value_column_df,
+                config,
+                value_column_metrics_config['indicators'],
+                value_column,
+                id_column
+            )
+
+        else:
+            # if no indicators are needed, pass through coins with complete date coverage
+            logging.getLogger().setLevel(logging.WARNING) # suppress INFO logs about splits
+            value_column_metrics_df, _ = cwm.split_dataframe_by_coverage(
+                value_column_df,
+                config['training_data']['training_period_start'],
+                config['training_data']['training_period_end'],
+                id_column
+            )
+            logging.getLogger().setLevel(logging.INFO) # could be updated to use original level
+
+
+        # flatten metrics
+        flattened_features = flatten_date_features(value_column_metrics_df,dataset_metrics_config)
+        flattened_macro_trends_df = pd.DataFrame([flattened_features])
+
+        # save flattened metrics
+        flattened_macro_trends_df, flattened_macro_trends_filepath = save_flattened_outputs(
+            flattened_macro_trends_df,
+            os.path.join(
+                modeling_config['modeling']['modeling_folder'],  # Folder to store flattened outputs
+                'outputs/flattened_outputs'
+            ),
+            value_column_config['description'],  # Descriptive metadata for the dataset
+            config['training_data']['modeling_period_start']  # Ensure data starts from modeling period
+        )
+
+        # preprocess metrics
+        macro_trends_preprocessed_df, macro_trends_preprocessed_filepath = preprocess_coin_df(
+            flattened_macro_trends_filepath
+            ,modeling_config
+            ,value_column_config
+            ,value_column_metrics_config
+        )
+
+        macro_trends_tuple = (macro_trends_preprocessed_filepath.split('preprocessed_outputs/')[1],
+                              value_column_config['fill_method'])
+        logger.info('Generated features for %s.%s.%s',
+                    dataset_category, dataset_name, value_column)
+
+        training_data_tuples.append(macro_trends_tuple)
+        training_data_dfs.append(macro_trends_preprocessed_df)
+
+    return training_data_tuples, training_data_dfs
+
 
 
 
@@ -882,14 +986,14 @@ def merge_and_fill_training_data(
         if 'coin_id' in df.columns:
             all_coin_ids.update(df['coin_id'].unique())
 
-    # Start merging with the full set of coin_ids in a DataFrame
+    # Makes a new df with all coin_ids in a column
     training_data_df = pd.DataFrame(all_coin_ids, columns=['coin_id'])
 
     # Iterate through df_list and merge each one
     for df, fill_strategy, filename in df_list:
 
         # if the df is a macro_series without a coin_id, cross join it to all coin_ids
-        if fill_strategy == 'expand':
+        if fill_strategy == 'extend':
             original_coin_ids = set()
             training_data_df = training_data_df.merge(df, how='cross')
 

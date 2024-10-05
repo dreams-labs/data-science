@@ -8,6 +8,10 @@ training_data:
   modeling_period_duration: 15    # Duration of the modeling period in days
   training_period_duration: 45    # Duration of the training period in days
 
+  # The entire training data generation pipeline will be run for this many additional \
+  # windows, with the periods moved back the full modeling+training duration time
+  additional_windows: 1
+
 datasets:
 
   # Keyed on coin_id-date
@@ -50,16 +54,26 @@ datasets:
         fill_method: 'drop_records'
         sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
 
-  # Keyed on only coin_id
-  coin_facts:
+  # # Keyed on only coin_id
+  # coin_facts:
 
-    coin_metadata:
-      description: 'metadata'  # prefix that will be included in feature columns
-      fill_method: 'drop_records'
-      sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
-      chain_threshold: 30  # Minimum coins associated with a chain for the chain to become a boolean feature
+  #   coin_metadata:
+  #     description: 'metadata'  # prefix that will be included in feature columns
+  #     fill_method: 'drop_records'
+  #     sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
+  #     chain_threshold: 30  # Minimum coins associated with a chain for the chain to become a boolean feature
 
 
+  # Keyed on only date
+  macro_trends:
+
+    google_trends:
+      cryptocurrency_worldwide:
+        description: 'cryptocurrency_worldwide'
+        fill_method: 'fill_zeros'
+      altcoin_worldwide:
+        description: 'altcoin_worldwide'
+        fill_method: 'fill_zeros'
 
 data_cleaning:
   # Variables used to clean and filter raw data before training data is built

@@ -247,14 +247,14 @@ def evaluate_model(model, X_test, y_test, model_id, returns_test, modeling_confi
         if "profitability_auc" in metrics_request:
             metrics_dict["profitability_auc"] = calculate_profitability_auc(
                                                         y_pred_prob,
-                                                        returns_test,
+                                                        returns_test['returns'],
                                                         metrics_request["profitability_auc"]["top_percentage_filter"],
                                                         modeling_config["evaluation"]["winsorization_cutoff"]
                                                         )
         if "downside_profitability_auc" in metrics_request:
             metrics_dict["downside_profitability_auc"] = calculate_downside_profitability_auc(
                                                         y_pred_prob,
-                                                        returns_test,
+                                                        returns_test['returns'],
                                                         metrics_request["profitability_auc"]["top_percentage_filter"],
                                                         modeling_config["evaluation"]["winsorization_cutoff"]
                                                         )
@@ -274,14 +274,14 @@ def evaluate_model(model, X_test, y_test, model_id, returns_test, modeling_confi
         if "profitability_auc" in metrics_request:
             metrics_dict["profitability_auc"] = calculate_profitability_auc(
                                                         y_pred,
-                                                        returns_test,
+                                                        returns_test['returns'],
                                                         metrics_request["profitability_auc"]["top_percentage_filter"],
                                                         modeling_config["evaluation"]["winsorization_cutoff"]
                                                         )
         if "downside_profitability_auc" in metrics_request:
             metrics_dict["downside_profitability_auc"] = calculate_downside_profitability_auc(
                                                         y_pred,
-                                                        returns_test,
+                                                        returns_test['returns'],
                                                         metrics_request["profitability_auc"]["top_percentage_filter"],
                                                         modeling_config["evaluation"]["winsorization_cutoff"]
                                                         )
