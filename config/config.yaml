@@ -10,7 +10,7 @@ training_data:
 
   # The entire training data generation pipeline will be run for this many additional \
   # windows, with the periods moved back the full modeling+training duration time
-  additional_windows: 0
+  additional_windows: 1
 
 datasets:
 

@@ -7,7 +7,6 @@ functions used to perform high level analysis and performance assessments
 
 import os
 from datetime import timedelta
-import tempfile
 import hashlib
 import json
 import pandas as pd
@@ -215,62 +214,60 @@ def validate_key_in_config(config, key_path):
             f"Key '{keys[-1]}' not found in config at final level '{'.'.join(keys[:-1])}'")
 
 
-
+# Module level config_cache dictionary. Config hashes are stored here.
+config_cache = {"hash": None}
 
 def rebuild_profits_df_if_necessary(config, prices_df, profits_df=None):
     """
     Checks if the config has changed and reruns time-intensive steps if needed.
-
     Args:
     - config (dict): The config containing training_data and data_cleaning.
     - prices_df (DataFrame): The prices dataframe needed to compute profits_df.
     - profits_df (DataFrame, optional): The profits dataframe passed in memory.
-
     Returns:
     - profits_df (DataFrame): The profits dataframe.
     """
-    # Use a local temp folder for storing the hash
-    with tempfile.TemporaryDirectory() as temp_folder:
+    # Combine 'training_data' and 'data_cleaning' for a single hash
+    relevant_configs = {**config['training_data'], **config['data_cleaning']}
+    config_hash = generate_config_hash(relevant_configs)
 
-        # Combine 'training_data' and 'data_cleaning' for a single hash
-        relevant_configs = {**config['training_data'], **config['data_cleaning']}
-        config_hash = generate_config_hash(relevant_configs)
+    # If the hash hasn't changed and profits_df is passed, skip rerun
+    if config_hash == config_cache["hash"] and profits_df is not None:
+        logger.info("Using passed profits_df from memory.")
+        return profits_df
 
-        # Load the previous hash
-        previous_hash = handle_hash(config_hash, temp_folder, 'load')
+    # Otherwise, rerun time-intensive steps
+    if profits_df is None:
+        logger.info("No profits_df found, rebuilding profits_df...")
+    else:
+        logger.info("Config changes detected, rebuilding profits_df...")
 
-        # If the hash hasn't changed and profits_df is passed, skip rerun
-        if config_hash == previous_hash and profits_df is not None:
-            logger.info("Using passed profits_df from memory.")
-            return profits_df
+    # retrieve profits data
+    profits_df = td.retrieve_profits_data(config['training_data']['training_period_start'],
+                                          config['training_data']['modeling_period_end'],
+                                          config['data_cleaning']['minimum_wallet_inflows'])
+    profits_df, _ = cwm.split_dataframe_by_coverage(profits_df,
+                                                    config['training_data']['training_period_start'],
+                                                    config['training_data']['modeling_period_end'],
+                                                    id_column='coin_id')
+    profits_df, _ = td.clean_profits_df(profits_df, config['data_cleaning'])
+    dates_to_impute = [
+        config['training_data']['training_period_end'],
+        config['training_data']['modeling_period_start'],
+        config['training_data']['modeling_period_end'],
+    ]
+    profits_df = td.impute_profits_for_multiple_dates(
+                    profits_df,
+                    prices_df,
+                    dates_to_impute,
+                    n_threads=24)
 
-        # Otherwise, rerun time-intensive steps
-        logger.info("Config changes detected or missing profits_df, rebuilding profits_df...")
-
-        # retrieve profits data
-        profits_df = td.retrieve_profits_data(config['training_data']['training_period_start'],
-                                            config['training_data']['modeling_period_end'],
-                                            config['data_cleaning']['minimum_wallet_inflows'])
-        profits_df, _ = cwm.split_dataframe_by_coverage(profits_df,
-                                                        config['training_data']['training_period_start'],
-                                                        config['training_data']['modeling_period_end'],
-                                                        id_column='coin_id')
-        profits_df, _ = td.clean_profits_df(profits_df, config['data_cleaning'])
-        dates_to_impute = [
-            config['training_data']['training_period_end'],
-            config['training_data']['modeling_period_start'],
-            config['training_data']['modeling_period_end'],
-        ]
-        profits_df = td.impute_profits_for_multiple_dates(
-                        profits_df,
-                        prices_df,
-                        dates_to_impute,
-                        n_threads=24)
-
-        # Save the new hash for future runs
-        handle_hash(config_hash, temp_folder, 'save')
+    # Update the cache for future comparisons
+    config_cache["hash"] = config_hash
 
     return profits_df
+
+
 
 # helper function for rebuild_profits_df_if_necessary()
 def generate_config_hash(config):
