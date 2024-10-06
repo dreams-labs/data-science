@@ -126,7 +126,7 @@ class Metric(NoExtrasBaseModel):
         using Comparisons.
 
     * Indicator metrics are transformations that result in a new time series, e.g. SMA, EMA, RSI.
-        Indicator metrics can flattened through Aggregations or RollingMetrics.
+        Indicator metrics can be flattened through Aggregations or RollingMetrics.
 
     Finally, all of these types of metrics can be scaled using ScalingConfig after they've been
     calculated. Scaling is applied to the dataframe containing every coin_id's values for the
@@ -134,8 +134,30 @@ class Metric(NoExtrasBaseModel):
     """
     aggregations: Optional[Dict['AggregationType', 'AggregationConfig']] = Field(default=None)
     rolling: Optional['RollingMetrics'] = Field(default=None)
-    indicators: Optional[Dict['IndicatorType', 'Metric']] = Field(default=None)
-    parameters: Optional['IndicatorParameters'] = Field(default=None) # parameters for indicator metrics
+    indicators: Optional[Dict['IndicatorType', 'IndicatorConfig']] = Field(default=None)
+
+    @model_validator(mode='before')
+    def validate_indicators(cls, values):
+        """
+        Custom validation to ensure parameters match the indicator type (key).
+        """
+        indicators = values.get('indicators', {})
+
+        for indicator_type, config in indicators.items():
+            if indicator_type == IndicatorType.SMA:
+                SMAParameters(**config['parameters'])
+            elif indicator_type == IndicatorType.EMA:
+                EMAParameters(**config['parameters'])
+            elif indicator_type == IndicatorType.RSI:
+                RSIParameters(**config['parameters'])
+            elif indicator_type == IndicatorType.BOLLINGER_BANDS_UPPER:
+                BollingerBandsUpperParameters(**config['parameters'])
+            elif indicator_type == IndicatorType.BOLLINGER_BANDS_LOWER:
+                BollingerBandsLowerParameters(**config['parameters'])
+            else:
+                raise ValueError(f"Invalid indicator type: {indicator_type}")
+
+        return values
 
     @model_validator(mode='after')
     def remove_empty_fields(cls, values):
@@ -256,12 +278,30 @@ class IndicatorType(str, Enum):
     BOLLINGER_BANDS_UPPER = "bollinger_bands_upper"
     BOLLINGER_BANDS_LOWER = "bollinger_bands_lower"
 
+# Paramater requirements for each indicator
+class SMAParameters(NoExtrasBaseModel):
+    window: List[int]
 
-class IndicatorParameters(BaseModel):
+class EMAParameters(NoExtrasBaseModel):
+    window: List[int]
+
+class RSIParameters(NoExtrasBaseModel):
+    window: List[int]
+
+class BollingerBandsUpperParameters(NoExtrasBaseModel):
+    window: List[int]
+    num_std: Optional[float] = None  # defaults to 2
+
+class BollingerBandsLowerParameters(NoExtrasBaseModel):
+    window: List[int]
+    num_std: Optional[float] = None  # defaults to 2
+
+# Define the IndicatorConfig class that combines parameters and metrics
+class IndicatorConfig(Metric):
     """
-    Class enforcing that windows are entered as a list to support looping through them
+    Each Indicator needs to have parameters and some type of Metric() calculations
     """
-    window: Optional[List[int]] = None
+    parameters: Union[SMAParameters, EMAParameters, RSIParameters, BollingerBandsUpperParameters, BollingerBandsLowerParameters]
 
 
 # Modular Metrics: ScalingConfig

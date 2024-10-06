@@ -87,10 +87,18 @@ time_series:
         window_duration: 10
         lookback_periods: 5
       indicators:
-
         sma:
           parameters:
             window: [30,100]
+          aggregations:
+            last:
+              scaling: "none"
+          rolling:
+            aggregations:
+              sum:
+                scaling: "log"
+            window_duration: 10
+            lookback_periods: 3
         rsi:
           parameters:
             window: [14]
@@ -100,6 +108,18 @@ time_series:
         ema:
           parameters:
             window: [12,26]
+            num_std: 3
+          aggregations:
+            last:
+              scaling: "none"
+        bollinger_bands_upper:
+          parameters:
+            window: [20]
+            num_std: 2
+        bollinger_bands_lower:
+          parameters:
+            window: [20]
+            num_std: 2
 
     volume:
       rolling:
