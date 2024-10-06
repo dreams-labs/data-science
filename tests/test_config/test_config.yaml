@@ -4,13 +4,13 @@ training_data:
   # Defining the modeling and training periods (dates must follow YYYY-MM-DD format)
   # The modeling period end date and training period start and end dates are automatically
   # imputed using utils.py function calculate_period_dates() when load_config() is run
-  modeling_period_start: '2024-09-01'  # Start date for the modeling period
-  modeling_period_duration: 15    # Duration of the modeling period in days
-  training_period_duration: 45    # Duration of the training period in days
+  modeling_period_start: "2024-09-01"  # Start date for the modeling period
+  modeling_period_duration: 7    # Duration of the modeling period in days
+  training_period_duration: 30    # Duration of the training period in days
 
   # The entire training data generation pipeline will be run for this many additional \
   # windows, with the periods moved back the full modeling+training duration time
-  additional_windows: 1
+  additional_windows: 5
 
 datasets:
 
@@ -18,21 +18,21 @@ datasets:
   wallet_cohorts:
 
     whales:
-      description: 'cohort_whales'  # prefix that will be included in feature columns
-      fill_method: 'fill_zeros'
+      description: "cohort_whales"  # prefix that will be included in feature columns
+      fill_method: "fill_zeros"
       sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
-      wallet_minimum_inflows: 50000  # Minimum USD inflows for a wallet to be considered a 'shark'
-      wallet_maximum_inflows: 50000000  # Maximum USD inflows for a wallet to be considered a 'shark'
+      wallet_minimum_inflows: 50000  # Minimum USD inflows for a wallet to be considered a "shark"
+      wallet_maximum_inflows: 50000000  # Maximum USD inflows for a wallet to be considered a "shark"
       coin_profits_win_threshold: 3000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
       coin_return_win_threshold: 0.2  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
       wallet_min_coin_wins: 2  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
 
     normies:
-      description: 'cohort_normies'  # prefix that will be included in feature columns
-      fill_method: 'fill_zeros'
+      description: "cohort_normies"  # prefix that will be included in feature columns
+      fill_method: "fill_zeros"
       sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
-      wallet_minimum_inflows: 100  # Minimum USD inflows for a wallet to be considered a 'shark'
-      wallet_maximum_inflows: 10000  # Maximum USD inflows for a wallet to be considered a 'shark'
+      wallet_minimum_inflows: 100  # Minimum USD inflows for a wallet to be considered a "shark"
+      wallet_maximum_inflows: 10000  # Maximum USD inflows for a wallet to be considered a "shark"
       coin_profits_win_threshold: 0  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
       coin_return_win_threshold: 0  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
       wallet_min_coin_wins: 0  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
@@ -42,24 +42,24 @@ datasets:
 
     market_data:
       price:
-        description: 'price'  # prefix that will be included in feature columns
-        fill_method: 'drop_records'
-        sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
+        description: "price"  # prefix that will be included in feature columns
+        fill_method: "drop_records"
+        sameness_threshold: 1  # columns with more than this % of one value will be dropped
       volume:
-        description: 'volume'  # prefix that will be included in feature columns
-        fill_method: 'drop_records'
-        sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
+        description: "volume"  # prefix that will be included in feature columns
+        fill_method: "drop_records"
+        sameness_threshold: 1  # columns with more than this % of one value will be dropped
       market_cap:
-        description: 'market_cap'  # prefix that will be included in feature columns
-        fill_method: 'drop_records'
-        sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
+        description: "market_cap"  # prefix that will be included in feature columns
+        fill_method: "drop_records"
+        sameness_threshold: 1  # columns with more than this % of one value will be dropped
 
   # # Keyed on only coin_id
   # coin_facts:
 
   #   coin_metadata:
-  #     description: 'metadata'  # prefix that will be included in feature columns
-  #     fill_method: 'drop_records'
+  #     description: "metadata"  # prefix that will be included in feature columns
+  #     fill_method: "drop_records"
   #     sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
   #     chain_threshold: 30  # Minimum coins associated with a chain for the chain to become a boolean feature
 
@@ -68,26 +68,20 @@ datasets:
   macro_trends:
 
     gtrends_cryptocurrency_worldwide:
-      description: 'cryptocurrency_worldwide'
-      fill_method: 'extend'
-    btc_cdd_terminal_adjusted_90dma:
-      description: 'btc_cdd_terminal_adjusted_90dmae'
-      fill_method: 'extend'
-    btc_fear_and_greed:
-      description: 'btc_fear_and_greed'
-      fill_method: 'extend'
-    global_market_cap:
-      description: 'global_market_cap'
-      fill_method: 'extend'
-    global_volume:
-      description: 'global_volume'
-      fill_method: 'extend'
-    btc_vdd_multiple:
-      description: 'btc_vdd_multiple'
-      fill_method: 'extend'
+      description: "cryptocurrency_worldwide"
+      fill_method: "extend"
     btc_mvrv_z_score:
-      description: 'btc_mvrv_z_score'
-      fill_method: 'extend'
+      description: "btc_mvrv_z_score"
+      fill_method: "extend"
+    btc_vdd_multiple:
+      description: "btc_vdd_multiple"
+      fill_method: "extend"
+    global_volume:
+      description: "global_volume"
+      fill_method: "extend"
+    # global_market_cap:
+    #   description: "global_market_cap"
+    #   fill_method: "none"
 
 
 data_cleaning:
@@ -97,9 +91,10 @@ data_cleaning:
   profitability_filter: 15000000  # Exclude wallets with profits or losses greater than or equal to this amount (USD)
   inflows_filter: 10000000  # Exclude wallets with inflows greater than or equal to this amount (USD)
 
-  # prices_df filters: Define how to handle missing price data
-  max_gap_days: 10  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
+  # market_data_df filters: Define how to handle missing price data
+  max_gap_days: 25  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
+  min_daily_volume: 10000 # Minimum average daily volume the coin must have
   exclude_coins_without_transfers: True  # determines whether to create price features for coins without transfers data
 
-  # The amount of total USD inflows a wallet must have to be included in the training data
-  minimum_wallet_inflows: 10
+  # wallet filters: defines which wallets are included in analysis
+  minimum_wallet_inflows: 10 # The amount of total USD inflows a wallet must have to be included in the training data

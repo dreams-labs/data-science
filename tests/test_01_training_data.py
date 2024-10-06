@@ -22,7 +22,7 @@ from dreams_core import core as dc
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 import training_data.data_retrieval as dr
 import training_data.profits_row_imputation as ri
-import coin_wallet_metrics as cwm
+import coin_wallet_metrics.coin_wallet_metrics as cwm
 from utils import load_config
 
 load_dotenv()
@@ -744,18 +744,6 @@ MODELING_PERIOD_END = config['training_data']['modeling_period_end']
 # retrieve_transfers_data() integration tests
 # ---------------------------------------- #
 
-@contextlib.contextmanager
-def single_threaded():
-    """
-    helper function to avoid multithreading which breaks in pytest
-    """
-    _original_thread_count = threading.active_count()
-    yield
-    current_thread_count = threading.active_count()
-    if current_thread_count > _original_thread_count:
-        raise AssertionError(f"Test created new threads: {current_thread_count - _original_thread_count}")
-
-
 @pytest.fixture(scope='session')
 def profits_df_base():
     """
@@ -792,6 +780,19 @@ def cleaned_profits_df(profits_df_base):
     logger.info("Generating cleaned_profits_df from clean_profits_df()...")
     cleaned_df, exclusions_df = dr.clean_profits_df(profits_df_base, config['data_cleaning'])
     return cleaned_df, exclusions_df
+
+
+@contextlib.contextmanager
+def single_threaded():
+    """
+    helper function to avoid multithreading which breaks in pytest
+    """
+    _original_thread_count = threading.active_count()
+    yield
+    current_thread_count = threading.active_count()
+    if current_thread_count > _original_thread_count:
+        raise AssertionError(f"Test created new threads: {current_thread_count - _original_thread_count}")
+
 
 @pytest.fixture(scope='session')
 def profits_df(prices_df,cleaned_profits_df):
@@ -924,6 +925,7 @@ def market_data_df():
     """
     logger.info("Generating market_data_df from production data...")
     market_data_df = dr.retrieve_market_data()
+    market_data_df = dr.clean_market_data(market_data_df, config)
     market_data_df, _ = cwm.split_dataframe_by_coverage(
         market_data_df,
         start_date=config['training_data']['training_period_start'],

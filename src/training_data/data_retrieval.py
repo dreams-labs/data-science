@@ -90,6 +90,9 @@ def clean_market_data(market_data_df, config):
     # Remove coins with gaps above the maximum
     market_data_df_no_gaps = market_data_df[~market_data_df['coin_id'].isin(gap_coin_ids)]
 
+    # Drop helper column
+    market_data_df_no_gaps = market_data_df_no_gaps.drop(columns='days_imputed')
+
     logger.info("Removed %s market data records for %s coins with gaps above max_gap_days",
                 len(market_data_df) - len(market_data_df_no_gaps),
                 len(gap_coin_ids))

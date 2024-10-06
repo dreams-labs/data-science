@@ -86,6 +86,17 @@ time_series:
             scaling: "none"
         window_duration: 10
         lookback_periods: 5
+      indicators:
+        rsi:
+          parameters:
+            window: 14
+          aggregations:
+            last:
+              scaling: "none"
+        ema:
+          parameters:
+            window: [12,26]
+
     volume:
       rolling:
         aggregations:
@@ -109,36 +120,10 @@ macro_trends:
     aggregations:
       last:
         scaling: "none"
-  btc_cdd_terminal_adjusted_90dma:
-    aggregations:
-      last:
-        scaling: "none"
-    rolling:
-      comparisons:
-        pct_change:
-          scaling: "none"
-      window_duration: 15
-      lookback_periods: 2
-  btc_fear_and_greed:
-    aggregations:
-      last:
-        scaling: "none"
-    rolling:
-      comparisons:
-        pct_change:
-          scaling: "none"
-      window_duration: 15
-      lookback_periods: 2
   btc_mvrv_z_score:
     aggregations:
       last:
         scaling: "none"
-    rolling:
-      comparisons:
-        pct_change:
-          scaling: "none"
-      window_duration: 15
-      lookback_periods: 2
   btc_vdd_multiple:
     aggregations:
       last:
@@ -147,17 +132,7 @@ macro_trends:
       comparisons:
         pct_change:
           scaling: "none"
-      window_duration: 15
-      lookback_periods: 2
-  global_market_cap:
-    aggregations:
-      last:
-        scaling: "none"
-    rolling:
-      comparisons:
-        pct_change:
-          scaling: "none"
-      window_duration: 15
+      window_duration: 10
       lookback_periods: 2
   global_volume:
     aggregations:
@@ -167,5 +142,84 @@ macro_trends:
       comparisons:
         pct_change:
           scaling: "none"
-      window_duration: 15
+      window_duration: 10
       lookback_periods: 2
+  # global_market_cap:
+  #   aggregations:
+  #     none:
+  #       scaling: "none"
+
+# ratios:
+#   crossover_1:
+#     definition:
+#       series1: "time_series.market_data.price.indicators.ema.parameters.window.12"
+#       series2: "time_series.market_data.price.indicators.ema.parameters.window.26"
+#     rolling:
+#       aggregations:
+#         sum:
+#           scaling: "none"
+#       window_duration: 15
+#       lookback_periods: 2
+#   crossover_2:
+#     definition:
+#       series1: "time_series.market_data.price.indicators.bollinger_bands_upper.parameters.window.12"
+#       series2: "time_series.market_data.price"
+#     rolling:
+#       aggregations:
+#         sum:
+#           scaling: "none"
+#       window_duration: 15
+#       lookback_periods: 2
+#   crossover_3:
+#     definition:
+#       series1: "time_series.market_data.price.indicators.bollinger_bands_lower.parameters.window.12"
+#       series2: "time_series.market_data.price"
+#     rolling:
+#       aggregations:
+#         sum:
+#           scaling: "none"
+#       window_duration: 15
+#       lookback_periods: 2
+#   on_balance_volume_1:
+#     definition:
+#       series1: "time_series.market_data.price"
+#       series2: "time_series.market_data.volume"
+#     rolling:
+#       aggregations:
+#         average:
+#           scaling: "none"
+#       window_duration: 7
+#       lookback_periods: 3
+#   on_balance_volume_2:
+#     definition:
+#       series1: "macro_trends.global_market_cap"
+#       series2: "macro_trends.global_volume"
+#     rolling:
+#       aggregations:
+#         average:
+#           scaling: "none"
+#       window_duration: 7
+#       lookback_periods: 3
+#   money_flow_index:
+#     definition:
+#       series1: "time_series.market_data.price"
+#       series2: "time_series.market_data.volume"
+#       window: 14
+#     rolling:
+#       aggregations:
+#         max:
+#           scaling: "none"
+#   divide:
+#     definition:
+#       series1: "wallet_cohorts.normies.total_bought"
+#       series2: "wallet_cohorts.whales.total_bought"
+#     aggregations:
+#       sum:
+#         scaling: "none"
+#   subtract:
+#     definition:
+#       series1: "wallet_cohorts.normies.total_bought"
+#       series2: "wallet_cohorts.whales.total_bought"
+#     aggregations:
+#       sum:
+#         scaling: "none"
