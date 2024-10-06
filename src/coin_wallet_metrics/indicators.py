@@ -19,75 +19,106 @@ logger = dc.setup_logger()
 
 def generate_time_series_indicators(
         time_series_df: pd.DataFrame,
-        config: dict,
-        value_column_indicators_config: dict,
         value_column: str,
-        id_column: Optional[str]='coin_id'
+        value_column_indicators_config: dict,
+        id_column: Optional[str]=None
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Generates time series metrics (e.g., SMA, EMA) based on the given config.
     Works for both multi-series (e.g., multiple coins) and single time series data.
 
     Params:
-    - time_series_df (pd.DataFrame): The input DataFrame with time series data.
-    - config: The full general config file containing training_period_start and
-        training_period_end.
-    - value_column_indicators_config: The metrics_config subcomponent with the parameters for the
-        value_column, e.g. metrics_config['time_series']['prices']['price']['indicators']
-    - value_column (string): The column used to calculate the indicators (e.g., 'price').
-    - id_column (Optional[string]): The name of the column used to identify different series
-        (e.g., 'coin_id'). If None, assumes a single time series.
+    - time_series_df (pd.DataFrame): The time series data with column {value_column}.
+    - value_column (string): The column in time_series_df that needs indicators
+    - value_column_indicators_config: The metrics_config indicators dict for the column
+        e.g. metrics_config['time_series']['market_data']['price']['indicators']
+    - id_column (Optional[string]): The name of the column used to identify different
+        series that should have indicators computed separately. If None, all values
+        will be treated as part of the same series.
+            e.g. SMA should not average 2 coins' prices together if they are next
+            to each other in the df, so we need to group on coin_id
 
     Returns:
-    - full_indicators_df (pd.DataFrame): Input df with additional columns for the specified
-        indicators. Only includes series that had complete data for the period between
-        training_period_start and training_period_end.
-    - partial_time_series_indicators_df (pd.DataFrame): Input df with additional columns for the
-        configured indicators. Only includes series that had partial data for the period.
+    - time_series_df (pd.DataFrame): Input df with all indicators added
     """
-    # 1. Data Quality Checks and Formatting
-    # -------------------------------------
+    # Data Quality Checks and Formatting
     if value_column not in time_series_df.columns:
         raise KeyError(f"Input DataFrame does not include column '{value_column}'.")
 
     if time_series_df[value_column].isnull().any():
         raise ValueError(f"The '{value_column}' column contains null values, which are not allowed.")
 
-    time_series_df = time_series_df.copy()
-    time_series_df['date'] = pd.to_datetime(time_series_df['date'])
-    training_period_start = pd.to_datetime(config['training_data']['training_period_start'])
-    training_period_end = pd.to_datetime(config['training_data']['training_period_end'])
+    # Defining index to group on
+    # --------------------------
+    # Reset index if it exists
+    if not time_series_df.index.empty:
+        time_series_df = time_series_df.reset_index()
 
-    time_series_df = time_series_df[(time_series_df['date'] >= training_period_start) &
-                                    (time_series_df['date'] <= training_period_end)]
-
-    # 2. Indicator Calculations
-    # ----------------------
+    # If there is an id_column, group indicator calculations on it
     if id_column:
-        # Multi-series data (e.g., multiple coins)
-        time_series_df = time_series_df.sort_values(by=[id_column, 'date'])
         groupby_column = id_column
+    # If there isn't, create a dummy_column for grouping and remove it later
     else:
-        # Single time series data
-        time_series_df = time_series_df.sort_values(by=['date'])
-        groupby_column = lambda x: True # Group all rows on dummy column    # pylint: disable=C3001
+        time_series_df['dummy_group'] = 1
+        groupby_column = 'dummy_group'
 
-    for _, group in time_series_df.groupby(groupby_column):
-        for metric, config in value_column_indicators_config.items():
-            period = config['parameters']['period']
+    time_series_df = time_series_df.set_index([groupby_column,'date'])
 
-            if metric == 'sma':
-                sma = calculate_sma(group[value_column], period)
-                time_series_df.loc[group.index, f"{value_column}_{metric}"] = sma
-            elif metric == 'ema':
-                ema = calculate_ema(group[value_column], period)
-                time_series_df.loc[group.index, f"{value_column}_{metric}"] = ema
+    # Indicator Calculations
+    # ----------------------
+    # For each indicator, loop through all options and add the appropriate column
+    for indicator, indicator_config in value_column_indicators_config.items():
+        if indicator == 'sma':
+            windows = indicator_config['parameters']['window']
+            for w in windows:
+                ind_series = time_series_df.groupby(level=groupby_column, observed=True)[value_column].transform(
+                    lambda x: calculate_sma(x, w))
+                time_series_df[f"{value_column}_{indicator}_{w}"] = ind_series
 
-    # # Logging
-    # logger.debug("Generated time series indicators data.")
+        elif indicator == 'ema':
+            windows = indicator_config['parameters']['window']
+            for w in windows:
+                ind_series = time_series_df.groupby(level=groupby_column, observed=True)[value_column].transform(
+                    lambda x: calculate_ema(x, w))
+                time_series_df[f"{value_column}_{indicator}_{w}"] = ind_series
 
-    # return full_indicators_df, partial_time_series_indicators_df
+        elif indicator == 'rsi':
+            windows = indicator_config['parameters']['window']
+            for w in windows:
+                ind_series = time_series_df.groupby(level=groupby_column, observed=True)['price'].transform(
+                    lambda x: calculate_rsi(x, w))
+                time_series_df[f"{value_column}_{indicator}_{w}"] = ind_series
 
+        elif indicator == 'bollinger_bands_upper':
+            windows = indicator_config['parameters']['window']
+            num_std = indicator_config['parameters'].get('num_std', None)
+            for w in windows:
+                ind_series = time_series_df.groupby(level=groupby_column, observed=True)['price'].transform(
+                    lambda x: calculate_bollinger_bands(x, 'upper', w, num_std))
+                time_series_df[f"{value_column}_{indicator}_{w}"] = ind_series
+
+        elif indicator == 'bollinger_bands_lower':
+            windows = indicator_config['parameters']['window']
+            num_std = indicator_config['parameters'].get('num_std', None)
+            for w in windows:
+                ind_series = time_series_df.groupby(level=groupby_column, observed=True)['price'].transform(
+                    lambda x: calculate_bollinger_bands(x, 'lower', w, num_std))
+                time_series_df[f"{value_column}_{indicator}_{w}"] = ind_series
+
+    # Reset index
+    time_series_df = time_series_df.reset_index()
+
+    # Remove the dummy column if it was created
+    if groupby_column == 'dummy_group':
+        time_series_df = time_series_df.drop('dummy_group', axis=1)
+
+
+    logger.info("Generated indicators for column '%s' :%s",
+                value_column,
+                list(value_column_indicators_config.keys()))
+
+
+    return time_series_df
 
 
 # =====================================================================
@@ -171,11 +202,11 @@ def calculate_bollinger_bands(timeseries: pd.Series,
     upper_band = middle_band + (std_dev * num_std)
     lower_band = middle_band - (std_dev * num_std)
 
-
     # Return the requested band
     if return_band == 'upper':
         return upper_band
-    return lower_band
+    if return_band == 'lower':
+        return lower_band
 
 
 

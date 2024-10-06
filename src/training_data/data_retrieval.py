@@ -93,7 +93,8 @@ def clean_market_data(market_data_df, config):
     # Drop helper column
     market_data_df_no_gaps = market_data_df_no_gaps.drop(columns='days_imputed')
 
-    logger.info("Removed %s market data records for %s coins with gaps above max_gap_days",
+    logger.info("Max gap days threshold of %s day removed %s market data records for %s coins.",
+                max_gap_days,
                 len(market_data_df) - len(market_data_df_no_gaps),
                 len(gap_coin_ids))
 
@@ -106,8 +107,8 @@ def clean_market_data(market_data_df, config):
     market_data_df_no_gaps_no_vol = (market_data_df_no_gaps[market_data_df_no_gaps['coin_id']
                                                       .isin(coin_ids_filtered)])
 
-    logger.info("Removed %s additional market data records for %s coins with volume below "
-                "min_daily_volume",
+    logger.info("Min daily volume threshold of $%i removed %s additional market data records for %s coins.",
+                min_daily_volume,
                 len(market_data_df_no_gaps) - len(market_data_df_no_gaps_no_vol),
                 len(set(market_data_df_no_gaps['coin_id'].unique()) - set(coin_ids_filtered)))
 

@@ -108,7 +108,6 @@ time_series:
         ema:
           parameters:
             window: [12,26]
-            # x: 3
           aggregations:
             last:
               scaling: "none"
