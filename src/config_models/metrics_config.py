@@ -134,30 +134,7 @@ class Metric(NoExtrasBaseModel):
     """
     aggregations: Optional[Dict['AggregationType', 'AggregationConfig']] = Field(default=None)
     rolling: Optional['RollingMetrics'] = Field(default=None)
-    indicators: Optional[Dict['IndicatorType', 'IndicatorConfig']] = Field(default=None)
-
-    @model_validator(mode='before')
-    def validate_indicators(cls, values):
-        """
-        Custom validation to ensure parameters match the indicator type (key).
-        """
-        indicators = values.get('indicators', {})
-
-        for indicator_type, config in indicators.items():
-            if indicator_type == IndicatorType.SMA:
-                SMAParameters(**config['parameters'])
-            elif indicator_type == IndicatorType.EMA:
-                EMAParameters(**config['parameters'])
-            elif indicator_type == IndicatorType.RSI:
-                RSIParameters(**config['parameters'])
-            elif indicator_type == IndicatorType.BOLLINGER_BANDS_UPPER:
-                BollingerBandsUpperParameters(**config['parameters'])
-            elif indicator_type == IndicatorType.BOLLINGER_BANDS_LOWER:
-                BollingerBandsLowerParameters(**config['parameters'])
-            else:
-                raise ValueError(f"Invalid indicator type: {indicator_type}")
-
-        return values
+    indicators: Optional[Dict['IndicatorType', 'IndicatorMetric']] = Field(default=None)
 
     @model_validator(mode='after')
     def remove_empty_fields(cls, values):
@@ -278,30 +255,19 @@ class IndicatorType(str, Enum):
     BOLLINGER_BANDS_UPPER = "bollinger_bands_upper"
     BOLLINGER_BANDS_LOWER = "bollinger_bands_lower"
 
-# Paramater requirements for each indicator
-class SMAParameters(NoExtrasBaseModel):
-    window: List[int]
-
-class EMAParameters(NoExtrasBaseModel):
-    window: List[int]
-
-class RSIParameters(NoExtrasBaseModel):
-    window: List[int]
-
-class BollingerBandsUpperParameters(NoExtrasBaseModel):
-    window: List[int]
-    num_std: Optional[float] = None  # defaults to 2
-
-class BollingerBandsLowerParameters(NoExtrasBaseModel):
-    window: List[int]
-    num_std: Optional[float] = None  # defaults to 2
-
-# Define the IndicatorConfig class that combines parameters and metrics
-class IndicatorConfig(Metric):
+class IndicatorParams(NoExtrasBaseModel):
     """
-    Each Indicator needs to have parameters and some type of Metric() calculations
+    This is class that defines all parameters that can be used by all indicators. If a parameter isn't
+    applicable to the specific indicator, it will be ignored.
     """
-    parameters: Union[SMAParameters, EMAParameters, RSIParameters, BollingerBandsUpperParameters, BollingerBandsLowerParameters]
+    window: List[int] # used in all indicators
+    num_std: Optional[float] = None  # used in bollinger_bands
+
+class IndicatorMetric(Metric):
+    """
+    This includes all fields from the Metric parent class as well as IndicatorParameters.
+    """
+    parameters: 'IndicatorParams'
 
 
 # Modular Metrics: ScalingConfig
