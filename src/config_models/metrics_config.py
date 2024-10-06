@@ -134,7 +134,8 @@ class Metric(NoExtrasBaseModel):
     """
     aggregations: Optional[Dict['AggregationType', 'AggregationConfig']] = Field(default=None)
     rolling: Optional['RollingMetrics'] = Field(default=None)
-    indicators: Optional[Dict[str, 'Indicators']] = Field(default=None)
+    indicators: Optional[Dict['IndicatorType', 'Metric']] = Field(default=None)
+    parameters: Optional['IndicatorParameters'] = Field(default=None) # parameters for indicator metrics
 
     @model_validator(mode='after')
     def remove_empty_fields(cls, values):
@@ -255,10 +256,12 @@ class IndicatorType(str, Enum):
     BOLLINGER_BANDS_UPPER = "bollinger_bands_upper"
     BOLLINGER_BANDS_LOWER = "bollinger_bands_lower"
 
-class Indicators(NoExtrasBaseModel):
-    parameters: Dict[str, Any]  # Flexible to handle unique parameters
-    aggregations: Optional[Dict['AggregationType', 'AggregationConfig']] = Field(default=None)
-    rolling: Optional['RollingMetrics'] = Field(default=None)
+
+class IndicatorParameters(BaseModel):
+    """
+    Class enforcing that windows are entered as a list to support looping through them
+    """
+    window: Optional[List[int]] = None
 
 
 # Modular Metrics: ScalingConfig

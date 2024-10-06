@@ -100,90 +100,67 @@ def calculate_sma(timeseries: pd.Series, window: int) -> pd.Series:
     """
     Simple Moving Average (SMA): Use SMA to smooth out price data over a set period by calculating
     the average price, helping to identify trends and support/resistance levels.
+
+    The function returns NaN for records where there are fewer data points than the window size.
+
+    Params:
+    - timeseries (pd.Series): a series of numbers representing the time series data
+    - window (int): the number of periods to use for the simple moving average
+
+    Returns:
+    - pd.Series: A series containing the calculated SMA, with NaNs for records where there are fewer than 'window' data points.
     """
-    # Calculate the SMA for the first few values where data is less than the period
-    sma = timeseries.expanding(min_periods=1).apply(lambda x: x.mean() if len(x) < window else np.nan)
-
-    # Use rolling().mean() for the rest once the period is reached
-    rolling_sma = timeseries.rolling(window=window, min_periods=window).mean()
-
-    # Combine the two: use the expanding calculation until the period is reached, then use rolling()
-    sma = sma.combine_first(rolling_sma)
+    # Apply rolling().mean() with min_periods=window to ensure NaN for fewer than 'window' records
+    sma = timeseries.rolling(window=window, min_periods=window).mean()
 
     return sma
+
 
 def calculate_ema(timeseries: pd.Series, window: int) -> pd.Series:
     """
     Exponential Moving Average (EMA): EMA gives more weight to recent prices, making it more
     responsive to current price movements and useful for identifying momentum and trends.
-    """
-    return timeseries.ewm(span=window, adjust=False).mean()
 
+    The function returns NaN for records where there are fewer data points than the window size.
 
-
-def add_bollinger_bands(time_series_df, price_col='price', window=20, num_std=2, include_middle=False):
-    """
-    Adds Bollinger Bands (middle, upper, lower) to time_series_df based on the specified price column.
-    Bollinger Bands measure volatility by placing bands above and below a moving average, indicating
-    overbought or oversold conditions when prices touch the upper or lower bands.
-
-    Parameters:
-    -----------
-    time_series_df : pd.DataFrame
-        The input DataFrame containing the time series data.
-    price_col : str, optional (default='price')
-        The name of the price column used for calculating Bollinger Bands.
-    window : int, optional (default=20)
-        The number of periods to use for the moving average and standard deviation.
-    num_std : float, optional (default=2)
-        The number of standard deviations for the upper and lower bands.
-    include_middle : bool, optional (default=False)
-        If True, the bolinger_band_middle will be returned. If False, it will be dropped.
+    Params:
+    - timeseries (pd.Series): a series of numbers representing the time series data
+    - window (int): the number of periods to use for the exponential moving average
 
     Returns:
-    --------
-    pd.DataFrame
-        The DataFrame with the new Bollinger Band columns added and the optional price column dropped.
+    - pd.Series: A series containing the calculated EMA, with NaNs for records where there are fewer than 'window' data points.
     """
+    # Calculate the EMA using ewm(), but mask the first 'window - 1' values with NaN
+    ema = timeseries.ewm(span=window, adjust=False).mean()
 
-    # Define a function to apply Bollinger Bands calculation to a group
-    def apply_bollinger_bands(group):
-        group = group.reset_index()
+    # Set the first 'window - 1' values to NaN
+    ema[:window-1] = np.nan
 
-        # Calculate Bollinger Bands
-        middle_band, upper_band, lower_band = calculate_bollinger_bands(group[price_col], window=window, num_std=num_std)
+    return ema
 
-        # Add the bands as new columns
-        group['bollinger_band_middle'] = middle_band
-        group['bollinger_band_upper'] = upper_band
-        group['bollinger_band_lower'] = lower_band
-
-        return group.set_index(['coin_id', 'date'])
-
-    # Apply the Bollinger Bands calculation across each 'coin_id' group
-    time_series_df = time_series_df.groupby('coin_id', group_keys=False, observed=True).apply(apply_bollinger_bands)
-
-    # Drop middle band column if requested
-    if not include_middle:
-        time_series_df = time_series_df.drop(columns='bollinger_band_middle')
-
-    return time_series_df
 
 def calculate_bollinger_bands(timeseries: pd.Series,
+                              return_band: str,
                               window: int = 20,
-                              num_std: float = 2) -> tuple:
+                              num_std: float = 2) -> pd.Series:
     """
     Bollinger Bands: Bollinger Bands measure volatility by placing bands above and below a moving
     average, indicating overbought or oversold conditions when prices touch the upper or lower bands.
 
     Params:
     - timeseries (pd.Series): a series of numbers that each represent a time series step
+    - return_band (str): which band to return, either 'upper' or 'lower'
     - window (int): the number of periods to use for the moving average and standard deviation
     - num_std (float): the number of standard deviations for the upper and lower bands
 
     Returns:
-    - tuple: A tuple containing three Series (middle_band, upper_band, lower_band)
+    - pd.Series: The selected band (upper or lower) based on the return_band parameter
+      Raises a ValueError if return_band is not 'upper' or 'lower'.
     """
+    # Validate the return_band parameter
+    if return_band not in ['upper', 'lower']:
+        raise ValueError("Invalid return_band value. Must be 'upper' or 'lower'.")
+
     # Calculate the simple moving average (middle band)
     middle_band = timeseries.rolling(window=window).mean()
 
@@ -194,7 +171,12 @@ def calculate_bollinger_bands(timeseries: pd.Series,
     upper_band = middle_band + (std_dev * num_std)
     lower_band = middle_band - (std_dev * num_std)
 
-    return middle_band, upper_band, lower_band
+
+    # Return the requested band
+    if return_band == 'upper':
+        return upper_band
+    return lower_band
+
 
 
 # Strength Indicators

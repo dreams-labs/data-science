@@ -14,7 +14,8 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 # pylint: disable=E0401
 # project module imports
-import coin_wallet_metrics as cwm
+import coin_wallet_metrics.coin_wallet_metrics as cwm
+import coin_wallet_metrics.indicators as ind
 
 
 # set up logger at the module level
@@ -59,15 +60,16 @@ def generate_time_series_features(
 
         # a value_column-specific df will be used for feature generation
         value_column_config = config['datasets']['time_series'][dataset_name][value_column]
-        value_column_metrics_config = dataset_metrics_config[value_column]
+        value_column_indicators_config = dataset_metrics_config[value_column]
         value_column_df = dataset_df[['date','coin_id',value_column]].copy()
 
         # check if there are any time series indicators to add, e.g. sma, ema, etc
-        if 'indicators' in value_column_metrics_config:
-            value_column_metrics_df, _ = cwm.generate_time_series_indicators(
+        if 'indicators' in value_column_indicators_config:
+
+            value_column_metrics_df, _ = ind.generate_time_series_indicators(
                 value_column_df,
                 config,
-                value_column_metrics_config['indicators'],
+                value_column_indicators_config['indicators'],
                 value_column,
                 id_column='coin_id'
             )
@@ -158,7 +160,6 @@ def generate_wallet_cohort_features(
     return wallet_cohort_tuples, wallet_data_dfs
 
 
-
 def generate_macro_trends_features(
         dataset_df,
         config,
@@ -199,14 +200,14 @@ def generate_macro_trends_features(
 
         # a value_column-specific df will be used for feature generation
         value_column_config = config['datasets'][dataset_category][value_column]
-        value_column_metrics_config = dataset_metrics_config[value_column]
+        value_column_indicators_config = dataset_metrics_config[value_column]
         value_column_df = dataset_df[['date',value_column]].copy()
         # check if there are any time series indicators to add, e.g. sma, ema, etc
-        if 'indicators' in value_column_metrics_config:
-            value_column_metrics_df, _ = cwm.generate_time_series_indicators(
+        if 'indicators' in value_column_indicators_config:
+            value_column_metrics_df, _ = ind.generate_time_series_indicators(
                 value_column_df,
                 config,
-                value_column_metrics_config['indicators'],
+                value_column_indicators_config['indicators'],
                 value_column,
                 id_column
             )
@@ -243,7 +244,7 @@ def generate_macro_trends_features(
             flattened_macro_trends_filepath
             ,modeling_config
             ,value_column_config
-            ,value_column_metrics_config
+            ,value_column_indicators_config
         )
 
         macro_trends_tuple = (macro_trends_preprocessed_filepath.split('preprocessed_outputs/')[1],

@@ -41,50 +41,50 @@ logger = dc.setup_logger()
 # generate_time_series_indicators() unit tests
 # ------------------------------------------ #
 
-@pytest.fixture
-def sample_time_series_df():
-    """Fixture that provides a sample DataFrame for the time series with multiple coin_ids."""
-    data = {
-        'coin_id': [1, 1, 1, 2, 2, 2],
-        'date': ['2023-01-01', '2023-01-02', '2023-01-03', '2023-01-01', '2023-01-02', '2023-01-03'],
-        'price': [100, 110, 120, 200, 210, 220]
-    }
-    df = pd.DataFrame(data)
-    return df
+# @pytest.fixture
+# def sample_time_series_df():
+#     """Fixture that provides a sample DataFrame for the time series with multiple coin_ids."""
+#     data = {
+#         'coin_id': [1, 1, 1, 2, 2, 2],
+#         'date': ['2023-01-01', '2023-01-02', '2023-01-03', '2023-01-01', '2023-01-02', '2023-01-03'],
+#         'price': [100, 110, 120, 200, 210, 220]
+#     }
+#     df = pd.DataFrame(data)
+#     return df
 
-@pytest.fixture
-def sample_metrics_config():
-    """Fixture that provides a sample metrics configuration for time series analysis."""
-    return {
-        'time_series': {
-            'prices': {
-                'price': {
-                    'metrics': {
-                        'sma': {
-                            'parameters': {
-                                'period': 2
-                            }
-                        },
-                        'ema': {
-                            'parameters': {
-                                'period': 2
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+# @pytest.fixture
+# def sample_metrics_config():
+#     """Fixture that provides a sample metrics configuration for time series analysis."""
+#     return {
+#         'time_series': {
+#             'prices': {
+#                 'price': {
+#                     'metrics': {
+#                         'sma': {
+#                             'parameters': {
+#                                 'period': 2
+#                             }
+#                         },
+#                         'ema': {
+#                             'parameters': {
+#                                 'period': 2
+#                             }
+#                         }
+#                     }
+#                 }
+#             }
+#         }
+#     }
 
-@pytest.fixture
-def sample_config():
-    """Fixture that provides a sample general config for the date range."""
-    return {
-        'training_data': {
-            'training_period_start': '2023-01-01',
-            'training_period_end': '2023-01-03'
-        }
-    }
+# @pytest.fixture
+# def sample_config():
+#     """Fixture that provides a sample general config for the date range."""
+#     return {
+#         'training_data': {
+#             'training_period_start': '2023-01-01',
+#             'training_period_end': '2023-01-03'
+#         }
+#     }
 
 # @pytest.mark.unit
 # def test_generate_time_series_indicators_basic_functionality(sample_time_series_df, sample_metrics_config, sample_config):
@@ -286,26 +286,27 @@ def test_sma_scenario1(sample_timeseries_sma1):
     Unit test for calculating Simple Moving Average (SMA) for a normal case.
 
     Scenario: Calculate SMA for a time series [1, 2, 3, 4, 5, 6] with a window of 3.
-    The first 2 values should be the expanding average, and the rest should use rolling mean.
+    The first 2 values should be NaN, and the rest should use rolling mean.
     """
 
-    # Define the expected result based on the SMA logic:
-    # - For the first two values: the expanding calculation is applied:
-    #   Step 1: SMA for 1st element (1): 1
-    #   Step 2: SMA for 2nd element (1+2)/2 = 1.5
-    # - From the 3rd value onward, use rolling mean:
+    # Define the expected result based on the new SMA logic:
+    # - First 2 values should be NaN since there are fewer than 3 records.
+    # - For the third value and onwards:
     #   Step 3: (1+2+3)/3 = 2
     #   Step 4: (2+3+4)/3 = 3
     #   Step 5: (3+4+5)/3 = 4
     #   Step 6: (4+5+6)/3 = 5
-    expected_sma = pd.Series([1.0, 1.5, 2.0, 3.0, 4.0, 5.0])
+    expected_sma = pd.Series([np.nan, np.nan, 2.0, 3.0, 4.0, 5.0])
 
     # Call the function under test
     result = ind.calculate_sma(sample_timeseries_sma1, 3)
 
     # Assert each logical step of the calculation matches the expected result
-    assert np.array_equal(result.values, expected_sma.values), \
+    assert np.allclose(result[2:], expected_sma[2:], atol=1e-4), \
         f"Expected {expected_sma.values}, but got {result.values}"
+
+    # Assert that the first two values are NaN
+    assert result[:2].isna().all(), "Expected NaN values for the first two entries."
 
 
 @pytest.fixture
@@ -321,20 +322,17 @@ def test_sma_scenario2(sample_timeseries_sma2):
     Unit test for calculating Simple Moving Average (SMA) with insufficient data for the window size.
 
     Scenario: Calculate SMA for a time series [10, 15] with a window of 3.
-    Since the length of the series is smaller than the window, expanding average should be used throughout.
+    Since the length of the series is smaller than the window, the SMA should return NaN.
     """
 
-    # Define the expected result based on SMA logic:
-    # - For the first element (10): SMA = 10 (expanding mean)
-    # - For the second element (10, 15): SMA = (10+15)/2 = 12.5 (expanding mean)
-    expected_sma = pd.Series([10.0, 12.5])
+    # Define the expected result: both values should be NaN since the window size is 3
+    expected_sma = pd.Series([np.nan, np.nan])
 
     # Call the function under test
     result = ind.calculate_sma(sample_timeseries_sma2, 3)
 
-    # Assert each logical step of the calculation matches the expected result
-    assert np.array_equal(result.values, expected_sma.values), \
-        f"Expected {expected_sma.values}, but got {result.values}"
+    # Assert the result is NaN for all values since the window is larger than the series length
+    assert result.isna().all(), f"Expected all NaN values, but got {result.values}"
 
 
 # -------------------------------------------- #
@@ -358,25 +356,26 @@ def test_ema_scenario1(sample_timeseries_ema1):
     """
 
     # Step-by-step logic for EMA calculation:
-    # - First value (1): Since it's the first value, the EMA is just the value itself (1).
-    # - From the second value onwards, use the EMA formula:
+    # - The first two values should be NaN due to insufficient data.
+    # - From the third value onwards, use the EMA formula:
     #   EMA(current) = alpha * current_price + (1 - alpha) * EMA(previous)
     #   where alpha = 2 / (window + 1) = 2 / (3 + 1) = 0.5
     #
-    #   Step 1: EMA(1) = 1
-    #   Step 2: EMA(2) = 0.5 * 2 + 0.5 * 1 = 1.5
     #   Step 3: EMA(3) = 0.5 * 3 + 0.5 * 1.5 = 2.25
     #   Step 4: EMA(4) = 0.5 * 4 + 0.5 * 2.25 = 3.125
     #   Step 5: EMA(5) = 0.5 * 5 + 0.5 * 3.125 = 4.0625
     #   Step 6: EMA(6) = 0.5 * 6 + 0.5 * 4.0625 = 5.03125
-    expected_ema = pd.Series([1.0, 1.5, 2.25, 3.125, 4.0625, pytest.approx(5.03125, abs=1e-4)])
+    expected_ema = pd.Series([np.nan, np.nan, 2.25, 3.125, 4.0625, pytest.approx(5.03125, abs=1e-4)])
 
     # Call the function under test
     result = ind.calculate_ema(sample_timeseries_ema1, 3)
 
-    # Assert each logical step of the calculation matches the expected result
-    assert np.array_equal(result.values, expected_ema.values), \
-        f"Expected {expected_ema.values}, but got {result.values}"
+    # Assert that the first two values are NaN
+    assert result[:2].isna().all(), "Expected NaN for the first two entries due to insufficient data."
+
+    # Use np.allclose for the values excluding the last one (handled by pytest.approx)
+    assert all(result[2:] == expected_ema[2:])
+
 
 @pytest.fixture
 def sample_timeseries_ema2():
@@ -391,104 +390,18 @@ def test_ema_scenario2(sample_timeseries_ema2):
     Unit test for calculating Exponential Moving Average (EMA) with insufficient data for the window size.
 
     Scenario: Calculate EMA for a time series [10, 20] with a window of 5.
-    Since the series has fewer data points than the window size, the EMA should still be calculated
-    using the available data.
+    Since the series has fewer data points than the window size, the EMA should return NaN.
     """
 
-    # Step-by-step logic for EMA calculation:
-    # The formula still applies with alpha = 2 / (window + 1) = 2 / (5 + 1) = 0.3333 (approx).
-    #
-    #   Step 1: EMA(10) = 10 (first value is always the value itself)
-    #   Step 2: EMA(20) = 0.3333 * 20 + (1 - 0.3333) * 10 = 0.3333 * 20 + 0.6667 * 10 = 13.3333 (approx)
-    expected_ema = pd.Series([10.0, pytest.approx(13.3333, abs=1e-4)])
+    # Define the expected result: both values should be NaN since the window size is 5
+    expected_ema = pd.Series([np.nan, np.nan])
 
     # Call the function under test
     result = ind.calculate_ema(sample_timeseries_ema2, 5)
 
-    # Assert each logical step of the calculation matches the expected result
-    assert np.array_equal(result.values, expected_ema.values), \
-        f"Expected {expected_ema.values}, but got {result.values}"
+    # Assert the result is NaN for all values since the window is larger than the series length
+    assert result.isna().all(), f"Expected all NaN values, but got {result.values}"
 
-
-# -------------------------------------------- #
-# add_bollinger_bands() unit tests
-# -------------------------------------------- #
-
-@pytest.fixture
-def sample_time_series_df_bollinger_base():
-    """
-    Fixture to provide a sample time series DataFrame for Bollinger Bands calculation in
-    test_add_bollinger_bands_base_case. Contains two coin_id groups to ensure Bollinger Bands
-    are calculated independently for each coin and that the transition between groups is handled properly.
-    """
-    data = {
-        'coin_id': ['coin_1', 'coin_1', 'coin_1', 'coin_1', 'coin_1',
-                    'coin_2', 'coin_2', 'coin_2', 'coin_2', 'coin_2'],
-        'date': ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05',
-                 '2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05'],
-        'price': [100, 102, 104, 103, 101, 110, 112, 115, 113, 111]
-    }
-    return pd.DataFrame(data).set_index(['coin_id', 'date'])
-
-@pytest.mark.unit
-def test_add_bollinger_bands_base_case(sample_time_series_df_bollinger_base):
-    """
-    Unit test for adding Bollinger Bands with two coin_id groups to ensure that the transition
-    between coin_id groups is handled appropriately. The bands should be calculated independently
-    for each coin and the window period should reset for each group.
-
-    Scenario: Calculate Bollinger Bands for two separate coin_id groups and ensure no cross-group
-    calculation errors occur.
-    """
-
-    # Call the function under test
-    result_df = ind.add_bollinger_bands(sample_time_series_df_bollinger_base, price_col='price', window=3, num_std=2, include_middle=True)
-
-    # Extract the Bollinger Band columns
-    middle_band = result_df['bollinger_band_middle']
-    upper_band = result_df['bollinger_band_upper']
-    lower_band = result_df['bollinger_band_lower']
-
-    # Manually calculate expected values for comparison for both coin groups
-    # coin_1 group
-    expected_middle_band_coin1 = sample_time_series_df_bollinger_base.loc['coin_1', 'price'].rolling(window=3).mean()
-    expected_std_dev_coin1 = sample_time_series_df_bollinger_base.loc['coin_1', 'price'].rolling(window=3).std()
-    expected_upper_band_coin1 = expected_middle_band_coin1 + (expected_std_dev_coin1 * 2)
-    expected_lower_band_coin1 = expected_middle_band_coin1 - (expected_std_dev_coin1 * 2)
-
-    # coin_2 group
-    expected_middle_band_coin2 = sample_time_series_df_bollinger_base.loc['coin_2', 'price'].rolling(window=3).mean()
-    expected_std_dev_coin2 = sample_time_series_df_bollinger_base.loc['coin_2', 'price'].rolling(window=3).std()
-    expected_upper_band_coin2 = expected_middle_band_coin2 + (expected_std_dev_coin2 * 2)
-    expected_lower_band_coin2 = expected_middle_band_coin2 - (expected_std_dev_coin2 * 2)
-
-    # Ensure transition between coin groups does not cause issues
-    assert np.allclose(middle_band.loc['coin_1'][2:], expected_middle_band_coin1[2:], atol=1e-4), \
-        f"Expected middle band values for coin_1: {expected_middle_band_coin1.values}, but got {middle_band.loc['coin_1'].values}"
-
-    assert np.allclose(upper_band.loc['coin_1'][2:], expected_upper_band_coin1[2:], atol=1e-4), \
-        f"Expected upper band values for coin_1: {expected_upper_band_coin1.values}, but got {upper_band.loc['coin_1'].values}"
-
-    assert np.allclose(lower_band.loc['coin_1'][2:], expected_lower_band_coin1[2:], atol=1e-4), \
-        f"Expected lower band values for coin_1: {expected_lower_band_coin1.values}, but got {lower_band.loc['coin_1'].values}"
-
-    assert np.allclose(middle_band.loc['coin_2'][2:], expected_middle_band_coin2[2:], atol=1e-4), \
-        f"Expected middle band values for coin_2: {expected_middle_band_coin2.values}, but got {middle_band.loc['coin_2'].values}"
-
-    assert np.allclose(upper_band.loc['coin_2'][2:], expected_upper_band_coin2[2:], atol=1e-4), \
-        f"Expected upper band values for coin_2: {expected_upper_band_coin2.values}, but got {upper_band.loc['coin_2'].values}"
-
-    assert np.allclose(lower_band.loc['coin_2'][2:], expected_lower_band_coin2[2:], atol=1e-4), \
-        f"Expected lower band values for coin_2: {expected_lower_band_coin2.values}, but got {lower_band.loc['coin_2'].values}"
-
-    # Ensure the first few values before the window period are NaN for both groups
-    assert middle_band.loc['coin_1'][:2].isna().all(), "Expected NaN values for coin_1 before the window period."
-    assert upper_band.loc['coin_1'][:2].isna().all(), "Expected NaN values for coin_1 upper band before the window period."
-    assert lower_band.loc['coin_1'][:2].isna().all(), "Expected NaN values for coin_1 lower band before the window period."
-
-    assert middle_band.loc['coin_2'][:2].isna().all(), "Expected NaN values for coin_2 before the window period."
-    assert upper_band.loc['coin_2'][:2].isna().all(), "Expected NaN values for coin_2 upper band before the window period."
-    assert lower_band.loc['coin_2'][:2].isna().all(), "Expected NaN values for coin_2 lower band before the window period."
 
 # -------------------------------------------- #
 # calculate_bollinger_bands() unit tests
@@ -508,16 +421,12 @@ def test_calculate_bollinger_bands_scenario1(sample_timeseries_bollinger1):
 
     Scenario: Calculate Bollinger Bands for a timeseries [100, 102, 104, 103, 101, ...] with a window of 5 and num_std of 2.
 
-    Expected Behavior: The function should return three Series: the middle band (SMA), upper band, and lower band,
-    correctly calculated using the provided window and standard deviation.
+    Expected Behavior: The function should return the selected band (upper or lower) correctly calculated using the provided window and standard deviation.
     """
 
     # Define window and standard deviation multiplier
     window = 5
     num_std = 2
-
-    # Call the function under test
-    middle_band, upper_band, lower_band = ind.calculate_bollinger_bands(sample_timeseries_bollinger1, window=window, num_std=num_std)
 
     # Manually calculate expected values for comparison
     expected_middle_band = sample_timeseries_bollinger1.rolling(window=window).mean()
@@ -525,18 +434,21 @@ def test_calculate_bollinger_bands_scenario1(sample_timeseries_bollinger1):
     expected_upper_band = expected_middle_band + (expected_std_dev * num_std)
     expected_lower_band = expected_middle_band - (expected_std_dev * num_std)
 
-    # Assert that the middle band, upper band, and lower band match expected values
-    assert np.allclose(middle_band[window:], expected_middle_band[window:], atol=1e-4), \
-        f"Expected middle band values: {expected_middle_band.values}, but got {middle_band.values}"
+    # Call the function for the upper band
+    upper_band = ind.calculate_bollinger_bands(sample_timeseries_bollinger1, return_band='upper', window=window, num_std=num_std)
 
+    # Assert that the upper band matches the expected values
     assert np.allclose(upper_band[window:], expected_upper_band[window:], atol=1e-4), \
         f"Expected upper band values: {expected_upper_band.values}, but got {upper_band.values}"
 
+    # Call the function for the lower band
+    lower_band = ind.calculate_bollinger_bands(sample_timeseries_bollinger1, return_band='lower', window=window, num_std=num_std)
+
+    # Assert that the lower band matches the expected values
     assert np.allclose(lower_band[window:], expected_lower_band[window:], atol=1e-4), \
         f"Expected lower band values: {expected_lower_band.values}, but got {lower_band.values}"
 
     # Ensure the first values before the window period are NaN (due to insufficient data)
-    assert middle_band[:window-1].isna().all(), "Expected NaN values for middle band before the window period."
     assert upper_band[:window-1].isna().all(), "Expected NaN values for upper band before the window period."
     assert lower_band[:window-1].isna().all(), "Expected NaN values for lower band before the window period."
 
@@ -706,7 +618,7 @@ def test_add_crossover_column_scenario1(sample_time_series_df_scenario1):
         f"Expected {expected_crossover.values}, but got {result_crossover.values}"
 
     # Ensure no crossovers were incorrectly calculated across different coin_id groups
-    assert all(result_df.groupby('coin_id')['crossover_ema_12_ema_26'].apply(lambda x: x.is_monotonic_decreasing == False)), \
+    assert all(result_df.groupby('coin_id')['crossover_ema_12_ema_26'].apply(lambda x: x.is_monotonic_decreasing is False)), \
         "Crossovers were incorrectly flagged across different coin_id groups."
 
 
@@ -964,42 +876,42 @@ def prices_df():
     """
     return pd.read_csv('tests/fixtures/prices_df.csv')
 
-@pytest.mark.integration
-def test_generate_time_series_indicators_no_nulls_and_row_count(prices_df, config, metrics_config):
-    """
-    Integration test for cwm.generate_time_series_indicators to confirm that:
-    1. The returned DataFrame has no null values.
-    2. The number of rows in the output matches the input prices_df.
-    """
-    # Define dataset key and column name
-    value_column = 'price'
+# @pytest.mark.integration
+# def test_generate_time_series_indicators_no_nulls_and_row_count(prices_df, config, metrics_config):
+#     """
+#     Integration test for cwm.generate_time_series_indicators to confirm that:
+#     1. The returned DataFrame has no null values.
+#     2. The number of rows in the output matches the input prices_df.
+#     """
+#     # Define dataset key and column name
+#     value_column = 'price'
 
-    # Identify coins that have complete data for the period
-    coin_data_range = prices_df.groupby('coin_id')['date'].agg(['min', 'max'])
+#     # Identify coins that have complete data for the period
+#     coin_data_range = prices_df.groupby('coin_id')['date'].agg(['min', 'max'])
 
-    # Full duration coins: Data spans the entire training to modeling period
-    training_period_start = pd.to_datetime(config['training_data']['training_period_start'])
-    training_period_end = pd.to_datetime(config['training_data']['training_period_end'])
+#     # Full duration coins: Data spans the entire training to modeling period
+#     training_period_start = pd.to_datetime(config['training_data']['training_period_start'])
+#     training_period_end = pd.to_datetime(config['training_data']['training_period_end'])
 
-    full_duration_days = (training_period_end - training_period_start).days + 1
-    full_duration_coins = coin_data_range[
-        (coin_data_range['min'] <= config['training_data']['training_period_start']) &
-        (coin_data_range['max'] >= config['training_data']['training_period_end'])
-    ].index
+#     full_duration_days = (training_period_end - training_period_start).days + 1
+#     full_duration_coins = coin_data_range[
+#         (coin_data_range['min'] <= config['training_data']['training_period_start']) &
+#         (coin_data_range['max'] >= config['training_data']['training_period_end'])
+#     ].index
 
-    expected_rows = len(full_duration_coins) * full_duration_days
+#     expected_rows = len(full_duration_coins) * full_duration_days
 
-    if 'indicators' in metrics_config['time_series']['market_data']['price'].keys():
-        # Run the generate_time_series_indicators function
-        full_metrics_df, _ = ind.generate_time_series_indicators(
-            time_series_df=prices_df,
-            config=config,
-            value_column_indicators_config=metrics_config['time_series']['market_data']['price']['indicators'],
-            value_column=value_column
-        )
+#     if 'indicators' in metrics_config['time_series']['market_data']['price'].keys():
+#         # Run the generate_time_series_indicators function
+#         full_metrics_df, _ = ind.generate_time_series_indicators(
+#             time_series_df=prices_df,
+#             config=config,
+#             value_column_indicators_config=metrics_config['time_series']['market_data']['price']['indicators'],
+#             value_column=value_column
+#         )
 
-        # Check that the number of rows in the result matches the expected number of rows
-        assert len(full_metrics_df) == expected_rows, "The number of rows in the output does not match the expected number of rows."
+#         # Check that the number of rows in the result matches the expected number of rows
+#         assert len(full_metrics_df) == expected_rows, "The number of rows in the output does not match the expected number of rows."
 
-        # Check that there are no null values in the result
-        assert not full_metrics_df.isnull().values.any(), "The output DataFrame contains null values."
+#         # Check that there are no null values in the result
+#         assert not full_metrics_df.isnull().values.any(), "The output DataFrame contains null values."

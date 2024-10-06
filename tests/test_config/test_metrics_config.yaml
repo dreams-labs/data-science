@@ -87,9 +87,10 @@ time_series:
         window_duration: 10
         lookback_periods: 5
       indicators:
+
         rsi:
           parameters:
-            window: 14
+            window: [14]
           aggregations:
             last:
               scaling: "none"
