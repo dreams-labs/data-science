@@ -42,13 +42,18 @@ def retrieve_market_data():
     market_data_df['coin_id'] = market_data_df['coin_id'].astype('category')
 
     # Downcast numeric columns to reduce memory usage
-    market_data_df['price'] = pd.to_numeric(market_data_df['price'], downcast='float')
-    market_data_df['volume'] = pd.to_numeric(market_data_df['volume'], downcast='integer')
-    market_data_df['market_cap'] = pd.to_numeric(market_data_df['market_cap'], downcast='integer')
+    market_data_df['price'] = market_data_df['price'].astype('float32')
 
     # Dates as dates
-    market_data_df['date'] = market_data_df['date'].dt.date
     market_data_df['date'] = pd.to_datetime(market_data_df['date'])
+
+    # Check for negative values in 'price', 'volume', and 'market_cap'
+    if (market_data_df['price'] < 0).any():
+        raise ValueError("Negative values found in 'price' column.")
+    if (market_data_df['volume'] < 0).any():
+        raise ValueError("Negative values found in 'volume' column.")
+    if (market_data_df['market_cap'] < 0).any():
+        raise ValueError("Negative values found in 'market_cap' column.")
 
     logger.info('Retrieved market_data_df with %s unique coins and %s rows after %s seconds',
                 len(set(market_data_df['coin_id'])),

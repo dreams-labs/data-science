@@ -21,7 +21,8 @@ from dreams_core import core as dc
 
 # pyright: reportMissingImports=false
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
-import coin_wallet_metrics as cwm
+import coin_wallet_metrics.coin_wallet_metrics as cwm
+import coin_wallet_metrics.indicators as id
 from utils import load_config
 
 load_dotenv()
@@ -366,186 +367,313 @@ def sample_config():
         }
     }
 
+# @pytest.mark.unit
+# def test_generate_time_series_indicators_basic_functionality(sample_time_series_df, sample_metrics_config, sample_config):
+#     """
+#     Test the basic functionality of generate_time_series_indicators to ensure that SMA and EMA
+#     are calculated correctly for a simple DataFrame with multiple coin_ids, and that the date
+#     range filtering works.
+#     """
+#     # Convert the date to datetime in the sample data
+#     sample_time_series_df['date'] = pd.to_datetime(sample_time_series_df['date'])
+
+#     # Run the generate_time_series_indicators function
+#     result_df, _ = id.generate_time_series_indicators(
+#         sample_time_series_df,
+#         sample_config,
+#         sample_metrics_config['time_series']['prices']['price']['metrics'],
+#         value_column='price'
+#     )
+
+#     # Expected columns in the result
+#     expected_columns = ['coin_id', 'date', 'price', 'price_sma', 'price_ema']
+
+#     # Assert that the columns exist in the result
+#     assert all(col in result_df.columns for col in expected_columns), "Missing expected columns in the result."
+
+#     # Assert that SMA and EMA are calculated correctly
+#     expected_sma_1 = [100.0, 105.0, 115.0]  # SMA for coin_id=1 with period=2
+#     expected_ema_1 = [100.0, 106.666667, 115.555556]  # EMA for coin_id=1 with period=2
+
+#     # Confirm that the SMA result matches the expected, with special logic to handle NaNs
+#     for i, (expected, actual) in enumerate(zip(
+#         expected_sma_1,
+#         result_df[result_df['coin_id'] == 1]['price_sma'].tolist()
+#     )):
+#         if np.isnan(expected) and np.isnan(actual):
+#             continue  # Both values are NaN, so this is considered equal
+#         assert expected == actual, f"Mismatch at index {i}: expected {expected}, got {actual}"
+
+#     # Confirm that the EMA result matches the expected
+#     assert result_df[result_df['coin_id'] == 1]['price_ema'].tolist() == pytest.approx(
+#         expected_ema_1,
+#         abs=1e-2
+#     ), "EMA calculation incorrect for coin_id=1"
+
+#     # Check for another coin_id
+#     expected_sma_2 = [200.0, 205.0, 215.0]  # SMA for coin_id=2 with period=2
+#     expected_ema_2 = [200.0, 206.666667, 215.555556]  # EMA for coin_id=2 with period=2
+
+#     # Confirm that the SMA result matches the expected, with special logic to handle NaNs
+#     for i, (expected, actual) in enumerate(zip(
+#         expected_sma_2,
+#         result_df[result_df['coin_id'] == 2]['price_sma'].tolist()
+#     )):
+#         if np.isnan(expected) and np.isnan(actual):
+#             continue  # Both values are NaN, so this is considered equal
+#         assert expected == actual, f"Mismatch at index {i}: expected {expected}, got {actual}"
+
+#     # Confirm that the EMA result matches the expected
+#     assert result_df[result_df['coin_id'] == 2]['price_ema'].tolist() == pytest.approx(
+#         expected_ema_2,
+#         abs=1e-2
+#     ), "EMA calculation incorrect for coin_id=2"
+
+#     # Confirm that the output df has the same number of rows as the filtered input df
+#     assert len(result_df) == len(sample_time_series_df), "Output row count does not match input row count"
+
+# @pytest.mark.unit
+# def test_generate_time_series_indicators_different_periods(sample_time_series_df, sample_config):
+#     """
+#     Test the functionality of generate_time_series_indicators with different periods for SMA and EMA.
+#     """
+#     # Adjust the sample_metrics_config for different periods
+#     sample_metrics_config = {
+#         'time_series': {
+#             'prices': {
+#                 'price': {
+#                     'metrics': {
+#                         'sma': {
+#                             'parameters': {
+#                                 'period': 3  # Different period for SMA
+#                             }
+#                         },
+#                         'ema': {
+#                             'parameters': {
+#                                 'period': 2  # Different period for EMA
+#                             }
+#                         }
+#                     }
+#                 }
+#             }
+#         }
+#     }
+
+#     # Convert the date to datetime in the sample data
+#     sample_time_series_df['date'] = pd.to_datetime(sample_time_series_df['date'])
+
+#     # Run the generate_time_series_metrics function
+#     result_df, _ = id.generate_time_series_indicators(
+#         sample_time_series_df,
+#         sample_config,
+#         sample_metrics_config['time_series']['prices']['price']['metrics'],
+#         value_column='price'
+#     )
+
+#     # Expected columns in the result
+#     expected_columns = ['coin_id', 'date', 'price', 'price_sma', 'price_ema']
+
+#     # Assert that the columns exist in the result
+#     assert all(col in result_df.columns for col in expected_columns), "Missing expected columns in the result."
+
+#     # Expected SMA and EMA values for coin_id=1
+#     expected_sma_1 = [100.0, 105.0, 110.0]  # SMA for coin_id=1 with period=3
+#     expected_ema_1 = [100.0, 106.666667, 115.555556]  # EMA for coin_id=1 with period=2
+
+#     # Confirm that the SMA result matches the expected, with special logic to handle NaNs
+#     for i, (expected, actual) in enumerate(zip(
+#         expected_sma_1,
+#         result_df[result_df['coin_id'] == 1]['price_sma'].tolist()
+#     )):
+#         if np.isnan(expected) and np.isnan(actual):
+#             continue  # Both values are NaN, so this is considered equal
+#         assert expected == actual, f"Mismatch at index {i}: expected {expected}, got {actual}"
+
+#     # Confirm that the EMA result matches the expected
+#     assert result_df[result_df['coin_id'] == 1]['price_ema'].tolist() == pytest.approx(
+#         expected_ema_1,
+#         abs=1e-2
+#     ), "EMA calculation incorrect for coin_id=1"
+
+#     # Expected SMA and EMA values for coin_id=2
+#     expected_sma_2 = [200.0, 205.0, 210.0]  # SMA for coin_id=2 with period=3
+#     expected_ema_2 = [200.0, 206.666667, 215.555556]  # EMA for coin_id=2 with period=2
+
+#     # Confirm that the SMA result matches the expected, with special logic to handle NaNs
+#     for i, (expected, actual) in enumerate(zip(
+#         expected_sma_2,
+#         result_df[result_df['coin_id'] == 2]['price_sma'].tolist()
+#     )):
+#         if np.isnan(expected) and np.isnan(actual):
+#             continue  # Both values are NaN, so this is considered equal
+#         assert expected == actual, f"Mismatch at index {i}: expected {expected}, got {actual}"
+
+#     # Confirm that the EMA result matches the expected
+#     assert result_df[result_df['coin_id'] == 2]['price_ema'].tolist() == pytest.approx(
+#         expected_ema_2,
+#         abs=1e-2
+#     ), "EMA calculation incorrect for coin_id=2"
+
+# @pytest.mark.unit
+# def test_generate_time_series_indicators_value_column_does_not_exist(sample_time_series_df, sample_metrics_config, sample_config):
+#     """
+#     Test that generate_time_series_indicators raises a KeyError if the value_column does not exist in the time_series_df.
+#     """
+#     # Use a value_column that doesn't exist in the DataFrame
+#     invalid_value_column = 'non_existent_column'
+
+#     with pytest.raises(KeyError, match=f"Input DataFrame does not include column '{invalid_value_column}'"):
+#         id.generate_time_series_indicators(
+#             time_series_df=sample_time_series_df,
+#             config=sample_config,
+#             value_column_indicators_config=sample_metrics_config['time_series']['prices']['price']['metrics'],
+#             value_column=invalid_value_column
+#         )
+
+
+# @pytest.mark.unit
+# def test_generate_time_series_indicators_value_column_contains_nan(sample_time_series_df, sample_metrics_config, sample_config):
+#     """
+#     Test that generate_time_series_indicators raises a ValueError if the value_column contains null values.
+#     """
+#     # Introduce null values into the 'price' column
+#     sample_time_series_df.loc[0, 'price'] = None
+
+#     with pytest.raises(ValueError, match="contains null values"):
+#         id.generate_time_series_indicators(
+#             time_series_df=sample_time_series_df,
+#             config=sample_config,
+#             value_column_indicators_config=sample_metrics_config['time_series']['prices']['price']['metrics'],
+#             value_column='price'
+#         )
+
+
+
+
+# -------------------------------------------- #
+# identify_crossovers() unit tests
+# -------------------------------------------- #
+
+@pytest.fixture
+def input_series_1():
+    """
+    Fixture for input series1: [1, 2, 3, 4, 5]
+    """
+    return pd.Series([1, 2, 3, 4, 5])
+
+@pytest.fixture
+def input_series_2():
+    """
+    Fixture for input series2: [3, 3, 3, 3, 3]
+    """
+    return pd.Series([3, 3, 3, 3, 3])
+
 @pytest.mark.unit
-def test_generate_time_series_indicators_basic_functionality(sample_time_series_df, sample_metrics_config, sample_config):
+def test_identify_crossovers_scenario_1(input_series_1, input_series_2):
     """
-    Test the basic functionality of generate_time_series_indicators to ensure that SMA and EMA
-    are calculated correctly for a simple DataFrame with multiple coin_ids, and that the date
-    range filtering works.
+    Unit test for identify_crossovers function - Scenario 1.
+
+    This test checks if the function correctly identifies an upward crossover
+    when series1 crosses from below to above series2. It confirms that the function
+    returns the correct crossover points only when they happen.
     """
-    # Convert the date to datetime in the sample data
-    sample_time_series_df['date'] = pd.to_datetime(sample_time_series_df['date'])
+    # Run the function
+    result = id.identify_crossovers(input_series_1, input_series_2)
 
-    # Run the generate_time_series_indicators function
-    result_df, _ = cwm.generate_time_series_indicators(
-        sample_time_series_df,
-        sample_config,
-        sample_metrics_config['time_series']['prices']['price']['metrics'],
-        value_column='price'
-    )
+    # Step-by-step explanation of expected values:
+    # At index 0, series1 (1) is below series2 (3): no crossover => result[0] = 0
+    # At index 1, series1 (2) is still below series2 (3): no crossover => result[1] = 0
+    # At index 2, series1 (3) equals series2 (3): no crossover => result[2] = 0
+    # At index 3, series1 (4) crosses above series2 (3): upward crossover => result[3] = 1
+    # At index 4, series1 (5) is above series2 (3), but no new crossover: => result[4] = 0
 
-    # Expected columns in the result
-    expected_columns = ['coin_id', 'date', 'price', 'price_sma', 'price_ema']
+    expected_result = pd.Series([0, 0, 0, 1, 0])
 
-    # Assert that the columns exist in the result
-    assert all(col in result_df.columns for col in expected_columns), "Missing expected columns in the result."
+    # Compare the result using np.array_equal
+    assert np.array_equal(result.values, expected_result.values), \
+        f"Expected {expected_result.values} but got {result.values}"
 
-    # Assert that SMA and EMA are calculated correctly
-    expected_sma_1 = [100.0, 105.0, 115.0]  # SMA for coin_id=1 with period=2
-    expected_ema_1 = [100.0, 106.666667, 115.555556]  # EMA for coin_id=1 with period=2
 
-    # Confirm that the SMA result matches the expected, with special logic to handle NaNs
-    for i, (expected, actual) in enumerate(zip(
-        expected_sma_1,
-        result_df[result_df['coin_id'] == 1]['price_sma'].tolist()
-    )):
-        if np.isnan(expected) and np.isnan(actual):
-            continue  # Both values are NaN, so this is considered equal
-        assert expected == actual, f"Mismatch at index {i}: expected {expected}, got {actual}"
+@pytest.fixture
+def input_series_1_scenario_9():
+    """
+    Fixture for input series1: [2, 2, 3, 4, 5] for Scenario 9.
+    """
+    return pd.Series([2, 2, 3, 4, 5])
 
-    # Confirm that the EMA result matches the expected
-    assert result_df[result_df['coin_id'] == 1]['price_ema'].tolist() == pytest.approx(
-        expected_ema_1,
-        abs=1e-2
-    ), "EMA calculation incorrect for coin_id=1"
-
-    # Check for another coin_id
-    expected_sma_2 = [200.0, 205.0, 215.0]  # SMA for coin_id=2 with period=2
-    expected_ema_2 = [200.0, 206.666667, 215.555556]  # EMA for coin_id=2 with period=2
-
-    # Confirm that the SMA result matches the expected, with special logic to handle NaNs
-    for i, (expected, actual) in enumerate(zip(
-        expected_sma_2,
-        result_df[result_df['coin_id'] == 2]['price_sma'].tolist()
-    )):
-        if np.isnan(expected) and np.isnan(actual):
-            continue  # Both values are NaN, so this is considered equal
-        assert expected == actual, f"Mismatch at index {i}: expected {expected}, got {actual}"
-
-    # Confirm that the EMA result matches the expected
-    assert result_df[result_df['coin_id'] == 2]['price_ema'].tolist() == pytest.approx(
-        expected_ema_2,
-        abs=1e-2
-    ), "EMA calculation incorrect for coin_id=2"
-
-    # Confirm that the output df has the same number of rows as the filtered input df
-    assert len(result_df) == len(sample_time_series_df), "Output row count does not match input row count"
+@pytest.fixture
+def input_series_2_scenario_9():
+    """
+    Fixture for input series2: [2, 2, 2, 2, 2] for Scenario 9.
+    """
+    return pd.Series([2, 2, 2, 2, 2])
 
 @pytest.mark.unit
-def test_generate_time_series_indicators_different_periods(sample_time_series_df, sample_config):
+def test_identify_crossovers_scenario_9(input_series_1_scenario_9, input_series_2_scenario_9):
     """
-    Test the functionality of generate_time_series_indicators with different periods for SMA and EMA.
+    Unit test for identify_crossovers function - Scenario 9.
+
+    This test checks if the function correctly identifies an upward crossover
+    when series1 is tied with series2 at first and later crosses above.
     """
-    # Adjust the sample_metrics_config for different periods
-    sample_metrics_config = {
-        'time_series': {
-            'prices': {
-                'price': {
-                    'metrics': {
-                        'sma': {
-                            'parameters': {
-                                'period': 3  # Different period for SMA
-                            }
-                        },
-                        'ema': {
-                            'parameters': {
-                                'period': 2  # Different period for EMA
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
 
-    # Convert the date to datetime in the sample data
-    sample_time_series_df['date'] = pd.to_datetime(sample_time_series_df['date'])
+    # Run the function
+    result = id.identify_crossovers(input_series_1_scenario_9, input_series_2_scenario_9)
 
-    # Run the generate_time_series_metrics function
-    result_df, _ = cwm.generate_time_series_indicators(
-        sample_time_series_df,
-        sample_config,
-        sample_metrics_config['time_series']['prices']['price']['metrics'],
-        value_column='price'
-    )
+    # Step-by-step explanation of expected values:
+    # At index 0, series1 (2) is equal to series2 (2): no crossover => result[0] = 0
+    # At index 1, series1 (2) is still equal to series2 (2): no crossover => result[1] = 0
+    # At index 2, series1 (3) crosses above series2 (2): upward crossover => result[2] = 1
+    # At index 3, series1 (4) is still above series2 (2): no new crossover => result[3] = 0
+    # At index 4, series1 (5) is still above series2 (2): no new crossover => result[4] = 0
 
-    # Expected columns in the result
-    expected_columns = ['coin_id', 'date', 'price', 'price_sma', 'price_ema']
+    expected_result = pd.Series([0, 0, 1, 0, 0])
 
-    # Assert that the columns exist in the result
-    assert all(col in result_df.columns for col in expected_columns), "Missing expected columns in the result."
+    # Compare the result using np.array_equal
+    assert np.array_equal(result.values, expected_result.values), \
+        f"Expected {expected_result.values} but got {result.values}"
 
-    # Expected SMA and EMA values for coin_id=1
-    expected_sma_1 = [100.0, 105.0, 110.0]  # SMA for coin_id=1 with period=3
-    expected_ema_1 = [100.0, 106.666667, 115.555556]  # EMA for coin_id=1 with period=2
 
-    # Confirm that the SMA result matches the expected, with special logic to handle NaNs
-    for i, (expected, actual) in enumerate(zip(
-        expected_sma_1,
-        result_df[result_df['coin_id'] == 1]['price_sma'].tolist()
-    )):
-        if np.isnan(expected) and np.isnan(actual):
-            continue  # Both values are NaN, so this is considered equal
-        assert expected == actual, f"Mismatch at index {i}: expected {expected}, got {actual}"
+@pytest.fixture
+def input_series_1_scenario_11():
+    """
+    Fixture for input series1: [2, 3, 4, 5, 3, 2, 1] for Scenario 11.
+    """
+    return pd.Series([2, 3, 4, 5, 3, 2, 1])
 
-    # Confirm that the EMA result matches the expected
-    assert result_df[result_df['coin_id'] == 1]['price_ema'].tolist() == pytest.approx(
-        expected_ema_1,
-        abs=1e-2
-    ), "EMA calculation incorrect for coin_id=1"
-
-    # Expected SMA and EMA values for coin_id=2
-    expected_sma_2 = [200.0, 205.0, 210.0]  # SMA for coin_id=2 with period=3
-    expected_ema_2 = [200.0, 206.666667, 215.555556]  # EMA for coin_id=2 with period=2
-
-    # Confirm that the SMA result matches the expected, with special logic to handle NaNs
-    for i, (expected, actual) in enumerate(zip(
-        expected_sma_2,
-        result_df[result_df['coin_id'] == 2]['price_sma'].tolist()
-    )):
-        if np.isnan(expected) and np.isnan(actual):
-            continue  # Both values are NaN, so this is considered equal
-        assert expected == actual, f"Mismatch at index {i}: expected {expected}, got {actual}"
-
-    # Confirm that the EMA result matches the expected
-    assert result_df[result_df['coin_id'] == 2]['price_ema'].tolist() == pytest.approx(
-        expected_ema_2,
-        abs=1e-2
-    ), "EMA calculation incorrect for coin_id=2"
+@pytest.fixture
+def input_series_2_scenario_11():
+    """
+    Fixture for input series2: [3, 3, 3, 3, 3, 3, 3] for Scenario 11.
+    """
+    return pd.Series([3, 3, 3, 3, 3, 3, 3])
 
 @pytest.mark.unit
-def test_generate_time_series_indicators_value_column_does_not_exist(sample_time_series_df, sample_metrics_config, sample_config):
+def test_identify_crossovers_scenario_11(input_series_1_scenario_11, input_series_2_scenario_11):
     """
-    Test that generate_time_series_indicators raises a KeyError if the value_column does not exist in the time_series_df.
+    Unit test for identify_crossovers function - Scenario 11.
+
+    This test checks if the function correctly identifies both upward and downward crossovers
+    when series1 gradually crosses above and then below series2.
     """
-    # Use a value_column that doesn't exist in the DataFrame
-    invalid_value_column = 'non_existent_column'
 
-    with pytest.raises(KeyError, match=f"Input DataFrame does not include column '{invalid_value_column}'"):
-        cwm.generate_time_series_indicators(
-            time_series_df=sample_time_series_df,
-            config=sample_config,
-            value_column_indicators_config=sample_metrics_config['time_series']['prices']['price']['metrics'],
-            value_column=invalid_value_column
-        )
+    # Run the function
+    result = id.identify_crossovers(input_series_1_scenario_11, input_series_2_scenario_11)
 
+    # Step-by-step explanation of expected values:
+    # At index 0, series1 (2) is below series2 (3): no crossover => result[0] = 0
+    # At index 1, series1 (3) equals series2 (3): no crossover => result[1] = 0
+    # At index 2, series1 (4) crosses above series2 (3): upward crossover => result[2] = 1
+    # At index 3, series1 (5) is still above series2 (3): no new crossover => result[3] = 0
+    # At index 4, series1 (3) crosses below series2 (3): downward crossover => result[4] = -1
+    # At index 5, series1 (2) is below series2 (3): no new crossover => result[5] = 0
+    # At index 6, series1 (1) is still below series2 (3): no new crossover => result[6] = 0
 
-@pytest.mark.unit
-def test_generate_time_series_indicators_value_column_contains_nan(sample_time_series_df, sample_metrics_config, sample_config):
-    """
-    Test that generate_time_series_indicators raises a ValueError if the value_column contains null values.
-    """
-    # Introduce null values into the 'price' column
-    sample_time_series_df.loc[0, 'price'] = None
+    expected_result = pd.Series([0, 0, 1, 0, 0, -1, 0])
 
-    with pytest.raises(ValueError, match="contains null values"):
-        cwm.generate_time_series_indicators(
-            time_series_df=sample_time_series_df,
-            config=sample_config,
-            value_column_indicators_config=sample_metrics_config['time_series']['prices']['price']['metrics'],
-            value_column='price'
-        )
-
+    # Compare the result using np.array_equal
+    assert np.array_equal(result.values, expected_result.values), \
+        f"Expected {expected_result.values} but got {result.values}"
 
 
 # -------------------------------------------- #
@@ -849,7 +977,7 @@ def test_generate_time_series_metrics_no_nulls_and_row_count(prices_df, config, 
 
     if 'indicators' in metrics_config['time_series']['market_data']['price'].keys():
         # Run the generate_time_series_indicators function
-        full_metrics_df, _ = cwm.generate_time_series_indicators(
+        full_metrics_df, _ = id.generate_time_series_indicators(
             time_series_df=prices_df,
             config=config,
             value_column_indicators_config=metrics_config['time_series']['market_data']['price']['indicators'],

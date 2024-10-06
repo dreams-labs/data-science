@@ -86,6 +86,17 @@ time_series:
             scaling: "none"
         window_duration: 10
         lookback_periods: 5
+      indicators:
+        rsi:
+          parameters:
+            window: 14
+          aggregations:
+            last:
+              scaling: "none"
+        ema:
+          parameters:
+            window: [12,26]
+
     volume:
       rolling:
         aggregations:

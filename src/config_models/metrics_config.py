@@ -250,6 +250,7 @@ class IndicatorType(str, Enum):
     """
     SMA = "sma"
     EMA = "ema"
+    RSI = "rsi"
 
 class Indicators(NoExtrasBaseModel):
     parameters: Dict[str, Any]  # Flexible to handle unique parameters

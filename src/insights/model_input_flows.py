@@ -222,7 +222,8 @@ def validate_key_in_config(config, key_path):
             f"Key '{keys[-1]}' not found in config at final level '{'.'.join(keys[:-1])}'")
 
 
-# Module level config_cache dictionary. Config hashes are stored here.
+
+# module level config_cache dictionary for rebuild_profits_df_if_necessary()
 config_cache = {"hash": None}
 
 def rebuild_profits_df_if_necessary(config, prices_df, profits_df=None):
@@ -259,6 +260,8 @@ def rebuild_profits_df_if_necessary(config, prices_df, profits_df=None):
                                                     config['training_data']['modeling_period_end'],
                                                     id_column='coin_id')
     profits_df, _ = dr.clean_profits_df(profits_df, config['data_cleaning'])
+
+    # DDA355 THESE GET REMOVED
     dates_to_impute = [
         config['training_data']['training_period_end'],
         config['training_data']['modeling_period_start'],
@@ -274,8 +277,6 @@ def rebuild_profits_df_if_necessary(config, prices_df, profits_df=None):
     config_cache["hash"] = config_hash
 
     return profits_df
-
-
 
 # helper function for rebuild_profits_df_if_necessary()
 def generate_config_hash(config):
