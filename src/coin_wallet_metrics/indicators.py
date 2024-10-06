@@ -72,21 +72,21 @@ def generate_time_series_indicators(
             windows = indicator_config['parameters']['window']
             for w in windows:
                 ind_series = time_series_df.groupby(level=groupby_column, observed=True)[value_column].transform(
-                    lambda x: calculate_sma(x, w))
+                    lambda x, w=w: calculate_sma(x, w))
                 time_series_df[f"{value_column}_{indicator}_{w}"] = ind_series
 
         elif indicator == 'ema':
             windows = indicator_config['parameters']['window']
             for w in windows:
                 ind_series = time_series_df.groupby(level=groupby_column, observed=True)[value_column].transform(
-                    lambda x: calculate_ema(x, w))
+                    lambda x, w=w: calculate_ema(x, w))
                 time_series_df[f"{value_column}_{indicator}_{w}"] = ind_series
 
         elif indicator == 'rsi':
             windows = indicator_config['parameters']['window']
             for w in windows:
                 ind_series = time_series_df.groupby(level=groupby_column, observed=True)['price'].transform(
-                    lambda x: calculate_rsi(x, w))
+                    lambda x, w=w: calculate_rsi(x, w))
                 time_series_df[f"{value_column}_{indicator}_{w}"] = ind_series
 
         elif indicator == 'bollinger_bands_upper':
@@ -94,7 +94,7 @@ def generate_time_series_indicators(
             num_std = indicator_config['parameters'].get('num_std', None)
             for w in windows:
                 ind_series = time_series_df.groupby(level=groupby_column, observed=True)['price'].transform(
-                    lambda x: calculate_bollinger_bands(x, 'upper', w, num_std))
+                    lambda x, w=w, num_std=num_std: calculate_bollinger_bands(x, 'upper', w, num_std))
                 time_series_df[f"{value_column}_{indicator}_{w}"] = ind_series
 
         elif indicator == 'bollinger_bands_lower':
@@ -102,7 +102,7 @@ def generate_time_series_indicators(
             num_std = indicator_config['parameters'].get('num_std', None)
             for w in windows:
                 ind_series = time_series_df.groupby(level=groupby_column, observed=True)['price'].transform(
-                    lambda x: calculate_bollinger_bands(x, 'lower', w, num_std))
+                    lambda x, w=w, num_std=num_std: calculate_bollinger_bands(x, 'lower', w, num_std))
                 time_series_df[f"{value_column}_{indicator}_{w}"] = ind_series
 
     # Reset index
