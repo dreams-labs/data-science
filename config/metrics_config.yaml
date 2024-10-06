@@ -144,3 +144,82 @@ macro_trends:
           scaling: "none"
       window_duration: 10
       lookback_periods: 2
+  # global_market_cap:
+  #   aggregations:
+  #     none:
+  #       scaling: "none"
+
+# ratios:
+#   crossover_1:
+#     definition:
+#       series1: "time_series.market_data.price.indicators.ema.parameters.window.12"
+#       series2: "time_series.market_data.price.indicators.ema.parameters.window.26"
+#     rolling:
+#       aggregations:
+#         sum:
+#           scaling: "none"
+#       window_duration: 15
+#       lookback_periods: 2
+#   crossover_2:
+#     definition:
+#       series1: "time_series.market_data.price.indicators.bollinger_bands_upper.parameters.window.12"
+#       series2: "time_series.market_data.price"
+#     rolling:
+#       aggregations:
+#         sum:
+#           scaling: "none"
+#       window_duration: 15
+#       lookback_periods: 2
+#   crossover_3:
+#     definition:
+#       series1: "time_series.market_data.price.indicators.bollinger_bands_lower.parameters.window.12"
+#       series2: "time_series.market_data.price"
+#     rolling:
+#       aggregations:
+#         sum:
+#           scaling: "none"
+#       window_duration: 15
+#       lookback_periods: 2
+#   on_balance_volume_1:
+#     definition:
+#       series1: "time_series.market_data.price"
+#       series2: "time_series.market_data.volume"
+#     rolling:
+#       aggregations:
+#         average:
+#           scaling: "none"
+#       window_duration: 7
+#       lookback_periods: 3
+#   on_balance_volume_2:
+#     definition:
+#       series1: "macro_trends.global_market_cap"
+#       series2: "macro_trends.global_volume"
+#     rolling:
+#       aggregations:
+#         average:
+#           scaling: "none"
+#       window_duration: 7
+#       lookback_periods: 3
+#   money_flow_index:
+#     definition:
+#       series1: "time_series.market_data.price"
+#       series2: "time_series.market_data.volume"
+#       window: 14
+#     rolling:
+#       aggregations:
+#         max:
+#           scaling: "none"
+#   divide:
+#     definition:
+#       series1: "wallet_cohorts.normies.total_bought"
+#       series2: "wallet_cohorts.whales.total_bought"
+#     aggregations:
+#       sum:
+#         scaling: "none"
+#   subtract:
+#     definition:
+#       series1: "wallet_cohorts.normies.total_bought"
+#       series2: "wallet_cohorts.whales.total_bought"
+#     aggregations:
+#       sum:
+#         scaling: "none"

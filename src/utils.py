@@ -31,9 +31,23 @@ importlib.reload(py_mc)
 importlib.reload(py_mo)
 importlib.reload(py_e)
 
-
 # set up logger at the module level
 logger = dc.setup_logger()
+
+
+def load_all_configs(config_folder):
+    """
+    Loads and returns all config files
+    """
+    config = load_config(f'{config_folder}/config.yaml')
+    metrics_config = load_config(f'{config_folder}/metrics_config.yaml')
+    modeling_config = load_config(f'{config_folder}/modeling_config.yaml')
+    experiments_config = load_config(f'{config_folder}/experiments_config.yaml')
+
+    # Confirm that all datasets and metrics match across config and metrics_config
+    validate_config_consistency(config,metrics_config)
+
+    return config, metrics_config, modeling_config, experiments_config
 
 
 def load_config(file_path='../notebooks/config.yaml'):
@@ -101,19 +115,53 @@ def load_config(file_path='../notebooks/config.yaml'):
     return config
 
 
-def load_all_configs(config_folder):
+# helper function for load_config
+def calculate_period_dates(training_data_config):
     """
-    Loads and returns all config files
+    Calculate the training and modeling period start and end dates based on the provided
+    durations and the modeling period start date. The calculated dates will include both
+    the start and end dates, ensuring the correct number of days for each period.
+
+    Args:
+        training_data_config (dict): Configuration dictionary containing:
+        - 'modeling_period_start' (str): Start date of the modeling period in 'YYYY-MM-DD' format.
+        - 'modeling_period_duration' (int): Duration of the modeling period in days.
+        - 'training_period_duration' (int): Duration of the training period in days.
+
+    Returns:
+        dict: Dictionary containing:
+        - 'training_period_start' (str): Calculated start date of the training period.
+        - 'training_period_end' (str): Calculated end date of the training period.
+        - 'modeling_period_end' (str): Calculated end date of the modeling period.
     """
-    config = load_config(f'{config_folder}/config.yaml')
-    metrics_config = load_config(f'{config_folder}/metrics_config.yaml')
-    modeling_config = load_config(f'{config_folder}/modeling_config.yaml')
-    experiments_config = load_config(f'{config_folder}/experiments_config.yaml')
+    # Extract the config values
+    modeling_period_start = datetime.strptime(training_data_config['modeling_period_start'], '%Y-%m-%d')
+    modeling_period_duration = training_data_config['modeling_period_duration']  # in days
+    training_period_duration = training_data_config['training_period_duration']  # in days
 
-    # Confirm that all datasets and metrics match across config and metrics_config
-    validate_config_consistency(config,metrics_config)
+    # Calculate modeling_period_end (inclusive of the start date)
+    modeling_period_end = modeling_period_start + timedelta(days=modeling_period_duration - 1)
 
-    return config, metrics_config, modeling_config, experiments_config
+    # Calculate training_period_end (just before modeling_period_start)
+    training_period_end = modeling_period_start - timedelta(days=1)
+
+    # Calculate training_period_start (inclusive of the start date)
+    training_period_start = training_period_end - timedelta(days=training_period_duration - 1)
+
+    # Calculate the start date of the earliest window
+    window_duration = modeling_period_duration + training_period_duration
+    window_count = training_data_config['additional_windows'] + 1
+    total_days = window_duration * window_count
+    earliest_window_start = pd.to_datetime(modeling_period_end) - timedelta(days=total_days)
+
+    # Return updated config with calculated values
+    return {
+        'training_period_start': training_period_start.strftime('%Y-%m-%d'),
+        'training_period_end': training_period_end.strftime('%Y-%m-%d'),
+        'modeling_period_end': modeling_period_end.strftime('%Y-%m-%d'),
+        'earliest_window_start': earliest_window_start.strftime('%Y-%m-%d')
+    }
+
 
 
 def validate_config_consistency(config,metrics_config):
@@ -211,48 +259,6 @@ def timing_decorator(func):
         )
         return result
     return wrapper
-
-
-
-# helper function for load_config
-def calculate_period_dates(config):
-    """
-    Calculate the training and modeling period start and end dates based on the provided
-    durations and the modeling period start date. The calculated dates will include both
-    the start and end dates, ensuring the correct number of days for each period.
-
-    Args:
-        config (dict): Configuration dictionary containing:
-        - 'modeling_period_start' (str): Start date of the modeling period in 'YYYY-MM-DD' format.
-        - 'modeling_period_duration' (int): Duration of the modeling period in days.
-        - 'training_period_duration' (int): Duration of the training period in days.
-
-    Returns:
-        dict: Dictionary containing:
-        - 'training_period_start' (str): Calculated start date of the training period.
-        - 'training_period_end' (str): Calculated end date of the training period.
-        - 'modeling_period_end' (str): Calculated end date of the modeling period.
-    """
-    # Extract the config values
-    modeling_period_start = datetime.strptime(config['modeling_period_start'], '%Y-%m-%d')
-    modeling_period_duration = config['modeling_period_duration']  # in days
-    training_period_duration = config['training_period_duration']  # in days
-
-    # Calculate modeling_period_end (inclusive of the start date)
-    modeling_period_end = modeling_period_start + timedelta(days=modeling_period_duration - 1)
-
-    # Calculate training_period_end (just before modeling_period_start)
-    training_period_end = modeling_period_start - timedelta(days=1)
-
-    # Calculate training_period_start (inclusive of the start date)
-    training_period_start = training_period_end - timedelta(days=training_period_duration - 1)
-
-    # Return updated config with calculated values
-    return {
-        'training_period_start': training_period_start.strftime('%Y-%m-%d'),
-        'training_period_end': training_period_end.strftime('%Y-%m-%d'),
-        'modeling_period_end': modeling_period_end.strftime('%Y-%m-%d')
-    }
 
 
 

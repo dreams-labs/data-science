@@ -88,6 +88,8 @@ def generate_time_series_indicators(
 
     # return full_indicators_df, partial_time_series_indicators_df
 
+
+
 # =====================================================================
 # Single Series Input Indicators
 # =====================================================================
@@ -216,7 +218,7 @@ def calculate_rsi(timeseries: pd.Series, window: int = 14) -> pd.Series:
 
 
 # =====================================================================
-# Double Series Input Indicators
+# Dual Series Input Indicators
 # =====================================================================
 
 def add_mfi_column(time_series_df, price_col='price', volume_col='volume', window=14, drop_price=False, drop_volume=False):
@@ -392,8 +394,8 @@ def identify_crossovers(series1, series2):
 
 def generalized_obv(primary_series, secondary_series):
     """
-    OBV uses volume changes to predict price movements by showing whether volume is flowing
-    into or out of an asset, indicating potential buying or selling pressure.
+    On-Balance Volume (OBV): OBV uses volume changes to predict price movements by showing whether
+    volume is flowing into or out of an asset, indicating potential buying or selling pressure.
 
     - If the primary series increases, the secondary series is added.
     - If the primary series decreases, the secondary series is subtracted.

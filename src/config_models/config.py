@@ -40,6 +40,7 @@ class TrainingDataConfig(NoExtrasBaseModel):
     modeling_period_start: date = Field(...)
     modeling_period_end: date = Field(...)
     additional_windows: int = Field(..., ge=0)
+    earliest_window_start: date = Field(...)
 
 
 
@@ -51,9 +52,10 @@ class FillMethod(str, Enum):
     These dicatates what to do if the dataset doesn't have rows for every coin_id in other
     datasets.
     """
-    FILL_ZEROS = "fill_zeros"   # any missing rows are filled with 0
-    DROP_RECORDS = "drop_records"     # any missing rows are dropped from the training set
-    EXTEND = "extend"           # used for macro series; copies the features to all coins
+    FILL_ZEROS = "fill_zeros"       # any missing rows are filled with 0
+    DROP_RECORDS = "drop_records"   # any missing rows are dropped from the training set
+    EXTEND = "extend"               # used for macro series; copies the features to all coins
+    NONE = "none"                   # generates no features but allows series to be used for ratios
 
 
 class DatasetsConfig(NoExtrasBaseModel):
@@ -127,8 +129,9 @@ class DataCleaningConfig(NoExtrasBaseModel):
     profitability_filter: float = Field(..., gt=0)
     inflows_filter: float = Field(..., gt=0)
     max_gap_days: int = Field(..., gt=0)
-    exclude_coins_without_transfers: bool = Field(False)
+    min_daily_volume: float = Field(..., gt=0)
     minimum_wallet_inflows: float = Field(..., gt=0)
+    exclude_coins_without_transfers: bool = Field(False)
 
 
 # ============================================================================

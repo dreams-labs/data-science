@@ -171,6 +171,7 @@ class AggregationType(str, Enum):
     MIN = "min"
     FIRST = "first"
     LAST = "last"
+    NONE = "none" # generates no features but allows column to be used for ratios
 
 class AggregationConfig(NoExtrasBaseModel):
     """
@@ -251,6 +252,8 @@ class IndicatorType(str, Enum):
     SMA = "sma"
     EMA = "ema"
     RSI = "rsi"
+    BOLLINGER_BANDS_UPPER = "bollinger_bands_upper"
+    BOLLINGER_BANDS_LOWER = "bollinger_bands_lower"
 
 class Indicators(NoExtrasBaseModel):
     parameters: Dict[str, Any]  # Flexible to handle unique parameters

@@ -31,6 +31,7 @@ def retrieve_market_data():
         ,cast(cmd.price as float64) as price
         ,cast(cmd.volume as int64) as volume
         ,cast(coalesce(cmd.market_cap,cmd.fdv) as int64) as market_cap
+        ,days_imputed
         from core.coin_market_data cmd
         order by 1,2
     """
@@ -61,6 +62,53 @@ def retrieve_market_data():
                 round(time.time()-start_time,1))
 
     return market_data_df
+
+
+
+def clean_market_data(market_data_df, config):
+    """
+    Removes all market data records for
+        1. coins with a longer price gap than the config['data_cleaning']['max_gap_days']
+        2. coins with lower daily mean volume than the minimum_daily_volume between the
+            earliest_window_start and the end of the last modeling period.
+
+    Params:
+    - market_data_df (DataFrame): DataFrame containing market data as well as the
+        days_imputed column, which represents the number of days a real price has been
+        forwardfilled in a row to ensure a complete time series.
+    - max_gap_days (int): The maximum allowable number of forwardfilled dates before
+        all records for the coin are removed
+    """
+    # Declare thresholds
+    max_gap_days = config['data_cleaning']['max_gap_days']
+    min_daily_volume = config['data_cleaning']['min_daily_volume']
+
+    # Identify coin_ids with gaps that exceed the maximum
+    all_coin_ids = market_data_df.groupby('coin_id', observed=True)['days_imputed'].max()
+    gap_coin_ids = all_coin_ids[all_coin_ids > max_gap_days].index.tolist()
+
+    # Remove coins with gaps above the maximum
+    market_data_df_no_gaps = market_data_df[~market_data_df['coin_id'].isin(gap_coin_ids)]
+
+    logger.info("Removed %s market data records for %s coins with gaps above max_gap_days",
+                len(market_data_df) - len(market_data_df_no_gaps),
+                len(gap_coin_ids))
+
+
+    # Identify coin_ids with daily volume below the minimum
+    mean_volume = market_data_df_no_gaps.groupby('coin_id', observed=True)['volume'].mean()
+    coin_ids_filtered = mean_volume[mean_volume > min_daily_volume].index
+
+    # Filter market_data_df
+    market_data_df_no_gaps_no_vol = (market_data_df_no_gaps[market_data_df_no_gaps['coin_id']
+                                                      .isin(coin_ids_filtered)])
+
+    logger.info("Removed %s additional market data records for %s coins with volume below "
+                "min_daily_volume",
+                len(market_data_df_no_gaps) - len(market_data_df_no_gaps_no_vol),
+                len(set(market_data_df_no_gaps['coin_id'].unique()) - set(coin_ids_filtered)))
+
+    return market_data_df_no_gaps_no_vol
 
 
 
