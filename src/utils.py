@@ -163,7 +163,6 @@ def calculate_period_dates(training_data_config):
     }
 
 
-
 def validate_config_consistency(config,metrics_config):
     """
     Validates the consistency between config.yaml and metrics_config.yaml.
@@ -214,6 +213,25 @@ def validate_config_consistency(config,metrics_config):
     # If we've made it this far, the configs are consistent
     logger.debug("Config files are consistent.")
 
+
+def check_nan_values(series):
+    """
+    Check if NaN values are only at the start or end of the series.
+
+    Returns:
+    - True if NaN values are in the middle of the series
+    - False if NaN values are only at start/end or if there are no NaN values
+    """
+    # Get the index of the first and last non-NaN value
+    first_valid = series.first_valid_index()
+    last_valid = series.last_valid_index()
+
+    # Check if there are any NaN values between the first and last valid value
+    has_nans_in_series = (series.loc[first_valid:last_valid] # selects the range between first and last valid value
+                             .isna() # checks for NaN values in this range
+                             .any()) # returns True if there are any NaN values in this range
+
+    return has_nans_in_series
 
 
 def timing_decorator(func):

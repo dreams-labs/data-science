@@ -78,6 +78,7 @@ class WalletCohortConfig(NoExtrasBaseModel):
     description: str = Field(...)
     fill_method: FillMethod = Field(...)
     sameness_threshold: float = Field(..., ge=0, le=1)
+    lookback_period: int = Field(..., gt=0)
     wallet_minimum_inflows: float = Field(..., ge=0)
     wallet_maximum_inflows: float = Field(..., gt=0)
     coin_profits_win_threshold: float = Field(...)

@@ -2,16 +2,15 @@
 calculates metrics related to the distribution of coin ownership across wallets
 '''
 # pylint: disable=C0301 # line too long
-
+import sys
 from typing import Tuple,Optional
 import pandas as pd
 import numpy as np
 import dreams_core.core as dc
 
 # import coin_wallet_metrics as cwm
-# sys.path.append('..')
-# from training_data import data_retrieval as dr
-# from training_data import profits_row_imputation as ri
+sys.path.append('..')
+import utils as u  # pylint: disable=C0413  # import must be at top
 
 
 # set up logger at the module level
@@ -90,10 +89,10 @@ def generate_column_time_series_indicators(
     # Check for NaN values
     if id_column:
         for group_id, group in time_series_df.groupby(id_column, observed=True):
-            if check_nan_values(group[value_column]):
+            if u.check_nan_values(group[value_column]):
                 raise ValueError(f"The '{value_column}' column contains NaN values in the middle for {id_column} {group_id}.")
     else:
-        if check_nan_values(time_series_df[value_column]):
+        if u.check_nan_values(time_series_df[value_column]):
             raise ValueError(f"The '{value_column}' column contains NaN values in the middle of the series.")
 
     # Defining index to group on
@@ -163,25 +162,6 @@ def generate_column_time_series_indicators(
 
     return time_series_df
 
-
-def check_nan_values(series):
-    """
-    Check if NaN values are only at the start or end of the series.
-
-    Returns:
-    - True if NaN values are in the middle of the series
-    - False if NaN values are only at start/end or if there are no NaN values
-    """
-    # Get the index of the first and last non-NaN value
-    first_valid = series.first_valid_index()
-    last_valid = series.last_valid_index()
-
-    # Check if there are any NaN values between the first and last valid value
-    nans_in_series = (series.loc[first_valid:last_valid] # selects the range between first and last valid value
-                             .isna() # checks for NaN values in this range
-                             .any()) # returns True if there are any NaN values in this range
-
-    return nans_in_series
 
 
 # =====================================================================

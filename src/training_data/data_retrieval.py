@@ -1,13 +1,15 @@
 """
 functions used in generating training data for the models
 """
+import sys
 import time
 import pandas as pd
 from dreams_core.googlecloud import GoogleCloud as dgc
 from dreams_core import core as dc
 
-# project file imports
-from utils import timing_decorator  # pylint: disable=E0401 # can't find utils import
+# import coin_wallet_metrics as cwm
+sys.path.append('..')
+import utils as u  # pylint: disable=C0413  # import must be at top
 
 
 # set up logger at the module level
@@ -279,7 +281,7 @@ def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows):
     return profits_df
 
 
-@timing_decorator
+@u.timing_decorator
 def clean_profits_df(profits_df, data_cleaning_config):
     """
     Clean the profits DataFrame by excluding all records for any wallet_addresses that
@@ -460,6 +462,8 @@ def clean_macro_trends(macro_trends_df, config):
     Returns:
     - filtered_macro_trends_df (DataFrame): input df with non-metric configured columns removed
     """
+    # 1. Filter to only relevant columns
+    # ----------------------------------
     # Get the keys from the config dictionary
     metric_columns = list(config['datasets']['macro_trends'].keys())
 
@@ -474,5 +478,23 @@ def clean_macro_trends(macro_trends_df, config):
 
     # Filter the dataframe to only the required columns
     filtered_macro_trends_df = macro_trends_df[required_columns]
+
+
+    # 2. Confirm there are no mid-series nan values
+    # ---------------------------------------------
+    nan_checks = []
+    nan_cols = []
+
+    for col in filtered_macro_trends_df.columns:
+        # Check if there are NaNs in the middle of any columns
+        nan_check = u.check_nan_values(filtered_macro_trends_df[col])
+        nan_checks.append(nan_check)
+
+        # Store column name if there are NaNs in the middle of the series
+        if nan_check:
+            nan_cols.append(col)
+
+    if sum(nan_checks) > 0:
+        raise ValueError(f"NaN values found in macro_trends_df columns: {nan_cols}")
 
     return filtered_macro_trends_df
