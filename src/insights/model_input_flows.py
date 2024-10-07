@@ -230,7 +230,7 @@ def identify_imputation_dates(config):
     - config (dict): config.yaml
 
     Returns:
-    - required_dates (list of strings): list of all dates that need records showing unrealized
+    - imputation_dates (list of strings): list of all dates that need records showing unrealized
         profits as of that date
     """
     # Basic period boundary dates
@@ -255,9 +255,10 @@ def identify_imputation_dates(config):
         lookback_start_dates.append(lbp_start.strftime('%Y-%m-%d'))
 
     # Return combined list
-    required_dates = period_boundary_dates + lookback_start_dates
+    imputation_dates = period_boundary_dates + lookback_start_dates
+    imputation_dates = sorted(imputation_dates)
 
-    return required_dates
+    return imputation_dates
 
 
 # module level config_cache dictionary for rebuild_profits_df_if_necessary()

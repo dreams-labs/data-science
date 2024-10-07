@@ -91,7 +91,7 @@ def multithreaded_impute_profits_rows(profits_df, prices_df, target_date, n_thre
             ensure that every coin-wallet pair has a record on the given date.
     """
     # Partition profits_df on coin_id
-    logger.info("Splitting profits_df into %s partitions for date %s...",n_threads,target_date)
+    logger.debug("Splitting profits_df into %s partitions for date %s...",n_threads,target_date)
 
     profits_df_partitions = create_partitions(profits_df, n_threads)
 
@@ -102,7 +102,7 @@ def multithreaded_impute_profits_rows(profits_df, prices_df, target_date, n_thre
     threads = []
 
     # Create and start a thread for each partition
-    logger.info("Initiating multithreading calculations for date %s...",target_date)
+    logger.debug("Initiating multithreading calculations for date %s...",target_date)
 
     # Temporarily increase the log level to suppress most logs from multithread workers
     original_level = logger.level

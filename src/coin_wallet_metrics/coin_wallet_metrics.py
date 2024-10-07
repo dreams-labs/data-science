@@ -383,6 +383,9 @@ def split_dataframe_by_coverage(
     start_date = pd.to_datetime(start_date)
     end_date = pd.to_datetime(end_date)
 
+    # Create copy of df
+    time_series_df = time_series_df.copy()
+
     # Define a function to check if a date range has full coverage
     def has_full_coverage(min_date, max_date):
         return (min_date <= start_date) and (max_date >= end_date)

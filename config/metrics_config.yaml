@@ -34,10 +34,28 @@ wallet_cohorts:
                         scaling: "log"
                 window_duration: 10
                 lookback_periods: 3
+            indicators:
+                rsi:
+                    parameters:
+                        window: [14]
+                    aggregations:
+                        last:
+                            scaling: "none"
         total_volume:
             aggregations:
                 last:
                     scaling: "log"        # Total sold should also be scaled to account for high variance.
+            indicators:
+                ema:
+                    parameters:
+                        window: [7]
+                    rolling:
+                        aggregations:
+                            last:
+                                scaling: "none"
+                        window_duration: 7
+                        lookback_periods: 3
+
         total_balance:
             aggregations:
                 last:
