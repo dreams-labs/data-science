@@ -319,8 +319,8 @@ def calculate_new_profits_values(profits_df, target_date):
                                   * profits_df['usd_balance'])
 
     # these are zero since the transactionless day is being imputed
-    new_rows_df['usd_net_transfers'] = 0
-    new_rows_df['usd_inflows'] = 0
+    new_rows_df['usd_net_transfers'] = np.float32(0)
+    new_rows_df['usd_inflows'] = np.float32(0)
 
     # no new usd_inflows so cumulative remains the same
     new_rows_df['usd_inflows_cumulative'] = profits_df['usd_inflows_cumulative']

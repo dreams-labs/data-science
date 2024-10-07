@@ -99,4 +99,4 @@ data_cleaning:
   exclude_coins_without_transfers: True  # determines whether to create price features for coins without transfers data
 
   # wallet filters: defines which wallets are included in analysis
-  minimum_wallet_inflows: 10 # The amount of total USD inflows a wallet must have to be included in the training data
+  minimum_wallet_inflows: 10 # The amount of lifetime USD inflows a wallet must have to be included in the training data

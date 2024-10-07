@@ -21,7 +21,7 @@ from dreams_core import core as dc
 # pyright: reportMissingImports=false
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 import training_data.data_retrieval as dr
-import training_data.profits_row_imputation as ri
+import training_data.profits_row_imputation as pri
 import coin_wallet_metrics.coin_wallet_metrics as cwm
 from utils import load_config
 
@@ -267,7 +267,7 @@ def test_calculate_new_profits_values_normal_data(sample_profits_df, target_date
         sample_profits_df (pd.DataFrame): Fixture providing sample input data.
         target_date (datetime): Fixture providing a target date for imputation.
     """
-    result = ri.calculate_new_profits_values(sample_profits_df, target_date)
+    result = pri.calculate_new_profits_values(sample_profits_df, target_date)
     result = result.set_index(['coin_id', 'wallet_address', 'date'])
 
     # Check if the result has the correct structure
@@ -325,7 +325,7 @@ def test_calculate_new_profits_values_zero_price_change(zero_price_change_df, ta
         zero_price_change_df (pd.DataFrame): Fixture providing sample input data with no price change.
         target_date (datetime): Fixture providing a target date for imputation.
     """
-    result = ri.calculate_new_profits_values(zero_price_change_df, target_date)
+    result = pri.calculate_new_profits_values(zero_price_change_df, target_date)
     result = result.set_index(['coin_id', 'wallet_address', 'date'])
 
     # Check if the result has the correct structure
@@ -383,7 +383,7 @@ def test_calculate_new_profits_values_negative_price_change(negative_price_chang
             price decreases.
         target_date (datetime): Fixture providing a target date for imputation.
     """
-    result = ri.calculate_new_profits_values(negative_price_change_df, target_date)
+    result = pri.calculate_new_profits_values(negative_price_change_df, target_date)
     result = result.set_index(['coin_id', 'wallet_address', 'date'])
 
     # Check if the result has the correct structure
@@ -449,7 +449,7 @@ def test_calculate_new_profits_values_zero_usd_balance(zero_usd_balance_df, targ
         zero_usd_balance_df (pd.DataFrame): Fixture providing sample input data with zero USD balances.
         target_date (datetime): Fixture providing a target date for imputation.
     """
-    result = ri.calculate_new_profits_values(zero_usd_balance_df, target_date)
+    result = pri.calculate_new_profits_values(zero_usd_balance_df, target_date)
     result = result.set_index(['coin_id', 'wallet_address', 'date'])
 
     # Check if calculations are correct for all rows
@@ -507,7 +507,7 @@ def test_calculate_new_profits_values_multiple_coins_wallets(
             coins and wallets.
         target_date (datetime): Fixture providing a target date for imputation.
     """
-    result = ri.calculate_new_profits_values(multiple_coins_wallets_df, target_date)
+    result = pri.calculate_new_profits_values(multiple_coins_wallets_df, target_date)
     result = result.set_index(['coin_id', 'wallet_address', 'date'])
 
     # Check if calculations are correct for all rows
@@ -625,7 +625,7 @@ def test_impute_profits_df_rows_base_case(sample_profits_df_missing_dates,
     """
     target_date = pd.Timestamp('2023-01-06')
 
-    result = ri.impute_profits_df_rows(sample_profits_df_missing_dates,
+    result = pri.impute_profits_df_rows(sample_profits_df_missing_dates,
                                        sample_prices_df_missing_dates,
                                        target_date)
 
@@ -693,7 +693,7 @@ def test_impute_profits_df_rows_early_target_date(
     early_target_date = pd.Timestamp('2022-12-31')
 
     with pytest.raises(ValueError) as excinfo:
-        ri.impute_profits_df_rows(
+        pri.impute_profits_df_rows(
             sample_profits_df_missing_dates,
             sample_prices_df_missing_dates,
             early_target_date)
@@ -713,7 +713,7 @@ def test_impute_profits_df_rows_late_target_date(
     late_target_date = pd.Timestamp('2023-01-08')
 
     with pytest.raises(ValueError) as excinfo:
-        ri.impute_profits_df_rows(
+        pri.impute_profits_df_rows(
             sample_profits_df_missing_dates,
             sample_prices_df_missing_dates,
             late_target_date)
@@ -809,7 +809,7 @@ def profits_df(prices_df,cleaned_profits_df):
     ]
     # this must use only 1 thread to work in a testing environment
     with single_threaded():
-        profits_df = ri.impute_profits_for_multiple_dates(profits_df, prices_df, dates_to_impute, n_threads=1)
+        profits_df = pri.impute_profits_for_multiple_dates(profits_df, prices_df, dates_to_impute, n_threads=1)
 
     return profits_df
 

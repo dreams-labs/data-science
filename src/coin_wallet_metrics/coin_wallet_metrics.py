@@ -360,7 +360,8 @@ def split_dataframe_by_coverage(
         time_series_df: pd.DataFrame,
         start_date: pd.Timestamp,
         end_date: pd.Timestamp,
-        id_column: Optional[str] = 'coin_id'
+        id_column: Optional[str] = 'coin_id',
+        drop_outside_date_range: bool = False
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Splits the input DataFrame into full coverage and partial coverage based on date range.
@@ -371,6 +372,8 @@ def split_dataframe_by_coverage(
     - start_date (pd.Timestamp): Start date of the training period.
     - end_date (pd.Timestamp): End date of the modeling period.
     - id_column (Optional[str]): The name of the column used to identify different series.
+    - drop_outside_date_range (Optional[bool]): Whether to remove all rows that are outside of
+        the start_date and end_date
 
     Returns:
     - full_coverage_df (pd.DataFrame): DataFrame with series having complete data for the period.
@@ -408,11 +411,23 @@ def split_dataframe_by_coverage(
 
     logger.info("Split df with dimensions %s into %s full coverage records and %s partial coverage records.",
                 time_series_df.shape,
-                dc.human_format(len(full_coverage_df)),
-                dc.human_format(len(partial_coverage_df))
-    )
+                len(full_coverage_df),
+                len(partial_coverage_df))
+
+    if drop_outside_date_range:
+        # Remove rows outside the date range for both dataframes
+        full_coverage_df = (full_coverage_df[(full_coverage_df['date'] >= start_date) &
+                                             (full_coverage_df['date'] <= end_date)])
+        partial_coverage_df = (partial_coverage_df[(partial_coverage_df['date'] >= start_date) &
+                                                   (partial_coverage_df['date'] <= end_date)])
+
+        # Log the number of remaining records
+        total_remaining = len(full_coverage_df) + len(partial_coverage_df)
+        logger.info("After removing records outside the date range, %s records remain.",
+                    total_remaining)
 
     return full_coverage_df, partial_coverage_df
+
 
 
 

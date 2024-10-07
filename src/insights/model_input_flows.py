@@ -22,7 +22,7 @@ import feature_engineering as fe
 import modeling as m
 sys.path.append('..')
 from training_data import data_retrieval as dr
-from training_data import profits_row_imputation as ri
+from training_data import profits_row_imputation as pri
 
 
 
@@ -176,7 +176,7 @@ def prepare_configs(config_folder, override_params):
             raise ValueError(f"Unknown config section in key: {full_key}")
 
     # reapply the period boundary dates based on the current config['training_data'] params
-    period_dates = u.calculate_period_dates(config['training_data'])
+    period_dates = u.calculate_period_dates(config)
     config['training_data'].update(period_dates)
 
     return config, metrics_config, modeling_config
@@ -304,7 +304,7 @@ def rebuild_profits_df_if_necessary(config, prices_df, profits_df=None):
         config['training_data']['modeling_period_start'],
         config['training_data']['modeling_period_end'],
     ]
-    profits_df = ri.impute_profits_for_multiple_dates(
+    profits_df = pri.impute_profits_for_multiple_dates(
                     profits_df,
                     prices_df,
                     dates_to_impute,

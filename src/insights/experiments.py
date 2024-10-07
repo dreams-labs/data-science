@@ -125,11 +125,9 @@ def run_experiment(modeling_config):
                                             modeling_config)
 
         # 3.4 Train the model using the current configuration and log the results
-        model, model_id = m.train_model(
-                            X_train,
-                            y_train,
-                            modeling_folder,
-                            modeling_config['modeling']['model_params'])
+        model, model_id = m.train_model(X_train,
+                                        y_train,
+                                        modeling_config)
 
         # 3.5 Evaluate and save the model's performance on the test set to a CSV
         _, _, _ = m.evaluate_model(model, X_test, y_test, model_id, returns_test, modeling_config)
