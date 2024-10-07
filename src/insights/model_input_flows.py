@@ -222,44 +222,6 @@ def validate_key_in_config(config, key_path):
             f"Key '{keys[-1]}' not found in config at final level '{'.'.join(keys[:-1])}'")
 
 
-def identify_imputation_dates(config):
-    """
-    Identifies all dates that must be imputed into profits_df.
-
-    Params:
-    - config (dict): config.yaml
-
-    Returns:
-    - imputation_dates (list of strings): list of all dates that need records showing unrealized
-        profits as of that date
-    """
-    # Basic period boundary dates
-    period_boundary_dates = [
-        config['training_data']['modeling_period_end'],
-        config['training_data']['modeling_period_start'],
-        config['training_data']['training_period_end'],
-        config['training_data']['training_period_start'],
-    ]
-
-    # Identify all unique cohort lookback periods
-    cohort_lookback_periods = [
-        cohort['lookback_period']
-        for cohort in config['datasets']['wallet_cohorts'].values()
-    ]
-
-    # Determine the actual dates of the lookback period starts in this time window
-    training_period_start = pd.to_datetime(config['training_data']['training_period_start'])
-    lookback_start_dates = []
-    for lbp in set(cohort_lookback_periods):
-        lbp_start = training_period_start - timedelta(days=lbp)
-        lookback_start_dates.append(lbp_start.strftime('%Y-%m-%d'))
-
-    # Return combined list
-    imputation_dates = period_boundary_dates + lookback_start_dates
-    imputation_dates = sorted(imputation_dates)
-
-    return imputation_dates
-
 
 # module level config_cache dictionary for rebuild_profits_df_if_necessary()
 config_cache = {"hash": None}

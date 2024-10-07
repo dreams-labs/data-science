@@ -38,14 +38,14 @@ def generate_time_series_indicators(dataset_df, dataset_metrics_config, id_colum
     for value_column in list(dataset_metrics_config.keys()):
 
         if 'indicators' in dataset_metrics_config[value_column].keys():
-            dataset_indicators_df = generate_column_time_series_indicators(
+            dataset_df = generate_column_time_series_indicators(
                 dataset_df,
                 value_column,
                 dataset_metrics_config[value_column]['indicators'],
                 id_column
             )
 
-    return dataset_indicators_df
+    return dataset_df
 
 
 def generate_column_time_series_indicators(

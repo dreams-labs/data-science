@@ -75,7 +75,6 @@ class WalletCohortConfig(NoExtrasBaseModel):
     This data category is a series of metrics generated based on the behavior of a cohort
     of wallets, which are defined using the variables within.
     """
-    description: str = Field(...)
     fill_method: FillMethod = Field(...)
     sameness_threshold: float = Field(..., ge=0, le=1)
     lookback_period: int = Field(..., gt=0)
@@ -91,7 +90,6 @@ class TimeSeriesDataConfig(NoExtrasBaseModel):
     """
     This data category includes any dataset keyed on both coin_id and date.
     """
-    description: str = Field(...)
     fill_method: FillMethod = Field(...)
     sameness_threshold: float = Field(..., ge=0, le=1)
 
@@ -103,7 +101,6 @@ class CoinFactsConfig(NoExtrasBaseModel):
     do not generally change over time. Examples include a token's category, blockchain,
     fee structure, etc.
     """
-    description: str = Field(...)
     fill_method: FillMethod = Field(...)
     sameness_threshold: float = Field(..., ge=0, le=1)
     chain_threshold: Optional[int] = Field(None, ge=0)
@@ -116,7 +113,6 @@ class MacroTrendsConfig(NoExtrasBaseModel):
     do not generally change over time. Examples include a token's category, blockchain,
     fee structure, etc.
     """
-    description: str = Field(...)
     fill_method: FillMethod = Field(...)
 
 
