@@ -79,9 +79,9 @@ datasets:
     global_volume:
       description: "global_volume"
       fill_method: "extend"
-    # global_market_cap:
-    #   description: "global_market_cap"
-    #   fill_method: "none"
+    global_market_cap:
+      description: "global_market_cap"
+      fill_method: "extend"
 
 
 data_cleaning:

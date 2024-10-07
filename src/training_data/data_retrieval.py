@@ -442,4 +442,37 @@ def retrieve_macro_trends_data():
     macro_trends_df = macro_trends_df.set_index('date')
     macro_trends_df = macro_trends_df.resample('D').interpolate(method='time', limit_area='inside')
 
+    # Reset index
+    macro_trends_df = macro_trends_df.reset_index()
+
     return macro_trends_df
+
+
+def clean_macro_trends(macro_trends_df, config):
+    """
+    Basic function to only retain the columns in macro_trends_df that have metrics described in
+    the config files.
+
+    Params:
+    - macro_trends_df (DataFrame): df with macro trends data keyed on date
+    - config (dict): config.yaml
+
+    Returns:
+    - filtered_macro_trends_df (DataFrame): input df with non-metric configured columns removed
+    """
+    # Get the keys from the config dictionary
+    metric_columns = list(config['datasets']['macro_trends'].keys())
+
+    # Ensure 'date' is included
+    required_columns = ['date'] + metric_columns
+
+    # Check if all required columns exist in the dataframe
+    missing_columns = [col for col in required_columns if col not in macro_trends_df.columns]
+
+    if missing_columns:
+        raise ValueError(f"The following columns are missing from the dataframe: {', '.join(missing_columns)}")
+
+    # Filter the dataframe to only the required columns
+    filtered_macro_trends_df = macro_trends_df[required_columns]
+
+    return filtered_macro_trends_df

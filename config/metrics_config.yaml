@@ -186,10 +186,14 @@ macro_trends:
                     scaling: "none"
             window_duration: 10
             lookback_periods: 2
-    # global_market_cap:
-    #     aggregations:
-    #         none:
-    #             scaling: "none"
+    global_market_cap:
+        indicators:
+            rsi:
+                parameters:
+                    window: [14]
+                aggregations:
+                    last:
+                        scaling: "none"
 
 # ratios:
 #     crossover_1:

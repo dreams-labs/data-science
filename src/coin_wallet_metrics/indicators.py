@@ -18,26 +18,23 @@ import dreams_core.core as dc
 logger = dc.setup_logger()
 
 
-def generate_time_series_indicators(dataset_name, dataset_df, metrics_config):
+def generate_time_series_indicators(dataset_df, dataset_metrics_config, id_column):
     """
     Generates all indicators for a time series dataframe keyed on coin_id and date. This is
     a wrapper function to apply ind.generate_column_time_series_indicators() to each dataset
     column with indicator configurations.
 
     Params:
-    - dataset_name (str): The config key for the dataset, e.g. "market_data"
     - dataset_df (DataFrame): The df containing dataset metrics and a coin_id and date column,
         as well as columns needing indicator calculations.
-    - metrics_config: metrics_config.yaml
+    - dataset_metrics_config (dict): The subcomponent of metrics_config that has keys for the
+        columns needing indicators, e.g. metrics_config['time_series']['market_data']
+    - id_column: whether the input df has an id column that needs to be grouped on
 
     Returns:
     - dataset_indicators_df (DataFrame): The original dataset_df with added columns for all
         configured indicators.
     """
-
-    # Split out metrics_config subcomponent
-    dataset_metrics_config = metrics_config['time_series'][dataset_name]
-
     # Calculate indicators for each value column
     for value_column in list(dataset_metrics_config.keys()):
 
@@ -46,7 +43,7 @@ def generate_time_series_indicators(dataset_name, dataset_df, metrics_config):
                 dataset_df,
                 value_column,
                 dataset_metrics_config[value_column]['indicators'],
-                id_column='coin_id'
+                id_column
             )
 
     return dataset_indicators_df
@@ -77,17 +74,27 @@ def generate_column_time_series_indicators(
     Returns:
     - time_series_df (pd.DataFrame): Input df with all indicators added
     """
-    # Confirm df has no starting index
-    if not isinstance(time_series_df.index, pd.RangeIndex):
-        raise ValueError("time_series_df must not have values stored in an index. ")
+    # Confirm coin_id and date exist
+    if 'date' not in time_series_df.columns:
+        raise ValueError("Input df to generate_column_time_series_indicators() must have a "
+                         "date column.")
+    if id_column:
+        if id_column not in time_series_df.columns:
+            raise ValueError("Input df to generate_column_time_series_indicators() does not "
+                             f"have id_column {id_column}.")
 
     # Confirm value column exists
     if value_column not in time_series_df.columns:
         raise KeyError(f"Input DataFrame does not include column '{value_column}'.")
 
-    # Confirm no null values
-    if time_series_df[value_column].isnull().any():
-        raise ValueError(f"The '{value_column}' column contains null values, which are not allowed.")
+    # Check for NaN values
+    if id_column:
+        for group_id, group in time_series_df.groupby(id_column, observed=True):
+            if check_nan_values(group[value_column]):
+                raise ValueError(f"The '{value_column}' column contains NaN values in the middle for {id_column} {group_id}.")
+    else:
+        if check_nan_values(time_series_df[value_column]):
+            raise ValueError(f"The '{value_column}' column contains NaN values in the middle of the series.")
 
     # Defining index to group on
     # --------------------------
@@ -122,7 +129,7 @@ def generate_column_time_series_indicators(
         elif indicator == 'rsi':
             windows = indicator_config['parameters']['window']
             for w in windows:
-                ind_series = time_series_df.groupby(level=groupby_column, observed=True)['price'].transform(
+                ind_series = time_series_df.groupby(level=groupby_column, observed=True)[value_column].transform(
                     lambda x, w=w: calculate_rsi(x, w))
                 time_series_df[f"{value_column}_{indicator}_{w}"] = ind_series
 
@@ -130,7 +137,7 @@ def generate_column_time_series_indicators(
             windows = indicator_config['parameters']['window']
             num_std = indicator_config['parameters'].get('num_std', None)
             for w in windows:
-                ind_series = time_series_df.groupby(level=groupby_column, observed=True)['price'].transform(
+                ind_series = time_series_df.groupby(level=groupby_column, observed=True)[value_column].transform(
                     lambda x, w=w, num_std=num_std: calculate_bollinger_bands(x, 'upper', w, num_std))
                 time_series_df[f"{value_column}_{indicator}_{w}"] = ind_series
 
@@ -138,7 +145,7 @@ def generate_column_time_series_indicators(
             windows = indicator_config['parameters']['window']
             num_std = indicator_config['parameters'].get('num_std', None)
             for w in windows:
-                ind_series = time_series_df.groupby(level=groupby_column, observed=True)['price'].transform(
+                ind_series = time_series_df.groupby(level=groupby_column, observed=True)[value_column].transform(
                     lambda x, w=w, num_std=num_std: calculate_bollinger_bands(x, 'lower', w, num_std))
                 time_series_df[f"{value_column}_{indicator}_{w}"] = ind_series
 
@@ -149,13 +156,32 @@ def generate_column_time_series_indicators(
     if groupby_column == 'dummy_group':
         time_series_df = time_series_df.drop('dummy_group', axis=1)
 
-
-    logger.info("Generated indicators for column '%s' :%s",
+    logger.info("Generated indicators for column '%s': %s",
                 value_column,
                 list(value_column_indicators_config.keys()))
 
 
     return time_series_df
+
+
+def check_nan_values(series):
+    """
+    Check if NaN values are only at the start or end of the series.
+
+    Returns:
+    - True if NaN values are in the middle of the series
+    - False if NaN values are only at start/end or if there are no NaN values
+    """
+    # Get the index of the first and last non-NaN value
+    first_valid = series.first_valid_index()
+    last_valid = series.last_valid_index()
+
+    # Check if there are any NaN values between the first and last valid value
+    nans_in_series = (series.loc[first_valid:last_valid] # selects the range between first and last valid value
+                             .isna() # checks for NaN values in this range
+                             .any()) # returns True if there are any NaN values in this range
+
+    return nans_in_series
 
 
 # =====================================================================

@@ -64,17 +64,13 @@ def sample_config():
     - dict: A configuration dictionary for testing all supported indicators.
     """
     return {
-        'time_series': {
-            'market_data': {
-                'price': {
-                    'indicators': {
-                        'sma': {'parameters': {'window': [2]}},
-                        'ema': {'parameters': {'window': [2]}},
-                        'rsi': {'parameters': {'window': [2]}},
-                        'bollinger_bands_upper': {'parameters': {'window': [2], 'num_std': 2}},
-                        'bollinger_bands_lower': {'parameters': {'window': [2], 'num_std': 2}}
-                    }
-                }
+        'price': {
+            'indicators': {
+                'sma': {'parameters': {'window': [2]}},
+                'ema': {'parameters': {'window': [2]}},
+                'rsi': {'parameters': {'window': [2]}},
+                'bollinger_bands_upper': {'parameters': {'window': [2], 'num_std': 2}},
+                'bollinger_bands_lower': {'parameters': {'window': [2], 'num_std': 2}}
             }
         }
     }
@@ -86,7 +82,7 @@ def test_all_supported_indicators(sample_data, sample_config):
 
     This test checks the calculation of SMA, EMA, RSI, and Bollinger Bands for the given sample data.
     """
-    result = ind.generate_time_series_indicators('market_data', sample_data, sample_config)
+    result = ind.generate_time_series_indicators(sample_data, sample_config, 'coin_id')
 
     # Calculate expected values
     # SMA (2-day)
@@ -132,8 +128,10 @@ def test_all_supported_indicators(sample_data, sample_config):
     # Check Bollinger Bands values
     expected_bb_upper = [np.nan, 115, 112.5, np.nan, 230, 225]
     expected_bb_lower = [np.nan, 95, 102.5, np.nan, 190, 205]
-    assert all(np.isclose(a, b, equal_nan=True) for a, b in zip(result['price_bollinger_bands_upper_2'], expected_bb_upper))
-    assert all(np.isclose(a, b, equal_nan=True) for a, b in zip(result['price_bollinger_bands_lower_2'], expected_bb_lower))
+    assert all(np.isclose(a, b, equal_nan=True) for a, b in zip(result['price_bollinger_bands_upper_2'],
+                                                                 expected_bb_upper))
+    assert all(np.isclose(a, b, equal_nan=True) for a, b in zip(result['price_bollinger_bands_lower_2'],
+                                                                 expected_bb_lower))
 
 
 @pytest.fixture
@@ -159,23 +157,20 @@ def sample_config_incorrect_column():
     - dict: A configuration dictionary with incorrect column names.
     """
     return {
-        'time_series': {
-            'market_data': {
-                'price': {  # This should be 'actual_price' to match the DataFrame
-                    'indicators': {
-                        'sma': {'parameters': {'window': [2]}},
-                        'ema': {'parameters': {'window': [2]}},
-                        'rsi': {'parameters': {'window': [2]}},
-                        'bollinger_bands_upper': {'parameters': {'window': [2], 'num_std': 2}},
-                        'bollinger_bands_lower': {'parameters': {'window': [2], 'num_std': 2}}
-                    }
-                }
+        'price': {  # This should be 'actual_price' to match the DataFrame
+            'indicators': {
+                'sma': {'parameters': {'window': [2]}},
+                'ema': {'parameters': {'window': [2]}},
+                'rsi': {'parameters': {'window': [2]}},
+                'bollinger_bands_upper': {'parameters': {'window': [2], 'num_std': 2}},
+                'bollinger_bands_lower': {'parameters': {'window': [2], 'num_std': 2}}
             }
         }
     }
 
 @pytest.mark.unit
-def test_generate_time_series_indicators_incorrect_column(sample_data_incorrect_column, sample_config_incorrect_column):
+def test_generate_time_series_indicators_incorrect_column(sample_data_incorrect_column,
+                                                          sample_config_incorrect_column):
     """
     Test that generate_time_series_indicators handles incorrect column names in the configuration.
 
@@ -183,7 +178,8 @@ def test_generate_time_series_indicators_incorrect_column(sample_data_incorrect_
     references columns not present in the dataset.
     """
     with pytest.raises(KeyError) as excinfo:
-        ind.generate_time_series_indicators('market_data', sample_data_incorrect_column, sample_config_incorrect_column)
+        ind.generate_time_series_indicators(sample_data_incorrect_column,
+                                            sample_config_incorrect_column, 'coin_id')
 
     assert "price" in str(excinfo.value), "Expected KeyError mentioning the missing 'price' column"
 
