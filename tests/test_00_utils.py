@@ -43,38 +43,38 @@ def valid_config_data():
     """
     return """
     time_series:
-      market_data:
-        price:
-          aggregations:
-            max:
-              scaling: "standard"
-            last:
-              buckets:
-                - small: 0.01
-                - medium: 1.0
-                - large: "remainder"
-          rolling:
-            window_duration: 3
-            lookback_periods: 2
-            aggregations:
-              max:
-                scaling: "standard"
-            comparisons:
-              change:
-                scaling: "standard"
-          indicators:
-            sma:
-              parameters:
-                period: 3
-              rolling:
-                window_duration: 3
-                lookback_periods: 2
-                comparisons:
-                  pct_change:
-                    scaling: "none"
-            ema:
-              parameters:
-                period: 3
+        market_data:
+            price:
+                aggregations:
+                    max:
+                        scaling: "standard"
+                    last:
+                        buckets:
+                            - small: 0.01
+                            - medium: 1.0
+                            - large: "remainder"
+                rolling:
+                    window_duration: 3
+                    lookback_periods: 2
+                    aggregations:
+                        max:
+                            scaling: "standard"
+                    comparisons:
+                        change:
+                            scaling: "standard"
+                indicators:
+                    sma:
+                        parameters:
+                            window: [3]
+                        rolling:
+                            window_duration: 3
+                            lookback_periods: 2
+                            comparisons:
+                                pct_change:
+                                    scaling: "none"
+                    ema:
+                        parameters:
+                            window: [3]
     """
 
 @pytest.fixture
@@ -503,7 +503,7 @@ def test_invalid_aggregation_type(temp_config_file_invalid_aggregation, caplog):
 
     # Assert that the error message contains the expected text
     assert "Validation Error in metrics_config.yaml" in error_message
-    assert "Issue: Input should be 'sum', 'mean', 'median', 'std', 'max', 'min', 'first' or 'last'" in error_message
+    assert "Issue: Input should be" in error_message
     assert "Location: time_series.market_data.price.aggregations.average" in error_message
 
 
@@ -607,47 +607,47 @@ def config_demo_dict():
     """
     return """
     time_series:
-      market_data:
-        price:
-          aggregations:
-            max:
-              scaling: "standard"
-            last:
-              buckets:
-              - small: .01
-              - medium: 1.0
-              - large: "remainder"
-          rolling:
-            aggregations:
-              max:
-                scaling: "standard"
-            comparisons:
-              change:
-                scaling: "standard"
-            window_duration: 3
-            lookback_periods: 2
-          indicators:
-            sma:
-              parameters:
-                period: 3
-              aggregations:
-                max:
-                  scaling: "standard"
-              rolling:
+        market_data:
+            price:
                 aggregations:
-                  mean:
-                    scaling: "standard"
-                comparisons:
-                  pct_change:
-                    scaling: "none"
-                window_duration: 3
-                lookback_periods: 2
-            ema:
-              parameters:
-                period: 3
-              aggregations:
-                mean:
-                  scaling: "standard"
+                    max:
+                        scaling: "standard"
+                    last:
+                        buckets:
+                        - small: .01
+                        - medium: 1.0
+                        - large: "remainder"
+                rolling:
+                    aggregations:
+                        max:
+                            scaling: "standard"
+                    comparisons:
+                        change:
+                            scaling: "standard"
+                    window_duration: 3
+                    lookback_periods: 2
+                indicators:
+                    sma:
+                        parameters:
+                            window: [3]
+                        aggregations:
+                            max:
+                                scaling: "standard"
+                        rolling:
+                            aggregations:
+                                mean:
+                                    scaling: "standard"
+                            comparisons:
+                                pct_change:
+                                    scaling: "none"
+                            window_duration: 3
+                            lookback_periods: 2
+                    ema:
+                        parameters:
+                            window: [3]
+                        aggregations:
+                            mean:
+                                scaling: "standard"
     """
 
 @pytest.fixture

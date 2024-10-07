@@ -28,6 +28,117 @@ logger = dc.setup_logger()
 # to split the calculations between cores and by using only vectorized operations
 # to manipulate dfs.
 
+
+def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
+    """
+    Wrapper function to impute profits for multiple dates using multithreaded processing.
+
+    Args:
+        profits_df (pd.DataFrame): DataFrame containing dated profits data for coin-wallet pairs
+        prices_df (pd.DataFrame): DataFrame containing price information
+        dates (list): List of dates (str or datetime) for which to impute rows
+        n_threads (int): The number of threads to use for imputation
+
+    Returns:
+        pd.DataFrame: Updated profits_df with imputed rows for all specified dates
+
+    Raises:
+        ValueError: If any NaN values are found in the new_rows_df DataFrames.
+    """
+    start_time = time.time()
+    logger.info("Starting profits_df imputation for %s dates...", len(dates))
+
+    new_rows_list = []
+
+    for date in dates:
+        new_rows_df = multithreaded_impute_profits_rows(profits_df, prices_df, date, n_threads)
+
+        # Check for NaN values
+        if new_rows_df.isna().any().any():
+            raise ValueError(f"NaN values found in the imputed rows for date: {date}")
+
+        new_rows_list.append(new_rows_df)
+
+    # Concatenate all new rows at once
+    all_new_rows = pd.concat(new_rows_list, ignore_index=True)
+
+    # Append all new rows to profits_df
+    updated_profits_df = pd.concat([profits_df, all_new_rows], ignore_index=True)
+
+    logger.info("Completed new row generation after %.2f seconds. Total rows after imputation: %s",
+                time.time() - start_time,
+                updated_profits_df.shape[0])
+
+    return updated_profits_df
+
+
+
+def multithreaded_impute_profits_rows(profits_df, prices_df, target_date, n_threads):
+    """
+    Imputes new profits_df rows as of the taget_date by using multithreading to maximize
+    performance, and then merges and returns the results. First, profits_df is split on coin_id
+    into n_threads partitions. Then a thread is started and impute_profits_df_rows() is
+    calculated by all threads before being merged into all_new_rows_df.
+
+    Args:
+        profits_df (pd.DataFrame): DataFrame containing dated profits data for coin-wallet pairs
+        prices_df (pd.DataFrame): DataFrame containing price information
+        target_date (str or datetime): The date for which to impute rows
+        n_threads (int): The number of threads to run impute_profits_df_rows() with
+
+    Returns:
+        all_new_rows_df (pd.DataFrame): The set of new rows to be added to profits_df to
+            ensure that every coin-wallet pair has a record on the given date.
+    """
+    # Partition profits_df on coin_id
+    logger.info("Splitting profits_df into %s partitions for date %s...",n_threads,target_date)
+
+    profits_df_partitions = create_partitions(profits_df, n_threads)
+
+    # Create a thread-safe queue to store results
+    result_queue = queue.Queue()
+
+    # Create a list to hold thread objects
+    threads = []
+
+    # Create and start a thread for each partition
+    logger.info("Initiating multithreading calculations for date %s...",target_date)
+
+    # Temporarily increase the log level to suppress most logs from multithread workers
+    original_level = logger.level
+    logger.setLevel(logging.ERROR)
+
+    for partition in profits_df_partitions:
+        thread = threading.Thread(
+            target=worker,
+            args=(partition, prices_df, target_date, result_queue)
+        )
+        thread.start()
+        threads.append(thread)
+
+    # Wait for all threads to complete
+    for thread in threads:
+        thread.join()
+
+    # Restore the original log level
+    logger.setLevel(original_level)
+
+    # Collect results
+    results = []
+    while not result_queue.empty():
+        results.append(result_queue.get())
+
+    # Merge results together
+    warnings.simplefilter(action='ignore', category=FutureWarning) # ignore NaN dtype warnings
+    all_new_rows_df = pd.concat(results, ignore_index=True)
+    logger.info("Generated %s new rows for date %s.",
+                len(all_new_rows_df),
+                target_date)
+
+    return all_new_rows_df
+
+
+
 def impute_profits_df_rows(profits_df, prices_df, target_date):
     """
     Impute rows for all coin-wallet pairs in profits_df on the target date using only
@@ -59,6 +170,8 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
                 profits_df.shape,
                 target_date)
 
+    # Data Checks and Typecasting
+    # ---------------------------
     # Convert date to datetime
     target_date = pd.to_datetime(target_date)
 
@@ -70,10 +183,10 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
     if pd.to_datetime(target_date) >  pd.to_datetime(prices_df['date'].max()):
         raise ValueError("Target date is later than all dates in prices_df")
 
-
     # Create indices so we can use vectorized operations
     profits_df = profits_df.set_index(['coin_id', 'wallet_address', 'date'])
     prices_df = prices_df.set_index(['coin_id', 'date']).copy(deep=True)
+
 
     # Step 1: Split profits_df records before and after the target_date
     # -----------------------------------------------------------------
@@ -221,116 +334,6 @@ def calculate_new_profits_values(profits_df, target_date):
     new_rows_df['date'] = target_date  # pylint: disable=E1137 # df does not support item assignment
 
     return new_rows_df
-
-
-
-def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
-    """
-    Wrapper function to impute profits for multiple dates using multithreaded processing.
-
-    Args:
-        profits_df (pd.DataFrame): DataFrame containing dated profits data for coin-wallet pairs
-        prices_df (pd.DataFrame): DataFrame containing price information
-        dates (list): List of dates (str or datetime) for which to impute rows
-        n_threads (int): The number of threads to use for imputation
-
-    Returns:
-        pd.DataFrame: Updated profits_df with imputed rows for all specified dates
-
-    Raises:
-        ValueError: If any NaN values are found in the new_rows_df DataFrames.
-    """
-    start_time = time.time()
-    logger.info("Starting profits_df imputation for %s dates...", len(dates))
-
-    new_rows_list = []
-
-    for date in dates:
-        new_rows_df = multithreaded_impute_profits_rows(profits_df, prices_df, date, n_threads)
-
-        # Check for NaN values
-        if new_rows_df.isna().any().any():
-            raise ValueError(f"NaN values found in the imputed rows for date: {date}")
-
-        new_rows_list.append(new_rows_df)
-
-    # Concatenate all new rows at once
-    all_new_rows = pd.concat(new_rows_list, ignore_index=True)
-
-    # Append all new rows to profits_df
-    updated_profits_df = pd.concat([profits_df, all_new_rows], ignore_index=True)
-
-    logger.info("Completed new row generation after %.2f seconds. Total rows after imputation: %s",
-                time.time() - start_time,
-                updated_profits_df.shape[0])
-
-    return updated_profits_df
-
-
-
-def multithreaded_impute_profits_rows(profits_df, prices_df, target_date, n_threads):
-    """
-    Imputes new profits_df rows as of the taget_date by using multithreading to maximize
-    performance, and then merges and returns the results. First, profits_df is split on coin_id
-    into n_threads partitions. Then a thread is started and impute_profits_df_rows() is
-    calculated by all threads before being merged into all_new_rows_df.
-
-    Args:
-        profits_df (pd.DataFrame): DataFrame containing dated profits data for coin-wallet pairs
-        prices_df (pd.DataFrame): DataFrame containing price information
-        target_date (str or datetime): The date for which to impute rows
-        n_threads (int): The number of threads to run impute_profits_df_rows() with
-
-    Returns:
-        all_new_rows_df (pd.DataFrame): The set of new rows to be added to profits_df to
-            ensure that every coin-wallet pair has a record on the given date.
-    """
-    # Partition profits_df on coin_id
-    logger.info("Splitting profits_df into %s partitions for date %s...",n_threads,target_date)
-
-    profits_df_partitions = create_partitions(profits_df, n_threads)
-
-    # Create a thread-safe queue to store results
-    result_queue = queue.Queue()
-
-    # Create a list to hold thread objects
-    threads = []
-
-    # Create and start a thread for each partition
-    logger.info("Initiating multithreading calculations for date %s...",target_date)
-
-    # Temporarily increase the log level to suppress most logs from multithread workers
-    original_level = logger.level
-    logger.setLevel(logging.ERROR)
-
-    for partition in profits_df_partitions:
-        thread = threading.Thread(
-            target=worker,
-            args=(partition, prices_df, target_date, result_queue)
-        )
-        thread.start()
-        threads.append(thread)
-
-    # Wait for all threads to complete
-    for thread in threads:
-        thread.join()
-
-    # Restore the original log level
-    logger.setLevel(original_level)
-
-    # Collect results
-    results = []
-    while not result_queue.empty():
-        results.append(result_queue.get())
-
-    # Merge results together
-    warnings.simplefilter(action='ignore', category=FutureWarning) # ignore NaN dtype warnings
-    all_new_rows_df = pd.concat(results, ignore_index=True)
-    logger.info("Generated %s new rows for date %s.",
-                len(all_new_rows_df),
-                target_date)
-
-    return all_new_rows_df
 
 
 

@@ -67,7 +67,7 @@ def load_config(file_path='../notebooks/config.yaml'):
 
     # Calculate and add period boundary dates into the config['training_data'] section
     if 'training_data' in config_dict and 'modeling_period_start' in config_dict['training_data']:
-        period_dates = calculate_period_dates(config_dict['training_data'])
+        period_dates = calculate_period_dates(config_dict)
         config_dict['training_data'].update(period_dates)
 
     # If a pydantic definition exists for the config, return it in json format
@@ -117,17 +117,21 @@ def load_config(file_path='../notebooks/config.yaml'):
 
 
 # helper function for load_config
-def calculate_period_dates(training_data_config):
+def calculate_period_dates(config):
     """
     Calculate the training and modeling period start and end dates based on the provided
     durations and the modeling period start date. The calculated dates will include both
     the start and end dates, ensuring the correct number of days for each period.
 
     Args:
-        training_data_config (dict): Configuration dictionary containing:
+        config (dict): config.yaml which contains:
+        ['training_data']
         - 'modeling_period_start' (str): Start date of the modeling period in 'YYYY-MM-DD' format.
         - 'modeling_period_duration' (int): Duration of the modeling period in days.
         - 'training_period_duration' (int): Duration of the training period in days.
+        ['wallet_cohorts']
+        - [{cohort_name}]['lookback_period' (int): How far back a cohort's transaction history
+            needs to extend prioer to the training_period_start
 
     Returns:
         dict: Dictionary containing:
@@ -135,11 +139,15 @@ def calculate_period_dates(training_data_config):
         - 'training_period_end' (str): Calculated end date of the training period.
         - 'modeling_period_end' (str): Calculated end date of the modeling period.
     """
+    training_data_config = config['training_data']
+
     # Extract the config values
     modeling_period_start = datetime.strptime(training_data_config['modeling_period_start'], '%Y-%m-%d')
     modeling_period_duration = training_data_config['modeling_period_duration']  # in days
     training_period_duration = training_data_config['training_period_duration']  # in days
 
+    # Training and Modeling Period Dates
+    # ----------------------------------
     # Calculate modeling_period_end (inclusive of the start date)
     modeling_period_end = modeling_period_start + timedelta(days=modeling_period_duration - 1)
 
@@ -149,11 +157,16 @@ def calculate_period_dates(training_data_config):
     # Calculate training_period_start (inclusive of the start date)
     training_period_start = training_period_end - timedelta(days=training_period_duration - 1)
 
+    # Lookback Dates
+    # --------------
     # Calculate the start date of the earliest window
     window_duration = modeling_period_duration + training_period_duration
     window_count = training_data_config['additional_windows'] + 1
     total_days = window_duration * window_count
     earliest_window_start = pd.to_datetime(modeling_period_end) - timedelta(days=total_days)
+
+    # Calculate the earliest cohort lookback date for the earliest window
+
 
     # Return updated config with calculated values
     return {

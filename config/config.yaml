@@ -19,7 +19,7 @@ datasets:
 
     whales:
       description: "cohort_whales"  # prefix that will be included in feature columns
-      lookback_period: 90 # how long the window for wallet thresholds extends backwards
+      lookback_period: 60 # how long the window for wallet thresholds extends backwards before the training_period_start
       wallet_minimum_inflows: 50000  # Minimum USD inflows for a wallet to be considered a "shark"
       wallet_maximum_inflows: 50000000  # Maximum USD inflows for a wallet to be considered a "shark"
       coin_profits_win_threshold: 3000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
@@ -30,7 +30,7 @@ datasets:
 
     normies:
       description: "cohort_normies"  # prefix that will be included in feature columns
-      lookback_period: 90 # how long the window for wallet thresholds extends backwards
+      lookback_period: 90 # how long the window for wallet thresholds extends backwards before the training_period_start
       wallet_minimum_inflows: 100  # Minimum USD inflows for a wallet to be considered a "shark"
       wallet_maximum_inflows: 10000  # Maximum USD inflows for a wallet to be considered a "shark"
       coin_profits_win_threshold: 0  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
