@@ -17,13 +17,12 @@ import dreams_core.core as dc
 # pylint: disable=C0413  # wrong import position
 # project files
 import utils as u
-import coin_wallet_metrics as cwm
 import feature_engineering as fe
-import modeling as m
 sys.path.append('..')
 from training_data import data_retrieval as dr
 from training_data import profits_row_imputation as pri
-
+from coin_wallet_metrics import coin_wallet_metrics as cwm
+from coin_wallet_metrics import indicators as ind
 
 
 # set up logger at the module level
@@ -58,75 +57,127 @@ def generate_time_windows(config):
 
 
 
-def build_time_window_model_input(n, window, config, metrics_config, modeling_config):
+def retrieve_all_windows_training_data(
+        config,
+        metrics_config
+    ):
     """
-    Generates training data for each of the config.training_data.additional_windows.
+    Retrieves, cleans and adds indicators to the all windows training data.
+
+    Wallet cohort indicators will be generated for each window as the cohort groups will
+    change based on the boundary dates of the cohort lookback_period specified in the config.
 
     Params:
-        n (int): The lookback number of the time window (e.g 0,1,2)
-        window (Dict): The config override dict with the window's modeling_period_start
-        config: config.yaml
-        metrics_config: metrics_config.yaml
-        modeling_config: modeling_config.yaml
+    - config (dict): overall config.yaml without any window overrides
+    - metrics_config (dict): metrics_config.yaml unadjusted
 
     Returns:
-        model_data (Dict): Dictionary containing all of the modeling features and variables:
-            X_train, X_test (DataFrame): Model training features
-            y_train, y_test (pd.Series): Model target variables
-            returns_test (DataFrame): The actual returns of each coin_id in each time_window.
-                - coin_id: Index (str)
-                - time_window: Index (int)
-                - returns: value column (float)
+
     """
+    # 1. Data Retrieval, Cleaning, Indicator Calculation
+    # --------------------------------------------------
+    # Macro trends: retrieve and clean full history
+    macro_trends_df = dr.retrieve_macro_trends_data()
+    macro_trends_df = dr.clean_macro_trends(macro_trends_df, config)
 
-    # Prepare the full configuration by applying overrides from the current trial config
-    config, metrics_config, modeling_config = prepare_configs(modeling_config['modeling']['config_folder'], window)
-
-    # Define window start and end dates
-    start_date = config['training_data']['training_period_start']
-    end_date = config['training_data']['modeling_period_end']
-
-    # Rebuild market data
+    # Market data: retrieve and clean full history
     market_data_df = dr.retrieve_market_data()
-    market_data_df, _ = cwm.split_dataframe_by_coverage(market_data_df, start_date, end_date, id_column='coin_id')
+    market_data_df = dr.clean_market_data(market_data_df, config)
+
+    # Profits: retrieve and clean profits data spanning the earliest to latest training periods
+    profits_df = dr.retrieve_profits_data(config['training_data']['earliest_cohort_lookback_start'],
+                                        config['training_data']['training_period_end'],
+                                        config['data_cleaning']['minimum_wallet_inflows'])
+    profits_df, _ = dr.clean_profits_df(profits_df, config['data_cleaning'])
+
+
+    # 2. Filtering based on dataset overlap
+    # -------------------------------------
+    # Filter market_data to only coins with transfers data if configured to
+    if config['data_cleaning']['exclude_coins_without_transfers']:
+        market_data_df = market_data_df[market_data_df['coin_id'].isin(profits_df['coin_id'])]
+    # Create prices_df: lightweight reference for other functions
     prices_df = market_data_df[['coin_id','date','price']].copy()
 
-    # Retrieve macro trends data
-    macro_trends_df = dr.retrieve_macro_trends_data()
-    macro_trends_df = cwm.generate_macro_trends_features(macro_trends_df, config)
+    # Filter profits_df to remove records for any coins that were removed in data cleaning
+    profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
 
-    # Rebuild profits_df
-    if 'profits_df' not in locals():
-        profits_df = None
-    profits_df = rebuild_profits_df_if_necessary(config, prices_df, profits_df)
 
-    # Build the configured model input data for the nth window
-    X_train, X_test, y_train, y_test, returns_test = build_configured_model_input(
-                                        profits_df,
-                                        market_data_df,
-                                        macro_trends_df,
-                                        config,
-                                        metrics_config,
-                                        modeling_config)
+    # 3. Add indicators (additional time series)
+    # ------------------------------------------
+    # Macro trends: add indicators
+    macro_trends_df = ind.generate_time_series_indicators(macro_trends_df,
+                                                        metrics_config['macro_trends'],
+                                                        None)
+    # Market data: add indicators
+    market_data_df = ind.generate_time_series_indicators(market_data_df,
+                                                        metrics_config['time_series']['market_data'],
+                                                        'coin_id')
 
-    # Add time window indices to dfs with coin_ids
-    X_train['time_window'] = n
-    X_train.set_index('time_window', append=True, inplace=True)
-    X_test['time_window'] = n
-    X_test.set_index('time_window', append=True, inplace=True)
-    returns_test['time_window'] = n
-    returns_test.set_index('time_window', append=True, inplace=True)
+    return macro_trends_df, market_data_df, profits_df, prices_df
 
-    model_data = {
-        'X_train': X_train,
-        'X_test': X_test,
-        'y_train': y_train,
-        'y_test': y_test,
-        'returns_test': returns_test
-    }
 
-    return model_data
 
+def generate_window_flattened_dfs(
+        market_data_df,
+        macro_trends_df,
+        profits_df,
+        prices_df,
+        config,
+        metrics_config,
+        modeling_config
+    ):
+    """
+    Takes the all windows datasets and filters and transforms them as needed to generate
+    flattened dfs with all configured aggregations and indicators for all columns.
+
+    Params:
+    - market_data_df,macro_trends_df (DataFrames): all windows datasets with indicators added
+        that will be flattened
+    - profits_df,prices_df (DataFrames): all windows datasets that will be used to compute
+        wallet cohorts metrics, which will then have indicators added and be flattened
+    - config,metrics_config,modeling_config (dicts): full config files for the given window
+
+    Returns:
+    - window_flattened_dfs (list of DataFrames): all flattened dfs keyed on coin_id with columns
+        for every specified aggregation and indicator
+    - window_flattened_filepaths (list of strings): filepaths to csv versions of the flattened dfs
+    """
+    window_flattened_dfs = []
+    window_flattened_filepaths = []
+
+    # Market data: generate window-specific flattened metrics
+    flattened_market_data_df, flattened_market_data_filepath = fe.generate_window_time_series_features(
+        market_data_df,
+        config,
+        metrics_config['time_series']['market_data'],
+        modeling_config
+    )
+    window_flattened_dfs.extend([flattened_market_data_df])
+    window_flattened_filepaths.extend([flattened_market_data_filepath])
+
+    # Macro trends: generate window-specific flattened metrics
+    flattened_macro_trends_df, flattened_macro_trends_filepath = fe.generate_window_macro_trends_features(
+        macro_trends_df,
+        config,
+        metrics_config,
+        modeling_config
+    )
+    window_flattened_dfs.extend([flattened_macro_trends_df])
+    window_flattened_filepaths.extend([flattened_macro_trends_filepath])
+
+    # Cohorts: generate window-specific flattened metrics
+    flattened_cohort_dfs, flattened_cohort_filepaths = fe.generate_window_wallet_cohort_features(
+        profits_df,
+        prices_df,
+        config,
+        metrics_config,
+        modeling_config
+    )
+    window_flattened_dfs.extend(flattened_cohort_dfs)
+    window_flattened_filepaths.extend(flattened_cohort_filepaths)
+
+    return window_flattened_dfs, window_flattened_filepaths
 
 
 
@@ -319,95 +370,170 @@ def handle_hash(config_hash, temp_folder, operation='load'):
 
 
 
-def build_configured_model_input(
-        profits_df,
-        market_data_df,
-        macro_trends_df,
-        config,
-        metrics_config,
-        modeling_config):
-    """
-    Build the model input data (train/test sets) based on the configuration settings.
 
-    Args:
-    - profits_df (DataFrame): DataFrame containing profits information for wallets.
-    - market_data_df (DataFrame): DataFrame containing market data for coins.
-    - macro_trends_df (DataFrame): DataFrame containing macro trends data for dates.
-    - config (dict): Overall configuration containing details for wallet cohorts and training
-        data periods.
-    - metrics_config (dict): Configuration for metric generation.
-    - modeling_config (dict): Configuration for model training parameters.
+# def build_time_window_model_input(n, window, config, metrics_config, modeling_config):
+#     """
+#     Generates training data for each of the config.training_data.additional_windows.
 
-    Returns:
-    - X_train (DataFrame): Training feature set.
-    - X_test (DataFrame): Testing feature set.
-    - y_train (Series): Training target variable.
-    - y_test (Series): Testing target variable.
-    - returns_test_df (DataFrame): The actual returns of the test set with index 'coin_id' and
-        column 'returns'
-    """
-    training_data_tuples = []
+#     Params:
+#         n (int): The lookback number of the time window (e.g 0,1,2)
+#         window (Dict): The config override dict with the window's modeling_period_start
+#         config: config.yaml
+#         metrics_config: metrics_config.yaml
+#         modeling_config: modeling_config.yaml
 
-    # 1. Generate and merge features for all datasets
-    # -------------------------------------
-    # Time series features
-    dataset_name = 'market_data'  # update to loop through all time series
-    market_data_tuples, _ = fe.generate_time_series_features(
-            dataset_name,
-            market_data_df,
-            config,
-            metrics_config,
-            modeling_config)
-    training_data_tuples.extend(market_data_tuples)
+#     Returns:
+#         model_data (Dict): Dictionary containing all of the modeling features and variables:
+#             X_train, X_test (DataFrame): Model training features
+#             y_train, y_test (pd.Series): Model target variables
+#             returns_test (DataFrame): The actual returns of each coin_id in each time_window.
+#                 - coin_id: Index (str)
+#                 - time_window: Index (int)
+#                 - returns: value column (float)
+#     """
 
-    # Wallet cohort features
-    wallet_cohort_tuples, _ = fe.generate_wallet_cohort_features(
-            profits_df,
-            config,
-            metrics_config,
-            modeling_config)
-    training_data_tuples.extend(wallet_cohort_tuples)
+#     # Prepare the full configuration by applying overrides from the current trial config
+#     config, metrics_config, modeling_config = prepare_configs(modeling_config['modeling']['config_folder'], window)
 
-    # Macro trends features
-    macro_trends_tuples, _ = fe.generate_macro_trends_features(
-            macro_trends_df,
-            config,
-            metrics_config,
-            modeling_config
-        )
-    training_data_tuples.extend(macro_trends_tuples)
+#     # Define window start and end dates
+#     start_date = config['training_data']['training_period_start']
+#     end_date = config['training_data']['modeling_period_end']
 
-    # Merge all the features
-    training_data_df, _ = fe.create_training_data_df(
-                            modeling_config['modeling']['modeling_folder'],
-                            training_data_tuples)
+#     # Rebuild market data
+#     market_data_df = dr.retrieve_market_data()
+#     market_data_df, _ = cwm.split_dataframe_by_coverage(market_data_df, start_date, end_date, id_column='coin_id')
+#     prices_df = market_data_df[['coin_id','date','price']].copy()
 
+#     # Retrieve macro trends data
+#     macro_trends_df = dr.retrieve_macro_trends_data()
+#     macro_trends_df = cwm.generate_macro_trends_features(macro_trends_df, config)
 
-    # 2. Add target variable to training_data_df
-    # ------------------------------------------
-    # create the target variable df
-    target_variables_df, returns_df, _ = fe.create_target_variables(
-                                market_data_df,
-                                config['training_data'],
-                                modeling_config)
+#     # Rebuild profits_df
+#     if 'profits_df' not in locals():
+#         profits_df = None
+#     profits_df = rebuild_profits_df_if_necessary(config, prices_df, profits_df)
 
-    # merge the two into the final model input df
-    model_input_df = fe.prepare_model_input_df(
-                                training_data_df,
-                                target_variables_df,
-                                modeling_config['modeling']['target_column'])
+#     # Build the configured model input data for the nth window
+#     X_train, X_test, y_train, y_test, returns_test = build_configured_model_input(
+#                                         profits_df,
+#                                         market_data_df,
+#                                         macro_trends_df,
+#                                         config,
+#                                         metrics_config,
+#                                         modeling_config)
+
+#     # Add time window indices to dfs with coin_ids
+#     X_train['time_window'] = n
+#     X_train.set_index('time_window', append=True, inplace=True)
+#     X_test['time_window'] = n
+#     X_test.set_index('time_window', append=True, inplace=True)
+#     returns_test['time_window'] = n
+#     returns_test.set_index('time_window', append=True, inplace=True)
+
+#     model_data = {
+#         'X_train': X_train,
+#         'X_test': X_test,
+#         'y_train': y_train,
+#         'y_test': y_test,
+#         'returns_test': returns_test
+#     }
+
+#     return model_data
 
 
-    # 3. Split into train/test datasets
-    # ---------------------------------
-    # split the df into train and test sets
-    X_train, X_test, y_train, y_test = m.split_model_input(
-        model_input_df,
-        modeling_config['modeling']['target_column'],
-        modeling_config['modeling']['train_test_split'],
-        modeling_config['modeling']['random_state']
-    )
-    # Create returns_df for the test population by matching the X_test index
-    returns_test_df = returns_df.loc[X_test.index].copy()
 
-    return X_train, X_test, y_train, y_test, returns_test_df
+
+# def build_configured_model_input(
+#         profits_df,
+#         market_data_df,
+#         macro_trends_df,
+#         config,
+#         metrics_config,
+#         modeling_config):
+#     """
+#     Build the model input data (train/test sets) based on the configuration settings.
+
+#     Args:
+#     - profits_df (DataFrame): DataFrame containing profits information for wallets.
+#     - market_data_df (DataFrame): DataFrame containing market data for coins.
+#     - macro_trends_df (DataFrame): DataFrame containing macro trends data for dates.
+#     - config (dict): Overall configuration containing details for wallet cohorts and training
+#         data periods.
+#     - metrics_config (dict): Configuration for metric generation.
+#     - modeling_config (dict): Configuration for model training parameters.
+
+#     Returns:
+#     - X_train (DataFrame): Training feature set.
+#     - X_test (DataFrame): Testing feature set.
+#     - y_train (Series): Training target variable.
+#     - y_test (Series): Testing target variable.
+#     - returns_test_df (DataFrame): The actual returns of the test set with index 'coin_id' and
+#         column 'returns'
+#     """
+#     training_data_tuples = []
+
+#     # 1. Generate and merge features for all datasets
+#     # -------------------------------------
+#     # Time series features
+#     dataset_name = 'market_data'  # update to loop through all time series
+#     market_data_tuples, _ = fe.generate_time_series_features(
+#             dataset_name,
+#             market_data_df,
+#             config,
+#             metrics_config,
+#             modeling_config)
+#     training_data_tuples.extend(market_data_tuples)
+
+#     # Wallet cohort features
+#     wallet_cohort_tuples, _ = fe.generate_wallet_cohort_features(
+#             profits_df,
+#             config,
+#             metrics_config,
+#             modeling_config)
+#     training_data_tuples.extend(wallet_cohort_tuples)
+
+#     # Macro trends features
+#     macro_trends_tuples, _ = fe.generate_macro_trends_features(
+#             macro_trends_df,
+#             config,
+#             metrics_config,
+#             modeling_config
+#         )
+#     training_data_tuples.extend(macro_trends_tuples)
+
+#     # Merge all the features
+#     training_data_df, _ = fe.create_training_data_df(
+#                             modeling_config['modeling']['modeling_folder'],
+#                             training_data_tuples)
+
+
+#     # 2. Add target variable to training_data_df
+#     # ------------------------------------------
+#     # create the target variable df
+#     target_variables_df, returns_df, _ = fe.create_target_variables(
+#                                 market_data_df,
+#                                 config['training_data'],
+#                                 modeling_config)
+
+#     # merge the two into the final model input df
+#     model_input_df = fe.prepare_model_input_df(
+#                                 training_data_df,
+#                                 target_variables_df,
+#                                 modeling_config['modeling']['target_column'])
+
+
+#     # 3. Split into train/test datasets
+#     # ---------------------------------
+#     # split the df into train and test sets
+#     X_train, X_test, y_train, y_test = m.split_model_input(
+#         model_input_df,
+#         modeling_config['modeling']['target_column'],
+#         modeling_config['modeling']['train_test_split'],
+#         modeling_config['modeling']['random_state']
+#     )
+#     # Create returns_df for the test population by matching the X_test index
+#     returns_test_df = returns_df.loc[X_test.index].copy()
+
+#     return X_train, X_test, y_train, y_test, returns_test_df
+
+

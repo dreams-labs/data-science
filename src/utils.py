@@ -126,7 +126,7 @@ def calculate_period_dates(config):
     Args:
         config (dict): config.yaml which contains:
         ['training_data']
-        - 'modeling_period_start' (str): Start date of the modeling period in 'YYYY-MM-DD' format.
+        - 'modeling_period_start' (str): Start date of the modeling period as 'YYYY-MM-DD'.
         - 'modeling_period_duration' (int): Duration of the modeling period in days.
         - 'training_period_duration' (int): Duration of the training period in days.
         ['wallet_cohorts']
@@ -142,7 +142,8 @@ def calculate_period_dates(config):
     training_data_config = config['training_data']
 
     # Extract the config values
-    modeling_period_start = datetime.strptime(training_data_config['modeling_period_start'], '%Y-%m-%d')
+    modeling_period_start = datetime.strptime(training_data_config['modeling_period_start'],
+                                              '%Y-%m-%d')
     modeling_period_duration = training_data_config['modeling_period_duration']  # in days
     training_period_duration = training_data_config['training_period_duration']  # in days
 
@@ -163,9 +164,16 @@ def calculate_period_dates(config):
     window_duration = modeling_period_duration + training_period_duration
     window_count = training_data_config['additional_windows'] + 1
     total_days = window_duration * window_count
-    earliest_window_start = pd.to_datetime(modeling_period_end) - timedelta(days=total_days)
+    earliest_window_start = pd.to_datetime(training_period_end) - timedelta(days=total_days)
 
     # Calculate the earliest cohort lookback date for the earliest window
+    # Identify all unique cohort lookback periods
+    cohort_lookback_periods = [
+        cohort['lookback_period']
+        for cohort in config['datasets']['wallet_cohorts'].values()
+    ]
+    earliest_cohort_lookback_start = (earliest_window_start -
+                                      timedelta(days=max(cohort_lookback_periods)))
 
 
     # Return updated config with calculated values
@@ -173,7 +181,8 @@ def calculate_period_dates(config):
         'training_period_start': training_period_start.strftime('%Y-%m-%d'),
         'training_period_end': training_period_end.strftime('%Y-%m-%d'),
         'modeling_period_end': modeling_period_end.strftime('%Y-%m-%d'),
-        'earliest_window_start': earliest_window_start.strftime('%Y-%m-%d')
+        'earliest_window_start': earliest_window_start.strftime('%Y-%m-%d'),
+        'earliest_cohort_lookback_start': earliest_cohort_lookback_start.strftime('%Y-%m-%d')
     }
 
 

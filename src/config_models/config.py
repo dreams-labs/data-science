@@ -41,6 +41,7 @@ class TrainingDataConfig(NoExtrasBaseModel):
     modeling_period_end: date = Field(...)
     additional_windows: int = Field(..., ge=0)
     earliest_window_start: date = Field(...)
+    earliest_cohort_lookback_start: date = Field(...)
 
 
 
