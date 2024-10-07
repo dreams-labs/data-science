@@ -17,7 +17,42 @@ import dreams_core.core as dc
 # set up logger at the module level
 logger = dc.setup_logger()
 
-def generate_time_series_indicators(
+
+def generate_time_series_indicators(dataset_name, dataset_df, metrics_config):
+    """
+    Generates all indicators for a time series dataframe keyed on coin_id and date. This is
+    a wrapper function to apply ind.generate_column_time_series_indicators() to each dataset
+    column with indicator configurations.
+
+    Params:
+    - dataset_name (str): The config key for the dataset, e.g. "market_data"
+    - dataset_df (DataFrame): The df containing dataset metrics and a coin_id and date column,
+        as well as columns needing indicator calculations.
+    - metrics_config: metrics_config.yaml
+
+    Returns:
+    - dataset_indicators_df (DataFrame): The original dataset_df with added columns for all
+        configured indicators.
+    """
+
+    # Split out metrics_config subcomponent
+    dataset_metrics_config = metrics_config['time_series'][dataset_name]
+
+    # Calculate indicators for each value column
+    for value_column in list(dataset_metrics_config.keys()):
+
+        if 'indicators' in dataset_metrics_config[value_column].keys():
+            dataset_indicators_df = generate_column_time_series_indicators(
+                dataset_df,
+                value_column,
+                dataset_metrics_config[value_column]['indicators'],
+                id_column='coin_id'
+            )
+
+    return dataset_indicators_df
+
+
+def generate_column_time_series_indicators(
         time_series_df: pd.DataFrame,
         value_column: str,
         value_column_indicators_config: dict,
@@ -28,7 +63,8 @@ def generate_time_series_indicators(
     Works for both multi-series (e.g., multiple coins) and single time series data.
 
     Params:
-    - time_series_df (pd.DataFrame): The time series data with column {value_column}.
+    - time_series_df (pd.DataFrame): The time series data with column {value_column} and
+        no index.
     - value_column (string): The column in time_series_df that needs indicators
     - value_column_indicators_config: The metrics_config indicators dict for the column
         e.g. metrics_config['time_series']['market_data']['price']['indicators']
@@ -41,19 +77,20 @@ def generate_time_series_indicators(
     Returns:
     - time_series_df (pd.DataFrame): Input df with all indicators added
     """
-    # Data Quality Checks and Formatting
+    # Confirm df has no starting index
+    if not isinstance(time_series_df.index, pd.RangeIndex):
+        raise ValueError("time_series_df must not have values stored in an index. ")
+
+    # Confirm value column exists
     if value_column not in time_series_df.columns:
         raise KeyError(f"Input DataFrame does not include column '{value_column}'.")
 
+    # Confirm no null values
     if time_series_df[value_column].isnull().any():
         raise ValueError(f"The '{value_column}' column contains null values, which are not allowed.")
 
     # Defining index to group on
     # --------------------------
-    # Reset index if it exists
-    if not time_series_df.index.empty:
-        time_series_df = time_series_df.reset_index()
-
     # If there is an id_column, group indicator calculations on it
     if id_column:
         groupby_column = id_column
@@ -172,7 +209,7 @@ def calculate_ema(timeseries: pd.Series, window: int) -> pd.Series:
 
 def calculate_bollinger_bands(timeseries: pd.Series,
                               return_band: str,
-                              window: int = 20,
+                              window: int,
                               num_std: float = 2) -> pd.Series:
     """
     Bollinger Bands: Bollinger Bands measure volatility by placing bands above and below a moving
@@ -196,7 +233,7 @@ def calculate_bollinger_bands(timeseries: pd.Series,
     middle_band = timeseries.rolling(window=window).mean()
 
     # Calculate the standard deviation
-    std_dev = timeseries.rolling(window=window).std()
+    std_dev = timeseries.rolling(window=window).std(ddof=0)
 
     # Calculate the upper and lower bands
     upper_band = middle_band + (std_dev * num_std)

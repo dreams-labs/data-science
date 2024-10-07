@@ -68,9 +68,8 @@ def generate_time_series_features(
 
             value_column_metrics_df, _ = ind.generate_time_series_indicators(
                 value_column_df,
-                config,
-                value_column_indicators_config['indicators'],
                 value_column,
+                value_column_indicators_config['indicators'],
                 id_column='coin_id'
             )
 

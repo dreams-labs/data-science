@@ -37,9 +37,165 @@ logger = dc.setup_logger()
 #                                                       #
 # ===================================================== #
 
-# ------------------------------------------ #
+# -------------------------------------------- #
 # generate_time_series_indicators() unit tests
-# ------------------------------------------ #
+# -------------------------------------------- #
+
+@pytest.fixture
+def sample_data():
+    """
+    Fixture to create a sample DataFrame for testing.
+
+    Returns:
+    - pd.DataFrame: A DataFrame with sample data for testing indicators.
+    """
+    return pd.DataFrame({
+        'coin_id': ['BTC', 'BTC', 'BTC', 'ETH', 'ETH', 'ETH'],
+        'date': pd.date_range(start='2023-01-01', periods=6),
+        'price': [100, 110, 105, 200, 220, 210]
+    })
+
+@pytest.fixture
+def sample_config():
+    """
+    Fixture to create a sample configuration for testing.
+
+    Returns:
+    - dict: A configuration dictionary for testing all supported indicators.
+    """
+    return {
+        'time_series': {
+            'market_data': {
+                'price': {
+                    'indicators': {
+                        'sma': {'parameters': {'window': [2]}},
+                        'ema': {'parameters': {'window': [2]}},
+                        'rsi': {'parameters': {'window': [2]}},
+                        'bollinger_bands_upper': {'parameters': {'window': [2], 'num_std': 2}},
+                        'bollinger_bands_lower': {'parameters': {'window': [2], 'num_std': 2}}
+                    }
+                }
+            }
+        }
+    }
+
+@pytest.mark.unit
+def test_all_supported_indicators(sample_data, sample_config):
+    """
+    Test that all supported indicators are correctly calculated and added to the DataFrame.
+
+    This test checks the calculation of SMA, EMA, RSI, and Bollinger Bands for the given sample data.
+    """
+    result = ind.generate_time_series_indicators('market_data', sample_data, sample_config)
+
+    # Calculate expected values
+    # SMA (2-day)
+    # For BTC: [None, 105, 107.5]
+    # For ETH: [None, 210, 215]
+
+    # EMA (2-day)
+    # For BTC: [None, 106.67, 105.56]
+    # For ETH: [None, 213.33, 211.11]
+    # EMA = (Current * (2 / (1 + 2))) + (Previous EMA * (1 - (2 / (1 + 2))))
+
+    # RSI (2-day)
+    # For BTC: [None, 100, 33.33]
+    # For ETH: [None, 100, 33.33]
+    # RSI = 100 - (100 / (1 + (Average Gain / Average Loss)))
+
+    # Bollinger Bands (2-day, 2 std dev)
+    # Upper Band = SMA + (2 * std dev)
+    # Lower Band = SMA - (2 * std dev)
+    # For BTC: [None, 115, 112.5], [None, 95, 102.5]
+    # For ETH: [None, 230, 225], [None, 190, 205]
+
+    expected_columns = [
+        'coin_id', 'date', 'price',
+        'price_sma_2', 'price_ema_2', 'price_rsi_2',
+        'price_bollinger_bands_upper_2', 'price_bollinger_bands_lower_2'
+    ]
+
+    assert list(result.columns) == expected_columns
+
+    # Check SMA values
+    expected_sma = [np.nan, 105, 107.5, np.nan, 210, 215]
+    assert all(np.isclose(a, b, equal_nan=True) for a, b in zip(result['price_sma_2'], expected_sma))
+
+    # Check EMA values
+    expected_ema = [np.nan, 106.67, 105.56, np.nan, 213.33, 211.11]
+    assert all(np.isclose(a, b, equal_nan=True, rtol=1e-2) for a, b in zip(result['price_ema_2'], expected_ema))
+
+    # Check RSI values
+    expected_rsi = [np.nan, 1.0, 0.6667, np.nan, 1.0, 0.6667]
+    assert all(np.isclose(a, b, equal_nan=True, rtol=1e-2) for a, b in zip(result['price_rsi_2'], expected_rsi))
+
+    # Check Bollinger Bands values
+    expected_bb_upper = [np.nan, 115, 112.5, np.nan, 230, 225]
+    expected_bb_lower = [np.nan, 95, 102.5, np.nan, 190, 205]
+    assert all(np.isclose(a, b, equal_nan=True) for a, b in zip(result['price_bollinger_bands_upper_2'], expected_bb_upper))
+    assert all(np.isclose(a, b, equal_nan=True) for a, b in zip(result['price_bollinger_bands_lower_2'], expected_bb_lower))
+
+
+@pytest.fixture
+def sample_data_incorrect_column():
+    """
+    Fixture to create a sample DataFrame for testing with incorrect column names.
+
+    Returns:
+    - pd.DataFrame: A DataFrame with sample data for testing indicators.
+    """
+    return pd.DataFrame({
+        'coin_id': ['BTC', 'BTC', 'BTC', 'ETH', 'ETH', 'ETH'],
+        'date': pd.date_range(start='2023-01-01', periods=6),
+        'actual_price': [100, 110, 105, 200, 220, 210]  # Note: 'price' changed to 'actual_price'
+    })
+
+@pytest.fixture
+def sample_config_incorrect_column():
+    """
+    Fixture to create a sample configuration with incorrect column names for testing.
+
+    Returns:
+    - dict: A configuration dictionary with incorrect column names.
+    """
+    return {
+        'time_series': {
+            'market_data': {
+                'price': {  # This should be 'actual_price' to match the DataFrame
+                    'indicators': {
+                        'sma': {'parameters': {'window': [2]}},
+                        'ema': {'parameters': {'window': [2]}},
+                        'rsi': {'parameters': {'window': [2]}},
+                        'bollinger_bands_upper': {'parameters': {'window': [2], 'num_std': 2}},
+                        'bollinger_bands_lower': {'parameters': {'window': [2], 'num_std': 2}}
+                    }
+                }
+            }
+        }
+    }
+
+@pytest.mark.unit
+def test_generate_time_series_indicators_incorrect_column(sample_data_incorrect_column, sample_config_incorrect_column):
+    """
+    Test that generate_time_series_indicators handles incorrect column names in the configuration.
+
+    This test checks that the function raises an appropriate exception when the configuration
+    references columns not present in the dataset.
+    """
+    with pytest.raises(KeyError) as excinfo:
+        ind.generate_time_series_indicators('market_data', sample_data_incorrect_column, sample_config_incorrect_column)
+
+    assert "price" in str(excinfo.value), "Expected KeyError mentioning the missing 'price' column"
+
+    # Additional check to ensure the function didn't modify the input DataFrame
+    assert list(sample_data_incorrect_column.columns) == ['coin_id', 'date', 'actual_price'], \
+        "The input DataFrame should not be modified when an error occurs"
+
+
+
+# ------------------------------------------------ #
+# generate_column_time_series_indicators() unit tests
+# ------------------------------------------------ #
 
 @pytest.fixture
 def multi_series_df():
@@ -75,7 +231,7 @@ def sma_ema_config():
     }
 
 @pytest.mark.unit
-def test_generate_time_series_indicators_multi_series(multi_series_df, sma_ema_config):
+def test_generate_column_time_series_indicators_multi_series(multi_series_df, sma_ema_config):
     """
     Test case for generate_time_series_indicators to verify that SMA and EMA are calculated
     separately for each coin_id and not mixed together.
@@ -86,7 +242,7 @@ def test_generate_time_series_indicators_multi_series(multi_series_df, sma_ema_c
     """
 
     # 1. Run the function
-    result_df = ind.generate_time_series_indicators(
+    result_df = ind.generate_column_time_series_indicators(
         time_series_df=multi_series_df,
         value_column='price',
         value_column_indicators_config=sma_ema_config,
@@ -274,21 +430,13 @@ def sample_timeseries_bollinger1():
 
 @pytest.mark.unit
 def test_calculate_bollinger_bands_scenario1(sample_timeseries_bollinger1):
-    """
-    Unit test for calculating Bollinger Bands for a normal case.
-
-    Scenario: Calculate Bollinger Bands for a timeseries [100, 102, 104, 103, 101, ...] with a window of 5 and num_std of 2.
-
-    Expected Behavior: The function should return the selected band (upper or lower) correctly calculated using the provided window and standard deviation.
-    """
-
-    # Define window and standard deviation multiplier
     window = 5
     num_std = 2
 
-    # Manually calculate expected values for comparison
-    expected_middle_band = sample_timeseries_bollinger1.rolling(window=window).mean()
-    expected_std_dev = sample_timeseries_bollinger1.rolling(window=window).std()
+    # Manually calculate expected values using numpy for population standard deviation
+    values = sample_timeseries_bollinger1.values
+    expected_middle_band = np.convolve(values, np.ones(window), 'valid') / window
+    expected_std_dev = np.array([np.std(values[i:i+window], ddof=0) for i in range(len(values)-window+1)])
     expected_upper_band = expected_middle_band + (expected_std_dev * num_std)
     expected_lower_band = expected_middle_band - (expected_std_dev * num_std)
 
@@ -296,20 +444,19 @@ def test_calculate_bollinger_bands_scenario1(sample_timeseries_bollinger1):
     upper_band = ind.calculate_bollinger_bands(sample_timeseries_bollinger1, return_band='upper', window=window, num_std=num_std)
 
     # Assert that the upper band matches the expected values
-    assert np.allclose(upper_band[window:], expected_upper_band[window:], atol=1e-4), \
-        f"Expected upper band values: {expected_upper_band.values}, but got {upper_band.values}"
+    assert np.allclose(upper_band[window-1:], expected_upper_band, atol=1e-4), \
+        f"Expected upper band values: {expected_upper_band}, but got {upper_band[window-1:].values}"
 
     # Call the function for the lower band
     lower_band = ind.calculate_bollinger_bands(sample_timeseries_bollinger1, return_band='lower', window=window, num_std=num_std)
 
     # Assert that the lower band matches the expected values
-    assert np.allclose(lower_band[window:], expected_lower_band[window:], atol=1e-4), \
-        f"Expected lower band values: {expected_lower_band.values}, but got {lower_band.values}"
+    assert np.allclose(lower_band[window-1:], expected_lower_band, atol=1e-4), \
+        f"Expected lower band values: {expected_lower_band}, but got {lower_band[window-1:].values}"
 
     # Ensure the first values before the window period are NaN (due to insufficient data)
     assert upper_band[:window-1].isna().all(), "Expected NaN values for upper band before the window period."
     assert lower_band[:window-1].isna().all(), "Expected NaN values for lower band before the window period."
-
 
 # -------------------------------------------- #
 # calculate_rsi() unit tests
