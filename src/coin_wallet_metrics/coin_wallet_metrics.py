@@ -356,90 +356,12 @@ def fill_buysell_metrics_df(buysell_metrics_df, training_period_end):
 
 
 
-def generate_time_series_indicators(
-        time_series_df: pd.DataFrame,
-        config: dict,
-        value_column_indicators_config: dict,
-        value_column: str,
-        id_column: Optional[str]='coin_id'
-    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Generates time series metrics (e.g., SMA, EMA) based on the given config.
-    Works for both multi-series (e.g., multiple coins) and single time series data.
-
-    Params:
-    - time_series_df (pd.DataFrame): The input DataFrame with time series data.
-    - config: The full general config file containing training_period_start and
-        training_period_end.
-    - value_column_indicators_config: The metrics_config subcomponent with the parameters for the
-        value_column, e.g. metrics_config['time_series']['prices']['price']['indicators']
-    - value_column (string): The column used to calculate the indicators (e.g., 'price').
-    - id_column (Optional[string]): The name of the column used to identify different series
-        (e.g., 'coin_id'). If None, assumes a single time series.
-
-    Returns:
-    - full_indicators_df (pd.DataFrame): Input df with additional columns for the specified
-        indicators. Only includes series that had complete data for the period between
-        training_period_start and training_period_end.
-    - partial_time_series_indicators_df (pd.DataFrame): Input df with additional columns for the
-        configured indicators. Only includes series that had partial data for the period.
-    """
-    # 1. Data Quality Checks and Formatting
-    # -------------------------------------
-    if value_column not in time_series_df.columns:
-        raise KeyError(f"Input DataFrame does not include column '{value_column}'.")
-
-    if time_series_df[value_column].isnull().any():
-        raise ValueError(f"The '{value_column}' column contains null values, which are not allowed.")
-
-    time_series_df = time_series_df.copy()
-    time_series_df['date'] = pd.to_datetime(time_series_df['date'])
-    training_period_start = pd.to_datetime(config['training_data']['training_period_start'])
-    training_period_end = pd.to_datetime(config['training_data']['training_period_end'])
-
-    time_series_df = time_series_df[(time_series_df['date'] >= training_period_start) &
-                                    (time_series_df['date'] <= training_period_end)]
-
-    # 2. Indicator Calculations
-    # ----------------------
-    if id_column:
-        # Multi-series data (e.g., multiple coins)
-        time_series_df = time_series_df.sort_values(by=[id_column, 'date'])
-        groupby_column = id_column
-    else:
-        # Single time series data
-        time_series_df = time_series_df.sort_values(by=['date'])
-        groupby_column = lambda x: True # Group all rows on dummy column    # pylint: disable=C3001
-
-    for _, group in time_series_df.groupby(groupby_column):
-        for metric, config in value_column_indicators_config.items():
-            period = config['parameters']['period']
-
-            if metric == 'sma':
-                sma = calculate_sma(group[value_column], period)
-                time_series_df.loc[group.index, f"{value_column}_{metric}"] = sma
-            elif metric == 'ema':
-                ema = calculate_ema(group[value_column], period)
-                time_series_df.loc[group.index, f"{value_column}_{metric}"] = ema
-
-
-    # 3. Split records by complete vs partial time series coverage
-    # ------------------------------------------------------------
-    full_indicators_df, partial_time_series_indicators_df = split_dataframe_by_coverage(
-        time_series_df, training_period_start, training_period_end, id_column
-    )
-
-    # Logging
-    logger.debug("Generated time series indicators data.")
-
-    return full_indicators_df, partial_time_series_indicators_df
-
-
 def split_dataframe_by_coverage(
         time_series_df: pd.DataFrame,
         start_date: pd.Timestamp,
         end_date: pd.Timestamp,
-        id_column: Optional[str] = 'coin_id'
+        id_column: Optional[str] = 'coin_id',
+        drop_outside_date_range: bool = False
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Splits the input DataFrame into full coverage and partial coverage based on date range.
@@ -450,6 +372,8 @@ def split_dataframe_by_coverage(
     - start_date (pd.Timestamp): Start date of the training period.
     - end_date (pd.Timestamp): End date of the modeling period.
     - id_column (Optional[str]): The name of the column used to identify different series.
+    - drop_outside_date_range (Optional[bool]): Whether to remove all rows that are outside of
+        the start_date and end_date
 
     Returns:
     - full_coverage_df (pd.DataFrame): DataFrame with series having complete data for the period.
@@ -458,6 +382,12 @@ def split_dataframe_by_coverage(
     # Convert params to datetime
     start_date = pd.to_datetime(start_date)
     end_date = pd.to_datetime(end_date)
+
+    # Create copy of df
+    time_series_df = time_series_df.copy()
+
+    # Drop all rows with any NaN values
+    time_series_df = time_series_df.dropna()
 
     # Define a function to check if a date range has full coverage
     def has_full_coverage(min_date, max_date):
@@ -487,33 +417,22 @@ def split_dataframe_by_coverage(
 
     logger.info("Split df with dimensions %s into %s full coverage records and %s partial coverage records.",
                 time_series_df.shape,
-                dc.human_format(len(full_coverage_df)),
-                dc.human_format(len(partial_coverage_df))
-    )
+                len(full_coverage_df),
+                len(partial_coverage_df))
+
+    if drop_outside_date_range:
+        # Remove rows outside the date range for both dataframes
+        full_coverage_df = (full_coverage_df[(full_coverage_df['date'] >= start_date) &
+                                             (full_coverage_df['date'] <= end_date)])
+        partial_coverage_df = (partial_coverage_df[(partial_coverage_df['date'] >= start_date) &
+                                                   (partial_coverage_df['date'] <= end_date)])
+
+        # Log the number of remaining records
+        total_remaining = len(full_coverage_df) + len(partial_coverage_df)
+        logger.info("After removing records outside the date range, %s records remain.",
+                    total_remaining)
 
     return full_coverage_df, partial_coverage_df
-
-
-
-def calculate_sma(timeseries: pd.Series, period: int) -> pd.Series:
-    """
-    Calculates Simple Moving Average (SMA) for a given time series, with handling for imputing
-    null values on dates that occur when there are fewer data points than the period duration.
-    """
-    # Calculate the SMA for the first few values where data is less than the period
-    sma = timeseries.expanding(min_periods=1).apply(lambda x: x.mean() if len(x) < period else np.nan)
-
-    # Use rolling().mean() for the rest once the period is reached
-    rolling_sma = timeseries.rolling(window=period, min_periods=period).mean()
-
-    # Combine the two: use the expanding calculation until the period is reached, then use rolling()
-    sma = sma.combine_first(rolling_sma)
-
-    return sma
-
-def calculate_ema(timeseries: pd.Series, period: int) -> pd.Series:
-    """Calculates Exponential Moving Average (EMA) for a given time series."""
-    return timeseries.ewm(span=period, adjust=False).mean()
 
 
 

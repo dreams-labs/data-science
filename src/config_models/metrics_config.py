@@ -126,7 +126,7 @@ class Metric(NoExtrasBaseModel):
         using Comparisons.
 
     * Indicator metrics are transformations that result in a new time series, e.g. SMA, EMA, RSI.
-        Indicator metrics can flattened through Aggregations or RollingMetrics.
+        Indicator metrics can be flattened through Aggregations or RollingMetrics.
 
     Finally, all of these types of metrics can be scaled using ScalingConfig after they've been
     calculated. Scaling is applied to the dataframe containing every coin_id's values for the
@@ -134,7 +134,7 @@ class Metric(NoExtrasBaseModel):
     """
     aggregations: Optional[Dict['AggregationType', 'AggregationConfig']] = Field(default=None)
     rolling: Optional['RollingMetrics'] = Field(default=None)
-    indicators: Optional[Dict[str, 'Indicators']] = Field(default=None)
+    indicators: Optional[Dict['IndicatorType', 'IndicatorMetric']] = Field(default=None)
 
     @model_validator(mode='after')
     def remove_empty_fields(cls, values):
@@ -171,6 +171,7 @@ class AggregationType(str, Enum):
     MIN = "min"
     FIRST = "first"
     LAST = "last"
+    NONE = "none" # generates no features but allows column to be used for ratios
 
 class AggregationConfig(NoExtrasBaseModel):
     """
@@ -250,11 +251,23 @@ class IndicatorType(str, Enum):
     """
     SMA = "sma"
     EMA = "ema"
+    RSI = "rsi"
+    BOLLINGER_BANDS_UPPER = "bollinger_bands_upper"
+    BOLLINGER_BANDS_LOWER = "bollinger_bands_lower"
 
-class Indicators(NoExtrasBaseModel):
-    parameters: Dict[str, Any]  # Flexible to handle unique parameters
-    aggregations: Optional[Dict['AggregationType', 'AggregationConfig']] = Field(default=None)
-    rolling: Optional['RollingMetrics'] = Field(default=None)
+class IndicatorParams(NoExtrasBaseModel):
+    """
+    This is class that defines all parameters that can be used by all indicators. If a parameter isn't
+    applicable to the specific indicator, it will be ignored.
+    """
+    window: List[int] # used in all indicators
+    num_std: Optional[float] = None  # used in bollinger_bands
+
+class IndicatorMetric(Metric):
+    """
+    This includes all fields from the Metric parent class as well as IndicatorParameters.
+    """
+    parameters: 'IndicatorParams'
 
 
 # Modular Metrics: ScalingConfig

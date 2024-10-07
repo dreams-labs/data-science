@@ -2,7 +2,6 @@
 functions used to build coin-level features from training data
 """
 import os
-import logging
 from datetime import datetime
 import time
 import copy
@@ -14,107 +13,173 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 # pylint: disable=E0401
 # project module imports
-import coin_wallet_metrics as cwm
+import coin_wallet_metrics.coin_wallet_metrics as cwm
+import coin_wallet_metrics.indicators as ind
+import training_data.profits_row_imputation as pri
 
 
 # set up logger at the module level
 logger = dc.setup_logger()
 
 
-def generate_time_series_features(
-        dataset_name,
-        dataset_df,
+
+def generate_window_time_series_features(
+        all_windows_time_series_df,
+        config,
+        dataset_metrics_config,
+        modeling_config
+    ):
+    """
+    Generates a window-specific feature set from the full all windows dataset. The window-specific
+    features are saved as a csv and returned, along with the csv filepath.
+
+    Params:
+    - all_windows_time_series_df (DataFrame): df containing all metrics and indicators for a time
+        series dataset.
+    - config (dict): config.yaml that has the dates for the specific time window
+    - dataset_metrics_config (dict): The component of metrics_config relating to this dataset, e.g.
+        metrics_config['time_series']['market_data']
+    - modeling_config (dict): modeling_config.yaml
+
+    Returns:
+    - flattened_metrics_df (DataFrame): the flattened version of the original df, with columns for
+        the configured aggregations and rolling metrics for all value columns and indicators.
+    - flattened_metrics_filepath (string): the filepath to where the flattened_metrics_df is saved
+    """
+    # Filter input data to time window
+    window_time_series_df, _ = cwm.split_dataframe_by_coverage(
+        all_windows_time_series_df,
+        config['training_data']['training_period_start'],
+        config['training_data']['training_period_end'],
+        id_column='coin_id',
+        drop_outside_date_range=True
+    )
+
+    # Flatten the metrics DataFrame to be keyed only on coin_id
+    flattened_metrics_df = flatten_coin_date_df(
+        window_time_series_df,
+        dataset_metrics_config,
+        config['training_data']['training_period_end']  # Ensure data is up to training period end
+    )
+
+    # Add time window modeling period start
+    flattened_metrics_df.loc[:,'time_window'] = config['training_data']['modeling_period_start']
+
+    # Save the flattened output and retrieve the file path
+    _, flattened_metrics_filepath = save_flattened_outputs(
+        flattened_metrics_df,
+        os.path.join(
+            modeling_config['modeling']['modeling_folder'],  # Folder to store flattened outputs
+            'outputs/flattened_outputs'
+        ),
+        'market_data',  # Descriptive metadata for the dataset
+        config['training_data']['modeling_period_start']  # Ensure data starts from modeling period
+    )
+
+    return flattened_metrics_df, flattened_metrics_filepath
+
+
+
+def generate_window_macro_trends_features(
+        all_windows_macro_trends_df,
         config,
         metrics_config,
         modeling_config
     ):
     """
-    Generates features for a time series dataset by calculating all metrics defined in the
-    metrics_config for each coin_id. The metrics are then flattened into features and saved
-    in the format needed to merge them using fe.create_training_data_df().
+    Generates a window-specific feature set from the full all windows dataset. The window-specific
+    features are saved as a csv and returned, along with the csv filepath.
+
+    This function differs from the time_series set because it only flattens on date, since this
+    dataset doesn't have coin_id.
 
     Params:
-    - dataset_name (string): the key of the dataset,
-        e.g. config['datasets']['time_series'][{dataset_name}]
-    - dataset_df (pd.DataFrame): the dataframe containing the columns with defined metrics,
-        e.g. a column for each of metrics_config['time_series'][{dataset_name}].keys()
-    - config (dict): config.yaml
-    - metrics_config (dict): metrics_config.yaml
-    - modeling_config (dict): modeling_config.yaml
+    - all_windows_time_series_df (DataFrame): df containing all metrics and indicators for a time
+        series dataset.
+    - config: config.yaml that has the dates for the specific time window
+    - metrics_config: metrics_config.yaml
+    - modeling_config: modeling_config.yaml
 
     Returns:
-    - training_data_tuples (list of tuples): Each tuple contains the preprocessed file name
-        and fill method for the value column contained in dataset_metrics_config, formatted for
-        input to fe.create_training_data_df().
-    - training_data_dfs (list of pd.DataFrames): A list of preprocessed DataFrames for each
-        value_column included in the dataset_metrics_config.
+    - flattened_metrics_df (DataFrame): the flattened version of the original df, with columns for
+        the configured aggregations and rolling metrics for all value columns and indicators.
+    - flattened_metrics_filepath (string): the filepath to where the flattened_metrics_df is saved
     """
-    training_data_tuples = []
-    training_data_dfs = []
+    # Filter input data to time window
+    window_macro_trends_df,_ = cwm.split_dataframe_by_coverage(all_windows_macro_trends_df,
+                                                            config['training_data']['training_period_start'],
+                                                            config['training_data']['training_period_end'],
+                                                            id_column=None,
+                                                            drop_outside_date_range=True)
 
-    dataset_metrics_config = metrics_config['time_series'][dataset_name]
+    # Macro trends: flatten metrics
+    flattened_features = flatten_date_features(window_macro_trends_df,metrics_config['macro_trends'])
+    flattened_macro_trends_df = pd.DataFrame([flattened_features])
 
-    # calculate metrics for each value column
-    for value_column in list(dataset_metrics_config.keys()):
+    # Add time window modeling period start
+    flattened_macro_trends_df.loc[:,'time_window'] = config['training_data']['modeling_period_start']
 
-        # a value_column-specific df will be used for feature generation
-        value_column_config = config['datasets']['time_series'][dataset_name][value_column]
-        value_column_metrics_config = dataset_metrics_config[value_column]
-        value_column_df = dataset_df[['date','coin_id',value_column]].copy()
 
-        # check if there are any time series indicators to add, e.g. sma, ema, etc
-        if 'indicators' in value_column_metrics_config:
-            value_column_metrics_df, _ = cwm.generate_time_series_indicators(
-                value_column_df,
-                config,
-                value_column_metrics_config['indicators'],
-                value_column,
-                id_column='coin_id'
-            )
+    # Save the flattened output and retrieve the file path
+    _, flattened_metrics_filepath = save_flattened_outputs(
+        flattened_macro_trends_df,
+        os.path.join(
+            modeling_config['modeling']['modeling_folder'],  # Folder to store flattened outputs
+            'outputs/flattened_outputs'
+        ),
+        'macro_trends',  # Descriptive metadata for the dataset
+        config['training_data']['modeling_period_start']  # Ensure data starts from modeling period
+    )
 
-        else:
-            # if no indicators are needed, pass through coins with complete date coverage
-            logging.getLogger().setLevel(logging.WARNING) # raise level to avoid INFO logs about this split
-            value_column_metrics_df, _ = cwm.split_dataframe_by_coverage(
-                value_column_df,
-                config['training_data']['training_period_start'],
-                config['training_data']['training_period_end'],
-                id_column='coin_id'
-            )
-            logging.getLogger().setLevel(logging.INFO) # reset to INFO, could be updated to use original level
-
-        # generate features from the metrics
-        value_column_features_df, value_column_tuple = convert_dataset_metrics_to_features(
-            value_column_metrics_df,
-            value_column_config,
-            dataset_metrics_config,
-            config,
-            modeling_config
-        )
-
-        logger.info('Generated features for %s.%s.%s',
-                    'time_series', dataset_name, value_column)
-
-        training_data_tuples.append(value_column_tuple)
-        training_data_dfs.append(value_column_features_df)
-
-    return training_data_tuples, training_data_dfs
+    return flattened_macro_trends_df, flattened_metrics_filepath
 
 
 
 def generate_wallet_cohort_features(
         profits_df,
+        prices_df,
         config,
         metrics_config,
         modeling_config
     ):
     """
-    Generates features for all wallet cohorts by calculating the metrics defined in the
-    metrics_config for each coin_id. The metrics are then flattened into features and saved
-    in the format needed to merge them using fe.create_training_data_df().
+    Generates a window-specific feature set from the full all windows dataset. The window-specific
+    features are saved as a csv and returned, along with the csv filepath.
+
+    This function differs from the time_series set because it only flattens on date, since this
+    dataset doesn't have coin_id.
+
+    Params:
+    - all_windows_time_series_df (DataFrame): df containing all metrics and indicators for a time
+        series dataset.
+    - config: config.yaml that has the dates for the specific time window
+    - metrics_config: metrics_config.yaml
+    - modeling_config: modeling_config.yaml
+
+    Returns:
+    - flattened_cohort_dfs (list of DataFrames): a list containing the flattened versions of each
+        cohort's metrics, with columns for the configured aggregations and rolling metrics for all
+        value columns and indicators.
+    - flattened_cohorts_filepath (list of strings): a list containing the filepaths to where the
+        flattened_cohort_dfs are saved
     """
-    wallet_cohort_tuples = []
-    wallet_data_dfs = []
+
+    # 1. Impute all required dates
+    # ----------------------------
+    # Identify all required imputation dates
+    imputation_dates = pri.identify_imputation_dates(config)
+
+    # Impute all required dates
+    window_profits_df = pri.impute_profits_for_multiple_dates(profits_df, prices_df, imputation_dates, n_threads=24)
+    window_profits_df = (window_profits_df[(window_profits_df['date'] >= pd.to_datetime(min(imputation_dates))) &
+                                        (window_profits_df['date'] <= pd.to_datetime(max(imputation_dates)))])
+
+
+    # 2. Generate metrics and indicators for all cohorts
+    # --------------------------------------------------
+    # Set up lists to store flattened cohort data
+    flattened_cohort_dfs = []
+    flattened_cohort_filepaths = []
 
     for cohort_name in metrics_config['wallet_cohorts']:
 
@@ -122,8 +187,8 @@ def generate_wallet_cohort_features(
         dataset_metrics_config = metrics_config['wallet_cohorts'][cohort_name]
         dataset_config = config['datasets']['wallet_cohorts'][cohort_name]
 
-        # identify wallets in the cohort
-        cohort_summary_df = cwm.classify_wallet_cohort(profits_df, dataset_config, cohort_name)
+        # identify wallets in the cohort based on the full lookback period
+        cohort_summary_df = cwm.classify_wallet_cohort(window_profits_df, dataset_config, cohort_name)
         cohort_wallets = cohort_summary_df[cohort_summary_df['in_cohort']]['wallet_address']
 
         # If no cohort members were identified, continue
@@ -131,131 +196,28 @@ def generate_wallet_cohort_features(
             logger.info("No wallets identified as members of cohort '%s'", cohort_name)
             continue
 
-        # generate cohort buysell_metrics
-        cohort_metrics_df = cwm.generate_buysell_metrics_df(
-            profits_df,config['training_data']['training_period_end'],cohort_wallets)
+        # Generate cohort buysell_metrics
+        cohort_metrics_df = cwm.generate_buysell_metrics_df(window_profits_df,
+                                                            config['training_data']['training_period_end'],
+                                                            cohort_wallets)
 
-        # generate features from the metrics
-        dataset_features_df, dataset_tuple = convert_dataset_metrics_to_features(
+        # Generate cohort indicator metrics
+        cohort_metrics_df = ind.generate_time_series_indicators(cohort_metrics_df,
+                                                                metrics_config['wallet_cohorts'][cohort_name],
+                                                                'coin_id')
+
+        # Flatten cohort metrics
+        flattened_cohort_df, flattened_cohort_filepath = generate_window_time_series_features(
             cohort_metrics_df,
-            dataset_config,
-            dataset_metrics_config,
             config,
+            dataset_metrics_config,
             modeling_config
         )
 
-        # identify columns for logging
-        dataset_features = dataset_features_df.columns.tolist()
-        dataset_features.remove('coin_id')
+        flattened_cohort_dfs.extend([flattened_cohort_df])
+        flattened_cohort_filepaths.extend([flattened_cohort_filepath])
 
-        logger.info("Generated %s features for wallet cohort '%s'.",
-                    len(dataset_features), cohort_name)
-        logger.debug('Features generated: %s', dataset_features)
-
-        wallet_cohort_tuples.append(dataset_tuple)
-        wallet_data_dfs.append(dataset_features_df)
-
-    return wallet_cohort_tuples, wallet_data_dfs
-
-
-
-def generate_macro_trends_features(
-        dataset_df,
-        config,
-        metrics_config,
-        modeling_config
-    ):
-    """
-    Generates features for a macro series datasets. The primary difference between this and
-    generate_time_series_features() are that these datasets do not have coin_ids, and so
-    use flatten_date_features() instead of convert_dataset_metrics_to_features().
-
-    Params:
-    - dataset_df (pd.DataFrame): the dataframe containing the columns with defined metrics,
-        e.g. a column for each of metrics_config['time_series'][{dataset_name}].keys()
-    - config (dict): config.yaml
-    - metrics_config (dict): metrics_config.yaml
-    - modeling_config (dict): modeling_config.yaml
-
-    Returns:
-    - training_data_tuples (list of tuples): Each tuple contains the preprocessed file name
-        and fill method for the value column contained in dataset_metrics_config, formatted for
-        input to fe.create_training_data_df().
-    - training_data_dfs (list of pd.DataFrames): A list of preprocessed DataFrames for each
-        value_column included in the dataset_metrics_config.
-        """
-    # function variables we want to reference
-    dataset_category = 'macro_trends'
-    id_column=None
-    dataset_metrics_config = metrics_config[dataset_category]
-
-    # Model-ready tuples and dfs will go here
-    training_data_tuples = []
-    training_data_dfs = []
-
-
-    # calculate metrics for each value column
-    for value_column in list(dataset_metrics_config.keys()):
-
-        # a value_column-specific df will be used for feature generation
-        value_column_config = config['datasets'][dataset_category][value_column]
-        value_column_metrics_config = dataset_metrics_config[value_column]
-        value_column_df = dataset_df[['date',value_column]].copy()
-        # check if there are any time series indicators to add, e.g. sma, ema, etc
-        if 'indicators' in value_column_metrics_config:
-            value_column_metrics_df, _ = cwm.generate_time_series_indicators(
-                value_column_df,
-                config,
-                value_column_metrics_config['indicators'],
-                value_column,
-                id_column
-            )
-
-        else:
-            # if no indicators are needed, pass through coins with complete date coverage
-            logging.getLogger().setLevel(logging.WARNING) # suppress INFO logs about splits
-            value_column_metrics_df, _ = cwm.split_dataframe_by_coverage(
-                value_column_df,
-                config['training_data']['training_period_start'],
-                config['training_data']['training_period_end'],
-                id_column
-            )
-            logging.getLogger().setLevel(logging.INFO) # could be updated to use original level
-
-
-        # flatten metrics
-        flattened_features = flatten_date_features(value_column_metrics_df,dataset_metrics_config)
-        flattened_macro_trends_df = pd.DataFrame([flattened_features])
-
-        # save flattened metrics
-        flattened_macro_trends_df, flattened_macro_trends_filepath = save_flattened_outputs(
-            flattened_macro_trends_df,
-            os.path.join(
-                modeling_config['modeling']['modeling_folder'],  # Folder to store flattened outputs
-                'outputs/flattened_outputs'
-            ),
-            value_column_config['description'],  # Descriptive metadata for the dataset
-            config['training_data']['modeling_period_start']  # Ensure data starts from modeling period
-        )
-
-        # preprocess metrics
-        macro_trends_preprocessed_df, macro_trends_preprocessed_filepath = preprocess_coin_df(
-            flattened_macro_trends_filepath
-            ,modeling_config
-            ,value_column_config
-            ,value_column_metrics_config
-        )
-
-        macro_trends_tuple = (macro_trends_preprocessed_filepath.split('preprocessed_outputs/')[1],
-                                value_column_config['fill_method'])
-        logger.info('Generated features for %s.%s',
-                    dataset_category, value_column)
-
-        training_data_tuples.append(macro_trends_tuple)
-        training_data_dfs.append(macro_trends_preprocessed_df)
-
-    return training_data_tuples, training_data_dfs
-
+    return flattened_cohort_dfs, flattened_cohort_filepaths
 
 
 def convert_dataset_metrics_to_features(
@@ -484,9 +446,12 @@ def promote_indicators_to_metrics(df_metrics_config):
     Moves indicators to the same level as other columns in the config file so that their
     features can be generated the same way they are for primary metrics.
 
+    If there are multiple windows for an indicator, a key will be generated for each of
+    them with all metrics configured for the overall indicator.
+
     Params:
-    - df_metrics_config (dict): Configuration object with metric rules from the metrics file for
-        the specific input df.
+    - df_metrics_config (dict): Configuration object with metric rules from the metrics
+        file for the specific input df.
 
     Returns:
     """
@@ -496,16 +461,20 @@ def promote_indicators_to_metrics(df_metrics_config):
     for key, value in df_metrics_config.items():
         # Check if indicators are present
         if 'indicators' in value:
-            for indicator, indicator_data in value['indicators'].items():
-                # Create new top-level key: original key + indicator name
-                new_key = f"{key}_{indicator}"
-                df_metrics_indicators_config[new_key] = indicator_data
+            # If there are indicators...
+            for indicator, indicator_metrics in value['indicators'].items():
 
-            # Optionally, remove indicators from the original key
+                # ...define a new key for each window....
+                for window in indicator_metrics['parameters']['window']:
+                    new_key = f"{key}_{indicator}_{window}"
+
+                # ...and create new top-level key for each window
+                df_metrics_indicators_config[new_key] = indicator_metrics
+
+            # Remove indicators from their original position
             df_metrics_indicators_config[key].pop('indicators')
 
     return df_metrics_indicators_config
-
 
 
 
@@ -667,7 +636,6 @@ def save_flattened_outputs(flattened_df, output_dir, metric_description, modelin
     - output_dir (str): Directory where the CSV file will be saved.
     - metric_description (str): Description of metrics (e.g., 'buysell_metrics').
     - modeling_period_start (str): Start of the modeling period (e.g., '2023-01-01').
-    - description (str, optional): A description to be added to the filename.
 
     Returns:
     - flattened_df (pd.DataFrame): The same DataFrame that was passed in.

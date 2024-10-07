@@ -13,6 +13,7 @@ import functools
 import yaml
 import progressbar
 import pandas as pd
+import numpy as np
 from pydantic import ValidationError
 import dreams_core.core as dc
 
@@ -31,9 +32,23 @@ importlib.reload(py_mc)
 importlib.reload(py_mo)
 importlib.reload(py_e)
 
-
 # set up logger at the module level
 logger = dc.setup_logger()
+
+
+def load_all_configs(config_folder):
+    """
+    Loads and returns all config files
+    """
+    config = load_config(f'{config_folder}/config.yaml')
+    metrics_config = load_config(f'{config_folder}/metrics_config.yaml')
+    modeling_config = load_config(f'{config_folder}/modeling_config.yaml')
+    experiments_config = load_config(f'{config_folder}/experiments_config.yaml')
+
+    # Confirm that all datasets and metrics match across config and metrics_config
+    validate_config_consistency(config,metrics_config)
+
+    return config, metrics_config, modeling_config, experiments_config
 
 
 def load_config(file_path='../notebooks/config.yaml'):
@@ -52,7 +67,7 @@ def load_config(file_path='../notebooks/config.yaml'):
 
     # Calculate and add period boundary dates into the config['training_data'] section
     if 'training_data' in config_dict and 'modeling_period_start' in config_dict['training_data']:
-        period_dates = calculate_period_dates(config_dict['training_data'])
+        period_dates = calculate_period_dates(config_dict)
         config_dict['training_data'].update(period_dates)
 
     # If a pydantic definition exists for the config, return it in json format
@@ -101,19 +116,65 @@ def load_config(file_path='../notebooks/config.yaml'):
     return config
 
 
-def load_all_configs(config_folder):
+# helper function for load_config
+def calculate_period_dates(config):
     """
-    Loads and returns all config files
+    Calculate the training and modeling period start and end dates based on the provided
+    durations and the modeling period start date. The calculated dates will include both
+    the start and end dates, ensuring the correct number of days for each period.
+
+    Args:
+        config (dict): config.yaml which contains:
+        ['training_data']
+        - 'modeling_period_start' (str): Start date of the modeling period in 'YYYY-MM-DD' format.
+        - 'modeling_period_duration' (int): Duration of the modeling period in days.
+        - 'training_period_duration' (int): Duration of the training period in days.
+        ['wallet_cohorts']
+        - [{cohort_name}]['lookback_period' (int): How far back a cohort's transaction history
+            needs to extend prioer to the training_period_start
+
+    Returns:
+        dict: Dictionary containing:
+        - 'training_period_start' (str): Calculated start date of the training period.
+        - 'training_period_end' (str): Calculated end date of the training period.
+        - 'modeling_period_end' (str): Calculated end date of the modeling period.
     """
-    config = load_config(f'{config_folder}/config.yaml')
-    metrics_config = load_config(f'{config_folder}/metrics_config.yaml')
-    modeling_config = load_config(f'{config_folder}/modeling_config.yaml')
-    experiments_config = load_config(f'{config_folder}/experiments_config.yaml')
+    training_data_config = config['training_data']
 
-    # Confirm that all datasets and metrics match across config and metrics_config
-    validate_config_consistency(config,metrics_config)
+    # Extract the config values
+    modeling_period_start = datetime.strptime(training_data_config['modeling_period_start'], '%Y-%m-%d')
+    modeling_period_duration = training_data_config['modeling_period_duration']  # in days
+    training_period_duration = training_data_config['training_period_duration']  # in days
 
-    return config, metrics_config, modeling_config, experiments_config
+    # Training and Modeling Period Dates
+    # ----------------------------------
+    # Calculate modeling_period_end (inclusive of the start date)
+    modeling_period_end = modeling_period_start + timedelta(days=modeling_period_duration - 1)
+
+    # Calculate training_period_end (just before modeling_period_start)
+    training_period_end = modeling_period_start - timedelta(days=1)
+
+    # Calculate training_period_start (inclusive of the start date)
+    training_period_start = training_period_end - timedelta(days=training_period_duration - 1)
+
+    # Lookback Dates
+    # --------------
+    # Calculate the start date of the earliest window
+    window_duration = modeling_period_duration + training_period_duration
+    window_count = training_data_config['additional_windows'] + 1
+    total_days = window_duration * window_count
+    earliest_window_start = pd.to_datetime(modeling_period_end) - timedelta(days=total_days)
+
+    # Calculate the earliest cohort lookback date for the earliest window
+
+
+    # Return updated config with calculated values
+    return {
+        'training_period_start': training_period_start.strftime('%Y-%m-%d'),
+        'training_period_end': training_period_end.strftime('%Y-%m-%d'),
+        'modeling_period_end': modeling_period_end.strftime('%Y-%m-%d'),
+        'earliest_window_start': earliest_window_start.strftime('%Y-%m-%d')
+    }
 
 
 def validate_config_consistency(config,metrics_config):
@@ -167,6 +228,65 @@ def validate_config_consistency(config,metrics_config):
     logger.debug("Config files are consistent.")
 
 
+def check_nan_values(series):
+    """
+    Check if NaN values are only at the start or end of the series.
+
+    Returns:
+    - True if NaN values are in the middle of the series
+    - False if NaN values are only at start/end or if there are no NaN values
+    """
+    # Get the index of the first and last non-NaN value
+    first_valid = series.first_valid_index()
+    last_valid = series.last_valid_index()
+
+    # Check if there are any NaN values between the first and last valid value
+    has_nans_in_series = (series.loc[first_valid:last_valid] # selects the range between first and last valid value
+                             .isna() # checks for NaN values in this range
+                             .any()) # returns True if there are any NaN values in this range
+
+    return has_nans_in_series
+
+
+def safe_downcast(df, column, dtype):
+    """
+    Safe method to downcast a column datatype. If the column has no values that exceed the
+    limits of the new dtype, it will be downcasted. It it has values that will result in
+    overflow errors, it will raise an error.
+
+
+    """
+    # Get the original dtype of the column
+    original_dtype = df[column].dtype
+
+    # Get the min and max values of the column
+    col_min = df[column].min()
+    col_max = df[column].max()
+
+    # Get the limits of the target dtype
+    if dtype in ['float32', 'float64']:
+        type_info = np.finfo(dtype)
+    elif dtype in ['int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64']:
+        type_info = np.iinfo(dtype)
+    else:
+        logger.error("Unsupported dtype: %s", dtype)
+        return df
+
+    # Check if the column values are within the limits of the target dtype
+    if col_min < type_info.min or col_max > type_info.max:
+        logger.warning("Cannot safely downcast column '%s' to %s. "
+                       "Values are outside the range of %s. "
+                       "Min: %s, Max: %s",
+                       column, dtype, dtype, col_min, col_max)
+        return df
+
+    # If we've made it here, it's safe to downcast
+    df[column] = df[column].astype(dtype)
+
+    logger.debug("Successfully downcasted column '%s' from %s to %s",
+                column, original_dtype, dtype)
+    return df
+
 
 def timing_decorator(func):
     """
@@ -211,48 +331,6 @@ def timing_decorator(func):
         )
         return result
     return wrapper
-
-
-
-# helper function for load_config
-def calculate_period_dates(config):
-    """
-    Calculate the training and modeling period start and end dates based on the provided
-    durations and the modeling period start date. The calculated dates will include both
-    the start and end dates, ensuring the correct number of days for each period.
-
-    Args:
-        config (dict): Configuration dictionary containing:
-        - 'modeling_period_start' (str): Start date of the modeling period in 'YYYY-MM-DD' format.
-        - 'modeling_period_duration' (int): Duration of the modeling period in days.
-        - 'training_period_duration' (int): Duration of the training period in days.
-
-    Returns:
-        dict: Dictionary containing:
-        - 'training_period_start' (str): Calculated start date of the training period.
-        - 'training_period_end' (str): Calculated end date of the training period.
-        - 'modeling_period_end' (str): Calculated end date of the modeling period.
-    """
-    # Extract the config values
-    modeling_period_start = datetime.strptime(config['modeling_period_start'], '%Y-%m-%d')
-    modeling_period_duration = config['modeling_period_duration']  # in days
-    training_period_duration = config['training_period_duration']  # in days
-
-    # Calculate modeling_period_end (inclusive of the start date)
-    modeling_period_end = modeling_period_start + timedelta(days=modeling_period_duration - 1)
-
-    # Calculate training_period_end (just before modeling_period_start)
-    training_period_end = modeling_period_start - timedelta(days=1)
-
-    # Calculate training_period_start (inclusive of the start date)
-    training_period_start = training_period_end - timedelta(days=training_period_duration - 1)
-
-    # Return updated config with calculated values
-    return {
-        'training_period_start': training_period_start.strftime('%Y-%m-%d'),
-        'training_period_end': training_period_end.strftime('%Y-%m-%d'),
-        'modeling_period_end': modeling_period_end.strftime('%Y-%m-%d')
-    }
 
 
 

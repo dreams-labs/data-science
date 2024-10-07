@@ -1,13 +1,15 @@
 """
 functions used in generating training data for the models
 """
+import sys
 import time
 import pandas as pd
 from dreams_core.googlecloud import GoogleCloud as dgc
 from dreams_core import core as dc
 
-# project file imports
-from utils import timing_decorator  # pylint: disable=E0401 # can't find utils import
+# import coin_wallet_metrics as cwm
+sys.path.append('..')
+import utils as u  # pylint: disable=C0413  # import must be at top
 
 
 # set up logger at the module level
@@ -31,6 +33,7 @@ def retrieve_market_data():
         ,cast(cmd.price as float64) as price
         ,cast(cmd.volume as int64) as volume
         ,cast(coalesce(cmd.market_cap,cmd.fdv) as int64) as market_cap
+        ,days_imputed
         from core.coin_market_data cmd
         order by 1,2
     """
@@ -42,13 +45,18 @@ def retrieve_market_data():
     market_data_df['coin_id'] = market_data_df['coin_id'].astype('category')
 
     # Downcast numeric columns to reduce memory usage
-    market_data_df['price'] = pd.to_numeric(market_data_df['price'], downcast='float')
-    market_data_df['volume'] = pd.to_numeric(market_data_df['volume'], downcast='integer')
-    market_data_df['market_cap'] = pd.to_numeric(market_data_df['market_cap'], downcast='integer')
+    market_data_df['price'] = market_data_df['price'].astype('float32')
 
     # Dates as dates
-    market_data_df['date'] = market_data_df['date'].dt.date
     market_data_df['date'] = pd.to_datetime(market_data_df['date'])
+
+    # Check for negative values in 'price', 'volume', and 'market_cap'
+    if (market_data_df['price'] < 0).any():
+        raise ValueError("Negative values found in 'price' column.")
+    if (market_data_df['volume'] < 0).any():
+        raise ValueError("Negative values found in 'volume' column.")
+    if (market_data_df['market_cap'] < 0).any():
+        raise ValueError("Negative values found in 'market_cap' column.")
 
     logger.info('Retrieved market_data_df with %s unique coins and %s rows after %s seconds',
                 len(set(market_data_df['coin_id'])),
@@ -56,6 +64,57 @@ def retrieve_market_data():
                 round(time.time()-start_time,1))
 
     return market_data_df
+
+
+
+def clean_market_data(market_data_df, config):
+    """
+    Removes all market data records for
+        1. coins with a longer price gap than the config['data_cleaning']['max_gap_days']
+        2. coins with lower daily mean volume than the minimum_daily_volume between the
+            earliest_window_start and the end of the last modeling period.
+
+    Params:
+    - market_data_df (DataFrame): DataFrame containing market data as well as the
+        days_imputed column, which represents the number of days a real price has been
+        forwardfilled in a row to ensure a complete time series.
+    - max_gap_days (int): The maximum allowable number of forwardfilled dates before
+        all records for the coin are removed
+    """
+    # Declare thresholds
+    max_gap_days = config['data_cleaning']['max_gap_days']
+    min_daily_volume = config['data_cleaning']['min_daily_volume']
+
+    # Identify coin_ids with gaps that exceed the maximum
+    all_coin_ids = market_data_df.groupby('coin_id', observed=True)['days_imputed'].max()
+    gap_coin_ids = all_coin_ids[all_coin_ids > max_gap_days].index.tolist()
+
+    # Remove coins with gaps above the maximum
+    market_data_df_no_gaps = market_data_df[~market_data_df['coin_id'].isin(gap_coin_ids)]
+
+    # Drop helper column
+    market_data_df_no_gaps = market_data_df_no_gaps.drop(columns='days_imputed')
+
+    logger.info("Max gap days threshold of %s day removed %s market data records for %s coins.",
+                max_gap_days,
+                len(market_data_df) - len(market_data_df_no_gaps),
+                len(gap_coin_ids))
+
+
+    # Identify coin_ids with daily volume below the minimum
+    mean_volume = market_data_df_no_gaps.groupby('coin_id', observed=True)['volume'].mean()
+    coin_ids_filtered = mean_volume[mean_volume > min_daily_volume].index
+
+    # Filter market_data_df
+    market_data_df_no_gaps_no_vol = (market_data_df_no_gaps[market_data_df_no_gaps['coin_id']
+                                                      .isin(coin_ids_filtered)])
+
+    logger.info("Min daily volume threshold of $%i removed %s additional market data records for %s coins.",
+                min_daily_volume,
+                len(market_data_df_no_gaps) - len(market_data_df_no_gaps_no_vol),
+                len(set(market_data_df_no_gaps['coin_id'].unique()) - set(coin_ids_filtered)))
+
+    return market_data_df_no_gaps_no_vol
 
 
 
@@ -205,14 +264,14 @@ def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows):
     profits_df['total_return'] = (profits_df['profits_cumulative']
                                    / profits_df['usd_inflows_cumulative'])
 
-    # Convert all numerical columns to float32
-    profits_df['wallet_address'] = profits_df['wallet_address'].astype('int32')
-    profits_df['profits_cumulative'] = profits_df['profits_cumulative'].astype('float32')
-    profits_df['usd_balance'] = profits_df['usd_balance'].astype('float32')
-    profits_df['usd_net_transfers'] = profits_df['usd_net_transfers'].astype('float32')
-    profits_df['usd_inflows'] = profits_df['usd_inflows'].astype('float32')
-    profits_df['usd_inflows_cumulative'] = profits_df['usd_inflows_cumulative'].astype('float32')
-    profits_df['total_return'] = profits_df['total_return'].astype('float32')
+    # Convert all numerical columns to 32 bit, using safe_downcast to avoid overflow
+    profits_df = u.safe_downcast(profits_df, 'wallet_address', 'int32')
+    profits_df = u.safe_downcast(profits_df, 'profits_cumulative', 'float32')
+    profits_df = u.safe_downcast(profits_df, 'usd_balance', 'float32')
+    profits_df = u.safe_downcast(profits_df, 'usd_net_transfers', 'float32')
+    profits_df = u.safe_downcast(profits_df, 'usd_inflows', 'float32')
+    profits_df = u.safe_downcast(profits_df, 'usd_inflows_cumulative', 'float32')
+    profits_df = u.safe_downcast(profits_df, 'total_return', 'float32')
 
     logger.info('Retrieved profits_df with %s unique coins and %s rows after %.2f seconds',
                 len(set(profits_df['coin_id'])),
@@ -222,7 +281,7 @@ def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows):
     return profits_df
 
 
-@timing_decorator
+@u.timing_decorator
 def clean_profits_df(profits_df, data_cleaning_config):
     """
     Clean the profits DataFrame by excluding all records for any wallet_addresses that
@@ -385,4 +444,57 @@ def retrieve_macro_trends_data():
     macro_trends_df = macro_trends_df.set_index('date')
     macro_trends_df = macro_trends_df.resample('D').interpolate(method='time', limit_area='inside')
 
+    # Reset index
+    macro_trends_df = macro_trends_df.reset_index()
+
     return macro_trends_df
+
+
+def clean_macro_trends(macro_trends_df, config):
+    """
+    Basic function to only retain the columns in macro_trends_df that have metrics described in
+    the config files.
+
+    Params:
+    - macro_trends_df (DataFrame): df with macro trends data keyed on date
+    - config (dict): config.yaml
+
+    Returns:
+    - filtered_macro_trends_df (DataFrame): input df with non-metric configured columns removed
+    """
+    # 1. Filter to only relevant columns
+    # ----------------------------------
+    # Get the keys from the config dictionary
+    metric_columns = list(config['datasets']['macro_trends'].keys())
+
+    # Ensure 'date' is included
+    required_columns = ['date'] + metric_columns
+
+    # Check if all required columns exist in the dataframe
+    missing_columns = [col for col in required_columns if col not in macro_trends_df.columns]
+
+    if missing_columns:
+        raise ValueError(f"The following columns are missing from the dataframe: {', '.join(missing_columns)}")
+
+    # Filter the dataframe to only the required columns
+    filtered_macro_trends_df = macro_trends_df[required_columns]
+
+
+    # 2. Confirm there are no mid-series nan values
+    # ---------------------------------------------
+    nan_checks = []
+    nan_cols = []
+
+    for col in filtered_macro_trends_df.columns:
+        # Check if there are NaNs in the middle of any columns
+        nan_check = u.check_nan_values(filtered_macro_trends_df[col])
+        nan_checks.append(nan_check)
+
+        # Store column name if there are NaNs in the middle of the series
+        if nan_check:
+            nan_cols.append(col)
+
+    if sum(nan_checks) > 0:
+        raise ValueError(f"NaN values found in macro_trends_df columns: {nan_cols}")
+
+    return filtered_macro_trends_df
