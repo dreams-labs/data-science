@@ -264,14 +264,14 @@ def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows):
     profits_df['total_return'] = (profits_df['profits_cumulative']
                                    / profits_df['usd_inflows_cumulative'])
 
-    # Convert all numerical columns to float32
-    profits_df['wallet_address'] = profits_df['wallet_address'].astype('int32')
-    profits_df['profits_cumulative'] = profits_df['profits_cumulative'].astype('float32')
-    profits_df['usd_balance'] = profits_df['usd_balance'].astype('float32')
-    profits_df['usd_net_transfers'] = profits_df['usd_net_transfers'].astype('float32')
-    profits_df['usd_inflows'] = profits_df['usd_inflows'].astype('float32')
-    profits_df['usd_inflows_cumulative'] = profits_df['usd_inflows_cumulative'].astype('float32')
-    profits_df['total_return'] = profits_df['total_return'].astype('float32')
+    # Convert all numerical columns to 32 bit, using safe_downcast to avoid overflow
+    profits_df = u.safe_downcast(profits_df, 'wallet_address', 'int32')
+    profits_df = u.safe_downcast(profits_df, 'profits_cumulative', 'float32')
+    profits_df = u.safe_downcast(profits_df, 'usd_balance', 'float32')
+    profits_df = u.safe_downcast(profits_df, 'usd_net_transfers', 'float32')
+    profits_df = u.safe_downcast(profits_df, 'usd_inflows', 'float32')
+    profits_df = u.safe_downcast(profits_df, 'usd_inflows_cumulative', 'float32')
+    profits_df = u.safe_downcast(profits_df, 'total_return', 'float32')
 
     logger.info('Retrieved profits_df with %s unique coins and %s rows after %.2f seconds',
                 len(set(profits_df['coin_id'])),
