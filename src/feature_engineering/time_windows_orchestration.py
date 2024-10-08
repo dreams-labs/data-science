@@ -5,6 +5,10 @@ functions used to orchestrate time windows. the major steps are:
 3. merging all time window features together into a training data df
     ready for preprocessing
 """
+# pylint: disable=E0401  # unable to import modules from parent folders
+# pylint: disable=C0413  # wrong import position
+# pylint: disable=C0103  # X_train violates camelcase
+
 import os
 import re
 from datetime import timedelta
@@ -12,17 +16,96 @@ from typing import List, Dict, Tuple
 import pandas as pd
 import dreams_core.core as dc
 
-# pylint: disable=E0401  # unable to import modules from parent folders
-# pylint: disable=C0413  # wrong import position
-# project files
+# project modules
 import training_data.data_retrieval as dr
 import coin_wallet_metrics.indicators as ind
 import feature_engineering.feature_generation as fg
 import feature_engineering.preprocessing as prp
-
+import insights.experiments as exp
 
 # set up logger at the module level
 logger = dc.setup_logger()
+
+
+def generate_all_time_windows_model_inputs(config,metrics_config,modeling_config):
+    """
+    The full sequence to generate X and y splits for all sets that incorporates all datasets,
+    time windows, metrics, and indicators.
+
+    Sequence:
+    1. Retrieve the base datasets that contain records across all windows
+    2. Loop through each time window and generate flattened features for the window
+    3a. Concat each dataset's window dfs, then join all the dataset dfs with the target variable to
+        create a comprehensive feature set keyed on coin_id.
+    3b. Split the full feature set into train/test/validation/future sets.
+
+    Params:
+    - config, metrics_config, modeling_config: loaded config yaml files
+
+    Returns:
+    - sets_X_y_dict (dict[pd.DataFrame, pd.Series]): Dict with keys for each set type (e.g. train_set,
+        future_set, etc) that contains the X and y data for the set.
+    - returns_df (pd.DataFrame): DataFrame with MultiIndex on time_window,coin_id that contains a
+        'returns' column showing actual returns during the each time_window's modeling period.
+    - join_logs_df (pd.DataFrame): DataFrame showing the outcomes of each dataset's join and fill
+        methods
+    """
+
+    # 1. Retrieve base datasets used by all windows
+    # ---------------------------------------------
+    macro_trends_df, market_data_df, profits_df, prices_df = prepare_all_windows_base_data(config,
+                                                                                              metrics_config)
+
+
+    # 2. Generate flattened features for each dataset in each window
+    # --------------------------------------------------------------
+    # Generate time_windows config overrides that will modify each window's config settings
+    time_windows = generate_time_windows(config)
+
+    all_flattened_dfs = []
+    all_flattened_filepaths = []
+
+    for _, time_window in enumerate(time_windows):
+
+        # Prepare time window config files
+        window_config, window_metrics_config, window_modeling_config = (
+            exp.prepare_configs(modeling_config['modeling']['config_folder'], time_window))
+
+        # Generate flattened feature dfs for all datasets for the window
+        window_flattened_dfs, window_flattened_filepaths = generate_window_flattened_dfs(
+            market_data_df,
+            macro_trends_df,
+            profits_df,
+            prices_df,
+            window_config,
+            window_metrics_config,
+            window_modeling_config
+        )
+
+        # Store window's flattened features
+        all_flattened_dfs.extend(window_flattened_dfs)
+        all_flattened_filepaths.extend(window_flattened_filepaths)
+
+
+    # 3. Combine features from all datasets in all time windows with target variables
+    # -------------------------------------------------------------------------------
+    # Combine all time windows for each dataset, the join the datasets together
+    concatenated_dfs = concat_dataset_time_windows_dfs(all_flattened_filepaths,modeling_config)
+    training_data_df, join_logs_df = join_dataset_all_windows_dfs(concatenated_dfs)
+
+    # Create target variables for all time windows
+    target_variable_df, returns_df, = create_target_variables_for_all_time_windows(training_data_df,
+                                                                                        prices_df,
+                                                                                        config,
+                                                                                        modeling_config)
+
+    # Split target variables into the train/test/validation/future sets
+    sets_X_y_dict = prp.perform_train_test_validation_future_splits(training_data_df,
+                                                                    target_variable_df,
+                                                                    modeling_config)
+
+    return sets_X_y_dict, returns_df, join_logs_df
+
 
 
 def generate_time_windows(config):
