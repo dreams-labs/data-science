@@ -1,7 +1,6 @@
 """
 Validation logic for items in config.yaml
 """
-from enum import Enum
 from datetime import date
 from typing import Dict, Optional
 from pydantic import BaseModel, Field

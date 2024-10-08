@@ -208,7 +208,7 @@ def generate_window_wallet_cohort_features(
         # Flatten cohort metrics
         flattened_cohort_df, flattened_cohort_filepath = generate_window_time_series_features(
             cohort_metrics_df,
-            'wallet_cohorts',
+            f'wallet_cohorts-{cohort_name}',
             config,
             dataset_metrics_config,
             modeling_config

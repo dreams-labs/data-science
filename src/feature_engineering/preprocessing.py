@@ -3,6 +3,7 @@ functions used to build coin-level features from training data
 """
 import os
 import re
+from typing import List, Dict, Tuple
 import pandas as pd
 import numpy as np
 import dreams_core.core as dc
@@ -13,6 +14,79 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 # set up logger at the module level
 logger = dc.setup_logger()
+
+
+def concatenate_dataset_dfs_across_windows(filepaths: List[str],
+                                          modeling_config: Dict
+                                          ) -> Dict[str, Tuple[pd.DataFrame, str]]:
+    """
+    For each dataset, concatenates the flattened dfs from all windows together and returns the
+    merged df with its fill method.
+
+    This function reads multiple CSV files, extracts their dataset prefixes,
+    concatenates DataFrames with the same prefix, and determines the fill method for each dataset.
+    It handles subgroups within datasets by prefixing column names with the subgroup name.
+
+    Args:
+        filepaths (List[str]): A list of file paths to the CSV files to be processed.
+        modeling_config (Dict): Configuration dictionary containing preprocessing fill methods.
+
+    Returns:
+        Dict[str, Tuple[pd.DataFrame, str]]: A dictionary where keys are dataset prefixes and
+        values are tuples containing:
+            - The concatenated DataFrame for each prefix
+            - The fill method for the dataset
+    """
+    # Dictionary to store DataFrames grouped by dataset prefix
+    grouped_dfs = {}
+
+    for filepath in filepaths:
+        # Validate file existence
+        if not os.path.exists(filepath):
+            raise KeyError(f"File {filepath} does not exist.")
+
+        # Read the CSV
+        df = pd.read_csv(filepath)
+
+        # Identify filepath of parent directory
+        parent_directory = os.path.join(modeling_config['modeling']['modeling_folder'],
+                                        'outputs/preprocessed_outputs/')
+
+        # Extract the dataset prefix from the filename
+        dataset_prefix = extract_dataset_key_from_filepath(filepath, parent_directory)
+
+        # Handle subgroups if present
+        if '-' in dataset_prefix:
+            dataset, subgroup = dataset_prefix.split('-')
+            # Prefix the columns with the subgroup
+            df = df.rename(
+                columns={
+                    col: (f'{subgroup}_' + col)
+                    for col in df.columns
+                    if col not in ['coin_id', 'time_window']}
+            )
+        else:
+            dataset = dataset_prefix
+
+        # Add the DataFrame to the appropriate group
+        if dataset_prefix not in grouped_dfs:
+            grouped_dfs[dataset_prefix] = []
+        grouped_dfs[dataset_prefix].append(df)
+
+    # Concatenate DataFrames within each group and pair with fill method
+    result = {}
+    for dataset_prefix, dfs in grouped_dfs.items():
+        concatenated_df = pd.concat(dfs, ignore_index=True)
+
+        # Identify the fill method
+        try:
+            fill_method = modeling_config['preprocessing']['fill_methods'][dataset]
+        except KeyError as exc:
+            raise KeyError(f"Fill method not found for dataset: {dataset}") from exc
+
+        result[dataset_prefix] = (concatenated_df, fill_method)
+
+    return result
 
 
 
