@@ -299,6 +299,134 @@ def perform_model_input_data_quality_checks(training_data_df, target_variable_df
 
 
 
+def create_target_variables(prices_df, training_data_config, modeling_config):
+    """
+    Main function to create target variables based on coin returns.
+
+    Parameters:
+    - prices_df: DataFrame containing price data with columns 'coin_id', 'date', and 'price'.
+    - training_data_config: Configuration with modeling period dates.
+    - modeling_config: Configuration for modeling with target variable settings.
+
+    Returns:
+    - target_variables_df: DataFrame with target variables.
+    - returns_df: DataFrame with coin returns data.
+    """
+    returns_df = calculate_coin_returns(prices_df, training_data_config)
+
+    target_variable = modeling_config['modeling']['target_column']
+
+    if target_variable in ['is_moon','is_crater']:
+        target_variables_df = calculate_mooncrater_targets(returns_df, modeling_config)
+    elif target_variable == 'returns':
+        target_variables_df = returns_df.reset_index()
+    else:
+        raise ValueError(f"Unsupported target variable type: {target_variable}")
+
+    return target_variables_df, returns_df
+
+
+
+def calculate_coin_returns(prices_df, training_data_config):
+    """
+    Prepares the data and computes price returns for each coin.
+
+    Parameters:
+    - prices_df: DataFrame containing price data with columns 'coin_id', 'date', and 'price'.
+    - training_data_config: Configuration with modeling period dates.
+
+    Returns:
+    - returns_df: DataFrame with columns 'coin_id' and 'returns'.
+    """
+    prices_df = prices_df.copy()
+    prices_df['date'] = pd.to_datetime(prices_df['date'])
+    modeling_period_start = pd.to_datetime(training_data_config['modeling_period_start'])
+    modeling_period_end = pd.to_datetime(training_data_config['modeling_period_end'])
+
+    # Filter data for start and end dates
+    start_prices = prices_df[prices_df['date'] == modeling_period_start].set_index('coin_id')['price']
+    end_prices = prices_df[prices_df['date'] == modeling_period_end].set_index('coin_id')['price']
+
+    # Identify coins with both start and end prices
+    valid_coins = start_prices.index.intersection(end_prices.index)
+
+    # Check for missing data
+    all_coins = prices_df['coin_id'].unique()
+    coins_missing_price = set(all_coins) - set(valid_coins)
+
+    if coins_missing_price:
+        missing = ', '.join(map(str, coins_missing_price))
+        raise ValueError(f"Missing price for coins at start or end date: {missing}")
+
+    # Compute returns
+    returns = (end_prices[valid_coins] - start_prices[valid_coins]) / start_prices[valid_coins]
+    returns_df = pd.DataFrame({'returns': returns})
+
+    return returns_df
+
+
+
+def calculate_mooncrater_targets(returns_df, modeling_config):
+    """
+    Calculates 'is_moon' and 'is_crater' target variables based on returns.
+
+    Parameters:
+    - returns_df: DataFrame with columns 'coin_id' and 'returns'.
+    - modeling_config: Configuration for modeling with target variable thresholds.
+
+    Returns:
+    - target_variables_df: DataFrame with columns 'coin_id', 'is_moon', and 'is_crater'.
+    """
+    moon_threshold = modeling_config['target_variables']['moon_threshold']
+    crater_threshold = modeling_config['target_variables']['crater_threshold']
+    moon_minimum_percent = modeling_config['target_variables']['moon_minimum_percent']
+    crater_minimum_percent = modeling_config['target_variables']['crater_minimum_percent']
+
+    target_variables_df = returns_df.copy().reset_index()
+    target_variables_df['is_moon'] = (target_variables_df['returns'] >= moon_threshold).astype(int)
+    target_variables_df['is_crater'] = (target_variables_df['returns'] <= crater_threshold).astype(int)
+
+    total_coins = len(target_variables_df)
+    moons = target_variables_df['is_moon'].sum()
+    craters = target_variables_df['is_crater'].sum()
+
+    # Ensure minimum percentage for moons and craters
+    if moons / total_coins < moon_minimum_percent:
+        additional_moons_needed = int(total_coins * moon_minimum_percent) - moons
+        moon_candidates = (target_variables_df[target_variables_df['is_moon'] == 0]
+                           .nlargest(additional_moons_needed, 'returns'))
+        target_variables_df.loc[moon_candidates.index, 'is_moon'] = 1
+
+    if craters / total_coins < crater_minimum_percent:
+        additional_craters_needed = int(total_coins * crater_minimum_percent) - craters
+        crater_candidates = (target_variables_df[target_variables_df['is_crater'] == 0]
+                             .nsmallest(additional_craters_needed, 'returns'))
+        target_variables_df.loc[crater_candidates.index, 'is_crater'] = 1
+
+    # Log results
+    total_coins = len(target_variables_df)
+    moons = target_variables_df['is_moon'].sum()
+    craters = target_variables_df['is_crater'].sum()
+
+    logger.info(
+        "Target variables created for %s coins with %s/%s (%s) moons and %s/%s (%s) craters.",
+        total_coins, moons, total_coins, f"{moons/total_coins:.2%}",
+        craters, total_coins, f"{craters/total_coins:.2%}"
+    )
+
+    if modeling_config['modeling']['target_column']=="is_moon":
+        target_column_df = target_variables_df[['coin_id', 'is_moon']]
+    elif modeling_config['modeling']['target_column']=="is_crater":
+        target_column_df = target_variables_df[['coin_id', 'is_crater']]
+    else:
+        raise KeyError("Cannot run calculate_mooncrater_targets() if target column is not 'is_moon' or 'is_crater'.")
+
+    return target_column_df
+
+
+
+
+
 def preprocess_coin_df(input_path, modeling_config, dataset_config, df_metrics_config=None):
     """
     Preprocess the flattened coin DataFrame by applying feature selection based on the modeling
@@ -436,272 +564,3 @@ def apply_scaling(df, df_metrics_config):
                                 scaling_method, column_name)
 
     return df
-
-
-
-def merge_and_fill_training_data(
-    df_list: list[tuple[pd.DataFrame, str, str]]
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Merges a list of DataFrames on 'coin_id' and applies specified fill strategies for missing
-    values. Generates a log of the merging process with details on record counts and modifications.
-
-    Params:
-    - df_list (list of tuples): Each tuple contains:
-        - df (pd.DataFrame): A DataFrame to merge.
-        - fill_strategy (str): The strategy to handle missing values ('fill_zeros', 'drop_records').
-        - filename (str): The name of the input file, used for logging.
-
-    Returns:
-    - training_data_df (pd.DataFrame): Merged DataFrame with applied fill strategies.
-    - merge_logs_df (pd.DataFrame): Log DataFrame detailing record counts for each input DataFrame.
-    """
-    if not df_list:
-        raise ValueError("No DataFrames to merge.")
-
-    # Initialize the log DataFrame
-    merge_logs = []
-
-    # Pull a unique set of all coin_ids across all DataFrames
-    all_coin_ids = set()
-    for df, _, _ in df_list:
-        if 'coin_id' in df.columns:
-            all_coin_ids.update(df['coin_id'].unique())
-
-    # Makes a new df with all coin_ids in a column
-    training_data_df = pd.DataFrame(all_coin_ids, columns=['coin_id'])
-
-    # Iterate through df_list and merge each one
-    for df, fill_strategy, filename in df_list:
-
-        # if the df is a macro_series without a coin_id, cross join it to all coin_ids
-        if fill_strategy == 'extend':
-            original_coin_ids = set()
-            training_data_df = training_data_df.merge(df, how='cross')
-
-        else:
-            # Merge with the full coin_id set (outer join)
-            original_coin_ids = set(df['coin_id'].unique())  # Track original coin_ids
-            training_data_df = pd.merge(training_data_df, df, on='coin_id', how='outer')
-
-            # Apply the fill strategy
-            if fill_strategy == 'fill_zeros':
-                # Fill missing values with 0
-                training_data_df.fillna(0, inplace=True)
-            elif fill_strategy == 'drop_records':
-                # Drop rows with missing values for this DataFrame's columns
-                training_data_df.dropna(inplace=True)
-            else:
-                raise ValueError(f"Invalid fill strategy '{fill_strategy}' found in config.yaml.")
-
-        # Calculate log details
-        final_coin_ids = set(training_data_df['coin_id'].unique())
-        filled_ids = final_coin_ids - original_coin_ids  # Present in final, missing in original
-
-        # Add log information for this DataFrame
-        merge_logs.append({
-            'file': filename,  # Use filename for logging
-            'original_count': len(original_coin_ids),
-            'filled_count': len(filled_ids)
-        })
-
-    # Ensure no duplicate columns after merging
-    if training_data_df.columns.duplicated().any():
-        raise ValueError("Duplicate columns found after merging.")
-
-    # Raise an error if there are any null values in the final DataFrame
-    if training_data_df.isnull().any().any():
-        raise ValueError("Null values detected in the final merged DataFrame.")
-
-    # Convert logs to a DataFrame
-    merge_logs_df = pd.DataFrame(merge_logs)
-
-    return training_data_df, merge_logs_df
-
-
-
-def create_target_variables(prices_df, training_data_config, modeling_config):
-    """
-    Main function to create target variables based on coin returns.
-
-    Parameters:
-    - prices_df: DataFrame containing price data with columns 'coin_id', 'date', and 'price'.
-    - training_data_config: Configuration with modeling period dates.
-    - modeling_config: Configuration for modeling with target variable settings.
-
-    Returns:
-    - target_variables_df: DataFrame with target variables.
-    - returns_df: DataFrame with coin returns data.
-    """
-    returns_df = calculate_coin_returns(prices_df, training_data_config)
-
-    target_variable = modeling_config['modeling']['target_column']
-
-    if target_variable in ['is_moon','is_crater']:
-        target_variables_df = calculate_mooncrater_targets(returns_df, modeling_config)
-    elif target_variable == 'returns':
-        target_variables_df = returns_df.reset_index()
-    else:
-        raise ValueError(f"Unsupported target variable type: {target_variable}")
-
-    return target_variables_df, returns_df
-
-
-
-def calculate_coin_returns(prices_df, training_data_config):
-    """
-    Prepares the data and computes price returns for each coin.
-
-    Parameters:
-    - prices_df: DataFrame containing price data with columns 'coin_id', 'date', and 'price'.
-    - training_data_config: Configuration with modeling period dates.
-
-    Returns:
-    - returns_df: DataFrame with columns 'coin_id' and 'returns'.
-    """
-    prices_df = prices_df.copy()
-    prices_df['date'] = pd.to_datetime(prices_df['date'])
-    modeling_period_start = pd.to_datetime(training_data_config['modeling_period_start'])
-    modeling_period_end = pd.to_datetime(training_data_config['modeling_period_end'])
-
-    # Filter data for start and end dates
-    start_prices = prices_df[prices_df['date'] == modeling_period_start].set_index('coin_id')['price']
-    end_prices = prices_df[prices_df['date'] == modeling_period_end].set_index('coin_id')['price']
-
-    # Identify coins with both start and end prices
-    valid_coins = start_prices.index.intersection(end_prices.index)
-
-    # Check for missing data
-    all_coins = prices_df['coin_id'].unique()
-    coins_missing_price = set(all_coins) - set(valid_coins)
-
-    if coins_missing_price:
-        missing = ', '.join(map(str, coins_missing_price))
-        raise ValueError(f"Missing price for coins at start or end date: {missing}")
-
-    # Compute returns
-    returns = (end_prices[valid_coins] - start_prices[valid_coins]) / start_prices[valid_coins]
-    returns_df = pd.DataFrame({'returns': returns})
-
-    return returns_df
-
-
-
-def calculate_mooncrater_targets(returns_df, modeling_config):
-    """
-    Calculates 'is_moon' and 'is_crater' target variables based on returns.
-
-    Parameters:
-    - returns_df: DataFrame with columns 'coin_id' and 'returns'.
-    - modeling_config: Configuration for modeling with target variable thresholds.
-
-    Returns:
-    - target_variables_df: DataFrame with columns 'coin_id', 'is_moon', and 'is_crater'.
-    """
-    moon_threshold = modeling_config['target_variables']['moon_threshold']
-    crater_threshold = modeling_config['target_variables']['crater_threshold']
-    moon_minimum_percent = modeling_config['target_variables']['moon_minimum_percent']
-    crater_minimum_percent = modeling_config['target_variables']['crater_minimum_percent']
-
-    target_variables_df = returns_df.copy().reset_index()
-    target_variables_df['is_moon'] = (target_variables_df['returns'] >= moon_threshold).astype(int)
-    target_variables_df['is_crater'] = (target_variables_df['returns'] <= crater_threshold).astype(int)
-
-    total_coins = len(target_variables_df)
-    moons = target_variables_df['is_moon'].sum()
-    craters = target_variables_df['is_crater'].sum()
-
-    # Ensure minimum percentage for moons and craters
-    if moons / total_coins < moon_minimum_percent:
-        additional_moons_needed = int(total_coins * moon_minimum_percent) - moons
-        moon_candidates = (target_variables_df[target_variables_df['is_moon'] == 0]
-                           .nlargest(additional_moons_needed, 'returns'))
-        target_variables_df.loc[moon_candidates.index, 'is_moon'] = 1
-
-    if craters / total_coins < crater_minimum_percent:
-        additional_craters_needed = int(total_coins * crater_minimum_percent) - craters
-        crater_candidates = (target_variables_df[target_variables_df['is_crater'] == 0]
-                             .nsmallest(additional_craters_needed, 'returns'))
-        target_variables_df.loc[crater_candidates.index, 'is_crater'] = 1
-
-    # Log results
-    total_coins = len(target_variables_df)
-    moons = target_variables_df['is_moon'].sum()
-    craters = target_variables_df['is_crater'].sum()
-
-    logger.info(
-        "Target variables created for %s coins with %s/%s (%s) moons and %s/%s (%s) craters.",
-        total_coins, moons, total_coins, f"{moons/total_coins:.2%}",
-        craters, total_coins, f"{craters/total_coins:.2%}"
-    )
-
-    if modeling_config['modeling']['target_column']=="is_moon":
-        target_column_df = target_variables_df[['coin_id', 'is_moon']]
-    elif modeling_config['modeling']['target_column']=="is_crater":
-        target_column_df = target_variables_df[['coin_id', 'is_crater']]
-    else:
-        raise KeyError("Cannot run calculate_mooncrater_targets() if target column is not 'is_moon' or 'is_crater'.")
-
-    return target_column_df
-
-
-
-
-
-
-# def convert_dataset_metrics_to_features(
-#     dataset_metrics_df,
-#     dataset_config,
-#     dataset_metrics_config,
-#     config,
-#     modeling_config,
-# ):
-#     """
-#     Converts a dataset keyed on coin_id-date into features by flattening and preprocessing.
-
-#     Args:
-#         dataset_metrics_df (pd.DataFrame): Input DataFrame containing raw metrics data.
-#         dataset_config (dict): The component of config['datasets'] relating to this dataset
-#         dataset_metrics_config (dict): The component of metrics_config relating to this dataset
-#         config (dict): The whole main config, which includes period boundary dates
-#         modeling_config (dict): The whole modeling_config, which includes a list of tables to
-#             drop in preprocessing
-
-#     Returns:
-#         preprocessed_df (pd.DataFrame): The preprocessed DataFrame ready for model training.
-#         dataset_tuple (tuple): Contains the preprocessed file name and fill method for the dataset.
-#     """
-
-#     # Flatten the metrics DataFrame into the required format for feature engineering
-#     flattened_metrics_df = flatten_coin_date_df(
-#         dataset_metrics_df,
-#         dataset_metrics_config,
-#         config['training_data']['training_period_end']  # Ensure data is up to training period end
-#     )
-
-#     # Save the flattened output and retrieve the file path
-#     _, flattened_metrics_filepath = save_flattened_outputs(
-#         flattened_metrics_df,
-#         os.path.join(
-#             modeling_config['modeling']['modeling_folder'],  # Folder to store flattened outputs
-#             'outputs/flattened_outputs'
-#         ),
-#         dataset_config['description'],  # Descriptive metadata for the dataset
-#         config['training_data']['modeling_period_start']  # Ensure data starts from modeling period
-#     )
-
-#     # Preprocess the flattened data and return the preprocessed file path
-#     preprocessed_df, preprocessed_filepath = preprocess_coin_df(
-#         flattened_metrics_filepath,
-#         modeling_config,
-#         dataset_config,
-#         dataset_metrics_config
-#     )
-
-#     # this tuple is the input for join_all_feature_dfs() that will merge all the files
-#     dataset_tuple = (
-#         preprocessed_filepath.split('preprocessed_outputs/')[1],  # Extract file name from the path
-#         dataset_config['fill_method']  # fill method to be used as part of the merge process
-#     )
-
-#     return preprocessed_df, dataset_tuple
