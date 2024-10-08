@@ -2,9 +2,6 @@
 functions used to build coin-level features from training data
 """
 import os
-from datetime import datetime
-import time
-import copy
 import re
 import pandas as pd
 import numpy as np
@@ -13,10 +10,6 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 # pylint: disable=E0401
 # project module imports
-import coin_wallet_metrics.coin_wallet_metrics as cwm
-import coin_wallet_metrics.indicators as ind
-import training_data.profits_row_imputation as pri
-
 
 # set up logger at the module level
 logger = dc.setup_logger()

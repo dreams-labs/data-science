@@ -6,7 +6,6 @@ functions used to perform high level analysis and performance assessments
 # pyright: reportMissingModuleSource=false
 
 import os
-import sys
 from datetime import timedelta
 import hashlib
 import json
@@ -17,12 +16,11 @@ import dreams_core.core as dc
 # pylint: disable=C0413  # wrong import position
 # project files
 import utils as u
-import feature_engineering as fe
-sys.path.append('..')
-from training_data import data_retrieval as dr
-from training_data import profits_row_imputation as pri
-from coin_wallet_metrics import coin_wallet_metrics as cwm
-from coin_wallet_metrics import indicators as ind
+import training_data.data_retrieval as dr
+import training_data.profits_row_imputation as pri
+import coin_wallet_metrics.coin_wallet_metrics as cwm
+import coin_wallet_metrics.indicators as ind
+import feature_engineering.feature_generation as fg
 
 
 # set up logger at the module level
@@ -147,7 +145,7 @@ def generate_window_flattened_dfs(
     window_flattened_filepaths = []
 
     # Market data: generate window-specific flattened metrics
-    flattened_market_data_df, flattened_market_data_filepath = fe.generate_window_time_series_features(
+    flattened_market_data_df, flattened_market_data_filepath = fg.generate_window_time_series_features(
         market_data_df,
         config,
         metrics_config['time_series']['market_data'],
@@ -157,7 +155,7 @@ def generate_window_flattened_dfs(
     window_flattened_filepaths.extend([flattened_market_data_filepath])
 
     # Macro trends: generate window-specific flattened metrics
-    flattened_macro_trends_df, flattened_macro_trends_filepath = fe.generate_window_macro_trends_features(
+    flattened_macro_trends_df, flattened_macro_trends_filepath = fg.generate_window_macro_trends_features(
         macro_trends_df,
         config,
         metrics_config,
@@ -167,7 +165,7 @@ def generate_window_flattened_dfs(
     window_flattened_filepaths.extend([flattened_macro_trends_filepath])
 
     # Cohorts: generate window-specific flattened metrics
-    flattened_cohort_dfs, flattened_cohort_filepaths = fe.generate_window_wallet_cohort_features(
+    flattened_cohort_dfs, flattened_cohort_filepaths = fg.generate_window_wallet_cohort_features(
         profits_df,
         prices_df,
         config,

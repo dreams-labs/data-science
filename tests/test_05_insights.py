@@ -22,8 +22,6 @@ from dreams_core import core as dc
 # pyright: reportMissingImports=false
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 from utils import load_config
-# import feature_engineering as fe
-# import coin_wallet_metrics as cwm
 import insights.model_input_flows as mif
 
 load_dotenv()

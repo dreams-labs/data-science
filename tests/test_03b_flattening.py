@@ -19,14 +19,11 @@ from dreams_core import core as dc
 
 # pyright: reportMissingImports=false
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
-import feature_engineering as fe
+import feature_engineering.flattening as flt
 from utils import load_config
 
 load_dotenv()
 logger = dc.setup_logger()
-
-
-
 
 
 
@@ -51,31 +48,31 @@ def test_fe_calculate_aggregation():
     empty_series = pd.Series([])
 
     # Test sum
-    assert fe.calculate_aggregation(sample_series, 'sum') == 15
+    assert flt.calculate_aggregation(sample_series, 'sum') == 15
 
     # Test mean
-    assert fe.calculate_aggregation(sample_series, 'mean') == 3
+    assert flt.calculate_aggregation(sample_series, 'mean') == 3
 
     # Test median
-    assert fe.calculate_aggregation(sample_series, 'median') == 3
+    assert flt.calculate_aggregation(sample_series, 'median') == 3
 
     # Test std (rounded for comparison)
-    assert round(fe.calculate_aggregation(sample_series, 'std'), 5) == round(sample_series.std(), 5)
+    assert round(flt.calculate_aggregation(sample_series, 'std'), 5) == round(sample_series.std(), 5)
 
     # Test max
-    assert fe.calculate_aggregation(sample_series, 'max') == 5
+    assert flt.calculate_aggregation(sample_series, 'max') == 5
 
     # Test min
-    assert fe.calculate_aggregation(sample_series, 'min') == 1
+    assert flt.calculate_aggregation(sample_series, 'min') == 1
 
     # Test invalid statistic
     with pytest.raises(KeyError):
-        fe.calculate_aggregation(sample_series, 'invalid_stat')
+        flt.calculate_aggregation(sample_series, 'invalid_stat')
 
     # Test empty series
-    assert np.isnan(fe.calculate_aggregation(empty_series, 'mean'))
-    assert fe.calculate_aggregation(empty_series, 'sum') == 0
-    assert np.isnan(fe.calculate_aggregation(empty_series, 'std'))
+    assert np.isnan(flt.calculate_aggregation(empty_series, 'mean'))
+    assert flt.calculate_aggregation(empty_series, 'sum') == 0
+    assert np.isnan(flt.calculate_aggregation(empty_series, 'std'))
 
 
 # ------------------------------------------ #
@@ -98,31 +95,31 @@ def test_calculate_adj_pct_change():
     """
 
     # Test 1: Standard Case
-    result = fe.calculate_adj_pct_change(100, 150, 10)
+    result = flt.calculate_adj_pct_change(100, 150, 10)
     assert result == .50, f"Expected 50, got {result}"
 
     # Test 2: Zero Start, Non-Zero End (Capped)
-    result = fe.calculate_adj_pct_change(0, 100, 10)
+    result = flt.calculate_adj_pct_change(0, 100, 10)
     assert result == 10, f"Expected 1000 (capped), got {result}"
 
     # Test 3: Zero Start, Zero End (0/0 case)
-    result = fe.calculate_adj_pct_change(0, 0, 10)
+    result = flt.calculate_adj_pct_change(0, 0, 10)
     assert result == 0, f"Expected 0 for 0/0 case, got {result}"
 
     # Test 4: Negative Start to Positive End
-    result = fe.calculate_adj_pct_change(-50, 100, 10)
+    result = flt.calculate_adj_pct_change(-50, 100, 10)
     assert result == -3, f"Expected -300, got {result}"
 
     # Test 5: Start Greater than End (Decrease)
-    result = fe.calculate_adj_pct_change(200, 100, 10)
+    result = flt.calculate_adj_pct_change(200, 100, 10)
     assert result == -.5, f"Expected -50, got {result}"
 
     # Test 6: Small Positive Change (Cap not breached)
-    result = fe.calculate_adj_pct_change(0, 6, 10, 1)
+    result = flt.calculate_adj_pct_change(0, 6, 10, 1)
     assert result == 5, f"Expected 500, got {result}"
 
     # Test 7: Large Increase (Capped at 1000%)
-    result = fe.calculate_adj_pct_change(10, 800, 10)
+    result = flt.calculate_adj_pct_change(10, 800, 10)
     assert result == 10, f"Expected 1000 (capped), got {result}"
 
 
@@ -133,7 +130,7 @@ def test_calculate_adj_pct_change():
 @pytest.mark.unit
 def test_fe_calculate_rolling_window_features():
     """
-    Unit tests for fe.calculate_rolling_window_features().
+    Unit tests for flt.calculate_rolling_window_features().
 
     Test Cases:
     1. **Multiple periods with complete windows**:
@@ -177,7 +174,7 @@ def test_fe_calculate_rolling_window_features():
 
 
     # Test Case 1: Multiple periods with complete windows (10 records, 3 periods, window_duration=3)
-    rolling_features = fe.calculate_rolling_window_features(
+    rolling_features = flt.calculate_rolling_window_features(
         ts, window_duration, lookback_periods, rolling_aggregations, comparisons, metric_name)
 
     assert rolling_features['buyers_new_sum_3d_period_1'] == 27  # Last 3 records: 9+10+8 = 27
@@ -191,7 +188,7 @@ def test_fe_calculate_rolling_window_features():
 
 
     # Test Case 2: Non-divisible records (8 records, window_duration=3)
-    rolling_features_partial_window = fe.calculate_rolling_window_features(
+    rolling_features_partial_window = flt.calculate_rolling_window_features(
         ts_with_8_records, 3, 3, ['sum', 'max'], ['change', 'pct_change'], metric_name)
 
     # Only two full periods (6-8 and 3-5), so period 3 should not exist
@@ -204,7 +201,7 @@ def test_fe_calculate_rolling_window_features():
 
 
     # Test Case 3: Small dataset (2 records)
-    rolling_features_small_ts = fe.calculate_rolling_window_features(
+    rolling_features_small_ts = flt.calculate_rolling_window_features(
         small_ts, window_duration, lookback_periods, rolling_aggregations, comparisons, metric_name)
 
     # No valid 3-period windows exist, so the function should handle it gracefully
@@ -212,7 +209,7 @@ def test_fe_calculate_rolling_window_features():
 
 
     # Test Case 4: Check std and median specifically with window of 3 and valid lookback periods
-    rolling_features_std_median = fe.calculate_rolling_window_features(
+    rolling_features_std_median = flt.calculate_rolling_window_features(
         ts, window_duration, lookback_periods, ['std', 'median'], comparisons, metric_name)
 
     # Check for standard deviation and median over the last 3 periods
@@ -224,7 +221,7 @@ def test_fe_calculate_rolling_window_features():
 
     # Test Case 5: Handle pct_change with impute_value logic (start_value=0)
     ts_with_zeros = pd.Series([0, 0, 5, 10, 15, 20])
-    rolling_features_zeros = fe.calculate_rolling_window_features(
+    rolling_features_zeros = flt.calculate_rolling_window_features(
         ts_with_zeros, window_duration, lookback_periods, ['sum'], comparisons, metric_name)
 
     assert 'buyers_new_pct_change_3d_period_1' in rolling_features_zeros
@@ -288,7 +285,7 @@ def test_fe_flatten_date_features():
     }
 
     # Test Case 1: Basic functionality with all metrics present
-    flat_features = fe.flatten_date_features(sample_coin_df, metrics_config)
+    flat_features = flt.flatten_date_features(sample_coin_df, metrics_config)
 
     assert flat_features['buyers_new_sum'] == 210  # Sum of buyers_new column
     assert flat_features['buyers_new_mean'] == 35   # Mean of buyers_new column
@@ -311,7 +308,7 @@ def test_fe_flatten_date_features():
                 }
             }
         }
-        fe.flatten_date_features(sample_coin_df_invalid, metrics_config_invalid)
+        flt.flatten_date_features(sample_coin_df_invalid, metrics_config_invalid)
 
     # Test Case 3: Invalid aggregation function
     with pytest.raises(KeyError, match="Unsupported aggregation type: 'invalid_agg'."):
@@ -322,10 +319,10 @@ def test_fe_flatten_date_features():
                 }
             }
         }
-        fe.flatten_date_features(sample_coin_df, metrics_config_invalid_agg)
+        flt.flatten_date_features(sample_coin_df, metrics_config_invalid_agg)
 
     # Test Case 4: Rolling window metrics
-    rolling_features = fe.flatten_date_features(sample_coin_df, metrics_config)
+    rolling_features = flt.flatten_date_features(sample_coin_df, metrics_config)
 
     assert 'buyers_new_sum_3d_period_1' in rolling_features  # Ensure rolling aggregations are calculated
     assert 'buyers_new_max_3d_period_1' in rolling_features
@@ -390,7 +387,7 @@ def test_fe_flatten_coin_date_df():
     training_period_end = '2024-01-03'
 
     # Test Case 1: Basic functionality with multiple coins
-    result = fe.flatten_coin_date_df(sample_df, df_metrics_config, training_period_end)
+    result = flt.flatten_coin_date_df(sample_df, df_metrics_config, training_period_end)
 
     # Check that there are two coins in the output
     assert len(result['coin_id'].unique()) == 2
@@ -406,7 +403,7 @@ def test_fe_flatten_coin_date_df():
     # Test Case 2: Empty DataFrame (should raise ValueError)
     df_empty = pd.DataFrame(columns=['coin_id', 'buyers_new', 'sellers_new'])
     with pytest.raises(ValueError, match="Input DataFrame is empty"):
-        fe.flatten_coin_date_df(df_empty, df_metrics_config, training_period_end)
+        flt.flatten_coin_date_df(df_empty, df_metrics_config, training_period_end)
 
     # Test Case 3: One coin in the dataset
     df_one_coin = pd.DataFrame({
@@ -415,7 +412,7 @@ def test_fe_flatten_coin_date_df():
         'buyers_new': [10, 20, 30],
         'sellers_new': [5, 10, 15]
     })
-    result_one_coin = fe.flatten_coin_date_df(df_one_coin, df_metrics_config, training_period_end)
+    result_one_coin = flt.flatten_coin_date_df(df_one_coin, df_metrics_config, training_period_end)
 
     # Check that the single coin is processed correctly and the columns are as expected
     assert len(result_one_coin['coin_id'].unique()) == 1
@@ -455,8 +452,8 @@ def test_fe_flatten_date_features_bucketing():
         }
     }
 
-    flat_features_high = fe.flatten_date_features(sample_coin_high_df, metrics_config)
-    flat_features_low = fe.flatten_date_features(sample_coin_low_df, metrics_config)
+    flat_features_high = flt.flatten_date_features(sample_coin_high_df, metrics_config)
+    flat_features_low = flt.flatten_date_features(sample_coin_low_df, metrics_config)
 
     # Test Case 1: Bucketing functionality
     assert flat_features_high['buyers_new_sum_bucket'] == 'high'  # Sum = 210
@@ -504,7 +501,7 @@ def test_save_flattened_outputs(mock_coin_df):
     modeling_period_start = '2024-04-01'
 
     # Call the function to save the CSV and get the DataFrame and output path
-    _, saved_file_path = fe.save_flattened_outputs(mock_coin_df,
+    _, saved_file_path = flt.save_flattened_outputs(mock_coin_df,
                                                    test_output_path,
                                                    metric_description,
                                                    modeling_period_start)
@@ -526,641 +523,10 @@ def test_save_flattened_outputs_non_unique_coin_id(mock_non_unique_coin_id_df):
 
     # Check for the ValueError due to non-unique 'coin_id' values
     with pytest.raises(ValueError, match="The 'coin_id' column must have fully unique values."):
-        fe.save_flattened_outputs(mock_non_unique_coin_id_df,
+        flt.save_flattened_outputs(mock_non_unique_coin_id_df,
                                   test_output_path,
                                   metric_description,
                                   modeling_period_start)
-
-
-
-# ------------------------------------------ #
-# preprocess_coin_df() unit tests
-# ------------------------------------------ #
-@pytest.fixture
-def mock_modeling_config():
-    """
-    Returns a mock modeling configuration dictionary.
-    The configuration includes preprocessing options such as features to drop.
-    """
-    return {
-        'preprocessing': {
-            'drop_features': ['feature_to_drop']
-        }
-    }
-
-@pytest.fixture
-def mock_metrics_config():
-    """
-    Returns a mock metrics configuration dictionary.
-    This configuration includes settings for scaling different features.
-    """
-    return {
-            'feature_1': {
-                'aggregations': {
-                    'sum': {'scaling': 'standard'}
-                    ,'max': {}
-                }
-            }
-    }
-
-@pytest.fixture
-def mock_input_df():
-    """
-    Creates a mock DataFrame and saves it as a CSV for testing.
-    The CSV file is saved in the 'tests/test_modeling/outputs/flattened_outputs' directory.
-
-    Returns:
-    - input_path: Path to the CSV file.
-    - df: Original mock DataFrame.
-    """
-    data = {
-        'feature_1_sum': [1, 2, 3],
-        'feature_to_drop': [10, 20, 30],
-        'feature_3': [100, 200, 300]
-    }
-    df = pd.DataFrame(data)
-    input_path = 'tests/test_modeling/outputs/flattened_outputs/mock_input.csv'
-    df.to_csv(input_path, index=False)
-    return input_path, df
-
-@pytest.mark.unit
-def test_preprocess_coin_df_drops_columns(mock_modeling_config, mock_metrics_config, mock_input_df):
-    """
-    Tests that the preprocess_coin_df function correctly drops the specified columns.
-
-    Steps:
-    - Preprocesses the mock DataFrame by dropping the 'feature_to_drop' column.
-    - Asserts that the output CSV is created and the column was dropped.
-    - Cleans up the test files after execution.
-    """
-    input_path, original_df = mock_input_df
-
-    # Call the function
-    output_df, output_path = fe.preprocess_coin_df(input_path, mock_modeling_config, mock_metrics_config)
-
-    # Check that the output file exists
-    assert os.path.exists(output_path), "Output CSV file was not created."
-
-    # Check that the 'feature_to_drop' column is missing in the output DataFrame
-    assert 'feature_to_drop' not in output_df.columns, "Column 'feature_to_drop' was not dropped."
-    assert len(output_df.columns) == len(original_df.columns) - 1, "Unexpected number of columns after preprocessing."
-
-    # Cleanup (remove the test files)
-    os.remove(output_path)
-    os.remove(input_path)
-
-@pytest.mark.unit
-def test_preprocess_coin_df_scaling(mock_modeling_config, mock_metrics_config, mock_input_df):
-    """
-    Tests that the preprocess_coin_df function correctly applies scaling to the specified features.
-
-    Steps:
-    - Preprocesses the mock DataFrame by applying standard scaling to 'feature_1'.
-    - Asserts that the column is scaled correctly.
-    - Cleans up the test files after execution.
-    """
-    input_path, original_df = mock_input_df
-
-    # Declare empty dataset_config
-    mock_dataset_config = {}
-
-    # Call the function
-    output_df, output_path = fe.preprocess_coin_df(
-        input_path, mock_modeling_config, mock_dataset_config, mock_metrics_config
-    )
-
-    # Check that 'feature_1' is scaled (mean should be near 0 and std should be near 1)
-    scaled_column = output_df['feature_1_sum']
-    assert abs(scaled_column.mean()) < 1e-6, "Standard scaling not applied correctly to 'feature_1_sum'."
-    assert abs(np.std(scaled_column) - 1) < 1e-6, "Standard scaling not applied correctly to 'feature_1_sum'."
-
-    # Cleanup (remove the test files)
-    os.remove(output_path)
-    os.remove(input_path)
-
-
-
-# ------------------------------------------ #
-# create_training_data_df() unit tests
-# ------------------------------------------ #
-
-@pytest.fixture
-def mock_input_files_value_columns(tmpdir):
-    """
-    Unit test data for scenario with many duplicate columns and similar filenames.
-    """
-    # Create the correct subdirectory structure in tmpdir
-    preprocessed_output_dir = tmpdir.mkdir("outputs").mkdir("preprocessed_outputs")
-
-    # Create mock filenames and corresponding DataFrames
-    filenames = [
-        'buysell_metrics_2024-09-13_14-44_model_period_2024-05-01_v0.1.csv',
-        'buysell_metrics_2024-09-13_14-45_model_period_2024-05-01_v0.1.csv',
-        'buysell_metrics_megasharks_2024-09-13_14-45_model_period_2024-05-01_v0.1.csv',
-        'buysell_metrics_megasharks_2024-09-13_14-45_model_period_2024-05-01_v0.2.csv',
-        'price_metrics_2024-09-13_14-45_model_period_2024-05-01_v0.1.csv'
-    ]
-
-    # Create mock DataFrames for each file
-    df1 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [100, 200]})
-    df2 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [150, 250]})
-    df3 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [110, 210]})
-    df4 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [120, 220]})
-    df5 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [130, 230]})
-
-    # Save each DataFrame as a CSV to the correct directory
-    for i, df in enumerate([df1, df2, df3, df4, df5]):
-        df.to_csv(os.path.join(preprocessed_output_dir, filenames[i]), index=False)
-
-    # Create a tuple list with filenames and 'fill_zeros' strategy
-    input_files = [(filenames[i], 'fill_zeros') for i in range(len(filenames))]
-
-    return tmpdir, input_files
-
-@pytest.mark.unit
-def test_create_training_data_df(mock_input_files_value_columns):
-    """
-    Test column renaming logic for clarity when merging multiple files with similar filenames.
-    """
-    tmpdir, input_files = mock_input_files_value_columns
-
-    # Call the function using tmpdir as the modeling_folder
-    merged_df, _ = fe.create_training_data_df(tmpdir, input_files)
-
-    # Check if the columns have the correct suffixes
-    expected_columns = [
-        'coin_id',
-        'buyers_new_buysell_metrics_2024-09-13_14-44',
-        'buyers_new_buysell_metrics_2024-09-13_14-45',
-        'buyers_new_buysell_metrics_megasharks_2024-09-13_14-45',
-        'buyers_new_buysell_metrics_megasharks_2024-09-13_14-45_2',
-        'buyers_new_price_metrics'
-    ]
-
-    assert list(merged_df.columns) == expected_columns, \
-        f"Expected columns: {expected_columns}, but got: {list(merged_df.columns)}"
-
-@pytest.fixture
-def mock_input_files(tmpdir):
-    """
-    Valid input filenames that will be combined with invalid files.
-    """
-    # Create the correct subdirectory structure in tmpdir
-    preprocessed_output_dir = tmpdir.mkdir("outputs").mkdir("preprocessed_outputs")
-
-    # Create mock filenames and corresponding DataFrames with dummy date values
-    filenames = [
-        'file1_2024-09-13_14-44.csv',
-        'file2_2024-09-13_14-45.csv',
-        'file3_2024-09-13_14-46.csv'
-    ]
-
-    # Create mock DataFrames
-    df1 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [100, 200]})
-    df2 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [150, 250]})
-    df3 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [110, 210]})
-
-    # Save each DataFrame as a CSV to the correct directory
-    for i, df in enumerate([df1, df2, df3]):
-        df.to_csv(os.path.join(preprocessed_output_dir, filenames[i]), index=False)
-
-    # Create a tuple list with filenames and 'fill_zeros' strategy
-    input_files = [(filenames[i], 'fill_zeros') for i in range(len(filenames))]
-
-    return tmpdir, input_files
-
-
-@pytest.mark.unit
-def test_file_not_found(mock_input_files):
-    """
-    Confirms the error message when an input file does not exist.
-    """
-    tmpdir, filenames = mock_input_files
-
-    # Simulate one of the files not existing
-    filenames = [('file4_nonexistent_2024-09-13_14-47.csv', 'fill_zeros')]
-
-    with pytest.raises(ValueError, match="No DataFrames to merge."):
-        fe.create_training_data_df(tmpdir, filenames)
-
-
-@pytest.mark.unit
-def test_missing_coin_id(mock_input_files):
-    """
-    Confirms the error message when an input file does not have a coin_id column.
-    """
-    tmpdir, filenames = mock_input_files
-
-    # Create a DataFrame missing the 'coin_id' column
-    df_missing_coin_id = pd.DataFrame({'buyers_new': [100, 200]})
-    preprocessed_output_dir = os.path.join(tmpdir, 'outputs', 'preprocessed_outputs')
-    df_missing_coin_id.to_csv(os.path.join(preprocessed_output_dir,
-                                           'file_missing_coin_id_2024-09-13_14-47.csv'),
-                                           index=False)
-
-    filenames.append(('file_missing_coin_id_2024-09-13_14-47.csv', 'fill_zeros'))
-
-    with pytest.raises(ValueError, match="coin_id column is missing in file_missing_coin_id_2024-09-13_14-47.csv"):
-        fe.create_training_data_df(tmpdir, filenames)
-
-
-@pytest.mark.unit
-def test_duplicate_coin_id(mock_input_files):
-    """
-    Confirms the error message when an input file has duplicate coin_id rows.
-    """
-    tmpdir, filenames = mock_input_files
-    preprocessed_output_dir = os.path.join(tmpdir, 'outputs', 'preprocessed_outputs')
-    bad_file = 'file_duplicate_coin_id_2024-09-13_14-47.csv'
-
-    # Create a DataFrame with duplicate 'coin_id' values
-    df_duplicate_coin_id = pd.DataFrame({'coin_id': [1, 1], 'buyers_new': [100, 200]})
-    df_duplicate_coin_id.to_csv(os.path.join(preprocessed_output_dir, bad_file), index=False)
-
-    filenames.append((bad_file, 'fill_zeros'))
-
-    with pytest.raises(ValueError, match=f"Duplicate coin_ids found in file: {bad_file}"):
-        fe.create_training_data_df(tmpdir, filenames)
-
-
-# ------------------------------------------ #
-# merge_and_fill_training_data() unit tests
-# ------------------------------------------ #
-
-@pytest.mark.unit
-def test_merge_and_fill_training_data_same_coin_ids():
-    """
-    Test the merge_and_fill_training_data function with two DataFrames
-    that both have coin_id values 1, 2, 3 and the 'fill_zeros' strategy.
-    """
-    # Create mock DataFrames with the same coin_ids
-    df1 = pd.DataFrame({
-        'coin_id': [1, 2, 3],
-        'metric_1': [100, 200, 300]
-    })
-    df2 = pd.DataFrame({
-        'coin_id': [1, 2, 3],
-        'metric_2': [400, 500, 600]
-    })
-
-    # fill_zeros happy path
-    # ---------------------
-    # List of tuples (df, fill_strategy, filename), where 'filename' is a placeholder for logging
-    input_dfs = [
-        (df1, 'fill_zeros', 'file1'),
-        (df2, 'fill_zeros', 'file2')
-    ]
-
-    # Run the function
-    training_data_df, merge_logs_df = fe.merge_and_fill_training_data(input_dfs)
-
-    # Assert that the merged DataFrame matches the expected DataFrame
-    expected_df = pd.DataFrame({
-        'coin_id': [1, 2, 3],
-        'metric_1': [100, 200, 300],
-        'metric_2': [400, 500, 600]
-    })
-    np.array_equal(training_data_df.values,expected_df.values)
-
-    # Assert that the logs match the expected logs
-    expected_logs = pd.DataFrame({
-        'file': ['file1', 'file2'],
-        'original_count': [3, 3],
-        'filled_count': [0, 0],
-    })
-    np.array_equal(merge_logs_df.values,expected_logs.values)
-
-    # drop_records happy path
-    # ---------------------
-    # Rerun the same function with drop_records and confirm that the output is identical
-    input_dfs = [
-        (df1, 'drop_records', 'file1'),
-        (df2, 'drop_records', 'file2')
-    ]
-
-    # Run the function
-    training_data_df, merge_logs_df = fe.merge_and_fill_training_data(input_dfs)
-
-    # Assert that the merged DataFrame matches the expected DataFrame
-    np.array_equal(training_data_df.values,expected_df.values)
-
-    # Assert that the logs match the expected logs
-    np.array_equal(merge_logs_df.values,expected_logs.values)
-
-
-
-
-@pytest.mark.unit
-def test_merge_and_fill_training_data_fill_zeros():
-    """
-    Test that merge_and_fill_training_data correctly applies the 'fill_zeros' strategy for missing coin_ids.
-    """
-    # Define mock DataFrames
-    df1 = pd.DataFrame({'coin_id': [1, 2, 3], 'metric_1': [10, 20, 30]})
-    df2 = pd.DataFrame({'coin_id': [2, 3], 'metric_2': [50, 60]})
-
-    # Expected DataFrame
-    expected_df = pd.DataFrame({
-        'coin_id': [1, 2, 3],
-        'metric_1': [10, 20, 30],
-        'metric_2': [0, 50, 60]
-    })
-
-    # Call the function
-    merged_df, merge_logs_df = fe.merge_and_fill_training_data([
-        (df1, 'fill_zeros', 'df1'),
-        (df2, 'fill_zeros', 'df2')
-    ])
-
-    # Assert that the merged DataFrame matches the expected DataFrame
-    assert np.array_equal(merged_df.values, expected_df.values), "merged_df has unexpected values."
-
-    # Check logs
-    df1_log = merge_logs_df[merge_logs_df['file'] == 'df1']
-    df2_log = merge_logs_df[merge_logs_df['file'] == 'df2']
-
-    # df1 has no filling, but 1 dropped coin_id (coin_id 1 missing from df2)
-    assert df1_log['filled_count'].iloc[0] == 0, "df1 should have no filled entries."
-
-    # df2 has 1 filled entry for coin_id 1
-    assert df2_log['filled_count'].iloc[0] == 1, "df2 should have 1 filled entry."
-
-
-@pytest.mark.unit
-def test_merge_and_fill_training_data_drop_records():
-    """
-    Test the merge_and_fill_training_data function when the 'drop_records' strategy is used.
-    Ensures that the merge works correctly and that filled_count is logged appropriately.
-    """
-    # Mock DataFrames
-    df1 = pd.DataFrame({
-        'coin_id': [1, 2, 3],
-        'metric_1': [10, 20, 30]
-    })
-
-    df2 = pd.DataFrame({
-        'coin_id': [2, 3],
-        'metric_2': [200, 300]
-    })
-
-    # Expected output when drop_records is applied: rows for coin 1 should be dropped
-    expected_df = pd.DataFrame({
-        'coin_id': [2, 3],
-        'metric_1': [20, 30],
-        'metric_2': [200, 300]
-    })
-
-    # Run the function
-    merged_df, logs_df = fe.merge_and_fill_training_data([
-        (df1, 'drop_records', 'df1'),
-        (df2, 'drop_records', 'df2')
-    ])
-
-    # Assert the merged DataFrame is correct
-    assert np.array_equal(merged_df.values, expected_df.values), "merged_df has unexpected values."
-
-    # Assert the logs are correct
-    # df1 should have no filled rows, and df2 should also have no filled rows (since we used drop_records)
-    expected_logs = pd.DataFrame({
-        'file': ['df1', 'df2'],
-        'original_count': [3, 2],
-        'filled_count': [0, 0]
-    })
-
-    assert np.array_equal(logs_df.values, expected_logs.values), "merged_df has unexpected values."
-
-
-# ------------------------------------------ #
-# calculate_coin_returns() unit tests
-# ------------------------------------------ #
-
-@pytest.fixture
-def valid_prices_df():
-    """
-    Fixture to create a sample DataFrame with valid price data for multiple coins.
-    """
-    return pd.DataFrame({
-        'coin_id': ['BTC', 'ETH', 'XRP'] * 2,
-        'date': ['2023-01-01', '2023-01-01', '2023-01-01', '2023-12-31', '2023-12-31', '2023-12-31'],
-        'price': [30000, 2000, 0.5, 35000, 2500, 0.6]
-    })
-
-@pytest.fixture
-def valid_training_data_config():
-    """
-    Fixture to create a sample training data configuration.
-    """
-    return {
-        'modeling_period_start': '2023-01-01',
-        'modeling_period_end': '2023-12-31'
-    }
-
-@pytest.mark.unit
-def test_calculate_coin_returns_valid_data(valid_prices_df, valid_training_data_config):
-    """
-    Test calculate_coin_returns function with valid data for multiple coins.
-
-    This test ensures that the function correctly calculates returns and outcomes
-    for all coins when given valid input data.
-    """
-    returns_df, outcomes_df = fe.calculate_coin_returns(valid_prices_df,
-                                                                valid_training_data_config)
-
-    expected_returns = pd.DataFrame({
-        'coin_id': ['BTC', 'ETH', 'XRP'],
-        'returns': [0.166667, 0.25, 0.2]
-    })
-
-    expected_outcomes = pd.DataFrame({
-        'coin_id': ['BTC', 'ETH', 'XRP'],
-        'outcome': ['returns calculated'] * 3
-    })
-
-    assert np.all(np.isclose(returns_df['returns'].values,
-                            expected_returns['returns'].values,
-                            rtol=1e-4, atol=1e-4))
-    assert np.array_equal(outcomes_df.values, expected_outcomes.values)
-
-    # Check if returns values are approximately equal
-    for actual, expected in zip(returns_df['returns'], expected_returns['returns']):
-        assert actual == pytest.approx(expected, abs=1e-4)
-
-
-@pytest.fixture
-def no_change_prices_df():
-    """
-    Fixture to create a sample DataFrame with no price change for some coins.
-    """
-    return pd.DataFrame({
-        'coin_id': ['BTC', 'ETH', 'XRP'] * 2,
-        'date': ['2023-01-01', '2023-01-01', '2023-01-01', '2023-12-31', '2023-12-31', '2023-12-31'],
-        'price': [30000, 2000, 0.5, 30000, 2500, 0.5]
-    })
-
-@pytest.mark.unit
-def test_calculate_coin_returns_no_change(no_change_prices_df, valid_training_data_config):
-    """
-    Test calculate_coin_returns function with no price change for some coins.
-
-    This test ensures that the function correctly calculates zero returns for coins
-    with no price change and correct returns for others.
-    """
-    returns_df, outcomes_df = fe.calculate_coin_returns(no_change_prices_df,
-                                                                valid_training_data_config)
-
-    expected_returns = pd.DataFrame({
-        'coin_id': ['BTC', 'ETH', 'XRP'],
-        'returns': [0.0, 0.25, 0.0]
-    })
-
-    assert (np.isclose(returns_df['returns'].values,
-                       expected_returns['returns'].values,
-                       rtol=1e-4, atol=1e-4)).all()
-
-    expected_outcomes = pd.DataFrame({
-        'coin_id': ['BTC', 'ETH', 'XRP'],
-        'outcome': ['returns calculated'] * 3
-    })
-
-    assert np.array_equal(outcomes_df.values, expected_outcomes.values)
-
-
-@pytest.fixture
-def negative_returns_prices_df():
-    """
-    Fixture to create a sample DataFrame with negative returns for some coins.
-    """
-    return pd.DataFrame({
-        'coin_id': ['BTC', 'ETH', 'XRP'] * 2,
-        'date': ['2023-01-01', '2023-01-01', '2023-01-01', '2023-12-31', '2023-12-31', '2023-12-31'],
-        'price': [30000, 2000, 0.5, 25000, 2500, 0.4]
-    })
-
-@pytest.mark.unit
-def test_calculate_coin_returns_negative(negative_returns_prices_df, valid_training_data_config):
-    """
-    Test calculate_coin_returns function with negative returns for some coins.
-
-    This test ensures that the function correctly calculates negative returns values
-    for coins with price decreases and correct returns for others.
-    """
-    returns_df, outcomes_df = fe.calculate_coin_returns(negative_returns_prices_df,
-                                                                valid_training_data_config)
-
-    expected_returns = pd.DataFrame({
-        'coin_id': ['BTC', 'ETH', 'XRP'],
-        'returns': [-0.1667, 0.25, -0.2]
-    })
-
-    assert (np.isclose(returns_df['returns'].values,
-                       expected_returns['returns'].values,
-                       rtol=1e-4, atol=1e-4)).all()
-
-    expected_outcomes = pd.DataFrame({
-        'coin_id': ['BTC', 'ETH', 'XRP'],
-        'outcome': ['returns calculated'] * 3
-    })
-
-    assert np.array_equal(outcomes_df.values, expected_outcomes.values)
-
-
-@pytest.fixture
-def multiple_datapoints_prices_df():
-    """
-    Fixture to create a sample DataFrame with multiple data points between start and end dates.
-    """
-    return pd.DataFrame({
-        'coin_id': ['BTC', 'ETH', 'XRP'] * 4,
-        'date': ['2023-01-01', '2023-01-01', '2023-01-01',
-                 '2023-06-15', '2023-06-15', '2023-06-15',
-                 '2023-09-30', '2023-09-30', '2023-09-30',
-                 '2023-12-31', '2023-12-31', '2023-12-31'],
-        'price': [30000, 2000, 0.5,
-                  32000, 2200, 0.55,
-                  34000, 2400, 0.58,
-                  35000, 2500, 0.6]
-    })
-
-@pytest.mark.unit
-def test_calculate_coin_returns_multiple_datapoints(multiple_datapoints_prices_df,
-                                                        valid_training_data_config):
-    """
-    Test calculate_coin_returns function with multiple data points between start and end dates.
-
-    This test ensures that the function correctly calculates returns using only start and end dates,
-    ignoring intermediate data points.
-    """
-    returns_df, outcomes_df = fe.calculate_coin_returns(multiple_datapoints_prices_df,
-                                                                valid_training_data_config)
-
-    expected_returns = pd.DataFrame({
-        'coin_id': ['BTC', 'ETH', 'XRP'],
-        'returns': [0.1667, 0.25, 0.2]
-    })
-
-    assert (np.isclose(returns_df['returns'].values,
-                       expected_returns['returns'].values,
-                       rtol=1e-4, atol=1e-4)).all()
-
-    expected_outcomes = pd.DataFrame({
-        'coin_id': ['BTC', 'ETH', 'XRP'],
-        'outcome': ['returns calculated'] * 3
-    })
-
-    assert np.array_equal(outcomes_df.values, expected_outcomes.values)
-
-
-
-# ------------------------------------------ #
-# create_target_variables_mooncrater() unit tests
-# ------------------------------------------ #
-
-@pytest.mark.unit
-def test_calculate_mooncrater_targets():
-    """
-    Tests whether the is_moon and is_crater target variables are calculated correctly.
-    """
-    # Mock data
-    data = {
-        'coin_id': ['coin1', 'coin2', 'coin3', 'coin4', 'coin5'],
-        # 5% increase, 55% increase, 5% decrease, 55% decrease, 50% increase
-        'returns': [0.05, 0.55, -0.05, -0.55, 0.50]
-    }
-    returns_df = pd.DataFrame(data)
-
-    # Mock configuration
-    modeling_config = {
-        'target_variables': {
-            'moon_threshold': 0.5,  # 50% increase
-            'moon_minimum_percent': 0.2,  # 20% of coins should be moons
-            'crater_threshold': -0.5,  # 50% decrease
-            'crater_minimum_percent': 0.2  # 20% of coins should be craters
-        },
-        'modeling': {
-            'target_column': 'is_moon'
-        }
-    }
-
-    # Call the function being tested
-    target_variables_df = fe.calculate_mooncrater_targets(returns_df, modeling_config)
-
-    # Assertions
-    assert len(target_variables_df) == 5
-    assert list(target_variables_df.columns) == ['coin_id', 'is_moon']
-
-    # Check individual results
-    assert target_variables_df[target_variables_df['coin_id'] == 'coin1']['is_moon'].values[0] == 0
-    assert target_variables_df[target_variables_df['coin_id'] == 'coin2']['is_moon'].values[0] == 1
-    assert target_variables_df[target_variables_df['coin_id'] == 'coin3']['is_moon'].values[0] == 0
-    assert target_variables_df[target_variables_df['coin_id'] == 'coin4']['is_moon'].values[0] == 0
-    assert target_variables_df[target_variables_df['coin_id'] == 'coin5']['is_moon'].values[0] == 1
-
-    # Check minimum percentages
-    total_coins = len(target_variables_df)
-    assert (target_variables_df['is_moon'].sum() /
-            total_coins >= modeling_config['target_variables']['moon_minimum_percent'])
-
-
 
 
 # ======================================================== #
@@ -1233,7 +599,7 @@ def test_aggregation_methods(buysell_metrics_df, df_metrics_config, config):
     sum matches the expected result.
     """
     # Flatten the buysell metrics DataFrame to the coin_id level
-    flattened_buysell_metrics_df = fe.flatten_coin_date_df(buysell_metrics_df,
+    flattened_buysell_metrics_df = flt.flatten_coin_date_df(buysell_metrics_df,
                                                            df_metrics_config,
                                                            config['training_data']['training_period_end'])
 
@@ -1266,7 +632,7 @@ def test_outlier_handling(buysell_metrics_df, df_metrics_config, config):
     outlier_df.loc[0, 'total_bought'] = 1e12  # Extreme value
 
     # Flatten the modified DataFrame
-    flattened_buysell_metrics_df = fe.flatten_coin_date_df(outlier_df,
+    flattened_buysell_metrics_df = flt.flatten_coin_date_df(outlier_df,
                                                            df_metrics_config,
                                                            config['training_data']['training_period_end'])
 
@@ -1286,7 +652,7 @@ def test_all_coin_ids_present(buysell_metrics_df, df_metrics_config, config):
     """
 
     # Flatten the buysell metrics DataFrame to the coin_id level
-    flattened_buysell_metrics_df = fe.flatten_coin_date_df(buysell_metrics_df,
+    flattened_buysell_metrics_df = flt.flatten_coin_date_df(buysell_metrics_df,
                                                            df_metrics_config,
                                                            config['training_data']['training_period_end'])
 
