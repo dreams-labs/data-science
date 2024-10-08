@@ -24,7 +24,6 @@ datasets:
       coin_profits_win_threshold: 3000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
       coin_return_win_threshold: 0.2  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
       wallet_min_coin_wins: 2  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
-      fill_method: "fill_zeros"
       sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
 
     normies:
@@ -34,7 +33,6 @@ datasets:
       coin_profits_win_threshold: 0  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
       coin_return_win_threshold: 0  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
       wallet_min_coin_wins: 0  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
-      fill_method: "fill_zeros"
       sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
 
   # Keyed on coin_id-date
@@ -42,13 +40,10 @@ datasets:
 
     market_data:
       price:
-        fill_method: "drop_records"
         sameness_threshold: 1  # columns with more than this % of one value will be dropped
       volume:
-        fill_method: "drop_records"
         sameness_threshold: 1  # columns with more than this % of one value will be dropped
       market_cap:
-        fill_method: "drop_records"
         sameness_threshold: 1  # columns with more than this % of one value will be dropped
 
   # # Keyed on only coin_id
@@ -64,15 +59,15 @@ datasets:
   macro_trends:
 
     gtrends_cryptocurrency_worldwide:
-      fill_method: "extend"
+        sameness_threshold: 1  # columns with more than this % of one value will be dropped
     btc_mvrv_z_score:
-      fill_method: "extend"
+        sameness_threshold: 1  # columns with more than this % of one value will be dropped
     btc_vdd_multiple:
-      fill_method: "extend"
+        sameness_threshold: 1  # columns with more than this % of one value will be dropped
     global_volume:
-      fill_method: "extend"
+        sameness_threshold: 1  # columns with more than this % of one value will be dropped
     global_market_cap:
-      fill_method: "extend"
+        sameness_threshold: 1  # columns with more than this % of one value will be dropped
 
 
 data_cleaning:

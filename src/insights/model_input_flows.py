@@ -147,6 +147,7 @@ def generate_window_flattened_dfs(
     # Market data: generate window-specific flattened metrics
     flattened_market_data_df, flattened_market_data_filepath = fg.generate_window_time_series_features(
         market_data_df,
+        'market_data',
         config,
         metrics_config['time_series']['market_data'],
         modeling_config
@@ -157,6 +158,7 @@ def generate_window_flattened_dfs(
     # Macro trends: generate window-specific flattened metrics
     flattened_macro_trends_df, flattened_macro_trends_filepath = fg.generate_window_macro_trends_features(
         macro_trends_df,
+        'macro_trends',
         config,
         metrics_config,
         modeling_config

@@ -7,10 +7,10 @@ import dreams_core.core as dc
 
 # pylint: disable=E0401
 # project module imports
-import feature_engineering.flattening as flt
+import training_data.profits_row_imputation as pri
 import coin_wallet_metrics.coin_wallet_metrics as cwm
 import coin_wallet_metrics.indicators as ind
-import training_data.profits_row_imputation as pri
+import feature_engineering.flattening as flt
 
 # set up logger at the module level
 logger = dc.setup_logger()
@@ -18,6 +18,7 @@ logger = dc.setup_logger()
 
 def generate_window_time_series_features(
         all_windows_time_series_df,
+        dataset_name,
         config,
         dataset_metrics_config,
         modeling_config
@@ -29,6 +30,8 @@ def generate_window_time_series_features(
     Params:
     - all_windows_time_series_df (DataFrame): df containing all metrics and indicators for a time
         series dataset.
+    - dataset_name (string): key from config['datasets'] that will be added to the dataset's file
+        and column names, e.g. 'market_data', 'wallet_cohorts', etc
     - config (dict): config.yaml that has the dates for the specific time window
     - dataset_metrics_config (dict): The component of metrics_config relating to this dataset, e.g.
         metrics_config['time_series']['market_data']
@@ -65,7 +68,7 @@ def generate_window_time_series_features(
             modeling_config['modeling']['modeling_folder'],  # Folder to store flattened outputs
             'outputs/flattened_outputs'
         ),
-        'market_data',  # Descriptive metadata for the dataset
+        dataset_name,  # Descriptive metadata for the dataset
         config['training_data']['modeling_period_start']  # Ensure data starts from modeling period
     )
 
@@ -75,6 +78,7 @@ def generate_window_time_series_features(
 
 def generate_window_macro_trends_features(
         all_windows_macro_trends_df,
+        dataset_name,
         config,
         metrics_config,
         modeling_config
@@ -89,6 +93,8 @@ def generate_window_macro_trends_features(
     Params:
     - all_windows_time_series_df (DataFrame): df containing all metrics and indicators for a time
         series dataset.
+    - dataset_name (string): key from config['datasets'] that will be added to the dataset's file
+        and column names, e.g. 'macro_trends'
     - config: config.yaml that has the dates for the specific time window
     - metrics_config: metrics_config.yaml
     - modeling_config: modeling_config.yaml
@@ -106,7 +112,7 @@ def generate_window_macro_trends_features(
                                                             drop_outside_date_range=True)
 
     # Macro trends: flatten metrics
-    flattened_features = flt.flatten_date_features(window_macro_trends_df,metrics_config['macro_trends'])
+    flattened_features = flt.flatten_date_features(window_macro_trends_df,metrics_config[dataset_name])
     flattened_macro_trends_df = pd.DataFrame([flattened_features])
 
     # Add time window modeling period start
@@ -120,7 +126,7 @@ def generate_window_macro_trends_features(
             modeling_config['modeling']['modeling_folder'],  # Folder to store flattened outputs
             'outputs/flattened_outputs'
         ),
-        'macro_trends',  # Descriptive metadata for the dataset
+        dataset_name,  # Descriptive metadata for the dataset
         config['training_data']['modeling_period_start']  # Ensure data starts from modeling period
     )
 
@@ -202,6 +208,7 @@ def generate_window_wallet_cohort_features(
         # Flatten cohort metrics
         flattened_cohort_df, flattened_cohort_filepath = generate_window_time_series_features(
             cohort_metrics_df,
+            'wallet_cohorts',
             config,
             dataset_metrics_config,
             modeling_config

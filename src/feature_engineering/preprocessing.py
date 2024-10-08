@@ -16,62 +16,155 @@ logger = dc.setup_logger()
 
 
 
-# def convert_dataset_metrics_to_features(
-#     dataset_metrics_df,
-#     dataset_config,
-#     dataset_metrics_config,
-#     config,
-#     modeling_config,
-# ):
-#     """
-#     Converts a dataset keyed on coin_id-date into features by flattening and preprocessing.
+def extract_dataset_key_from_filepath(filepath, parent_directory):
+    """
+    Helper function to extract the dataset key (e.g. 'time_series', 'wallet_cohorts', etc)
+    from the flattend filepath.
 
-#     Args:
-#         dataset_metrics_df (pd.DataFrame): Input DataFrame containing raw metrics data.
-#         dataset_config (dict): The component of config['datasets'] relating to this dataset
-#         dataset_metrics_config (dict): The component of metrics_config relating to this dataset
-#         config (dict): The whole main config, which includes period boundary dates
-#         modeling_config (dict): The whole modeling_config, which includes a list of tables to
-#             drop in preprocessing
+    Params:
+    - filepath (str): filepath output by generate_window_flattened_dfs().
+    - parent_directory (string): the parent directory of the flattened files
 
-#     Returns:
-#         preprocessed_df (pd.DataFrame): The preprocessed DataFrame ready for model training.
-#         dataset_tuple (tuple): Contains the preprocessed file name and fill method for the dataset.
-#     """
+    Returns:
+    - dataset_key (string): dataset key that matches to the config and metrics_config
+    """
+    # Remove the parent directory part from the filepath
+    relative_path = filepath.replace(parent_directory, '')
 
-#     # Flatten the metrics DataFrame into the required format for feature engineering
-#     flattened_metrics_df = flatten_coin_date_df(
-#         dataset_metrics_df,
-#         dataset_metrics_config,
-#         config['training_data']['training_period_end']  # Ensure data is up to training period end
-#     )
+    # Split the remaining path into parts
+    parts = relative_path.split(os.sep)
 
-#     # Save the flattened output and retrieve the file path
-#     _, flattened_metrics_filepath = save_flattened_outputs(
-#         flattened_metrics_df,
-#         os.path.join(
-#             modeling_config['modeling']['modeling_folder'],  # Folder to store flattened outputs
-#             'outputs/flattened_outputs'
-#         ),
-#         dataset_config['description'],  # Descriptive metadata for the dataset
-#         config['training_data']['modeling_period_start']  # Ensure data starts from modeling period
-#     )
+    # The filename should be the last part
+    filename = parts[-1]
 
-#     # Preprocess the flattened data and return the preprocessed file path
-#     preprocessed_df, preprocessed_filepath = preprocess_coin_df(
-#         flattened_metrics_filepath,
-#         modeling_config,
-#         dataset_config,
-#         dataset_metrics_config
-#     )
+    # Define the date pattern regex
+    date_pattern = re.compile(r'\d{4}-\d{2}-\d{2}_\d{2}-\d{2}')
 
-#     # this tuple is the input for create_training_data_df() that will merge all the files
-#     dataset_tuple = (
-#         preprocessed_filepath.split('preprocessed_outputs/')[1],  # Extract file name from the path
-#         dataset_config['fill_method']  # fill method to be used as part of the merge process
-#     )
+    # Find the date in the filename
+    date_match = date_pattern.search(filename)
 
-#     return preprocessed_df, dataset_tuple
+    if date_match:
+        # Extract the part before the date
+        dataset_key = filename[:date_match.start()].rstrip('_')
+        return dataset_key
+    else:
+        raise ValueError(f"Could not parse dataset of file {filepath}")
+
+
+def create_training_data_df(
+    modeling_folder: str,
+    input_file_tuples: list[tuple[str, str]]
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Merges specified preprocessed output CSVs into a single DataFrame, applies fill strategies,
+    and ensures consistency of coin_ids across datasets. Adds suffixes to column names to
+    avoid duplicates.
+
+    Additionally, raises an error if any of the input files have duplicate coin_ids or are missing
+    the coin_id column.
+
+    Params:
+    - modeling_folder (str): Location of the parent modeling folder.
+    - input_file_tuples (list of tuples): List of tuples where each tuple contains:
+        - filename (str): The name of the CSV file to process.
+        - fill_strategy (str): Strategy for handling missing values ('fill_zeros', 'drop_records').
+
+    Returns:
+    - training_data_df (pd.DataFrame): Merged DataFrame with all specified preprocessed and all
+        fill strategies applied.
+    - merge_logs_df (pd.DataFrame): Log DataFrame detailing record counts for each input DataFrame.
+    """
+    # Initialize location of the preprocessed_outputs directory
+    input_directory = os.path.join(modeling_folder,'outputs/preprocessed_outputs/')
+
+    # Initialize an empty list to hold DataFrames
+    df_list = []
+    missing_files = []
+
+    # Regex to extract the date pattern %Y-%m-%d_%H-%M from the filename
+    date_pattern = re.compile(r'\d{4}-\d{2}-\d{2}_\d{2}-\d{2}')
+
+    # Dictionary to track how many times each column name has been used
+    column_suffix_count = {}
+
+    # Count occurrences of each metric_string
+    metric_string_count = {}
+
+    # First loop to count how often each metric_string appears
+    # for filename, _ in input_file_tuples:
+        # match = date_pattern.search(filename)
+        # if not match:
+        #     raise ValueError(f"No valid date string found in the filename: {filename}")
+
+        # date_string = match.group()
+        # metric_string = filename.split(date_string)[0].rstrip('_')
+
+        # if metric_string not in metric_string_count:
+        #     metric_string_count[metric_string] = 1
+        # else:
+        #     metric_string_count[metric_string] += 1
+
+    # Loop through the input_file_tuples (filename, fill_strategy)
+    for filename, fill_strategy in input_file_tuples:
+        file_path = os.path.join(input_directory, filename)
+
+        if os.path.exists(file_path):
+            df = pd.read_csv(file_path)
+
+            # Check if coin_id column exists if the fill strategy requires it
+            if fill_strategy in ['drop_records','fill_zeros']:
+                if 'coin_id' not in df.columns:
+                    raise ValueError(f"coin_id column is missing in {filename}")
+
+                # Raise an error if there are duplicate coin_ids in the file
+                if df['coin_id'].duplicated().any():
+                    raise ValueError(f"Duplicate coin_ids found in file: {filename}")
+
+            # Extract the date string from the filename
+            match = date_pattern.search(filename)
+            if not match:
+                raise ValueError(f"No valid date string found in the filename: {filename}")
+            date_string = match.group()  # e.g., '2024-09-13_14-44'
+            metric_string = filename.split(date_string)[0].rstrip('_')
+
+            # Add column suffixes based on the count of metric_string
+            if metric_string_count[metric_string] > 1:
+                suffix = f"{metric_string}_{date_string}"
+            else:
+                suffix = metric_string
+
+            # Check if this suffix has been used before and append a numerical suffix if necessary
+            for column in df.columns:
+                if column != 'coin_id':
+                    column_with_suffix = f"{column}_{suffix}"
+
+                    # Check if suffix exists in the count, increment if necessary
+                    if column_with_suffix in column_suffix_count:
+                        column_suffix_count[column_with_suffix] += 1
+                        suffix_count = column_suffix_count[column_with_suffix]
+                        column_with_suffix = f"{column_with_suffix}_{suffix_count}"
+                    else:
+                        column_suffix_count[column_with_suffix] = 1
+
+                    df = df.rename(columns={column: column_with_suffix})
+
+            # Append DataFrame and fill strategy to the list for processing
+            df_list.append((df, fill_strategy, filename))
+        else:
+            missing_files.append(filename)
+
+    # Merge the output DataFrames based on their fill strategies
+    training_data_df, merge_logs_df = merge_and_fill_training_data(df_list)
+
+    # Log the results
+    logger.debug("%d files were successfully merged into training_data_df.", len(df_list))
+    if missing_files:
+        logger.warning("%d files could not be found: %s",
+                        len(missing_files), ', '.join(missing_files))
+    else:
+        logger.debug("All specified files were found and merged into training_data_df.")
+
+    return training_data_df, merge_logs_df
 
 
 
@@ -213,122 +306,6 @@ def apply_scaling(df, df_metrics_config):
 
     return df
 
-
-
-def create_training_data_df(
-    modeling_folder: str,
-    input_file_tuples: list[tuple[str, str]]
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Merges specified preprocessed output CSVs into a single DataFrame, applies fill strategies,
-    and ensures consistency of coin_ids across datasets. Adds suffixes to column names to
-    avoid duplicates.
-
-    Additionally, raises an error if any of the input files have duplicate coin_ids or are missing
-    the coin_id column.
-
-    Params:
-    - modeling_folder (str): Location of the parent modeling folder.
-    - input_file_tuples (list of tuples): List of tuples where each tuple contains:
-        - filename (str): The name of the CSV file to process.
-        - fill_strategy (str): Strategy for handling missing values ('fill_zeros', 'drop_records').
-
-    Returns:
-    - training_data_df (pd.DataFrame): Merged DataFrame with all specified preprocessed and all
-        fill strategies applied.
-    - merge_logs_df (pd.DataFrame): Log DataFrame detailing record counts for each input DataFrame.
-    """
-    # Initialize location of the preprocessed_outputs directory
-    input_directory = os.path.join(modeling_folder,'outputs/preprocessed_outputs/')
-
-    # Initialize an empty list to hold DataFrames
-    df_list = []
-    missing_files = []
-
-    # Regex to extract the date pattern %Y-%m-%d_%H-%M from the filename
-    date_pattern = re.compile(r'\d{4}-\d{2}-\d{2}_\d{2}-\d{2}')
-
-    # Dictionary to track how many times each column name has been used
-    column_suffix_count = {}
-
-    # Count occurrences of each metric_string
-    metric_string_count = {}
-
-    # First loop to count how often each metric_string appears
-    for filename, _ in input_file_tuples:
-        match = date_pattern.search(filename)
-        if not match:
-            raise ValueError(f"No valid date string found in the filename: {filename}")
-
-        date_string = match.group()
-        metric_string = filename.split(date_string)[0].rstrip('_')
-
-        if metric_string not in metric_string_count:
-            metric_string_count[metric_string] = 1
-        else:
-            metric_string_count[metric_string] += 1
-
-    # Loop through the input_file_tuples (filename, fill_strategy)
-    for filename, fill_strategy in input_file_tuples:
-        file_path = os.path.join(input_directory, filename)
-
-        if os.path.exists(file_path):
-            df = pd.read_csv(file_path)
-
-            # Check if coin_id column exists if the fill strategy requires it
-            if fill_strategy in ['drop_records','fill_zeros']:
-                if 'coin_id' not in df.columns:
-                    raise ValueError(f"coin_id column is missing in {filename}")
-
-                # Raise an error if there are duplicate coin_ids in the file
-                if df['coin_id'].duplicated().any():
-                    raise ValueError(f"Duplicate coin_ids found in file: {filename}")
-
-            # Extract the date string from the filename
-            match = date_pattern.search(filename)
-            if not match:
-                raise ValueError(f"No valid date string found in the filename: {filename}")
-            date_string = match.group()  # e.g., '2024-09-13_14-44'
-            metric_string = filename.split(date_string)[0].rstrip('_')
-
-            # Add column suffixes based on the count of metric_string
-            if metric_string_count[metric_string] > 1:
-                suffix = f"{metric_string}_{date_string}"
-            else:
-                suffix = metric_string
-
-            # Check if this suffix has been used before and append a numerical suffix if necessary
-            for column in df.columns:
-                if column != 'coin_id':
-                    column_with_suffix = f"{column}_{suffix}"
-
-                    # Check if suffix exists in the count, increment if necessary
-                    if column_with_suffix in column_suffix_count:
-                        column_suffix_count[column_with_suffix] += 1
-                        suffix_count = column_suffix_count[column_with_suffix]
-                        column_with_suffix = f"{column_with_suffix}_{suffix_count}"
-                    else:
-                        column_suffix_count[column_with_suffix] = 1
-
-                    df = df.rename(columns={column: column_with_suffix})
-
-            # Append DataFrame and fill strategy to the list for processing
-            df_list.append((df, fill_strategy, filename))
-        else:
-            missing_files.append(filename)
-
-    # Merge the output DataFrames based on their fill strategies
-    training_data_df, merge_logs_df = merge_and_fill_training_data(df_list)
-
-    # Log the results
-    logger.debug("%d files were successfully merged into training_data_df.", len(df_list))
-    if missing_files:
-        logger.warning("%d files could not be found: %s",
-                        len(missing_files), ', '.join(missing_files))
-    else:
-        logger.debug("All specified files were found and merged into training_data_df.")
-
-    return training_data_df, merge_logs_df
 
 
 
@@ -592,3 +569,63 @@ def prepare_model_input_df(training_data_df, target_variable_df, target_column):
 
     # Step 7: Return the final model input DataFrame
     return model_input_df
+
+
+
+
+# def convert_dataset_metrics_to_features(
+#     dataset_metrics_df,
+#     dataset_config,
+#     dataset_metrics_config,
+#     config,
+#     modeling_config,
+# ):
+#     """
+#     Converts a dataset keyed on coin_id-date into features by flattening and preprocessing.
+
+#     Args:
+#         dataset_metrics_df (pd.DataFrame): Input DataFrame containing raw metrics data.
+#         dataset_config (dict): The component of config['datasets'] relating to this dataset
+#         dataset_metrics_config (dict): The component of metrics_config relating to this dataset
+#         config (dict): The whole main config, which includes period boundary dates
+#         modeling_config (dict): The whole modeling_config, which includes a list of tables to
+#             drop in preprocessing
+
+#     Returns:
+#         preprocessed_df (pd.DataFrame): The preprocessed DataFrame ready for model training.
+#         dataset_tuple (tuple): Contains the preprocessed file name and fill method for the dataset.
+#     """
+
+#     # Flatten the metrics DataFrame into the required format for feature engineering
+#     flattened_metrics_df = flatten_coin_date_df(
+#         dataset_metrics_df,
+#         dataset_metrics_config,
+#         config['training_data']['training_period_end']  # Ensure data is up to training period end
+#     )
+
+#     # Save the flattened output and retrieve the file path
+#     _, flattened_metrics_filepath = save_flattened_outputs(
+#         flattened_metrics_df,
+#         os.path.join(
+#             modeling_config['modeling']['modeling_folder'],  # Folder to store flattened outputs
+#             'outputs/flattened_outputs'
+#         ),
+#         dataset_config['description'],  # Descriptive metadata for the dataset
+#         config['training_data']['modeling_period_start']  # Ensure data starts from modeling period
+#     )
+
+#     # Preprocess the flattened data and return the preprocessed file path
+#     preprocessed_df, preprocessed_filepath = preprocess_coin_df(
+#         flattened_metrics_filepath,
+#         modeling_config,
+#         dataset_config,
+#         dataset_metrics_config
+#     )
+
+#     # this tuple is the input for create_training_data_df() that will merge all the files
+#     dataset_tuple = (
+#         preprocessed_filepath.split('preprocessed_outputs/')[1],  # Extract file name from the path
+#         dataset_config['fill_method']  # fill method to be used as part of the merge process
+#     )
+
+#     return preprocessed_df, dataset_tuple

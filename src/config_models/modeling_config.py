@@ -28,13 +28,25 @@ class ModelingConfig(NoExtrasBaseModel):
 
 # Preprocessing section
 # ---------------------
+
+class FillMethod(str, Enum):
+    """
+    These dicatates what to do if the dataset doesn't have rows for every coin_id in other
+    datasets.
+    """
+    FILL_ZEROS = "fill_zeros"       # any missing rows are filled with 0
+    DROP_RECORDS = "drop_records"   # any missing rows are dropped from the training set
+    EXTEND = "extend"               # used for macro series; copies the features to all coins
+
 class PreprocessingConfig(NoExtrasBaseModel):
     """Configuration for preprocessing step."""
     drop_features: Optional[List[str]] = Field(default=None)
+    fill_methods: Dict[str, 'FillMethod'] = Field(...)
 
 
 # Target Variables section
 # ------------------------
+
 class TargetVariablesConfig(BaseModel):
     """
     Configuration for target variables.
