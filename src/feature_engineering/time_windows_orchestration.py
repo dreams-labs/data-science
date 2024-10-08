@@ -20,7 +20,8 @@ import dreams_core.core as dc
 import training_data.data_retrieval as dr
 import coin_wallet_metrics.indicators as ind
 import feature_engineering.feature_generation as fg
-import feature_engineering.preprocessing as prp
+import feature_engineering.data_splitting as ds
+import feature_engineering.target_variables as tv
 import insights.experiments as exp
 
 # set up logger at the module level
@@ -100,7 +101,7 @@ def generate_all_time_windows_model_inputs(config,metrics_config,modeling_config
                                                                                         modeling_config)
 
     # Split target variables into the train/test/validation/future sets
-    sets_X_y_dict = prp.perform_train_test_validation_future_splits(training_data_df,
+    sets_X_y_dict = ds.perform_train_test_validation_future_splits(training_data_df,
                                                                     target_variable_df,
                                                                     modeling_config)
 
@@ -483,7 +484,7 @@ def create_target_variables_for_all_time_windows(training_data_df, prices_df, co
                 ).strftime('%Y-%m-%d')
 
         # Call create_target_variables function
-        target_variables_df, returns_df = prp.create_target_variables(
+        target_variables_df, returns_df = tv.create_target_variables(
             current_prices_df,
             current_training_data_config,
             modeling_config
