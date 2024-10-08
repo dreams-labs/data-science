@@ -8,6 +8,7 @@ functions used to run experiments
 
 import os
 import uuid
+import hashlib
 from datetime import datetime
 import random
 import json
@@ -19,9 +20,10 @@ import dreams_core.core as dc
 
 # project files
 import utils as u
-import training_data as td
+import training_data.data_retrieval as dr
+import training_data.profits_row_imputation as pri
+import coin_wallet_metrics.coin_wallet_metrics as cwm
 import modeling as m
-import model_input_flows as mi
 
 # set up logger at the module level
 logger = dc.setup_logger()
@@ -103,7 +105,7 @@ def run_experiment(modeling_config):
     for n, trial in enumerate(trial_configurations[:total_trials]):
 
         # 3.1 Prepare the full configuration by applying overrides from the current trial config
-        config, metrics_config, modeling_config = mi.prepare_configs(config_folder, trial)
+        config, metrics_config, modeling_config = prepare_configs(config_folder, trial)
 
         # Store the configuration settings used in this trial in metadata
         metadata['config_settings'] = {
@@ -113,7 +115,7 @@ def run_experiment(modeling_config):
         }
 
         # 3.2 Retrieve or rebuild profits_df based on config changes
-        profits_df = mi.rebuild_profits_df_if_necessary(config, prices_df, profits_df)
+        profits_df = rebuild_profits_df_if_necessary(config, prices_df, profits_df)
 
         # 3.3 Build the configured model input data (train/test data)
         X_train, X_test, y_train, y_test, returns_test = mi.build_configured_model_input(
@@ -163,6 +165,196 @@ def run_experiment(modeling_config):
     logger.info('Experiment %s complete.', experiment_id)
 
     return experiment_id
+
+
+def prepare_configs(config_folder, override_params):
+    """
+    Loads config files from the config_folder using load_config and applies overrides specified
+    in override_params.
+
+    Args:
+    - config_folder (str): Path to the folder containing the configuration files.
+    - override_params (dict): Dictionary of flattened parameters to override in the loaded configs.
+
+    Returns:
+    - config (dict): The main config file with overrides applied.
+    - metrics_config (dict): The metrics configuration with overrides applied.
+    - modeling_config (dict): The modeling configuration with overrides applied.
+
+    Raises:
+    - KeyError: if any key from override_params does not match an existing key in the
+        corresponding config.
+    """
+
+    # Load the main config files using load_config
+    config_path = os.path.join(config_folder, 'config.yaml')
+    metrics_config_path = os.path.join(config_folder, 'metrics_config.yaml')
+    modeling_config_path = os.path.join(config_folder, 'modeling_config.yaml')
+
+    config = u.load_config(config_path)
+    metrics_config = u.load_config(metrics_config_path)
+    modeling_config = u.load_config(modeling_config_path)
+
+    # Apply the flattened overrides to each config
+    for full_key, value in override_params.items():
+        if full_key.startswith('config.'):
+            # Validate the key exists before setting the value
+            validate_key_in_config(config, full_key[len('config.'):])
+            set_nested_value(config, full_key[len('config.'):], value)
+        elif full_key.startswith('metrics_config.'):
+            # Validate the key exists before setting the value
+            validate_key_in_config(metrics_config, full_key[len('metrics_config.'):])
+            set_nested_value(metrics_config, full_key[len('metrics_config.'):], value)
+        elif full_key.startswith('modeling_config.'):
+            # Validate the key exists before setting the value
+            validate_key_in_config(modeling_config, full_key[len('modeling_config.'):])
+            set_nested_value(modeling_config, full_key[len('modeling_config.'):], value)
+        else:
+            raise ValueError(f"Unknown config section in key: {full_key}")
+
+    # reapply the period boundary dates based on the current config['training_data'] params
+    period_dates = u.calculate_period_dates(config)
+    config['training_data'].update(period_dates)
+
+    return config, metrics_config, modeling_config
+
+# helper function for prepare_configs()
+def set_nested_value(config, key_path, value):
+    """
+    Sets a value in a nested dictionary based on a flattened key path.
+
+    Args:
+    - config (dict): The configuration dictionary to update.
+    - key_path (str): The flattened key path (e.g., 'config.data_cleaning.inflows_filter').
+    - value: The value to set at the given key path.
+    """
+    keys = key_path.split('.')
+    sub_dict = config
+    for key in keys[:-1]:  # Traverse down to the second-to-last key
+        sub_dict = sub_dict.setdefault(key, {})
+    sub_dict[keys[-1]] = value  # Set the value at the final key
+
+# helper function for prepare_configs
+def validate_key_in_config(config, key_path):
+    """
+    Validates that a given key path exists in the nested configuration.
+
+    Args:
+    - config (dict): The configuration dictionary to validate.
+    - key_path (str): The flattened key path to check.
+        (e.g. 'config.data_cleaning.inflows_filter')
+
+    Raises:
+    - KeyError: If the key path does not exist in the config.
+    """
+    keys = key_path.split('.')
+    sub_dict = config
+    for key in keys[:-1]:  # Traverse down to the second-to-last key
+        if key not in sub_dict:
+            raise KeyError(
+                f"Key '{key}' not found in config at level '{'.'.join(keys[:-1])}'")
+        sub_dict = sub_dict[key]
+    if keys[-1] not in sub_dict:
+        raise KeyError(
+            f"Key '{keys[-1]}' not found in config at final level '{'.'.join(keys[:-1])}'")
+
+
+
+# module level config_cache dictionary for rebuild_profits_df_if_necessary()
+config_cache = {"hash": None}
+
+def rebuild_profits_df_if_necessary(config, prices_df, profits_df=None):
+    """
+    Checks if the config has changed and reruns time-intensive steps if needed.
+    Args:
+    - config (dict): The config containing training_data and data_cleaning.
+    - prices_df (DataFrame): The prices dataframe needed to compute profits_df.
+    - profits_df (DataFrame, optional): The profits dataframe passed in memory.
+    Returns:
+    - profits_df (DataFrame): The profits dataframe.
+    """
+    # Combine 'training_data' and 'data_cleaning' for a single hash
+    relevant_configs = {**config['training_data'], **config['data_cleaning']}
+    config_hash = generate_config_hash(relevant_configs)
+
+    # If the hash hasn't changed and profits_df is passed, skip rerun
+    if config_hash == config_cache["hash"] and profits_df is not None:
+        logger.info("Using passed profits_df from memory.")
+        return profits_df
+
+    # Otherwise, rerun time-intensive steps
+    if profits_df is None:
+        logger.info("No profits_df found, rebuilding profits_df...")
+    else:
+        logger.info("Config changes detected, rebuilding profits_df...")
+
+    # retrieve profits data
+    profits_df = dr.retrieve_profits_data(config['training_data']['training_period_start'],
+                                          config['training_data']['modeling_period_end'],
+                                          config['data_cleaning']['minimum_wallet_inflows'])
+    profits_df, _ = cwm.split_dataframe_by_coverage(profits_df,
+                                                    config['training_data']['training_period_start'],
+                                                    config['training_data']['modeling_period_end'],
+                                                    id_column='coin_id')
+    profits_df, _ = dr.clean_profits_df(profits_df, config['data_cleaning'])
+
+    # DDA355 THESE GET REMOVED
+    dates_to_impute = [
+        config['training_data']['training_period_end'],
+        config['training_data']['modeling_period_start'],
+        config['training_data']['modeling_period_end'],
+    ]
+    profits_df = pri.impute_profits_for_multiple_dates(
+                    profits_df,
+                    prices_df,
+                    dates_to_impute,
+                    n_threads=24)
+
+    # Update the cache for future comparisons
+    config_cache["hash"] = config_hash
+
+    return profits_df
+
+# helper function for rebuild_profits_df_if_necessary()
+def generate_config_hash(config):
+    """
+    Generates a hash for a given config section.
+
+    Args:
+    - config (dict): The configuration section.
+
+    Returns:
+    - str: A hash representing the config state.
+    """
+    config_str = json.dumps(config, sort_keys=True)
+    return hashlib.md5(config_str.encode('utf-8')).hexdigest()
+
+# helper function for rebuild_profits_df_if_necessary()
+def handle_hash(config_hash, temp_folder, operation='load'):
+    """
+    Handles saving or loading the config hash for checking.
+
+    Args:
+    - config_hash (str): The generated hash to save or load.
+    - temp_folder (str): The folder where the hash file is stored.
+    - operation (str): Either 'save' or 'load' to perform the operation.
+
+    Returns:
+    - str: The loaded hash if operation is 'load', None if it doesn't exist.
+    """
+    hash_file = os.path.join(temp_folder, 'config_hash.txt')
+
+    if operation == 'load':
+        if os.path.exists(hash_file):
+            with open(hash_file, 'r', encoding='utf-8') as f:
+                return f.read()
+        else:
+            return None
+    elif operation == 'save':
+        with open(hash_file, 'w', encoding='utf-8') as f:
+            f.write(config_hash)
+
+
 
 
 

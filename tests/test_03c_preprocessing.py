@@ -140,7 +140,7 @@ def test_preprocess_coin_df_scaling(mock_modeling_config, mock_metrics_config, m
 
 
 # ------------------------------------------ #
-# create_training_data_df() unit tests
+# join_all_feature_dfs() unit tests
 # ------------------------------------------ #
 
 @pytest.fixture
@@ -177,14 +177,14 @@ def mock_input_files_value_columns(tmpdir):
     return tmpdir, input_files
 
 @pytest.mark.unit
-def test_create_training_data_df(mock_input_files_value_columns):
+def test_join_all_feature_dfs(mock_input_files_value_columns):
     """
     Test column renaming logic for clarity when merging multiple files with similar filenames.
     """
     tmpdir, input_files = mock_input_files_value_columns
 
     # Call the function using tmpdir as the modeling_folder
-    merged_df, _ = prp.create_training_data_df(tmpdir, input_files)
+    merged_df, _ = prp.join_all_feature_dfs(tmpdir, input_files)
 
     # Check if the columns have the correct suffixes
     expected_columns = [
@@ -240,7 +240,7 @@ def test_file_not_found(mock_input_files):
     filenames = [('file4_nonexistent_2024-09-13_14-47.csv', 'fill_zeros')]
 
     with pytest.raises(ValueError, match="No DataFrames to merge."):
-        prp.create_training_data_df(tmpdir, filenames)
+        prp.join_all_feature_dfs(tmpdir, filenames)
 
 
 @pytest.mark.unit
@@ -260,7 +260,7 @@ def test_missing_coin_id(mock_input_files):
     filenames.append(('file_missing_coin_id_2024-09-13_14-47.csv', 'fill_zeros'))
 
     with pytest.raises(ValueError, match="coin_id column is missing in file_missing_coin_id_2024-09-13_14-47.csv"):
-        prp.create_training_data_df(tmpdir, filenames)
+        prp.join_all_feature_dfs(tmpdir, filenames)
 
 
 @pytest.mark.unit
@@ -279,7 +279,7 @@ def test_duplicate_coin_id(mock_input_files):
     filenames.append((bad_file, 'fill_zeros'))
 
     with pytest.raises(ValueError, match=f"Duplicate coin_ids found in file: {bad_file}"):
-        prp.create_training_data_df(tmpdir, filenames)
+        prp.join_all_feature_dfs(tmpdir, filenames)
 
 
 # ------------------------------------------ #

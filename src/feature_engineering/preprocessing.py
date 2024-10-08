@@ -2,8 +2,6 @@
 functions used to build coin-level features from training data
 """
 import os
-import re
-from typing import List, Dict, Tuple
 import pandas as pd
 import numpy as np
 import dreams_core.core as dc
@@ -15,230 +13,6 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 # set up logger at the module level
 logger = dc.setup_logger()
 
-
-def concatenate_dataset_dfs_across_windows(filepaths: List[str],
-                                          modeling_config: Dict
-                                          ) -> Dict[str, Tuple[pd.DataFrame, str]]:
-    """
-    For each dataset, concatenates the flattened dfs from all windows together and returns the
-    merged df with its fill method.
-
-    This function reads multiple CSV files, extracts their dataset prefixes,
-    concatenates DataFrames with the same prefix, and determines the fill method for each dataset.
-    It handles subgroups within datasets by prefixing column names with the subgroup name.
-
-    Args:
-        filepaths (List[str]): A list of file paths to the CSV files to be processed.
-        modeling_config (Dict): Configuration dictionary containing preprocessing fill methods.
-
-    Returns:
-        Dict[str, Tuple[pd.DataFrame, str]]: A dictionary where keys are dataset prefixes and
-        values are tuples containing:
-            - The concatenated DataFrame for each prefix
-            - The fill method for the dataset
-    """
-    # Dictionary to store DataFrames grouped by dataset prefix
-    grouped_dfs = {}
-
-    for filepath in filepaths:
-        # Validate file existence
-        if not os.path.exists(filepath):
-            raise KeyError(f"File {filepath} does not exist.")
-
-        # Read the CSV
-        df = pd.read_csv(filepath)
-
-        # Identify filepath of parent directory
-        parent_directory = os.path.join(modeling_config['modeling']['modeling_folder'],
-                                        'outputs/preprocessed_outputs/')
-
-        # Extract the dataset prefix from the filename
-        dataset_prefix = extract_dataset_key_from_filepath(filepath, parent_directory)
-
-        # Handle subgroups if present
-        if '-' in dataset_prefix:
-            dataset, subgroup = dataset_prefix.split('-')
-            # Prefix the columns with the subgroup
-            df = df.rename(
-                columns={
-                    col: (f'{subgroup}_' + col)
-                    for col in df.columns
-                    if col not in ['coin_id', 'time_window']}
-            )
-        else:
-            dataset = dataset_prefix
-
-        # Add the DataFrame to the appropriate group
-        if dataset_prefix not in grouped_dfs:
-            grouped_dfs[dataset_prefix] = []
-        grouped_dfs[dataset_prefix].append(df)
-
-    # Concatenate DataFrames within each group and pair with fill method
-    result = {}
-    for dataset_prefix, dfs in grouped_dfs.items():
-        concatenated_df = pd.concat(dfs, ignore_index=True)
-
-        # Identify the fill method
-        try:
-            fill_method = modeling_config['preprocessing']['fill_methods'][dataset]
-        except KeyError as exc:
-            raise KeyError(f"Fill method not found for dataset: {dataset}") from exc
-
-        result[dataset_prefix] = (concatenated_df, fill_method)
-
-    return result
-
-
-
-def extract_dataset_key_from_filepath(filepath, parent_directory):
-    """
-    Helper function to extract the dataset key (e.g. 'time_series', 'wallet_cohorts', etc)
-    from the flattend filepath.
-
-    Params:
-    - filepath (str): filepath output by generate_window_flattened_dfs().
-    - parent_directory (string): the parent directory of the flattened files
-
-    Returns:
-    - dataset_key (string): dataset key that matches to the config and metrics_config
-    """
-    # Remove the parent directory part from the filepath
-    relative_path = filepath.replace(parent_directory, '')
-
-    # Split the remaining path into parts
-    parts = relative_path.split(os.sep)
-
-    # The filename should be the last part
-    filename = parts[-1]
-
-    # Define the date pattern regex
-    date_pattern = re.compile(r'\d{4}-\d{2}-\d{2}_\d{2}-\d{2}')
-
-    # Find the date in the filename
-    date_match = date_pattern.search(filename)
-
-    if date_match:
-        # Extract the part before the date
-        dataset_key = filename[:date_match.start()].rstrip('_')
-        return dataset_key
-    else:
-        raise ValueError(f"Could not parse dataset of file {filepath}")
-
-
-def create_training_data_df(
-    modeling_folder: str,
-    input_file_tuples: list[tuple[str, str]]
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Merges specified preprocessed output CSVs into a single DataFrame, applies fill strategies,
-    and ensures consistency of coin_ids across datasets. Adds suffixes to column names to
-    avoid duplicates.
-
-    Additionally, raises an error if any of the input files have duplicate coin_ids or are missing
-    the coin_id column.
-
-    Params:
-    - modeling_folder (str): Location of the parent modeling folder.
-    - input_file_tuples (list of tuples): List of tuples where each tuple contains:
-        - filename (str): The name of the CSV file to process.
-        - fill_strategy (str): Strategy for handling missing values ('fill_zeros', 'drop_records').
-
-    Returns:
-    - training_data_df (pd.DataFrame): Merged DataFrame with all specified preprocessed and all
-        fill strategies applied.
-    - merge_logs_df (pd.DataFrame): Log DataFrame detailing record counts for each input DataFrame.
-    """
-    # Initialize location of the preprocessed_outputs directory
-    input_directory = os.path.join(modeling_folder,'outputs/preprocessed_outputs/')
-
-    # Initialize an empty list to hold DataFrames
-    df_list = []
-    missing_files = []
-
-    # Regex to extract the date pattern %Y-%m-%d_%H-%M from the filename
-    date_pattern = re.compile(r'\d{4}-\d{2}-\d{2}_\d{2}-\d{2}')
-
-    # Dictionary to track how many times each column name has been used
-    column_suffix_count = {}
-
-    # Count occurrences of each metric_string
-    metric_string_count = {}
-
-    # First loop to count how often each metric_string appears
-    # for filename, _ in input_file_tuples:
-        # match = date_pattern.search(filename)
-        # if not match:
-        #     raise ValueError(f"No valid date string found in the filename: {filename}")
-
-        # date_string = match.group()
-        # metric_string = filename.split(date_string)[0].rstrip('_')
-
-        # if metric_string not in metric_string_count:
-        #     metric_string_count[metric_string] = 1
-        # else:
-        #     metric_string_count[metric_string] += 1
-
-    # Loop through the input_file_tuples (filename, fill_strategy)
-    for filename, fill_strategy in input_file_tuples:
-        file_path = os.path.join(input_directory, filename)
-
-        if os.path.exists(file_path):
-            df = pd.read_csv(file_path)
-
-            # Check if coin_id column exists if the fill strategy requires it
-            if fill_strategy in ['drop_records','fill_zeros']:
-                if 'coin_id' not in df.columns:
-                    raise ValueError(f"coin_id column is missing in {filename}")
-
-                # Raise an error if there are duplicate coin_ids in the file
-                if df['coin_id'].duplicated().any():
-                    raise ValueError(f"Duplicate coin_ids found in file: {filename}")
-
-            # Extract the date string from the filename
-            match = date_pattern.search(filename)
-            if not match:
-                raise ValueError(f"No valid date string found in the filename: {filename}")
-            date_string = match.group()  # e.g., '2024-09-13_14-44'
-            metric_string = filename.split(date_string)[0].rstrip('_')
-
-            # Add column suffixes based on the count of metric_string
-            if metric_string_count[metric_string] > 1:
-                suffix = f"{metric_string}_{date_string}"
-            else:
-                suffix = metric_string
-
-            # Check if this suffix has been used before and append a numerical suffix if necessary
-            for column in df.columns:
-                if column != 'coin_id':
-                    column_with_suffix = f"{column}_{suffix}"
-
-                    # Check if suffix exists in the count, increment if necessary
-                    if column_with_suffix in column_suffix_count:
-                        column_suffix_count[column_with_suffix] += 1
-                        suffix_count = column_suffix_count[column_with_suffix]
-                        column_with_suffix = f"{column_with_suffix}_{suffix_count}"
-                    else:
-                        column_suffix_count[column_with_suffix] = 1
-
-                    df = df.rename(columns={column: column_with_suffix})
-
-            # Append DataFrame and fill strategy to the list for processing
-            df_list.append((df, fill_strategy, filename))
-        else:
-            missing_files.append(filename)
-
-    # Merge the output DataFrames based on their fill strategies
-    training_data_df, merge_logs_df = merge_and_fill_training_data(df_list)
-
-    # Log the results
-    logger.debug("%d files were successfully merged into training_data_df.", len(df_list))
-    if missing_files:
-        logger.warning("%d files could not be found: %s",
-                        len(missing_files), ', '.join(missing_files))
-    else:
-        logger.debug("All specified files were found and merged into training_data_df.")
-
-    return training_data_df, merge_logs_df
 
 
 
@@ -476,9 +250,8 @@ def create_target_variables(prices_df, training_data_config, modeling_config):
     Returns:
     - target_variables_df: DataFrame with target variables.
     - returns_df: DataFrame with coin returns data.
-    - outcomes_df: DataFrame tracking outcomes for each coin.
     """
-    returns_df, outcomes_df = calculate_coin_returns(prices_df, training_data_config)
+    returns_df = calculate_coin_returns(prices_df, training_data_config)
 
     target_variable = modeling_config['modeling']['target_column']
 
@@ -489,7 +262,8 @@ def create_target_variables(prices_df, training_data_config, modeling_config):
     else:
         raise ValueError(f"Unsupported target variable type: {target_variable}")
 
-    return target_variables_df, returns_df, outcomes_df
+    return target_variables_df, returns_df
+
 
 
 def calculate_coin_returns(prices_df, training_data_config):
@@ -502,7 +276,6 @@ def calculate_coin_returns(prices_df, training_data_config):
 
     Returns:
     - returns_df: DataFrame with columns 'coin_id' and 'returns'.
-    - outcomes_df: DataFrame tracking outcomes for each coin.
     """
     prices_df = prices_df.copy()
     prices_df['date'] = pd.to_datetime(prices_df['date'])
@@ -528,13 +301,7 @@ def calculate_coin_returns(prices_df, training_data_config):
     returns = (end_prices[valid_coins] - start_prices[valid_coins]) / start_prices[valid_coins]
     returns_df = pd.DataFrame({'returns': returns})
 
-    # Create outcomes DataFrame
-    outcomes_df = pd.DataFrame({
-        'coin_id': valid_coins,
-        'outcome': 'returns calculated'
-    })
-
-    return returns_df, outcomes_df
+    return returns_df
 
 
 
@@ -600,42 +367,45 @@ def calculate_mooncrater_targets(returns_df, modeling_config):
 def prepare_model_input_df(training_data_df, target_variable_df, target_column):
     """
     Prepares the final model input DataFrame by merging the training data with the target variables
-    on 'coin_id' and selects the specified target column. Checks for data quality issues such as
-    missing columns, duplicate coin_ids, and missing target variables.
+    on the multiindex (coin_id, time_window) and selects the specified target column. Checks for
+    data quality issues such as missing columns, duplicate index entries, and missing target variables.
 
     Parameters:
-    - training_data_df: DataFrame containing the features for training the model.
-    - target_variable_df: DataFrame containing target variables for each coin_id.
+    - training_data_df: DataFrame with model training features and multiindex (time_window, coin_id).
+    - target_variable_df: DataFrame containing target variables with multiindex (coin_id, time_window).
     - target_column: The name of the target variable to train on (e.g., 'is_moon' or 'is_crater').
 
     Returns:
     - model_input_df: Merged DataFrame with both features and the specified target variable.
     """
 
-    # Step 1: Ensure that both DataFrames have 'coin_id' as a column
-    if 'coin_id' not in training_data_df.columns:
-        raise ValueError("The 'coin_id' column is missing in training_data_df")
-    if 'coin_id' not in target_variable_df.columns:
-        raise ValueError("The 'coin_id' column is missing in target_variable_df")
+    # Step 1: Ensure that both DataFrames have the correct multiindex
+    if not isinstance(training_data_df.index, pd.MultiIndex) or \
+        not isinstance(target_variable_df.index, pd.MultiIndex):
+        raise ValueError("Both DataFrames must have a MultiIndex with levels (time_window, coin_id)")
 
-    # Step 2: Check for duplicated coin_id entries in both DataFrames
-    if training_data_df['coin_id'].duplicated().any():
-        raise ValueError("Duplicate 'coin_id' found in training_data_df")
-    if target_variable_df['coin_id'].duplicated().any():
-        raise ValueError("Duplicate 'coin_id' found in target_variable_df")
+    if training_data_df.index.names != ['time_window', 'coin_id'] or \
+        target_variable_df.index.names != ['time_window', 'coin_id']:
+        raise ValueError("MultiIndex must have levels named 'coin_id' and 'time_window'")
+
+    # Step 2: Check for duplicated index entries in both DataFrames
+    if training_data_df.index.duplicated().any():
+        raise ValueError("Duplicate index entries found in training_data_df")
+    if target_variable_df.index.duplicated().any():
+        raise ValueError("Duplicate index entries found in target_variable_df")
 
     # Step 3: Ensure that the target column exists in the target_variable_df
     if target_column not in target_variable_df.columns:
         raise ValueError(f"The target column '{target_column}' is missing in target_variable_df")
 
-    # Step 4: Merge the training data with the target variable DataFrame on 'coin_id'
-    model_input_df = pd.merge(training_data_df, target_variable_df[['coin_id', target_column]],
-                              on='coin_id', how='inner')
+    # Step 4: Merge the training data with the target variable DataFrame on the multiindex
+    model_input_df = pd.merge(training_data_df, target_variable_df[[target_column]],
+                                left_index=True, right_index=True, how='inner')
 
-    # Step 5: Remove coins without target variables and output a warning with the number removed
-    removed_coins = len(training_data_df) - len(model_input_df)
-    if removed_coins > 0:
-        logger.warning("%s coins were removed due to missing target variables", removed_coins)
+    # Step 5: Remove entries without target variables and output a warning with the number removed
+    removed_entries = len(training_data_df) - len(model_input_df)
+    if removed_entries > 0:
+        logger.warning("%s entries were removed due to missing target variables", removed_entries)
 
     # Step 6: Perform final quality checks (e.g., no NaNs in important columns)
     if model_input_df.isnull().any().any():
@@ -696,7 +466,7 @@ def prepare_model_input_df(training_data_df, target_variable_df, target_column):
 #         dataset_metrics_config
 #     )
 
-#     # this tuple is the input for create_training_data_df() that will merge all the files
+#     # this tuple is the input for join_all_feature_dfs() that will merge all the files
 #     dataset_tuple = (
 #         preprocessed_filepath.split('preprocessed_outputs/')[1],  # Extract file name from the path
 #         dataset_config['fill_method']  # fill method to be used as part of the merge process

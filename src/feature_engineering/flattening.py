@@ -90,7 +90,6 @@ def flatten_coin_date_df(df, df_metrics_config, training_period_end):
     for coin_id in df['coin_id'].unique():
         # Filter the data for the current coin
         coin_df = df[df['coin_id'] == coin_id].copy()
-
         # Flatten the features for this coin
         flat_features = flatten_date_features(coin_df, df_metrics_config)
 
@@ -167,6 +166,7 @@ def flatten_date_features(time_series_df, df_metrics_config):
             rolling_features = calculate_rolling_window_features(
                 ts, window_duration, lookback_periods, rolling_aggregations, comparisons, metric)
             flat_features.update(rolling_features)
+
 
     if not matched_columns:
         raise ValueError("No metrics matched the columns in the DataFrame.")

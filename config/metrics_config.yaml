@@ -116,7 +116,7 @@ time_series:
                             sum:
                                 scaling: "log"
                         window_duration: 10
-                        lookback_periods: 3
+                        lookback_periods: 5
                 rsi:
                     parameters:
                         window: [14]

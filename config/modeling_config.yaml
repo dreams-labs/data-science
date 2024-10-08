@@ -3,7 +3,7 @@ preprocessing:
     fill_methods:
         wallet_cohorts: "fill_zeros"
         market_data: "drop_records"
-        macro_trends: "extend"
+        macro_trends: "extend_coin_ids"
 
 target_variables:
     moon_threshold: 0.25  # Minimum price % increase for a coin to be is_moon
@@ -24,8 +24,8 @@ modeling:
     # model_params:
     #   n_estimators: 100  # Number of trees in the model
 
-    # target_column: "is_moon"  # "is_moon" or "is_crater" depending on the experiment
-    target_column: "returns"  # "is_moon" or "is_crater" depending on the experiment
+    target_column: "is_moon"  # "is_moon" or "is_crater" depending on the experiment
+    # target_column: "returns"  # "is_moon" or "is_crater" depending on the experiment
 
 
     modeling_folder: "..//modeling"  # location of the modeling folder where outputs will be saved

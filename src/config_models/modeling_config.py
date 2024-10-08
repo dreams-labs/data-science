@@ -34,9 +34,10 @@ class FillMethod(str, Enum):
     These dicatates what to do if the dataset doesn't have rows for every coin_id in other
     datasets.
     """
-    FILL_ZEROS = "fill_zeros"       # any missing rows are filled with 0
-    DROP_RECORDS = "drop_records"   # any missing rows are dropped from the training set
-    EXTEND = "extend"               # used for macro series; copies the features to all coins
+    FILL_ZEROS = "fill_zeros"                   # any missing rows are filled with 0
+    DROP_RECORDS = "drop_records"               # any missing rows are dropped from the training set
+    EXTEND_COIN_IDS = "extend_coin_ids"         # used for macro series; copies time_window features to all coins
+    EXTEND_TIME_WINDOWS = "extend_time_windows" # used for metadata series; copies coin features to all time windows
 
 class PreprocessingConfig(NoExtrasBaseModel):
     """Configuration for preprocessing step."""
