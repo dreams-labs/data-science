@@ -16,6 +16,7 @@ import dreams_core.core as dc
 # pylint: disable=C0413  # wrong import position
 # project files
 import training_data.data_retrieval as dr
+import coin_wallet_metrics.indicators as ind
 import feature_engineering.feature_generation as fg
 import feature_engineering.preprocessing as prp
 
@@ -52,7 +53,7 @@ def generate_time_windows(config):
 
 
 
-def retrieve_all_windows_training_data(config):
+def prepare_all_windows_base_data(config, metrics_config):
     """
     Retrieves, cleans and adds indicators to the all windows training data.
 
@@ -96,6 +97,17 @@ def retrieve_all_windows_training_data(config):
     # Filter profits_df to remove records for any coins that were removed in data cleaning
     profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
 
+
+    # 3. Add indicators (additional time series)
+    # ------------------------------------------
+    # Macro trends: add indicators
+    macro_trends_df = ind.generate_time_series_indicators(macro_trends_df,
+                                                        metrics_config['macro_trends'],
+                                                        None)
+    # Market data: add indicators
+    market_data_df = ind.generate_time_series_indicators(market_data_df,
+                                                        metrics_config['time_series']['market_data'],
+                                                        'coin_id')
 
     return macro_trends_df, market_data_df, profits_df, prices_df
 
@@ -166,7 +178,7 @@ def generate_window_flattened_dfs(
 
 
 
-def merge_dataset_time_windows_df(
+def concat_dataset_time_windows_dfs(
         filepaths: List[str],
         modeling_config: Dict
     ) -> Dict[str, Tuple[pd.DataFrame, str]]:
@@ -243,7 +255,7 @@ def merge_dataset_time_windows_df(
 def join_dataset_all_windows_dfs(concatenated_dfs):
     """
     Merges the all-windows dataframes of each dataset together according to the fill method
-    specified in the model_config. The param is the format from tw.merge_dataset_time_windows_df().
+    specified in the model_config. The param is the format from tw.concat_dataset_time_windows_dfs().
 
     Params:
     - concatenated_dfs (Dict[str, Tuple[pd.DataFrame, str]]): A dictionary where keys are
@@ -319,7 +331,7 @@ def join_dataset_all_windows_dfs(concatenated_dfs):
 
 def extract_dataset_key_from_filepath(filepath, parent_directory):
     """
-    Helper function for merge_dataset_time_windows_df().
+    Helper function for concat_dataset_time_windows_dfs().
 
     Extracts the dataset key (e.g. 'time_series', 'wallet_cohorts', etc) from the
     flattened filepath.
@@ -404,7 +416,7 @@ def create_target_variables_for_all_time_windows(training_data_df, prices_df, co
 
     # Combine and set indices for results
     combined_target_variables = pd.concat(all_target_variables, ignore_index=True)
-    combined_target_variables = combined_target_variables.reset_index().set_index(['time_window','coin_id'])
+    combined_target_variables = combined_target_variables.reset_index(drop=True).set_index(['time_window','coin_id'])
 
     combined_returns = pd.concat(all_returns, ignore_index=False)
     combined_returns = combined_returns.reset_index().set_index(['time_window','coin_id'])

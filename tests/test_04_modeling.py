@@ -224,14 +224,14 @@ def test_custom_model_parameters(mock_open, mock_dump, sample_data, sample_model
     Ensures the model is trained with specified parameters.
     """
     X_train, y_train = sample_data
-    custom_params = {"n_estimators": 50, "random_state": 10}
+    custom_params = {"n_estimators": 50, "random_seed": 10}
     sample_modeling_config['modeling']['model_params'] = custom_params
 
     model, model_id = m.train_model(X_train, y_train, sample_modeling_config)
 
     # Assert the model is trained with custom parameters
     assert model.n_estimators == 50
-    assert model.random_state == 10
+    assert model.random_seed == 10
 
     # Assert model ID is generated
     assert isinstance(model_id, str)

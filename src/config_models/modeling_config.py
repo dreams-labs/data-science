@@ -19,12 +19,14 @@ class NoExtrasBaseModel(BaseModel):
 # ============================================================================
 #                   modeling_config.yaml Main Configuration
 # ============================================================================
+
 class ModelingConfig(NoExtrasBaseModel):
     """Top-level structure of the main modeling_config.yaml file."""
-    preprocessing: Optional['PreprocessingConfig'] = Field(default=None)
+    preprocessing: 'PreprocessingConfig' = Field(...)
     target_variables: 'TargetVariablesConfig'
     modeling: 'ModelingSettings'  # Modeling section is now its own object
-    evaluation: Optional['EvaluationConfig'] = Field(default=None)
+    evaluation: 'EvaluationConfig' = Field(...)
+
 
 # Preprocessing section
 # ---------------------
@@ -40,9 +42,20 @@ class FillMethod(str, Enum):
     EXTEND_TIME_WINDOWS = "extend_time_windows" # used for metadata series; copies coin features to all time windows
 
 class PreprocessingConfig(NoExtrasBaseModel):
-    """Configuration for preprocessing step."""
+    """
+    Configuration for preprocessing steps.
+    """
     drop_features: Optional[List[str]] = Field(default=None)
     fill_methods: Dict[str, 'FillMethod'] = Field(...)
+    data_partitioning: 'DataPartitioning'
+
+class DataPartitioning(NoExtrasBaseModel):
+    """
+    Defines the train/test/validation/future split shares
+    """
+    test_set_share: Annotated[float, Field(gt=0, lt=1)] = Field(...)
+    validation_set_share: Annotated[float, Field(gt=0, lt=1)] = Field(...)
+    future_set_time_windows: Annotated[int, Field(ge=0)] = Field(...)
 
 
 # Target Variables section
@@ -80,15 +93,13 @@ class ModelingSettings(NoExtrasBaseModel):
     target_column: TargetColumn = Field(default=TargetColumn.IS_MOON)
     modeling_folder: str = Field(default="../modeling")
     config_folder: str = Field(default="../config")
-    train_test_split: Annotated[float, Field(gt=0, lt=1)] = Field(default=0.25)
-    random_state: Annotated[int, Field(ge=0)] = Field(default=45)
+    random_seed: Annotated[int, Field(ge=0)] = Field(default=45)
     model_type: ModelType
     model_params: Optional['ModelParams'] = None
 
 class ModelParams(NoExtrasBaseModel):
     """Parameters for the model."""
-    n_estimators: Annotated[int, Field(ge=1)] = Field(default=100)
-    random_state: Annotated[int, Field(ge=0)] = Field(default=45)
+    n_estimators: Optional[Annotated[int, Field(ge=1)]] = Field(default=None)
 
 
 # Evaluation section

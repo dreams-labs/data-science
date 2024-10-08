@@ -4,10 +4,14 @@ preprocessing:
         wallet_cohorts: "fill_zeros"
         market_data: "drop_records"
         macro_trends: "extend_coin_ids"
+    data_partitioning:
+        test_set_share: 0.15  # Size of the test set as a proportion of the data
+        validation_set_share: 0.15  # Size of the validation set as a proportion of the data
+        future_set_time_windows: 0 # How many time windows should be the future_set, starting from the latest date
 
 target_variables:
     moon_threshold: 0.25  # Minimum price % increase for a coin to be is_moon
-    moon_minimum_percent: 0.05  # Minimum percentage of coins tagged as is_moon
+    moon_minimum_percent: 0.1  # Minimum percentage of coins tagged as is_moon
       # If the % of coins that meet the moon_threshold is below this
       # value, additional coins are added in order of price performance
       # until this % is reached
@@ -30,8 +34,7 @@ modeling:
 
     modeling_folder: "..//modeling"  # location of the modeling folder where outputs will be saved
     config_folder: "..//config"  # location of the config folder where base case config files are
-    train_test_split: 0.25  # Size of the test set as a proportion of the data
-    random_state: 3  # Random seed for reproducibility
+    random_seed: 38  # Random seed for reproducibility
 
 evaluation:
     winsorization_cutoff: 0.01

@@ -2,7 +2,6 @@
 functions used to build coin-level features from training data
 """
 # pylint: disable=C0103 # X_train violates camelcase
-
 import os
 import json
 import uuid
@@ -10,7 +9,6 @@ import joblib
 import pandas as pd
 import numpy as np
 import dreams_core.core as dc
-from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingRegressor
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.metrics import roc_auc_score, confusion_matrix, log_loss
@@ -22,83 +20,6 @@ from utils import timing_decorator  # pylint: disable=E0401 # can't find utils i
 
 # set up logger at the module level
 logger = dc.setup_logger()
-
-
-def split_model_input(model_input_df, target_column, test_size=0.2, random_state=42):
-    """
-    Splits the input DataFrame into training and test sets, separating features and target.
-
-    Args:
-    - model_input_df (pd.DataFrame): The full input DataFrame containing features and target.
-    - target_column (str): The name of the target variable.
-    - test_size (float): The proportion of data to include in the test set.
-    - random_state (int): Random state for reproducibility.
-
-    Returns:
-    - X_train (pd.DataFrame): Training features with 'coin_id' as the index.
-    - X_test (pd.DataFrame): Test features with 'coin_id' as the index.
-    - y_train (pd.Series): Training target with 'coin_id' as the index.
-    - y_test (pd.Series): Test target with 'coin_id' as the index.
-
-    Raises:
-    - ValueError: If the 'coin_id' column is not present in the DataFrame.
-    - ValueError: If features contain missing values.
-    - ValueError: If the target column contains missing values.
-    - ValueError: If the dataset is too small to perform a meaningful split.
-    - ValueError: If the target is heavily imbalanced (over 95% in one class).
-    - ValueError: If any features are non-numeric and require encoding.
-    - ValueError: If y_train or y_test contains only one unique class, which is unsuitable for
-        model training.
-    """
-    # Check for 'coin_id' column
-    if 'coin_id' not in model_input_df.columns:
-        raise ValueError("'coin_id' column is required in the DataFrame.")
-
-    # Separate the features and the target
-    # Set 'coin_id' as index for X
-    X = model_input_df.drop(columns=[target_column]).set_index('coin_id')
-    # Extract target as Series, it will retain the index from model_input_df
-    y = model_input_df[target_column]
-
-    # Check for missing values in features or target
-    if X.isnull().values.any():
-        raise ValueError("Features contain missing values. Please handle missing data \
-                         before splitting.")
-    if y.isnull().values.any():
-        raise ValueError("Target column contains missing values. Please handle missing \
-                         data before splitting.")
-
-    # Check if dataset is too small
-    if len(X) < 10:
-        raise ValueError("Dataset is too small to perform a meaningful split. Need at \
-                         least 10 data points.")
-
-    # Check for imbalanced target (for classification problems)
-    if y.value_counts(normalize=True).max() > 0.95:
-        raise ValueError("Target is heavily imbalanced. Consider rebalancing or using \
-                         specialized techniques.")
-
-    # Check for non-numeric features
-    if not all(np.issubdtype(dtype, np.number) for dtype in X.dtypes):
-        raise ValueError("Features contain non-numeric data. Consider encoding categorical \
-                         features.")
-
-    # Split into train and test sets
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=random_state
-    )
-
-    # Log the size and number of positives for y_train and y_test
-    logger.info("y_train: %d/%d positives, y_test: %d/%d positives",
-                y_train.sum(), len(y_train), y_test.sum(), len(y_test))
-
-    # Check if y_train or y_test contains only one unique value
-    if len(np.unique(y_train)) <= 1 or len(np.unique(y_test)) <= 1:
-        raise ValueError("y_train or y_test contains only one class, which is not suitable \
-                         for model training.")
-
-    return X_train, X_test, y_train, y_test
-
 
 
 @timing_decorator
@@ -123,7 +44,7 @@ def train_model(X_train, y_train, modeling_config):
     # Initialize model with default params if none provided
     model_params = modeling_config["modeling"].get("model_params", None)
     if model_params is None:
-        model_params = {"n_estimators": 100, "random_state": 42}
+        model_params = {"n_estimators": 100, "random_seed": 42}
 
     # Initialize the model
     model_type = modeling_config["modeling"]["model_type"]

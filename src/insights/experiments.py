@@ -393,7 +393,7 @@ def generate_experiment_configurations(config_folder, method='grid', max_evals=5
         configurations = list(ParameterSampler(
                             param_grid,
                             n_iter=max_evals,
-                            random_state=random.randint(1, 100)))
+                            random_seed=random.randint(1, 100)))
     else:
         raise ValueError(f"Invalid method: {method}. Must be 'grid' or 'random'.")
 
