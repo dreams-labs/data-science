@@ -501,11 +501,11 @@ def test_rsi_scenario1(sample_timeseries_rsi1):
     result = ind.calculate_rsi(sample_timeseries_rsi1, 3)
 
     # First, check NaN values are in the expected positions
-    assert np.isnan(result.values[:2]).all(), "Expected NaN in the first two positions"
+    assert np.isnan(result[:2]).all(), "Expected NaN in the first two positions"
 
     # Then, compare the non-NaN values separately
-    assert np.allclose(result.values[2:], [1.0, 0.8333, 0.6, 0.6, 0.8], atol=1e-4), \
-        f"Expected {expected_rsi.values}, but got {result.values}"
+    assert np.allclose(result[2:], [1.0, 0.8333, 0.6, 0.6, 0.8], atol=1e-4), \
+        f"Expected {expected_rsi.values}, but got {result}"
 
 # -------------------------------------------- #
 # calculate_mfi() unit tests

@@ -279,8 +279,8 @@ def calculate_rsi(timeseries: pd.Series, window: int = 14) -> pd.Series:
     gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
 
-    rs = np.where(loss != 0, gain / loss, 100)
-    rsi = 1 - (1 / (1 + rs))
+    rs = np.where(loss != 0, gain / loss, np.inf)
+    rsi = np.where(loss == 0, 1, 1 - (1 / (1 + rs)))
     return rsi
 
 

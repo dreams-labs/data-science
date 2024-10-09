@@ -15,100 +15,6 @@ logger = dc.setup_logger()
 
 
 
-def perform_train_test_validation_future_splits(training_data_df, target_variable_df, modeling_config):
-    """
-    Prepares the final model input DataFrame by merging the training data with the target variables
-    on the multiindex (coin_id, time_window) and selects the specified target column. Checks for
-    data quality issues such as missing columns, duplicate index entries, and missing target variables.
-
-    Parameters:
-    - training_data_df: DataFrame with model training features and multiindex (time_window, coin_id).
-    - target_variable_df: DataFrame containing target variables with multiindex (coin_id, time_window).
-    - target_column: The name of the target variable to train on (e.g., 'is_moon' or 'is_crater').
-
-    Returns:
-    - sets_X_y_dict (dict[pd.DataFrame, pd.Series]): Dict with keys for each set type (e.g. train_set,
-        future_set, etc) that contains the X and y data for the set.
-    """
-
-    # 1. Data Quality Checks
-    # ----------------------
-    # Set type to object now that there's only one row per coin_id
-    target_variable_df = target_variable_df.reset_index()
-    target_variable_df['coin_id'] = target_variable_df['coin_id'].astype('object')
-    target_variable_df = target_variable_df.set_index(['time_window', 'coin_id'])
-
-    original_row_count = len(training_data_df)
-    perform_model_input_data_quality_checks(training_data_df, target_variable_df, modeling_config)
-
-    # 2. Train Test Split
-    # -------------------
-    data_partitioning_config = modeling_config['preprocessing']['data_partitioning']
-    np.random.seed(modeling_config['modeling']['random_seed'])
-
-    # Split future set if specified
-    X_future, y_future, temp_training_data_df, temp_target_variable_df = split_future_set(
-        training_data_df,
-        target_variable_df,
-        data_partitioning_config)
-
-    # Split validation set
-    X_validation, y_validation, temp_training_data_df, temp_target_variable_df = split_validation_set(
-        temp_training_data_df,
-        temp_target_variable_df,
-        data_partitioning_config,
-        training_data_df)
-
-    # Split train and test sets
-    X_train, X_test, y_train, y_test = split_train_test_sets(
-        temp_training_data_df,
-        temp_target_variable_df,
-        data_partitioning_config,
-        training_data_df,
-    )
-
-    # Create the result dictionary
-    sets_X_y_dict = {
-        'train_set': (X_train, y_train),
-        'test_set': (X_test, y_test),
-        'validation_set': (X_validation, y_validation),
-        'future_set': (X_future, y_future)
-    }
-
-    # 3. Logs and additional data quality checks
-    # ------------------------------------------
-
-    # Prepare log message
-    target_column = modeling_config['modeling']['target_column']
-    unique_values = target_variable_df[target_column].unique()
-    is_binary = len(unique_values) == 2 and set(unique_values).issubset({0, 1})
-
-    log_message = "Data Partitioning Results:\n"
-    total_partitioned_rows = 0
-    for set_name, (X, y) in sets_X_y_dict.items():
-        row_count = len(X)
-        total_partitioned_rows += row_count
-        log_message += f"- {set_name}: {row_count} rows"
-        if is_binary:
-
-            positive_count = (y[target_column] == 1).sum()
-            total_count = len(y)
-            percentage = (positive_count / total_count) * 100 if total_count > 0 else 0
-            log_message += f", Positive samples: {positive_count} ({percentage:.2f}%)"
-        log_message += "\n"
-
-    # Check if total rows in all sets equals original row count
-    if total_partitioned_rows != original_row_count:
-        raise ValueError(f"Data partitioning error: Total rows in all sets ({total_partitioned_rows}) "
-                            f"does not match original row count ({original_row_count})")
-
-    # Log the consolidated message
-    logger.info(log_message)
-
-    return sets_X_y_dict
-
-
-
 def split_future_set(training_data_df, target_variable_df, data_partitioning_config):
     """
     Splits off the future set from the full training_data_df by assigning it the latest
@@ -296,3 +202,95 @@ def perform_model_input_data_quality_checks(training_data_df, target_variable_df
     if not all(np.issubdtype(dtype, np.number) for dtype in training_data_df.dtypes):
         raise ValueError("Features contain non-numeric data. Consider encoding categorical features.")
 
+
+
+def perform_train_test_validation_future_splits(training_data_df, target_variable_df, modeling_config):
+    """
+    Prepares the final model input DataFrame by merging the training data with the target variables
+    on the multiindex (coin_id, time_window) and selects the specified target column. Checks for
+    data quality issues such as missing columns, duplicate index entries, and missing target variables.
+
+    Parameters:
+    - training_data_df: DataFrame with model training features and multiindex (time_window, coin_id).
+    - target_variable_df: DataFrame containing target variables with multiindex (coin_id, time_window).
+    - target_column: The name of the target variable to train on (e.g., 'is_moon' or 'is_crater').
+
+    Returns:
+    - sets_X_y_dict (dict[pd.DataFrame, pd.Series]): Dict with keys for each set type (e.g. train_set,
+        future_set, etc) that contains the X and y data for the set.
+    """
+
+    # 1. Data Quality Checks
+    # ----------------------
+    # Set type to object now that there's only one row per coin_id
+    target_variable_df = target_variable_df.reset_index()
+    target_variable_df['coin_id'] = target_variable_df['coin_id'].astype('object')
+    target_variable_df = target_variable_df.set_index(['time_window', 'coin_id'])
+
+    original_row_count = len(training_data_df)
+    perform_model_input_data_quality_checks(training_data_df, target_variable_df, modeling_config)
+
+    # 2. Train Test Split
+    # -------------------
+    data_partitioning_config = modeling_config['preprocessing']['data_partitioning']
+    np.random.seed(modeling_config['modeling']['random_seed'])
+
+    # Split future set if specified
+    X_future, y_future, temp_training_data_df, temp_target_variable_df = split_future_set(
+        training_data_df,
+        target_variable_df,
+        data_partitioning_config)
+
+    # Split validation set
+    X_validation, y_validation, temp_training_data_df, temp_target_variable_df = split_validation_set(
+        temp_training_data_df,
+        temp_target_variable_df,
+        data_partitioning_config,
+        training_data_df)
+
+    # Split train and test sets
+    X_train, X_test, y_train, y_test = split_train_test_sets(
+        temp_training_data_df,
+        temp_target_variable_df,
+        data_partitioning_config,
+        training_data_df,
+    )
+
+    # Create the result dictionary
+    sets_X_y_dict = {
+        'train_set': (X_train, y_train),
+        'test_set': (X_test, y_test),
+        'validation_set': (X_validation, y_validation),
+        'future_set': (X_future, y_future)
+    }
+
+    # 3. Logs and additional data quality checks
+    # ------------------------------------------
+    # Prepare log message
+    target_column = modeling_config['modeling']['target_column']
+    unique_values = target_variable_df[target_column].unique()
+    is_binary = len(unique_values) == 2 and set(unique_values).issubset({0, 1})
+
+    log_message = "Data Partitioning Results:\n"
+    total_partitioned_rows = 0
+    for set_name, (X, y) in sets_X_y_dict.items():
+        row_count = len(X)
+        total_partitioned_rows += row_count
+        log_message += f"- {set_name}: {row_count} rows"
+        if is_binary:
+
+            positive_count = (y[target_column] == 1).sum()
+            total_count = len(y)
+            percentage = (positive_count / total_count) * 100 if total_count > 0 else 0
+            log_message += f", Positive samples: {positive_count} ({percentage:.2f}%)"
+        log_message += "\n"
+
+    # Check if total rows in all sets equals original row count
+    if total_partitioned_rows != original_row_count:
+        raise ValueError(f"Data partitioning error: Total rows in all sets ({total_partitioned_rows}) "
+                            f"does not match original row count ({original_row_count})")
+
+    # Log the consolidated message
+    logger.info(log_message)
+
+    return sets_X_y_dict

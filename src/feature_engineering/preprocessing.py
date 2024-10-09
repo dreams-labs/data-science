@@ -1,11 +1,12 @@
 """
 functions used to build coin-level features from training data
 """
-from typing import Dict, Any
+from typing import Dict, List, Any
 import pandas as pd
 import numpy as np
 import dreams_core.core as dc
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.preprocessing import OneHotEncoder
 
 
 # pylint: disable=C0103  # X_train doesn't conform to snake case
@@ -15,236 +16,328 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 logger = dc.setup_logger()
 
 
-
-
-
-
-def preprocess_coin_df(df, config, modeling_config):
+class DataPreprocessor:
     """
-    Preprocess the flattened coin DataFrame by applying feature selection based on the modeling
-    and dataset-specific configs, and optional scaling based on the metrics config.
+    Object to apply scaling to the X features for all split sets using the scaling outcomes
+    from the training set. This is important to ensure an accurate assessment of how well the
+    model generalizes to the test/validation/future sets based on only the training data.
 
-    Params:
-    - input_path (str): Path to the flattened CSV file.
-    - modeling_config (dict): Configuration with modeling-specific parameters.
-    - dataset_config (dict): Dataset-specific configuration (e.g., sharks, coin_metadata).
-    - df_metrics_config (dict, optional): Configuration for scaling metrics, can be None if scaling
-        is not required.
-
-    Returns:
-    - df (pd.DataFrame): The preprocessed DataFrame.
-    - output_path (str): The full path to the saved preprocessed CSV file.
+    The preprocessing methods are called in sequence through self.preprocessing_steps.
     """
-    # Confirm there are no null values
-    if df.isnull().values.any():
-        raise ValueError("Missing values detected in the DataFrame.")
+    def __init__(self, config, metrics_config, modeling_config):
+        # Configuration
+        self.config = config
+        self.modeling_config = modeling_config
 
-    # 1. Column Formatting
-    # --------------------
-    # Convert all columns to numeric
-    df = preprocess_categorical_and_boolean(df)
+        # Scaling
+        self.scaler = ScalingProcessor(metrics_config)
 
-    # 2. Feature Selection
-    # --------------------
-    # Drop features specified in modeling_config['drop_features']
-    drop_features = modeling_config['preprocessing'].get('drop_features', [])
-    if drop_features:
-        df = df.drop(columns=drop_features, errors='warn')
+        # Mapping and encoders
+        self.prefix_mapping = self._create_prefix_mapping()
+        self.categorical_encoders: Dict[str, OneHotEncoder] = {}
+        self.categorical_columns: List[str] = []
 
-    # Apply feature selection based on sameness_threshold from dataset_config
-    df = check_sameness_and_drop_columns(df, config)
+        # Preprocessing state
+        self.columns_to_drop: List[str] = []
 
-    # 3: Scaling and Transformation
-    # ----------------------------------------------------
-    # Apply scaling if df_metrics_config is provided
-    # if df_metrics_config:
-    #     df = apply_scaling(df, df_metrics_config)
+        # Define preprocessing pipeline
+        self.preprocessing_steps = [
+            self._preprocess_categorical_and_boolean,
+            self._drop_features_config,
+            self._drop_same_columns,
+            self._apply_scaling
+        ]
+
+    # -------------------------------------------------------------- #
+    # Configuration and Mapping Methods
+    # -------------------------------------------------------------- #
+
+    def _create_prefix_mapping(self) -> Dict[str, Dict[str, float]]:
+        """
+        Create a mapping of column prefixes to their config paths and sameness thresholds.
+
+        Parameters:
+        config (Dict[str, Any]): The configuration dictionary containing dataset information.
+
+        Returns:
+        Dict[str, Dict[str, float]]: A dictionary where keys are column prefixes and values are
+        dictionaries containing 'path' (str) and 'threshold' (float) for each prefix.
+        """
+        # Creates a mapping of which columns relate to which config keys
+        mapping = {}
+        for dataset_type, dataset_config in self.config['datasets'].items():
+            for category, category_config in dataset_config.items():
+                if isinstance(category_config, dict) and 'sameness_threshold' in category_config:
+                    prefix = f"{category}_"
+                    mapping[prefix] = {
+                        'path': f"datasets.{dataset_type}.{category}",
+                        'threshold': category_config['sameness_threshold']
+                    }
+                elif isinstance(category_config, dict):
+                    for subcategory, subcategory_config in category_config.items():
+                        if 'sameness_threshold' in subcategory_config:
+                            prefix = f"{subcategory}_"
+                            mapping[prefix] = {
+                                'path': f"datasets.{dataset_type}.{category}.{subcategory}",
+                                'threshold': subcategory_config['sameness_threshold']
+                            }
+        return mapping
 
 
-    # # Step 5: Save and Log Preprocessed Data
-    # # ----------------------------------------------------
-    # # Generate output path and filename based on input
-    # base_filename = os.path.basename(input_path).replace(".csv", "")
-    # output_filename = f"{base_filename}_preprocessed.csv"
-    # output_path = os.path.join(
-    #     os.path.dirname(input_path).replace("flattened_outputs", "preprocessed_outputs"),
-    #     output_filename
-    # )
+    # -------------------------------------------------------------- #
+    # Data Preprocessing Methods
+    # -------------------------------------------------------------- #
 
-    # # Save the preprocessed data
-    # df.to_csv(output_path, index=False)
+    def _preprocess_categorical_and_boolean(self, df: pd.DataFrame, is_train: bool = False) -> pd.DataFrame:
+        """
+        Preprocess categorical columns by one-hot encoding and convert booleans to integers.
+        Ensures consistency across all datasets by using the categories from the training set.
+        """
+        if is_train:
+            # Identify categorical columns
+            self.categorical_columns = df.select_dtypes(include=['object', 'category']).columns.tolist()
 
-    # # Log the changes made
-    # logger.debug("Preprocessed file saved at: %s", output_path)
+            # Initialize and fit OneHotEncoder for each categorical column
+            for col in self.categorical_columns:
+                num_categories = df[col].nunique()
+                if num_categories > 8:
+                    logger.warning("Warning: Column '%s' has %s categories, consider reducing categories.",
+                                   col, num_categories)
 
-    # return df, output_path
+                encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore', drop='first')
+                encoder.fit(df[[col]])
+                self.categorical_encoders[col] = encoder
+
+        # One-hot encode categorical columns
+        for col in self.categorical_columns:
+            encoder = self.categorical_encoders[col]
+            encoded_cols = encoder.transform(df[[col]])
+            encoded_df = pd.DataFrame(encoded_cols, columns=encoder.get_feature_names([col]))
+            df = pd.concat([df.drop(columns=[col]), encoded_df], axis=1)
+
+        # Convert boolean columns to integers
+        bool_columns = df.select_dtypes(include=['bool']).columns
+        for col in bool_columns:
+            df[col] = df[col].astype(int)
+
+        return df
+
+
+    def _apply_scaling(self, df: pd.DataFrame, is_train: bool = False) -> pd.DataFrame:
+        """Apply scaling with the ScalingProcessor class"""
+        return self.scaler.apply_scaling(df, is_train)
 
 
 
-def apply_scaling(df, df_metrics_config):
+    # -------------------------------------------------------------- #
+    # Feature Selection Methods
+    # -------------------------------------------------------------- #
+
+    def _drop_features_config(self, df: pd.DataFrame, is_train: bool = False) -> pd.DataFrame:
+        """Drop features specified in modeling_config."""
+        drop_features = self.modeling_config['preprocessing'].get('drop_features', [])
+        if drop_features:
+            df = df.drop(columns=drop_features, errors='ignore')
+
+            # If preprocessing the training set, log dropped columns
+            if is_train:
+                dropped = set(drop_features) & set(df.columns)
+                not_dropped = set(drop_features) - dropped
+                if dropped:
+                    logger.debug("Dropped specified features: %s", list(dropped))
+                if not_dropped:
+                    logger.warning("Some specified features were not found in the dataset: %s",
+                                   list(not_dropped))
+        return df
+
+    def _drop_same_columns(self, df: pd.DataFrame, is_train: bool = False) -> pd.DataFrame:
+        """
+        Drop columns based on sameness threshold of the training set.
+        """
+        # If preprocessing the training set, compile the list of columns to drop
+        if is_train:
+            self.columns_to_drop = []
+            for column in df.columns:
+                for prefix, config_info in self.prefix_mapping.items():
+                    if column.startswith(prefix):
+                        sameness = self._calculate_sameness_percentage(df[column])
+                        if sameness > config_info['threshold']:
+                            self.columns_to_drop.append(column)
+                        break
+
+        # For all dfs, drop the training set columns_to_drop
+        df = df.drop(columns=self.columns_to_drop)
+        return df
+
+    def _calculate_sameness_percentage(self, column: pd.Series) -> float:
+        """Calculate the percentage of the most common value in a column."""
+        return column.value_counts().iloc[0] / len(column)
+
+
+    # -------------------------------------------------------------------------
+    # Main Preprocessing Pipeline
+    # -------------------------------------------------------------------------
+
+    def preprocess(self, datasets: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
+        """
+        Preprocess all datasets consistently based on the training set.
+
+        This method applies all preprocessing steps in the order defined in self.preprocessing_steps.
+        It first processes the training set, learning any necessary parameters, and then
+        applies the same transformations to the test, validation, and future datasets.
+
+        Parameters:
+        datasets (Dict[str, pd.DataFrame]): A dictionary containing 'train', 'test', 'validation',
+                                            and 'future' DataFrames.
+
+        Returns:
+        Dict[str, pd.DataFrame]: A dictionary containing the preprocessed DataFrames.
+        """
+        preprocessed_datasets = {}
+
+        # Preprocess training set and learn parameters
+        if 'train' in datasets:
+            preprocessed_datasets['train'] = datasets['train']
+            for step in self.preprocessing_steps:
+                preprocessed_datasets['train'] = step(preprocessed_datasets['train'], is_train=True)
+
+        # Apply same preprocessing to all other datasets
+        for dataset_name, dataset in datasets.items():
+            if dataset_name != 'train':
+                preprocessed_datasets[dataset_name] = dataset
+                for step in self.preprocessing_steps:
+                    preprocessed_datasets[dataset_name] = step(preprocessed_datasets[dataset_name], is_train=False)
+
+        return preprocessed_datasets
+
+
+
+class ScalingProcessor:
     """
-    Apply scaling to the relevant columns in the DataFrame based on the metrics config.
+    Class to apply scaling to all columns as configured in the metrics_config.
 
-    Params:
-    - df (pd.DataFrame): The DataFrame to scale.
-    - df_metrics_config (dict): The input file's configuration with metrics and their scaling
-        methods, aggregations, etc.
+    High level sequence:
+    * Makes a mapping from column to the metrics_config using _create_column_scaling_map()
+    * For the training set, applies scaling and stores the scaler
+    * For other sets, retrieves the training set scaler and applies it
 
-    Returns:
-    - df (pd.DataFrame): The scaled DataFrame.
     """
-    scalers = {
-        "standard": StandardScaler(),
-        "minmax": MinMaxScaler()
-    }
+    def __init__(self, metrics_config: Dict[str, Any]):
+        self.metrics_config = metrics_config
+        self.column_scaling_map = self._create_column_scaling_map()
+        self.scalers = {}
 
-    # Loop through each metric and its settings in the df_metrics_config
-    for metric, settings in df_metrics_config.items():
+    def _create_column_scaling_map(self) -> Dict[str, str]:
+        """
+        Create a mapping between column names and their corresponding scaling methods.
 
-        # if there are no aggregations for the metric, continue
-        if 'aggregations' not in settings.keys():
-            continue
-        for agg, agg_settings in settings['aggregations'].items():
-            # Ensure agg_settings exists and is not None
-            if not agg_settings:
-                continue
+        This method recursively parses the metrics configuration to build a flat dictionary
+        where keys are column names and values are scaling methods.
 
-            column_name = f"{metric}_{agg}"
-            if column_name in df.columns:
-                scaling_method = agg_settings.get('scaling', None)
+        Returns:
+            Dict[str, str]: A dictionary mapping column names to scaling methods.
+        """
+        def recursive_parse(config: Dict[str, Any], prefix: str = '') -> Dict[str, str]:
+            """
+            Recursively parse the configuration to extract scaling methods for columns.
 
-                # Skip scaling if set to "none" or if no scaling is provided
-                if scaling_method is None or scaling_method == "none":
-                    continue
+            Args:
+                config (Dict[str, Any]): The configuration dictionary to parse.
+                prefix (str): The current prefix for column names.
 
-                if scaling_method == "log":
-                    # Apply log1p scaling (log(1 + x)) to avoid issues with zero values
-                    df[[column_name]] = np.log1p(df[[column_name]])
-                elif scaling_method in scalers:
-                    scaler = scalers[scaling_method]
-                    df[[column_name]] = scaler.fit_transform(df[[column_name]])
-                else:
-                    logger.info("Unknown scaling method %s for column %s",
-                                scaling_method, column_name)
+            Returns:
+                Dict[str, str]: A dictionary mapping column names to scaling methods.
+            """
+            mapping = {}
+            for key, value in config.items():
+                new_prefix = f"{prefix}_{key}" if prefix else key
 
-    return df
+                if isinstance(value, dict):
+                    # Direct scaling for the current level
+                    if 'scaling' in value:
+                        mapping[new_prefix] = value['scaling']
 
+                    # Handle aggregations
+                    if 'aggregations' in value:
+                        for agg_type, agg_config in value['aggregations'].items():
+                            if isinstance(agg_config, dict) and 'scaling' in agg_config:
+                                mapping[f"{new_prefix}_{agg_type}"] = agg_config['scaling']
 
-def preprocess_categorical_and_boolean(df):
-    """
-    Preprocess categorical columns by one-hot encoding and convert boolean columns to integers.
+                    # Handle comparisons
+                    if 'comparisons' in value:
+                        for comp_type, comp_config in value['comparisons'].items():
+                            if isinstance(comp_config, dict) and 'scaling' in comp_config:
+                                mapping[f"{new_prefix}_{comp_type}"] = comp_config['scaling']
 
-    Args:
-    df (pd.DataFrame): Input DataFrame
+                    # Handle rolling metrics
+                    if 'rolling' in value:
+                        rolling_config = value['rolling']
+                        if 'aggregations' in rolling_config:
+                            for agg_type, agg_config in rolling_config['aggregations'].items():
+                                if isinstance(agg_config, dict) and 'scaling' in agg_config:
+                                    # Note: Adjust this pattern if your column names differ
+                                    mapping[f"{new_prefix}_sum_{agg_type}"] = agg_config['scaling']
+                        if 'comparisons' in rolling_config:
+                            for comp_type, comp_config in rolling_config['comparisons'].items():
+                                if isinstance(comp_config, dict) and 'scaling' in comp_config:
+                                    mapping[f"{new_prefix}_{comp_type}"] = comp_config['scaling']
 
-    Returns:
-    pd.DataFrame: Processed DataFrame
-    """
-    categorical_columns = df.select_dtypes(include=['object', 'category']).columns
-    for col in categorical_columns:
-        num_categories = df[col].nunique()
-        if num_categories > 8:
-            logger.warning("Column '%s' has %s categories, consider reducing categories.",
-                           col, num_categories)
-        df = pd.get_dummies(df, columns=[col], drop_first=True)
+                    # Recursive call for nested structures
+                    mapping.update(recursive_parse(value, new_prefix))
 
-    # Convert boolean columns to integers
-    df = df.apply(lambda col: col.astype(int) if col.dtype == bool else col)
+                elif isinstance(value, list):
+                    for item in value:
+                        if isinstance(item, dict):
+                            mapping.update(recursive_parse(item, new_prefix))
 
-    return df
+            return mapping
 
+        return recursive_parse(self.metrics_config)
 
+    def apply_scaling(self, df: pd.DataFrame, is_train: bool = False) -> pd.DataFrame:
+        """
+        Apply scaling to the dataframe based on the column_scaling_map.
 
-def check_sameness_and_drop_columns(df: pd.DataFrame, config: Dict[str, Any]) -> pd.DataFrame:
-    """
-    Check column sameness and drop columns exceeding the threshold.
+        Args:
+            df (pd.DataFrame): The input dataframe to scale.
+            is_train (bool): Whether this is the training set (to fit scalers) or not.
 
-    This function analyzes each column in the DataFrame, calculates its sameness percentage,
-    and drops columns that exceed the threshold specified in the configuration.
+        Returns:
+            pd.DataFrame: The scaled dataframe.
+        """
+        scaled_df = df.copy()
+        for column in df.columns:
+            if column in self.column_scaling_map:
+                scaling_method = self.column_scaling_map[column]
+                if scaling_method != 'none':
+                    if is_train:
+                        scaler = self._get_scaler(scaling_method)
+                        scaled_values = scaler.fit_transform(df[[column]])
+                        self.scalers[column] = scaler
+                    else:
+                        scaler = self.scalers[column]
+                        scaled_values = scaler.transform(df[[column]])
+                    scaled_df[column] = scaled_values
+        return scaled_df
 
-    Parameters:
-    df (pd.DataFrame): The input DataFrame to process.
-    config (Dict[str, Any]): The configuration dictionary containing sameness thresholds.
+    def _get_scaler(self, scaling_method: str):
+        """
+        Get the appropriate scaler based on the scaling method.
 
-    Returns:
-    pd.DataFrame: A new DataFrame with columns dropped based on the sameness criteria.
+        Args:
+            scaling_method (str): The scaling method to use.
 
-    Raises:
-    ValueError: If any columns can't be mapped to a sameness threshold or if any config keys
-                can't be mapped to columns.
-    """
-    prefix_mapping = create_prefix_mapping(config)
-    columns_to_drop = []
-    unmapped_columns = []
-    used_config_keys = set()
+        Returns:
+            object: A scaler object or function.
 
-    for column in df.columns:
-        mapped = False
-        for prefix, config_info in prefix_mapping.items():
-            if column.startswith(prefix):
-                mapped = True
-                used_config_keys.add(prefix)
-                sameness = calculate_sameness_percentage(df[column])
-                if sameness > config_info['threshold']:
-                    columns_to_drop.append(column)
-                break
-        if not mapped:
-            unmapped_columns.append(column)
-
-    unused_config_keys = set(prefix_mapping.keys()) - used_config_keys
-
-    if unmapped_columns:
-        raise ValueError(f"The following columns could not be mapped to a sameness threshold: {unmapped_columns}")
-
-    if unused_config_keys:
-        raise ValueError(f"The following config keys could not be mapped to columns: {unused_config_keys}")
-
-    # Drop the columns
-    df.drop(columns=columns_to_drop)
-    logger.info("Dropped %s columns %s due to sameness thresholds.", len(columns_to_drop), columns_to_drop)
-
-    return df
-
-def calculate_sameness_percentage(column: pd.Series) -> float:
-    """
-    Calculate the percentage of the most common value in a column.
-
-    Parameters:
-    column (pd.Series): The column to analyze.
-
-    Returns:
-    float: The percentage (0 to 1) of the most common value in the column.
-    """
-    return column.value_counts().iloc[0] / len(column)
-
-def create_prefix_mapping(config: Dict[str, Any]) -> Dict[str, Dict[str, float]]:
-    """
-    Create a mapping of column prefixes to their config paths and sameness thresholds.
-
-    Parameters:
-    config (Dict[str, Any]): The configuration dictionary containing dataset information.
-
-    Returns:
-    Dict[str, Dict[str, float]]: A dictionary where keys are column prefixes and values are
-    dictionaries containing 'path' (str) and 'threshold' (float) for each prefix.
-    """
-    mapping = {}
-
-    for dataset_type, dataset_config in config['datasets'].items():
-        for category, category_config in dataset_config.items():
-            if isinstance(category_config, dict) and 'sameness_threshold' in category_config:
-                prefix = f"{category}_"
-                mapping[prefix] = {
-                    'path': f"datasets.{dataset_type}.{category}",
-                    'threshold': category_config['sameness_threshold']
-                }
-            elif isinstance(category_config, dict):
-                for subcategory, subcategory_config in category_config.items():
-                    if 'sameness_threshold' in subcategory_config:
-                        prefix = f"{subcategory}_"
-                        mapping[prefix] = {
-                            'path': f"datasets.{dataset_type}.{category}.{subcategory}",
-                            'threshold': subcategory_config['sameness_threshold']
-                        }
-
-    return mapping
+        Raises:
+            ValueError: If an unknown scaling method is provided.
+        """
+        if scaling_method == 'standard':
+            return StandardScaler()
+        elif scaling_method == 'minmax':
+            return MinMaxScaler()
+        elif scaling_method == 'log':
+            return lambda x: np.log1p(x)
+        else:
+            raise ValueError(f"Unknown scaling method: {scaling_method}")
