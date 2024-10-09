@@ -235,4 +235,4 @@ def test_calculate_coin_returns_multiple_datapoints(multiple_datapoints_prices_d
 
     assert (np.isclose(returns_df['returns'].values,
                        expected_returns['returns'].values,
-                       rtol=1e-4,pytestatol=1e-4)).all()
+                       rtol=1e-4,atol=1e-4)).all()

@@ -20,8 +20,6 @@ import dreams_core.core as dc
 import training_data.data_retrieval as dr
 import coin_wallet_metrics.indicators as ind
 import feature_engineering.feature_generation as fg
-import feature_engineering.data_splitting as ds
-import feature_engineering.target_variables as tv
 import insights.experiments as exp
 
 # set up logger at the module level
@@ -44,10 +42,8 @@ def generate_all_time_windows_model_inputs(config,metrics_config,modeling_config
     - config, metrics_config, modeling_config: loaded config yaml files
 
     Returns:
-    - sets_X_y_dict (dict[pd.DataFrame, pd.Series]): Dict with keys for each set type (e.g. train_set,
-        future_set, etc) that contains the X and y data for the set.
-    - returns_df (pd.DataFrame): DataFrame with MultiIndex on time_window,coin_id that contains a
-        'returns' column showing actual returns during the each time_window's modeling period.
+    - training_data_df (pd.DataFrame): DataFrame with MultiIndex on time_window,coin_id that contains
+        columns for all configured features for all datasets in all time windows.
     - join_logs_df (pd.DataFrame): DataFrame showing the outcomes of each dataset's join and fill
         methods
     """
@@ -94,18 +90,7 @@ def generate_all_time_windows_model_inputs(config,metrics_config,modeling_config
     concatenated_dfs = concat_dataset_time_windows_dfs(all_flattened_filepaths,modeling_config)
     training_data_df, join_logs_df = join_dataset_all_windows_dfs(concatenated_dfs)
 
-    # Create target variables for all time windows
-    target_variable_df, returns_df, = create_target_variables_for_all_time_windows(training_data_df,
-                                                                                        prices_df,
-                                                                                        config,
-                                                                                        modeling_config)
-
-    # Split target variables into the train/test/validation/future sets
-    sets_X_y_dict = ds.perform_train_test_validation_future_splits(training_data_df,
-                                                                    target_variable_df,
-                                                                    modeling_config)
-
-    return sets_X_y_dict, returns_df, join_logs_df
+    return training_data_df, join_logs_df
 
 
 
@@ -443,61 +428,3 @@ def extract_dataset_key_from_filepath(filepath, parent_directory):
         return dataset_key
     else:
         raise ValueError(f"Could not parse dataset of file {filepath}")
-
-
-
-def create_target_variables_for_all_time_windows(training_data_df, prices_df, config, modeling_config):
-    """
-    Create target variables for all time windows in training_data_df.
-
-    Parameters:
-    - training_data_df: DataFrame with multi-index (time_window, coin_id) and 'modeling_period_end' column
-    - prices_df: DataFrame with 'coin_id', 'date', and 'price' columns
-    - config: config.yaml
-    - modeling_config: modeling_config.yaml
-
-    Returns:
-    - combined_target_variables: DataFrame with columns for 'time_window' and the configured
-        target variable
-    - combined_returns: DataFrame with columns 'returns' and 'time_window'
-    """
-    all_target_variables = []
-    all_returns = []
-
-    for time_window in training_data_df.index.get_level_values('time_window').unique():
-        # Get the list of coin_ids for the current time_window
-        current_coins = training_data_df.loc[time_window].index.get_level_values('coin_id').tolist()
-
-        # Filter prices_df for the current coins
-        current_prices_df = prices_df[prices_df['coin_id'].isin(current_coins)]
-
-        # Create copy of config with time_window's modeling period dates
-        current_training_data_config = config['training_data'].copy()
-        current_training_data_config['modeling_period_start'] = time_window
-        current_training_data_config['modeling_period_end'] = (
-                pd.to_datetime(time_window) + timedelta(days=current_training_data_config['modeling_period_duration'])
-                ).strftime('%Y-%m-%d')
-
-        # Call create_target_variables function
-        target_variables_df, returns_df = tv.create_target_variables(
-            current_prices_df,
-            current_training_data_config,
-            modeling_config
-        )
-
-        # Add time_window information to the results
-        target_variables_df['time_window'] = time_window
-        returns_df['time_window'] = time_window
-
-        # Store results
-        all_target_variables.append(target_variables_df)
-        all_returns.append(returns_df)
-
-    # Combine and set indices for results
-    combined_target_variables = pd.concat(all_target_variables, ignore_index=True)
-    combined_target_variables = combined_target_variables.reset_index(drop=True).set_index(['time_window','coin_id'])
-
-    combined_returns = pd.concat(all_returns, ignore_index=False)
-    combined_returns = combined_returns.reset_index().set_index(['time_window','coin_id'])
-
-    return combined_target_variables, combined_returns

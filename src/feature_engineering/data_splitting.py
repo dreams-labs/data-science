@@ -1,6 +1,7 @@
 """
 functions used to build coin-level features from training data
 """
+from typing import Any,Dict,Tuple
 import pandas as pd
 import numpy as np
 import dreams_core.core as dc
@@ -204,7 +205,11 @@ def perform_model_input_data_quality_checks(training_data_df, target_variable_df
 
 
 
-def perform_train_test_validation_future_splits(training_data_df, target_variable_df, modeling_config):
+def perform_train_test_validation_future_splits(
+    training_data_df: pd.DataFrame,
+    target_variable_df: pd.DataFrame,
+    modeling_config: Dict[str, Any]
+) -> Dict[str, Tuple[pd.DataFrame, pd.Series]]:
     """
     Prepares the final model input DataFrame by merging the training data with the target variables
     on the multiindex (coin_id, time_window) and selects the specified target column. Checks for
@@ -213,22 +218,25 @@ def perform_train_test_validation_future_splits(training_data_df, target_variabl
     Parameters:
     - training_data_df: DataFrame with model training features and multiindex (time_window, coin_id).
     - target_variable_df: DataFrame containing target variables with multiindex (coin_id, time_window).
-    - target_column: The name of the target variable to train on (e.g., 'is_moon' or 'is_crater').
+    - modeling_config: Dictionary containing modeling configuration.
 
     Returns:
-    - sets_X_y_dict (dict[pd.DataFrame, pd.Series]): Dict with keys for each set type (e.g. train_set,
-        future_set, etc) that contains the X and y data for the set.
+    - sets_X_y_dict (Dict[str, Tuple[pd.DataFrame, pd.Series]]): Dict with keys for each set type
+      (e.g., 'train_set', 'test_set') that contains the X and y data for the set.
+      Empty sets are not included in the dictionary.
     """
 
     # 1. Data Quality Checks
     # ----------------------
-    # Set type to object now that there's only one row per coin_id
+    # Reset index and ensure 'coin_id' is of type object
     target_variable_df = target_variable_df.reset_index()
     target_variable_df['coin_id'] = target_variable_df['coin_id'].astype('object')
     target_variable_df = target_variable_df.set_index(['time_window', 'coin_id'])
 
     original_row_count = len(training_data_df)
-    perform_model_input_data_quality_checks(training_data_df, target_variable_df, modeling_config)
+    perform_model_input_data_quality_checks(
+        training_data_df, target_variable_df, modeling_config
+    )
 
     # 2. Train Test Split
     # -------------------
@@ -239,14 +247,16 @@ def perform_train_test_validation_future_splits(training_data_df, target_variabl
     X_future, y_future, temp_training_data_df, temp_target_variable_df = split_future_set(
         training_data_df,
         target_variable_df,
-        data_partitioning_config)
+        data_partitioning_config
+    )
 
     # Split validation set
     X_validation, y_validation, temp_training_data_df, temp_target_variable_df = split_validation_set(
         temp_training_data_df,
         temp_target_variable_df,
         data_partitioning_config,
-        training_data_df)
+        training_data_df
+    )
 
     # Split train and test sets
     X_train, X_test, y_train, y_test = split_train_test_sets(
@@ -256,41 +266,56 @@ def perform_train_test_validation_future_splits(training_data_df, target_variabl
         training_data_df,
     )
 
-    # Create the result dictionary
-    sets_X_y_dict = {
-        'train_set': (X_train, y_train),
-        'test_set': (X_test, y_test),
-        'validation_set': (X_validation, y_validation),
-        'future_set': (X_future, y_future)
+    # 3. Prepare sets_X_y_dict excluding empty sets
+    # ---------------------------------------------
+    # Initialize the result dictionary
+    sets_X_y_dict = {}
+    # Initialize log message
+    log_message = "Data Partitioning Results:\n"
+    total_partitioned_rows = 0
+
+    # List of sets to process
+    sets_info = {
+        'train': (X_train, y_train),
+        'test': (X_test, y_test),
+        'validation': (X_validation, y_validation),
+        'future': (X_future, y_future)
     }
 
-    # 3. Logs and additional data quality checks
-    # ------------------------------------------
-    # Prepare log message
+    # Get target column and check if it's binary
     target_column = modeling_config['modeling']['target_column']
     unique_values = target_variable_df[target_column].unique()
     is_binary = len(unique_values) == 2 and set(unique_values).issubset({0, 1})
 
-    log_message = "Data Partitioning Results:\n"
-    total_partitioned_rows = 0
-    for set_name, (X, y) in sets_X_y_dict.items():
-        row_count = len(X)
+    for set_name, (X_set, y_set) in sets_info.items():
+        row_count = len(X_set)
         total_partitioned_rows += row_count
-        log_message += f"- {set_name}: {row_count} rows"
-        if is_binary:
+        if row_count == 0:
+            # Log that the set has 0 records allocated
+            logger.warning("Set '%s' has 0 records allocated and will be excluded.", set_name)
+        else:
+            # Include the set in the dictionary
+            sets_X_y_dict[set_name] = (X_set, y_set)
+            # Prepare log message
+            log_message += f"- {set_name}: {row_count} rows"
+            if is_binary:
+                positive_count = (y_set[target_column] == 1).sum()
+                total_count = len(y_set)
+                percentage = (positive_count / total_count) * 100 if total_count > 0 else 0
+                log_message += f", Positive samples: {positive_count} ({percentage:.2f}%)"
+            log_message += "\n"
 
-            positive_count = (y[target_column] == 1).sum()
-            total_count = len(y)
-            percentage = (positive_count / total_count) * 100 if total_count > 0 else 0
-            log_message += f", Positive samples: {positive_count} ({percentage:.2f}%)"
-        log_message += "\n"
-
+    # 4. Data Quality Check
+    # ---------------------
     # Check if total rows in all sets equals original row count
     if total_partitioned_rows != original_row_count:
-        raise ValueError(f"Data partitioning error: Total rows in all sets ({total_partitioned_rows}) "
-                            f"does not match original row count ({original_row_count})")
+        raise ValueError(
+            f"Data partitioning error: Total rows in all sets ({total_partitioned_rows}) "
+            f"does not match original row count ({original_row_count})"
+        )
 
-    # Log the consolidated message
+    # 5. Log the Data Partitioning Results
+    # ------------------------------------
     logger.info(log_message)
 
     return sets_X_y_dict

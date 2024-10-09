@@ -801,6 +801,15 @@ def profits_df(prices_df,cleaned_profits_df):
     """
     profits_df, _ = cleaned_profits_df
 
+    # 2. Filtering based on dataset overlap
+    # -------------------------------------
+    # Filter market_data to only coins with transfers data if configured to
+    if config['data_cleaning']['exclude_coins_without_transfers']:
+        prices_df = prices_df[prices_df['coin_id'].isin(profits_df['coin_id'])]
+
+    # Filter profits_df to remove records for any coins that were removed in data cleaning
+    profits_df = profits_df[profits_df['coin_id'].isin(prices_df['coin_id'])]
+
     # impute period boundary dates
     dates_to_impute = [
         TRAINING_PERIOD_END,

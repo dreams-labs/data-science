@@ -1,6 +1,7 @@
 """
 functions used to build coin-level features from training data
 """
+from datetime import timedelta
 import pandas as pd
 import dreams_core.core as dc
 
@@ -135,3 +136,61 @@ def calculate_mooncrater_targets(returns_df, modeling_config):
         raise KeyError("Cannot run calculate_mooncrater_targets() if target column is not 'is_moon' or 'is_crater'.")
 
     return target_column_df
+
+
+
+def create_target_variables_for_all_time_windows(training_data_df, prices_df, config, modeling_config):
+    """
+    Create target variables for all time windows in training_data_df.
+
+    Parameters:
+    - training_data_df: DataFrame with multi-index (time_window, coin_id) and 'modeling_period_end' column
+    - prices_df: DataFrame with 'coin_id', 'date', and 'price' columns
+    - config: config.yaml
+    - modeling_config: modeling_config.yaml
+
+    Returns:
+    - combined_target_variables: DataFrame with columns for 'time_window' and the configured
+        target variable
+    - combined_returns: DataFrame with columns 'returns' and 'time_window'
+    """
+    all_target_variables = []
+    all_returns = []
+
+    for time_window in training_data_df.index.get_level_values('time_window').unique():
+        # Get the list of coin_ids for the current time_window
+        current_coins = training_data_df.loc[time_window].index.get_level_values('coin_id').tolist()
+
+        # Filter prices_df for the current coins
+        current_prices_df = prices_df[prices_df['coin_id'].isin(current_coins)]
+
+        # Create copy of config with time_window's modeling period dates
+        current_training_data_config = config['training_data'].copy()
+        current_training_data_config['modeling_period_start'] = time_window
+        current_training_data_config['modeling_period_end'] = (
+                pd.to_datetime(time_window) + timedelta(days=current_training_data_config['modeling_period_duration'])
+                ).strftime('%Y-%m-%d')
+
+        # Call create_target_variables function
+        target_variables_df, returns_df = create_target_variables(
+            current_prices_df,
+            current_training_data_config,
+            modeling_config
+        )
+
+        # Add time_window information to the results
+        target_variables_df['time_window'] = time_window
+        returns_df['time_window'] = time_window
+
+        # Store results
+        all_target_variables.append(target_variables_df)
+        all_returns.append(returns_df)
+
+    # Combine and set indices for results
+    combined_target_variables = pd.concat(all_target_variables, ignore_index=True)
+    combined_target_variables = combined_target_variables.reset_index(drop=True).set_index(['time_window','coin_id'])
+
+    combined_returns = pd.concat(all_returns, ignore_index=False)
+    combined_returns = combined_returns.reset_index().set_index(['time_window','coin_id'])
+
+    return combined_target_variables, combined_returns

@@ -1,6 +1,5 @@
 preprocessing:
     drop_features:  # List of features to drop from the dataset before modeling
-    - "whales_total_bought_sum_10d_period_3"
     fill_methods:
         wallet_cohorts: "fill_zeros"
         time_series: "drop_records"
