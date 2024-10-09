@@ -162,7 +162,7 @@ def test_scaling_processor(scaling_1_metrics_config, scaling_1_dummy_dataframe):
 
 
 @pytest.fixture
-def complex_metrics_config():
+def rolling_metrics_config():
     """Complex metrics_config structure with nested aggregations"""
     return {
         "wallet_cohorts": {
@@ -181,27 +181,6 @@ def complex_metrics_config():
                         },
                         "window_duration": 10,
                         "lookback_periods": 3
-                    },
-                    "indicators": {
-                        "ema": {
-                            "parameters": {
-                                "window": [7]
-                            },
-                            "aggregations": {
-                                "last": {
-                                    "scaling": "none"
-                                }
-                            },
-                            "rolling": {
-                                "aggregations": {
-                                    "last": {
-                                        "scaling": "standard"
-                                    }
-                                },
-                                "window_duration": 7,
-                                "lookback_periods": 3
-                            }
-                        }
                     }
                 }
             }

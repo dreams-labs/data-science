@@ -264,14 +264,14 @@ class ScalingProcessor:
                             elif isinstance(agg_config, str):
                                 # If agg_config is directly a scaling method
                                 mapping[f"{new_prefix}_{agg_type}"] = agg_config
-                        continue  # Skip further recursion for 'aggregations'
+                        # Do not recurse into 'aggregations'
 
                     # Handle comparisons
                     if 'comparisons' in value:
                         for comp_type, comp_config in value['comparisons'].items():
                             if isinstance(comp_config, dict) and 'scaling' in comp_config:
                                 mapping[f"{new_prefix}_{comp_type}"] = comp_config['scaling']
-                        continue  # Skip further recursion for 'comparisons'
+                        # Do not recurse into 'comparisons'
 
                     # Handle rolling metrics
                     if 'rolling' in value:
@@ -288,10 +288,13 @@ class ScalingProcessor:
                                     mapping[f"{new_prefix}_{comp_type}_"
                                             f"{rolling_config['window_duration']}d_period_"
                                             f"{rolling_config['lookback_periods']}"] = comp_config['scaling']
-                        continue  # Skip further recursion for 'rolling'
+                        # Do not recurse into 'rolling'
 
+                    # Exclude 'aggregations', 'comparisons', 'rolling', and 'scaling' keys from recursion
+                    keys_to_exclude = {'aggregations', 'comparisons', 'rolling', 'scaling'}
+                    sub_config = {k: v for k, v in value.items() if k not in keys_to_exclude}
                     # Recursive call for nested structures
-                    mapping.update(recursive_parse(value, new_prefix))
+                    mapping.update(recursive_parse(sub_config, new_prefix))
 
                 elif isinstance(value, list):
                     for item in value:
@@ -299,6 +302,7 @@ class ScalingProcessor:
                             mapping.update(recursive_parse(item, new_prefix))
 
             return mapping
+
 
         return recursive_parse(self.metrics_config)
 
