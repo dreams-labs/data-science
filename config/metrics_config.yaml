@@ -10,6 +10,33 @@
 # lookback_periods:
 #     - Defines how many periods to look back when calculating rolling stats (e.g., 8 means calculate rolling stats over 8 previous periods)
 
+
+# Time series keyed on coin_id-date
+time_series:
+    market_data:
+        price:
+            indicators:
+                ema:
+                    parameters:
+                        window: [5]
+                    rolling:
+                        aggregations:
+                            last:
+                                scaling: "none"
+                        window_duration: 7
+                        lookback_periods: 4
+        volume:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 7
+                lookback_periods: 4
+        market_cap:
+            aggregations:
+                last:
+                    scaling: "log"
+
 # Keyed on coin_id-date
 wallet_cohorts:
     whales:
@@ -36,44 +63,6 @@ wallet_cohorts:
                                 scaling: "standard"
                         window_duration: 7
                         lookback_periods: 3
-
-# Time series keyed on coin_id-date
-time_series:
-    market_data:
-        price:
-            aggregations:
-                std:
-                    scaling: "none"
-        volume:
-            aggregations:
-                sum:
-                    scaling: "standard"
-                std:
-                    scaling: "none"
-        market_cap:
-            aggregations:
-                last:
-                    scaling: "log"
-            indicators:
-                ema:
-                    parameters:
-                        window: [3,14]
-                    aggregations:
-                        last:
-                            scaling: "log"
-                    rolling:
-                        aggregations:
-                            sum:
-                                scaling: "log"
-                        window_duration: 10
-                        lookback_periods: 2
-                rsi:
-                    parameters:
-                        window: [14]
-                    aggregations:
-                        last:
-                            scaling: "none"
-
         # buyers_new:
         #     aggregations:
         #         sum:

@@ -1,6 +1,8 @@
 """
 functions used to build coin-level features from training data
 """
+import os
+from datetime import datetime
 from typing import Dict, List, Any, Tuple
 import itertools
 import pandas as pd
@@ -438,6 +440,41 @@ class ScalingProcessor:
             raise ValueError(f"Unknown scaling method: {scaling_method}")
 
 
+def save_preprocessed_output(set_key, preprocessed_X, y_data, config, modeling_config):
+    """
+    Saves the preprocessed DataFrame with descriptive metrics into a CSV file.
+
+    Params:
+    - set_key (str): The name of set (e.g. 'train', 'test', etc)
+    - preprocessed_X (pd.DataFrame): DataFrame with MultiIndex on time_window,period containing all
+        features for the set
+    - y_data (pd.DataFrame): DataFrame with MultiIndex on time_window,period containing target
+        variables for the set
+    - config (dict): config.yaml
+    - modeling_config (dict): modeling_config.yaml
+
+    Returns:
+    none
+    """
+
+    # Define filename with metric description and optional description
+    model_period = config['training_data']['modeling_period_start']
+    windows = config['training_data']['additional_windows']
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M')
+    filename = f"preprocessed_X_{set_key}_{timestamp}_model_period_{model_period}_{windows}_windows.csv"
+
+    # Join X and y
+    preprocessed_df = preprocessed_X.join(y_data)
+
+    # Save file
+    output_dir = os.path.join(modeling_config['modeling']['modeling_folder'],
+                            'outputs/preprocessed_outputs')
+    output_path = os.path.join(output_dir, filename)
+    preprocessed_df.to_csv(output_path, index=False)
+
+    logger.debug("Saved preprocessed outputs to %s", output_path)
+
+
 
 def preprocess_sets_X_y(
     sets_X_y_dict: Dict[str, Tuple[pd.DataFrame, pd.Series]],
@@ -489,7 +526,11 @@ def preprocess_sets_X_y(
     for set_key, preprocessed_X in preprocessed_X_datasets.items():
         # Get the original y_data
         _, y_data = sets_X_y_dict[set_key]
+
         # Update the 'X' data with preprocessed 'X'
         preprocessed_sets_X_y_dict[set_key] = (preprocessed_X, y_data)
+
+        # Save the final data in the preprocessed_outputs folder
+        save_preprocessed_output(set_key, preprocessed_X, y_data, config, modeling_config)
 
     return preprocessed_sets_X_y_dict
