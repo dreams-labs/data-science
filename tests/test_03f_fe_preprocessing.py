@@ -458,3 +458,152 @@ def test_scaling_processor_with_indicators(indicators_metrics_config, dummy_indi
             "expected min-max scaled values."
         )
     )
+
+@pytest.fixture
+def complex_metrics_config():
+    """
+    Fixture providing a complex metrics configuration incorporating all aggregation types.
+    """
+    return {
+        'wallet_cohorts': {
+            'whales': {
+                'total_volume': {
+                    'aggregations': {
+                        'last': {
+                            'scaling': 'log'
+                        }
+                    },
+                    'rolling': {
+                        'aggregations': {
+                            'mean': {
+                                'scaling': 'log'
+                            }
+                        },
+                        'window_duration': 10,
+                        'lookback_periods': 3
+                    },
+                    'indicators': {
+                        'ema': {
+                            'parameters': {
+                                'window': [3, 14]
+                            },
+                            'aggregations': {
+                                'last': {
+                                    'scaling': 'none'
+                                }
+                            },
+                            'rolling': {
+                                'aggregations': {
+                                    'last': {
+                                        'scaling': 'standard'
+                                    }
+                                },
+                                'window_duration': 7,
+                                'lookback_periods': 3
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+@pytest.fixture
+def dummy_complex_dataframe():
+    """
+    Fixture providing a dummy dataframe with sample data for complex metrics configurations.
+    """
+    index = pd.MultiIndex.from_product(
+        [
+            pd.to_datetime(['2023-01-01', '2023-01-02']),
+            ['bitcoin', 'ethereum']
+        ],
+        names=['time_window', 'coin_id']
+    )
+    data = {
+        'wallet_cohorts_whales_total_volume_last': [1000, 2000, 3000, 4000],
+        'wallet_cohorts_whales_total_volume_mean_10d_period_1': [500, 600, 700, 800],
+        'wallet_cohorts_whales_total_volume_mean_10d_period_2': [400, 500, 600, 700],
+        'wallet_cohorts_whales_total_volume_mean_10d_period_3': [300, 400, 500, 600],
+        'wallet_cohorts_whales_total_volume_ema_3_last': [1100, 2100, 3100, 4100],
+        'wallet_cohorts_whales_total_volume_ema_3_last_7d_period_1': [1050, 2050, 3050, 4050],
+        'wallet_cohorts_whales_total_volume_ema_3_last_7d_period_2': [1000, 2000, 3000, 4000],
+        'wallet_cohorts_whales_total_volume_ema_3_last_7d_period_3': [950, 1950, 2950, 3950],
+        'wallet_cohorts_whales_total_volume_ema_14_last': [1200, 2200, 3200, 4200],
+        'wallet_cohorts_whales_total_volume_ema_14_last_7d_period_1': [1150, 2150, 3150, 4150],
+        'wallet_cohorts_whales_total_volume_ema_14_last_7d_period_2': [1100, 2100, 3100, 4100],
+        'wallet_cohorts_whales_total_volume_ema_14_last_7d_period_3': [1050, 2050, 3050, 4050],
+    }
+    df = pd.DataFrame(data, index=index)
+    return df
+
+@pytest.mark.unit
+def test_scaling_processor_with_complex_metrics(
+    complex_metrics_config, dummy_complex_dataframe
+):
+    """
+    Test the ScalingProcessor class with a complex metrics configuration incorporating
+    all aggregation types.
+    """
+    # Instantiate the ScalingProcessor with the provided complex_metrics_config
+    processor = prp.ScalingProcessor(complex_metrics_config)
+
+    # Expected column_scaling_map based on the complex_metrics_config
+    expected_column_scaling_map = {
+        'wallet_cohorts_whales_total_volume_last': 'log',
+        'wallet_cohorts_whales_total_volume_mean_10d_period_1': 'log',
+        'wallet_cohorts_whales_total_volume_mean_10d_period_2': 'log',
+        'wallet_cohorts_whales_total_volume_mean_10d_period_3': 'log',
+        'wallet_cohorts_whales_total_volume_ema_3_last': 'none',
+        'wallet_cohorts_whales_total_volume_ema_3_last_7d_period_1': 'standard',
+        'wallet_cohorts_whales_total_volume_ema_3_last_7d_period_2': 'standard',
+        'wallet_cohorts_whales_total_volume_ema_3_last_7d_period_3': 'standard',
+        'wallet_cohorts_whales_total_volume_ema_14_last': 'none',
+        'wallet_cohorts_whales_total_volume_ema_14_last_7d_period_1': 'standard',
+        'wallet_cohorts_whales_total_volume_ema_14_last_7d_period_2': 'standard',
+        'wallet_cohorts_whales_total_volume_ema_14_last_7d_period_3': 'standard',
+    }
+
+    # Assert that the column_scaling_map is as expected
+    assert processor.column_scaling_map == expected_column_scaling_map, (
+        "Column scaling map does not match expected mapping."
+    )
+
+    # Apply scaling to the dummy_complex_dataframe (as training data)
+    scaled_df = processor.apply_scaling(dummy_complex_dataframe, is_train=True)
+
+    # Prepare expected scaled values for each column
+    columns_to_test = expected_column_scaling_map.keys()
+
+    for column in columns_to_test:
+        scaling_method = expected_column_scaling_map[column]
+        original_values = dummy_complex_dataframe[column].values.reshape(-1, 1)
+
+        if scaling_method == 'log':
+            # Logical steps:
+            # - Original values: Retrieved from the dataframe
+            # - Apply np.log1p to handle zero values safely
+            expected_values = np.log1p(original_values).flatten()
+        elif scaling_method == 'standard':
+            # Logical steps:
+            # - Calculate mean and standard deviation of the values
+            mean = original_values.mean()
+            std = original_values.std()
+            # - Standardize the values using (value - mean) / std
+            expected_values = ((original_values - mean) / std).flatten()
+        elif scaling_method == 'none':
+            # Logical steps:
+            # - Values remain the same as original
+            expected_values = original_values.flatten()
+        else:
+            raise ValueError(f"Unknown scaling method: {scaling_method}")
+
+        # Compare the scaled values in scaled_df to the expected values
+        np.testing.assert_allclose(
+            scaled_df[column].values,
+            expected_values,
+            atol=1e-4,
+            err_msg=(
+                f"Scaled values for '{column}' do not match expected values with scaling '{scaling_method}'."
+            )
+        )

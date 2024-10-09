@@ -369,12 +369,22 @@ class ScalingProcessor:
                         mapping.update(self._parse_aggregations(
                             indicator_config['aggregations'], full_indicator_prefix
                         ))
+
+                    # Handle rolling within the indicator
+                    if 'rolling' in indicator_config:
+                        mapping.update(self._parse_rolling(
+                            indicator_config['rolling'], full_indicator_prefix
+                        ))
             else:
                 # No parameters, directly process aggregations
                 full_indicator_prefix = indicator_prefix
                 if 'aggregations' in indicator_config:
                     mapping.update(self._parse_aggregations(
                         indicator_config['aggregations'], full_indicator_prefix
+                    ))
+                if 'rolling' in indicator_config:
+                    mapping.update(self._parse_rolling(
+                        indicator_config['rolling'], full_indicator_prefix
                     ))
         return mapping
 
