@@ -211,6 +211,10 @@ class DataPreprocessor:
         return preprocessed_datasets
 
 
+import pdb
+
+
+
 
 class ScalingProcessor:
     """
@@ -262,12 +266,17 @@ class ScalingProcessor:
                         for agg_type, agg_config in value['aggregations'].items():
                             if isinstance(agg_config, dict) and 'scaling' in agg_config:
                                 mapping[f"{new_prefix}_{agg_type}"] = agg_config['scaling']
+                            elif isinstance(agg_config, str):
+                                # If agg_config is directly a scaling method
+                                mapping[f"{new_prefix}_{agg_type}"] = agg_config
+                        continue  # Skip further recursion for 'aggregations'
 
                     # Handle comparisons
                     if 'comparisons' in value:
                         for comp_type, comp_config in value['comparisons'].items():
                             if isinstance(comp_config, dict) and 'scaling' in comp_config:
                                 mapping[f"{new_prefix}_{comp_type}"] = comp_config['scaling']
+                        continue  # Skip further recursion for 'comparisons'
 
                     # Handle rolling metrics
                     if 'rolling' in value:
@@ -275,12 +284,12 @@ class ScalingProcessor:
                         if 'aggregations' in rolling_config:
                             for agg_type, agg_config in rolling_config['aggregations'].items():
                                 if isinstance(agg_config, dict) and 'scaling' in agg_config:
-                                    # Note: Adjust this pattern if your column names differ
-                                    mapping[f"{new_prefix}_sum_{agg_type}"] = agg_config['scaling']
+                                    mapping[f"{new_prefix}_rolling_{agg_type}"] = agg_config['scaling']
                         if 'comparisons' in rolling_config:
                             for comp_type, comp_config in rolling_config['comparisons'].items():
                                 if isinstance(comp_config, dict) and 'scaling' in comp_config:
-                                    mapping[f"{new_prefix}_{comp_type}"] = comp_config['scaling']
+                                    mapping[f"{new_prefix}_rolling_{comp_type}"] = comp_config['scaling']
+                        continue  # Skip further recursion for 'rolling'
 
                     # Recursive call for nested structures
                     mapping.update(recursive_parse(value, new_prefix))
@@ -293,6 +302,8 @@ class ScalingProcessor:
             return mapping
 
         return recursive_parse(self.metrics_config)
+
+
 
     def apply_scaling(self, df: pd.DataFrame, is_train: bool = False) -> pd.DataFrame:
         """
@@ -310,13 +321,16 @@ class ScalingProcessor:
             if column in self.column_scaling_map:
                 scaling_method = self.column_scaling_map[column]
                 if scaling_method != 'none':
-                    if is_train:
-                        scaler = self._get_scaler(scaling_method)
-                        scaled_values = scaler.fit_transform(df[[column]])
-                        self.scalers[column] = scaler
+                    scaler = self._get_scaler(scaling_method)
+                    if scaling_method == 'log':
+                        scaled_values = scaler(df[[column]])
                     else:
-                        scaler = self.scalers[column]
-                        scaled_values = scaler.transform(df[[column]])
+                        if is_train:
+                            scaled_values = scaler.fit_transform(df[[column]])
+                            self.scalers[column] = scaler
+                        else:
+                            scaler = self.scalers[column]
+                            scaled_values = scaler.transform(df[[column]])
                     scaled_df[column] = scaled_values
         return scaled_df
 
@@ -338,6 +352,6 @@ class ScalingProcessor:
         elif scaling_method == 'minmax':
             return MinMaxScaler()
         elif scaling_method == 'log':
-            return lambda x: np.log1p(x)
+            return lambda x: np.log1p(x.values)
         else:
             raise ValueError(f"Unknown scaling method: {scaling_method}")

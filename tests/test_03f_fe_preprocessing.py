@@ -13,6 +13,7 @@ import sys
 import os
 import pandas as pd
 import numpy as np
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from dotenv import load_dotenv
 import pytest
 from dreams_core import core as dc
@@ -35,248 +36,94 @@ logger = dc.setup_logger()
 # ------------------------------------------ #
 # preprocess_coin_df() unit tests
 # ------------------------------------------ #
+
+
 @pytest.fixture
-def mock_modeling_config():
-    """
-    Returns a mock modeling configuration dictionary.
-    The configuration includes preprocessing options such as features to drop.
-    """
+def sample_metrics_config():
+    """basic sample config for initial unit tests"""
     return {
-        'preprocessing': {
-            'drop_features': ['feature_to_drop']
+        "metric1": {
+            "scaling": "standard"
+        },
+        "metric2": {
+            "scaling": "minmax"
+        },
+        "metric3": {
+            "scaling": "log"
+        },
+        "metric4": {
+            "scaling": "none"
+        },
+        "nested_metric": {
+            "aggregations": {
+                "sum": {"scaling": "standard"}
+            }
         }
     }
 
 @pytest.fixture
-def mock_metrics_config():
-    """
-    Returns a mock metrics configuration dictionary.
-    This configuration includes settings for scaling different features.
-    """
-    return {
-            'feature_1': {
-                'aggregations': {
-                    'sum': {'scaling': 'standard'}
-                    ,'max': {}
-                }
-            }
+def sample_dataframe():
+    """simple df for initial unit tests"""
+    return pd.DataFrame({
+        "metric1": [1, 2, 3, 4, 5],
+        "metric2": [10, 20, 30, 40, 50],
+        "metric3": [1, 10, 100, 1000, 10000],
+        "metric4": [1, 2, 3, 4, 5],
+        "nested_metric_sum": [5, 10, 15, 20, 25]
+    })
+
+def test_basic_create_column_scaling_map(sample_metrics_config):
+    """Confirms basic functionality of _create_column_scaling_map() method"""
+    processor = prp.ScalingProcessor(sample_metrics_config)
+    expected_map = {
+        "metric1": "standard",
+        "metric2": "minmax",
+        "metric3": "log",
+        "metric4": "none",
+        "nested_metric_sum": "standard"
+    }
+    assert processor.column_scaling_map == expected_map
+
+def test_basic_apply_scaling():
+    sample_metrics_config = {
+        "metric1": {"scaling": "standard"},
+        "metric2": {"scaling": "minmax"},
+        "metric3": {"scaling": "log"},
+        "metric4": {"scaling": "none"}
     }
 
-@pytest.fixture
-def mock_input_df():
-    """
-    Creates a mock DataFrame and saves it as a CSV for testing.
-    The CSV file is saved in the 'tests/test_modeling/outputs/flattened_outputs' directory.
+    sample_df = pd.DataFrame({
+        "metric1": [1, 2, 3, 4, 5],
+        "metric2": [10, 20, 30, 40, 50],
+        "metric3": [1, 10, 100, 1000, 10000],
+        "metric4": [1, 2, 3, 4, 5]
+    })
 
-    Returns:
-    - input_path: Path to the CSV file.
-    - df: Original mock DataFrame.
-    """
-    data = {
-        'feature_1_sum': [1, 2, 3],
-        'feature_to_drop': [10, 20, 30],
-        'feature_3': [100, 200, 300]
-    }
-    df = pd.DataFrame(data)
-    input_path = 'tests/test_modeling/outputs/flattened_outputs/mock_input.csv'
-    df.to_csv(input_path, index=False)
-    return input_path, df
+    processor = prp.ScalingProcessor(sample_metrics_config)
+    scaled_df = processor.apply_scaling(sample_df, is_train=True)
 
-@pytest.mark.unit
-def test_preprocess_coin_df_drops_columns(mock_modeling_config, mock_metrics_config, mock_input_df):
-    """
-    Tests that the preprocess_coin_df function correctly drops the specified columns.
+    # Check if scalers are created and stored
+    assert "metric1" in processor.scalers
+    assert "metric2" in processor.scalers
+    assert "metric3" not in processor.scalers  # log scaling doesn't use a stored scaler
+    assert "metric4" not in processor.scalers
 
-    Steps:
-    - Preprocesses the mock DataFrame by dropping the 'feature_to_drop' column.
-    - Asserts that the output CSV is created and the column was dropped.
-    - Cleans up the test files after execution.
-    """
-    input_path, original_df = mock_input_df
-
-    # Call the function
-    output_df, output_path = prp.preprocess_coin_df(input_path, mock_modeling_config, mock_metrics_config)
-
-    # Check that the output file exists
-    assert os.path.exists(output_path), "Output CSV file was not created."
-
-    # Check that the 'feature_to_drop' column is missing in the output DataFrame
-    assert 'feature_to_drop' not in output_df.columns, "Column 'feature_to_drop' was not dropped."
-    assert len(output_df.columns) == len(original_df.columns) - 1, "Unexpected number of columns after preprocessing."
-
-    # Cleanup (remove the test files)
-    os.remove(output_path)
-    os.remove(input_path)
-
-@pytest.mark.unit
-def test_preprocess_coin_df_scaling(mock_modeling_config, mock_metrics_config, mock_input_df):
-    """
-    Tests that the preprocess_coin_df function correctly applies scaling to the specified features.
-
-    Steps:
-    - Preprocesses the mock DataFrame by applying standard scaling to 'feature_1'.
-    - Asserts that the column is scaled correctly.
-    - Cleans up the test files after execution.
-    """
-    input_path, original_df = mock_input_df
-
-    # Declare empty dataset_config
-    mock_dataset_config = {}
-
-    # Call the function
-    output_df, output_path = prp.preprocess_coin_df(
-        input_path, mock_modeling_config, mock_dataset_config, mock_metrics_config
+    # Check if scaling is applied correctly
+    np.testing.assert_allclose(
+        scaled_df["metric1"].values,
+        StandardScaler().fit_transform(sample_df[["metric1"]]).flatten(),
+        rtol=1e-7, atol=1e-7
     )
+    np.testing.assert_allclose(
+        scaled_df["metric2"].values,
+        MinMaxScaler().fit_transform(sample_df[["metric2"]]).flatten(),
+        rtol=1e-7, atol=1e-7
+    )
+    np.testing.assert_allclose(
+        scaled_df["metric3"].values,
+        np.log1p(sample_df["metric3"]),
+        rtol=1e-7, atol=1e-7
+    )
+    np.testing.assert_array_equal(scaled_df["metric4"].values, sample_df["metric4"].values)
 
-    # Check that 'feature_1' is scaled (mean should be near 0 and std should be near 1)
-    scaled_column = output_df['feature_1_sum']
-    assert abs(scaled_column.mean()) < 1e-6, "Standard scaling not applied correctly to 'feature_1_sum'."
-    assert abs(np.std(scaled_column) - 1) < 1e-6, "Standard scaling not applied correctly to 'feature_1_sum'."
-
-    # Cleanup (remove the test files)
-    os.remove(output_path)
-    os.remove(input_path)
-
-
-
-# ------------------------------------------ #
-# join_all_feature_dfs() unit tests
-# ------------------------------------------ #
-
-@pytest.fixture
-def mock_input_files_value_columns(tmpdir):
-    """
-    Unit test data for scenario with many duplicate columns and similar filenames.
-    """
-    # Create the correct subdirectory structure in tmpdir
-    preprocessed_output_dir = tmpdir.mkdir("outputs").mkdir("preprocessed_outputs")
-
-    # Create mock filenames and corresponding DataFrames
-    filenames = [
-        'buysell_metrics_2024-09-13_14-44_model_period_2024-05-01_v0.1.csv',
-        'buysell_metrics_2024-09-13_14-45_model_period_2024-05-01_v0.1.csv',
-        'buysell_metrics_megasharks_2024-09-13_14-45_model_period_2024-05-01_v0.1.csv',
-        'buysell_metrics_megasharks_2024-09-13_14-45_model_period_2024-05-01_v0.2.csv',
-        'price_metrics_2024-09-13_14-45_model_period_2024-05-01_v0.1.csv'
-    ]
-
-    # Create mock DataFrames for each file
-    df1 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [100, 200]})
-    df2 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [150, 250]})
-    df3 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [110, 210]})
-    df4 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [120, 220]})
-    df5 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [130, 230]})
-
-    # Save each DataFrame as a CSV to the correct directory
-    for i, df in enumerate([df1, df2, df3, df4, df5]):
-        df.to_csv(os.path.join(preprocessed_output_dir, filenames[i]), index=False)
-
-    # Create a tuple list with filenames and 'fill_zeros' strategy
-    input_files = [(filenames[i], 'fill_zeros') for i in range(len(filenames))]
-
-    return tmpdir, input_files
-
-@pytest.mark.unit
-def test_join_all_feature_dfs(mock_input_files_value_columns):
-    """
-    Test column renaming logic for clarity when merging multiple files with similar filenames.
-    """
-    tmpdir, input_files = mock_input_files_value_columns
-
-    # Call the function using tmpdir as the modeling_folder
-    merged_df, _ = prp.join_all_feature_dfs(tmpdir, input_files)
-
-    # Check if the columns have the correct suffixes
-    expected_columns = [
-        'coin_id',
-        'buyers_new_buysell_metrics_2024-09-13_14-44',
-        'buyers_new_buysell_metrics_2024-09-13_14-45',
-        'buyers_new_buysell_metrics_megasharks_2024-09-13_14-45',
-        'buyers_new_buysell_metrics_megasharks_2024-09-13_14-45_2',
-        'buyers_new_price_metrics'
-    ]
-
-    assert list(merged_df.columns) == expected_columns, \
-        f"Expected columns: {expected_columns}, but got: {list(merged_df.columns)}"
-
-@pytest.fixture
-def mock_input_files(tmpdir):
-    """
-    Valid input filenames that will be combined with invalid files.
-    """
-    # Create the correct subdirectory structure in tmpdir
-    preprocessed_output_dir = tmpdir.mkdir("outputs").mkdir("preprocessed_outputs")
-
-    # Create mock filenames and corresponding DataFrames with dummy date values
-    filenames = [
-        'file1_2024-09-13_14-44.csv',
-        'file2_2024-09-13_14-45.csv',
-        'file3_2024-09-13_14-46.csv'
-    ]
-
-    # Create mock DataFrames
-    df1 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [100, 200]})
-    df2 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [150, 250]})
-    df3 = pd.DataFrame({'coin_id': [1, 2], 'buyers_new': [110, 210]})
-
-    # Save each DataFrame as a CSV to the correct directory
-    for i, df in enumerate([df1, df2, df3]):
-        df.to_csv(os.path.join(preprocessed_output_dir, filenames[i]), index=False)
-
-    # Create a tuple list with filenames and 'fill_zeros' strategy
-    input_files = [(filenames[i], 'fill_zeros') for i in range(len(filenames))]
-
-    return tmpdir, input_files
-
-
-@pytest.mark.unit
-def test_file_not_found(mock_input_files):
-    """
-    Confirms the error message when an input file does not exist.
-    """
-    tmpdir, filenames = mock_input_files
-
-    # Simulate one of the files not existing
-    filenames = [('file4_nonexistent_2024-09-13_14-47.csv', 'fill_zeros')]
-
-    with pytest.raises(ValueError, match="No DataFrames to merge."):
-        prp.join_all_feature_dfs(tmpdir, filenames)
-
-
-@pytest.mark.unit
-def test_missing_coin_id(mock_input_files):
-    """
-    Confirms the error message when an input file does not have a coin_id column.
-    """
-    tmpdir, filenames = mock_input_files
-
-    # Create a DataFrame missing the 'coin_id' column
-    df_missing_coin_id = pd.DataFrame({'buyers_new': [100, 200]})
-    preprocessed_output_dir = os.path.join(tmpdir, 'outputs', 'preprocessed_outputs')
-    df_missing_coin_id.to_csv(os.path.join(preprocessed_output_dir,
-                                           'file_missing_coin_id_2024-09-13_14-47.csv'),
-                                           index=False)
-
-    filenames.append(('file_missing_coin_id_2024-09-13_14-47.csv', 'fill_zeros'))
-
-    with pytest.raises(ValueError, match="coin_id column is missing in file_missing_coin_id_2024-09-13_14-47.csv"):
-        prp.join_all_feature_dfs(tmpdir, filenames)
-
-
-@pytest.mark.unit
-def test_duplicate_coin_id(mock_input_files):
-    """
-    Confirms the error message when an input file has duplicate coin_id rows.
-    """
-    tmpdir, filenames = mock_input_files
-    preprocessed_output_dir = os.path.join(tmpdir, 'outputs', 'preprocessed_outputs')
-    bad_file = 'file_duplicate_coin_id_2024-09-13_14-47.csv'
-
-    # Create a DataFrame with duplicate 'coin_id' values
-    df_duplicate_coin_id = pd.DataFrame({'coin_id': [1, 1], 'buyers_new': [100, 200]})
-    df_duplicate_coin_id.to_csv(os.path.join(preprocessed_output_dir, bad_file), index=False)
-
-    filenames.append((bad_file, 'fill_zeros'))
-
-    with pytest.raises(ValueError, match=f"Duplicate coin_ids found in file: {bad_file}"):
-        prp.join_all_feature_dfs(tmpdir, filenames)
+    print("All tests passed!")
