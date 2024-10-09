@@ -12,12 +12,18 @@
 
 # Keyed on coin_id-date
 wallet_cohorts:
-
     whales:
         buyers_new:
             aggregations:
                 sum:
-                    scaling: "log"        # Scaling applied to sums, which can vary significantly in range.
+                    scaling: "standard"        # Scaling applied to sums, which can vary significantly in range.
+            indicators:
+                rsi:
+                    parameters:
+                        window: [14,60]
+                    aggregations:
+                        last:
+                            scaling: "minmax"
             rolling:
                 aggregations:
                     sum:
@@ -34,13 +40,6 @@ wallet_cohorts:
             #             scaling: "log"
             #     window_duration: 10
             #     lookback_periods: 3
-            indicators:
-                rsi:
-                    parameters:
-                        window: [14]
-                    aggregations:
-                        last:
-                            scaling: "none"
         total_volume:
             aggregations:
                 last:
@@ -117,13 +116,13 @@ time_series:
             aggregations:
                 last:
                     scaling: "log"
-            # indicators:
-            #     ema:
-            #         parameters:
-            #             window: [3,14]
-            #         aggregations:
-            #             last:
-            #                 scaling: "log"
+            indicators:
+                ema:
+                    parameters:
+                        window: [3,14]
+                    aggregations:
+                        last:
+                            scaling: "log"
             #         rolling:
             #             aggregations:
             #                 sum:

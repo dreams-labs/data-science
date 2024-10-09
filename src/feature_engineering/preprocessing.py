@@ -279,18 +279,20 @@ class ScalingProcessor:
                         if 'aggregations' in rolling_config:
                             for agg_type, agg_config in rolling_config['aggregations'].items():
                                 if isinstance(agg_config, dict) and 'scaling' in agg_config:
-                                    mapping[f"{new_prefix}_{agg_type}_"
-                                            f"{rolling_config['window_duration']}d_period_"
-                                            f"{rolling_config['lookback_periods']}"] = agg_config['scaling']
+                                    # Iterate over each period
+                                    for period in range(1, rolling_config['lookback_periods'] + 1):
+                                        mapping[f"{new_prefix}_{agg_type}_"
+                                                f"{rolling_config['window_duration']}d_period_{period}"] = agg_config['scaling']
                         if 'comparisons' in rolling_config:
                             for comp_type, comp_config in rolling_config['comparisons'].items():
                                 if isinstance(comp_config, dict) and 'scaling' in comp_config:
-                                    mapping[f"{new_prefix}_{comp_type}_"
-                                            f"{rolling_config['window_duration']}d_period_"
-                                            f"{rolling_config['lookback_periods']}"] = comp_config['scaling']
+                                    # Iterate over each period
+                                    for period in range(1, rolling_config['lookback_periods'] + 1):
+                                        mapping[f"{new_prefix}_{comp_type}_"
+                                                f"{rolling_config['window_duration']}d_period_{period}"] = comp_config['scaling']
                         # Do not recurse into 'rolling'
 
-                    # Exclude 'aggregations', 'comparisons', 'rolling', and 'scaling' keys from recursion
+                    # Exclude specific keys from recursion
                     keys_to_exclude = {'aggregations', 'comparisons', 'rolling', 'scaling'}
                     sub_config = {k: v for k, v in value.items() if k not in keys_to_exclude}
                     # Recursive call for nested structures
@@ -302,7 +304,6 @@ class ScalingProcessor:
                             mapping.update(recursive_parse(item, new_prefix))
 
             return mapping
-
 
         return recursive_parse(self.metrics_config)
 

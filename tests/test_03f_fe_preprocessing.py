@@ -186,3 +186,153 @@ def rolling_metrics_config():
             }
         }
     }
+
+@pytest.fixture
+def rolling_metrics_config():
+    """Fixture providing a complex metrics configuration with rolling metrics."""
+    return {
+        "wallet_cohorts": {
+            "whales": {
+                "total_volume": {
+                    "aggregations": {
+                        "last": {
+                            "scaling": "log"
+                        }
+                    },
+                    "rolling": {
+                        "aggregations": {
+                            "mean": {
+                                "scaling": "log"
+                            }
+                        },
+                        "window_duration": 10,
+                        "lookback_periods": 3
+                    }
+                }
+            }
+        }
+    }
+
+@pytest.fixture
+def dummy_rolling_dataframe():
+    """
+    Fixture providing a dummy dataframe with a MultiIndex and sample data for rolling metrics.
+    """
+    index = pd.MultiIndex.from_product(
+        [
+            pd.to_datetime(['2023-01-01', '2023-01-02']),
+            ['bitcoin', 'ethereum']
+        ],
+        names=['time_window', 'coin_id']
+    )
+    data = {
+        'wallet_cohorts_whales_total_volume_last': [1000, 2000, 3000, 4000],
+        'wallet_cohorts_whales_total_volume_mean_10d_period_1': [500, 600, 700, 800],
+        'wallet_cohorts_whales_total_volume_mean_10d_period_2': [400, 500, 600, 700],
+        'wallet_cohorts_whales_total_volume_mean_10d_period_3': [300, 400, 500, 600],
+    }
+    df = pd.DataFrame(data, index=index)
+    return df
+
+@pytest.mark.unit
+def test_scaling_processor_with_rolling_metrics(rolling_metrics_config, dummy_rolling_dataframe):
+    """
+    Test the ScalingProcessor class for correct column mapping and scaling application with rolling metrics.
+    """
+    # Instantiate the ScalingProcessor with the provided rolling_metrics_config
+    processor = prp.ScalingProcessor(rolling_metrics_config)
+
+    # Expected column_scaling_map based on the rolling_metrics_config
+    expected_column_scaling_map = {
+        'wallet_cohorts_whales_total_volume_last': 'log',
+        'wallet_cohorts_whales_total_volume_mean_10d_period_1': 'log',
+        'wallet_cohorts_whales_total_volume_mean_10d_period_2': 'log',
+        'wallet_cohorts_whales_total_volume_mean_10d_period_3': 'log',
+    }
+
+    # Assert that the column_scaling_map is as expected
+    assert processor.column_scaling_map == expected_column_scaling_map, (
+        "Column scaling map does not match expected mapping."
+    )
+
+    # Apply scaling to the dummy_rolling_dataframe (as training data)
+    scaled_df = processor.apply_scaling(dummy_rolling_dataframe, is_train=True)
+
+    # Prepare expected scaled values for each column
+    # For each column, scaling is 'log', so we apply np.log1p to the original values
+
+    # Logical steps for 'wallet_cohorts_whales_total_volume_last':
+    # - Original values: [1000, 2000, 3000, 4000]
+    # - Apply np.log1p to each value to get the expected scaled values
+    original_values_last = dummy_rolling_dataframe['wallet_cohorts_whales_total_volume_last'].values
+    expected_values_last = np.log1p(original_values_last)
+
+    # Logical steps for 'wallet_cohorts_whales_total_volume_mean_10d_period_1':
+    # - Original values: [500, 600, 700, 800]
+    # - Apply np.log1p to each value
+    original_values_mean1 = dummy_rolling_dataframe[
+        'wallet_cohorts_whales_total_volume_mean_10d_period_1'
+    ].values
+    expected_values_mean1 = np.log1p(original_values_mean1)
+
+    # Logical steps for 'wallet_cohorts_whales_total_volume_mean_10d_period_2':
+    # - Original values: [400, 500, 600, 700]
+    # - Apply np.log1p to each value
+    original_values_mean2 = dummy_rolling_dataframe[
+        'wallet_cohorts_whales_total_volume_mean_10d_period_2'
+    ].values
+    expected_values_mean2 = np.log1p(original_values_mean2)
+
+    # Logical steps for 'wallet_cohorts_whales_total_volume_mean_10d_period_3':
+    # - Original values: [300, 400, 500, 600]
+    # - Apply np.log1p to each value
+    original_values_mean3 = dummy_rolling_dataframe[
+        'wallet_cohorts_whales_total_volume_mean_10d_period_3'
+    ].values
+    expected_values_mean3 = np.log1p(original_values_mean3)
+
+    # Now, compare the scaled values in scaled_df to the expected values calculated above
+
+    # Compare 'wallet_cohorts_whales_total_volume_last' values
+    np.testing.assert_allclose(
+        scaled_df['wallet_cohorts_whales_total_volume_last'].values,
+        expected_values_last,
+        atol=1e-4,
+        err_msg=(
+            "Scaled values for 'wallet_cohorts_whales_total_volume_last' do not match "
+            "expected log-transformed values."
+        )
+    )
+
+    # Compare 'wallet_cohorts_whales_total_volume_mean_10d_period_1' values
+    np.testing.assert_allclose(
+        scaled_df['wallet_cohorts_whales_total_volume_mean_10d_period_1'].values,
+        expected_values_mean1,
+        atol=1e-4,
+        err_msg=(
+            "Scaled values for 'wallet_cohorts_whales_total_volume_mean_10d_period_1' "
+            "do not match expected log-transformed values."
+        )
+    )
+
+    # Compare 'wallet_cohorts_whales_total_volume_mean_10d_period_2' values
+    np.testing.assert_allclose(
+        scaled_df['wallet_cohorts_whales_total_volume_mean_10d_period_2'].values,
+        expected_values_mean2,
+        atol=1e-4,
+        err_msg=(
+            "Scaled values for 'wallet_cohorts_whales_total_volume_mean_10d_period_2' "
+            "do not match expected log-transformed values."
+        )
+    )
+
+    # Compare 'wallet_cohorts_whales_total_volume_mean_10d_period_3' values
+    np.testing.assert_allclose(
+        scaled_df['wallet_cohorts_whales_total_volume_mean_10d_period_3'].values,
+        expected_values_mean3,
+        atol=1e-4,
+        err_msg=(
+            "Scaled values for 'wallet_cohorts_whales_total_volume_mean_10d_period_3' "
+            "do not match expected log-transformed values."
+        )
+    )
