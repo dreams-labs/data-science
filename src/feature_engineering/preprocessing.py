@@ -230,23 +230,10 @@ class ScalingProcessor:
         """
         Create a mapping between column names and their corresponding scaling methods.
 
-        This method recursively parses the metrics configuration to build a flat dictionary
-        where keys are column names and values are scaling methods.
-
         Returns:
             Dict[str, str]: A dictionary mapping column names to scaling methods.
         """
         def recursive_parse(config: Dict[str, Any], prefix: str = '') -> Dict[str, str]:
-            """
-            Recursively parse the configuration to extract scaling methods for columns.
-
-            Args:
-                config (Dict[str, Any]): The configuration dictionary to parse.
-                prefix (str): The current prefix for column names.
-
-            Returns:
-                Dict[str, str]: A dictionary mapping column names to scaling methods.
-            """
             mapping = {}
             for key, value in config.items():
                 new_prefix = f"{prefix}_{key}" if prefix else key
@@ -256,45 +243,20 @@ class ScalingProcessor:
                     if 'scaling' in value:
                         mapping[new_prefix] = value['scaling']
 
-                    # Handle aggregations
+                    # Handle different configurations
                     if 'aggregations' in value:
-                        for agg_type, agg_config in value['aggregations'].items():
-                            if isinstance(agg_config, dict) and 'scaling' in agg_config:
-                                mapping[f"{new_prefix}_{agg_type}"] = agg_config['scaling']
-                            elif isinstance(agg_config, str):
-                                # If agg_config is directly a scaling method
-                                mapping[f"{new_prefix}_{agg_type}"] = agg_config
-                        # Do not recurse into 'aggregations'
-
-                    # Handle comparisons
+                        mapping.update(self._parse_aggregations(value['aggregations'], new_prefix))
                     if 'comparisons' in value:
-                        for comp_type, comp_config in value['comparisons'].items():
-                            if isinstance(comp_config, dict) and 'scaling' in comp_config:
-                                mapping[f"{new_prefix}_{comp_type}"] = comp_config['scaling']
-                        # Do not recurse into 'comparisons'
-
-                    # Handle rolling metrics
+                        mapping.update(self._parse_comparisons(value['comparisons'], new_prefix))
                     if 'rolling' in value:
-                        rolling_config = value['rolling']
-                        if 'aggregations' in rolling_config:
-                            for agg_type, agg_config in rolling_config['aggregations'].items():
-                                if isinstance(agg_config, dict) and 'scaling' in agg_config:
-                                    # Iterate over each period
-                                    for period in range(1, rolling_config['lookback_periods'] + 1):
-                                        mapping[f"{new_prefix}_{agg_type}_"
-                                                f"{rolling_config['window_duration']}d_period_{period}"] = agg_config['scaling']
-                        if 'comparisons' in rolling_config:
-                            for comp_type, comp_config in rolling_config['comparisons'].items():
-                                if isinstance(comp_config, dict) and 'scaling' in comp_config:
-                                    # Iterate over each period
-                                    for period in range(1, rolling_config['lookback_periods'] + 1):
-                                        mapping[f"{new_prefix}_{comp_type}_"
-                                                f"{rolling_config['window_duration']}d_period_{period}"] = comp_config['scaling']
-                        # Do not recurse into 'rolling'
+                        mapping.update(self._parse_rolling(value['rolling'], new_prefix))
+                    if 'indicators' in value:
+                        mapping.update(self._parse_indicators(value['indicators'], new_prefix))
 
                     # Exclude specific keys from recursion
-                    keys_to_exclude = {'aggregations', 'comparisons', 'rolling', 'scaling'}
+                    keys_to_exclude = {'aggregations', 'comparisons', 'rolling', 'scaling', 'indicators', 'parameters'}
                     sub_config = {k: v for k, v in value.items() if k not in keys_to_exclude}
+
                     # Recursive call for nested structures
                     mapping.update(recursive_parse(sub_config, new_prefix))
 
@@ -307,6 +269,114 @@ class ScalingProcessor:
 
         return recursive_parse(self.metrics_config)
 
+    def _parse_aggregations(self, aggregations: Dict[str, Any], prefix: str) -> Dict[str, str]:
+        """
+        Parse the 'aggregations' section of the configuration.
+        """
+        mapping = {}
+        for agg_type, agg_config in aggregations.items():
+            column_name = f"{prefix}_{agg_type}"
+            if isinstance(agg_config, dict) and 'scaling' in agg_config:
+                mapping[column_name] = agg_config['scaling']
+            elif isinstance(agg_config, str):
+                # If agg_config is directly a scaling method
+                mapping[column_name] = agg_config
+        return mapping
+
+    def _parse_comparisons(self, comparisons: Dict[str, Any], prefix: str) -> Dict[str, str]:
+        """
+        Parse the 'comparisons' section of the configuration.
+        """
+        mapping = {}
+        for comp_type, comp_config in comparisons.items():
+            column_name = f"{prefix}_{comp_type}"
+            if isinstance(comp_config, dict) and 'scaling' in comp_config:
+                mapping[column_name] = comp_config['scaling']
+        return mapping
+
+    def _parse_rolling(self, rolling_config: Dict[str, Any], prefix: str) -> Dict[str, str]:
+        """
+        Parse the 'rolling' section of the configuration.
+        """
+        mapping = {}
+        window_duration = rolling_config['window_duration']
+        lookback_periods = rolling_config['lookback_periods']
+
+        if 'aggregations' in rolling_config:
+            mapping.update(self._parse_rolling_aggregations(
+                rolling_config['aggregations'], prefix, window_duration, lookback_periods
+            ))
+        if 'comparisons' in rolling_config:
+            mapping.update(self._parse_rolling_comparisons(
+                rolling_config['comparisons'], prefix, window_duration, lookback_periods
+            ))
+        return mapping
+
+    def _parse_rolling_aggregations(self, aggregations: Dict[str, Any], prefix: str,
+                                    window_duration: int, lookback_periods: int) -> Dict[str, str]:
+        """
+        Parse the 'aggregations' within 'rolling' configuration.
+        """
+        mapping = {}
+        for agg_type, agg_config in aggregations.items():
+            if isinstance(agg_config, dict) and 'scaling' in agg_config:
+                for period in range(1, lookback_periods + 1):
+                    column_name = (f"{prefix}_{agg_type}_{window_duration}d_period_{period}")
+                    mapping[column_name] = agg_config['scaling']
+        return mapping
+
+    def _parse_rolling_comparisons(self, comparisons: Dict[str, Any], prefix: str,
+                                   window_duration: int, lookback_periods: int) -> Dict[str, str]:
+        """
+        Parse the 'comparisons' within 'rolling' configuration.
+        """
+        mapping = {}
+        for comp_type, comp_config in comparisons.items():
+            if isinstance(comp_config, dict) and 'scaling' in comp_config:
+                for period in range(1, lookback_periods + 1):
+                    column_name = (f"{prefix}_{comp_type}_{window_duration}d_period_{period}")
+                    mapping[column_name] = comp_config['scaling']
+        return mapping
+
+    def _parse_indicators(self, indicators: Dict[str, Any], prefix: str) -> Dict[str, str]:
+        """
+        Parse the 'indicators' section of the configuration.
+        """
+        mapping = {}
+        for indicator_type, indicator_config in indicators.items():
+            indicator_prefix = f"{prefix}_{indicator_type}"
+
+            # Handle parameters
+            if 'parameters' in indicator_config:
+                # Get parameter names and values
+                param_names = list(indicator_config['parameters'].keys())
+                param_values_list = list(indicator_config['parameters'].values())
+
+                # Import itertools for combinations
+                import itertools
+
+                # Create combinations of parameters
+                param_combinations = list(itertools.product(*param_values_list))
+
+                for params in param_combinations:
+                    # Build parameter string
+                    param_str = '_'.join(map(str, params))
+                    # Full indicator prefix with parameters
+                    full_indicator_prefix = f"{indicator_prefix}_{param_str}"
+
+                    # Handle aggregations within the indicator
+                    if 'aggregations' in indicator_config:
+                        mapping.update(self._parse_aggregations(
+                            indicator_config['aggregations'], full_indicator_prefix
+                        ))
+            else:
+                # No parameters, directly process aggregations
+                full_indicator_prefix = indicator_prefix
+                if 'aggregations' in indicator_config:
+                    mapping.update(self._parse_aggregations(
+                        indicator_config['aggregations'], full_indicator_prefix
+                    ))
+        return mapping
 
     def apply_scaling(self, df: pd.DataFrame, is_train: bool = False) -> pd.DataFrame:
         """

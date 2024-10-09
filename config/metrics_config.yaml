@@ -13,6 +13,29 @@
 # Keyed on coin_id-date
 wallet_cohorts:
     whales:
+        total_volume:
+            aggregations:
+                last:
+                    scaling: "log"        # Total sold should also be scaled to account for high variance.
+            rolling:
+                aggregations:
+                    mean:
+                        scaling: "log"
+                window_duration: 10
+                lookback_periods: 3
+            indicators:
+                ema:
+                    parameters:
+                        window: [3,14]
+                    aggregations:
+                        last:
+                            scaling: "none"
+                    rolling:
+                        aggregations:
+                            last:
+                                scaling: "standard"
+                        window_duration: 7
+                        lookback_periods: 3
         buyers_new:
             aggregations:
                 sum:
@@ -40,34 +63,11 @@ wallet_cohorts:
             #             scaling: "log"
             #     window_duration: 10
             #     lookback_periods: 3
-        total_volume:
-            aggregations:
-                last:
-                    scaling: "log"        # Total sold should also be scaled to account for high variance.
-            rolling:
-                aggregations:
-                    mean:
-                        scaling: "log"
-                window_duration: 10
-                lookback_periods: 3
-            indicators:
-                ema:
-                    parameters:
-                        window: [7]
-                    aggregations:
-                        last:
-                            scaling: "none"
-                    rolling:
-                        aggregations:
-                            last:
-                                scaling: "standard"
-                        window_duration: 7
-                        lookback_periods: 3
 
-        total_balance:
-            aggregations:
-                last:
-                    scaling: "log"        # Total sold should also be scaled to account for high variance.
+        # total_balance:
+        #     aggregations:
+        #         last:
+        #             scaling: "log"        # Total sold should also be scaled to account for high variance.
 
 
     # normies:

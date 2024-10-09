@@ -201,8 +201,8 @@ def promote_indicators_to_metrics(df_metrics_config):
                 for window in indicator_metrics['parameters']['window']:
                     new_key = f"{key}_{indicator}_{window}"
 
-                # ...and create new top-level key for each window
-                df_metrics_indicators_config[new_key] = indicator_metrics
+                    # ...and create new top-level key for each window
+                    df_metrics_indicators_config[new_key] = indicator_metrics
 
             # Remove indicators from their original position
             df_metrics_indicators_config[key].pop('indicators')

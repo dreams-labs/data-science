@@ -246,6 +246,178 @@ def validate_config_consistency(config,metrics_config, modeling_config):
     logger.debug("Config files are consistent.")
 
 
+from typing import List,Dict,Any
+
+def get_expected_columns(metrics_config: Dict[str, Any]) -> List[str]:
+    """
+    Generate a list of expected column names from the given metrics configuration.
+
+    Args:
+        metrics_config (Dict[str, Any]): The metrics configuration dictionary.
+
+    Returns:
+        List[str]: A list of expected column names.
+    """
+    expected_columns = []
+
+    def recursive_parse(config: Dict[str, Any], prefix: str = ''):
+        for key, value in config.items():
+            new_prefix = f"{prefix}_{key}" if prefix else key
+
+            if isinstance(value, dict):
+                # Direct scaling for the current level
+                if 'scaling' in value:
+                    expected_columns.append(new_prefix)
+
+                # Handle aggregations
+                if 'aggregations' in value:
+                    expected_columns.extend(
+                        parse_aggregations(value['aggregations'], new_prefix)
+                    )
+
+                # Handle comparisons
+                if 'comparisons' in value:
+                    expected_columns.extend(
+                        parse_comparisons(value['comparisons'], new_prefix)
+                    )
+
+                # Handle rolling metrics
+                if 'rolling' in value:
+                    expected_columns.extend(
+                        parse_rolling(value['rolling'], new_prefix)
+                    )
+
+                # Handle indicators
+                if 'indicators' in value:
+                    expected_columns.extend(
+                        parse_indicators(value['indicators'], new_prefix)
+                    )
+
+                # Exclude specific keys from recursion
+                keys_to_exclude = {
+                    'aggregations', 'comparisons', 'rolling',
+                    'scaling', 'indicators', 'parameters', 'definition'
+                }
+                sub_config = {k: v for k, v in value.items() if k not in keys_to_exclude}
+
+                # Recursive call for nested structures
+                recursive_parse(sub_config, new_prefix)
+
+            elif isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict):
+                        recursive_parse(item, new_prefix)
+
+    def parse_aggregations(aggregations: Dict[str, Any], prefix: str) -> List[str]:
+        columns = []
+        for agg_type, agg_config in aggregations.items():
+            column_name = f"{prefix}_{agg_type}"
+            columns.append(column_name)
+        return columns
+
+    def parse_comparisons(comparisons: Dict[str, Any], prefix: str) -> List[str]:
+        columns = []
+        for comp_type, comp_config in comparisons.items():
+            column_name = f"{prefix}_{comp_type}"
+            columns.append(column_name)
+        return columns
+
+    def parse_rolling(rolling_config: Dict[str, Any], prefix: str) -> List[str]:
+        columns = []
+        window_duration = rolling_config['window_duration']
+        lookback_periods = rolling_config['lookback_periods']
+
+        if 'aggregations' in rolling_config:
+            columns.extend(parse_rolling_aggregations(
+                rolling_config['aggregations'], prefix, window_duration, lookback_periods
+            ))
+        if 'comparisons' in rolling_config:
+            columns.extend(parse_rolling_comparisons(
+                rolling_config['comparisons'], prefix, window_duration, lookback_periods
+            ))
+        return columns
+
+    def parse_rolling_aggregations(aggregations: Dict[str, Any], prefix: str,
+                                   window_duration: int, lookback_periods: int) -> List[str]:
+        columns = []
+        for agg_type in aggregations.keys():
+            for period in range(1, lookback_periods + 1):
+                column_name = (f"{prefix}_{agg_type}_{window_duration}d_period_{period}")
+                columns.append(column_name)
+        return columns
+
+    def parse_rolling_comparisons(comparisons: Dict[str, Any], prefix: str,
+                                  window_duration: int, lookback_periods: int) -> List[str]:
+        columns = []
+        for comp_type in comparisons.keys():
+            for period in range(1, lookback_periods + 1):
+                column_name = (f"{prefix}_{comp_type}_{window_duration}d_period_{period}")
+                columns.append(column_name)
+        return columns
+
+    def parse_indicators(indicators: Dict[str, Any], prefix: str) -> List[str]:
+        columns = []
+        for indicator_type, indicator_config in indicators.items():
+            indicator_prefix = f"{prefix}_{indicator_type}"
+
+            # Handle parameters
+            if 'parameters' in indicator_config:
+                # Get parameter names and values
+                param_names = list(indicator_config['parameters'].keys())
+                param_values_list = list(indicator_config['parameters'].values())
+
+                # Import itertools for combinations
+                import itertools
+
+                # Create combinations of parameters
+                param_combinations = list(itertools.product(*param_values_list))
+
+                for params in param_combinations:
+                    # Build parameter string
+                    param_str = '_'.join(map(str, params))
+                    # Full indicator prefix with parameters
+                    full_indicator_prefix = f"{indicator_prefix}_{param_str}"
+
+                    # Handle aggregations within the indicator
+                    if 'aggregations' in indicator_config:
+                        columns.extend(parse_aggregations(
+                            indicator_config['aggregations'], full_indicator_prefix
+                        ))
+
+                    # Handle rolling within the indicator
+                    if 'rolling' in indicator_config:
+                        columns.extend(parse_indicator_rolling(
+                            indicator_config['rolling'], full_indicator_prefix
+                        ))
+            else:
+                # No parameters, directly process aggregations
+                full_indicator_prefix = indicator_prefix
+                if 'aggregations' in indicator_config:
+                    columns.extend(parse_aggregations(
+                        indicator_config['aggregations'], full_indicator_prefix
+                    ))
+        return columns
+
+    def parse_indicator_rolling(rolling_config: Dict[str, Any], prefix: str) -> List[str]:
+        columns = []
+        window_duration = rolling_config['window_duration']
+        lookback_periods = rolling_config['lookback_periods']
+
+        if 'aggregations' in rolling_config:
+            columns.extend(parse_rolling_aggregations(
+                rolling_config['aggregations'], prefix, window_duration, lookback_periods
+            ))
+        if 'comparisons' in rolling_config:
+            columns.extend(parse_rolling_comparisons(
+                rolling_config['comparisons'], prefix, window_duration, lookback_periods
+            ))
+        return columns
+
+    recursive_parse(metrics_config)
+    return expected_columns
+
+
+
 def check_nan_values(series):
     """
     Check if NaN values are only at the start or end of the series.

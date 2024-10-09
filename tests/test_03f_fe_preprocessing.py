@@ -1,7 +1,6 @@
 """
 tests used to audit the files in the data-science/src folder
 """
-# pylint: disable=C0302 # over 1000 lines
 # pylint: disable=C0413 # import not at top of doc (due to local import)
 # pylint: disable=W0612 # unused variables (due to test reusing functions with 2 outputs)
 # pylint: disable=W0621 # redefining from outer scope triggering on pytest fixtures
@@ -13,7 +12,6 @@ import sys
 import os
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from dotenv import load_dotenv
 import pytest
 from dreams_core import core as dc
@@ -188,32 +186,6 @@ def rolling_metrics_config():
     }
 
 @pytest.fixture
-def rolling_metrics_config():
-    """Fixture providing a complex metrics configuration with rolling metrics."""
-    return {
-        "wallet_cohorts": {
-            "whales": {
-                "total_volume": {
-                    "aggregations": {
-                        "last": {
-                            "scaling": "log"
-                        }
-                    },
-                    "rolling": {
-                        "aggregations": {
-                            "mean": {
-                                "scaling": "log"
-                            }
-                        },
-                        "window_duration": 10,
-                        "lookback_periods": 3
-                    }
-                }
-            }
-        }
-    }
-
-@pytest.fixture
 def dummy_rolling_dataframe():
     """
     Fixture providing a dummy dataframe with a MultiIndex and sample data for rolling metrics.
@@ -334,5 +306,155 @@ def test_scaling_processor_with_rolling_metrics(rolling_metrics_config, dummy_ro
         err_msg=(
             "Scaled values for 'wallet_cohorts_whales_total_volume_mean_10d_period_3' "
             "do not match expected log-transformed values."
+        )
+    )
+
+@pytest.fixture
+def indicators_metrics_config():
+    """
+    Fixture providing a metrics configuration that includes indicators.
+    """
+    return {
+        'wallet_cohorts': {
+            'whales': {
+                'buyers_new': {
+                    'aggregations': {
+                        'sum': {
+                            'scaling': 'standard'
+                        }
+                    },
+                    'indicators': {
+                        'rsi': {
+                            'parameters': {
+                                'window': [14, 60]
+                            },
+                            'aggregations': {
+                                'last': {
+                                    'scaling': 'minmax'
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+@pytest.fixture
+def dummy_indicators_dataframe():
+    """
+    Fixture providing a dummy dataframe with sample data for indicators.
+    """
+    index = pd.MultiIndex.from_product(
+        [
+            pd.to_datetime(['2023-01-01', '2023-01-02']),
+            ['bitcoin', 'ethereum']
+        ],
+        names=['time_window', 'coin_id']
+    )
+    data = {
+        'wallet_cohorts_whales_buyers_new_sum': [100, 200, 300, 400],
+        'wallet_cohorts_whales_buyers_new_rsi_14_last': [30, 40, 50, 60],
+        'wallet_cohorts_whales_buyers_new_rsi_60_last': [35, 45, 55, 65],
+    }
+    df = pd.DataFrame(data, index=index)
+    return df
+
+@pytest.mark.unit
+def test_scaling_processor_with_indicators(indicators_metrics_config, dummy_indicators_dataframe):
+    """
+    Test the ScalingProcessor class for correct column mapping and scaling application with indicators.
+    """
+    # Instantiate the ScalingProcessor with the provided indicators_metrics_config
+    processor = prp.ScalingProcessor(indicators_metrics_config)
+
+    # Expected column_scaling_map based on the indicators_metrics_config
+    expected_column_scaling_map = {
+        'wallet_cohorts_whales_buyers_new_sum': 'standard',
+        'wallet_cohorts_whales_buyers_new_rsi_14_last': 'minmax',
+        'wallet_cohorts_whales_buyers_new_rsi_60_last': 'minmax',
+    }
+
+    # Assert that the column_scaling_map is as expected
+    assert processor.column_scaling_map == expected_column_scaling_map, (
+        "Column scaling map does not match expected mapping."
+    )
+
+    # Apply scaling to the dummy_indicators_dataframe (as training data)
+    scaled_df = processor.apply_scaling(dummy_indicators_dataframe, is_train=True)
+
+    # Prepare expected scaled values for each column
+
+    # Logical steps for 'wallet_cohorts_whales_buyers_new_sum':
+    # - Scaling method is 'standard'.
+    # - Original values: [100, 200, 300, 400]
+    # - Calculate mean and standard deviation.
+    sum_values = dummy_indicators_dataframe[
+        'wallet_cohorts_whales_buyers_new_sum'
+    ].values.reshape(-1, 1)
+    sum_mean = sum_values.mean()
+    sum_std = sum_values.std()
+    # - Standardize the values.
+    expected_sum = (sum_values - sum_mean) / sum_std
+    expected_sum = expected_sum.flatten()
+
+    # Logical steps for 'wallet_cohorts_whales_buyers_new_rsi_14_last':
+    # - Scaling method is 'minmax'.
+    # - Original values: [30, 40, 50, 60]
+    # - Find min and max.
+    rsi14_values = dummy_indicators_dataframe[
+        'wallet_cohorts_whales_buyers_new_rsi_14_last'
+    ].values.reshape(-1, 1)
+    rsi14_min = rsi14_values.min()
+    rsi14_max = rsi14_values.max()
+    # - Apply min-max scaling.
+    expected_rsi14 = (rsi14_values - rsi14_min) / (rsi14_max - rsi14_min)
+    expected_rsi14 = expected_rsi14.flatten()
+
+    # Logical steps for 'wallet_cohorts_whales_buyers_new_rsi_60_last':
+    # - Scaling method is 'minmax'.
+    # - Original values: [35, 45, 55, 65]
+    # - Find min and max.
+    rsi60_values = dummy_indicators_dataframe[
+        'wallet_cohorts_whales_buyers_new_rsi_60_last'
+    ].values.reshape(-1, 1)
+    rsi60_min = rsi60_values.min()
+    rsi60_max = rsi60_values.max()
+    # - Apply min-max scaling.
+    expected_rsi60 = (rsi60_values - rsi60_min) / (rsi60_max - rsi60_min)
+    expected_rsi60 = expected_rsi60.flatten()
+
+    # Now, compare the scaled values in scaled_df to the expected values calculated above
+
+    # Compare 'wallet_cohorts_whales_buyers_new_sum' values
+    np.testing.assert_allclose(
+        scaled_df['wallet_cohorts_whales_buyers_new_sum'].values,
+        expected_sum,
+        atol=1e-4,
+        err_msg=(
+            "Scaled values for 'wallet_cohorts_whales_buyers_new_sum' do not match "
+            "expected standardized values."
+        )
+    )
+
+    # Compare 'wallet_cohorts_whales_buyers_new_rsi_14_last' values
+    np.testing.assert_allclose(
+        scaled_df['wallet_cohorts_whales_buyers_new_rsi_14_last'].values,
+        expected_rsi14,
+        atol=1e-4,
+        err_msg=(
+            "Scaled values for 'wallet_cohorts_whales_buyers_new_rsi_14_last' do not match "
+            "expected min-max scaled values."
+        )
+    )
+
+    # Compare 'wallet_cohorts_whales_buyers_new_rsi_60_last' values
+    np.testing.assert_allclose(
+        scaled_df['wallet_cohorts_whales_buyers_new_rsi_60_last'].values,
+        expected_rsi60,
+        atol=1e-4,
+        err_msg=(
+            "Scaled values for 'wallet_cohorts_whales_buyers_new_rsi_60_last' do not match "
+            "expected min-max scaled values."
         )
     )
