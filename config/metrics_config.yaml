@@ -36,27 +36,65 @@ wallet_cohorts:
                                 scaling: "standard"
                         window_duration: 7
                         lookback_periods: 3
-        buyers_new:
+
+# Time series keyed on coin_id-date
+time_series:
+    market_data:
+        price:
+            aggregations:
+                std:
+                    scaling: "none"
+        volume:
             aggregations:
                 sum:
-                    scaling: "standard"        # Scaling applied to sums, which can vary significantly in range.
+                    scaling: "standard"
+                std:
+                    scaling: "none"
+        market_cap:
+            aggregations:
+                last:
+                    scaling: "log"
             indicators:
-                rsi:
+                ema:
                     parameters:
-                        window: [14,60]
+                        window: [3,14]
                     aggregations:
                         last:
-                            scaling: "minmax"
-            rolling:
-                aggregations:
-                    sum:
-                        scaling: "log"
-                window_duration: 10
-                lookback_periods: 3
-        total_bought:
-            aggregations:
-                sum:
-                    scaling: "log"        # Scaling applied to sums, which can vary significantly in range.
+                            scaling: "log"
+                    rolling:
+                        aggregations:
+                            sum:
+                                scaling: "log"
+                        window_duration: 10
+                        lookback_periods: 2
+                rsi:
+                    parameters:
+                        window: [14]
+                    aggregations:
+                        last:
+                            scaling: "none"
+
+        # buyers_new:
+        #     aggregations:
+        #         sum:
+        #             scaling: "standard"        # Scaling applied to sums, which can vary significantly in range.
+        #     indicators:
+        #         rsi:
+        #             parameters:
+        #                 window: [14,60]
+        #             aggregations:
+        #                 last:
+        #                     scaling: "minmax"
+        #     rolling:
+        #         aggregations:
+        #             sum:
+        #                 scaling: "log"
+        #         window_duration: 10
+        #         lookback_periods: 3
+        # total_bought:
+        #     aggregations:
+        #         sum:
+        #             scaling: "log"        # Scaling applied to sums, which can vary significantly in range.
             # rolling:
             #     aggregations:
             #         sum:
@@ -101,40 +139,6 @@ wallet_cohorts:
     #                 scaling: "log"        # Total sold should also be scaled to account for high variance.
 
 
-# Time series keyed on coin_id-date
-time_series:
-    market_data:
-        price:
-            aggregations:
-                std:
-                    scaling: "none"
-        volume:
-            aggregations:
-                sum:
-                    scaling: "standard"
-        market_cap:
-            aggregations:
-                last:
-                    scaling: "log"
-            indicators:
-                ema:
-                    parameters:
-                        window: [3,14]
-                    aggregations:
-                        last:
-                            scaling: "log"
-            #         rolling:
-            #             aggregations:
-            #                 sum:
-            #                     scaling: "log"
-            #             window_duration: 10
-            #             lookback_periods: 2
-            #     rsi:
-            #         parameters:
-            #             window: [14]
-            #         aggregations:
-            #             last:
-            #                 scaling: "none"
 
 
 # Time series keyed on only date

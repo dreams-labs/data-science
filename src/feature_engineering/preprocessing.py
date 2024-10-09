@@ -2,6 +2,7 @@
 functions used to build coin-level features from training data
 """
 from typing import Dict, List, Any
+import itertools
 import pandas as pd
 import numpy as np
 import dreams_core.core as dc
@@ -211,7 +212,7 @@ class DataPreprocessor:
         return preprocessed_datasets
 
 
-import pdb
+
 class ScalingProcessor:
     """
     Class to apply scaling to all columns as configured in the metrics_config.
@@ -349,11 +350,8 @@ class ScalingProcessor:
             # Handle parameters
             if 'parameters' in indicator_config:
                 # Get parameter names and values
-                param_names = list(indicator_config['parameters'].keys())
+                param_names = list(indicator_config['parameters'].keys())  # pylint: disable=W0612
                 param_values_list = list(indicator_config['parameters'].values())
-
-                # Import itertools for combinations
-                import itertools
 
                 # Create combinations of parameters
                 param_combinations = list(itertools.product(*param_values_list))

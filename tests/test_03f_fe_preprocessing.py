@@ -13,6 +13,7 @@ import os
 import pandas as pd
 import numpy as np
 from dotenv import load_dotenv
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import pytest
 from dreams_core import core as dc
 
@@ -607,3 +608,386 @@ def test_scaling_processor_with_complex_metrics(
                 f"Scaled values for '{column}' do not match expected values with scaling '{scaling_method}'."
             )
         )
+
+
+@pytest.fixture
+def double_complex_metrics_config():
+    """
+    Fixture providing a double complex metrics configuration incorporating multiple levels.
+    """
+    return {
+        'wallet_cohorts': {
+            'whales': {
+                'total_volume': {
+                    'aggregations': {
+                        'last': {
+                            'scaling': 'log'
+                        }
+                    },
+                    'rolling': {
+                        'aggregations': {
+                            'mean': {
+                                'scaling': 'log'
+                            }
+                        },
+                        'window_duration': 10,
+                        'lookback_periods': 3
+                    },
+                    'indicators': {
+                        'ema': {
+                            'parameters': {
+                                'window': [3, 14]
+                            },
+                            'aggregations': {
+                                'last': {
+                                    'scaling': 'none'
+                                }
+                            },
+                            'rolling': {
+                                'aggregations': {
+                                    'last': {
+                                        'scaling': 'standard'
+                                    }
+                                },
+                                'window_duration': 7,
+                                'lookback_periods': 3
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        'time_series': {
+            'market_data': {
+                'price': {
+                    'aggregations': {
+                        'std': {
+                            'scaling': 'none'
+                        }
+                    }
+                },
+                'volume': {
+                    'aggregations': {
+                        'sum': {
+                            'scaling': 'standard'
+                        },
+                        'std': {
+                            'scaling': 'none'
+                        }
+                    }
+                },
+                'market_cap': {
+                    'aggregations': {
+                        'last': {
+                            'scaling': 'log'
+                        }
+                    },
+                    'indicators': {
+                        'ema': {
+                            'parameters': {
+                                'window': [3, 14]
+                            },
+                            'aggregations': {
+                                'last': {
+                                    'scaling': 'log'
+                                }
+                            },
+                            'rolling': {
+                                'aggregations': {
+                                    'sum': {
+                                        'scaling': 'log'
+                                    }
+                                },
+                                'window_duration': 10,
+                                'lookback_periods': 2
+                            }
+                        },
+                        'rsi': {
+                            'parameters': {
+                                'window': [14]
+                            },
+                            'aggregations': {
+                                'last': {
+                                    'scaling': 'none'
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+@pytest.fixture
+def dummy_double_complex_dataframe():
+    """
+    Fixture providing a dummy dataframe with sample data for the double complex metrics configuration.
+    """
+    index = pd.MultiIndex.from_product(
+        [
+            pd.to_datetime(['2023-01-01', '2023-01-02']),
+            ['bitcoin', 'ethereum']
+        ],
+        names=['time_window', 'coin_id']
+    )
+    data = {
+        # wallet_cohorts.whales.total_volume
+        'wallet_cohorts_whales_total_volume_last': [1000, 2000, 3000, 4000],
+        'wallet_cohorts_whales_total_volume_mean_10d_period_1': [500, 600, 700, 800],
+        'wallet_cohorts_whales_total_volume_mean_10d_period_2': [400, 500, 600, 700],
+        'wallet_cohorts_whales_total_volume_mean_10d_period_3': [300, 400, 500, 600],
+        'wallet_cohorts_whales_total_volume_ema_3_last': [1100, 2100, 3100, 4100],
+        'wallet_cohorts_whales_total_volume_ema_3_last_7d_period_1': [1050, 2050, 3050, 4050],
+        'wallet_cohorts_whales_total_volume_ema_3_last_7d_period_2': [1000, 2000, 3000, 4000],
+        'wallet_cohorts_whales_total_volume_ema_3_last_7d_period_3': [950, 1950, 2950, 3950],
+        'wallet_cohorts_whales_total_volume_ema_14_last': [1200, 2200, 3200, 4200],
+        'wallet_cohorts_whales_total_volume_ema_14_last_7d_period_1': [1150, 2150, 3150, 4150],
+        'wallet_cohorts_whales_total_volume_ema_14_last_7d_period_2': [1100, 2100, 3100, 4100],
+        'wallet_cohorts_whales_total_volume_ema_14_last_7d_period_3': [1050, 2050, 3050, 4050],
+        # time_series.market_data.price
+        'time_series_market_data_price_std': [50, 60, 70, 80],
+        # time_series.market_data.volume
+        'time_series_market_data_volume_sum': [5000, 6000, 7000, 8000],
+        'time_series_market_data_volume_std': [500, 600, 700, 800],
+        # time_series.market_data.market_cap
+        'time_series_market_data_market_cap_last': [100000, 200000, 300000, 400000],
+        'time_series_market_data_market_cap_ema_3_last': [110000, 210000, 310000, 410000],
+        'time_series_market_data_market_cap_ema_3_sum_10d_period_1': [105000, 205000, 305000, 405000],
+        'time_series_market_data_market_cap_ema_3_sum_10d_period_2': [100000, 200000, 300000, 400000],
+        'time_series_market_data_market_cap_ema_14_last': [120000, 220000, 320000, 420000],
+        'time_series_market_data_market_cap_ema_14_sum_10d_period_1': [115000, 215000, 315000, 415000],
+        'time_series_market_data_market_cap_ema_14_sum_10d_period_2': [110000, 210000, 310000, 410000],
+        'time_series_market_data_market_cap_rsi_14_last': [30, 40, 50, 60],
+    }
+    df = pd.DataFrame(data, index=index)
+    return df
+
+@pytest.mark.unit
+def test_scaling_processor_with_double_complex_metrics(
+    double_complex_metrics_config, dummy_double_complex_dataframe
+):
+    """
+    Test the ScalingProcessor class with a double complex metrics configuration incorporating
+    multiple levels and nested configurations.
+    """
+    # Instantiate the ScalingProcessor with the provided double_complex_metrics_config
+    processor = prp.ScalingProcessor(double_complex_metrics_config)
+
+    # Expected column_scaling_map based on the double_complex_metrics_config
+    expected_column_scaling_map = {
+        # wallet_cohorts.whales.total_volume
+        'wallet_cohorts_whales_total_volume_last': 'log',
+        'wallet_cohorts_whales_total_volume_mean_10d_period_1': 'log',
+        'wallet_cohorts_whales_total_volume_mean_10d_period_2': 'log',
+        'wallet_cohorts_whales_total_volume_mean_10d_period_3': 'log',
+        'wallet_cohorts_whales_total_volume_ema_3_last': 'none',
+        'wallet_cohorts_whales_total_volume_ema_3_last_7d_period_1': 'standard',
+        'wallet_cohorts_whales_total_volume_ema_3_last_7d_period_2': 'standard',
+        'wallet_cohorts_whales_total_volume_ema_3_last_7d_period_3': 'standard',
+        'wallet_cohorts_whales_total_volume_ema_14_last': 'none',
+        'wallet_cohorts_whales_total_volume_ema_14_last_7d_period_1': 'standard',
+        'wallet_cohorts_whales_total_volume_ema_14_last_7d_period_2': 'standard',
+        'wallet_cohorts_whales_total_volume_ema_14_last_7d_period_3': 'standard',
+        # time_series.market_data.price
+        'time_series_market_data_price_std': 'none',
+        # time_series.market_data.volume
+        'time_series_market_data_volume_sum': 'standard',
+        'time_series_market_data_volume_std': 'none',
+        # time_series.market_data.market_cap
+        'time_series_market_data_market_cap_last': 'log',
+        'time_series_market_data_market_cap_ema_3_last': 'log',
+        'time_series_market_data_market_cap_ema_3_sum_10d_period_1': 'log',
+        'time_series_market_data_market_cap_ema_3_sum_10d_period_2': 'log',
+        'time_series_market_data_market_cap_ema_14_last': 'log',
+        'time_series_market_data_market_cap_ema_14_sum_10d_period_1': 'log',
+        'time_series_market_data_market_cap_ema_14_sum_10d_period_2': 'log',
+        'time_series_market_data_market_cap_rsi_14_last': 'none',
+    }
+
+    # Assert that the column_scaling_map is as expected
+    assert processor.column_scaling_map == expected_column_scaling_map, (
+        "Column scaling map does not match expected mapping."
+    )
+
+    # Apply scaling to the dummy_double_complex_dataframe (as training data)
+    scaled_df = processor.apply_scaling(dummy_double_complex_dataframe, is_train=True)
+
+    # Prepare expected scaled values for each column
+    columns_to_test = expected_column_scaling_map.keys()
+
+    for column in columns_to_test:
+        scaling_method = expected_column_scaling_map[column]
+        original_values = dummy_double_complex_dataframe[column].values.reshape(-1, 1)
+
+        if scaling_method == 'log':
+            # Logical steps:
+            # - Apply np.log1p to the original values
+            expected_values = np.log1p(original_values).flatten()
+        elif scaling_method == 'standard':
+            # Logical steps:
+            # - Calculate mean and std, standardize the values
+            mean = original_values.mean()
+            std = original_values.std()
+            expected_values = ((original_values - mean) / std).flatten()
+        elif scaling_method == 'none':
+            # Logical steps:
+            # - Values remain the same as original
+            expected_values = original_values.flatten()
+        else:
+            raise ValueError(f"Unknown scaling method: {scaling_method}")
+
+        # Compare the scaled values in scaled_df to the expected values
+        np.testing.assert_allclose(
+            scaled_df[column].values,
+            expected_values,
+            atol=1e-4,
+            err_msg=(
+                f"Scaled values for '{column}' do not match expected values with scaling '{scaling_method}'."
+            )
+        )
+
+@pytest.fixture
+def scaling_metrics_config():
+    """
+    Fixture providing a metrics configuration with different scaling methods for testing.
+    """
+    return {
+        'feature1': {
+            'aggregations': {
+                'sum': {
+                    'scaling': 'standard'
+                }
+            }
+        },
+        'feature2': {
+            'aggregations': {
+                'last': {
+                    'scaling': 'minmax'
+                }
+            }
+        }
+    }
+
+@pytest.fixture
+def training_dataset():
+    """
+    Fixture providing a training dataset with known values.
+    """
+    data = {
+        'feature1_sum': [1, 2, 3, 4],
+        'feature2_last': [10, 20, 30, 40]
+    }
+    df = pd.DataFrame(data)
+    return df
+
+@pytest.fixture
+def test_dataset():
+    """
+    Fixture providing a test dataset with different values.
+    """
+    data = {
+        'feature1_sum': [5, 6, 7, 8],
+        'feature2_last': [15, 25, 35, 45]
+    }
+    df = pd.DataFrame(data)
+    return df
+
+@pytest.fixture
+def minimal_config():
+    """
+    Fixture providing a minimal configuration dictionary required by DataPreprocessor.
+    """
+    return {
+        'datasets': {}
+    }
+
+@pytest.fixture
+def minimal_modeling_config():
+    """
+    Fixture providing a minimal modeling configuration required by DataPreprocessor.
+    """
+    return {
+        'preprocessing': {}
+    }
+
+@pytest.mark.unit
+def test_data_preprocessor_scaling_consistency(
+    scaling_metrics_config, training_dataset, test_dataset,
+    minimal_config, minimal_modeling_config
+):
+    """
+    Test that the scaling parameters learned from the training set are applied to the test set
+    without re-fitting the scalers.
+    """
+    # Instantiate the DataPreprocessor
+    preprocessor = prp.DataPreprocessor(
+        config=minimal_config,
+        metrics_config=scaling_metrics_config,
+        modeling_config=minimal_modeling_config
+    )
+
+    # Prepare datasets
+    datasets = {
+        'train': training_dataset,
+        'test': test_dataset
+    }
+
+    # Preprocess the datasets
+    preprocessed_datasets = preprocessor.preprocess(datasets)
+
+    # Extract the processed training and test sets
+    preprocessed_train = preprocessed_datasets['train']
+    preprocessed_test = preprocessed_datasets['test']
+
+    # Extract scalers from the ScalingProcessor after processing training data
+    # For feature1_sum (standard scaling), get the mean and std from the scaler
+    feature1_column = 'feature1_sum'
+    feature2_column = 'feature2_last'
+
+    # Check that the scaler for feature1_sum is StandardScaler and has been fitted
+    assert feature1_column in preprocessor.scaler.scalers, "Scaler for feature1_sum not found."
+    scaler_feature1 = preprocessor.scaler.scalers[feature1_column]
+    assert isinstance(scaler_feature1, StandardScaler), (
+        "Scaler for feature1_sum is not StandardScaler."
+    )
+
+    # Similarly for feature2_last (minmax scaling)
+    assert feature2_column in preprocessor.scaler.scalers, "Scaler for feature2_last not found."
+    scaler_feature2 = preprocessor.scaler.scalers[feature2_column]
+    assert isinstance(scaler_feature2, MinMaxScaler), (
+        "Scaler for feature2_last is not MinMaxScaler."
+    )
+
+    # Get the parameters from the scalers
+    # For StandardScaler, mean_ and scale_
+    mean_feature1 = scaler_feature1.mean_[0]
+    std_feature1 = scaler_feature1.scale_[0]
+
+    # For MinMaxScaler, data_min_ and data_max_
+    min_feature2 = scaler_feature2.data_min_[0]
+    max_feature2 = scaler_feature2.data_max_[0]
+
+    # Manually scale the test data using these parameters
+    # For feature1_sum
+    original_test_feature1 = test_dataset[feature1_column].values
+    expected_scaled_feature1 = (original_test_feature1 - mean_feature1) / std_feature1
+
+    # For feature2_last
+    original_test_feature2 = test_dataset[feature2_column].values
+    expected_scaled_feature2 = (original_test_feature2 - min_feature2) / (max_feature2 - min_feature2)
+
+    # Compare the scaled test data from preprocessed_test with expected scaled values
+    np.testing.assert_allclose(
+        preprocessed_test[feature1_column].values,
+        expected_scaled_feature1,
+        atol=1e-6,
+        err_msg="Scaled feature1_sum in test set does not match expected scaled values."
+    )
+
+    np.testing.assert_allclose(
+        preprocessed_test[feature2_column].values,
+        expected_scaled_feature2,
+        atol=1e-6,
+        err_msg="Scaled feature2_last in test set does not match expected scaled values."
+    )

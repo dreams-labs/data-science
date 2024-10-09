@@ -6,7 +6,9 @@ import sys
 import gc
 import os
 from datetime import datetime, timedelta
+from typing import List,Dict,Any
 import importlib
+import itertools
 import logging
 import warnings
 import functools
@@ -246,8 +248,6 @@ def validate_config_consistency(config,metrics_config, modeling_config):
     logger.debug("Config files are consistent.")
 
 
-from typing import List,Dict,Any
-
 def get_expected_columns(metrics_config: Dict[str, Any]) -> List[str]:
     """
     Generate a list of expected column names from the given metrics configuration.
@@ -310,14 +310,14 @@ def get_expected_columns(metrics_config: Dict[str, Any]) -> List[str]:
 
     def parse_aggregations(aggregations: Dict[str, Any], prefix: str) -> List[str]:
         columns = []
-        for agg_type, agg_config in aggregations.items():
+        for agg_type, _ in aggregations.items():
             column_name = f"{prefix}_{agg_type}"
             columns.append(column_name)
         return columns
 
     def parse_comparisons(comparisons: Dict[str, Any], prefix: str) -> List[str]:
         columns = []
-        for comp_type, comp_config in comparisons.items():
+        for comp_type, _ in comparisons.items():
             column_name = f"{prefix}_{comp_type}"
             columns.append(column_name)
         return columns
@@ -342,7 +342,7 @@ def get_expected_columns(metrics_config: Dict[str, Any]) -> List[str]:
         columns = []
         for agg_type in aggregations.keys():
             for period in range(1, lookback_periods + 1):
-                column_name = (f"{prefix}_{agg_type}_{window_duration}d_period_{period}")
+                column_name = f"{prefix}_{agg_type}_{window_duration}d_period_{period}"
                 columns.append(column_name)
         return columns
 
@@ -351,7 +351,7 @@ def get_expected_columns(metrics_config: Dict[str, Any]) -> List[str]:
         columns = []
         for comp_type in comparisons.keys():
             for period in range(1, lookback_periods + 1):
-                column_name = (f"{prefix}_{comp_type}_{window_duration}d_period_{period}")
+                column_name = f"{prefix}_{comp_type}_{window_duration}d_period_{period}"
                 columns.append(column_name)
         return columns
 
@@ -363,11 +363,8 @@ def get_expected_columns(metrics_config: Dict[str, Any]) -> List[str]:
             # Handle parameters
             if 'parameters' in indicator_config:
                 # Get parameter names and values
-                param_names = list(indicator_config['parameters'].keys())
+                param_names = list(indicator_config['parameters'].keys())  # pylint: disable=W0612
                 param_values_list = list(indicator_config['parameters'].values())
-
-                # Import itertools for combinations
-                import itertools
 
                 # Create combinations of parameters
                 param_combinations = list(itertools.product(*param_values_list))
