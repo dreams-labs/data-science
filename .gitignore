@@ -1,5 +1,8 @@
-# modeling folder
+# Modeling folder
 /modeling/
+
+# Config archive
+/config_archive/
 
 # temp files
 temp/

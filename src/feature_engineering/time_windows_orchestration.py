@@ -20,6 +20,7 @@ import dreams_core.core as dc
 import training_data.data_retrieval as dr
 import coin_wallet_metrics.indicators as ind
 import feature_engineering.feature_generation as fg
+import feature_engineering.target_variables as tv
 import insights.experiments as exp
 
 # set up logger at the module level
@@ -44,6 +45,10 @@ def generate_all_time_windows_model_inputs(config,metrics_config,modeling_config
     Returns:
     - training_data_df (pd.DataFrame): DataFrame with MultiIndex on time_window,coin_id that contains
         columns for all configured features for all datasets in all time windows.
+    - target_variable_df (pd.DataFrame): DataFrame with MultiIndex containing matching target variables
+        for each training data row
+    - returns_df (pd.DataFrame): DataFrame with MultiIndex containing modeling period returns for each
+        training data row
     - join_logs_df (pd.DataFrame): DataFrame showing the outcomes of each dataset's join and fill
         methods
     """
@@ -90,7 +95,14 @@ def generate_all_time_windows_model_inputs(config,metrics_config,modeling_config
     concatenated_dfs = concat_dataset_time_windows_dfs(all_flattened_filepaths,modeling_config)
     training_data_df, join_logs_df = join_dataset_all_windows_dfs(concatenated_dfs)
 
-    return training_data_df, join_logs_df
+    # Create target variables for all time windows
+    target_variable_df, returns_df, = tv.create_target_variables_for_all_time_windows(training_data_df,
+                                                                                    prices_df,
+                                                                                    config,
+                                                                                    modeling_config)
+
+
+    return training_data_df, target_variable_df, returns_df, join_logs_df
 
 
 
