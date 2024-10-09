@@ -188,6 +188,83 @@ def test_generate_time_series_indicators_incorrect_column(sample_data_incorrect_
         "The input DataFrame should not be modified when an error occurs"
 
 
+@pytest.mark.unit
+def test_generate_time_series_indicators_multiple_windows():
+    """
+    Test that generate_time_series_indicators correctly calculates indicators when multiple window
+    sizes are provided, producing separate columns for each window size with correct calculations.
+    """
+
+    # Prepare sample dataset
+    data = {
+        'coin_id': [1, 1, 1, 1, 1],
+        'date': pd.date_range(start='2021-01-01', periods=5, freq='D'),
+        'price': [10, 12, 14, 16, 18]
+    }
+    dataset_df = pd.DataFrame(data)
+
+    # Prepare dataset_metrics_config with multiple windows for SMA
+    dataset_metrics_config = {
+        'price': {
+            'indicators': {
+                'sma': {
+                    'parameters': {
+                        'window': [2, 3]
+                    }
+                }
+            }
+        }
+    }
+
+    # Call the function
+    result_df = ind.generate_time_series_indicators(
+        dataset_df,
+        dataset_metrics_config,
+        id_column='coin_id'
+    )
+
+    # Expected SMA values
+    # For window=2:
+    # - For date 2021-01-01: insufficient data (NaN)
+    # - For date 2021-01-02: (10 + 12)/2 = 11.0
+    # - For date 2021-01-03: (12 + 14)/2 = 13.0
+    # - For date 2021-01-04: (14 + 16)/2 = 15.0
+    # - For date 2021-01-05: (16 + 18)/2 = 17.0
+    expected_sma_2 = [np.nan, 11.0, 13.0, 15.0, 17.0]
+
+    # For window=3:
+    # - For date 2021-01-01: insufficient data (NaN)
+    # - For date 2021-01-02: insufficient data (NaN)
+    # - For date 2021-01-03: (10 + 12 + 14)/3 = 12.0
+    # - For date 2021-01-04: (12 + 14 + 16)/3 = 14.0
+    # - For date 2021-01-05: (14 + 16 + 18)/3 = 16.0
+    expected_sma_3 = [np.nan, np.nan, 12.0, 14.0, 16.0]
+
+    # Assertions
+    # Check that the output DataFrame has the expected columns
+    assert 'price_sma_2' in result_df.columns, "price_sma_2 column is missing"
+    assert 'price_sma_3' in result_df.columns, "price_sma_3 column is missing"
+
+    # Check that the SMA values are correctly calculated
+    # For price_sma_2 column:
+    # - Comparing the calculated SMA values to expected_sma_2
+    # - Allowing for NaNs where data is insufficient
+    assert np.allclose(
+        result_df['price_sma_2'],
+        expected_sma_2,
+        equal_nan=True
+    ), "price_sma_2 values are incorrect"
+
+    # For price_sma_3 column:
+    # - Comparing the calculated SMA values to expected_sma_3
+    # - Allowing for NaNs where data is insufficient
+    assert np.allclose(
+        result_df['price_sma_3'],
+        expected_sma_3,
+        equal_nan=True
+    ), "price_sma_3 values are incorrect"
+
+
 
 # ------------------------------------------------ #
 # generate_column_time_series_indicators() unit tests
@@ -501,11 +578,11 @@ def test_rsi_scenario1(sample_timeseries_rsi1):
     result = ind.calculate_rsi(sample_timeseries_rsi1, 3)
 
     # First, check NaN values are in the expected positions
-    assert np.isnan(result.values[:2]).all(), "Expected NaN in the first two positions"
+    assert np.isnan(result[:2]).all(), "Expected NaN in the first two positions"
 
     # Then, compare the non-NaN values separately
-    assert np.allclose(result.values[2:], [1.0, 0.8333, 0.6, 0.6, 0.8], atol=1e-4), \
-        f"Expected {expected_rsi.values}, but got {result.values}"
+    assert np.allclose(result[2:], [1.0, 0.8333, 0.6, 0.6, 0.8], atol=1e-4), \
+        f"Expected {expected_rsi.values}, but got {result}"
 
 # -------------------------------------------- #
 # calculate_mfi() unit tests

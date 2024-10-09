@@ -415,7 +415,7 @@ def split_dataframe_by_coverage(
         full_coverage_df = time_series_df if full_coverage_count else pd.DataFrame(columns=time_series_df.columns)
         partial_coverage_df = time_series_df if not full_coverage_count else pd.DataFrame(columns=time_series_df.columns)
 
-    logger.info("Split df with dimensions %s into %s full coverage records and %s partial coverage records.",
+    logger.debug("Split df with dimensions %s into %s full coverage records and %s partial coverage records.",
                 time_series_df.shape,
                 len(full_coverage_df),
                 len(partial_coverage_df))
@@ -429,7 +429,7 @@ def split_dataframe_by_coverage(
 
         # Log the number of remaining records
         total_remaining = len(full_coverage_df) + len(partial_coverage_df)
-        logger.info("After removing records outside the date range, %s records remain.",
+        logger.debug("After removing records outside the date range, %s records remain.",
                     total_remaining)
 
     return full_coverage_df, partial_coverage_df

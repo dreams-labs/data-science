@@ -1,7 +1,6 @@
 """
 Validation logic for items in config.yaml
 """
-from enum import Enum
 from datetime import date
 from typing import Dict, Optional
 from pydantic import BaseModel, Field
@@ -41,21 +40,14 @@ class TrainingDataConfig(NoExtrasBaseModel):
     modeling_period_end: date = Field(...)
     additional_windows: int = Field(..., ge=0)
     earliest_window_start: date = Field(...)
+    earliest_cohort_lookback_start: date = Field(...)
 
 
 
 # ----------------------------------------------------------------------------
 # Datasets Section
 # ----------------------------------------------------------------------------
-class FillMethod(str, Enum):
-    """
-    These dicatates what to do if the dataset doesn't have rows for every coin_id in other
-    datasets.
-    """
-    FILL_ZEROS = "fill_zeros"       # any missing rows are filled with 0
-    DROP_RECORDS = "drop_records"   # any missing rows are dropped from the training set
-    EXTEND = "extend"               # used for macro series; copies the features to all coins
-    NONE = "none"                   # generates no features but allows series to be used for ratios
+
 
 
 class DatasetsConfig(NoExtrasBaseModel):
@@ -75,7 +67,6 @@ class WalletCohortConfig(NoExtrasBaseModel):
     This data category is a series of metrics generated based on the behavior of a cohort
     of wallets, which are defined using the variables within.
     """
-    fill_method: FillMethod = Field(...)
     sameness_threshold: float = Field(..., ge=0, le=1)
     lookback_period: int = Field(..., gt=0)
     wallet_minimum_inflows: float = Field(..., ge=0)
@@ -90,7 +81,6 @@ class TimeSeriesDataConfig(NoExtrasBaseModel):
     """
     This data category includes any dataset keyed on both coin_id and date.
     """
-    fill_method: FillMethod = Field(...)
     sameness_threshold: float = Field(..., ge=0, le=1)
 
 # Coin Facts Configuration
@@ -101,7 +91,6 @@ class CoinFactsConfig(NoExtrasBaseModel):
     do not generally change over time. Examples include a token's category, blockchain,
     fee structure, etc.
     """
-    fill_method: FillMethod = Field(...)
     sameness_threshold: float = Field(..., ge=0, le=1)
     chain_threshold: Optional[int] = Field(None, ge=0)
 
@@ -113,7 +102,7 @@ class MacroTrendsConfig(NoExtrasBaseModel):
     do not generally change over time. Examples include a token's category, blockchain,
     fee structure, etc.
     """
-    fill_method: FillMethod = Field(...)
+    sameness_threshold: float = Field(..., ge=0, le=1)
 
 
 # ----------------------------------------------------------------------------

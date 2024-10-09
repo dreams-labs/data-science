@@ -25,6 +25,7 @@ class NoExtrasBaseModel(BaseModel):
 # ----------------------------------------------------------------------------
 # ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
 
+
 class MetricsConfig(NoExtrasBaseModel):
     """
     Top level structure of the main metrics_config.yaml file.
@@ -111,10 +112,8 @@ class MacroTrendMetric(str, Enum):
 # Modular Metrics Flattening System
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
-
-class Metric(NoExtrasBaseModel):
     """
-    The Metric config class defines how a time series should be flattened into a single row by
+    The Metric config defines how a time series should be flattened into a single row by
     specifying the columns that will show up in the row, e.g. sum of buyers_new in the sharks
     cohort. These are the three ways that metrics can be generated from time series data:
 
@@ -132,9 +131,15 @@ class Metric(NoExtrasBaseModel):
     calculated. Scaling is applied to the dataframe containing every coin_id's values for the
     metric and done as part of preprocessing.
     """
+
+
+class BaseMetric(NoExtrasBaseModel):
+    """
+    Base metrics template defining the fields and datatypes for metrics at all
+    levels of the config
+    """
     aggregations: Optional[Dict['AggregationType', 'AggregationConfig']] = Field(default=None)
     rolling: Optional['RollingMetrics'] = Field(default=None)
-    indicators: Optional[Dict['IndicatorType', 'IndicatorMetric']] = Field(default=None)
 
     @model_validator(mode='after')
     def remove_empty_fields(cls, values):
@@ -144,6 +149,15 @@ class Metric(NoExtrasBaseModel):
         values_dict = values.model_dump(exclude_none=True)  # Exclude None values
         cleaned_dict = remove_empty_dicts(values_dict)  # Recursively remove empty dictionaries
         return cleaned_dict
+
+
+class Metric(BaseMetric):
+    """
+    The Metric config class represents metrics calculated from the dataset base columns.
+    They can generate new time series or aggregation fields through indicators or rolling.
+    """
+    indicators: Optional[Dict['IndicatorType', 'IndicatorMetric']] = Field(default=None)
+
 
 def remove_empty_dicts(data):
     """
@@ -263,7 +277,7 @@ class IndicatorParams(NoExtrasBaseModel):
     window: List[int] # used in all indicators
     num_std: Optional[float] = None  # used in bollinger_bands
 
-class IndicatorMetric(Metric):
+class IndicatorMetric(BaseMetric):
     """
     This includes all fields from the Metric parent class as well as IndicatorParameters.
     """
@@ -293,3 +307,5 @@ class ScalingConfig(NoExtrasBaseModel):
 # ============================================================================
 # Ensures all classes are fully reflected in structure regardless of the order they were defined
 MetricsConfig.model_rebuild()
+Metric.model_rebuild()
+IndicatorMetric.model_rebuild()

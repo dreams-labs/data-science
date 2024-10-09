@@ -22,9 +22,7 @@ from dreams_core import core as dc
 # pyright: reportMissingImports=false
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 from utils import load_config
-# import feature_engineering as fe
-# import coin_wallet_metrics as cwm
-import insights.model_input_flows as mif
+import insights.experiments as exp
 
 load_dotenv()
 logger = dc.setup_logger()
@@ -85,7 +83,7 @@ def test_validate_experiments_yaml_success(tmpdir):
     config_folder.join("modeling_config.yaml").write(modeling_config)
 
     # Run the function and verify no errors
-    configurations = mif.validate_experiments_yaml(str(config_folder))
+    configurations = exp.validate_experiments_yaml(str(config_folder))
 
     # Assert that both config and modeling_config sections are validated
     assert len(configurations) == 2  # Two sections: config and modeling_config
@@ -133,7 +131,7 @@ def test_validate_experiments_yaml_missing_file(tmpdir):
 
     # Verify that it raises FileNotFoundError for the missing config file
     with pytest.raises(FileNotFoundError, match="config_missing.yaml not found in"):
-        mif.validate_experiments_yaml(str(config_folder))
+        exp.validate_experiments_yaml(str(config_folder))
 
 @pytest.mark.xfail
 # these will be redone once the next experiment is run
@@ -166,7 +164,13 @@ def test_validate_experiments_yaml_invalid_key(tmpdir):
 
     # Verify that it raises a ValueError for the invalid key
     with pytest.raises(ValueError, match="Key 'invalid_key' in variable_overrides not found in config.yaml"):
-        mif.validate_experiments_yaml(str(config_folder))
+        exp.validate_experiments_yaml(str(config_folder))
+
+
+
+# ---------------------------------------------- #
+# prepare_configs() unit tests
+# ---------------------------------------------- #
 
 @pytest.mark.xfail
 # these will be redone once the next experiment is run
@@ -223,7 +227,7 @@ def test_prepare_configs_success(tmpdir):
     }
 
     # Run the function
-    config, metrics_config, modeling_config = mif.prepare_configs(str(config_folder), override_params)
+    config, metrics_config, modeling_config = exp.prepare_configs(str(config_folder), override_params)
 
     # Assert the overrides were applied correctly
     assert config['data_cleaning']['inflows_filter'] == 10000000
@@ -284,7 +288,7 @@ def test_prepare_configs_failure(tmpdir):
 
     # Run the function and expect a KeyError
     with pytest.raises(KeyError, match="Key 'non_existent_filter' not found"):
-        mif.prepare_configs(str(config_folder), override_params)
+        exp.prepare_configs(str(config_folder), override_params)
 
 
 # pytest: disable=C0116  # no docstrings in fixtures
@@ -348,7 +352,7 @@ def test_rebuild_profits_df_if_necessary(
     os.makedirs(temp_folder)
 
     # Call the function to trigger the rebuild
-    new_profits_df = mif.rebuild_profits_df_if_necessary(mock_config, mock_prices_df, profits_df=None)
+    new_profits_df = exp.rebuild_profits_df_if_necessary(mock_config, mock_prices_df, profits_df=None)
 
     # Assertions
     mock_retrieve_profits_data.assert_called_once_with(
@@ -385,16 +389,16 @@ def test_return_cached_profits_df(mock_config, mock_profits_df, mock_prices_df):
     Test the case where the config has not changed and the cached profits_df is returned from memory.
     """
 
-    # Generate the correct hash for the mock_config using mif.generate_config_hash
+    # Generate the correct hash for the mock_config using exp.generate_config_hash
     relevant_config = {**mock_config['training_data'], **mock_config['data_cleaning']}
-    correct_hash = mif.generate_config_hash(relevant_config)
+    correct_hash = exp.generate_config_hash(relevant_config)
 
     # Simulate the hash being cached in memory by directly assigning it to the global cache or the dictionary cache
-    mif.config_cache = {"hash": correct_hash}  # Use the cache dictionary instead of file-based hash
+    exp.config_cache = {"hash": correct_hash}  # Use the cache dictionary instead of file-based hash
 
     # Call the function and verify the profits_df is returned from memory without rebuilding
     try:
-        returned_profits_df = mif.rebuild_profits_df_if_necessary(mock_config, mock_prices_df, profits_df=mock_profits_df)
+        returned_profits_df = exp.rebuild_profits_df_if_necessary(mock_config, mock_prices_df, profits_df=mock_profits_df)
         assert returned_profits_df.equals(mock_profits_df)
     except Exception as e:  # pylint: disable = W0718
         pytest.fail(f"Test failed due to timeout: {str(e)}")
@@ -510,7 +514,7 @@ def profits_df():
     # logger.debug(f"Shape of flattened_buysell_metrics_df: {flattened_buysell_metrics_df.shape}")
 
     # # Run build_configured_model_input
-    # X_train, X_test, y_train, y_test = mif.build_configured_model_input(
+    # X_train, X_test, y_train, y_test = exp.build_configured_model_input(
     #     profits_df, prices_df, config, df_metrics_config, modeling_config
     # )
 

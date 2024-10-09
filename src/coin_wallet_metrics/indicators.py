@@ -155,6 +155,17 @@ def generate_column_time_series_indicators(
     if groupby_column == 'dummy_group':
         time_series_df = time_series_df.drop('dummy_group', axis=1)
 
+
+    # Recheck for NaN values in the middle of series
+    if id_column:
+        for group_id, group in time_series_df.groupby(id_column, observed=True):
+            if u.check_nan_values(group[value_column]):
+                raise ValueError(f"The '{value_column}' column contains NaN values in the middle for {id_column} {group_id}.")
+    else:
+        if u.check_nan_values(time_series_df[value_column]):
+            raise ValueError(f"The '{value_column}' column contains NaN values in the middle of the series.")
+
+
     logger.info("Generated indicators for column '%s': %s",
                 value_column,
                 list(value_column_indicators_config.keys()))
@@ -268,8 +279,8 @@ def calculate_rsi(timeseries: pd.Series, window: int = 14) -> pd.Series:
     gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
 
-    rs = gain / loss
-    rsi = 1 - (1 / (1 + rs))
+    rs = np.where(loss != 0, gain / loss, np.inf)
+    rsi = np.where(loss == 0, 1, 1 - (1 / (1 + rs)))
     return rsi
 
 

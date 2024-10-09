@@ -1,55 +1,63 @@
 preprocessing:
-  drop_features:  # List of features to drop from the dataset before modeling
+    drop_features:  # List of features to drop from the dataset before modeling
+    - "whales_total_bought_sum_10d_period_3"
+    fill_methods:
+        wallet_cohorts: "fill_zeros"
+        market_data: "drop_records"
+        macro_trends: "extend_coin_ids"
+    data_partitioning:
+        test_set_share: 0.15  # Size of the test set as a proportion of the data
+        validation_set_share: 0.15  # Size of the validation set as a proportion of the data
+        future_set_time_windows: 0 # How many time windows should be the future_set, starting from the latest date
 
 target_variables:
-  moon_threshold: 0.25  # Minimum price % increase for a coin to be is_moon
-  moon_minimum_percent: 0.05  # Minimum percentage of coins tagged as is_moon
-  #   # If the % of coins that meet the moon_threshold is below this
-  #   # value, additional coins are added in order of price performance
-  #   # until this % is reached
-  # crater_threshold: -0.25  # Minimum price % decrease for a coin to be is_crater
-  # crater_minimum_percent: 0.1  # Minimum percentage of coins tagged as is_crater
-  #   # If the % of coins that meet the crater_threshold is below this
-  #   # value, additional coins are added in order of price performance
-  #   # until this % is reached
+    moon_threshold: 0.25  # Minimum price % increase for a coin to be is_moon
+    moon_minimum_percent: 0.1  # Minimum percentage of coins tagged as is_moon
+      # If the % of coins that meet the moon_threshold is below this
+      # value, additional coins are added in order of price performance
+      # until this % is reached
+    crater_threshold: -0.25  # Minimum price % decrease for a coin to be is_crater
+    crater_minimum_percent: 0.1  # Minimum percentage of coins tagged as is_crater
+      # If the % of coins that meet the crater_threshold is below this
+      # value, additional coins are added in order of price performance
+      # until this % is reached
 
 modeling:
-  # model_type: "GradientBoostingRegressor"
-  model_type: "RandomForestRegressor"
-  # model_type: "RandomForestClassifier"
-  # model_params:
-  #   n_estimators: 100  # Number of trees in the model
+    # model_type: "GradientBoostingRegressor"
+    model_type: "RandomForestRegressor"
+    # model_type: "RandomForestClassifier"
+    # model_params:
+    #   n_estimators: 100  # Number of trees in the model
 
-  # target_column: "is_moon"  # "is_moon" or "is_crater" depending on the experiment
-  target_column: "returns"  # "is_moon" or "is_crater" depending on the experiment
+    target_column: "is_moon"  # "is_moon" or "is_crater" depending on the experiment
+    # target_column: "returns"  # "is_moon" or "is_crater" depending on the experiment
 
 
-  modeling_folder: "..//modeling"  # location of the modeling folder where outputs will be saved
-  config_folder: "..//config"  # location of the config folder where base case config files are
-  train_test_split: 0.25  # Size of the test set as a proportion of the data
-  random_state: 3  # Random seed for reproducibility
+    modeling_folder: "..//modeling"  # location of the modeling folder where outputs will be saved
+    config_folder: "..//config"  # location of the config folder where base case config files are
+    random_seed: 38  # Random seed for reproducibility
 
 evaluation:
-  winsorization_cutoff: 0.01
-  metrics:
-  # # Classifier Metrics
-    accuracy:
-    precision:
-    recall:
-    f1_score:
-    roc_auc:
-    log_loss:
-    confusion_matrix:
+    winsorization_cutoff: 0.01
+    metrics:
+        # Classifier Metrics
+        accuracy:
+        precision:
+        recall:
+        f1_score:
+        roc_auc:
+        log_loss:
+        confusion_matrix:
 
-  # # Regressor Metrics
-    mse:
-    rmse:
-    mae:
-    r2:
-    explained_variance:
+        # Regressor Metrics
+        mse:
+        rmse:
+        mae:
+        r2:
+        explained_variance:
 
-  # Profitability AUC
-    profitability_auc:
-      top_percentage_filter: 0.1
-    downside_profitability_auc:
-      top_percentage_filter: 0.1
+        # Profitability AUC
+        profitability_auc:
+            top_percentage_filter: 0.1
+        downside_profitability_auc:
+            top_percentage_filter: 0.1

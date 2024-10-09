@@ -43,8 +43,6 @@ def identify_imputation_dates(config):
     """
     # Basic period boundary dates
     period_boundary_dates = [
-        config['training_data']['modeling_period_end'],
-        config['training_data']['modeling_period_start'],
         config['training_data']['training_period_end'],
         config['training_data']['training_period_start'],
     ]
