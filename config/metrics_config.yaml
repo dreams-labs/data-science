@@ -18,12 +18,12 @@ wallet_cohorts:
             aggregations:
                 sum:
                     scaling: "log"        # Scaling applied to sums, which can vary significantly in range.
-            # rolling:
-            #     aggregations:
-            #         sum:
-            #             scaling: "log"
-            #     window_duration: 10
-            #     lookback_periods: 3
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "log"
+                window_duration: 10
+                lookback_periods: 3
         total_bought:
             aggregations:
                 sum:
@@ -45,6 +45,12 @@ wallet_cohorts:
             aggregations:
                 last:
                     scaling: "log"        # Total sold should also be scaled to account for high variance.
+            rolling:
+                aggregations:
+                    mean:
+                        scaling: "log"
+                window_duration: 10
+                lookback_periods: 3
             indicators:
                 ema:
                     parameters:
@@ -52,12 +58,12 @@ wallet_cohorts:
                     aggregations:
                         last:
                             scaling: "none"
-                    # rolling:
-                    #     aggregations:
-                    #         last:
-                    #             scaling: "none"
-                    #     window_duration: 7
-                    #     lookback_periods: 3
+                    rolling:
+                        aggregations:
+                            last:
+                                scaling: "standard"
+                        window_duration: 7
+                        lookback_periods: 3
 
         total_balance:
             aggregations:
@@ -98,60 +104,38 @@ wallet_cohorts:
 
 # Time series keyed on coin_id-date
 time_series:
-
     market_data:
         price:
-            # rolling:
-            #     comparisons:
-            #         pct_change:
-            #             scaling: "none"
-            #     window_duration: 10
-            #     lookback_periods: 5
-            indicators:
-                # sma:
-                #     parameters:
-                #         window: [30,100]
-                #     aggregations:
-                #         last:
-                #             scaling: "none"
-                #     rolling:
-                #         aggregations:
-                #             sum:
-                #                 scaling: "log"
-                #         window_duration: 10
-                #         lookback_periods: 5
-                rsi:
-                    parameters:
-                        window: [14]
-                    aggregations:
-                        last:
-                            scaling: "none"
-
-
+            aggregations:
+                std:
+                    scaling: "none"
         volume:
-            indicators:
-                ema:
-                    parameters:
-                        window: [3,14]
-                    aggregations:
-                        last:
-                            scaling: "log"
-                    rolling:
-                        aggregations:
-                            sum:
-                                scaling: "log"
-                        window_duration: 10
-                        lookback_periods: 2
-                rsi:
-                    parameters:
-                        window: [14]
-                    aggregations:
-                        last:
-                            scaling: "none"
+            aggregations:
+                sum:
+                    scaling: "standard"
         market_cap:
             aggregations:
                 last:
                     scaling: "log"
+            # indicators:
+            #     ema:
+            #         parameters:
+            #             window: [3,14]
+            #         aggregations:
+            #             last:
+            #                 scaling: "log"
+            #         rolling:
+            #             aggregations:
+            #                 sum:
+            #                     scaling: "log"
+            #             window_duration: 10
+            #             lookback_periods: 2
+            #     rsi:
+            #         parameters:
+            #             window: [14]
+            #         aggregations:
+            #             last:
+            #                 scaling: "none"
 
 
 # Time series keyed on only date

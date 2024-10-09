@@ -34,96 +34,176 @@ logger = dc.setup_logger()
 # ===================================================== #
 
 # ------------------------------------------ #
-# preprocess_coin_df() unit tests
+# ScalingProcessor unit tests
 # ------------------------------------------ #
 
-
 @pytest.fixture
-def sample_metrics_config():
-    """basic sample config for initial unit tests"""
+def scaling_1_metrics_config():
+    """
+    Fixture providing a sample metrics configuration dictionary.
+    """
     return {
-        "metric1": {
-            "scaling": "standard"
-        },
-        "metric2": {
-            "scaling": "minmax"
-        },
-        "metric3": {
-            "scaling": "log"
-        },
-        "metric4": {
-            "scaling": "none"
-        },
-        "nested_metric": {
-            "aggregations": {
-                "sum": {"scaling": "standard"}
+        'time_series': {
+            'market_data': {
+                'price': {
+                    'aggregations': {
+                        'std': {
+                            'scaling': 'none'
+                        }
+                    }
+                },
+                'volume': {
+                    'aggregations': {
+                        'sum': {
+                            'scaling': 'standard'
+                        }
+                    }
+                },
+                'market_cap': {
+                    'aggregations': {
+                        'last': {
+                            'scaling': 'log'
+                        }
+                    }
+                }
             }
         }
     }
 
 @pytest.fixture
-def sample_dataframe():
-    """simple df for initial unit tests"""
-    return pd.DataFrame({
-        "metric1": [1, 2, 3, 4, 5],
-        "metric2": [10, 20, 30, 40, 50],
-        "metric3": [1, 10, 100, 1000, 10000],
-        "metric4": [1, 2, 3, 4, 5],
-        "nested_metric_sum": [5, 10, 15, 20, 25]
-    })
-
-def test_basic_create_column_scaling_map(sample_metrics_config):
-    """Confirms basic functionality of _create_column_scaling_map() method"""
-    processor = prp.ScalingProcessor(sample_metrics_config)
-    expected_map = {
-        "metric1": "standard",
-        "metric2": "minmax",
-        "metric3": "log",
-        "metric4": "none",
-        "nested_metric_sum": "standard"
+def scaling_1_dummy_dataframe():
+    """
+    Fixture providing a dummy dataframe with a MultiIndex and sample data.
+    """
+    index = pd.MultiIndex.from_product(
+        [
+            pd.to_datetime(['2023-01-01', '2023-01-02']),
+            ['bitcoin', 'ethereum']
+        ],
+        names=['time_window', 'coin_id']
+    )
+    data = {
+        'time_series_market_data_price_std': [1.0, 2.0, 3.0, 4.0],
+        'time_series_market_data_volume_sum': [100, 200, 300, 400],
+        'time_series_market_data_market_cap_last': [1000, 2000, 3000, 4000]
     }
-    assert processor.column_scaling_map == expected_map
+    df = pd.DataFrame(data, index=index)
+    return df
 
-def test_basic_apply_scaling():
-    sample_metrics_config = {
-        "metric1": {"scaling": "standard"},
-        "metric2": {"scaling": "minmax"},
-        "metric3": {"scaling": "log"},
-        "metric4": {"scaling": "none"}
+@pytest.mark.unit
+def test_scaling_processor(scaling_1_metrics_config, scaling_1_dummy_dataframe):
+    """
+    Test the ScalingProcessor class for correct column mapping and scaling application.
+    """
+    # Instantiate the ScalingProcessor with the provided metrics_config
+    processor = prp.ScalingProcessor(scaling_1_metrics_config)
+
+    # Expected column_scaling_map based on the metrics_config
+    expected_column_scaling_map = {
+        'time_series_market_data_price_std': 'none',
+        'time_series_market_data_volume_sum': 'standard',
+        'time_series_market_data_market_cap_last': 'log'
     }
 
-    sample_df = pd.DataFrame({
-        "metric1": [1, 2, 3, 4, 5],
-        "metric2": [10, 20, 30, 40, 50],
-        "metric3": [1, 10, 100, 1000, 10000],
-        "metric4": [1, 2, 3, 4, 5]
-    })
-
-    processor = prp.ScalingProcessor(sample_metrics_config)
-    scaled_df = processor.apply_scaling(sample_df, is_train=True)
-
-    # Check if scalers are created and stored
-    assert "metric1" in processor.scalers
-    assert "metric2" in processor.scalers
-    assert "metric3" not in processor.scalers  # log scaling doesn't use a stored scaler
-    assert "metric4" not in processor.scalers
-
-    # Check if scaling is applied correctly
-    np.testing.assert_allclose(
-        scaled_df["metric1"].values,
-        StandardScaler().fit_transform(sample_df[["metric1"]]).flatten(),
-        rtol=1e-7, atol=1e-7
+    # Assert that the column_scaling_map is as expected
+    assert processor.column_scaling_map == expected_column_scaling_map, (
+        "Column scaling map does not match expected mapping."
     )
-    np.testing.assert_allclose(
-        scaled_df["metric2"].values,
-        MinMaxScaler().fit_transform(sample_df[["metric2"]]).flatten(),
-        rtol=1e-7, atol=1e-7
-    )
-    np.testing.assert_allclose(
-        scaled_df["metric3"].values,
-        np.log1p(sample_df["metric3"]),
-        rtol=1e-7, atol=1e-7
-    )
-    np.testing.assert_array_equal(scaled_df["metric4"].values, sample_df["metric4"].values)
 
-    print("All tests passed!")
+    # Apply scaling to the dummy_dataframe (as training data)
+    scaled_df = processor.apply_scaling(scaling_1_dummy_dataframe, is_train=True)
+
+    # Prepare expected scaled values for each column
+
+    # For 'time_series_market_data_price_std', scaling is 'none',
+    # so values should remain the same as in the original dataframe.
+    expected_price_std = scaling_1_dummy_dataframe['time_series_market_data_price_std'].values
+
+    # For 'time_series_market_data_volume_sum', scaling is 'standard'.
+    # This means we need to standardize the values by subtracting the mean and dividing by the std deviation.
+    volume_values = scaling_1_dummy_dataframe['time_series_market_data_volume_sum'].values.reshape(-1, 1)
+    # Calculate mean and standard deviation of the volume values
+    volume_mean = volume_values.mean()
+    volume_std = volume_values.std()
+    # Standardize the volume values
+    expected_volume_sum = (volume_values - volume_mean) / volume_std
+    expected_volume_sum = expected_volume_sum.flatten()
+
+    # For 'time_series_market_data_market_cap_last', scaling is 'log'.
+    # We apply the natural logarithm to the values (using np.log1p to handle zero values safely).
+    market_cap_values = scaling_1_dummy_dataframe['time_series_market_data_market_cap_last'].values
+    expected_market_cap_last = np.log1p(market_cap_values)
+
+    # Now, we compare the scaled values in scaled_df to the expected values calculated above.
+
+    # Compare 'time_series_market_data_price_std' values
+    np.testing.assert_allclose(
+        scaled_df['time_series_market_data_price_std'].values,
+        expected_price_std,
+        atol=1e-4,
+        err_msg="Scaled values for 'price_std' do not match expected values."
+    )
+
+    # Compare 'time_series_market_data_volume_sum' values
+    np.testing.assert_allclose(
+        scaled_df['time_series_market_data_volume_sum'].values,
+        expected_volume_sum,
+        atol=1e-4,
+        err_msg="Scaled values for 'volume_sum' do not match expected standardized values."
+    )
+
+    # Compare 'time_series_market_data_market_cap_last' values
+    np.testing.assert_allclose(
+        scaled_df['time_series_market_data_market_cap_last'].values,
+        expected_market_cap_last,
+        atol=1e-4,
+        err_msg="Scaled values for 'market_cap_last' do not match expected log-transformed values."
+    )
+
+
+@pytest.fixture
+def complex_metrics_config():
+    """Complex metrics_config structure with nested aggregations"""
+    return {
+        "wallet_cohorts": {
+            "whales": {
+                "total_volume": {
+                    "aggregations": {
+                        "last": {
+                            "scaling": "log"
+                        }
+                    },
+                    "rolling": {
+                        "aggregations": {
+                            "mean": {
+                                "scaling": "log"
+                            }
+                        },
+                        "window_duration": 10,
+                        "lookback_periods": 3
+                    },
+                    "indicators": {
+                        "ema": {
+                            "parameters": {
+                                "window": [7]
+                            },
+                            "aggregations": {
+                                "last": {
+                                    "scaling": "none"
+                                }
+                            },
+                            "rolling": {
+                                "aggregations": {
+                                    "last": {
+                                        "scaling": "standard"
+                                    }
+                                },
+                                "window_duration": 7,
+                                "lookback_periods": 3
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }

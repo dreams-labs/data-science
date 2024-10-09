@@ -228,7 +228,7 @@ def generate_window_flattened_dfs(
     # Market data: generate window-specific flattened metrics
     flattened_market_data_df, flattened_market_data_filepath = fg.generate_window_time_series_features(
         market_data_df,
-        'market_data',
+        'time_series-market_data',
         config,
         metrics_config['time_series']['market_data'],
         modeling_config
@@ -302,21 +302,16 @@ def concat_dataset_time_windows_dfs(
         # Read the CSV
         df = pd.read_csv(filepath)
 
-        # Handle subgroups if present
+        # Handle dataset subkeys if present
         if '-' in dataset_prefix:
-            dataset, subgroup = dataset_prefix.split('-')
+            dataset, dataset_subkey = dataset_prefix.split('-')  # pylint: disable=W0612
             # Prefix the columns with the subgroup
-            df = df.rename(
-                columns={
-                    col: (f'{subgroup}_' + col)
-                    for col in df.columns
-                    if col not in ['coin_id', 'time_window']}
-            )
         else:
             dataset = dataset_prefix
 
         # Add the DataFrame to the appropriate group
         if dataset_prefix not in grouped_dfs:
+
             grouped_dfs[dataset_prefix] = []
             # Identify the fill method only once per dataset
             try:

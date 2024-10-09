@@ -212,10 +212,6 @@ class DataPreprocessor:
 
 
 import pdb
-
-
-
-
 class ScalingProcessor:
     """
     Class to apply scaling to all columns as configured in the metrics_config.
@@ -224,7 +220,6 @@ class ScalingProcessor:
     * Makes a mapping from column to the metrics_config using _create_column_scaling_map()
     * For the training set, applies scaling and stores the scaler
     * For other sets, retrieves the training set scaler and applies it
-
     """
     def __init__(self, metrics_config: Dict[str, Any]):
         self.metrics_config = metrics_config
@@ -284,11 +279,15 @@ class ScalingProcessor:
                         if 'aggregations' in rolling_config:
                             for agg_type, agg_config in rolling_config['aggregations'].items():
                                 if isinstance(agg_config, dict) and 'scaling' in agg_config:
-                                    mapping[f"{new_prefix}_rolling_{agg_type}"] = agg_config['scaling']
+                                    mapping[f"{new_prefix}_{agg_type}_"
+                                            f"{rolling_config['window_duration']}d_period_"
+                                            f"{rolling_config['lookback_periods']}"] = agg_config['scaling']
                         if 'comparisons' in rolling_config:
                             for comp_type, comp_config in rolling_config['comparisons'].items():
                                 if isinstance(comp_config, dict) and 'scaling' in comp_config:
-                                    mapping[f"{new_prefix}_rolling_{comp_type}"] = comp_config['scaling']
+                                    mapping[f"{new_prefix}_{comp_type}_"
+                                            f"{rolling_config['window_duration']}d_period_"
+                                            f"{rolling_config['lookback_periods']}"] = comp_config['scaling']
                         continue  # Skip further recursion for 'rolling'
 
                     # Recursive call for nested structures
@@ -302,7 +301,6 @@ class ScalingProcessor:
             return mapping
 
         return recursive_parse(self.metrics_config)
-
 
 
     def apply_scaling(self, df: pd.DataFrame, is_train: bool = False) -> pd.DataFrame:

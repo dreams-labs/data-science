@@ -46,7 +46,7 @@ def load_all_configs(config_folder):
     experiments_config = load_config(f'{config_folder}/experiments_config.yaml')
 
     # Confirm that all datasets and metrics match across config and metrics_config
-    validate_config_consistency(config,metrics_config)
+    validate_config_consistency(config,metrics_config,modeling_config)
 
     return config, metrics_config, modeling_config, experiments_config
 
@@ -186,7 +186,7 @@ def calculate_period_dates(config):
     }
 
 
-def validate_config_consistency(config,metrics_config):
+def validate_config_consistency(config,metrics_config, modeling_config):
     """
     Validates the consistency between config.yaml and metrics_config.yaml.
 
@@ -199,7 +199,7 @@ def validate_config_consistency(config,metrics_config):
     """
     config_datasets = config.get('datasets', {})
 
-    # Check if top-level keys match
+    # Check if metrics_config and config top-level keys match
     config_dataset_keys = set(config_datasets.keys())
     metrics_config_keys = set(metrics_config.keys())
 
@@ -213,6 +213,15 @@ def validate_config_consistency(config,metrics_config):
         if missing_in_config:
             error_msg.append(f"Missing in config.yaml datasets: {', '.join(missing_in_config)}")
         raise ValueError("Inconsistency between config files:\n" + "\n".join(error_msg))
+
+    # Confirm all top-level keys have a modeling_config fill_method
+    modeling_config_keys = set(modeling_config['preprocessing']['fill_methods'].keys())
+    missing_in_modeling = config_dataset_keys - modeling_config_keys
+    if missing_in_modeling:
+        error_msg = (["Missing in modeling_config['preprocessing']"
+                    f"['drop_features']: {', '.join(missing_in_modeling)}"])
+        raise ValueError("Inconsistency between config files:\n" + "\n".join(error_msg))
+
 
     # Check if next-level keys match for each top-level key
     for key in config_dataset_keys:

@@ -254,7 +254,7 @@ def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows):
     # Run the SQL query using dgc's run_sql method
     profits_df = dgc().run_sql(query_sql)
 
-    logger.info('Converting columns to memory-optimized formats...')
+    logger.debug('Converting columns to memory-optimized formats...')
 
     # Convert coin_id to categorical and date to date
     profits_df['coin_id'] = profits_df['coin_id'].astype('category')
@@ -381,7 +381,7 @@ def retrieve_metadata_data():
     logger.debug('retrieving metadata data...')
     metadata_df = dgc().run_sql(query_sql)
 
-    logger.info('retrieved metadata_df with shape %s',metadata_df.shape)
+    logger.info('Retrieved metadata_df with shape %s',metadata_df.shape)
 
     return metadata_df
 
@@ -435,7 +435,7 @@ def retrieve_macro_trends_data():
 
     # Run the SQL query using dgc's run_sql method
     macro_trends_df = dgc().run_sql(query_sql)
-    logger.debug('retrieved macro trends data with shape %s',macro_trends_df.shape)
+    logger.debug('Retrieved macro trends data with shape %s',macro_trends_df.shape)
 
     # Convert the date column to datetime format
     macro_trends_df['date'] = pd.to_datetime(macro_trends_df['date'])

@@ -31,7 +31,8 @@ def generate_window_time_series_features(
     - all_windows_time_series_df (DataFrame): df containing all metrics and indicators for a time
         series dataset.
     - dataset_name (string): key from config['datasets'] that will be added to the dataset's file
-        and column names, e.g. 'market_data', 'wallet_cohorts', etc
+        and column names. If there are multiple keys, they should be split with a '-'.
+            e.g. wallet_cohorts-whales, time_series-market_data
     - config (dict): config.yaml that has the dates for the specific time window
     - dataset_metrics_config (dict): The component of metrics_config relating to this dataset, e.g.
         metrics_config['time_series']['market_data']
@@ -60,6 +61,13 @@ def generate_window_time_series_features(
 
     # Add time window modeling period start
     flattened_metrics_df.loc[:,'time_window'] = config['training_data']['modeling_period_start']
+
+    # Add dataset_name as a prefix to all columns so their lineage is fully documented
+    flattened_metrics_df = flattened_metrics_df.rename(
+        columns=lambda x:
+        f"{dataset_name.replace('-', '_')}_{x}"
+        if x not in ['coin_id', 'time_window']
+        else x)
 
     # Save the flattened output and retrieve the file path
     _, flattened_metrics_filepath = flt.save_flattened_outputs(
@@ -94,7 +102,8 @@ def generate_window_macro_trends_features(
     - all_windows_time_series_df (DataFrame): df containing all metrics and indicators for a time
         series dataset.
     - dataset_name (string): key from config['datasets'] that will be added to the dataset's file
-        and column names, e.g. 'macro_trends'
+        and column names. If there are multiple keys, they should be split with a '-'.
+            e.g. wallet_cohorts-whales, time_series-market_data
     - config: config.yaml that has the dates for the specific time window
     - metrics_config: metrics_config.yaml
     - modeling_config: modeling_config.yaml
@@ -118,6 +127,12 @@ def generate_window_macro_trends_features(
     # Add time window modeling period start
     flattened_macro_trends_df.loc[:,'time_window'] = config['training_data']['modeling_period_start']
 
+    # Add dataset_name as a prefix to all columns so their lineage is fully documented
+    flattened_macro_trends_df = flattened_macro_trends_df.rename(
+        columns=lambda x:
+        f"{dataset_name.replace('-', '_')}_{x}"
+        if x not in ['coin_id', 'time_window']
+        else x)
 
     # Save the flattened output and retrieve the file path
     _, flattened_metrics_filepath = flt.save_flattened_outputs(
