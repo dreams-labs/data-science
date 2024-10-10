@@ -13,16 +13,17 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, Grad
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.metrics import roc_auc_score, confusion_matrix, log_loss
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, explained_variance_score, max_error
+from sklearn.model_selection import KFold, cross_val_score
 
 
 # project files
-from utils import timing_decorator  # pylint: disable=E0401 # can't find utils import
+import utils as u  # pylint: disable=E0401 # can't find utils import
 
 # set up logger at the module level
 logger = dc.setup_logger()
 
 
-@timing_decorator
+@u.timing_decorator
 def train_model(X_train, y_train, modeling_config):
     """
     Trains a model (classifier or regressor) on the training data and saves the model, logs, and feature importance.
@@ -44,7 +45,7 @@ def train_model(X_train, y_train, modeling_config):
     # Initialize model with default params if none provided
     model_params = modeling_config["modeling"].get("model_params", None)
     if model_params is None:
-        model_params = {"n_estimators": 100, "random_seed": 42}
+        model_params = {"n_estimators": 100}
 
     # Initialize the model
     model_type = modeling_config["modeling"]["model_type"]
@@ -56,6 +57,12 @@ def train_model(X_train, y_train, modeling_config):
         model = GradientBoostingRegressor(**model_params)
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
+
+    # K-Fold cross-validation
+    n_splits = modeling_config["modeling"].get("n_splits", 5)
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+    cv_scores = cross_val_score(model, X_train, y_train, cv=kf)
+
 
     # Train the model
     model.fit(X_train, y_train)
@@ -94,7 +101,7 @@ def train_model(X_train, y_train, modeling_config):
             feature_importance_path, f"feature_importance_{model_id}.csv")
         feature_importances.to_csv(feature_importances_filename, index=False)
 
-    return model, model_id
+    return model, model_id, cv_scores
 
 
 def evaluate_model(model, X_test, y_test, model_id, returns_test, modeling_config):
@@ -348,7 +355,7 @@ def winsorize(data, cutoff):
 
 
 
-def log_trial_results(modeling_folder, model_id, experiment_id=None, trial_overrides=None):
+def log_trial_results(modeling_config, model_id, experiment_id=None, trial_overrides=None):
     """
     Logs the results of a modeling trial by pulling data from saved files
     and storing the combined results in the experiment tracking folder.
@@ -363,6 +370,7 @@ def log_trial_results(modeling_folder, model_id, experiment_id=None, trial_overr
     - trial_log (dict): A dictionary with the logged trial details.
     """
     # Define folder paths
+    modeling_folder = modeling_config['modeling']['modeling_folder']
     logs_path = os.path.join(modeling_folder, "logs")
     performance_metrics_path = os.path.join(modeling_folder, "outputs", "performance_metrics")
     feature_importance_path = os.path.join(modeling_folder, "outputs", "feature_importance")
@@ -418,7 +426,15 @@ def log_trial_results(modeling_folder, model_id, experiment_id=None, trial_overr
     else:
         trial_log["predictions"] = "N/A"
 
-    # Step 6: Save the trial log as a JSON file
+    # Step 6: Add all configs to the trial log
+    config_folder = modeling_config['modeling']['config_folder']
+    config, metrics_config, modeling_config, _ = u.load_all_configs(config_folder)  # Reload all configs
+
+    trial_log["configs"]["config"] = config
+    trial_log["configs"]["metrics_config"] = metrics_config
+    trial_log["configs"]["modeling_config"] = modeling_config
+
+    # Step 7: Save the trial log as a JSON file
     trial_log_filename = os.path.join(experiment_tracking_path, f"trial_log_{model_id}.json")
     with open(trial_log_filename, 'w', encoding='utf-8') as trial_log_file:
         json.dump(trial_log, trial_log_file, indent=4)

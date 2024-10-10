@@ -39,6 +39,7 @@ class TrainingDataConfig(NoExtrasBaseModel):
     modeling_period_start: date = Field(...)
     modeling_period_end: date = Field(...)
     additional_windows: int = Field(..., ge=0)
+    time_window_frequency: int = Field(..., gt=0)
     earliest_window_start: date = Field(...)
     earliest_cohort_lookback_start: date = Field(...)
 
@@ -68,7 +69,7 @@ class WalletCohortConfig(NoExtrasBaseModel):
     of wallets, which are defined using the variables within.
     """
     sameness_threshold: float = Field(..., ge=0, le=1)
-    lookback_period: int = Field(..., gt=0)
+    lookback_period: int = Field(..., ge=0)
     wallet_minimum_inflows: float = Field(..., ge=0)
     wallet_maximum_inflows: float = Field(..., gt=0)
     coin_profits_win_threshold: float = Field(...)

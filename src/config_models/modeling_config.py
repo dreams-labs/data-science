@@ -54,7 +54,7 @@ class DataPartitioning(NoExtrasBaseModel):
     Defines the train/test/validation/future split shares
     """
     test_set_share: Annotated[float, Field(gt=0, lt=1)] = Field(...)
-    validation_set_share: Annotated[float, Field(gt=0, lt=1)] = Field(...)
+    validation_set_share: Annotated[float, Field(ge=0, lt=1)] = Field(...)
     future_set_time_windows: Annotated[int, Field(ge=0)] = Field(...)
 
 

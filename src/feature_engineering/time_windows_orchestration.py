@@ -20,7 +20,6 @@ import dreams_core.core as dc
 import training_data.data_retrieval as dr
 import coin_wallet_metrics.indicators as ind
 import feature_engineering.feature_generation as fg
-import feature_engineering.target_variables as tv
 import insights.experiments as exp
 
 # set up logger at the module level
@@ -45,10 +44,7 @@ def generate_all_time_windows_model_inputs(config,metrics_config,modeling_config
     Returns:
     - training_data_df (pd.DataFrame): DataFrame with MultiIndex on time_window,coin_id that contains
         columns for all configured features for all datasets in all time windows.
-    - target_variable_df (pd.DataFrame): DataFrame with MultiIndex containing matching target variables
-        for each training data row
-    - returns_df (pd.DataFrame): DataFrame with MultiIndex containing modeling period returns for each
-        training data row
+    - prices_df (pd.DataFrame): DataFrame with prices for all coins on all dates
     - join_logs_df (pd.DataFrame): DataFrame showing the outcomes of each dataset's join and fill
         methods
     """
@@ -56,7 +52,7 @@ def generate_all_time_windows_model_inputs(config,metrics_config,modeling_config
     # 1. Retrieve base datasets used by all windows
     # ---------------------------------------------
     macro_trends_df, market_data_df, profits_df, prices_df = prepare_all_windows_base_data(config,
-                                                                                              metrics_config)
+                                                                                           metrics_config)
 
 
     # 2. Generate flattened features for each dataset in each window
@@ -95,14 +91,7 @@ def generate_all_time_windows_model_inputs(config,metrics_config,modeling_config
     concatenated_dfs = concat_dataset_time_windows_dfs(all_flattened_filepaths,modeling_config)
     training_data_df, join_logs_df = join_dataset_all_windows_dfs(concatenated_dfs)
 
-    # Create target variables for all time windows
-    target_variable_df, returns_df, = tv.create_target_variables_for_all_time_windows(training_data_df,
-                                                                                    prices_df,
-                                                                                    config,
-                                                                                    modeling_config)
-
-
-    return training_data_df, target_variable_df, returns_df, join_logs_df
+    return training_data_df, prices_df, join_logs_df
 
 
 
@@ -119,19 +108,17 @@ def generate_time_windows(config):
         config.yaml settings for each time window.
     """
     start_date = pd.to_datetime(config['training_data']['modeling_period_start'])
-    window_duration = timedelta(days=config['training_data']['training_period_duration'] +
-                                     config['training_data']['modeling_period_duration'])
+    window_frequency = config['training_data']['time_window_frequency']
 
     time_windows = [
         {'config.training_data.modeling_period_start': start_date.strftime('%Y-%m-%d')}
     ]
 
     for _ in range(config['training_data']['additional_windows']):
-        start_date -= window_duration
+        start_date -= timedelta(days=window_frequency)
         time_windows.append({'config.training_data.modeling_period_start': start_date.strftime('%Y-%m-%d')})
 
     return time_windows
-
 
 
 def prepare_all_windows_base_data(config, metrics_config):

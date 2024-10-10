@@ -1,3 +1,4 @@
+import pdb
 """
 functions used to build coin-level features from training data
 """
@@ -139,13 +140,16 @@ class DataPreprocessor:
     def _drop_features_config(self, df: pd.DataFrame, is_train: bool = False) -> pd.DataFrame:
         """Drop features specified in modeling_config."""
         drop_features = self.modeling_config['preprocessing'].get('drop_features', [])
+        original_columns = df.columns
+
         if drop_features:
             df = df.drop(columns=drop_features, errors='ignore')
 
             # If preprocessing the training set, log dropped columns
             if is_train:
-                dropped = set(drop_features) & set(df.columns)
-                not_dropped = set(drop_features) - dropped
+                # pdb.set_trace()
+                dropped = set(original_columns) - set(df.columns)
+                not_dropped = set(drop_features) - set(original_columns)
                 if dropped:
                     logger.debug("Dropped specified features: %s", list(dropped))
                 if not_dropped:

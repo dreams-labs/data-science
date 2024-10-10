@@ -163,10 +163,14 @@ def calculate_period_dates(config):
     # Lookback Dates
     # --------------
     # Calculate the start date of the earliest window
-    window_duration = modeling_period_duration + training_period_duration
-    window_count = training_data_config['additional_windows'] + 1
-    total_days = window_duration * window_count
-    earliest_window_start = pd.to_datetime(training_period_end) - timedelta(days=total_days)
+    window_frequency = training_data_config['time_window_frequency']
+    additional_windows = training_data_config['additional_windows']
+    total_days_range = (
+        # the total duration of modeling+training periods
+        (modeling_period_duration + training_period_duration)
+        # the number of lookback days added from the time windows
+        + (window_frequency * additional_windows))
+    earliest_window_start = pd.to_datetime(modeling_period_end) - timedelta(days=total_days_range)
 
     # Calculate the earliest cohort lookback date for the earliest window
     # Identify all unique cohort lookback periods
@@ -175,7 +179,7 @@ def calculate_period_dates(config):
         for cohort in config['datasets']['wallet_cohorts'].values()
     ]
     earliest_cohort_lookback_start = (earliest_window_start -
-                                      timedelta(days=max(cohort_lookback_periods)))
+                                        timedelta(days=max(cohort_lookback_periods)))
 
 
     # Return updated config with calculated values
