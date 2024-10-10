@@ -1,8 +1,16 @@
 preprocessing:
     drop_features:  # List of features to drop from the dataset before modeling
-    # - "time_series_market_data_price_ema_7_pct_change_15d_period_1"
-    # - "time_series_market_data_price_ema_7_pct_change_15d_period_2"
-    # - "time_series_market_data_price_ema_7_pct_change_15d_period_3"
+        # - "time_series_market_data_price_ema_7_pct_change_15d_period_4"
+        # - "time_series_market_data_price_ema_7_pct_change_15d_period_2"
+        # - "time_series_market_data_price_ema_7_pct_change_15d_period_1"
+        # - "time_series_market_data_market_cap_last"
+        # - "time_series_market_data_price_rsi_14_last"
+        # - "time_series_market_data_price_rsi_14_first"
+        # - "time_series_market_data_volume_sum_10d_period_1"
+        # - "time_series_market_data_price_ema_7_pct_change_15d_period_3"
+        # - "time_series_market_data_volume_sum_10d_period_4"
+        # - "time_series_market_data_volume_sum_10d_period_2"
+        # - "time_series_market_data_volume_sum_10d_period_3"
     fill_methods:
         wallet_cohorts: "fill_zeros"
         time_series: "drop_records"
@@ -14,25 +22,28 @@ preprocessing:
 
 target_variables:
     moon_threshold: 0.25  # Minimum price % increase for a coin to be is_moon
-    moon_minimum_percent: 0.1  # Minimum percentage of coins tagged as is_moon
+    moon_minimum_percent: 0.05  # Minimum percentage of coins tagged as is_moon
       # If the % of coins that meet the moon_threshold is below this
       # value, additional coins are added in order of price performance
       # until this % is reached
-    crater_threshold: -0.25  # Minimum price % decrease for a coin to be is_crater
-    crater_minimum_percent: 0.1  # Minimum percentage of coins tagged as is_crater
+    # crater_threshold: -0.25  # Minimum price % decrease for a coin to be is_crater
+    # crater_minimum_percent: 0.1  # Minimum percentage of coins tagged as is_crater
       # If the % of coins that meet the crater_threshold is below this
       # value, additional coins are added in order of price performance
       # until this % is reached
 
 modeling:
     # model_type: "GradientBoostingRegressor"
-    model_type: "RandomForestRegressor"
-    # model_type: "RandomForestClassifier"
+    # model_type: "RandomForestRegressor"
+    # target_column: "returns"  # "is_moon" or "is_crater" depending on the experiment
+
+    model_type: "GradientBoostingClassifier"
+    model_type: "RandomForestClassifier"
+    target_column: "is_moon"  # "is_moon" or "is_crater" depending on the experiment
+
     # model_params:
     #   n_estimators: 100  # Number of trees in the model
 
-    # target_column: "is_moon"  # "is_moon" or "is_crater" depending on the experiment
-    target_column: "returns"  # "is_moon" or "is_crater" depending on the experiment
 
 
     modeling_folder: "..//modeling"  # location of the modeling folder where outputs will be saved

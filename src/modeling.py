@@ -9,7 +9,7 @@ import joblib
 import pandas as pd
 import numpy as np
 import dreams_core.core as dc
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingRegressor
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingRegressor, GradientBoostingClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.metrics import roc_auc_score, confusion_matrix, log_loss
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, explained_variance_score, max_error
@@ -42,6 +42,9 @@ def train_model(X_train, y_train, modeling_config):
     model_id = str(uuid.uuid4())
     modeling_folder = modeling_config['modeling']['modeling_folder']
 
+    # Format y_train as an array
+    y_train = y_train[modeling_config['modeling']['target_column']].ravel()
+
     # Initialize model with default params if none provided
     model_params = modeling_config["modeling"].get("model_params", None)
     if model_params is None:
@@ -55,6 +58,8 @@ def train_model(X_train, y_train, modeling_config):
         model = RandomForestRegressor(**model_params)
     elif model_type == "GradientBoostingRegressor":
         model = GradientBoostingRegressor(**model_params)
+    elif model_type == "GradientBoostingClassifier":
+        model = GradientBoostingClassifier(**model_params)
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
 
@@ -386,7 +391,8 @@ def log_trial_results(modeling_config, model_id, experiment_id=None, trial_overr
         "experiment_id": experiment_id,
         "model_id": model_id,
         "trial_overrides": trial_overrides,
-        "metrics": {}  # Initialize the 'metrics' key for performance metrics
+        "metrics": {},  # Initialize the 'metrics' key for performance metrics
+        "configs": {}
     }
 
     # Step 2: Read the model training log in JSON format

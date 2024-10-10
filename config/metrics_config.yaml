@@ -42,6 +42,14 @@ time_series:
             aggregations:
                 last:
                     scaling: "none"
+        mfi:
+            aggregations:
+                last:
+                    scaling: "none"
+        obv:
+            aggregations:
+                last:
+                    scaling: "none"
 
 # Keyed on coin_id-date
 wallet_cohorts:
@@ -55,28 +63,12 @@ wallet_cohorts:
                 sum:
                     scaling: "none"
         total_bought:
-            aggregations:
-                sum:
-                    scaling: "none"
-        total_sold:
-            aggregations:
-                sum:
-                    scaling: "none"
-        total_balance:
-            aggregations:
-                last:
-                    scaling: "none"
-
-
-    normies:
-        buyers_new:
-            aggregations:
-                sum:
-                    scaling: "none"
-        total_bought:
-            aggregations:
-                sum:
-                    scaling: "none"
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 20
+                lookback_periods: 2
         total_sold:
             rolling:
                 aggregations:
@@ -85,9 +77,40 @@ wallet_cohorts:
                 window_duration: 20
                 lookback_periods: 2
         total_balance:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: "none"
+                window_duration: 20
+                lookback_periods: 2
+
+
+    normies:
+        buyers_new:
             aggregations:
-                last:
+                sum:
                     scaling: "none"
+        total_bought:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 20
+                lookback_periods: 2
+        total_sold:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 20
+                lookback_periods: 2
+        total_balance:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: "none"
+                window_duration: 20
+                lookback_periods: 2
 
 
 # Time series keyed on only date

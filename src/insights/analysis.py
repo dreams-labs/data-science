@@ -102,7 +102,7 @@ def generate_profitability_curves_by_time_window(predictions, returns, winsoriza
     average_return = np.mean(returns_winsorized)
 
     # Plotting
-    unique_time_windows = df['time_window'].unique()
+    unique_time_windows = sorted(df['time_window'].unique())
     num_plots = len(unique_time_windows)
     plots_per_row = 3
     rows = (num_plots + plots_per_row - 1) // plots_per_row

@@ -4,14 +4,14 @@ training_data:
   # Defining the modeling and training periods (dates must follow YYYY-MM-DD format)
   # The modeling period end date and training period start and end dates are automatically
   # imputed using utils.py function calculate_period_dates() when load_config() is run
-  modeling_period_start: "2024-09-01"  # Start date for the modeling period
-  modeling_period_duration: 20    # Duration of the modeling period in days
-  training_period_duration: 60    # Duration of the training period in days
+  modeling_period_start: "2024-08-01"  # Start date for the modeling period
+  modeling_period_duration: 15    # Duration of the modeling period in days
+  training_period_duration: 45    # Duration of the training period in days
 
   # The entire training data generation pipeline will be run for this many additional \
   # windows, with the periods moved back the full modeling+training duration time
   additional_windows: 4
-  time_window_frequency: 30 # how many days apart each time_window should start
+  time_window_frequency: 45 # how many days apart each time_window should start
 
 datasets:
 
@@ -25,9 +25,22 @@ datasets:
         sameness_threshold: .95  # columns with more than this % of one value will be dropped
       market_cap:
         sameness_threshold: .95  # columns with more than this % of one value will be dropped
+      mfi:
+        sameness_threshold: .95  # columns with more than this % of one value will be dropped
+      obv:
+        sameness_threshold: .95  # columns with more than this % of one value will be dropped
 
   # Keyed on coin_id-date
   wallet_cohorts:
+
+    # whales_longterm:
+    #   lookback_period: 120 # how long the window for wallet thresholds extends backwards before the training_period_start
+    #   wallet_minimum_inflows: 50000  # Minimum USD inflows for a wallet to be considered a "shark"
+    #   wallet_maximum_inflows: 50000000  # Maximum USD inflows for a wallet to be considered a "shark"
+    #   coin_profits_win_threshold: 10000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
+    #   coin_return_win_threshold: 0.5  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
+    #   wallet_min_coin_wins: 5  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
+    #   sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
 
     whales:
       lookback_period: 0 # how long the window for wallet thresholds extends backwards before the training_period_start
@@ -79,7 +92,7 @@ data_cleaning:
   inflows_filter: 10000000  # Exclude wallets with inflows greater than or equal to this amount (USD)
 
   # market_data_df filters: Define how to handle missing price data
-  max_gap_days: 25  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
+  max_gap_days: 3  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
   min_daily_volume: 10000 # Minimum average daily volume the coin must have
   exclude_coins_without_transfers: True  # determines whether to create price features for coins without transfers data
 

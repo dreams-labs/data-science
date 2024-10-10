@@ -176,6 +176,7 @@ def prepare_all_windows_base_data(config, metrics_config):
     market_data_df = ind.generate_time_series_indicators(market_data_df,
                                                         metrics_config['time_series']['market_data'],
                                                         'coin_id')
+    market_data_df = ind.add_market_data_dualcolumn_indicators(market_data_df)
 
     return macro_trends_df, market_data_df, profits_df, prices_df
 

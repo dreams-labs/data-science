@@ -61,7 +61,7 @@ def identify_imputation_dates(config):
         lookback_start_dates.append(lbp_start.strftime('%Y-%m-%d'))
 
     # Return combined list
-    imputation_dates = period_boundary_dates + lookback_start_dates
+    imputation_dates = set(period_boundary_dates + lookback_start_dates)
     imputation_dates = sorted(imputation_dates)
 
     return imputation_dates
