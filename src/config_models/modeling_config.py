@@ -65,9 +65,9 @@ class TargetVariablesConfig(BaseModel):
     """
     Configuration for target variables.
     """
-    moon_threshold: Optional[Annotated[float, Field(ge=0, le=1)]] = Field(default=0.3)
+    moon_threshold: Optional[Annotated[float, Field(ge=0)]] = Field(default=0.3)
     moon_minimum_percent: Optional[Annotated[float, Field(ge=0, le=1)]] = Field(default=0.1)
-    crater_threshold: Optional[Annotated[float, Field(ge=-1, le=0)]] = Field(default=-0.3)
+    crater_threshold: Optional[Annotated[float, Field(le=0)]] = Field(default=-0.3)
     crater_minimum_percent: Optional[Annotated[float, Field(ge=0, le=1)]] = Field(default=0.1)
 
 
@@ -79,6 +79,7 @@ class ModelType(str, Enum):
     RANDOMFORESTCLASSIFIER = "RandomForestClassifier"
     RANDOMFORESTREGRESSOR = "RandomForestRegressor"
     GRADIENTBOOSTINGREGRESSOR = "GradientBoostingRegressor"
+    GRADIENTBOOSTINGCLASSIFIER = "GradientBoostingClassifier"
 
 
 class TargetColumn(str, Enum):
@@ -97,7 +98,7 @@ class ModelingSettings(NoExtrasBaseModel):
     model_type: ModelType
     model_params: Optional['ModelParams'] = None
 
-class ModelParams(NoExtrasBaseModel):
+class ModelParams(BaseModel):
     """Parameters for the model."""
     n_estimators: Optional[Annotated[int, Field(ge=1)]] = Field(default=None)
 

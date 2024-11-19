@@ -149,8 +149,9 @@ def prepare_all_windows_base_data(config, metrics_config):
 
     # Profits: retrieve and clean profits data spanning the earliest to latest training periods
     profits_df = dr.retrieve_profits_data(config['training_data']['earliest_cohort_lookback_start'],
-                                        config['training_data']['training_period_end'],
-                                        config['data_cleaning']['minimum_wallet_inflows'])
+                                          config['training_data']['training_period_end'],
+                                          config['data_cleaning']['minimum_wallet_inflows'],
+                                          config['data_cleaning']['maximum_market_cap_share'])
     profits_df, _ = dr.clean_profits_df(profits_df, config['data_cleaning'])
 
 
@@ -168,10 +169,11 @@ def prepare_all_windows_base_data(config, metrics_config):
 
     # 3. Add indicators (additional time series)
     # ------------------------------------------
-    # Macro trends: add indicators
-    macro_trends_df = ind.generate_time_series_indicators(macro_trends_df,
-                                                        metrics_config['macro_trends'],
-                                                        None)
+    # Macro trends: add indicators if there are metrics configured
+    if metrics_config.get('macro_trends'):
+        macro_trends_df = ind.generate_time_series_indicators(macro_trends_df,
+                                                              metrics_config['macro_trends'],
+                                                              None)
     # Market data: add indicators
     market_data_df = ind.generate_time_series_indicators(market_data_df,
                                                         metrics_config['time_series']['market_data'],
@@ -222,15 +224,16 @@ def generate_window_flattened_dfs(
     window_flattened_filepaths.extend([flattened_market_data_filepath])
 
     # Macro trends: generate window-specific flattened metrics
-    flattened_macro_trends_df, flattened_macro_trends_filepath = fg.generate_window_macro_trends_features(
-        macro_trends_df,
-        'macro_trends',
-        config,
-        metrics_config,
-        modeling_config
-    )
-    window_flattened_dfs.extend([flattened_macro_trends_df])
-    window_flattened_filepaths.extend([flattened_macro_trends_filepath])
+    if not macro_trends_df.drop(columns='date').empty:
+        flattened_macro_trends_df, flattened_macro_trends_filepath = fg.generate_window_macro_trends_features(
+            macro_trends_df,
+            'macro_trends',
+            config,
+            metrics_config,
+            modeling_config
+        )
+        window_flattened_dfs.extend([flattened_macro_trends_df])
+        window_flattened_filepaths.extend([flattened_macro_trends_filepath])
 
     # Cohorts: generate window-specific flattened metrics
     flattened_cohort_dfs, flattened_cohort_filepaths = fg.generate_window_wallet_cohort_features(

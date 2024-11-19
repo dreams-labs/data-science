@@ -2,6 +2,7 @@
 functions used to build coin-level features from training data
 """
 import os
+from datetime import timedelta
 import pandas as pd
 import dreams_core.core as dc
 

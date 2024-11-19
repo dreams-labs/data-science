@@ -118,7 +118,7 @@ def clean_market_data(market_data_df, config):
 
 
 
-def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows):
+def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows, maximum_market_cap_share):
     """
     Retrieves data from the core.coin_wallet_profits table and converts columns to
     memory-efficient formats. Records prior to the start_date are excluded but a new
@@ -130,6 +130,9 @@ def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows):
     - start_date (String): The latest date to retrieve records for with format 'YYYY-MM-DD'
     - minimum_wallet_inflows (Float): Wallet-coin pairs with fewer than this amount of total
         USD inflows will be removed from the profits_df dataset
+    - maximum_market_cap_share (Float): Wallet-coin pairs that ever own a high % of the coin's
+        market cap than this amount are removed. Helpful for identifying treasuries, CExs,
+        deployers, burn addresses, etc.
 
     Returns:
     - profits_df (DataFrame): contains coin-wallet-date keyed profits data denominated in USD
@@ -167,12 +170,28 @@ def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows):
             group by 1,2
         ),
 
+        overage_wallets as (
+            select cwp.coin_id
+            ,cwp.wallet_address
+            from core.coin_wallet_profits cwp
+            join core.coin_market_data cmd on cmd.coin_id = cwp.coin_id and cmd.date = cwp.date
+            where cwp.usd_balance > cmd.market_cap * {maximum_market_cap_share}
+            group by 1,2
+        ),
+
         profits_base_filtered as (
             select pb.*
             from profits_base pb
+
+            -- filter to remove wallets below the minimum_wallet_inflows
             join usd_inflows_filter f on f.coin_id = pb.coin_id
                 and f.wallet_address = pb.wallet_address
-            where f.total_usd_inflows >= {minimum_wallet_inflows}
+                and f.total_usd_inflows >= {minimum_wallet_inflows}
+
+            -- filter to remove wallets exceeding the maximum_market_cap_share
+            left join overage_wallets o on o.coin_id = pb.coin_id
+                and o.wallet_address = pb.wallet_address
+            where o.wallet_address is null
         ),
 
 
@@ -465,7 +484,7 @@ def clean_macro_trends(macro_trends_df, config):
     # 1. Filter to only relevant columns
     # ----------------------------------
     # Get the keys from the config dictionary
-    metric_columns = list(config['datasets']['macro_trends'].keys())
+    metric_columns = list(config['datasets']['macro_trends'].keys()) if 'macro_trends' in config['datasets'] else []
 
     # Ensure 'date' is included
     required_columns = ['date'] + metric_columns

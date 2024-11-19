@@ -197,7 +197,7 @@ def perform_model_input_data_quality_checks(training_data_df, target_variable_df
 
     # Check for imbalanced target
     if target_variable_df[modeling_config['modeling']['target_column']].value_counts(normalize=True).max() > 0.95:
-        raise ValueError("Target is heavily imbalanced. Consider rebalancing or using specialized techniques.")
+        logger.warning("Target is heavily imbalanced. Consider rebalancing or using specialized techniques.")
 
     # Check for non-numeric features
     if not all(np.issubdtype(dtype, np.number) for dtype in training_data_df.dtypes):

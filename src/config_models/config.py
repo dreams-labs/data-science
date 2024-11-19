@@ -118,6 +118,7 @@ class DataCleaningConfig(NoExtrasBaseModel):
     max_gap_days: int = Field(..., gt=0)
     min_daily_volume: float = Field(..., gt=0)
     minimum_wallet_inflows: float = Field(..., gt=0)
+    maximum_market_cap_share: float = Field(..., gt=0)
     exclude_coins_without_transfers: bool = Field(False)
 
 
