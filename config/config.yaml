@@ -4,7 +4,7 @@ training_data:
   # Defining the modeling and training periods (dates must follow YYYY-MM-DD format)
   # The modeling period end date and training period start and end dates are automatically
   # imputed using utils.py function calculate_period_dates() when load_config() is run
-  modeling_period_start: "2024-10-01"  # Start date for the modeling period
+  modeling_period_start: "2024-09-01"  # Start date for the modeling period
   modeling_period_duration: 30    # Duration of the modeling period in days
   training_period_duration: 180    # Duration of the training period in days
 
@@ -79,8 +79,8 @@ data_cleaning:
 
   # market_data_df filters: Define how to handle missing price data
   max_gap_days: 25  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
-  min_daily_volume: 10000 # Minimum average daily volume the coin must have
+  min_daily_volume: 5000 # Minimum average daily volume the coin must have
   exclude_coins_without_transfers: True  # determines whether to create price features for coins without transfers data
 
   # wallet filters: defines which wallets are included in analysis
-  minimum_wallet_inflows: 2000 # The amount of lifetime USD inflows a wallet must have to be included in the training data
+  minimum_wallet_inflows: 5000 # The amount of lifetime USD inflows a wallet must have to be included in the training data
