@@ -438,11 +438,14 @@ def check_nan_values(series):
 def safe_downcast(df, column, dtype):
     """
     Safe method to downcast a column datatype. If the column has no values that exceed the
-    limits of the new dtype, it will be downcasted. It it has values that will result in
+    limits of the new dtype, it will be downcasted. If it has values that will result in
     overflow errors, it will raise an error.
-
-
     """
+    # Check if the column is numeric
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        logger.warning("Column '%s' is not numeric. Skipping downcast.", column)
+        return df
+
     # Get the original dtype of the column
     original_dtype = df[column].dtype
 
@@ -471,7 +474,7 @@ def safe_downcast(df, column, dtype):
     df[column] = df[column].astype(dtype)
 
     logger.debug("Successfully downcasted column '%s' from %s to %s",
-                column, original_dtype, dtype)
+                 column, original_dtype, dtype)
     return df
 
 
