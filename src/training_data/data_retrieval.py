@@ -240,7 +240,7 @@ def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows):
         ,date
 
         -- replace the memory-intensive address strings with integers
-        -- ,DENSE_RANK() OVER (ORDER BY wallet_address) as wallet_address
+        ,DENSE_RANK() OVER (ORDER BY wallet_address) as wallet_address
         ,wallet_address
 
         ,profits_cumulative
