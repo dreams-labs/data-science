@@ -32,7 +32,7 @@ def retrieve_market_data():
         ,date
         ,cast(cmd.price as float64) as price
         ,cast(cmd.volume as int64) as volume
-        ,cast(coalesce(cmd.market_cap,cmd.fdv) as int64) as market_cap
+        ,cast(cmd.market_cap as int64) as market_cap
         ,days_imputed
         from core.coin_market_data cmd
         order by 1,2
