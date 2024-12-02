@@ -2,6 +2,7 @@
 functions used to build coin-level features from training data
 """
 import os
+from datetime import timedelta
 import pandas as pd
 import dreams_core.core as dc
 
@@ -201,8 +202,14 @@ def generate_window_wallet_cohort_features(
         dataset_metrics_config = metrics_config['wallet_cohorts'][cohort_name]
         dataset_config = config['datasets']['wallet_cohorts'][cohort_name]
 
+        # filter profits_df to the cohort lookback
+        training_period_start = config['training_data']['training_period_start']
+        cohort_lookback = config['datasets']['wallet_cohorts'][cohort_name]['lookback_period']
+        cohort_lookback_start = pd.to_datetime(training_period_start) - timedelta(days=cohort_lookback)
+        cohort_profits_df = window_profits_df[window_profits_df['date']>=cohort_lookback_start]
+
         # identify wallets in the cohort based on the full lookback period
-        cohort_summary_df = cwm.classify_wallet_cohort(window_profits_df, dataset_config, cohort_name)
+        cohort_summary_df = cwm.classify_wallet_cohort(cohort_profits_df, dataset_config, cohort_name)
         cohort_wallets = cohort_summary_df[cohort_summary_df['in_cohort']]['wallet_address']
 
         # If no cohort members were identified, continue

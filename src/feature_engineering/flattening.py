@@ -3,6 +3,7 @@ functions used to build coin-level features from training data
 """
 import os
 from datetime import datetime
+import numpy as np
 import time
 import copy
 import pandas as pd
@@ -304,6 +305,9 @@ def calculate_adj_pct_change(start_value, end_value, cap=5, impute_value=1):
     Returns:
     - pct_change (float): The calculated or capped percentage change.
     """
+    if np.isnan(start_value) or np.isnan(end_value):
+        return 0
+
     if start_value == 0:
         if end_value == 0:
             return 0  # 0/0 case

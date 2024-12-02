@@ -44,6 +44,7 @@ def generate_all_time_windows_model_inputs(config,metrics_config,modeling_config
     Returns:
     - training_data_df (pd.DataFrame): DataFrame with MultiIndex on time_window,coin_id that contains
         columns for all configured features for all datasets in all time windows.
+    - prices_df (pd.DataFrame): DataFrame with prices for all coins on all dates
     - join_logs_df (pd.DataFrame): DataFrame showing the outcomes of each dataset's join and fill
         methods
     """
@@ -51,7 +52,7 @@ def generate_all_time_windows_model_inputs(config,metrics_config,modeling_config
     # 1. Retrieve base datasets used by all windows
     # ---------------------------------------------
     macro_trends_df, market_data_df, profits_df, prices_df = prepare_all_windows_base_data(config,
-                                                                                              metrics_config)
+                                                                                           metrics_config)
 
 
     # 2. Generate flattened features for each dataset in each window
@@ -90,7 +91,7 @@ def generate_all_time_windows_model_inputs(config,metrics_config,modeling_config
     concatenated_dfs = concat_dataset_time_windows_dfs(all_flattened_filepaths,modeling_config)
     training_data_df, join_logs_df = join_dataset_all_windows_dfs(concatenated_dfs)
 
-    return training_data_df, join_logs_df
+    return training_data_df, prices_df, join_logs_df
 
 
 
@@ -107,19 +108,17 @@ def generate_time_windows(config):
         config.yaml settings for each time window.
     """
     start_date = pd.to_datetime(config['training_data']['modeling_period_start'])
-    window_duration = timedelta(days=config['training_data']['training_period_duration'] +
-                                     config['training_data']['modeling_period_duration'])
+    window_frequency = config['training_data']['time_window_frequency']
 
     time_windows = [
         {'config.training_data.modeling_period_start': start_date.strftime('%Y-%m-%d')}
     ]
 
     for _ in range(config['training_data']['additional_windows']):
-        start_date -= window_duration
+        start_date -= timedelta(days=window_frequency)
         time_windows.append({'config.training_data.modeling_period_start': start_date.strftime('%Y-%m-%d')})
 
     return time_windows
-
 
 
 def prepare_all_windows_base_data(config, metrics_config):
@@ -150,8 +149,9 @@ def prepare_all_windows_base_data(config, metrics_config):
 
     # Profits: retrieve and clean profits data spanning the earliest to latest training periods
     profits_df = dr.retrieve_profits_data(config['training_data']['earliest_cohort_lookback_start'],
-                                        config['training_data']['training_period_end'],
-                                        config['data_cleaning']['minimum_wallet_inflows'])
+                                          config['training_data']['training_period_end'],
+                                          config['data_cleaning']['minimum_wallet_inflows'],
+                                          config['data_cleaning']['maximum_market_cap_share'])
     profits_df, _ = dr.clean_profits_df(profits_df, config['data_cleaning'])
 
 
@@ -169,14 +169,16 @@ def prepare_all_windows_base_data(config, metrics_config):
 
     # 3. Add indicators (additional time series)
     # ------------------------------------------
-    # Macro trends: add indicators
-    macro_trends_df = ind.generate_time_series_indicators(macro_trends_df,
-                                                        metrics_config['macro_trends'],
-                                                        None)
+    # Macro trends: add indicators if there are metrics configured
+    if metrics_config.get('macro_trends'):
+        macro_trends_df = ind.generate_time_series_indicators(macro_trends_df,
+                                                              metrics_config['macro_trends'],
+                                                              None)
     # Market data: add indicators
     market_data_df = ind.generate_time_series_indicators(market_data_df,
                                                         metrics_config['time_series']['market_data'],
                                                         'coin_id')
+    market_data_df = ind.add_market_data_dualcolumn_indicators(market_data_df)
 
     return macro_trends_df, market_data_df, profits_df, prices_df
 
@@ -222,15 +224,16 @@ def generate_window_flattened_dfs(
     window_flattened_filepaths.extend([flattened_market_data_filepath])
 
     # Macro trends: generate window-specific flattened metrics
-    flattened_macro_trends_df, flattened_macro_trends_filepath = fg.generate_window_macro_trends_features(
-        macro_trends_df,
-        'macro_trends',
-        config,
-        metrics_config,
-        modeling_config
-    )
-    window_flattened_dfs.extend([flattened_macro_trends_df])
-    window_flattened_filepaths.extend([flattened_macro_trends_filepath])
+    if not macro_trends_df.drop(columns='date').empty:
+        flattened_macro_trends_df, flattened_macro_trends_filepath = fg.generate_window_macro_trends_features(
+            macro_trends_df,
+            'macro_trends',
+            config,
+            metrics_config,
+            modeling_config
+        )
+        window_flattened_dfs.extend([flattened_macro_trends_df])
+        window_flattened_filepaths.extend([flattened_macro_trends_filepath])
 
     # Cohorts: generate window-specific flattened metrics
     flattened_cohort_dfs, flattened_cohort_filepaths = fg.generate_window_wallet_cohort_features(

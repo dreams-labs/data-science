@@ -174,6 +174,15 @@ def generate_column_time_series_indicators(
     return time_series_df
 
 
+def add_market_data_dualcolumn_indicators(market_data_df):
+    """
+    Adds multi-column indicators to market_data_df
+    """
+    market_data_df = add_mfi_column(market_data_df, price_col='price', volume_col='volume', window=14)
+    market_data_df['obv'] = generalized_obv(market_data_df['price'], market_data_df['volume'])
+
+    return market_data_df
+
 
 # =====================================================================
 # Single Series Input Indicators
@@ -316,10 +325,8 @@ def add_mfi_column(time_series_df, price_col='price', volume_col='volume', windo
     pd.DataFrame
         The DataFrame with the new MFI column added and optional columns dropped.
     """
-
     # Define a function to apply MFI calculation to a group
     def apply_mfi(group):
-        group = group.reset_index()
         group['mfi'] = calculate_mfi(group[price_col], group[volume_col], window=window)
         return group.set_index(['coin_id', 'date'])
 
@@ -331,6 +338,8 @@ def add_mfi_column(time_series_df, price_col='price', volume_col='volume', windo
         time_series_df = time_series_df.drop(columns=[price_col])
     if drop_volume:
         time_series_df = time_series_df.drop(columns=[volume_col])
+
+    time_series_df = time_series_df.reset_index()
 
     return time_series_df
 
@@ -363,6 +372,9 @@ def calculate_mfi(price: pd.Series, volume: pd.Series, window: int = 14) -> pd.S
 
     # Step 5: Calculate the Money Flow Index (MFI)
     mfi = 100 - (100 / (1 + money_flow_ratio))
+
+    # Step 6: Forward fill NaN values, then fill remaining NaNs with 0.5
+    mfi = mfi.ffill().fillna(0.5)
 
     return mfi
 

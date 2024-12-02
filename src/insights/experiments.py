@@ -136,7 +136,7 @@ def run_experiment(modeling_config):
 
         # 3.6 Log the trial results for this configuration
         # Include the trial name, metadata, and other relevant details
-        trial_log_filename = m.log_trial_results(modeling_folder, model_id, experiment_id, trial)
+        trial_log_filename = m.log_trial_results(modeling_config, model_id, experiment_id, trial)
 
         # Append the trial log filename to the metadata
         metadata['trial_logs'].append(trial_log_filename)
