@@ -1,271 +1,229 @@
-# Available Commands:
-# aggregations:
-#     - "sum", "mean", "median", "min", "max", "std"
-# rolling stats:
-#     - "sum", "mean", "median", "max", "min", "std"
-# comparisons:
-#     - "change", "pct_change", "difference"
-# window_duration:
-#     - Specifies the number of days per rolling window (e.g., 7 means a 7-day rolling window)
-# lookback_periods:
-#     - Defines how many periods to look back when calculating rolling stats (e.g., 8 means calculate rolling stats over 8 previous periods)
+# See details on config structure and valid inputs in src/config_models/metrics_config.py
 
-# Keyed on coin_id-date
-wallet_cohorts:
-
-    whales:
-        buyers_new:
-            aggregations:
-                sum:
-                    scaling: "log"        # Scaling applied to sums, which can vary significantly in range.
-            # rolling:
-            #     aggregations:
-            #         sum:
-            #             scaling: "log"
-            #     window_duration: 10
-            #     lookback_periods: 3
-        total_bought:
-            aggregations:
-                sum:
-                    scaling: "log"        # Scaling applied to sums, which can vary significantly in range.
-            # rolling:
-            #     aggregations:
-            #         sum:
-            #             scaling: "log"
-            #     window_duration: 10
-            #     lookback_periods: 3
-            indicators:
-                rsi:
-                    parameters:
-                        window: [14]
-                    aggregations:
-                        last:
-                            scaling: "none"
-        total_volume:
-            aggregations:
-                last:
-                    scaling: "log"        # Total sold should also be scaled to account for high variance.
+# Time series keyed on coin_id-date
+time_series:
+    market_data:
+        price:
             indicators:
                 ema:
                     parameters:
                         window: [7]
-                    aggregations:
-                        last:
-                            scaling: "none"
-                    # rolling:
-                    #     aggregations:
-                    #         last:
-                    #             scaling: "none"
-                    #     window_duration: 7
-                    #     lookback_periods: 3
-
-        total_balance:
-            aggregations:
-                last:
-                    scaling: "log"        # Total sold should also be scaled to account for high variance.
-
-
-    # normies:
-    #     buyers_new:
-    #         aggregations:
-    #             sum:
-    #                 scaling: "log"        # Scaling applied to sums, which can vary significantly in range.
-    #         # rolling:
-    #         #     aggregations:
-    #         #         sum:
-    #         #             scaling: "log"
-    #         #     window_duration: 10
-    #             # lookback_periods: 3
-    #     total_bought:
-    #         aggregations:
-    #             sum:
-    #                 scaling: "log"        # Scaling applied to sums, which can vary significantly in range.
-    #     #     rolling:
-    #     #         aggregations:
-    #     #             sum:
-    #     #                 scaling: "log"
-    #     #         window_duration: 10
-    #     #         lookback_periods: 3
-    #     # total_volume:
-    #     #     aggregations:
-    #     #         last:
-    #     #             scaling: "log"        # Total sold should also be scaled to account for high variance.
-    #     total_balance:
-    #         aggregations:
-    #             last:
-    #                 scaling: "log"        # Total sold should also be scaled to account for high variance.
-
-
-# Time series keyed on coin_id-date
-time_series:
-
-    market_data:
-        price:
-            # rolling:
-            #     comparisons:
-            #         pct_change:
-            #             scaling: "none"
-            #     window_duration: 10
-            #     lookback_periods: 5
-            indicators:
+                    rolling:
+                        comparisons:
+                            pct_change:
+                                scaling: "none"
+                        window_duration: 5
+                        lookback_periods: 4
                 # sma:
                 #     parameters:
-                #         window: [30,100]
-                #     aggregations:
-                #         last:
-                #             scaling: "none"
+                #         window: [30]
                 #     rolling:
-                #         aggregations:
-                #             sum:
-                #                 scaling: "log"
-                #         window_duration: 10
-                #         lookback_periods: 5
+                #         comparisons:
+                #             pct_change:
+                #                 scaling: "none"
+                #         window_duration: 5
+                #         lookback_periods: 4
                 rsi:
                     parameters:
                         window: [14]
                     aggregations:
                         last:
                             scaling: "none"
-
-
+                        first:
+                            scaling: "none"
         volume:
-            indicators:
-                ema:
-                    parameters:
-                        window: [3,14]
-                    aggregations:
-                        last:
-                            scaling: "log"
-                    rolling:
-                        aggregations:
-                            sum:
-                                scaling: "log"
-                        window_duration: 10
-                        lookback_periods: 2
-                rsi:
-                    parameters:
-                        window: [14]
-                    aggregations:
-                        last:
-                            scaling: "none"
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 5
+                lookback_periods: 4
         market_cap:
             aggregations:
                 last:
-                    scaling: "log"
+                    scaling: "none"
+        mfi:
+            aggregations:
+                last:
+                    scaling: "none"
+        obv:
+            aggregations:
+                last:
+                    scaling: "none"
+
+# Keyed on coin_id-date
+wallet_cohorts:
+    whales_longterm:
+        buyers_new:
+            aggregations:
+                sum:
+                    scaling: "none"
+        buyers_repeat:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 5
+                lookback_periods: 4
+        total_bought:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 5
+                lookback_periods: 4
+        total_balance:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: "none"
+                window_duration: 5
+                lookback_periods: 4
+    whales:
+        buyers_new:
+            aggregations:
+                sum:
+                    scaling: "none"
+        buyers_repeat:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 5
+                lookback_periods: 4
+        total_bought:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 5
+                lookback_periods: 4
+        total_balance:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: "none"
+                window_duration: 5
+                lookback_periods: 4
+
+    normies:
+        buyers_new:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 5
+                lookback_periods: 4
+        total_holders:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: "none"
+                window_duration: 5
+                lookback_periods: 4
+        total_bought:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 5
+                lookback_periods: 4
+        total_sold:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 5
+                lookback_periods: 4
+        total_balance:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: "none"
+                window_duration: 5
+                lookback_periods: 4
+
+    midtier:
+        buyers_new:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 5
+                lookback_periods: 4
+        total_holders:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: "none"
+                window_duration: 5
+                lookback_periods: 4
+        total_bought:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 5
+                lookback_periods: 4
+        total_sold:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 5
+                lookback_periods: 4
+        total_balance:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: "none"
+                window_duration: 5
+                lookback_periods: 4
 
 
 # Time series keyed on only date
 macro_trends:
 
-    gtrends_cryptocurrency_worldwide:
-        aggregations:
-            last:
-                scaling: "none"
-    btc_mvrv_z_score:
-        aggregations:
-            last:
-                scaling: "none"
-    # btc_vdd_multiple:
+    # gtrends_cryptocurrency_worldwide:
     #     aggregations:
     #         last:
     #             scaling: "none"
+    # btc_mvrv_z_score:
+    #     aggregations:
+    #         last:
+    #             scaling: "none"
+    # global_volume:
     #     rolling:
-    #         comparisons:
-    #             pct_change:
+    #         aggregations:
+    #             sum:
     #                 scaling: "none"
-    #         window_duration: 10
+    #         window_duration: 15
     #         lookback_periods: 2
-    global_volume:
-        indicators:
-            ema:
-                rolling:
-                    aggregations:
-                        sum:
-                            scaling: "standard"
-                    window_duration: 10
-                    lookback_periods: 2
-                parameters:
-                    window: [100,30]
-    global_market_cap:
-        indicators:
-            rsi:
-                parameters:
-                    window: [14]
-                aggregations:
-                    last:
-                        scaling: "none"
-
-# ratios:
-#     crossover_1:
-#         definition:
-#             series1: "time_series.market_data.price.indicators.ema.parameters.window.12"
-#             series2: "time_series.market_data.price.indicators.ema.parameters.window.26"
-#         rolling:
-#             aggregations:
-#                 sum:
-#                     scaling: "none"
-#             window_duration: 15
-#             lookback_periods: 2
-#     crossover_2:
-#         definition:
-#             series1: "time_series.market_data.price.indicators.bollinger_bands_upper.parameters.window.12"
-#             series2: "time_series.market_data.price"
-#         rolling:
-#             aggregations:
-#                 sum:
-#                     scaling: "none"
-#             window_duration: 15
-#             lookback_periods: 2
-#     crossover_3:
-#         definition:
-#             series1: "time_series.market_data.price.indicators.bollinger_bands_lower.parameters.window.12"
-#             series2: "time_series.market_data.price"
-#         rolling:
-#             aggregations:
-#                 sum:
-#                     scaling: "none"
-#             window_duration: 15
-#             lookback_periods: 2
-#     on_balance_volume_1:
-#         definition:
-#             series1: "time_series.market_data.price"
-#             series2: "time_series.market_data.volume"
-#         rolling:
-#             aggregations:
-#                 average:
-#                     scaling: "none"
-#             window_duration: 7
-#             lookback_periods: 3
-#     on_balance_volume_2:
-#         definition:
-#             series1: "macro_trends.global_market_cap"
-#             series2: "macro_trends.global_volume"
-#         rolling:
-#             aggregations:
-#                 average:
-#                     scaling: "none"
-#             window_duration: 7
-#             lookback_periods: 3
-#     money_flow_index:
-#         definition:
-#             series1: "time_series.market_data.price"
-#             series2: "time_series.market_data.volume"
-#             window: 14
-#         rolling:
-#             aggregations:
-#                 max:
-#                     scaling: "none"
-#     divide:
-#         definition:
-#             series1: "wallet_cohorts.normies.total_bought"
-#             series2: "wallet_cohorts.whales.total_bought"
-#         aggregations:
-#             sum:
-#                 scaling: "none"
-#     subtract:
-#         definition:
-#             series1: "wallet_cohorts.normies.total_bought"
-#             series2: "wallet_cohorts.whales.total_bought"
-#         aggregations:
-#             sum:
-#                 scaling: "none"
+    # btc_price:
+    #     indicators:
+    #         ema:
+    #             parameters:
+    #                 window: [7]
+    #             rolling:
+    #                 comparisons:
+    #                     pct_change:
+    #                         scaling: "none"
+    #                 window_duration: 15
+    #                 lookback_periods: 2
+    #         rsi:
+    #             parameters:
+    #                 window: [14]
+    #             aggregations:
+    #                 last:
+    #                     scaling: "none"
+    # global_market_cap:
+    #     indicators:
+    #         rsi:
+    #             parameters:
+    #                 window: [14]
+    #             aggregations:
+    #                 last:
+    #                     scaling: "none"
+    #             aggregations:
+    #                 first:
+    #                     scaling: "none"
