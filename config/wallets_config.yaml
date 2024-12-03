@@ -1,7 +1,11 @@
 training_data:
   # Variables used to define the training data
-  earliest_transfer_date: "2023-07-01"  # Start date for the modeling period
-  latest_transfer_date: "2024-03-30"  # Start date for the modeling period
+  earliest_transfer_date: "2023-07-01"
+  training_period_start: "2023-07-01"
+  training_period_end: "2023-12-31"
+  modeling_period_start: "2024-01-01"
+  modeling_period_end: "2024-03-31"
+  latest_transfer_date: "2024-03-31"
 
 data_cleaning:
   # Variables used to clean and filter raw data before training data is built
