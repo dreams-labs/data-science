@@ -232,13 +232,17 @@ def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows):
         -- STEP 3: merge all records together
         -------------------------------------
         profits_merged as (
-            select * from profits_base_filtered
+            select *,
+            False as is_imputed
+            from profits_base_filtered
             -- transfers prior to the training period are summarized in training_start_new_rows
             where date >= '{start_date}'
 
             union all
 
-            select * from training_start_new_rows
+            select *,
+            True as is_imputed
+            from training_start_new_rows
         )
 
         select coin_id
@@ -253,6 +257,7 @@ def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows):
         ,usd_inflows
         -- set a floor of $0.01 to avoid divide by 0 errors caused by rounding
         ,greatest(0.01,usd_inflows_cumulative) as usd_inflows_cumulative
+        ,is_imputed
         from profits_merged
     """
 
