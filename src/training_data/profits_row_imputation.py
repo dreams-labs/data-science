@@ -68,7 +68,7 @@ def identify_imputation_dates(config):
 
 
 
-def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads, log_column=False):
+def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
     """
     Wrapper function to impute profits for multiple dates using multithreaded processing.
 
@@ -77,7 +77,6 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads, l
         prices_df (pd.DataFrame): DataFrame containing price information
         dates (list): List of dates (str or datetime) for which to impute rows
         n_threads (int): The number of threads to use for imputation
-        log_column (bool): Whether to append a column indicating whether the row was imputed
 
     Returns:
         pd.DataFrame: Updated profits_df with imputed rows for all specified dates
@@ -89,10 +88,6 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads, l
     logger.info("Starting profits_df imputation for %s dates...", len(dates))
 
     new_rows_list = []
-
-    # Add a column showing whether the rows were imputed if instructed to
-    if log_column:
-        profits_df['is_imputed'] = False
 
     for date in dates:
         new_rows_df = multithreaded_impute_profits_rows(profits_df, prices_df, date, n_threads)
