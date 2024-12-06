@@ -249,7 +249,7 @@ def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows):
         ,date
 
         -- replace the memory-intensive address strings with integers
-        ,DENSE_RANK() OVER (ORDER BY wallet_address) as wallet_address
+        ,id.wallet_id as wallet_address
 
         ,profits_cumulative
         ,usd_balance
@@ -258,7 +258,8 @@ def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows):
         -- set a floor of $0.01 to avoid divide by 0 errors caused by rounding
         ,greatest(0.01,usd_inflows_cumulative) as usd_inflows_cumulative
         ,is_imputed
-        from profits_merged
+        from profits_merged pm
+        join reference.wallet_ids id on id.wallet_address = pm.wallet_address
     """
 
     # Run the SQL query using dgc's run_sql method
