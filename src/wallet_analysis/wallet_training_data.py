@@ -54,6 +54,42 @@ def generate_imputation_dates():
     return imputation_dates
 
 
+def add_cash_flow_transfers_logic(profits_df):
+    """
+    Adds a cash_flow_transfers column to profits_df that can be used to compute
+    the wallet's gain and investment amount by converting their starting and ending
+    balances to cash flow equivilants.
+
+    Params:
+    - profits_df (df): profits_df that needs wallet investment peformance computed
+        based on the earliest and latest dates in the df.
+
+    Returns:
+    - adj_profits_df (df): input df with the cash_flow_transfers column added
+    """
+
+    def adjust_end_transfers(df, target_date):
+        df.loc[df['date'] == target_date, 'cash_flow_transfers'] -= df.loc[df['date'] == target_date, 'usd_balance']
+        return df
+
+    def adjust_start_transfers(df, target_date):
+        df.loc[df['date'] == target_date, 'cash_flow_transfers'] = df.loc[df['date'] == target_date, 'usd_balance']
+        return df
+
+    # Copy df and add cash flow column
+    adj_profits_df = profits_df.copy()
+    adj_profits_df['cash_flow_transfers'] = adj_profits_df['usd_net_transfers']
+
+    # Modify the records on the start and end dates to reflect the balances
+    start_date = adj_profits_df['date'].min()
+    end_date = adj_profits_df['date'].max()
+
+    adj_profits_df = adjust_start_transfers(adj_profits_df,start_date)
+    adj_profits_df = adjust_end_transfers(adj_profits_df,end_date)
+
+    return adj_profits_df
+
+
 
 def apply_wallet_thresholds(wallet_metrics_df):
     """
@@ -83,15 +119,24 @@ def apply_wallet_thresholds(wallet_metrics_df):
         wallet_metrics_df['total_volume']<wallets_config['data_cleaning']['minimum_volume']
         ].index.values
 
+    # minumum_coins_traded flagged wallets
+    low_coins_traded_wallets = wallet_metrics_df[
+        wallet_metrics_df['unique_coins_traded']<wallets_config['data_cleaning']['minumum_coins_traded']
+        ].index.values
+
     # combine all exclusion lists and apply them
     wallets_to_exclude = np.unique(
-        np.concatenate([excess_inflows_wallets,excess_profits_wallets,low_inflows_wallets,low_volume_wallets])
+        np.concatenate([excess_inflows_wallets,excess_profits_wallets,low_inflows_wallets,
+                        low_volume_wallets,low_coins_traded_wallets])
     )
     filtered_wallet_metrics_df = wallet_metrics_df[
         ~wallet_metrics_df.index.isin(wallets_to_exclude)
     ]
-    logger.info("Filtered %s unique wallets (%s low volume, %s low inflows, %s excess inflows, %s excess profits)",
-                len(low_volume_wallets), len(low_inflows_wallets), len(wallets_to_exclude),
+    logger.info("Retained %s wallets after filtering %s unique wallets."
+                "(%s low volume, %s low inflows, %s too few coins traded, "
+                "%s excess inflows, %s excess profits)",
+                len(filtered_wallet_metrics_df), len(wallets_to_exclude),
+                len(low_volume_wallets), len(low_inflows_wallets), len(low_coins_traded_wallets),
                 len(excess_inflows_wallets), len(excess_profits_wallets))
 
     return filtered_wallet_metrics_df
@@ -152,17 +197,17 @@ def split_window_dfs(windows_profits_df):
 
 
 
-def upload_wallet_cohort(merged_df):
+def upload_wallet_cohort(wallet_cohort):
     """
     Uploads the list of wallet_ids that are used in the model to BigQuery. This
     is used to pull additional metrics while limiting results to only relevant wallets.
 
     Params:
-    - merged_df (pd.DataFrame):df with wallet_id as the index
+    - wallet_cohort (np.array): the wallet_ids included in the cohort
     """
     # generate upload_df from input df
     upload_df = pd.DataFrame()
-    upload_df['wallet_id'] = merged_df.index.values
+    upload_df['wallet_id'] = wallet_cohort
     upload_df['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     # set df datatypes of upload df

@@ -1,5 +1,6 @@
 """Allows the config file to be imported to other wallet .py files"""
 
+from datetime import datetime, timedelta
 from pathlib import Path
 import yaml
 
@@ -25,6 +26,7 @@ class WalletsConfig:
 
     # Class variable to store the singleton instance
     _instance = None
+    _yaml_path = None
 
     def __new__(cls):
         # Ensure only one instance is created (singleton pattern)
@@ -55,6 +57,7 @@ class WalletsConfig:
         instance = cls()
         cls._yaml_path = Path(yaml_path)  # Store the path
         instance.reload()  # Use reload method to load the config
+        instance._add_derived_values()  # Add derived training period boundary dates
         return instance
 
     def get(self, key, default=None):
@@ -81,6 +84,22 @@ class WalletsConfig:
         if self._yaml_path is None:
             raise FileNotFoundError("No config file path specified. Call load_from_yaml first.")
         self.config = yaml.safe_load(self._yaml_path.read_text(encoding='utf-8'))
+        self._add_derived_values()  # Add derived training period boundary dates
+
+    def _add_derived_values(self):
+        """Add calculated values to the config."""
+        if 'training_data' in self.config:
+            # Get the first training window start date
+            first_window = min(self.config['training_data']['training_window_starts'].values())
+            self.config['training_data']['training_period_start'] = first_window
+
+            # Get the day before modeling period start
+            modeling_start = datetime.strptime(
+                self.config['training_data']['modeling_period_start'],
+                "%Y-%m-%d"
+            )
+            training_end = (modeling_start - timedelta(days=1)).strftime("%Y-%m-%d")
+            self.config['training_data']['training_period_end'] = training_end
 
     def __getitem__(self, key):
         # Enable dictionary-style access with square brackets (config['key'])
