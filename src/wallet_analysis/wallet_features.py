@@ -1,6 +1,6 @@
-'''
-calculates metrics related to the distribution of coin ownership across wallets
-'''
+"""
+Calculates metrics aggregated at the wallet level
+"""
 
 import time
 import dreams_core.core as dc
@@ -56,6 +56,9 @@ def calculate_wallet_level_metrics(profits_df):
 
     # Join all metrics together
     wallet_metrics_df = imputed_metrics_df.join(observed_metrics_df)
+
+    # Fill 0s for wallets without observed activity
+    wallet_metrics_df = wallet_metrics_df.fillna(0)
 
     # Compute additional derived metrics
     wallet_metrics_df['return'] = wallet_metrics_df['net_gain'] / wallet_metrics_df['invested']
