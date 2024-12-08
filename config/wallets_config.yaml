@@ -3,19 +3,22 @@ training_data:
   training_window_starts:
     w1: "2023-07-01"
     w2: "2023-11-01"
-    # p3: "2023-04-01"
-    # p4: "2023-08-01"
-  modeling_period_start: "2024-02-01"
-  modeling_period_end: "2024-03-31"
+    w3: "2024-04-01"
+    w4: "2024-08-01"
+  # modeling_period_start: "2024-02-01"
+  # modeling_period_end: "2024-03-31"
+  modeling_period_start: "2024-11-01"
+  modeling_period_end: "2024-11-30"
 
 # Variables used to clean and filter raw data before training data is built
 data_cleaning:
 
   # Modeling period filters
-  min_modeling_investment: 1000
+  min_modeling_investment: 10000
+  min_modeling_transaction_days: 2
 
   # Wallet minimum thresholds
-  minimum_wallet_inflows: 50000 # The amount of lifetime USD inflows a wallet must have to be included in the training data
+  minimum_wallet_inflows: 25000 # The amount of lifetime USD inflows a wallet must have to be included in the training data
   minimum_volume: 1000  # Exclude wallets with fewer than this amount of training period USD volume
   minumum_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
 
@@ -25,4 +28,4 @@ data_cleaning:
 
   # market_data_df filters: Define how to handle missing price data
   max_gap_days: 50  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
-  min_daily_volume: 5000 # Minimum average daily volume the coin must have
+  min_daily_volume: 3000 # Minimum average daily volume the coin must have

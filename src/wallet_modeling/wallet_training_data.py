@@ -160,12 +160,17 @@ def split_window_dfs(windows_profits_df):
 
     # Convert training window starts to sorted datetime
     training_windows_starts = sorted([
-        datetime.strptime(date, "%Y-%m-%d")
+        datetime.strptime(date, "%Y-%m-%d") - pd.Timedelta(days=1)
         for date in wallets_config['training_data']['training_window_starts'].values()
     ])
 
     # Generate end dates for each period
-    training_windows_ends = training_windows_starts[1:] + [modeling_period_end - pd.Timedelta(days=1)]
+    training_windows_ends = (
+        # the dates before each window starts (excluding the first)...
+        [date - timedelta(days=1) for date in training_windows_starts[1:]]
+        # ...plus the date before the modeling period starts
+        + [modeling_period_start - pd.Timedelta(days=1)]
+    )
 
     # Create array of DataFrames for each training period
     training_windows_dfs = []
