@@ -1,22 +1,28 @@
+# Variables used to define the training data
 training_data:
-  # Variables used to define the training data
-  earliest_transfer_date: "2023-07-01"
-  training_period_start: "2023-07-01"
-  training_period_end: "2023-12-31"
-  modeling_period_start: "2024-01-01"
+  training_window_starts:
+    w1: "2023-07-01"
+    w2: "2023-11-01"
+    # p3: "2023-04-01"
+    # p4: "2023-08-01"
+  modeling_period_start: "2024-02-01"
   modeling_period_end: "2024-03-31"
-  latest_transfer_date: "2024-03-31"
 
+# Variables used to clean and filter raw data before training data is built
 data_cleaning:
-  # Variables used to clean and filter raw data before training data is built
 
-  # wallet filters: defines which wallets are included in analysis
-  minimum_wallet_inflows: 5000 # The amount of lifetime USD inflows a wallet must have to be included in the training data
-  profitability_filter: 20000000  # Exclude wallets with profits or losses greater than or equal to this amount (USD)
-  inflows_filter: 15000000  # Exclude wallets with inflows greater than or equal to this amount (USD)
-  minimum_volume: 5000  # Exclude wallets with fewer than this amount of training period USD volume
+  # Modeling period filters
+  min_modeling_investment: 1000
+
+  # Wallet minimum thresholds
+  minimum_wallet_inflows: 50000 # The amount of lifetime USD inflows a wallet must have to be included in the training data
+  minimum_volume: 1000  # Exclude wallets with fewer than this amount of training period USD volume
+  minumum_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
+
+  # Wallet maximum thresholds
+  profitability_filter: 25000000  # Exclude wallets with profits or losses greater than or equal to this amount (USD)
+  inflows_filter: 25000000  # Exclude wallets with inflows greater than or equal to this amount (USD)
 
   # market_data_df filters: Define how to handle missing price data
-  max_gap_days: 25  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
+  max_gap_days: 50  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
   min_daily_volume: 5000 # Minimum average daily volume the coin must have
-  exclude_coins_without_transfers: True  # determines whether to create price features for coins without transfers data
