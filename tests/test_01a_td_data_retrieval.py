@@ -258,8 +258,9 @@ def test_market_cap_missing_at_start():
         "'market_cap_imputed' column is not of type Int64."
     )
 
+
 @pytest.mark.unit
-def test_all_market_cap_missing_coverage_zero(mocker):
+def test_all_market_cap_missing_coverage_zero():
     """
     Test that when all 'market_cap' values are missing for a coin (coverage = 0),
     the function excludes the coin from imputation, leaving all 'market_cap_imputed' values as NaN.
@@ -296,8 +297,9 @@ def test_all_market_cap_missing_coverage_zero(mocker):
         "'market_cap_imputed' column is not of type Int64."
     )
 
+
 @pytest.mark.unit
-def test_market_cap_missing_intermittently(mocker):
+def test_market_cap_missing_intermittently():
     """
     Test that when 'market_cap' values are missing intermittently
     but overall coverage meets 'min_coverage', the function imputes
@@ -340,6 +342,8 @@ def test_market_cap_missing_intermittently(mocker):
     assert result_df['market_cap_imputed'].dtype == 'Int64', (
         "'market_cap_imputed' column is not of type Int64."
     )
+
+
 
 # ---------------------------------------- #
 # clean_profits_df() unit tests
