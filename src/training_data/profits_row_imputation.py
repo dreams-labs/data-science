@@ -124,6 +124,7 @@ def multithreaded_impute_profits_rows(profits_df, prices_df, target_date, n_thre
         prices_df (pd.DataFrame): DataFrame containing price information
         target_date (str or datetime): The date for which to impute rows
         n_threads (int): The number of threads to run impute_profits_df_rows() with
+        log_column (bool): Whether to append a column indicating whether the row was imputed
 
     Returns:
         all_new_rows_df (pd.DataFrame): The set of new rows to be added to profits_df to
@@ -372,6 +373,10 @@ def calculate_new_profits_values(profits_df, target_date):
     new_rows_df = new_rows_df.reset_index()
     new_rows_df['date'] = target_date  # pylint: disable=E1137 # df does not support item assignment
 
+    # Log the column as imputed if the lineage column was added from log_column=True
+    if 'is_imputed' in profits_df.columns:
+        new_rows_df['is_imputed']=True
+
     return new_rows_df
 
 
@@ -430,7 +435,9 @@ def worker(partition, prices_df, target_date, result_queue):
 
 def test_partition_performance(profits_df, prices_df, target_date, partition_numbers):
     """
-    Test the performance of the multithreaded_impute_profits function with different
+    (Development function not used in production pipelines)
+
+    Used to test the performance of the multithreaded_impute_profits function with different
     numbers of partitions.
 
     This function iterates through the provided partition numbers, running the

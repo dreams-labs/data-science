@@ -1,0 +1,19 @@
+training_data:
+  # Variables used to define the training data
+  earliest_transfer_date: "2023-07-01"  # Start date for the modeling period
+  latest_transfer_date: "2024-03-30"  # Start date for the modeling period
+
+data_cleaning:
+  # Variables used to clean and filter raw data before training data is built
+
+  # profits_df filters: The goal is to remove wallets that don't belong in the dataset (e.g., CEX, mint, contract wallets)
+  profitability_filter: 15000000  # Exclude wallets with profits or losses greater than or equal to this amount (USD)
+  inflows_filter: 20000000  # Exclude wallets with inflows greater than or equal to this amount (USD)
+
+  # market_data_df filters: Define how to handle missing price data
+  max_gap_days: 25  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
+  min_daily_volume: 5000 # Minimum average daily volume the coin must have
+  exclude_coins_without_transfers: True  # determines whether to create price features for coins without transfers data
+
+  # wallet filters: defines which wallets are included in analysis
+  minimum_wallet_inflows: 50000 # The amount of lifetime USD inflows a wallet must have to be included in the training data

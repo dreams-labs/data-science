@@ -67,7 +67,7 @@ def retrieve_market_data():
 
 
 
-def clean_market_data(market_data_df, config):
+def clean_market_data(market_data_df, config, earliest_date, latest_date):
     """
     Removes all market data records for
         1. coins with a longer price gap than the config['data_cleaning']['max_gap_days']
@@ -80,45 +80,48 @@ def clean_market_data(market_data_df, config):
         forwardfilled in a row to ensure a complete time series.
     - max_gap_days (int): The maximum allowable number of forwardfilled dates before
         all records for the coin are removed
+    - earliest_date (string): The earliest date relevant to the dataset formatted as
+        'YYYY-MM-DD'. Data cleaning filters will not be applied to records prior to this.
+    - latest_date (string): The latest date relevant to the dataset formatted as
+        'YYYY-MM-DD'. Data cleaning filters will not be applied to records after this.
     """
     # Declare thresholds
     max_gap_days = config['data_cleaning']['max_gap_days']
     min_daily_volume = config['data_cleaning']['min_daily_volume']
 
-    # Identify coin_ids with gaps that exceed the maximum
-    all_coin_ids = market_data_df.groupby('coin_id', observed=True)['days_imputed'].max()
-    gap_coin_ids = all_coin_ids[all_coin_ids > max_gap_days].index.tolist()
+    # Create mask for evaluation period
+    date_mask = ((market_data_df['date'] >= earliest_date) &
+                 (market_data_df['date'] <= latest_date))
 
-    # Remove coins with gaps above the maximum
-    market_data_df_no_gaps = market_data_df[~market_data_df['coin_id'].isin(gap_coin_ids)]
+    # Identify coin_ids with gaps that exceed the maximum within date range
+    filtered_df = market_data_df[date_mask]
+    gap_coin_ids = (filtered_df.groupby('coin_id', observed=True)['days_imputed']
+                    .max()[lambda x: x > max_gap_days].index.tolist())
+
+    # Identify coin_ids with insufficient volume within date range
+    mean_volume = filtered_df.groupby('coin_id', observed=True)['volume'].mean()
+    low_volume_coins = mean_volume[mean_volume <= min_daily_volume].index.tolist()
+
+    # Combine problematic coin lists
+    coins_to_remove = list(set(gap_coin_ids + low_volume_coins))
+
+    # Remove ALL records for problematic coins
+    cleaned_df = market_data_df[~market_data_df['coin_id'].isin(coins_to_remove)]
 
     # Drop helper column
-    market_data_df_no_gaps = market_data_df_no_gaps.drop(columns='days_imputed')
+    cleaned_df = cleaned_df.drop(columns='days_imputed')
 
-    logger.info("Max gap days threshold of %s day removed %s market data records for %s coins.",
-                max_gap_days,
-                len(market_data_df) - len(market_data_df_no_gaps),
-                len(gap_coin_ids))
+    logger.info("Removed %s coins (%s for gaps, %s for volume) and %s total records.",
+                len(coins_to_remove),
+                len(gap_coin_ids),
+                len(low_volume_coins),
+                len(market_data_df) - len(cleaned_df))
 
-
-    # Identify coin_ids with daily volume below the minimum
-    mean_volume = market_data_df_no_gaps.groupby('coin_id', observed=True)['volume'].mean()
-    coin_ids_filtered = mean_volume[mean_volume > min_daily_volume].index
-
-    # Filter market_data_df
-    market_data_df_no_gaps_no_vol = (market_data_df_no_gaps[market_data_df_no_gaps['coin_id']
-                                                      .isin(coin_ids_filtered)])
-
-    logger.info("Min daily volume threshold of $%i removed %s additional market data records for %s coins.",
-                min_daily_volume,
-                len(market_data_df_no_gaps) - len(market_data_df_no_gaps_no_vol),
-                len(set(market_data_df_no_gaps['coin_id'].unique()) - set(coin_ids_filtered)))
-
-    return market_data_df_no_gaps_no_vol
+    return cleaned_df
 
 
 
-def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows, maximum_market_cap_share):
+def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows):
     """
     Retrieves data from the core.coin_wallet_profits table and converts columns to
     memory-efficient formats. Records prior to the start_date are excluded but a new
@@ -130,9 +133,6 @@ def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows, maximum_
     - start_date (String): The latest date to retrieve records for with format 'YYYY-MM-DD'
     - minimum_wallet_inflows (Float): Wallet-coin pairs with fewer than this amount of total
         USD inflows will be removed from the profits_df dataset
-    - maximum_market_cap_share (Float): Wallet-coin pairs that ever own a high % of the coin's
-        market cap than this amount are removed. Helpful for identifying treasuries, CExs,
-        deployers, burn addresses, etc.
 
     Returns:
     - profits_df (DataFrame): contains coin-wallet-date keyed profits data denominated in USD
@@ -170,15 +170,6 @@ def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows, maximum_
             group by 1,2
         ),
 
-        overage_wallets as (
-            select cwp.coin_id
-            ,cwp.wallet_address
-            from core.coin_wallet_profits cwp
-            join core.coin_market_data cmd on cmd.coin_id = cwp.coin_id and cmd.date = cwp.date
-            where cwp.usd_balance > cmd.market_cap * {maximum_market_cap_share}
-            group by 1,2
-        ),
-
         profits_base_filtered as (
             select pb.*
             from profits_base pb
@@ -187,11 +178,6 @@ def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows, maximum_
             join usd_inflows_filter f on f.coin_id = pb.coin_id
                 and f.wallet_address = pb.wallet_address
                 and f.total_usd_inflows >= {minimum_wallet_inflows}
-
-            -- filter to remove wallets exceeding the maximum_market_cap_share
-            left join overage_wallets o on o.coin_id = pb.coin_id
-                and o.wallet_address = pb.wallet_address
-            where o.wallet_address is null
         ),
 
 
@@ -246,20 +232,24 @@ def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows, maximum_
         -- STEP 3: merge all records together
         -------------------------------------
         profits_merged as (
-            select * from profits_base_filtered
+            select *,
+            False as is_imputed
+            from profits_base_filtered
             -- transfers prior to the training period are summarized in training_start_new_rows
             where date >= '{start_date}'
 
             union all
 
-            select * from training_start_new_rows
+            select *,
+            True as is_imputed
+            from training_start_new_rows
         )
 
         select coin_id
         ,date
 
         -- replace the memory-intensive address strings with integers
-        ,DENSE_RANK() OVER (ORDER BY wallet_address) as wallet_address
+        ,id.wallet_id as wallet_address
 
         ,profits_cumulative
         ,usd_balance
@@ -267,7 +257,9 @@ def retrieve_profits_data(start_date, end_date, minimum_wallet_inflows, maximum_
         ,usd_inflows
         -- set a floor of $0.01 to avoid divide by 0 errors caused by rounding
         ,greatest(0.01,usd_inflows_cumulative) as usd_inflows_cumulative
-        from profits_merged
+        ,is_imputed
+        from profits_merged pm
+        join reference.wallet_ids id on id.wallet_address = pm.wallet_address
     """
 
     # Run the SQL query using dgc's run_sql method
