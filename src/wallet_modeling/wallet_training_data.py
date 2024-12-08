@@ -2,18 +2,17 @@
 Primary sequence functions used as part of the wallet modeling pipeline
 """
 
+import logging
 from datetime import datetime,timedelta
 import pandas as pd
 import numpy as np
 import pandas_gbq
-import dreams_core.core as dc
 
 # Local module imports
-# pylint:disable=E0401  # can't find local imports
-from wallet_analysis.wallets_config_manager import WalletsConfig
+from wallet_modeling.wallets_config_manager import WalletsConfig
 
 # Set up logger at the module level
-logger = dc.setup_logger()
+logger = logging.getLogger(__name__)
 
 # Load wallets_config at the module level
 wallets_config = WalletsConfig()

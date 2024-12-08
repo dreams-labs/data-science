@@ -2,7 +2,8 @@
 Calculates metrics aggregated at the wallet-coin-date level
 """
 
-import dreams_core.core as dc
+import logging
 
 # set up logger at the module level
-logger = dc.setup_logger()
+logger = logging.getLogger(__name__)
+

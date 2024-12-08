@@ -2,11 +2,11 @@
 Calculates metrics aggregated at the wallet-coin level
 """
 
-import dreams_core.core as dc
+import logging
 from dreams_core.googlecloud import GoogleCloud as dgc
 
 # set up logger at the module level
-logger = dc.setup_logger()
+logger = logging.getLogger(__name__)
 
 
 
