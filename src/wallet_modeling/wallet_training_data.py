@@ -159,9 +159,10 @@ def split_window_dfs(windows_profits_df):
     modeling_period_end = datetime.strptime(wallets_config['training_data']['modeling_period_end'], "%Y-%m-%d")
 
     # Convert training window starts to sorted datetime
-    training_windows_starts = sorted(
-        [datetime.strptime(date, "%Y-%m-%d") for date in wallets_config['training_data']['training_window_starts'].values()]
-    )
+    training_windows_starts = sorted([
+        datetime.strptime(date, "%Y-%m-%d")
+        for date in wallets_config['training_data']['training_window_starts'].values()
+    ])
 
     # Generate end dates for each period
     training_windows_ends = training_windows_starts[1:] + [modeling_period_end - pd.Timedelta(days=1)]
@@ -184,7 +185,7 @@ def split_window_dfs(windows_profits_df):
 
     # Extract modeling period DataFrame
     modeling_period_df = windows_profits_df[
-            (windows_profits_df['date'] >= modeling_period_start) & (windows_profits_df['date'] < modeling_period_end)
+            (windows_profits_df['date'] >= modeling_period_start) & (windows_profits_df['date'] <= modeling_period_end)
 
         ]
     logger.info("Modeling Period (%s to %s): %s",
