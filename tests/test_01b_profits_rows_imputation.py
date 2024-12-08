@@ -10,20 +10,14 @@ tests used to audit the files in the data-science/src folder
 
 import sys
 import os
-import contextlib
-import threading
 import pandas as pd
-import numpy as np
 from dotenv import load_dotenv
 import pytest
 from dreams_core import core as dc
 
 # pyright: reportMissingImports=false
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
-import training_data.data_retrieval as dr
 import training_data.profits_row_imputation as pri
-import coin_wallet_metrics.coin_wallet_metrics as cwm
-from utils import load_config
 
 load_dotenv()
 logger = dc.setup_logger()

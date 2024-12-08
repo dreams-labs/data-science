@@ -16,7 +16,6 @@ import pandas as pd
 import numpy as np
 from dotenv import load_dotenv
 import pytest
-from unittest import mock
 from dreams_core import core as dc
 
 # pyright: reportMissingImports=false
@@ -130,7 +129,217 @@ def test_market_cap_below_min_coverage(mocker):
     mock_logger.assert_not_called()
 
 
+@pytest.mark.unit
+def test_imputed_market_cap_exceeds_historical_max(mocker):
+    """
+    Test that when an imputed 'market_cap' exceeds the historical maximum,
+    a warning is logged appropriately.
+    """
+    # Mock the specific module's logger warning method
+    mock_logger = mocker.patch('training_data.data_retrieval.logger.warning')
 
+    # Define the input DataFrame with sufficient coverage for imputation
+    input_data = {
+        'coin_id': ['BTC', 'BTC', 'BTC'],
+        'date': ['2023-01-01', '2023-01-02', '2023-01-03'],
+        'price': [30000, 33000, 32000],
+        'market_cap': [600000000, np.nan, 640000000]
+    }
+    input_df = pd.DataFrame(input_data)
+
+    # Define the expected 'market_cap_imputed' values
+    expected_market_cap_imputed = pd.Series(
+        [600000000, 660000000, 640000000],
+        dtype='Int64'
+    )
+    expected_df = input_df.copy()
+    expected_df['market_cap_imputed'] = expected_market_cap_imputed
+
+    # Invoke the impute_market_cap function
+    result_df = dr.impute_market_cap(input_df, min_coverage=0.5)
+
+    # Assert that 'market_cap_imputed' matches the expected values
+    assert np.allclose(
+        result_df['market_cap_imputed'],
+        expected_df['market_cap_imputed'],
+        equal_nan=True
+    ), "The 'market_cap_imputed' does not correctly exceed the historical maximum."
+
+    # Assert that the 'market_cap_imputed' column is of type Int64
+    assert result_df['market_cap_imputed'].dtype == 'Int64', (
+        "'market_cap_imputed' column is not of type Int64."
+    )
+
+    # Assert that a warning was logged indicating the imputed value exceeds historical max
+    mock_logger.assert_called_once_with(
+        "Coin BTC: Imputed market cap (660000000) exceeds historical maximum (640000000)"
+    )
+
+
+@pytest.mark.unit
+def test_multiple_coins_varying_coverage():
+    """
+    Test that the 'impute_market_cap' function correctly handles multiple coins
+    with varying 'market_cap' coverage, imputing only those that meet or exceed
+    the 'min_coverage' threshold and excluding others.
+    """
+    # Define the input DataFrame with multiple coins and varying market_cap coverage
+    input_data = {
+        'coin_id': ['BTC', 'BTC', 'BTC', 'ETH', 'ETH', 'ETH', 'DOGE', 'DOGE'],
+        'date': ['2023-01-01', '2023-01-02', '2023-01-03',
+                 '2023-01-01', '2023-01-02', '2023-01-03',
+                 '2023-01-01', '2023-01-02'],
+        'price': [30000, 31000, 32000, 2000, 2100, 2200, 0.05, 0.06],
+        'market_cap': [600000000, np.nan, 640000000, 400000000, np.nan, 440000000,
+                      np.nan, np.nan]
+    }
+    input_df = pd.DataFrame(input_data)
+
+    # Define the expected 'market_cap_imputed' values
+    expected_market_cap_imputed = pd.Series(
+        [600000000, 620000000, 640000000, 400000000, 420000000, 440000000, np.nan, np.nan],
+        dtype='Int64'
+    )
+    expected_df = input_df.copy()
+    expected_df['market_cap_imputed'] = expected_market_cap_imputed
+
+    # Invoke the impute_market_cap function with min_coverage=0.5
+    result_df = dr.impute_market_cap(input_df, min_coverage=0.5)
+
+    # Assert that 'market_cap_imputed' matches the expected values
+    assert np.allclose(
+        result_df['market_cap_imputed'],
+        expected_df['market_cap_imputed'],
+        equal_nan=True
+    ), "The 'market_cap_imputed' does not correctly handle multiple coins with varying coverage."
+
+    # Assert that the 'market_cap_imputed' column is of type Int64 where applicable
+    assert result_df['market_cap_imputed'].dtype == 'Int64', (
+        "'market_cap_imputed' column is not of type Int64."
+    )
+
+
+@pytest.mark.unit
+def test_market_cap_missing_at_start():
+    """
+    Test that when a coin's 'market_cap' is missing at the start of its time series
+    but meets the 'min_coverage' threshold, the function imputes the missing values correctly.
+    """
+    # Define the input DataFrame with 'market_cap' missing at the start for BTC and DOGE
+    input_data = {
+        'coin_id': ['BTC', 'BTC', 'BTC', 'ETH', 'ETH', 'DOGE', 'DOGE'],
+        'date': ['2023-01-01', '2023-01-02', '2023-01-03',
+                 '2023-01-01', '2023-01-02', '2023-01-01', '2023-01-02'],
+        'price': [30000, 31000, 32000, 2000, 2100, 0.05, 0.06],
+        'market_cap': [np.nan, 620000000, 640000000, 400000000, 420000000, np.nan, 6000000]
+    }
+    input_df = pd.DataFrame(input_data)
+
+    # Define the expected 'market_cap_imputed' values
+    expected_market_cap_imputed = pd.Series(
+        [np.nan, 620000000, 640000000, 400000000, 420000000, np.nan, 6000000],
+        dtype='Int64'
+    )
+    expected_df = input_df.copy()
+    expected_df['market_cap_imputed'] = expected_market_cap_imputed
+
+    # Invoke the impute_market_cap function with min_coverage=0.7
+    result_df = dr.impute_market_cap(input_df, min_coverage=0.7)
+
+    # Assert that 'market_cap_imputed' matches the expected values
+    assert np.allclose(
+        result_df['market_cap_imputed'],
+        expected_df['market_cap_imputed'],
+        equal_nan=True
+    ), "The 'market_cap_imputed' does not correctly handle missing values at the start of the time series."
+
+    # Assert that the 'market_cap_imputed' column is of type Int64 where applicable
+    assert result_df['market_cap_imputed'].dtype == 'Int64', (
+        "'market_cap_imputed' column is not of type Int64."
+    )
+
+@pytest.mark.unit
+def test_all_market_cap_missing_coverage_zero(mocker):
+    """
+    Test that when all 'market_cap' values are missing for a coin (coverage = 0),
+    the function excludes the coin from imputation, leaving all 'market_cap_imputed' values as NaN.
+    """
+    # Define the input DataFrame with all 'market_cap' values missing for DOGE
+    input_data = {
+        'coin_id': ['BTC', 'BTC', 'ETH', 'ETH', 'DOGE', 'DOGE'],
+        'date': ['2023-01-01', '2023-01-02', '2023-01-01', '2023-01-02', '2023-01-01', '2023-01-02'],
+        'price': [30000, 31000, 2000, 2100, 0.05, 0.06],
+        'market_cap': [600000000, 620000000, 400000000, 420000000, np.nan, np.nan]
+    }
+    input_df = pd.DataFrame(input_data)
+
+    # Define the expected 'market_cap_imputed' values
+    expected_market_cap_imputed = pd.Series(
+        [600000000, 620000000, 400000000, 420000000, np.nan, np.nan],
+        dtype='Int64'
+    )
+    expected_df = input_df.copy()
+    expected_df['market_cap_imputed'] = expected_market_cap_imputed
+
+    # Invoke the impute_market_cap function with min_coverage=0.7
+    result_df = dr.impute_market_cap(input_df, min_coverage=0.7)
+
+    # Assert that 'market_cap_imputed' matches the expected values
+    assert np.allclose(
+        result_df['market_cap_imputed'],
+        expected_df['market_cap_imputed'],
+        equal_nan=True
+    ), "The 'market_cap_imputed' does not correctly handle cases where all 'market_cap' values are missing."
+
+    # Assert that the 'market_cap_imputed' column is of type Int64 where applicable
+    assert result_df['market_cap_imputed'].dtype == 'Int64', (
+        "'market_cap_imputed' column is not of type Int64."
+    )
+
+@pytest.mark.unit
+def test_market_cap_missing_intermittently(mocker):
+    """
+    Test that when 'market_cap' values are missing intermittently
+    but overall coverage meets 'min_coverage', the function imputes
+    only the missing values without altering existing ones.
+    """
+    # Define the input DataFrame with intermittent missing 'market_cap' values
+    input_data = {
+        'coin_id': ['BTC'] * 8,
+        'date': [
+            '2023-01-01', '2023-01-02', '2023-01-03', '2023-01-04',
+            '2023-01-05', '2023-01-06', '2023-01-07', '2023-01-08'
+        ],
+        'price': [1000, 1100, 1200, 1300, 1400, 1500, 1600, 1500],
+        'market_cap': [
+            np.nan, np.nan, 24000000, 26000000,
+            np.nan, 30000000, 32000000, np.nan
+        ]
+    }
+    input_df = pd.DataFrame(input_data)
+
+    # Define the expected 'market_cap_imputed' values
+    expected_market_cap_imputed = pd.Series(
+        [20000000, 22000000, 24000000, 26000000, 28000000, 30000000, 32000000, 30000000],
+        dtype='Int64'
+    )
+    expected_df = input_df.copy()
+    expected_df['market_cap_imputed'] = expected_market_cap_imputed
+
+    # Invoke the impute_market_cap function with min_coverage=0.5
+    result_df = dr.impute_market_cap(input_df, min_coverage=0.5)
+
+    # Assert that 'market_cap_imputed' matches the expected values
+    assert np.allclose(
+        result_df['market_cap_imputed'],
+        expected_df['market_cap_imputed'],
+        equal_nan=True
+    ), "The 'market_cap_imputed' does not correctly handle intermittent missing values."
+
+    # Assert that the 'market_cap_imputed' column is of type Int64
+    assert result_df['market_cap_imputed'].dtype == 'Int64', (
+        "'market_cap_imputed' column is not of type Int64."
+    )
 
 # ---------------------------------------- #
 # clean_profits_df() unit tests

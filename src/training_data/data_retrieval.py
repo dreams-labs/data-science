@@ -186,8 +186,8 @@ def impute_market_cap(market_data_df, min_coverage=0.7):
 
         if max_imputed > max_historical:
             logger.warning(
-                f"Coin {coin_id}: Imputed market cap ({max_imputed:,.0f}) "
-                f"exceeds historical maximum ({max_historical:,.0f})"
+                f"Coin {coin_id}: Imputed market cap ({max_imputed:.0f}) "
+                f"exceeds historical maximum ({max_historical:.0f})"
             )
 
     # Drop the temporary ratio column
