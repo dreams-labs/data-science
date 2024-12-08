@@ -16,14 +16,19 @@ from sklearn.metrics import (
 )
 
 # local module imports
+from wallet_modeling.wallets_config_manager import WalletsConfig
 import modeling as m
 
-# set up logger at the module level
+
+# Set up logger at the module level
 logger = logging.getLogger(__name__)
 
+# Load wallets_config at the module level
+wallets_config = WalletsConfig()
 
 
-def generate_target_variables(wallets_df, winsorization=0.00):
+
+def generate_target_variables(wallets_df):
     """
     Generates various target variables for modeling wallet performance.
 
@@ -34,13 +39,16 @@ def generate_target_variables(wallets_df, winsorization=0.00):
     Returns:
     - DataFrame with additional target variables
     """
-    metrics_df = wallets_df.copy()
+    metrics_df = wallets_df[['invested','net_gain']].copy()
+    returns_winsorization = wallets_config['modeling']['returns_winsorization']
     epsilon = 1e-10
 
     # Calculate base return
     metrics_df['return'] = metrics_df['net_gain'] / metrics_df['invested']
-    if winsorization > 0:
-        metrics_df['return'] = m.winsorize(metrics_df['return'],winsorization)
+
+    # Apply winsorization
+    if returns_winsorization > 0:
+        metrics_df['return'] = m.winsorize(metrics_df['return'],returns_winsorization)
 
     # Risk-Adjusted Dollar Return
     metrics_df['risk_adj_return'] = metrics_df['net_gain'] * \
@@ -80,6 +88,7 @@ def generate_target_variables(wallets_df, winsorization=0.00):
                                         if c in metrics_df.columns])
 
     return metrics_df.round(6)
+
 
 
 def evaluate_regression_model(y_true, y_pred, model=None, X_test=None, feature_names=None):

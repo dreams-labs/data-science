@@ -29,3 +29,7 @@ data_cleaning:
   # market_data_df filters: Define how to handle missing price data
   max_gap_days: 50  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
   min_daily_volume: 3000 # Minimum average daily volume the coin must have
+
+modeling:
+  target_variable: "performance_score"
+  returns_winsorization: 0.01
