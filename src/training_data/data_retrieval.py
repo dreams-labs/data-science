@@ -3,6 +3,7 @@ functions used in generating training data for the models
 """
 import sys
 import time
+import logging
 import pandas as pd
 from dreams_core.googlecloud import GoogleCloud as dgc
 from dreams_core import core as dc
@@ -11,9 +12,8 @@ from dreams_core import core as dc
 sys.path.append('..')
 import utils as u  # pylint: disable=C0413  # import must be at top
 
-
-# set up logger at the module level
-logger = dc.setup_logger()
+# Set up logger at the module level
+logger = logging.getLogger(__name__)
 
 
 def retrieve_market_data():
@@ -118,6 +118,82 @@ def clean_market_data(market_data_df, config, earliest_date, latest_date):
                 len(market_data_df) - len(cleaned_df))
 
     return cleaned_df
+
+
+def impute_market_cap(market_data_df, min_coverage=0.7):
+    """
+    Create a new column with imputed market cap values based on price movements.
+    Handles missing values at start, middle, and end of time series.
+    Logs warnings if imputed values exceed historical maximums.
+
+    Parameters:
+    -----------
+    market_data_df : pandas.DataFrame
+        DataFrame with columns ['coin_id', 'date', 'price', 'market_cap']
+    min_coverage : float
+        Minimum coverage threshold (0-1) for coins to be processed
+
+    Returns:
+    --------
+    pandas.DataFrame
+        DataFrame with new 'market_cap_imputed' column containing original and imputed values as int64
+    """
+    # Make a copy of input data
+    df_copy = market_data_df.copy()
+
+    # Calculate coverage and historical maximums per coin
+    coverage = df_copy.groupby('coin_id').agg(
+        records=('price', 'count'),
+        has_cap=('market_cap', 'count'),
+        max_cap=('market_cap', 'max')
+    )
+    coverage['coverage'] = coverage['has_cap'] / coverage['records']
+
+    # Get eligible coins
+    eligible_coins = coverage[
+        (coverage['coverage'] >= min_coverage) &
+        (coverage['coverage'] < 1)
+    ].index
+
+    # Initialize imputed column with original values as int64
+    df_copy['market_cap_imputed'] = df_copy['market_cap'].astype('Int64')
+
+    # Process only eligible coins
+    mask_eligible = df_copy['coin_id'].isin(eligible_coins)
+
+    # Calculate ratio for all valid records of eligible coins
+    df_copy.loc[mask_eligible, 'ratio'] = (
+        df_copy.loc[mask_eligible, 'market_cap'] /
+        df_copy.loc[mask_eligible, 'price']
+    )
+
+    # Backfill and forward fill ratios within each coin group
+    df_copy['ratio'] = df_copy.groupby('coin_id')['ratio'].bfill()
+    df_copy['ratio'] = df_copy.groupby('coin_id')['ratio'].ffill()
+
+    # Calculate imputed market caps using the filled ratios
+    mask_missing = df_copy['market_cap_imputed'].isna() & mask_eligible
+    df_copy.loc[mask_missing, 'market_cap_imputed'] = (
+        (df_copy.loc[mask_missing, 'price'] *
+         df_copy.loc[mask_missing, 'ratio']).round().astype('Int64')
+    )
+
+    # Check for imputed values exceeding historical maximums
+    for coin_id in eligible_coins:
+        max_historical = coverage.loc[coin_id, 'max_cap']
+        coin_mask = (df_copy['coin_id'] == coin_id) & df_copy['market_cap_imputed'].notna()
+        max_imputed = df_copy.loc[coin_mask, 'market_cap_imputed'].max()
+
+        if max_imputed > max_historical:
+            logger.warning(
+                f"Coin {coin_id}: Imputed market cap ({max_imputed:,.0f}) "
+                f"exceeds historical maximum ({max_historical:,.0f})"
+            )
+
+    # Drop the temporary ratio column
+    df_copy = df_copy.drop('ratio', axis=1)
+
+    return df_copy
 
 
 

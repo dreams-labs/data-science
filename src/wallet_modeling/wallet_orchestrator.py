@@ -9,7 +9,7 @@ import pandas as pd
 import training_data.data_retrieval as dr
 import training_data.profits_row_imputation as pri
 import wallet_modeling.wallet_training_data as wtd
-# import wallet_modeling.wallet_modeling as wm
+import wallet_modeling.wallet_modeling as wm
 import wallet_features.wallet_features as wf
 import wallet_features.wallet_coin_features as wcf
 # import wallet_features.wallet_coin_date_features as wcdf
@@ -99,15 +99,15 @@ def split_profits_df(profits_df,market_data_df,wallet_cohort):
                                                                imputation_dates, n_threads=24)
 
     # Filter to only include training window rows
-    windows_profits_df = (windows_profits_df[
+    training_profits_df = (windows_profits_df[
         (windows_profits_df['date'] >= pd.to_datetime(min(imputation_dates)))
         & (windows_profits_df['date'] <= pd.to_datetime(max(imputation_dates)))
     ])
 
     # Split profits_df into training windows and the modeling period
-    training_windows_profits_dfs, modeling_period_profits_df =  wtd.split_window_dfs(windows_profits_df)
+    training_windows_profits_dfs, modeling_profits_df =  wtd.split_window_dfs(training_profits_df)
 
-    return training_windows_profits_dfs, modeling_period_profits_df
+    return training_profits_df, training_windows_profits_dfs, modeling_profits_df
 
 
 def generate_wallet_performance_features(training_windows_profits_dfs,training_wallet_metrics_df,wallet_cohort):
@@ -120,12 +120,19 @@ def generate_wallet_performance_features(training_windows_profits_dfs,training_w
 
     # Generate and join dfs for each training window
     for i, window_df in enumerate(training_windows_profits_dfs, 1):
-        # Add metrics
+        # Add transaction metrics
         window_df = wcf.add_cash_flow_transfers_logic(window_df)
         window_wallets_df = wf.calculate_wallet_level_metrics(window_df)
 
         # Fill missing values and Join to training_data_df
         window_wallets_df = wf.fill_missing_wallet_data(window_wallets_df, wallet_cohort)
+
+        # Add performance metrics
+        window_performance_df = wm.generate_target_variables(window_wallets_df)
+        window_performance_df = window_performance_df.drop(['invested','net_gain'],axis=1)
+        window_wallets_df = window_wallets_df.join(window_performance_df)
+
+        # Add column suffix and join to training_data_df
         window_wallets_df = window_wallets_df.add_suffix(f'_w{i}')  # no need for i+1 now
         training_data_df = training_data_df.join(window_wallets_df, how='left')
 

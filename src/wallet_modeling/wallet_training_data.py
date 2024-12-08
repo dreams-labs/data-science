@@ -160,7 +160,7 @@ def split_window_dfs(windows_profits_df):
 
     # Convert training window starts to sorted datetime
     training_windows_starts = sorted([
-        datetime.strptime(date, "%Y-%m-%d") - pd.Timedelta(days=1)
+        datetime.strptime(date, "%Y-%m-%d")
         for date in wallets_config['training_data']['training_window_starts'].values()
     ])
 

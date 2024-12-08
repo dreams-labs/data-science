@@ -1,7 +1,6 @@
 """
 Calculates metrics aggregated at the wallet level
 """
-
 import logging
 import pandas as pd
 import numpy as np
@@ -18,6 +17,8 @@ from sklearn.metrics import (
 # local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
 import modeling as m
+
+# pylint:disable=invalid-name  # X_test isn't camelcase
 
 
 # Set up logger at the module level
@@ -39,12 +40,13 @@ def generate_target_variables(wallets_df):
     Returns:
     - DataFrame with additional target variables
     """
-    metrics_df = wallets_df[['invested','net_gain']].copy()
+    metrics_df = wallets_df[['invested','net_gain']].copy().round(6)
     returns_winsorization = wallets_config['modeling']['returns_winsorization']
     epsilon = 1e-10
 
     # Calculate base return
-    metrics_df['return'] = metrics_df['net_gain'] / metrics_df['invested']
+    metrics_df['return'] = np.where(abs(metrics_df['invested']) == 0,0,
+                                    metrics_df['net_gain'] / metrics_df['invested'])
 
     # Apply winsorization
     if returns_winsorization > 0:
@@ -78,9 +80,23 @@ def generate_target_variables(wallets_df):
                                 metrics_df['norm_return']) / 2
 
     # Size-adjusted rank
-    quartiles = pd.qcut(metrics_df['invested'], q=4, labels=['q1', 'q2', 'q3', 'q4'])
-    metrics_df['size_adjusted_rank'] = metrics_df.groupby(quartiles)['return'] \
-        .rank(pct=True)
+    # Create mask for zero values
+    zero_mask = metrics_df['invested'] == 0
+
+    # Create quartiles series initialized with 'q0' for zero values
+    quartiles = pd.Series('q0', index=metrics_df.index)
+
+    # Calculate quartiles for non-zero values
+    non_zero_quartiles = pd.qcut(metrics_df['invested'][~zero_mask],
+                                q=4,
+                                labels=['q1', 'q2', 'q3', 'q4'])
+
+    # Assign the quartiles to non-zero values
+    quartiles[~zero_mask] = non_zero_quartiles
+
+    # Calculate size-adjusted rank within each quartile
+    metrics_df['size_adjusted_rank'] = metrics_df.groupby(quartiles)['return'].rank(pct=True)
+
 
     # Clean up intermediate columns
     cols_to_drop = ['norm_return', 'norm_invested', 'norm_gain']
@@ -91,7 +107,7 @@ def generate_target_variables(wallets_df):
 
 
 
-def evaluate_regression_model(y_true, y_pred, model=None, X_test=None, feature_names=None):
+def evaluate_regression_model(y_true, y_pred, model=None, feature_names=None):
     """
     Comprehensive evaluation of regression model performance.
 
@@ -103,8 +119,6 @@ def evaluate_regression_model(y_true, y_pred, model=None, X_test=None, feature_n
         Predicted target values
     model : sklearn estimator, optional
         The fitted model object
-    X_test : array-like, optional
-        Test feature set for feature importance
     feature_names : list, optional
         List of feature names for feature importance plot
 
@@ -175,7 +189,7 @@ def evaluate_regression_model(y_true, y_pred, model=None, X_test=None, feature_n
 
         plt.tight_layout()
         metrics['figures'] = fig
-    except Exception as e:
+    except Exception as e:  # pylint:disable=broad-exception-caught
         print(f"Warning: Error generating plots: {str(e)}")
         metrics['figures'] = None
 
