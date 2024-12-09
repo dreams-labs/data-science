@@ -151,12 +151,23 @@ def split_window_dfs(windows_profits_df):
         for each period start and end
 
     Returns:
+    - training_profits_df (list of dfs): list of profits_dfs for each training window
     - training_windows_dfs (list of dfs): list of profits_dfs for each training window
-    - modeling_period_df (df): profits_df for the modeling period only
+    - modeling_profits_df (df): profits_df for the modeling period only
     """
-    # Extract modeling period boundaries
+    logger.info("Generating window-specific profits_dfs...")
+
+    # Extract period boundaries
+    training_period_start = datetime.strptime(wallets_config['training_data']['training_period_start'], "%Y-%m-%d")
+    training_period_end = datetime.strptime(wallets_config['training_data']['training_period_end'], "%Y-%m-%d")
     modeling_period_start = datetime.strptime(wallets_config['training_data']['modeling_period_start'], "%Y-%m-%d")
     modeling_period_end = datetime.strptime(wallets_config['training_data']['modeling_period_end'], "%Y-%m-%d")
+
+    # Extract training and modeling period DataFrames
+    training_profits_df = windows_profits_df[
+            (windows_profits_df['date'] >= training_period_start) & (windows_profits_df['date'] <= training_period_end)]
+    modeling_profits_df = windows_profits_df[
+            (windows_profits_df['date'] >= modeling_period_start) & (windows_profits_df['date'] <= modeling_period_end)]
 
     # Convert training window starts to sorted datetime
     training_windows_starts = sorted([
@@ -173,32 +184,30 @@ def split_window_dfs(windows_profits_df):
     )
 
     # Create array of DataFrames for each training period
-    training_windows_dfs = []
+    training_windows_profits_dfs = []
     for start, end in zip(training_windows_starts, training_windows_ends):
-        window_df = windows_profits_df[
-            (windows_profits_df['date'] >= start) & (windows_profits_df['date'] < end)
+        window_df = training_profits_df[
+            (training_profits_df['date'] >= start) & (training_profits_df['date'] < end)
         ]
-        training_windows_dfs.append(window_df)
+        training_windows_profits_dfs.append(window_df)
 
     # Result: array of DataFrames
-    for i, df in enumerate(training_windows_dfs):
+    for i, df in enumerate(training_windows_profits_dfs):
         logger.info("Training Window %s (%s to %s): %s",
                     i + 1,
-                    training_windows_starts[i].strftime('%Y-%m-%d'),
-                    training_windows_ends[i].strftime('%Y-%m-%d'),
+                    df['date'].min().strftime('%Y-%m-%d'),
+                    df['date'].max().strftime('%Y-%m-%d'),
                     df.shape)
-
-    # Extract modeling period DataFrame
-    modeling_period_df = windows_profits_df[
-            (windows_profits_df['date'] >= modeling_period_start) & (windows_profits_df['date'] <= modeling_period_end)
-
-        ]
+    logger.info("Training Period (%s to %s): %s",
+                training_profits_df['date'].min().strftime('%Y-%m-%d'),
+                training_profits_df['date'].max().strftime('%Y-%m-%d'),
+                training_profits_df.shape)
     logger.info("Modeling Period (%s to %s): %s",
-                modeling_period_start.strftime('%Y-%m-%d'),
-                modeling_period_end.strftime('%Y-%m-%d'),
-                modeling_period_df.shape)
+                modeling_profits_df['date'].min().strftime('%Y-%m-%d'),
+                modeling_profits_df['date'].max().strftime('%Y-%m-%d'),
+                modeling_profits_df.shape)
 
-    return training_windows_dfs, modeling_period_df
+    return training_profits_df, training_windows_profits_dfs, modeling_profits_df
 
 
 

@@ -46,12 +46,30 @@ def retrieve_datasets():
     )
 
     # Fill market cap in market_data_df
-    market_data_df = dr.impute_market_cap(market_data_df, wallets_config['data_cleaning']['min_mc_imputation_coverage'])
+    market_data_df = dr.impute_market_cap(market_data_df,
+                                        wallets_config['data_cleaning']['min_mc_imputation_coverage'],
+                                        wallets_config['data_cleaning']['max_mc_imputation_multiple'])
 
     # Remove the filtered coins from profits_df
     profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
 
+    # Drop unneeded columns
+    columns_to_drop = ['total_return']
+    profits_df = profits_df.drop(columns_to_drop,axis=1)
+
+    # Round relevant columns
+    columns_to_round = [
+        'profits_cumulative'
+        ,'usd_balance'
+        ,'usd_net_transfers'
+        ,'usd_inflows'
+        ,'usd_inflows_cumulative'
+    ]
+    profits_df[columns_to_round] = profits_df[columns_to_round].round(2)
+    profits_df[columns_to_round] = profits_df[columns_to_round].replace(-0, 0)
+
     return profits_df,market_data_df
+
 
 
 def define_wallet_cohort(profits_df,market_data_df):
@@ -89,6 +107,7 @@ def define_wallet_cohort(profits_df,market_data_df):
     return filtered_training_wallet_metrics_df,wallet_cohort
 
 
+
 def split_profits_df(profits_df,market_data_df,wallet_cohort):
     """
     Adds imputed rows at the start and end date of all windows
@@ -101,16 +120,11 @@ def split_profits_df(profits_df,market_data_df,wallet_cohort):
     windows_profits_df = pri.impute_profits_for_multiple_dates(cohort_profits_df, market_data_df,
                                                                imputation_dates, n_threads=24)
 
-    # Filter to only include training window rows
-    training_profits_df = (windows_profits_df[
-        (windows_profits_df['date'] >= pd.to_datetime(min(imputation_dates)))
-        & (windows_profits_df['date'] <= pd.to_datetime(max(imputation_dates)))
-    ])
-
     # Split profits_df into training windows and the modeling period
-    training_windows_profits_dfs, modeling_profits_df =  wtd.split_window_dfs(training_profits_df)
+    training_profits_df, training_windows_profits_dfs, modeling_profits_df =  wtd.split_window_dfs(windows_profits_df)
 
     return training_profits_df, training_windows_profits_dfs, modeling_profits_df
+
 
 
 def generate_wallet_performance_features(training_windows_profits_dfs,training_wallet_metrics_df,wallet_cohort):

@@ -140,7 +140,7 @@ def impute_market_cap(market_data_df, min_coverage=0.7, max_multiple=1.0):
     df_copy = df_copy.sort_values(['coin_id','date'])
 
     # Calculate coverage and historical maximums per coin
-    coverage = df_copy.groupby('coin_id').agg(
+    coverage = df_copy.groupby('coin_id', observed=True).agg(
         records=('price', 'count'),
         has_cap=('market_cap', 'count'),
         max_cap=('market_cap', 'max')
@@ -193,6 +193,15 @@ def impute_market_cap(market_data_df, min_coverage=0.7, max_multiple=1.0):
 
     # Drop temporary columns
     df_copy = df_copy.drop(['ratio', 'max_cap'], axis=1)
+
+    # Logger calculations and output
+    all_rows = len(df_copy)
+    known = df_copy['market_cap'].count()
+    imputed = df_copy['market_cap_imputed'].count()
+    logger.info("Imputation increased market cap coverage to %.1f%% (%s/%s) vs base of %.1f%% (%s/%s)",
+                100*imputed/all_rows, dc.human_format(imputed), dc.human_format(all_rows),
+                100*known/all_rows, dc.human_format(known), dc.human_format(all_rows))
+
 
     return df_copy
 
