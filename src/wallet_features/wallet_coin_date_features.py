@@ -2,6 +2,7 @@
 Calculates metrics aggregated at the wallet-coin-date level
 """
 import logging
+import time
 import pandas as pd
 import numpy as np
 
@@ -135,3 +136,48 @@ def calculate_balance_weighted_market_cap(profits_market_features_df):
     balance_wtd_df = balance_wtd_df.set_index('wallet_address')
 
     return balance_wtd_df
+
+
+def calculate_market_data_features(profits_df,market_data_df):
+    """
+    Calculates each wallet's total volume and ending balance, and the average market cap of coins
+    they interacted with weighted by the volume and ending balances.
+
+    Params:
+    - profits_df
+    - market_data_df
+
+    Returns:
+    - market_features_df (df): dataframe indexed on wallet_address that contains columns
+        total_volume, volume_wtd_market_cap, ending_portfolio_usd, portfolio_wtd_market_cap
+
+    """
+    start_time = time.time()
+    logger.debug("Calculating market data features...")
+
+    # Fully fill market cap data
+    filled_market_cap_df = force_fill_market_cap(market_data_df)
+
+    # Generate simplified profits df
+    profits_market_features_df = profits_df[['coin_id','date','wallet_address','usd_balance']].copy()
+    profits_market_features_df['volume'] = abs(profits_df['usd_net_transfers'])
+
+    # Append the filled market data to the simplified profits
+    profits_market_features_df = profits_market_features_df.merge(
+        filled_market_cap_df[['date', 'coin_id', 'market_cap_filled']],
+        on=['date', 'coin_id'],
+        how='inner'
+    )
+
+    # Calculate weighted metrics
+    volume_wtd_df = calculate_volume_weighted_market_cap(profits_market_features_df)
+    balance_wtd_df = calculate_balance_weighted_market_cap(profits_market_features_df)
+
+    # Merge into a wallet-indexed df of features
+    market_features_df = volume_wtd_df.copy()
+    market_features_df = market_features_df.join(balance_wtd_df)
+
+    logger.debug("Successfully calculated market data features after %.2f.",
+                 time.time() - start_time)
+
+    return market_features_df

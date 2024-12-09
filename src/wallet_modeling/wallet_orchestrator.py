@@ -3,7 +3,6 @@ Orchestrates groups of functions to generate wallet model pipeline
 """
 
 import logging
-import pandas as pd
 
 # Local module imports
 import training_data.data_retrieval as dr
@@ -136,10 +135,10 @@ def generate_wallet_performance_features(training_windows_profits_dfs,training_w
     training_data_df = training_data_df.add_suffix("_all_windows")
 
     # Generate and join dfs for each training window
-    for i, window_df in enumerate(training_windows_profits_dfs, 1):
+    for i, window_profits_df in enumerate(training_windows_profits_dfs, 1):
         # Add transaction metrics
-        window_df = wcf.add_cash_flow_transfers_logic(window_df)
-        window_wallets_df = wf.calculate_wallet_level_metrics(window_df)
+        window_profits_df = wcf.add_cash_flow_transfers_logic(window_profits_df)
+        window_wallets_df = wf.calculate_wallet_level_metrics(window_profits_df)
 
         # Fill missing values and Join to training_data_df
         window_wallets_df = wf.fill_missing_wallet_data(window_wallets_df, wallet_cohort)
