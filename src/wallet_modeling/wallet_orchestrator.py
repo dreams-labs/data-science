@@ -45,6 +45,9 @@ def retrieve_datasets():
         latest_date
     )
 
+    # Fill market cap in market_data_df
+    market_data_df = dr.impute_market_cap(market_data_df, wallets_config['data_cleaning']['min_mc_imputation_coverage'])
+
     # Remove the filtered coins from profits_df
     profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
 

@@ -29,7 +29,10 @@ data_cleaning:
     # market_data_df filters: Define how to handle missing price data
     max_gap_days: 50  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
     min_daily_volume: 3000 # Minimum average daily volume the coin must have
-    min_market_cap_imputation_coverage: 0.1  # coins with market cap coverage below this level will have hardcoded market cap values filled
+
+    # market cap imputation filters
+    min_mc_imputation_coverage: 0.3  # coins with market cap coverage below this level will have hardcoded market cap values filled
+    max_mc_imputation_multiple: 2.0  # don't impute dates where the imputed market cap exceeds the max known market cap * this ratio
     market_cap_default_fill:  500000  # coins below the imputation coverage level will have empty values filled with this
 
 modeling:

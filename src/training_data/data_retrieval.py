@@ -120,26 +120,24 @@ def clean_market_data(market_data_df, config, earliest_date, latest_date):
     return cleaned_df
 
 
-def impute_market_cap(market_data_df, min_coverage=0.7):
+def impute_market_cap(market_data_df, min_coverage=0.7, max_multiple=1.0):
     """
     Create a new column with imputed market cap values based on price movements.
     Handles missing values at start, middle, and end of time series.
-    Logs warnings if imputed values exceed historical maximums.
 
-    Parameters:
-    -----------
-    market_data_df : pandas.DataFrame
-        DataFrame with columns ['coin_id', 'date', 'price', 'market_cap']
-    min_coverage : float
-        Minimum coverage threshold (0-1) for coins to be processed
+    Params:
+    - market_data_df (DataFrame): DataFrame with columns ['coin_id', 'date', 'price', 'market_cap']
+    - min_coverage (Float): Minimum coverage threshold (0-1) for coins to be processed
+    - max_multiple (Float): The maximum multiple that an imputed market cap can reach relative to the
+        maximum known market cap. Rows exceeding this threshold will be set to np.nan
 
     Returns:
-    --------
-    pandas.DataFrame
-        DataFrame with new 'market_cap_imputed' column containing original and imputed values as int64
+    - df_copy (DataFrame): DataFrame with new 'market_cap_imputed' column containing original and
+        imputed values as int64
     """
     # Make a copy of input data
     df_copy = market_data_df.copy()
+    df_copy = df_copy.sort_values(['coin_id','date'])
 
     # Calculate coverage and historical maximums per coin
     coverage = df_copy.groupby('coin_id').agg(
@@ -178,20 +176,23 @@ def impute_market_cap(market_data_df, min_coverage=0.7):
          df_copy.loc[mask_missing, 'ratio']).round().astype('Int64')
     )
 
-    # Check for imputed values exceeding historical maximums
-    for coin_id in eligible_coins:
-        max_historical = coverage.loc[coin_id, 'max_cap']
-        coin_mask = (df_copy['coin_id'] == coin_id) & df_copy['market_cap_imputed'].notna()
-        max_imputed = df_copy.loc[coin_mask, 'market_cap_imputed'].max()
+    # Join max historical values and apply max_multiple check vectorized
+    df_copy = df_copy.merge(
+        coverage[['max_cap']],
+        left_on='coin_id',
+        right_index=True,
+        how='left'
+    )
 
-        if max_imputed > max_historical:
-            logger.warning(
-                f"Coin {coin_id}: Imputed market cap ({max_imputed:.0f}) "
-                f"exceeds historical maximum ({max_historical:.0f})"
-            )
+    # Set imputed values exceeding max_multiple * historical max to np.nan
+    mask_exceeds_max = (
+        df_copy['market_cap_imputed'] >
+        (df_copy['max_cap'] * max_multiple)
+    )
+    df_copy.loc[mask_exceeds_max, 'market_cap_imputed'] = pd.NA
 
-    # Drop the temporary ratio column
-    df_copy = df_copy.drop('ratio', axis=1)
+    # Drop temporary columns
+    df_copy = df_copy.drop(['ratio', 'max_cap'], axis=1)
 
     return df_copy
 
