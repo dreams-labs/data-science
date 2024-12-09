@@ -178,11 +178,14 @@ def evaluate_regression_model(y_true, y_pred, model=None, feature_names=None):
             importance_df = pd.DataFrame({
                 'Feature': feature_names,
                 'Importance': importances
-            }).sort_values('Importance', ascending=True)
+            }).sort_values('Importance', ascending=False)  # Changed to descending order
+
+            # Store in dictionary
+            metrics['importances'] = importance_df
 
             # Using barplot instead of barh
-            sns.barplot(data=importance_df, x='Importance', y='Feature', ax=axes[1, 1])
-            axes[1, 1].set_title('Feature Importance')
+            sns.barplot(data=importance_df.head(20), x='Importance', y='Feature', ax=axes[1, 1])
+            axes[1, 1].set_title('Top 25 Feature Importances')
         else:
             axes[1, 1].text(0.5, 0.5, 'Feature Importance Not Available',
                            ha='center', va='center')
