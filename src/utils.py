@@ -92,15 +92,15 @@ def load_config(file_path='../notebooks/config.yaml'):
             base_filename = get_base_filename(filename, valid_prefixes)
 
             config_mapping = {
-                'config.yaml': (py_c.MainConfig, "Main"),
-                'metrics_config.yaml': (py_mc.MetricsConfig, "Metrics"),
-                'modeling_config.yaml': (py_mo.ModelingConfig, "Modeling"),
-                'experiments_config.yaml': (py_e.ExperimentsConfig, "Experiments")
+                'config.yaml': py_c.MainConfig,
+                'metrics_config.yaml': py_mc.MetricsConfig,
+                'modeling_config.yaml': py_mo.ModelingConfig,
+                'experiments_config.yaml': py_e.ExperimentsConfig
             }
 
             if base_filename in config_mapping:
-                ConfigClass, config_type = config_mapping[base_filename]
-                config_pydantic = ConfigClass(**config_dict)
+                config_model = config_mapping[base_filename]
+                config_pydantic = config_model(**config_dict)
                 config = config_pydantic.model_dump(mode="json", exclude_none=True)
             else:
                 raise ValueError(f"Loading failed for unknown config type '{filename}'")
