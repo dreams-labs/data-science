@@ -13,6 +13,43 @@ import wallet_features.wallet_coin_date_features as wcdf
 # set up logger at the module level
 logger = logging.getLogger(__name__)
 
+
+
+def calculate_wallet_features(profits_df, market_data_df, wallet_cohort):
+    """
+    Calculates all features for the wallets in a given profits_df
+
+    Params:
+    - profits_df (df): for the window over which the metrics should be computed
+    - market_data_df (df): the full dataset
+    - wallet_cohort (array-like): Array of all wallet addresses that should be present
+
+    Returns:
+    - wallet_features_df (df): df indexed on wallet_address with all features
+    """
+    # Add transaction metrics
+    profits_df = wcf.add_cash_flow_transfers_logic(profits_df)
+    wallet_features_df = calculate_wallet_level_metrics(profits_df)
+
+    # Fill missing values in transaction data
+    wallet_features_df = fill_missing_wallet_data(wallet_features_df, wallet_cohort)
+
+    # Add market data metrics
+    market_features_df = wcdf.calculate_market_data_features(profits_df,market_data_df)
+    wallet_features_df = wallet_features_df.join(
+        market_features_df.drop('total_volume',axis=1)
+        ,how='left'
+        ).fillna(0)
+
+    # Add performance metrics
+    performance_df = wm.generate_target_variables(wallet_features_df)
+    performance_df = performance_df.drop(['invested','net_gain'],axis=1)
+    wallet_features_df = wallet_features_df.join(performance_df)
+
+    return wallet_features_df
+
+
+
 def calculate_wallet_level_metrics(profits_df):
     """
     Calculates the return on investment for the wallet and additional aggregation metrics,
@@ -125,38 +162,3 @@ def fill_missing_wallet_data(window_wallets_df, wallet_cohort):
     complete_df.update(window_wallets_df)
 
     return complete_df
-
-
-
-def calculate_wallet_features(profits_df, market_data_df, wallet_cohort):
-    """
-    Calculates all features for the wallets in a given profits_df
-
-    Params:
-    - profits_df (df): for the window over which the metrics should be computed
-    - market_data_df (df): the full dataset
-    - wallet_cohort (array-like): Array of all wallet addresses that should be present
-
-    Returns:
-    - wallet_features_df (df): df indexed on wallet_address with all features
-    """
-    # Add transaction metrics
-    profits_df = wcf.add_cash_flow_transfers_logic(profits_df)
-    wallet_features_df = calculate_wallet_level_metrics(profits_df)
-
-    # Fill missing values in transaction data
-    wallet_features_df = fill_missing_wallet_data(wallet_features_df, wallet_cohort)
-
-    # Add market data metrics
-    market_features_df = wcdf.calculate_market_data_features(profits_df,market_data_df)
-    wallet_features_df = wallet_features_df.join(
-        market_features_df.drop('total_volume',axis=1)
-        ,how='left'
-        ).fillna(0)
-
-    # Add performance metrics
-    performance_df = wm.generate_target_variables(wallet_features_df)
-    performance_df = performance_df.drop(['invested','net_gain'],axis=1)
-    wallet_features_df = wallet_features_df.join(performance_df)
-
-    return wallet_features_df
