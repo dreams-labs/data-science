@@ -24,8 +24,6 @@ import wallet_features.wallet_coin_date_features as wcdf
 load_dotenv()
 logger = dc.setup_logger()
 
-
-
 # ===================================================== #
 #                                                       #
 #                 U N I T   T E S T S                   #
@@ -47,8 +45,14 @@ def basic_market_timing_config():
     return {
         'market_timing': {
             'offsets': {
-                'price_rsi_14': [2, 3],
-                'price_sma_7': [1]
+                'price_rsi_14': {
+                    'offsets': [2, 3],
+                    'retain_base_columns': False
+                },
+                'price_sma_7': {
+                    'offsets': [1],
+                    'retain_base_columns': True
+                }
             }
         }
     }
@@ -138,7 +142,10 @@ def test_missing_column_in_df():
     invalid_config = {
         'market_timing': {
             'offsets': {
-                'price_rsi_4': [1]  # This column doesn't exist
+                'price_rsi_4': {  # This column doesn't exist
+                    'offsets': [1],
+                    'retain_base_columns': True
+                }
             }
         }
     }
@@ -147,3 +154,44 @@ def test_missing_column_in_df():
         wcdf.calculate_offsets(df, invalid_config)
 
     assert "Column 'price_rsi_4' not found in DataFrame" in str(exc_info.value)
+
+@pytest.mark.unit
+def test_relative_changes_calculation(basic_market_timing_config):
+    """
+    Test calculation of relative changes between base and offset columns.
+
+    Steps:
+    1. Create sample DataFrame with offset columns
+    2. Calculate relative changes
+    3. Verify changes are calculated correctly
+    4. Verify column retention based on configuration
+    """
+    # Create sample data with offset columns
+    df = pd.DataFrame({
+        'coin_id': ['BTC', 'BTC', 'BTC', 'ETH', 'ETH', 'ETH'],
+        'price_rsi_14': [10, 20, 30, 15, 25, 35],
+        'price_rsi_14_lead_2': [30, 40, np.nan, 35, 45, np.nan],
+        'price_rsi_14_lead_3': [40, np.nan, np.nan, 45, np.nan, np.nan],
+        'price_sma_7': [100, 200, 300, 150, 250, 350],
+        'price_sma_7_lead_1': [200, 300, np.nan, 250, 350, np.nan]
+    })
+
+    result = wcdf.calculate_relative_changes(df, basic_market_timing_config)
+
+    # Verify relative change calculations
+    # For price_rsi_14_vs_lead_2: ((lead_2 - base) / base) * 100
+    expected_rsi_change = ((30 - 10) / 10) * 100  # 200%
+    assert np.isclose(
+        result['price_rsi_14_vs_lead_2'].iloc[0],
+        expected_rsi_change,
+        equal_nan=True
+    )
+
+    # Verify column retention
+    # price_rsi_14 should be dropped (retain_base_columns: False)
+    assert 'price_rsi_14' not in result.columns
+    assert 'price_rsi_14_lead_2' not in result.columns
+
+    # price_sma_7 should be retained (retain_base_columns: True)
+    assert 'price_sma_7' in result.columns
+    assert 'price_sma_7_lead_1' in result.columns

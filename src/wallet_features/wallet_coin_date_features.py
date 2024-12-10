@@ -198,6 +198,12 @@ def calculate_offsets(
     Args:
         market_timing_df: DataFrame containing market timing data
         wallet_features_config: Configuration dictionary containing offset specifications
+            in the format:
+            market_timing:
+              offsets:
+                column_name:
+                  offsets: [list_of_offsets]
+                  retain_base_columns: bool
 
     Returns:
         DataFrame with added offset columns
@@ -213,13 +219,26 @@ def calculate_offsets(
         offset_config = wallet_features_config['market_timing']['offsets']
     except KeyError as e:
         raise FeatureConfigError("Config key ['market_timing']['offsets'] was not found in " \
-                                 "wallet_features_config.") from e
+                               "wallet_features_config.") from e
 
     # Process each column and its offsets
-    for column, offsets in offset_config.items():
+    for column, column_config in offset_config.items():
         # Check if the column exists in the DataFrame
         if column not in result_df.columns:
             raise FeatureConfigError(f"Column '{column}' not found in DataFrame")
+
+        # Extract offsets from the new config structure
+        try:
+            # Handle both old and new config formats
+            if isinstance(column_config, dict):
+                offsets = column_config['offsets']
+            else:
+                # Backward compatibility for old format
+                offsets = column_config
+        except KeyError as e:
+            raise FeatureConfigError(f"'offsets' key not found in configuration for column '{column}'") from e
+        except Exception as e:
+            raise FeatureConfigError(f"Invalid configuration format for column '{column}': {str(e)}") from e
 
         # Calculate offset for each specified lead value
         for lead in offsets:
@@ -228,6 +247,98 @@ def calculate_offsets(
                 result_df[new_column] = result_df.groupby('coin_id')[column].shift(-lead)
             except Exception as e:
                 raise FeatureConfigError(f"Error calculating offset for column '{column}' " \
-                                         "with lead {lead}: {str(e)}") from e
+                                      f"with lead {lead}: {str(e)}") from e
+
+    return result_df
+
+def calculate_relative_changes(
+    market_timing_df: pd.DataFrame,
+    wallet_features_config: Dict[str, Any]
+) -> pd.DataFrame:
+    """
+    Calculate relative changes between base columns and their corresponding offset columns.
+
+    For each base column with offset columns (e.g., price_rsi_14 and price_rsi_14_lead_30),
+    calculates the percentage change between them and stores it in a new column
+    (e.g., price_rsi_14_vs_lead_30). If retain_base_columns is False, drops the original
+    base and offset columns after calculating the changes.
+
+    Args:
+        market_timing_df: DataFrame containing market timing data with offset columns
+        wallet_features_config: Configuration dictionary containing offset specifications
+            and retention settings
+
+    Returns:
+        DataFrame with added relative change columns and optionally dropped base/offset columns
+
+    Raises:
+        FeatureConfigError: If configuration is invalid or required columns are missing
+    """
+    # Create a copy of the input DataFrame to avoid modifying the original
+    result_df = market_timing_df.copy()
+
+    # Get the offsets configuration
+    try:
+        offset_config = wallet_features_config['market_timing']['offsets']
+    except KeyError as e:
+        raise FeatureConfigError("Config key ['market_timing']['offsets'] was not found in " \
+                               "wallet_features_config.") from e
+
+    # Keep track of columns to drop
+    columns_to_drop = set()
+
+    # Process each column and calculate relative changes
+    for base_column, column_config in offset_config.items():
+        # Check if the base column exists in the DataFrame
+        if base_column not in result_df.columns:
+            raise FeatureConfigError(f"Base column '{base_column}' not found in DataFrame")
+
+        try:
+            # Extract configuration
+            if isinstance(column_config, dict):
+                offsets = column_config['offsets']
+                retain_base_columns = column_config.get('retain_base_columns', True)
+            else:
+                # Backward compatibility
+                offsets = column_config
+                retain_base_columns = True
+        except KeyError as e:
+            raise FeatureConfigError(f"Invalid configuration for column '{base_column}': {str(e)}") from e
+
+        # Calculate relative change for each offset
+        for lead in offsets:
+            offset_column = f"{base_column}_lead_{lead}"
+
+            # Check if offset column exists
+            if offset_column not in result_df.columns:
+                raise FeatureConfigError(f"Offset column '{offset_column}' not found in DataFrame. " \
+                                      "Run calculate_offsets() first.")
+
+            # Create new column name for relative change
+            change_column = f"{base_column}_vs_lead_{lead}"
+
+            try:
+                # Calculate percentage change
+                # Formula: (offset_value - base_value) / base_value * 100
+                result_df[change_column] = (
+                    (result_df[offset_column] - result_df[base_column]) /
+                    result_df[base_column] * 100
+                )
+
+                # Handle division by zero cases
+                result_df[change_column] = result_df[change_column].replace([np.inf, -np.inf], np.nan)
+
+                # If retain_base_columns is False, mark columns for dropping
+                if not retain_base_columns:
+                    columns_to_drop.add(base_column)
+                    columns_to_drop.add(offset_column)
+
+            except Exception as e:
+                raise FeatureConfigError(f"Error calculating relative change between '{base_column}' " \
+                                      f"and '{offset_column}': {str(e)}") from e
+
+    # Drop marked columns if any
+    if columns_to_drop:
+        result_df = result_df.drop(columns=list(columns_to_drop))
 
     return result_df
