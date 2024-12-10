@@ -11,6 +11,12 @@ training_data:
     modeling_period_end: "2024-11-30"
     validation_period_end: "2024-12-07"
 
+
+# Variables used to define features
+features:
+    timing_metrics_min_transaction_size: 20  # trades below this USD threshold will not be evaluated for market timing peformance
+
+
 # Variables used to clean and filter raw data before training data is built
 data_cleaning:
 
@@ -38,6 +44,7 @@ data_cleaning:
 
     # offset calculation limits
     offset_winsorization: 0.01 # comparisons between metrics and their offset values will be winsorized by this amount
+
 
 modeling:
     target_variable: "performance_score"

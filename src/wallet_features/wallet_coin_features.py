@@ -4,7 +4,6 @@ Calculates metrics aggregated at the wallet-coin level
 
 import logging
 import pandas as pd
-import numpy as np
 from dreams_core.googlecloud import GoogleCloud as dgc
 
 # set up logger at the module level
@@ -108,27 +107,86 @@ def calculate_timing_features_for_column(df, metric_column):
             - {metric_column}_sell_mean
     """
     # Split into buys and sells
-    buys = df[df['usd_net_transfers'] > 0]
-    sells = df[df['usd_net_transfers'] < 0]
+    buys = df[df['usd_net_transfers'] > 0].copy()
+    sells = df[df['usd_net_transfers'] < 0].copy()
 
     features = pd.DataFrame(index=df['wallet_address'].unique())
 
-    # Add buy features
-    # Explicitly select columns needed for calculation to avoid deprecation warning
-    buy_calc = buys[['wallet_address', metric_column, 'usd_net_transfers']]
-    features[f"{metric_column}_buy_weighted"] = buy_calc.groupby('wallet_address', observed=True).apply(
-        lambda x: np.average(x[metric_column], weights=abs(x['usd_net_transfers'])),
-        include_groups=False
-    )
-    features[f"{metric_column}_buy_mean"] = buys.groupby('wallet_address', observed=True)[metric_column].mean()
+    # Vectorized buy calculations
+    if not buys.empty:
+        # Regular mean
+        features[f"{metric_column}_buy_mean"] = (
+            buys.groupby('wallet_address')[metric_column].mean()
+        )
 
-    # Add sell features
-    # Explicitly select columns needed for calculation to avoid deprecation warning
-    sell_calc = sells[['wallet_address', metric_column, 'usd_net_transfers']]
-    features[f"{metric_column}_sell_weighted"] = sell_calc.groupby('wallet_address', observed=True).apply(
-        lambda x: np.average(x[metric_column], weights=abs(x['usd_net_transfers'])),
-        include_groups=False
-    )
-    features[f"{metric_column}_sell_mean"] = sells.groupby('wallet_address', observed=True)[metric_column].mean()
+        # Weighted mean: First compute the products, then group
+        buys['weighted_values'] = buys[metric_column] * abs(buys['usd_net_transfers'])
+        weighted_sums = buys.groupby('wallet_address')['weighted_values'].sum()
+        weight_sums = buys.groupby('wallet_address')['usd_net_transfers'].apply(abs).sum()
+        features[f"{metric_column}_buy_weighted"] = weighted_sums / weight_sums
+
+    # Similar for sells
+    if not sells.empty:
+        features[f"{metric_column}_sell_mean"] = (
+            sells.groupby('wallet_address')[metric_column].mean()
+        )
+
+        sells['weighted_values'] = sells[metric_column] * abs(sells['usd_net_transfers'])
+        weighted_sums = sells.groupby('wallet_address')['weighted_values'].sum()
+        weight_sums = sells.groupby('wallet_address')['usd_net_transfers'].apply(abs).sum()
+        features[f"{metric_column}_sell_weighted"] = weighted_sums / weight_sums
 
     return features
+
+
+
+def generate_all_timing_features(
+    profits_df,
+    market_timing_df,
+    relative_change_columns,
+    min_transaction_size=0
+):
+    """
+    Generate timing features for multiple market metric columns.
+
+    Args:
+        profits_df (pd.DataFrame): DataFrame with columns [coin_id, date, wallet_address, usd_net_transfers]
+        market_timing_df (pd.DataFrame): DataFrame with market timing metrics indexed by (coin_id, date)
+        relative_change_columns (list): List of column names from market_timing_df to analyze
+        min_transaction_size (float): Minimum absolute USD value of transaction to consider
+
+    Returns:
+        pd.DataFrame: DataFrame indexed by wallet_address with generated features for each input column
+    """
+    # Filter by minimum transaction size
+    filtered_profits = profits_df[
+        abs(profits_df['usd_net_transfers']) >= min_transaction_size
+    ].copy()
+
+    # Perform the merge once
+    timing_profits_df = filtered_profits.merge(
+        market_timing_df[relative_change_columns + ['coin_id', 'date']],
+        on=['coin_id', 'date'],
+        how='left'
+    )
+
+    # Initialize empty result with wallet_address index
+    all_features = []
+
+    # Calculate features for each column
+    for col in relative_change_columns:
+        logger.info("Generating timing performance features for %s...", col)
+        col_features = calculate_timing_features_for_column(
+            timing_profits_df,
+            col
+        )
+        all_features.append(col_features)
+
+    # Combine all feature sets
+    if all_features:
+        result = pd.concat(all_features, axis=1)
+    else:
+        # Return empty DataFrame with correct index if no features generated
+        result = pd.DataFrame(index=filtered_profits['wallet_address'].unique())
+
+    return result
