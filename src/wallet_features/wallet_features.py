@@ -77,6 +77,9 @@ def calculate_wallet_level_metrics(profits_df):
     # Fill 0s for wallets without observed activity
     wallet_metrics_df = wallet_metrics_df.fillna(0)
 
+    # Remove any negative 0s
+    wallet_metrics_df = wallet_metrics_df.replace(-0,0)
+
     # Compute additional derived metrics
     wallet_metrics_df['activity_days'] = (wallet_metrics_df['last_activity'] -
                                         wallet_metrics_df['first_activity']).dt.days + 1

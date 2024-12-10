@@ -26,7 +26,7 @@ def retrieve_datasets():
     Retrieves market and profits data
     """
     earliest_date = wallets_config['training_data']['training_period_start']
-    latest_date = wallets_config['training_data']['modeling_period_end']
+    latest_date = wallets_config['training_data']['validation_period_end']
 
     # Profits: retrieve for all wallets above lifetime inflows threshold
     profits_df = dr.retrieve_profits_data(earliest_date,latest_date,
@@ -120,9 +120,9 @@ def split_profits_df(profits_df,market_data_df,wallet_cohort):
                                                                imputation_dates, n_threads=24)
 
     # Split profits_df into training windows and the modeling period
-    training_profits_df, training_windows_profits_dfs, modeling_profits_df =  wtd.split_window_dfs(windows_profits_df)
+    training_profits_df, training_windows_profits_dfs, modeling_profits_df, validation_profits_df =  wtd.split_window_dfs(windows_profits_df)
 
-    return training_profits_df, training_windows_profits_dfs, modeling_profits_df
+    return training_profits_df, training_windows_profits_dfs, modeling_profits_df, validation_profits_df
 
 
 

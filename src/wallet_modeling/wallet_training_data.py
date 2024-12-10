@@ -50,6 +50,10 @@ def generate_imputation_dates():
     imputation_dates.append(wallets_config['training_data']['modeling_period_start'])
     imputation_dates.append(wallets_config['training_data']['modeling_period_end'])
 
+    # Append validation period dates
+    imputation_dates.append(wallets_config['training_data']['validation_period_start'])
+    imputation_dates.append(wallets_config['training_data']['validation_period_end'])
+
     return imputation_dates
 
 
@@ -157,18 +161,27 @@ def split_window_dfs(windows_profits_df):
     """
     logger.info("Generating window-specific profits_dfs...")
 
+    # 1. Full Period Datasets
+    # ---------------------------------------
     # Extract period boundaries
     training_period_start = datetime.strptime(wallets_config['training_data']['training_period_start'], "%Y-%m-%d")
     training_period_end = datetime.strptime(wallets_config['training_data']['training_period_end'], "%Y-%m-%d")
     modeling_period_start = datetime.strptime(wallets_config['training_data']['modeling_period_start'], "%Y-%m-%d")
     modeling_period_end = datetime.strptime(wallets_config['training_data']['modeling_period_end'], "%Y-%m-%d")
+    validation_period_start = datetime.strptime(wallets_config['training_data']['validation_period_start'], "%Y-%m-%d")
+    validation_period_end = datetime.strptime(wallets_config['training_data']['validation_period_end'], "%Y-%m-%d")
 
-    # Extract training and modeling period DataFrames
+    # Extract training, modeling, and validation period DataFrames
     training_profits_df = windows_profits_df[
             (windows_profits_df['date'] >= training_period_start) & (windows_profits_df['date'] <= training_period_end)]
     modeling_profits_df = windows_profits_df[
             (windows_profits_df['date'] >= modeling_period_start) & (windows_profits_df['date'] <= modeling_period_end)]
+    validation_profits_df = windows_profits_df[
+            (windows_profits_df['date'] >= validation_period_start) & (windows_profits_df['date'] <= validation_period_end)]
 
+
+    # 2. Training Windows Datasets
+    # ---------------------------------------
     # Convert training window starts to sorted datetime
     training_windows_starts = sorted([
         datetime.strptime(date, "%Y-%m-%d")
@@ -206,8 +219,12 @@ def split_window_dfs(windows_profits_df):
                 modeling_profits_df['date'].min().strftime('%Y-%m-%d'),
                 modeling_profits_df['date'].max().strftime('%Y-%m-%d'),
                 modeling_profits_df.shape)
+    logger.info("Validation Period (%s to %s): %s",
+                validation_profits_df['date'].min().strftime('%Y-%m-%d'),
+                validation_profits_df['date'].max().strftime('%Y-%m-%d'),
+                validation_profits_df.shape)
 
-    return training_profits_df, training_windows_profits_dfs, modeling_profits_df
+    return training_profits_df, training_windows_profits_dfs, modeling_profits_df, validation_profits_df
 
 
 

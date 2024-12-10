@@ -89,6 +89,7 @@ class WalletsConfig:
     def _add_derived_values(self):
         """Add calculated values to the config."""
         if 'training_data' in self.config:
+            # Training Period Boundaries
             # Get the first training window start date
             first_window = min(self.config['training_data']['training_window_starts'].values())
             self.config['training_data']['training_period_start'] = first_window
@@ -100,6 +101,15 @@ class WalletsConfig:
             )
             training_end = (modeling_start - timedelta(days=1)).strftime("%Y-%m-%d")
             self.config['training_data']['training_period_end'] = training_end
+
+            # Validation Period Boundaries
+            modeling_end = datetime.strptime(
+                self.config['training_data']['modeling_period_end'],
+                "%Y-%m-%d"
+            )
+            validation_start = (modeling_end + timedelta(days=1)).strftime("%Y-%m-%d")
+            self.config['training_data']['validation_period_start'] = validation_start
+
 
     def __getitem__(self, key):
         # Enable dictionary-style access with square brackets (config['key'])

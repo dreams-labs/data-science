@@ -17,6 +17,7 @@ import progressbar
 import pandas as pd
 import numpy as np
 from pydantic import ValidationError
+import pygame
 import dreams_core.core as dc
 
 
@@ -579,7 +580,6 @@ def cw_filter_df(df, coin_id, wallet_address):
     return filtered_df
 
 
-
 def df_mem(df):
     """
     Checks how much memory a dataframe is using
@@ -614,7 +614,6 @@ def obj_mem():
     return mem_df
 
 
-
 def log_nan_counts(df):
     """
     utility function for testing
@@ -628,3 +627,31 @@ def log_nan_counts(df):
         log_message = "No NaN values found in any column."
 
     logger.critical(log_message)
+
+
+def play_notification(sound_file_path=None):
+    """
+    Play a notification sound from a local audio file using pygame.
+    Falls back to ALERT_SOUND_FILEPATH environment variable if no path provided.
+    Returns early if no valid sound file path is found.
+
+    Args:
+        sound_file_path (str, optional): Path to the sound file (supports .mp3, .wav, etc.)
+    """
+    sound_file_path = sound_file_path or os.getenv('ALERT_SOUND_FILEPATH')
+    if not sound_file_path:
+        return "No sound file found."
+
+    try:
+        pygame.mixer.init()
+        pygame.mixer.music.load(sound_file_path)
+        pygame.mixer.music.play()
+
+        # Wait for the sound to finish playing
+        while pygame.mixer.music.get_busy():
+            pygame.time.Clock().tick(10)
+
+    except Exception as e:  # pylint:disable=broad-exception-caught
+        return f"Error playing sound: {e}"
+    finally:
+        pygame.mixer.quit()

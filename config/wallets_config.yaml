@@ -9,6 +9,7 @@ training_data:
     # modeling_period_end: "2024-03-31"
     modeling_period_start: "2024-11-01"
     modeling_period_end: "2024-11-30"
+    validation_period_end: "2024-12-07"
 
 # Variables used to clean and filter raw data before training data is built
 data_cleaning:
