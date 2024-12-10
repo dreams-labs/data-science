@@ -638,6 +638,29 @@ def log_nan_counts(df):
     logger.critical(log_message)
 
 
+def winsorize(data: pd.Series, cutoff: float = 0.01) -> pd.Series:
+    """
+    Winsorize a data series at specified cutoff levels.
+
+    Args:
+        data: Series to winsorize
+        cutoff: Percentage (in decimal form) to cut from each tail
+
+    Returns:
+        Winsorized series
+    """
+    # Make a copy to avoid modifying original
+    winsorized = data.copy()
+
+    # Calculate bounds using non-null values
+    valid_data = data[~np.isnan(data)]
+    lower_bound = np.percentile(valid_data, cutoff * 100)
+    upper_bound = np.percentile(valid_data, (1 - cutoff) * 100)
+
+    # Clip the data
+    return np.clip(winsorized, lower_bound, upper_bound)
+
+
 def play_notification(sound_file_path=None):
     """
     Play a notification sound from a local audio file using pygame.
@@ -664,3 +687,4 @@ def play_notification(sound_file_path=None):
         return f"Error playing sound: {e}"
     finally:
         pygame.mixer.quit()
+

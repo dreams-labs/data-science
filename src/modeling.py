@@ -249,7 +249,7 @@ def calculate_running_profitability_score(predictions, returns, winsorization_cu
         raise ValueError("Predictions and returns must have the same length")
 
     if winsorization_cutoff:
-        returns = winsorize(returns, winsorization_cutoff)
+        returns = u.winsorize(returns, winsorization_cutoff)
 
     # Create a DataFrame with predictions and returns
     df = pd.DataFrame({'predictions': predictions, 'returns': returns})
@@ -334,29 +334,6 @@ def calculate_downside_profitability_auc(predictions,
                                 winsorization_cutoff)
 
     return downside_auc
-
-
-def winsorize(data, cutoff):
-    """
-    Applies winsorization to the input data.
-
-    Args:
-    - data (numpy.array or pandas.Series): The data to be winsorized.
-    - cutoff (float): The percentile at which to winsorize (e.g., 0.05 for 5th and 95th percentiles).
-
-    Returns:
-    - numpy.array: The winsorized data.
-
-    Raises:
-    - ValueError: If cutoff is not between 0 and 0.5.
-    """
-    if not 0 < cutoff <= 0.5:
-        raise ValueError("Cutoff must be between 0 and 0.5")
-
-    lower_bound = np.percentile(data, cutoff * 100)
-    upper_bound = np.percentile(data, (1 - cutoff) * 100)
-
-    return np.clip(data, lower_bound, upper_bound)
 
 
 
