@@ -654,8 +654,8 @@ def winsorize(data: pd.Series, cutoff: float = 0.01) -> pd.Series:
 
     # Calculate bounds using non-null values
     valid_data = data[~np.isnan(data)]
-    lower_bound = np.percentile(valid_data, cutoff * 100)
-    upper_bound = np.percentile(valid_data, (1 - cutoff) * 100)
+    lower_bound = np.percentile(valid_data, cutoff * 100, method='nearest')
+    upper_bound = np.percentile(valid_data, (1 - cutoff) * 100, method='nearest')
 
     # Clip the data
     return np.clip(winsorized, lower_bound, upper_bound)
