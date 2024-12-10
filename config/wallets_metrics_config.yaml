@@ -10,7 +10,7 @@ time_series:
                         window: [7]
                 rsi:
                     parameters:
-                        window: [14]
+                        window: [5,14]
         volume:
             indicators:
                 sma:

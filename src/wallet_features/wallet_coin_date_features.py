@@ -3,6 +3,7 @@ Calculates metrics aggregated at the wallet-coin-date level
 """
 import logging
 import time
+from typing import Dict, Any
 import pandas as pd
 import numpy as np
 
@@ -181,3 +182,52 @@ def calculate_market_data_features(profits_df,market_data_df):
                  time.time() - start_time)
 
     return market_features_df
+
+
+class FeatureConfigError(Exception):
+    """Custom exception for feature configuration errors."""
+    pass
+
+def calculate_offsets(
+    market_timing_df: pd.DataFrame,
+    wallet_features_config: Dict[str, Any]
+) -> pd.DataFrame:
+    """
+    Calculate offset values for specified columns in market timing dataframe.
+
+    Args:
+        market_timing_df: DataFrame containing market timing data
+        wallet_features_config: Configuration dictionary containing offset specifications
+
+    Returns:
+        DataFrame with added offset columns
+
+    Raises:
+        FeatureConfigError: If configuration is invalid or required columns are missing
+    """
+    # Create a copy of the input DataFrame to avoid modifying the original
+    result_df = market_timing_df.copy()
+
+    # Get the offsets configuration
+    try:
+        offset_config = wallet_features_config['market_timing']['offsets']
+    except KeyError as e:
+        raise FeatureConfigError("Config key ['market_timing']['offsets'] was not found in " \
+                                 "wallet_features_config.") from e
+
+    # Process each column and its offsets
+    for column, offsets in offset_config.items():
+        # Check if the column exists in the DataFrame
+        if column not in result_df.columns:
+            raise FeatureConfigError(f"Column '{column}' not found in DataFrame")
+
+        # Calculate offset for each specified lead value
+        for lead in offsets:
+            new_column = f"{column}_lead_{lead}"
+            try:
+                result_df[new_column] = result_df.groupby('coin_id')[column].shift(-lead)
+            except Exception as e:
+                raise FeatureConfigError(f"Error calculating offset for column '{column}' " \
+                                         "with lead {lead}: {str(e)}") from e
+
+    return result_df

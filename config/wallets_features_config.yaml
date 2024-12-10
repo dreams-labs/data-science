@@ -1,0 +1,5 @@
+market_timing:
+    offsets:
+        price_rsi_14: [14,30]
+        price_rsi_5: [7]
+        price_sma_7: [7]
