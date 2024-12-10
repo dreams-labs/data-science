@@ -1,10 +1,11 @@
 # Variables used to define the training data
 training_data:
-    training_window_starts:
-        w1: "2023-07-01"
-        w2: "2023-11-01"
-        w3: "2024-04-01"
-        w4: "2024-08-01"
+    training_window_starts: [
+        "2023-07-01",
+        "2023-11-01",
+        "2024-04-01",
+        "2024-08-01"
+    ]
     # modeling_period_start: "2024-02-01"
     # modeling_period_end: "2024-03-31"
     modeling_period_start: "2024-11-01"

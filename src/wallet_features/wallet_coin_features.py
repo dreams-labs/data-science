@@ -139,7 +139,6 @@ def calculate_timing_features_for_column(df, metric_column):
     return features
 
 
-
 def generate_all_timing_features(
     profits_df,
     market_timing_df,
@@ -170,10 +169,8 @@ def generate_all_timing_features(
         how='left'
     )
 
-    # Initialize empty result with wallet_address index
-    all_features = []
-
     # Calculate features for each column
+    all_features = []
     for col in relative_change_columns:
         logger.info("Generating timing performance features for %s...", col)
         col_features = calculate_timing_features_for_column(
@@ -186,7 +183,14 @@ def generate_all_timing_features(
     if all_features:
         result = pd.concat(all_features, axis=1)
     else:
-        # Return empty DataFrame with correct index if no features generated
-        result = pd.DataFrame(index=filtered_profits['wallet_address'].unique())
+        result = pd.DataFrame(
+            index=pd.Index(filtered_profits['wallet_address'].cat.categories, name='wallet_address')
+        )
+
+    # Ensure all wallet addresses are included and fill NaNs
+    result = pd.DataFrame(
+        result,
+        index=pd.Index(filtered_profits['wallet_address'].cat.categories, name='wallet_address')
+    ).fillna(0)
 
     return result

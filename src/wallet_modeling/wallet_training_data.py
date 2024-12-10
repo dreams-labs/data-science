@@ -23,15 +23,12 @@ def generate_imputation_dates():
     Generates a list of all dates that need imputation, including the first
     and last date of each training window and modeling period.
 
-    The training period boundary dates are returned separateely so they can be used
-    to
-
     Returns:
     - imputation_dates (list): list that includes all start and end dates
     """
     # Extract all window start dates
     window_start_dates = sorted([datetime.strptime(date, "%Y-%m-%d")
-                    for date in wallets_config['training_data']['training_window_starts'].values()
+                    for date in wallets_config['training_data']['training_window_starts']
                     ])
 
     # Generate the output array
@@ -50,8 +47,7 @@ def generate_imputation_dates():
     imputation_dates.append(wallets_config['training_data']['modeling_period_start'])
     imputation_dates.append(wallets_config['training_data']['modeling_period_end'])
 
-    # Append validation period dates
-    imputation_dates.append(wallets_config['training_data']['validation_period_start'])
+    # Remove reference to validation_period_start since it's not in the config
     imputation_dates.append(wallets_config['training_data']['validation_period_end'])
 
     return imputation_dates
