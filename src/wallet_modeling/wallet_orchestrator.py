@@ -3,6 +3,7 @@ Orchestrates groups of functions to generate wallet model pipeline
 """
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
 # Local module imports
 import training_data.data_retrieval as dr
@@ -28,15 +29,21 @@ def retrieve_datasets():
     earliest_date = wallets_config['training_data']['training_period_start']
     latest_date = wallets_config['training_data']['validation_period_end']
 
-    # Profits: retrieve for all wallets above lifetime inflows threshold
-    profits_df = dr.retrieve_profits_data(earliest_date,latest_date,
-                                        wallets_config['data_cleaning']['minimum_wallet_inflows'])
+    # Retrieve profits_df and market_data_df concurrently
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        profits_future = executor.submit(
+            dr.retrieve_profits_data,
+            earliest_date,
+            latest_date,
+            wallets_config['data_cleaning']['minimum_wallet_inflows']
+        )
+        market_future = executor.submit(dr.retrieve_market_data)
 
-    # Market data: retrieve for all coins with transfer data
-    market_data_df = dr.retrieve_market_data()
-    market_data_df = market_data_df[market_data_df['coin_id'].isin(profits_df['coin_id'])]
+        profits_df = profits_future.result()
+        market_data_df = market_future.result()
 
     # Clean market_data_df
+    market_data_df = market_data_df[market_data_df['coin_id'].isin(profits_df['coin_id'])]
     market_data_df = dr.clean_market_data(
         market_data_df,
         wallets_config,
