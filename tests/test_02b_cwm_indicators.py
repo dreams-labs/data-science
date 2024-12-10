@@ -588,7 +588,6 @@ def test_rsi_scenario1(sample_timeseries_rsi1):
 # calculate_mfi() unit tests
 # -------------------------------------------- #
 
-
 @pytest.mark.unit
 def test_calculate_mfi_scenario1():
     """
@@ -635,6 +634,7 @@ def test_calculate_mfi_scenario1():
 
     # Assert the first value is 0.5 (since it can't be forward filled)
     assert result_mfi[0] == 0.5, "Expected first value to be 0.5 since it cannot be forward filled"
+
 
 
 # -------------------------------------------- #

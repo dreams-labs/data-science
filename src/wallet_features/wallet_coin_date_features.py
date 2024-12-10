@@ -9,6 +9,7 @@ import numpy as np
 
 # Local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
+import utils as u
 
 # set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -190,14 +191,14 @@ class FeatureConfigError(Exception):
 
 def calculate_offsets(
     market_timing_df: pd.DataFrame,
-    wallet_features_config: Dict[str, Any]
+    wallets_features_config: Dict[str, Any]
 ) -> pd.DataFrame:
     """
     Calculate offset values for specified columns in market timing dataframe.
 
     Args:
         market_timing_df: DataFrame containing market timing data
-        wallet_features_config: Configuration dictionary containing offset specifications
+        wallets_features_config: Configuration dictionary containing offset specifications
             in the format:
             market_timing:
               offsets:
@@ -216,10 +217,10 @@ def calculate_offsets(
 
     # Get the offsets configuration
     try:
-        offset_config = wallet_features_config['market_timing']['offsets']
+        offset_config = wallets_features_config['market_timing']['offsets']
     except KeyError as e:
         raise FeatureConfigError("Config key ['market_timing']['offsets'] was not found in " \
-                               "wallet_features_config.") from e
+                               "wallets_features_config.") from e
 
     # Process each column and its offsets
     for column, column_config in offset_config.items():
@@ -251,9 +252,10 @@ def calculate_offsets(
 
     return result_df
 
+
 def calculate_relative_changes(
     market_timing_df: pd.DataFrame,
-    wallet_features_config: Dict[str, Any]
+    wallets_features_config: Dict[str, Any]
 ) -> pd.DataFrame:
     """
     Calculate relative changes between base columns and their corresponding offset columns.
@@ -261,12 +263,13 @@ def calculate_relative_changes(
     For each base column with offset columns (e.g., price_rsi_14 and price_rsi_14_lead_30),
     calculates the percentage change between them and stores it in a new column
     (e.g., price_rsi_14_vs_lead_30). If retain_base_columns is False, drops the original
-    base and offset columns after calculating the changes.
+    base and offset columns after calculating the changes. All changes are winsorized
+    using the configured coefficient.
 
     Args:
         market_timing_df: DataFrame containing market timing data with offset columns
-        wallet_features_config: Configuration dictionary containing offset specifications
-            and retention settings
+        wallets_features_config: Configuration dictionary containing offset specifications,
+            retention settings, and winsorization coefficient
 
     Returns:
         DataFrame with added relative change columns and optionally dropped base/offset columns
@@ -279,13 +282,15 @@ def calculate_relative_changes(
 
     # Get the offsets configuration
     try:
-        offset_config = wallet_features_config['market_timing']['offsets']
+        offset_config = wallets_features_config['market_timing']['offsets']
+        winsor_coef = wallets_config['data_cleaning']['offset_winsorization']
     except KeyError as e:
-        raise FeatureConfigError("Config key ['market_timing']['offsets'] was not found in " \
-                               "wallet_features_config.") from e
+        raise FeatureConfigError("Required config key not found in wallets_features_config: " + str(e)) from e
 
     # Keep track of columns to drop
     columns_to_drop = set()
+    # Keep track of columns to winsorize
+    columns_to_winsorize = []
 
     # Process each column and calculate relative changes
     for base_column, column_config in offset_config.items():
@@ -319,14 +324,17 @@ def calculate_relative_changes(
 
             try:
                 # Calculate percentage change
-                # Formula: (offset_value - base_value) / base_value * 100
+                # Formula: (offset_value - base_value) / base_value
                 result_df[change_column] = (
                     (result_df[offset_column] - result_df[base_column]) /
-                    result_df[base_column] * 100
+                    result_df[base_column]
                 )
 
                 # Handle division by zero cases
                 result_df[change_column] = result_df[change_column].replace([np.inf, -np.inf], np.nan)
+
+                # Add column to winsorization list
+                columns_to_winsorize.append(change_column)
 
                 # If retain_base_columns is False, mark columns for dropping
                 if not retain_base_columns:
@@ -336,6 +344,10 @@ def calculate_relative_changes(
             except Exception as e:
                 raise FeatureConfigError(f"Error calculating relative change between '{base_column}' " \
                                       f"and '{offset_column}': {str(e)}") from e
+
+    # Winsorize all change columns
+    for column in columns_to_winsorize:
+        result_df[column] = u.winsorize(result_df[column], winsor_coef)
 
     # Drop marked columns if any
     if columns_to_drop:

@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 
 # project files
 import utils as u
-import modeling as m
 
 
 def generate_profitability_curves(predictions, returns, winsorization_cutoff=0):

@@ -180,7 +180,7 @@ def test_relative_changes_calculation(basic_market_timing_config):
 
     # Verify relative change calculations
     # For price_rsi_14_vs_lead_2: ((lead_2 - base) / base) * 100
-    expected_rsi_change = ((30 - 10) / 10) * 100  # 200%
+    expected_rsi_change = ((30 - 10) / 10)  # 200%
     assert np.isclose(
         result['price_rsi_14_vs_lead_2'].iloc[0],
         expected_rsi_change,
