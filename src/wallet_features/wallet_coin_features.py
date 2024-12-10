@@ -3,6 +3,8 @@ Calculates metrics aggregated at the wallet-coin level
 """
 
 import logging
+import pandas as pd
+import numpy as np
 from dreams_core.googlecloud import GoogleCloud as dgc
 
 # set up logger at the module level
@@ -87,3 +89,46 @@ def retrieve_buyer_numbers():
     logger.info("Retrieved buyer numbers for %s wallet-coin pairs.", len(buyer_numbers_df))
 
     return buyer_numbers_df
+
+
+
+def calculate_timing_features_for_column(df, metric_column):
+    """
+    Calculate timing features for a single metric column from pre-merged DataFrame.
+
+    Args:
+        df (pd.DataFrame): Pre-merged DataFrame with columns [wallet_address, usd_net_transfers, metric_column]
+        metric_column (str): Name of the column to analyze
+
+    Returns:
+        pd.DataFrame: DataFrame indexed by wallet_address with columns:
+            - {metric_column}_buy_weighted
+            - {metric_column}_buy_mean
+            - {metric_column}_sell_weighted
+            - {metric_column}_sell_mean
+    """
+    # Split into buys and sells
+    buys = df[df['usd_net_transfers'] > 0]
+    sells = df[df['usd_net_transfers'] < 0]
+
+    features = pd.DataFrame(index=df['wallet_address'].unique())
+
+    # Add buy features
+    # Explicitly select columns needed for calculation to avoid deprecation warning
+    buy_calc = buys[['wallet_address', metric_column, 'usd_net_transfers']]
+    features[f"{metric_column}_buy_weighted"] = buy_calc.groupby('wallet_address', observed=True).apply(
+        lambda x: np.average(x[metric_column], weights=abs(x['usd_net_transfers'])),
+        include_groups=False
+    )
+    features[f"{metric_column}_buy_mean"] = buys.groupby('wallet_address', observed=True)[metric_column].mean()
+
+    # Add sell features
+    # Explicitly select columns needed for calculation to avoid deprecation warning
+    sell_calc = sells[['wallet_address', metric_column, 'usd_net_transfers']]
+    features[f"{metric_column}_sell_weighted"] = sell_calc.groupby('wallet_address', observed=True).apply(
+        lambda x: np.average(x[metric_column], weights=abs(x['usd_net_transfers'])),
+        include_groups=False
+    )
+    features[f"{metric_column}_sell_mean"] = sells.groupby('wallet_address', observed=True)[metric_column].mean()
+
+    return features

@@ -273,6 +273,7 @@ def calculate_relative_changes(
 
     Returns:
         DataFrame with added relative change columns and optionally dropped base/offset columns
+        relative_change_columns: List of the relative change columns created
 
     Raises:
         FeatureConfigError: If configuration is invalid or required columns are missing
@@ -290,7 +291,7 @@ def calculate_relative_changes(
     # Keep track of columns to drop
     columns_to_drop = set()
     # Keep track of columns to winsorize
-    columns_to_winsorize = []
+    relative_change_columns = []
 
     # Process each column and calculate relative changes
     for base_column, column_config in offset_config.items():
@@ -334,7 +335,7 @@ def calculate_relative_changes(
                 result_df[change_column] = result_df[change_column].replace([np.inf, -np.inf], np.nan)
 
                 # Add column to winsorization list
-                columns_to_winsorize.append(change_column)
+                relative_change_columns.append(change_column)
 
                 # If retain_base_columns is False, mark columns for dropping
                 if not retain_base_columns:
@@ -346,11 +347,11 @@ def calculate_relative_changes(
                                       f"and '{offset_column}': {str(e)}") from e
 
     # Winsorize all change columns
-    for column in columns_to_winsorize:
+    for column in relative_change_columns:
         result_df[column] = u.winsorize(result_df[column], winsor_coef)
 
     # Drop marked columns if any
     if columns_to_drop:
         result_df = result_df.drop(columns=list(columns_to_drop))
 
-    return result_df
+    return result_df,relative_change_columns
