@@ -1,7 +1,6 @@
 # Variables used to define the training data
 training_data:
     training_window_starts: [
-        "2023-07-01",
         "2023-11-01",
         "2024-04-01",
         "2024-08-01"
@@ -26,8 +25,8 @@ data_cleaning:
     min_modeling_transaction_days: 2
 
     # Wallet minimum thresholds
-    minimum_wallet_inflows: 2000 # The amount of lifetime USD inflows a wallet must have to be included in the training data
-    minimum_volume: 2000  # Exclude wallets with fewer than this amount of training period USD volume
+    minimum_wallet_inflows: 25000 # The amount of lifetime USD inflows a wallet must have to be included in the training data
+    minimum_volume: 50000  # Exclude wallets with fewer than this amount of training period USD volume
     minumum_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
 
     # Wallet maximum thresholds
