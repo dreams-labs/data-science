@@ -24,7 +24,7 @@ def retrieve_market_data():
     - market_data_df: DataFrame containing market data with 'coin_id' as a categorical column.
     """
     start_time = time.time()
-    logger.debug('Retrieving market data...')
+    logger.info('Retrieving market data...')
 
     # SQL query to retrieve market data
     query_sql = """
