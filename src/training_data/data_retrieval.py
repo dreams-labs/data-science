@@ -166,8 +166,8 @@ def impute_market_cap(market_data_df, min_coverage=0.7, max_multiple=1.0):
     )
 
     # Backfill and forward fill ratios within each coin group
-    df_copy['ratio'] = df_copy.groupby('coin_id')['ratio'].bfill()
-    df_copy['ratio'] = df_copy.groupby('coin_id')['ratio'].ffill()
+    df_copy['ratio'] = df_copy.groupby('coin_id',observed=True)['ratio'].bfill()
+    df_copy['ratio'] = df_copy.groupby('coin_id',observed=True)['ratio'].ffill()
 
     # Calculate imputed market caps using the filled ratios
     mask_missing = df_copy['market_cap_imputed'].isna() & mask_eligible
