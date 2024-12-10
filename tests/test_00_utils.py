@@ -38,11 +38,7 @@ logger = dc.setup_logger()
 # load_config(metrics_config.yaml) unit tests
 # ---------------------------------------------- #
 
-import pytest
-import yaml
-import logging
-
-# Keep fixtures used by multiple tests
+# Define fixtures used by multiple tests
 @pytest.fixture
 def valid_config_data():
     """
@@ -471,7 +467,7 @@ def test_load_demo_config(tmp_path):
 
 
 # ---------------------------------------------- #
-# load_config(metrics_config.yaml) unit tests
+# winsorize() unit tests
 # ---------------------------------------------- #
 
 @pytest.mark.unit
@@ -510,8 +506,6 @@ def test_winsorize_basic_outliers():
         equal_nan=True
     ), "Middle values should remain unchanged"
 
-
-
 @pytest.mark.unit
 def test_winsorize_with_nans():
     """
@@ -533,12 +527,43 @@ def test_winsorize_with_nans():
     assert np.allclose(result, expected, equal_nan=True), "Values should be winsorized correctly with NaNs preserved"
     assert result.isna().sum() == input_data.isna().sum(), "Number of NaN values should remain unchanged"
 
+@pytest.mark.unit
+def test_winsorize_with_infinities():
+    """
+    Test winsorization of a series containing infinite values.
 
+    Verifies:
+    - Proper handling of np.inf values
+    - Correct bounds calculation with extreme values
+    """
+    input_data = pd.Series([1, 2, 3, np.inf, 4, 5, -np.inf, 20, 100])
+    # 7 finite values, so cutoff of 0.15 will winsorize at least one value on each end
 
+    result = u.winsorize(input_data, cutoff=0.15)
 
+    # With nearest method and 0.15 cutoff on 7 finite values:
+    # Lower bound should be 1, upper bound should be 100
+    expected = pd.Series([1, 2, 3, 100, 4, 5, 1, 20, 100])
 
-# ======================================================== #
-#                                                          #
-#            I N T E G R A T I O N   T E S T S             #
-#                                                          #
-# ======================================================== #
+    assert np.allclose(result, expected, equal_nan=True), "Infinite values should be properly winsorized"
+    assert not np.any(np.isinf(result)), "Result should not contain infinite values"
+
+@pytest.mark.unit
+def test_winsorize_edge_cutoffs():
+    """
+    Test winsorization with extreme cutoff values.
+
+    Verifies:
+    - Behavior with cutoff = 0.0 (no winsorization)
+    - Behavior with cutoff = 0.5 (maximum winsorization)
+    """
+    input_data = pd.Series([1, 2, 3, 4, 5])
+
+    # Test cutoff = 0.0
+    result_zero = u.winsorize(input_data, cutoff=0.0)
+    assert np.allclose(result_zero, input_data, equal_nan=True), "Zero cutoff should return unchanged data"
+
+    # Test cutoff = 0.5
+    result_half = u.winsorize(input_data, cutoff=0.5)
+    expected_half = pd.Series([3, 3, 3, 3, 3])  # All values should become the median
+    assert np.allclose(result_half, expected_half, equal_nan=True), "0.5 cutoff should set all values to median"
