@@ -80,18 +80,27 @@ def load_config(file_path='../notebooks/config.yaml'):
         # Suppresses pydantic "serialized value may not be as expected" warnings
         warnings.filterwarnings("ignore", category=UserWarning)
 
+        def get_base_filename(filename, valid_prefixes):
+            """Remove any valid prefixes from filename."""
+            for prefix in valid_prefixes:
+                if filename.startswith(prefix):
+                    return filename[len(prefix):]
+            return filename
+
         try:
-            if filename in ['config.yaml', 'test_config.yaml']:
-                config_pydantic = py_c.MainConfig(**config_dict)
-                config = config_pydantic.model_dump(mode="json", exclude_none=True)
-            elif filename in ['metrics_config.yaml', 'test_metrics_config.yaml']:
-                config_pydantic = py_mc.MetricsConfig(**config_dict)
-                config = config_pydantic.model_dump(mode="json", exclude_none=True)
-            elif filename in ['modeling_config.yaml', 'test_modeling_config.yaml']:
-                config_pydantic = py_mo.ModelingConfig(**config_dict)
-                config = config_pydantic.model_dump(mode="json", exclude_none=True)
-            elif filename in ['experiments_config.yaml', 'test_experiments_config.yaml']:
-                config_pydantic = py_e.ExperimentsConfig(**config_dict)
+            valid_prefixes = ['test_', 'wallets_']
+            base_filename = get_base_filename(filename, valid_prefixes)
+
+            config_mapping = {
+                'config.yaml': (py_c.MainConfig, "Main"),
+                'metrics_config.yaml': (py_mc.MetricsConfig, "Metrics"),
+                'modeling_config.yaml': (py_mo.ModelingConfig, "Modeling"),
+                'experiments_config.yaml': (py_e.ExperimentsConfig, "Experiments")
+            }
+
+            if base_filename in config_mapping:
+                ConfigClass, config_type = config_mapping[base_filename]
+                config_pydantic = ConfigClass(**config_dict)
                 config = config_pydantic.model_dump(mode="json", exclude_none=True)
             else:
                 raise ValueError(f"Loading failed for unknown config type '{filename}'")

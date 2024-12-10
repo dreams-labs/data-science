@@ -1,0 +1,26 @@
+# See details on config structure and valid inputs in src/config_models/metrics_config.py
+
+# Time series keyed on coin_id-date
+time_series:
+    market_data:
+        price:
+            indicators:
+                sma:
+                    parameters:
+                        window: [7]
+                rsi:
+                    parameters:
+                        window: [14]
+        volume:
+            indicators:
+                sma:
+                    parameters:
+                        window: [7]
+
+# Time series keyed on only date
+macro_trends:
+    global_market_cap:
+        indicators:
+            rsi:
+                parameters:
+                    window: [14]
