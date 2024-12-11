@@ -157,6 +157,9 @@ def generate_all_timing_features(
     Returns:
         pd.DataFrame: DataFrame indexed by wallet_address with generated features for each input column
     """
+    # Get list of wallets to include
+    wallet_addresses = profits_df['wallet_address'].unique()
+
     # Filter by minimum transaction size
     filtered_profits = profits_df[
         abs(profits_df['usd_net_transfers']) >= min_transaction_size
@@ -184,13 +187,13 @@ def generate_all_timing_features(
         result = pd.concat(all_features, axis=1)
     else:
         result = pd.DataFrame(
-            index=pd.Index(filtered_profits['wallet_address'].cat.categories, name='wallet_address')
+            index=pd.Index(wallet_addresses, name='wallet_address')
         )
 
     # Ensure all wallet addresses are included and fill NaNs
     result = pd.DataFrame(
         result,
-        index=pd.Index(filtered_profits['wallet_address'].cat.categories, name='wallet_address')
+        index=pd.Index(wallet_addresses, name='wallet_address')
     ).fillna(0)
 
     return result

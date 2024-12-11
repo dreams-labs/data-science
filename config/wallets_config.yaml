@@ -21,7 +21,7 @@ features:
 data_cleaning:
 
     # Modeling period filters
-    min_modeling_investment: 20000
+    min_modeling_investment: 2000
     min_modeling_transaction_days: 2
 
     # Wallet minimum thresholds

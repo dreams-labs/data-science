@@ -199,7 +199,7 @@ def impute_market_cap(market_data_df, min_coverage=0.7, max_multiple=1.0):
     known = df_copy['market_cap'].count()
     imputed = df_copy['market_cap_imputed'].count()
     logger.info("Imputation increased market cap coverage by %.1f%% to %.1f%% (%s/%s) vs base of %.1f%% (%s/%s)",
-                (imputed-known)/all_rows,
+                100*(imputed-known)/all_rows,
                 100*imputed/all_rows, dc.human_format(imputed), dc.human_format(all_rows),
                 100*known/all_rows, dc.human_format(known), dc.human_format(all_rows))
 

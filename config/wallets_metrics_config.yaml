@@ -17,10 +17,10 @@ time_series:
                     parameters:
                         window: [7]
 
-# Time series keyed on only date
-macro_trends:
-    global_market_cap:
-        indicators:
-            rsi:
-                parameters:
-                    window: [14]
+# # Time series keyed on only date
+# macro_trends:
+#     global_market_cap:
+#         indicators:
+#             rsi:
+#                 parameters:
+#                     window: [14]
