@@ -235,13 +235,11 @@ def upload_wallet_cohort(wallet_cohort):
     # generate upload_df from input df
     upload_df = pd.DataFrame()
     upload_df['wallet_id'] = wallet_cohort
-    upload_df['training_period_end'] = wallets_config['training_data']['training_period_end']
     upload_df['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     # set df datatypes of upload df
     dtype_mapping = {
         'wallet_id': int,
-        'training_period_end': 'datetime64[ns, UTC]',
         'updated_at': 'datetime64[ns, UTC]'
     }
     upload_df = upload_df.astype(dtype_mapping)
@@ -251,7 +249,6 @@ def upload_wallet_cohort(wallet_cohort):
     table_name = 'temp.wallet_modeling_cohort'
     schema = [
         {'name':'wallet_id', 'type': 'int64'},
-        {'name':'training_period_end', 'type': 'datetime'},
         {'name':'updated_at', 'type': 'datetime'}
     ]
     pandas_gbq.to_gbq(
