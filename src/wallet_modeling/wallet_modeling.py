@@ -16,7 +16,7 @@ from sklearn.metrics import (
 
 # local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
-import modeling as m
+import utils as u
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
 
@@ -50,7 +50,7 @@ def generate_target_variables(wallets_df):
 
     # Apply winsorization
     if returns_winsorization > 0:
-        metrics_df['return'] = m.winsorize(metrics_df['return'],returns_winsorization)
+        metrics_df['return'] = u.winsorize(metrics_df['return'],returns_winsorization)
 
     # Risk-Adjusted Dollar Return
     metrics_df['risk_adj_return'] = metrics_df['net_gain'] * \

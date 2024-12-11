@@ -1,0 +1,11 @@
+market_timing:
+  offsets:
+    price_sma_7:
+      offsets: [7,30]
+      retain_base_columns: False
+    price_rsi_14:
+      offsets: [30]
+      retain_base_columns: False
+    volume_sma_7:
+      offsets: [30]
+      retain_base_columns: True

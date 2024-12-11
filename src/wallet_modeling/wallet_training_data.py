@@ -23,15 +23,12 @@ def generate_imputation_dates():
     Generates a list of all dates that need imputation, including the first
     and last date of each training window and modeling period.
 
-    The training period boundary dates are returned separateely so they can be used
-    to
-
     Returns:
     - imputation_dates (list): list that includes all start and end dates
     """
     # Extract all window start dates
     window_start_dates = sorted([datetime.strptime(date, "%Y-%m-%d")
-                    for date in wallets_config['training_data']['training_window_starts'].values()
+                    for date in wallets_config['training_data']['training_window_starts']
                     ])
 
     # Generate the output array
@@ -42,9 +39,8 @@ def generate_imputation_dates():
         # Append window start date
         imputation_dates.append(window_start_dates[i].strftime("%Y-%m-%d"))
 
-    # Append day before modeling period
-    modeling_start = datetime.strptime(wallets_config['training_data']['modeling_period_start'], "%Y-%m-%d")
-    imputation_dates.append((modeling_start - timedelta(days=1)).strftime("%Y-%m-%d"))
+    # Append training period end
+    imputation_dates.append(wallets_config['training_data']['training_period_end'])
 
     # Append modeling period dates
     imputation_dates.append(wallets_config['training_data']['modeling_period_start'])
@@ -185,7 +181,7 @@ def split_window_dfs(windows_profits_df):
     # Convert training window starts to sorted datetime
     training_windows_starts = sorted([
         datetime.strptime(date, "%Y-%m-%d")
-        for date in wallets_config['training_data']['training_window_starts'].values()
+        for date in wallets_config['training_data']['training_window_starts']
     ])
 
     # Generate end dates for each period

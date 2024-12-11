@@ -2,7 +2,9 @@
 Orchestrates groups of functions to generate wallet model pipeline
 """
 
+import time
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
 # Local module imports
 import training_data.data_retrieval as dr
@@ -28,15 +30,21 @@ def retrieve_datasets():
     earliest_date = wallets_config['training_data']['training_period_start']
     latest_date = wallets_config['training_data']['validation_period_end']
 
-    # Profits: retrieve for all wallets above lifetime inflows threshold
-    profits_df = dr.retrieve_profits_data(earliest_date,latest_date,
-                                        wallets_config['data_cleaning']['minimum_wallet_inflows'])
+    # Retrieve profits_df and market_data_df concurrently
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        profits_future = executor.submit(
+            dr.retrieve_profits_data,
+            earliest_date,
+            latest_date,
+            wallets_config['data_cleaning']['minimum_wallet_inflows']
+        )
+        market_future = executor.submit(dr.retrieve_market_data)
 
-    # Market data: retrieve for all coins with transfer data
-    market_data_df = dr.retrieve_market_data()
-    market_data_df = market_data_df[market_data_df['coin_id'].isin(profits_df['coin_id'])]
+        profits_df = profits_future.result()
+        market_data_df = market_future.result()
 
     # Clean market_data_df
+    market_data_df = market_data_df[market_data_df['coin_id'].isin(profits_df['coin_id'])]
     market_data_df = dr.clean_market_data(
         market_data_df,
         wallets_config,
@@ -75,6 +83,9 @@ def define_wallet_cohort(profits_df,market_data_df):
     """
     Applies transformations and filters to identify wallets that pass data cleaning filters
     """
+    start_time = time.time()
+    logger.info("Defining wallet cohort based on cleaning params...")
+
     # Impute the training period boundary dates
     training_period_boundary_dates = [
         wallets_config['training_data']['training_period_start'],
@@ -92,7 +103,7 @@ def define_wallet_cohort(profits_df,market_data_df):
     training_profits_df = wcf.add_cash_flow_transfers_logic(training_profits_df)
 
     # Compute wallet level metrics over duration of training period
-    training_wallet_metrics_df = wf.calculate_wallet_level_metrics(training_profits_df)
+    training_wallet_metrics_df = wf.calculate_wallet_trading_features(training_profits_df)
 
     # Apply filters based on wallet behavior during the training period
     filtered_training_wallet_metrics_df = wtd.apply_wallet_thresholds(training_wallet_metrics_df)
@@ -102,6 +113,9 @@ def define_wallet_cohort(profits_df,market_data_df):
 
     # Upload the cohort to BigQuery for additional complex feature generation
     wtd.upload_wallet_cohort(wallet_cohort)
+
+    logger.info("Cohort defined as %s wallets after %.2f.",
+                len(wallet_cohort), time.time()-start_time)
 
     return filtered_training_wallet_metrics_df,wallet_cohort
 
@@ -138,7 +152,7 @@ def generate_wallet_performance_features(training_windows_profits_dfs,training_w
     for i, window_profits_df in enumerate(training_windows_profits_dfs, 1):
         # Add transaction metrics
         window_profits_df = wcf.add_cash_flow_transfers_logic(window_profits_df)
-        window_wallets_df = wf.calculate_wallet_level_metrics(window_profits_df)
+        window_wallets_df = wf.calculate_wallet_features(window_profits_df)
 
         # Fill missing values and Join to training_data_df
         window_wallets_df = wf.fill_missing_wallet_data(window_wallets_df, wallet_cohort)
@@ -161,7 +175,7 @@ def filter_modeling_period_wallets(modeling_period_profits_df):
     """
     # Calculate modeling period wallet metrics
     modeling_period_profits_df = wcf.add_cash_flow_transfers_logic(modeling_period_profits_df)
-    modeling_wallets_df = wf.calculate_wallet_level_metrics(modeling_period_profits_df)
+    modeling_wallets_df = wf.calculate_wallet_trading_features(modeling_period_profits_df)
 
     # Remove wallets with below the minimum investment threshold
     base_wallets = len(modeling_wallets_df)

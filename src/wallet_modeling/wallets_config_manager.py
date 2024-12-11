@@ -91,7 +91,7 @@ class WalletsConfig:
         if 'training_data' in self.config:
             # Training Period Boundaries
             # Get the first training window start date
-            first_window = min(self.config['training_data']['training_window_starts'].values())
+            first_window = min(self.config['training_data']['training_window_starts'])
             self.config['training_data']['training_period_start'] = first_window
 
             # Get the day before modeling period start

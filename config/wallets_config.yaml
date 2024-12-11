@@ -1,26 +1,32 @@
 # Variables used to define the training data
 training_data:
-    training_window_starts:
-        w1: "2023-07-01"
-        w2: "2023-11-01"
-        w3: "2024-04-01"
-        w4: "2024-08-01"
+    training_window_starts: [
+        "2023-11-01",
+        "2024-04-01",
+        "2024-08-01"
+    ]
     # modeling_period_start: "2024-02-01"
     # modeling_period_end: "2024-03-31"
     modeling_period_start: "2024-11-01"
     modeling_period_end: "2024-11-30"
     validation_period_end: "2024-12-07"
 
+
+# Variables used to define features
+features:
+    timing_metrics_min_transaction_size: 20  # trades below this USD threshold will not be evaluated for market timing peformance
+
+
 # Variables used to clean and filter raw data before training data is built
 data_cleaning:
 
     # Modeling period filters
-    min_modeling_investment: 20000
+    min_modeling_investment: 2000
     min_modeling_transaction_days: 2
 
     # Wallet minimum thresholds
-    minimum_wallet_inflows: 2000 # The amount of lifetime USD inflows a wallet must have to be included in the training data
-    minimum_volume: 2000  # Exclude wallets with fewer than this amount of training period USD volume
+    minimum_wallet_inflows: 25000 # The amount of lifetime USD inflows a wallet must have to be included in the training data
+    minimum_volume: 50000  # Exclude wallets with fewer than this amount of training period USD volume
     minumum_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
 
     # Wallet maximum thresholds
@@ -35,6 +41,10 @@ data_cleaning:
     min_mc_imputation_coverage: 0.3  # coins with market cap coverage below this level will have hardcoded market cap values filled
     max_mc_imputation_multiple: 2.0  # don't impute dates where the imputed market cap exceeds the max known market cap * this ratio
     market_cap_default_fill:  500000  # coins below the imputation coverage level will have empty values filled with this
+
+    # offset calculation limits
+    offset_winsorization: 0.01 # comparisons between metrics and their offset values will be winsorized by this amount
+
 
 modeling:
     target_variable: "performance_score"

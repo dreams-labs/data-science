@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # project files
-import modeling as m
+import utils as u
 
 
 def generate_profitability_curves(predictions, returns, winsorization_cutoff=0):
@@ -23,7 +23,7 @@ def generate_profitability_curves(predictions, returns, winsorization_cutoff=0):
         raise ValueError("Predictions and returns must have the same length")
 
     # Winsorize the returns (apply caps to the top n % of values)
-    returns_winsorized = m.winsorize(returns, winsorization_cutoff)
+    returns_winsorized = u.winsorize(returns, winsorization_cutoff)
 
     # Merge datasets
     df = pd.DataFrame({
@@ -87,7 +87,7 @@ def generate_profitability_curves_by_time_window(predictions, returns, winsoriza
 
     # Winsorize the returns
     if winsorization_cutoff>0:
-        returns_winsorized = m.winsorize(returns, winsorization_cutoff)
+        returns_winsorized = u.winsorize(returns, winsorization_cutoff)
     else:
         returns_winsorized = returns
 

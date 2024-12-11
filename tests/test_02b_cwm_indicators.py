@@ -588,23 +588,8 @@ def test_rsi_scenario1(sample_timeseries_rsi1):
 # calculate_mfi() unit tests
 # -------------------------------------------- #
 
-
-@pytest.fixture
-def sample_price_series_mfi1():
-    """
-    Fixture to provide a sample price series for MFI calculation in test_calculate_mfi_scenario1.
-    """
-    return pd.Series([10, 12, 15, 14, 13, 16, 17, 18, 19, 20])
-
-@pytest.fixture
-def sample_volume_series_mfi1():
-    """
-    Fixture to provide a sample volume series for MFI calculation in test_calculate_mfi_scenario1.
-    """
-    return pd.Series([100, 150, 200, 250, 300, 350, 400, 450, 500, 550])
-
 @pytest.mark.unit
-def test_calculate_mfi_scenario1(sample_price_series_mfi1, sample_volume_series_mfi1):
+def test_calculate_mfi_scenario1():
     """
     Unit test for calculating Money Flow Index (MFI) for a normal case.
 
@@ -612,19 +597,23 @@ def test_calculate_mfi_scenario1(sample_price_series_mfi1, sample_volume_series_
     volume series [100, 150, 200, 250, 300, 350, 400, 450, 500, 550] with a window of 3.
 
     Expected Behavior: MFI should be calculated based on price and volume over the given window,
-    reflecting positive and negative money flows.
+    reflecting positive and negative money flows. Initial NaN values should be forward filled,
+    and any remaining NaNs should be filled with 0.5.
     """
+    # Define test data directly in the test
+    price_series = pd.Series([10, 12, 15, 14, 13, 16, 17, 18, 19, 20])
+    volume_series = pd.Series([100, 150, 200, 250, 300, 350, 400, 450, 500, 550])
 
     # Call the function under test
-    result_mfi = ind.calculate_mfi(sample_price_series_mfi1, sample_volume_series_mfi1, window=3)
+    result_mfi = ind.calculate_mfi(price_series, volume_series, window=3)
 
     # Step-by-step expected MFI calculation for the first few values after the initial window (simplified):
     # Step 1: Calculate raw money flow (price * volume)
-    money_flow = sample_price_series_mfi1 * sample_volume_series_mfi1
+    money_flow = price_series * volume_series
 
     # Step 2: Calculate positive and negative money flow (simplified):
-    positive_money_flow = money_flow.where(sample_price_series_mfi1 > sample_price_series_mfi1.shift(1), 0)
-    negative_money_flow = money_flow.where(sample_price_series_mfi1 < sample_price_series_mfi1.shift(1), 0)
+    positive_money_flow = money_flow.where(price_series > price_series.shift(1), 0)
+    negative_money_flow = money_flow.where(price_series < price_series.shift(1), 0)
 
     # Step 3: Calculate the money flow ratio and MFI
     money_flow_ratio = positive_money_flow.rolling(window=3).sum() / negative_money_flow.rolling(window=3).sum()
@@ -633,12 +622,19 @@ def test_calculate_mfi_scenario1(sample_price_series_mfi1, sample_volume_series_
     # Adjust for the window, the third value is expected to be 100 if only positive flows exist
     expected_mfi.iloc[2] = 100  # since only positive money flows exist in the first window
 
-    # Expected MFI values (step by step), starting with NaN for the first two values due to insufficient data for the window
-    assert np.allclose(result_mfi[2:], expected_mfi[2:], atol=1e-4), \
+    # Fill NaN values according to the new function behavior
+    expected_mfi = expected_mfi.ffill().fillna(0.5)
+
+    # Assert all values are close, including the previously NaN values that are now filled
+    assert np.allclose(result_mfi, expected_mfi, atol=1e-4), \
         f"Expected MFI values: {expected_mfi.values}, but got {result_mfi.values}"
 
-    # Ensure the initial values before the window period are NaN
-    assert result_mfi[:2].isna().all(), "Expected NaN values for the first two periods due to insufficient data for the window."
+    # Assert there are no NaN values in the result
+    assert not result_mfi.isna().any(), "Expected no NaN values in the result due to forward fill and 0.5 filling"
+
+    # Assert the first value is 0.5 (since it can't be forward filled)
+    assert result_mfi[0] == 0.5, "Expected first value to be 0.5 since it cannot be forward filled"
+
 
 
 # -------------------------------------------- #
