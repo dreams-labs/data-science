@@ -40,34 +40,33 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_d
     wallet_features_df = pd.DataFrame(index=wallet_cohort)
     wallet_features_df.index.name = 'wallet_address'
 
-    # Add trading behavior features
+    # Trading features (inner join, custom fill)
     profits_df = wcf.add_cash_flow_transfers_logic(profits_df)
-    wallet_trading_features_df = calculate_wallet_trading_features(profits_df)
-    wallet_trading_features_df = fill_trading_features_data(wallet_trading_features_df, wallet_cohort)
-    wallet_features_df = wallet_features_df.join(wallet_trading_features_df, how='inner')
+    trading_features = calculate_wallet_trading_features(profits_df)
+    trading_features = fill_trading_features_data(trading_features, wallet_cohort)
+    wallet_features_df = wallet_features_df.join(trading_features, how='inner')
 
-    # Add transaction timing features
-    wallet_timing_features_df = calculate_market_timing_features(profits_df, market_indicators_data_df)
-    wallet_features_df = wallet_features_df.join(wallet_timing_features_df, how='left').fillna(0)
+    # Market timing features (fill zeros)
+    timing_features = calculate_market_timing_features(profits_df, market_indicators_data_df)
+    wallet_features_df = wallet_features_df.join(timing_features, how='left')\
+        .fillna({col: 0 for col in timing_features.columns})
 
-    # Add market cap features
-    market_features_df = wcdf.calculate_market_cap_features(profits_df,market_indicators_data_df)
+    # Market cap features (fill zeros)
+    market_features = wcdf.calculate_market_cap_features(profits_df, market_indicators_data_df)
+    wallet_features_df = wallet_features_df.join(market_features, how='left')\
+        .fillna({col: 0 for col in market_features.columns})
+
+    # Transfers features (fill -1)
+    transfers_features = calculate_transfers_features(profits_df, transfers_data_df)
+    wallet_features_df = wallet_features_df.join(transfers_features, how='left')\
+        .fillna({col: -1 for col in transfers_features.columns})
+
+    # Performance features (inner join, no fill)
+    performance_features = wm.generate_target_variables(wallet_features_df)
     wallet_features_df = wallet_features_df.join(
-        market_features_df.drop('total_volume',axis=1)
-        ,how='left'
-        ).fillna(0)
-
-    # Add transfers data features
-    transfers_features_df = calculate_transfers_features(profits_df, transfers_data_df)
-    wallet_features_df = wallet_features_df.join(
-        market_features_df.drop('total_volume',axis=1)
-        ,how='left'
-        ).fillna(0)
-
-    # Add financial performance features
-    performance_df = wm.generate_target_variables(wallet_features_df)
-    performance_df = performance_df.drop(['invested','net_gain'],axis=1)
-    wallet_features_df = wallet_features_df.join(performance_df)
+        performance_features.drop(['invested', 'net_gain'], axis=1),
+        how='inner'
+    )
 
     return wallet_features_df
 
@@ -241,7 +240,7 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
         wallets_config['features']['timing_metrics_min_transaction_size'],
     )
 
-    logger.info("Calculated market timing features after %.2f.",
+    logger.info("Calculated market timing features after %.2f seconds.",
                 time.time() - start_time)
 
     return wallet_timing_features_df

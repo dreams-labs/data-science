@@ -67,6 +67,7 @@ def retrieve_transfers_data():
     """
     # Wallet transactions below this threshold will not be included in the buyer sequencing
     minimum_transaction_size = wallets_config['features']['timing_metrics_min_transaction_size']
+    minimum_transaction_size = 0
 
     # All data after the training period must be ignored to avoid data leakage
     training_period_end = wallets_config['training_data']['training_period_end']
@@ -192,7 +193,7 @@ def generate_all_timing_features(
     # Calculate features for each column
     all_features = []
     for col in relative_change_columns:
-        logger.info("Generating timing performance features for %s...", col)
+        logger.debug("Generating timing performance features for %s...", col)
         col_features = calculate_timing_features_for_column(
             timing_profits_df,
             col

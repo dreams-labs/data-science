@@ -140,6 +140,7 @@ def calculate_balance_weighted_market_cap(profits_market_features_df):
     return balance_wtd_df
 
 
+
 def calculate_market_cap_features(profits_df,market_data_df):
     """
     Calculates each wallet's total volume and ending balance, and the average market cap of coins
@@ -179,7 +180,10 @@ def calculate_market_cap_features(profits_df,market_data_df):
     market_features_df = volume_wtd_df.copy()
     market_features_df = market_features_df.join(balance_wtd_df)
 
-    logger.info("Calculated market cap features after %.2f.",
+    # Drop total_volume which isn't needed as a market cap feature
+    market_features_df = market_features_df.drop('total_volume', axis=1)
+
+    logger.info("Calculated market cap features after %.2f seconds.",
                  time.time() - start_time)
 
     return market_features_df
