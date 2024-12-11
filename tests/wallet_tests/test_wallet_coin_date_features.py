@@ -20,9 +20,11 @@ from dreams_core import core as dc
 # pyright: reportMissingImports=false
 sys.path.append(str(Path(__file__).parent.parent.parent / 'src'))
 import wallet_features.wallet_coin_date_features as wcdf
+from wallet_modeling.wallets_config_manager import WalletsConfig
 
 load_dotenv()
 logger = dc.setup_logger()
+wallets_config = WalletsConfig.load_from_yaml('../config/wallets_config.yaml')
 
 # ===================================================== #
 #                                                       #
@@ -176,22 +178,30 @@ def test_relative_changes_calculation(basic_market_timing_config):
         'price_sma_7_lead_1': [200, 300, np.nan, 250, 350, np.nan]
     })
 
-    result = wcdf.calculate_relative_changes(df, basic_market_timing_config)
+    result_df,relative_change_columns = wcdf.calculate_relative_changes(df, basic_market_timing_config)
 
     # Verify relative change calculations
     # For price_rsi_14_vs_lead_2: ((lead_2 - base) / base) * 100
-    expected_rsi_change = ((30 - 10) / 10)  # 200%
+    expected_rsi_change = (30 - 10) / 10  # 200%
     assert np.isclose(
-        result['price_rsi_14_vs_lead_2'].iloc[0],
+        result_df['price_rsi_14_vs_lead_2'].iloc[0],
         expected_rsi_change,
         equal_nan=True
     )
 
+    # Verify that the relative_change_columns list is correct
+    expected_relative_change_columns = [
+        'price_rsi_14_vs_lead_2',
+        'price_rsi_14_vs_lead_3',
+        'price_sma_7_vs_lead_1'
+    ]
+    assert relative_change_columns == expected_relative_change_columns
+
     # Verify column retention
     # price_rsi_14 should be dropped (retain_base_columns: False)
-    assert 'price_rsi_14' not in result.columns
-    assert 'price_rsi_14_lead_2' not in result.columns
+    assert 'price_rsi_14' not in result_df.columns
+    assert 'price_rsi_14_lead_2' not in result_df.columns
 
     # price_sma_7 should be retained (retain_base_columns: True)
-    assert 'price_sma_7' in result.columns
-    assert 'price_sma_7_lead_1' in result.columns
+    assert 'price_sma_7' in result_df.columns
+    assert 'price_sma_7_lead_1' in result_df.columns
