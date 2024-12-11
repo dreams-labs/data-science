@@ -24,7 +24,10 @@ from wallet_modeling.wallets_config_manager import WalletsConfig
 
 load_dotenv()
 logger = dc.setup_logger()
-wallets_config = WalletsConfig.load_from_yaml('../config/wallets_config.yaml')
+
+config_path = Path(__file__).parent.parent / 'test_config' / 'test_wallets_config.yaml'
+wallets_config = WalletsConfig.load_from_yaml(config_path)
+
 
 # ===================================================== #
 #                                                       #
