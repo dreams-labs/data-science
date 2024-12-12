@@ -35,8 +35,8 @@ def force_fill_market_cap(market_data_df):
     market_data_df['market_cap_filled'] = market_data_df['market_cap_imputed']
 
     # Backfill and forward fill if there are any values at all, since these missing values failed imputation checks
-    market_data_df['market_cap_filled'] = market_data_df.groupby('coin_id')['market_cap_filled'].bfill()
-    market_data_df['market_cap_filled'] = market_data_df.groupby('coin_id')['market_cap_filled'].ffill()
+    market_data_df['market_cap_filled'] = market_data_df.groupby('coin_id',observed=True)['market_cap_filled'].bfill()
+    market_data_df['market_cap_filled'] = market_data_df.groupby('coin_id',observed=True)['market_cap_filled'].ffill()
 
     # For coins with no market cap data at all, bulk fill with a constant
     default_market_cap = wallets_config['data_cleaning']['market_cap_default_fill']

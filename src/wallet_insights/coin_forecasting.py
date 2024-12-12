@@ -3,8 +3,12 @@ Orchestrates groups of functions to generate wallet model pipeline
 """
 
 import logging
+from typing import List, Dict, Tuple
 import pandas as pd
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy import stats
 from dreams_core import core as dc
 
 # Local module imports
@@ -109,10 +113,10 @@ def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scor
     total_metrics = analysis_df.groupby('coin_id').agg({
         'usd_balance': 'sum',
         'wallet_address': 'count',
-        'score': ['mean', 'std', 'count']
+        'score': ['mean', 'std']
     }).reset_index()
     total_metrics.columns = ['coin_id', 'total_balance', 'total_wallets',
-                           'mean_score', 'score_std', 'score_count']
+                           'mean_score', 'score_std']
 
     # Combine metrics
     coin_wallet_metrics_df = pd.merge(weighted_scores, top_wallet_metrics, on='coin_id', how='left')
@@ -149,7 +153,7 @@ def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scor
     coin_wallet_metrics_df['avg_wallet_balance'] = (coin_wallet_metrics_df['total_balance']
                                                     / coin_wallet_metrics_df['total_wallets'])
     coin_wallet_metrics_df['score_confidence'] = 1 - (
-        1 / np.sqrt(coin_wallet_metrics_df['score_count'] + 1))  # Added +1 to avoid division by zero
+        1 / np.sqrt(coin_wallet_metrics_df['total_wallets'] + 1))  # Added +1 to avoid division by zero
 
 
     # 3. Apply filters based on wallets_config
@@ -327,3 +331,450 @@ def validate_coin_performance(coin_performance_df, top_n, max_market_cap, min_ma
     metric_top_n_returns_df = metric_top_n_returns_df.sort_values('mean_return', ascending=False)
 
     return metric_top_n_returns_df
+
+
+# pylint:disable=dangerous-default-value
+def analyze_market_cap_segments(
+    df: pd.DataFrame,
+    market_cap_ranges: List[Tuple[float, float]] = [
+        (0.1e6, 1e6),
+        (1e6, 15e6),
+        (15e6, 35e6),
+        (35e6, 100e6),
+        (100e6, 1e10)
+    ],
+    top_n: int = 10
+) -> Tuple[Dict[str, pd.DataFrame], pd.DataFrame]:
+    """
+    Analyze metric performance across different market cap segments.
+
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        The input dataframe containing coin metrics and performance data
+    market_cap_ranges : List[Tuple[float, float]]
+        List of (min, max) market cap boundaries for each segment
+    top_n : int
+        Number of top coins to analyze for each metric
+
+    Returns:
+    --------
+    segment_results : Dict[str, pd.DataFrame]
+        Dictionary mapping segment names to performance DataFrames
+    summary_df : pd.DataFrame
+        Summary DataFrame comparing metric performance across segments
+    """
+    # Create segment labels
+    segment_labels = [
+        f"Segment {i+1} ({dc.human_format(low)}-{dc.human_format(high)})"
+        for i, (low, high) in enumerate(market_cap_ranges)
+    ]
+
+    # Initialize results
+    segment_results = {}
+    summary_data = []
+
+    # Analyze each segment
+    for i, (low, high) in enumerate(market_cap_ranges):
+        # Filter data for this segment
+        segment_df = df[
+            (df['market_cap_filled'] >= low) &
+            (df['market_cap_filled'] < high)
+        ].copy()
+
+        if len(segment_df) == 0:
+            logging.warning(f"No coins found in segment {i+1} ({dc.human_format(low)}-{dc.human_format(high)})")
+            continue
+
+        # Run validation for this segment
+        segment_results_df = validate_coin_performance(
+            df,
+            top_n=min(top_n, len(segment_df)),  # Ensure top_n doesn't exceed segment size
+            max_market_cap=float(high),
+            min_market_cap=float(low)
+        )
+
+        # Store results
+        segment_name = segment_labels[i]
+        segment_results[segment_name] = segment_results_df
+
+        # Add to summary data
+        for metric in segment_results_df.index:
+            summary_data.append({
+                'Segment': segment_name,
+                'Metric': metric,
+                'Mean Return': segment_results_df.loc[metric, 'mean_return'],
+                'Median Return': segment_results_df.loc[metric, 'median_return'],
+                'Min Return': segment_results_df.loc[metric, 'min_return'],
+                'Max Return': segment_results_df.loc[metric, 'max_return'],
+                'Market Cap Range': f"{dc.human_format(low)}-{dc.human_format(high)}",
+                'Segment Size': len(segment_df)
+            })
+
+    # Create summary DataFrame
+    summary_df = pd.DataFrame(summary_data)
+
+    # Add segment performance rankings
+    summary_df['Segment Rank'] = summary_df.groupby('Segment')['Mean Return'].rank(ascending=False)
+
+    # Add overall metric consistency score (average rank across segments)
+    metric_consistency = summary_df.groupby('Metric')['Segment Rank'].mean()
+    summary_df = summary_df.merge(
+        metric_consistency.rename('Overall Consistency').reset_index(),
+        on='Metric'
+    )
+
+    return segment_results, summary_df
+
+
+def print_segment_analysis(
+    segment_results: Dict[str, pd.DataFrame],
+    summary_df: pd.DataFrame
+) -> None:
+    """Print formatted analysis of segment results."""
+    # Print segment-by-segment analysis
+    print("=== Market Cap Segment Analysis ===\n")
+
+    for segment, results_df in segment_results.items():
+        print(f"\n{segment}")
+        print("-" * len(segment))
+
+        # Print segment size
+        segment_size = summary_df[summary_df['Segment'] == segment]['Segment Size'].iloc[0]
+        print(f"Number of coins: {segment_size}")
+
+        # Get top 5 performing metrics for this segment
+        top_metrics = results_df.head().index.tolist()
+        print("\nTop performing metrics:")
+        for i, metric in enumerate(top_metrics, 1):
+            mean_return = results_df.loc[metric, 'mean_return'] * 100
+            print(f"{i}. {metric}: {mean_return:.1f}%")
+
+    # Print overall metric consistency
+    print("\n=== Overall Metric Consistency ===")
+    print("(Lower score indicates more consistent performance across segments)\n")
+
+    consistency_summary = summary_df.groupby('Metric')['Overall Consistency'].first()
+    consistency_summary = consistency_summary.sort_values()
+
+    for metric, score in consistency_summary.head().items():
+        print(f"{metric}: {score:.2f}")
+
+
+def plot_segment_heatmap(
+    summary_df: pd.DataFrame,
+    figsize=(12, 8),
+    cmap='YlOrRd',
+    return_fig=False
+):
+    """
+    Create a heatmap visualization of metric performance across market cap segments.
+
+    Parameters:
+    -----------
+    segment_results : Dict[str, pd.DataFrame]
+        Output from analyze_market_cap_segments
+    summary_df : pd.DataFrame
+        Summary DataFrame from analyze_market_cap_segments
+    figsize : tuple
+        Figure size (width, height)
+    cmap : str
+        Colormap to use for the heatmap
+    return_fig : bool
+        If True, return the figure object instead of displaying
+
+    Returns:
+    --------
+    fig : matplotlib.figure.Figure, optional
+        The figure object if return_fig is True
+    """
+    # Pivot the summary data for the heatmap
+    heatmap_data = summary_df.pivot(
+        index='Metric',
+        columns='Segment',
+        values='Mean Return'
+    ) * 100  # Convert to percentage
+
+    # Sort metrics by overall performance
+    metric_means = heatmap_data.mean(axis=1)
+    heatmap_data = heatmap_data.loc[metric_means.sort_values(ascending=False).index]
+
+    # Create figure and axes
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Create heatmap
+    sns.heatmap(
+        heatmap_data,
+        annot=True,
+        fmt='.1f',
+        cmap=cmap,
+        center=0,
+        ax=ax,
+        cbar_kws={'label': 'Mean Return (%)'}
+    )
+
+    # Customize appearance
+    plt.title('Metric Performance by Market Cap Segment', pad=20)
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
+    ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
+
+    # Add sample sizes
+    segment_sizes = summary_df.groupby('Segment')['Segment Size'].first()
+    ax2 = ax.twiny()
+    ax2.set_xlim(ax.get_xlim())
+    ax2.set_xticks(ax.get_xticks())
+    ax2.set_xticklabels([f'n={n}' for n in segment_sizes], rotation=45, ha='left')
+
+    # Adjust layout
+    plt.tight_layout()
+
+    if return_fig:
+        return fig
+    plt.show()
+
+
+
+def plot_metric_consistency(
+    summary_df: pd.DataFrame,
+    figsize=(10, 6),
+    return_fig=False
+):
+    """
+    Create a secondary visualization showing metric consistency across segments.
+
+    Parameters:
+    -----------
+    summary_df : pd.DataFrame
+        Summary DataFrame from analyze_market_cap_segments
+    figsize : tuple
+        Figure size (width, height)
+    return_fig : bool
+        If True, return the figure object instead of displaying
+
+    Returns:
+    --------
+    fig : matplotlib.figure.Figure, optional
+        The figure object if return_fig is True
+    """
+    # Get consistency scores
+    consistency_data = summary_df.groupby('Metric')['Overall Consistency'].first()
+    consistency_data = consistency_data.sort_values()
+
+    # Create figure
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Create bar plot
+    consistency_data.plot(
+        kind='barh',
+        ax=ax,
+        color='skyblue'
+    )
+
+    # Customize appearance
+    plt.title('Metric Consistency Across Segments', pad=20)
+    ax.set_xlabel('Average Rank (lower is more consistent)')
+    ax.invert_yaxis()  # Put best performers at top
+
+    plt.tight_layout()
+
+    if return_fig:
+        return fig
+    plt.show()
+
+
+# Convert the data into a pandas DataFrame
+def analyze_coin_metrics(df):
+    """
+    Analyze relationships between coin metrics and returns
+    """
+    # Calculate correlations with coin_return
+    metrics_of_interest = [
+        'weighted_avg_score',
+        'composite_score',
+        'score_confidence',
+        'top_wallet_balance_pct',
+        'top_wallet_count_pct',
+        'total_wallets',
+        'avg_wallet_balance',
+        'market_cap'
+    ]
+
+    # Calculate correlations
+    correlations = {}
+    for metric in metrics_of_interest:
+        correlation = df[metric].corr(df['coin_return'])
+        correlations[metric] = correlation
+
+    # Sort correlations by absolute value
+    correlations_sorted = {k: v for k, v in sorted(correlations.items(),
+                                                 key=lambda x: abs(x[1]),
+                                                 reverse=True)}
+
+    # Calculate basic statistics for coins with positive vs negative returns
+    positive_returns = df[df['coin_return'] > 0]
+    negative_returns = df[df['coin_return'] <= 0]
+
+    comparison_stats = {}
+    for metric in metrics_of_interest:
+        pos_mean = positive_returns[metric].mean()
+        neg_mean = negative_returns[metric].mean()
+        # Perform t-test
+        t_stat, p_value = stats.ttest_ind(positive_returns[metric],
+                                        negative_returns[metric])
+
+        comparison_stats[metric] = {
+            'positive_mean': pos_mean,
+            'negative_mean': neg_mean,
+            'difference': pos_mean - neg_mean,
+            'p_value': p_value
+        }
+
+    # Identify potential success indicators
+    success_indicators = {
+        metric: stats for metric, stats in comparison_stats.items()
+        if (abs(stats['difference']) > 0.1 * stats['negative_mean'] and
+            stats['p_value'] < 0.05)
+    }
+
+    return {
+        'correlations': correlations_sorted,
+        'comparison_stats': comparison_stats,
+        'success_indicators': success_indicators
+    }
+
+# Create summary statistics
+def print_analysis_results(results):
+    """
+    Print formatted analysis results
+    """
+    print("\n=== Correlation Analysis ===")
+    print("\nCorrelations with coin return (sorted by strength):")
+    for metric, corr in results['correlations'].items():
+        print(f"{metric:25} : {corr:0.4f}")
+
+    print("\n=== Positive vs Negative Returns Analysis ===")
+    print("\nMetrics comparison for positive vs negative returns:")
+    for metric, stats in results['comparison_stats'].items():
+        print(f"\n{metric}:")
+        print(f"  Positive returns mean: {stats['positive_mean']:0.4f}")
+        print(f"  Negative returns mean: {stats['negative_mean']:0.4f}")
+        print(f"  Difference: {stats['difference']:0.4f}")
+        print(f"  P-value: {stats['p_value']:0.4f}")
+
+    print("\n=== Strong Success Indicators ===")
+    print("\nMetrics showing significant difference between positive and negative returns:")
+    for metric, stats in results['success_indicators'].items():
+        print(f"\n{metric}:")
+        print(f"  Mean difference: {stats['difference']:0.4f}")
+        print(f"  P-value: {stats['p_value']:0.4f}")
+
+# Create visualizations
+def create_visualizations(df):
+    """
+    Create visualization plots for the analysis
+    """
+    plt.figure(figsize=(15, 10))
+
+    # Create correlation heatmap
+    metrics = ['weighted_avg_score', 'composite_score', 'score_confidence',
+              'top_wallet_balance_pct', 'top_wallet_count_pct', 'coin_return']
+    correlation_matrix = df[metrics].corr()
+
+    plt.subplot(2, 2, 1)
+    sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', center=0)
+    plt.title('Correlation Heatmap')
+
+    # Create scatter plot of weighted_avg_score vs returns
+    plt.subplot(2, 2, 2)
+    plt.scatter(df['weighted_avg_score'], df['coin_return'], alpha=0.5)
+    plt.xlabel('Weighted Average Score')
+    plt.ylabel('Coin Return')
+    plt.title('Weighted Score vs Returns')
+
+    # Create scatter plot of composite_score vs returns
+    plt.subplot(2, 2, 3)
+    plt.scatter(df['composite_score'], df['coin_return'], alpha=0.5)
+    plt.xlabel('Composite Score')
+    plt.ylabel('Coin Return')
+    plt.title('Composite Score vs Returns')
+
+    # Create box plot of score distributions for positive/negative returns
+    plt.subplot(2, 2, 4)
+    df['return_category'] = df['coin_return'].apply(lambda x: 'Positive' if x > 0 else 'Negative')
+    sns.boxplot(x='return_category', y='weighted_avg_score', data=df)
+    plt.title('Score Distribution by Return Category')
+
+    plt.tight_layout()
+    plt.show()
+
+
+
+def analyze_top_performing_coins(df, return_percentile=75):
+    """
+    Analyzes how wallet and scoring metrics differ between top performing coins and others.
+    Top performers defined as coins with returns >= 75th percentile.
+
+    Args:
+        df: DataFrame with coin metrics including 'coin_return' and scoring metrics
+        return_percentile: Threshold for defining top performers (default 75)
+
+    Returns:
+        Dict containing statistical comparison of metrics between top performers and others
+    """
+    # Split coins into performance groups
+    return_threshold = np.percentile(df['coin_return'], return_percentile)
+    top_coins = df[df['coin_return'] >= return_threshold]
+    other_coins = df[df['coin_return'] < return_threshold]
+
+    # Keep original metric names for consistency
+    metrics_to_analyze = [
+        'weighted_avg_score',
+        'composite_score',
+        'top_wallet_balance_pct',
+        'top_wallet_count_pct',
+        'score_confidence'
+    ]
+
+    results = {}
+    for metric in metrics_to_analyze:
+        # Calculate group means
+        top_mean = top_coins[metric].mean()
+        other_mean = other_coins[metric].mean()
+
+        # T-test between groups
+        t_stat, p_value = stats.ttest_ind(
+            top_coins[metric].fillna(0),
+            other_coins[metric].fillna(0)
+        )
+
+        # Effect size calculation
+        pooled_std = np.sqrt((top_coins[metric].var() + other_coins[metric].var()) / 2)
+        cohens_d = (top_mean - other_mean) / pooled_std if pooled_std != 0 else 0
+
+        results[metric] = {
+            'top_quartile_mean': top_mean,  # mean for coins with returns >= 75th percentile
+            'other_mean': other_mean,       # mean for coins with returns < 75th percentile
+            'abs_diff': top_mean - other_mean,
+            'pct_diff': ((top_mean - other_mean) / other_mean * 100) if other_mean != 0 else 0,
+            'p_value': p_value,
+            'effect_size': cohens_d
+        }
+
+    return results
+
+def print_performance_analysis(df):
+    """
+    Prints formatted comparison of metrics between top performing coins and others.
+    Top performing defined as returns >= 75th percentile.
+    """
+    results = analyze_top_performing_coins(df)
+
+    print(f"\n=== Metric Analysis: Returns >= {75}th percentile vs Others ===")
+    for metric, stats in results.items():
+        print(f"\n{metric}:")
+        print(f"  Top quartile mean (returns >= p75): {stats['top_quartile_mean']:.4f}")
+        print(f"  Other coins mean (returns < p75): {stats['other_mean']:.4f}")
+        print(f"  Absolute difference: {stats['abs_diff']:.4f}")
+        print(f"  Percent difference: {stats['pct_diff']:.1f}%")
+        print(f"  P-value: {stats['p_value']:.4f}")
+        print(f"  Effect size: {stats['effect_size']:.4f}")

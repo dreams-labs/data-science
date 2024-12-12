@@ -5,6 +5,7 @@ Orchestrates groups of functions to generate wallet model pipeline
 import time
 import logging
 from concurrent.futures import ThreadPoolExecutor
+from dreams_core import core as dc
 
 # Local module imports
 import training_data.data_retrieval as dr

@@ -4,15 +4,11 @@ Calculates metrics aggregated at the wallet level
 import logging
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.metrics import (
-    mean_squared_error,
-    mean_absolute_error,
-    r2_score,
-    explained_variance_score,
-    mean_absolute_percentage_error
-)
+from sklearn.model_selection import train_test_split
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from xgboost import XGBRegressor
 
 # local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
@@ -107,109 +103,78 @@ def generate_target_variables(wallets_df):
 
 
 
-def evaluate_regression_model(y_true, y_pred, model=None, feature_names=None):
+def train_xgb_model(modeling_df, return_data=True):
     """
-    Comprehensive evaluation of regression model performance.
+    Trains an XGBoost model using the provided DataFrame and configuration.
 
-    Parameters:
-    -----------
-    y_true : array-like
-        Actual target values
-    y_pred : array-like
-        Predicted target values
-    model : sklearn estimator, optional
-        The fitted model object
-    feature_names : list, optional
-        List of feature names for feature importance plot
+    Args:
+        modeling_df (pd.DataFrame): Input DataFrame for modeling
+        return_data (bool): If True, returns additional data for analysis
 
     Returns:
-    --------
-    dict
-        Dictionary containing various performance metrics
+        dict: Dictionary containing the pipeline and optionally training data
     """
-    metrics = {}
+    # Make copy of input DataFrame
+    df = modeling_df.copy()
 
-    # Basic metrics
-    metrics['mse'] = mean_squared_error(y_true, y_pred)
-    metrics['rmse'] = np.sqrt(metrics['mse'])
-    metrics['mae'] = mean_absolute_error(y_true, y_pred)
-    metrics['mape'] = mean_absolute_percentage_error(y_true, y_pred) * 100
-    metrics['r2'] = r2_score(y_true, y_pred)
-    metrics['explained_variance'] = explained_variance_score(y_true, y_pred)
+    # Drop columns if configured
+    if wallets_config['modeling']['drop_columns']:
+        existing_columns = [col for col in wallets_config['modeling']['drop_columns']
+                          if col in df.columns]
+        if existing_columns:
+            df = df.drop(columns=existing_columns)
 
-    # Additional statistical metrics
-    residuals = y_true - y_pred
-    metrics['residuals_mean'] = np.mean(residuals)
-    metrics['residuals_std'] = np.std(residuals)
+    # Prepare features and target
+    target_var = wallets_config['modeling']['target_variable']
+    X = df.drop(target_var, axis=1)
+    y = df[target_var]
 
-    # Calculate prediction intervals (assuming normal distribution of residuals)
-    z_score = 1.96  # 95% confidence interval
-    prediction_interval = z_score * metrics['residuals_std']
-    metrics['prediction_interval_95'] = prediction_interval
+    # Split data
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
 
-    try:
-        # Generate visualizations
-        fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+    # Create preprocessing steps
+    numeric_features = X.columns.tolist()
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('num', StandardScaler(), numeric_features)
+        ]
+    )
 
-        # Actual vs Predicted Plot
-        axes[0, 0].scatter(y_true, y_pred, alpha=0.5)
-        axes[0, 0].plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], 'r--', lw=2)
-        axes[0, 0].set_xlabel('Actual Values')
-        axes[0, 0].set_ylabel('Predicted Values')
-        axes[0, 0].set_title('Actual vs Predicted Values')
+    # Initialize XGBoost model
+    xgb = XGBRegressor(
+        n_estimators=200,
+        max_depth=4,
+        learning_rate=0.05,
+        subsample=0.8,
+        colsample_bytree=1.0,
+        min_child_weight=5,
+        random_state=42,
+        n_jobs=-1
+    )
 
-        # Residuals Plot
-        axes[0, 1].scatter(y_pred, residuals, alpha=0.5)
-        axes[0, 1].axhline(y=0, color='r', linestyle='--')
-        axes[0, 1].set_xlabel('Predicted Values')
-        axes[0, 1].set_ylabel('Residuals')
-        axes[0, 1].set_title('Residuals vs Predicted Values')
+    # Create and fit pipeline
+    pipeline = Pipeline([
+        ('preprocessor', preprocessor),
+        ('regressor', xgb)
+    ])
 
-        # Residuals Distribution
-        sns.histplot(residuals, kde=True, ax=axes[1, 0])
-        axes[1, 0].set_title('Distribution of Residuals')
+    pipeline.fit(X_train, y_train)
 
-        # Feature Importance Plot (if applicable)
-        if model is not None and hasattr(model, 'feature_importances_'):
-            importances = model.feature_importances_
-            if feature_names is None:
-                feature_names = [f'Feature {i}' for i in range(len(importances))]
+    # Prepare return dictionary
+    result = {'pipeline': pipeline}
 
-            importance_df = pd.DataFrame({
-                'Feature': feature_names,
-                'Importance': importances
-            }).sort_values('Importance', ascending=False)  # Changed to descending order
+    # Optionally return data for analysis
+    if return_data:
+        y_pred = pipeline.predict(X_test)
+        result.update({
+            'X': X,
+            'X_train': X_train,
+            'X_test': X_test,
+            'y_train': y_train,
+            'y_test': y_test,
+            'y_pred': y_pred,
+        })
 
-            # Store in dictionary
-            metrics['importances'] = importance_df
-
-            # Using barplot instead of barh
-            sns.barplot(data=importance_df.head(20), x='Importance', y='Feature', ax=axes[1, 1])
-            axes[1, 1].set_title('Top 25 Feature Importances')
-        else:
-            axes[1, 1].text(0.5, 0.5, 'Feature Importance Not Available',
-                           ha='center', va='center')
-
-        plt.tight_layout()
-        metrics['figures'] = fig
-    except Exception as e:  # pylint:disable=broad-exception-caught
-        print(f"Warning: Error generating plots: {str(e)}")
-        metrics['figures'] = None
-
-    # Generate summary report
-    metrics['summary_report'] = f"""
-    Model Performance Summary:
-    -------------------------
-    R² Score: {metrics['r2']:.3f}
-    RMSE: {metrics['rmse']:.3f}
-    MAE: {metrics['mae']:.3f}
-    MAPE: {metrics['mape']:.1f}%
-
-    Residuals Analysis:
-    ------------------
-    Mean of Residuals: {metrics['residuals_mean']:.3f}
-    Standard Deviation of Residuals: {metrics['residuals_std']:.3f}
-    95% Prediction Interval: ±{metrics['prediction_interval_95']:.3f}
-    """
-
-    return metrics
+    return result

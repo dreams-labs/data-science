@@ -25,24 +25,22 @@ data_cleaning:
     min_modeling_investment: 2000
     min_modeling_transaction_days: 2
 
-    # Wallet-level thresholds
+    # Wallet cohort thresholds
     minumum_coins_traded: 4  # Exclude wallets that have traded fewer coins than this during the training period
     maximum_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
     minimum_wallet_inflows: 25000 # The amount of lifetime USD inflows a wallet must have to be included in the training data
     minimum_volume: 50000  # Exclude wallets with fewer than this amount of training period USD volume
-    maximum_wallet_inflows: 25000 # The amount of lifetime USD inflows a wallet must have to be included in the training data
-    maximum_volume: 50000  # Exclude wallets with fewer than this amount of training period USD volume
 
     # Coin-wallet pair thresholds
     profitability_filter: 25000000  # Exclude wallets with profits or losses greater than or equal to this amount (USD)
     inflows_filter: 25000000  # Exclude wallets with inflows greater than or equal to this amount (USD)
 
     # Market data filters
-    max_initial_market_cap: 200_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
+    max_initial_market_cap: 100000_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
     max_gap_days: 50  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
     min_daily_volume: 3000 # Minimum average daily volume the coin must have
 
-    # market cap imputation filters
+    # Market cap imputation filters
     min_mc_imputation_coverage: 0.3  # coins with market cap coverage below this level will have hardcoded market cap values filled
     max_mc_imputation_multiple: 2.0  # don't impute dates where the imputed market cap exceeds the max known market cap * this ratio
     market_cap_default_fill:  500000  # coins below the imputation coverage level will have empty values filled with this
