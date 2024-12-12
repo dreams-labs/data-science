@@ -1,7 +1,6 @@
 # Variables used to define the training data
 training_data:
     training_window_starts: [
-        "2023-10-01",
         "2024-01-01",
         "2024-04-01",
         "2024-08-01",

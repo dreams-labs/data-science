@@ -15,6 +15,9 @@ from dreams_core import core as dc
 import wallet_features.wallet_coin_date_features as wcdf
 from wallet_modeling.wallets_config_manager import WalletsConfig
 
+# pylint: disable=unused-variable  # messy stats functions in visualizations
+
+
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
 
@@ -631,9 +634,9 @@ def analyze_coin_metrics(df):
 
     # Identify potential success indicators
     success_indicators = {
-        metric: stats for metric, stats in comparison_stats.items()
-        if (abs(stats['difference']) > 0.1 * stats['negative_mean'] and
-            stats['p_value'] < 0.05)
+        metric: metric_stats for metric, metric_stats in comparison_stats.items()
+        if (abs(metric_stats['difference']) > 0.1 * metric_stats['negative_mean'] and
+            metric_stats['p_value'] < 0.05)
     }
 
     return {
@@ -654,19 +657,19 @@ def print_analysis_results(results):
 
     print("\n=== Positive vs Negative Returns Analysis ===")
     print("\nMetrics comparison for positive vs negative returns:")
-    for metric, stats in results['comparison_stats'].items():
+    for metric, metric_stats in results['comparison_stats'].items():
         print(f"\n{metric}:")
-        print(f"  Positive returns mean: {stats['positive_mean']:0.4f}")
-        print(f"  Negative returns mean: {stats['negative_mean']:0.4f}")
-        print(f"  Difference: {stats['difference']:0.4f}")
-        print(f"  P-value: {stats['p_value']:0.4f}")
+        print(f"  Positive returns mean: {metric_stats['positive_mean']:0.4f}")
+        print(f"  Negative returns mean: {metric_stats['negative_mean']:0.4f}")
+        print(f"  Difference: {metric_stats['difference']:0.4f}")
+        print(f"  P-value: {metric_stats['p_value']:0.4f}")
 
     print("\n=== Strong Success Indicators ===")
     print("\nMetrics showing significant difference between positive and negative returns:")
-    for metric, stats in results['success_indicators'].items():
+    for metric, metric_stats in results['success_indicators'].items():
         print(f"\n{metric}:")
-        print(f"  Mean difference: {stats['difference']:0.4f}")
-        print(f"  P-value: {stats['p_value']:0.4f}")
+        print(f"  Mean difference: {metric_stats['difference']:0.4f}")
+        print(f"  P-value: {metric_stats['p_value']:0.4f}")
 
 # Create visualizations
 def create_visualizations(df):
@@ -770,11 +773,11 @@ def print_performance_analysis(df):
     results = analyze_top_performing_coins(df)
 
     print(f"\n=== Metric Analysis: Returns >= {75}th percentile vs Others ===")
-    for metric, stats in results.items():
+    for metric, metric_stats in results.items():
         print(f"\n{metric}:")
-        print(f"  Top quartile mean (returns >= p75): {stats['top_quartile_mean']:.4f}")
-        print(f"  Other coins mean (returns < p75): {stats['other_mean']:.4f}")
-        print(f"  Absolute difference: {stats['abs_diff']:.4f}")
-        print(f"  Percent difference: {stats['pct_diff']:.1f}%")
-        print(f"  P-value: {stats['p_value']:.4f}")
-        print(f"  Effect size: {stats['effect_size']:.4f}")
+        print(f"  Top quartile mean (returns >= p75): {metric_stats['top_quartile_mean']:.4f}")
+        print(f"  Other coins mean (returns < p75): {metric_stats['other_mean']:.4f}")
+        print(f"  Absolute difference: {metric_stats['abs_diff']:.4f}")
+        print(f"  Percent difference: {metric_stats['pct_diff']:.1f}%")
+        print(f"  P-value: {metric_stats['p_value']:.4f}")
+        print(f"  Effect size: {metric_stats['effect_size']:.4f}")
