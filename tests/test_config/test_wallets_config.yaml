@@ -25,8 +25,8 @@ data_cleaning:
     min_modeling_transaction_days: 2
 
     # Wallet minimum thresholds
-    min_wallet_inflows: 25000 # The amount of lifetime USD inflows a wallet must have to be included in the training data
-    min_volume: 50000  # Exclude wallets with fewer than this amount of training period USD volume
+    min_wallet_investment: 25000 # The amount of lifetime USD inflows a wallet must have to be included in the training data
+    min_wallet_volume: 50000  # Exclude wallets with fewer than this amount of training period USD volume
     min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
 
     # Wallet maximum thresholds
