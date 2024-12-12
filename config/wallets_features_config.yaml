@@ -1,8 +1,8 @@
 market_timing:
   offsets:
     price_sma_5:
-      offsets: [5,30]
+      offsets: [7,21]
       retain_base_columns: False
     volume_sma_5:
-      offsets: [5,30]
+      offsets: [7,21]
       retain_base_columns: True

@@ -208,9 +208,4 @@ def generate_and_save_model_artifacts(model_results, validation_profits_df, base
         base_path=base_path
     )
 
-    return {
-        'model_id': model_id,
-        'evaluation': evaluation,
-        'wallet_scores': wallet_scores_df,
-        'coin_validation': coin_validation_df
-    }
+    return model_id, evaluation, wallet_scores_df, coin_validation_df
