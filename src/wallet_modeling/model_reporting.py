@@ -183,8 +183,7 @@ def generate_and_save_model_artifacts(model_results, validation_profits_df, base
     # Create evaluation dictionary with the same structure as before
     evaluation = {
         **evaluator.metrics,  # Include all basic metrics
-        'summary_report': evaluator.get_summary_report(),
-        'figures': evaluator.plot_evaluation('all')  # Generate all plots
+        'summary_report': evaluator.get_summary_report()
     }
 
     # 2. Create wallet scores DataFrame

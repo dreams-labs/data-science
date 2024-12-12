@@ -74,10 +74,11 @@ class RegressionEvaluator:
             if self.feature_names is None:
                 self.feature_names = [f'Feature {i}' for i in range(len(importances))]
 
-            self.metrics['importances'] = pd.DataFrame({
-                'Feature': self.feature_names,
-                'Importance': importances
-            }).sort_values('Importance', ascending=False)
+            # Store as a dictionary instead of DataFrame
+            self.metrics['importances'] = {
+                'features': self.feature_names,
+                'values': importances.tolist()  # Convert numpy array to list
+            }
 
     def get_summary_report(self):
         """Generate and return a text summary of the model's performance."""
