@@ -25,13 +25,13 @@ data_cleaning:
     min_modeling_transaction_days: 2
 
     # Wallet minimum thresholds
-    minimum_wallet_inflows: 25000 # The amount of lifetime USD inflows a wallet must have to be included in the training data
-    minimum_volume: 50000  # Exclude wallets with fewer than this amount of training period USD volume
-    minumum_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
+    min_wallet_inflows: 25000 # The amount of lifetime USD inflows a wallet must have to be included in the training data
+    min_volume: 50000  # Exclude wallets with fewer than this amount of training period USD volume
+    min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
 
     # Wallet maximum thresholds
-    profitability_filter: 25000000  # Exclude wallets with profits or losses greater than or equal to this amount (USD)
-    inflows_filter: 25000000  # Exclude wallets with inflows greater than or equal to this amount (USD)
+    max_wallet_coin_profits: 25000000  # Exclude wallets with profits or losses greater than or equal to this amount (USD)
+    max_wallet_coin_inflows: 25000000  # Exclude wallets with inflows greater than or equal to this amount (USD)
 
     # market_data_df filters: Define how to handle missing price data
     max_gap_days: 50  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)

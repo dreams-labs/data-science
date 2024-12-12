@@ -99,14 +99,14 @@ def apply_wallet_thresholds(wallet_metrics_df):
         metrics that the filters will be applied to
     """
     # Extract thresholds
-    min_coins = wallets_config['data_cleaning']['minumum_coins_traded']
-    max_coins = wallets_config['data_cleaning']['maximum_coins_traded']
-    min_inflows = wallets_config['data_cleaning']['minimum_wallet_inflows']
-    min_volume = wallets_config['data_cleaning']['minimum_volume']
-    inflows_filter = wallets_config['data_cleaning']['inflows_filter']
-    profit_filter = wallets_config['data_cleaning']['profitability_filter']
+    min_coins = wallets_config['data_cleaning']['min_coins_traded']
+    max_coins = wallets_config['data_cleaning']['max_coins_traded']
+    min_inflows = wallets_config['data_cleaning']['min_wallet_inflows']
+    min_volume = wallets_config['data_cleaning']['min_volume']
+    max_wallet_coin_inflows = wallets_config['data_cleaning']['max_wallet_coin_inflows']
+    profit_filter = wallets_config['data_cleaning']['max_wallet_coin_profits']
 
-    # minumum_coins_traded flagged wallets
+    # min_coins_traded flagged wallets
     low_coins_traded_wallets = wallet_metrics_df[
         wallet_metrics_df['unique_coins_traded'] < min_coins
     ].index.values
@@ -116,22 +116,22 @@ def apply_wallet_thresholds(wallet_metrics_df):
         wallet_metrics_df['unique_coins_traded'] > max_coins
     ].index.values
 
-    # minimum_wallet_inflows flagged wallets
+    # min_wallet_inflows flagged wallets
     low_inflows_wallets = wallet_metrics_df[
         wallet_metrics_df['invested'] < min_inflows
     ].index.values
 
-    # minimum_volume flagged wallets
+    # min_volume flagged wallets
     low_volume_wallets = wallet_metrics_df[
         wallet_metrics_df['total_volume'] < min_volume
     ].index.values
 
-    # inflows_filter flagged wallets
+    # max_wallet_coin_inflows flagged wallets
     excess_inflows_wallets = wallet_metrics_df[
-        wallet_metrics_df['invested'] >= inflows_filter
+        wallet_metrics_df['invested'] >= max_wallet_coin_inflows
     ].index.values
 
-    # profitability_filter flagged wallets
+    # max_wallet_coin_profits flagged wallets
     excess_profits_wallets = wallet_metrics_df[
         wallet_metrics_df['net_gain'] >= profit_filter
     ].index.values
@@ -158,7 +158,7 @@ def apply_wallet_thresholds(wallet_metrics_df):
                 len(low_inflows_wallets), min_inflows)
 
     logger.info(" * %s wallets above inflow threshold %s, %s wallets above profit threshold %s",
-                len(excess_inflows_wallets), inflows_filter,
+                len(excess_inflows_wallets), max_wallet_coin_inflows,
                 len(excess_profits_wallets), profit_filter)
 
     return filtered_wallet_metrics_df

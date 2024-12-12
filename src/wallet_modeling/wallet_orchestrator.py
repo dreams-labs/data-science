@@ -37,7 +37,7 @@ def retrieve_datasets():
             dr.retrieve_profits_data,
             earliest_date,
             latest_date,
-            wallets_config['data_cleaning']['minimum_wallet_inflows']
+            wallets_config['data_cleaning']['min_wallet_coin_inflows']
         )
         market_future = executor.submit(dr.retrieve_market_data)
 
