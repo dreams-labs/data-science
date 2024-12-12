@@ -123,19 +123,28 @@ def apply_wallet_thresholds(wallet_metrics_df):
         wallet_metrics_df['unique_coins_traded']<wallets_config['data_cleaning']['minumum_coins_traded']
         ].index.values
 
+    # maxumum_coins_traded flagged wallets
+    excess_coins_traded_wallets = wallet_metrics_df[
+        wallet_metrics_df['unique_coins_traded']>wallets_config['data_cleaning']['maximum_coins_traded']
+        ].index.values
+
     # combine all exclusion lists and apply them
     wallets_to_exclude = np.unique(
         np.concatenate([excess_inflows_wallets,excess_profits_wallets,low_inflows_wallets,
-                        low_volume_wallets,low_coins_traded_wallets])
+                        low_volume_wallets,low_coins_traded_wallets,excess_coins_traded_wallets])
     )
     filtered_wallet_metrics_df = wallet_metrics_df[
         ~wallet_metrics_df.index.isin(wallets_to_exclude)
     ]
-    logger.info("Retained %s wallets after filtering %s unique wallets."
-                "(%s low volume, %s low inflows, %s too few coins traded, "
-                "%s excess inflows, %s excess profits)",
-                len(filtered_wallet_metrics_df), len(wallets_to_exclude),
-                len(low_volume_wallets), len(low_inflows_wallets), len(low_coins_traded_wallets),
+    logger.info("Retained %s wallets after filtering %s unique wallets:",
+                len(filtered_wallet_metrics_df), len(wallets_to_exclude))
+    logger.info("   * %s too few coins traded, %s too many coins traded",
+                len(low_coins_traded_wallets), len(excess_coins_traded_wallets))
+    logger.info("   * %s too little volume, %s too few inflows",
+                len(low_volume_wallets), len(low_inflows_wallets))
+    logger.info("   * %s too little volume, %s too few inflows",
+                len(low_volume_wallets), len(low_inflows_wallets))
+    logger.info("   * %s excess volume, %s excess inflows",
                 len(excess_inflows_wallets), len(excess_profits_wallets))
 
     return filtered_wallet_metrics_df

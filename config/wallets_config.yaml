@@ -29,6 +29,7 @@ data_cleaning:
     minimum_wallet_inflows: 25000 # The amount of lifetime USD inflows a wallet must have to be included in the training data
     minimum_volume: 50000  # Exclude wallets with fewer than this amount of training period USD volume
     minumum_coins_traded: 4  # Exclude wallets that have traded fewer coins than this during the training period
+    maximum_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
 
     # Wallet maximum thresholds
     profitability_filter: 25000000  # Exclude wallets with profits or losses greater than or equal to this amount (USD)
