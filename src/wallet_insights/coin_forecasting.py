@@ -61,6 +61,8 @@ def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scor
     - Returns results sorted by composite_score in descending order
     """
 
+    # 1. Combine and filter metrics to create base analysis df
+    # --------------------------------------------------------
     # identify balances at start of validation period
     validation_start_date = pd.to_datetime(wallets_config['training_data']['validation_period_start'])
     validation_start_df = validation_profits_df[validation_profits_df['date']==validation_start_date].copy()
@@ -79,8 +81,10 @@ def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scor
     analysis_df['usd_balance'] = analysis_df['usd_balance'].clip(lower=0)
     analysis_df['score'] = analysis_df['score'].fillna(0)
 
-    # Calculate weighted average score differently
 
+    # 2. Generate coin-level metrics from wallet behavior
+    # ---------------------------------------------------
+    # Calculate weighted average score differently
     def safe_weighted_average(scores, weights):
         """Calculate weighted average, handling zero weights safely"""
         if np.sum(weights) == 0:
@@ -113,6 +117,9 @@ def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scor
     coin_wallet_metrics_df = pd.merge(weighted_scores, top_wallet_metrics, on='coin_id', how='left')
     coin_wallet_metrics_df = pd.merge(coin_wallet_metrics_df, total_metrics, on='coin_id', how='left')
 
+    # Set index
+    coin_wallet_metrics_df=coin_wallet_metrics_df.set_index('coin_id')
+
     # Fill NaN values
     fill_columns = ['top_wallet_balance', 'top_wallet_count', 'score_std']
     coin_wallet_metrics_df[fill_columns] = coin_wallet_metrics_df[fill_columns].fillna(0)
@@ -143,6 +150,9 @@ def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scor
     coin_wallet_metrics_df['score_confidence'] = 1 - (
         1 / np.sqrt(coin_wallet_metrics_df['score_count'] + 1))  # Added +1 to avoid division by zero
 
+
+    # 3. Apply filters based on wallets_config
+    # ----------------------------------------
     # Filter for minimum activity
     min_wallets = wallets_config['coin_forecasting']['min_wallets']
     min_balance = wallets_config['coin_forecasting']['min_balance']
@@ -151,12 +161,8 @@ def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scor
         (coin_wallet_metrics_df['total_balance'] >= min_balance)
     ]
 
-    # Set index
-    coin_wallet_metrics_df=coin_wallet_metrics_df.set_index('coin_id')
-
-    # Sort by composite score
-    coin_wallet_metrics_df = coin_wallet_metrics_df.sort_values('composite_score', ascending=False)
-
+    logger.info("Compiled metrics for %s eligible coins based on data from %s wallets.",
+                len(coin_wallet_metrics_df), len(wallet_scores_df))
 
     return coin_wallet_metrics_df
 
