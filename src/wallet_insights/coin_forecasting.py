@@ -5,6 +5,7 @@ Orchestrates groups of functions to generate wallet model pipeline
 import logging
 import pandas as pd
 import numpy as np
+from dreams_core import core as dc
 
 # Local module imports
 import wallet_features.wallet_coin_date_features as wcdf
@@ -153,16 +154,40 @@ def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scor
 
     # 3. Apply filters based on wallets_config
     # ----------------------------------------
+    # Log initial count
+    initial_count = len(coin_wallet_metrics_df)
+    logger.info("Starting coin count: %d", initial_count)
+
     # Filter for minimum activity
     min_wallets = wallets_config['coin_forecasting']['min_wallets']
     min_balance = wallets_config['coin_forecasting']['min_balance']
-    coin_wallet_metrics_df = coin_wallet_metrics_df[
-        (coin_wallet_metrics_df['total_wallets'] >= min_wallets) &
-        (coin_wallet_metrics_df['total_balance'] >= min_balance)
-    ]
 
-    logger.info("Compiled metrics for %s eligible coins based on data from %s wallets.",
-                len(coin_wallet_metrics_df), len(wallet_scores_df))
+    # Apply wallet threshold and log
+    wallets_filtered_df = coin_wallet_metrics_df[coin_wallet_metrics_df['total_wallets'] >= min_wallets]
+    wallets_removed = initial_count - len(wallets_filtered_df)
+    logger.info(
+        "Removed %d coins (%.1f%%) with fewer than %d wallets",
+        wallets_removed,
+        (wallets_removed/initial_count)*100,
+        min_wallets
+    )
+
+    # Apply balance threshold and log
+    coin_wallet_metrics_df = wallets_filtered_df[wallets_filtered_df['total_balance'] >= min_balance]
+    balance_removed = len(wallets_filtered_df) - len(coin_wallet_metrics_df)
+    logger.info(
+        "Removed %d coins (%.1f%%) with balance below %d",
+        balance_removed,
+        (balance_removed/initial_count)*100,
+        min_balance
+    )
+
+    # Log final count
+    logger.info(
+        "Final coin count after all filters: %d (%.1f%% of initial)",
+        len(coin_wallet_metrics_df),
+        (len(coin_wallet_metrics_df)/initial_count)*100
+    )
 
     return coin_wallet_metrics_df
 
@@ -236,12 +261,33 @@ def validate_coin_performance(coin_performance_df, top_n, max_market_cap, min_ma
     - metric_top_n_returns_df (df): dataframe showing return metrics for the top_n coins when sorted by
         each wallet aggregation column, plus an "all_coins" row showing metrics across all coins
     """
+    # Log initial count
+    initial_count = len(coin_performance_df)
+    logger.info("Starting coin count: %d", initial_count)
+
+    # Count coins above and below thresholds before filtering
+    above_max = len(coin_performance_df[coin_performance_df['market_cap_filled'] > max_market_cap])
+    below_min = len(coin_performance_df[coin_performance_df['market_cap_filled'] < min_market_cap])
+
+    logger.info("Found %d coins (%.1f%%) above maximum market cap %s",
+        above_max,(above_max/initial_count)*100,dc.human_format(max_market_cap))
+
+    logger.info("Found %d coins (%.1f%%) below minimum market cap %s",
+        below_min,(below_min/initial_count)*100,dc.human_format(min_market_cap))
+
     # Filter based on market cap thresholds
     coin_performance_df = coin_performance_df[
-        (coin_performance_df['market_cap_filled']<=max_market_cap)
-        & (coin_performance_df['market_cap_filled']>=min_market_cap)
+        (coin_performance_df['market_cap_filled'] <= max_market_cap)
+        & (coin_performance_df['market_cap_filled'] >= min_market_cap)
     ].copy()
 
+    # Log final results
+    filtered_count = len(coin_performance_df)
+    logger.info(
+        "Final coin count after market cap filter: %d (%.1f%% of initial)",
+        filtered_count,
+        (filtered_count/initial_count)*100
+    )
     # Skip these columns as they're not useful ranking metrics
     skip_columns = ['coin_return', 'coin_id', 'market_cap', 'market_cap_filled']
 

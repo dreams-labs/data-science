@@ -13,7 +13,7 @@ import wallet_modeling.wallet_training_data as wtd
 import wallet_modeling.wallet_modeling as wm
 import wallet_features.wallet_features as wf
 import wallet_features.wallet_coin_features as wcf
-# import wallet_features.wallet_coin_date_features as wcdf
+import wallet_features.wallet_coin_date_features as wcdf
 from wallet_modeling.wallets_config_manager import WalletsConfig
 
 # Set up logger at the module level
@@ -52,10 +52,24 @@ def retrieve_datasets():
         latest_date
     )
 
-    # Fill market cap in market_data_df
+    # Intelligently impute market cap data in market_data_df when good data is available
     market_data_df = dr.impute_market_cap(market_data_df,
                                         wallets_config['data_cleaning']['min_mc_imputation_coverage'],
                                         wallets_config['data_cleaning']['max_mc_imputation_multiple'])
+
+    # Crudely fill all remaining gaps in market cap data
+    market_data_df = wcdf.force_fill_market_cap(market_data_df)
+
+    # Remove market data records for coins that exceed the initial market cap threshold
+    max_initial_market_cap = wallets_config['data_cleaning']['max_initial_market_cap']
+    above_initial_threshold_coins = market_data_df[
+        (market_data_df['date']==earliest_date)
+        & (market_data_df['market_cap_filled']>max_initial_market_cap)
+    ]['coin_id']
+    market_data_df = market_data_df[~market_data_df['coin_id'].isin(above_initial_threshold_coins)]
+    logger.info("Removed data for %s coins with a market cap above $%s at the start of the training period."
+                ,len(above_initial_threshold_coins),dc.human_format(max_initial_market_cap))
+
 
     # Remove the filtered coins from profits_df
     profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
