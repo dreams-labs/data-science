@@ -38,6 +38,8 @@ def generate_profitability_curves(predictions, returns, winsorization_cutoff=0):
 
     # Sort by model score to obtain modeled performance
     df_sorted = df.sort_values('predictions', ascending=False)
+    # After sorting by predictions
+    df_sorted = df.sort_values('predictions', ascending=False)
     cumulative_model_returns = np.cumsum(df_sorted['returns'])
     cumulative_model_avg_returns = df_sorted['returns'].expanding().mean()
 
