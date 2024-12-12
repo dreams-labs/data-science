@@ -148,6 +148,9 @@ def split_profits_df(profits_df,market_data_df,wallet_cohort):
     windows_profits_df = pri.impute_profits_for_multiple_dates(cohort_profits_df, market_data_df,
                                                                imputation_dates, n_threads=24)
 
+    # drop imputed total_return column
+    windows_profits_df = windows_profits_df.drop('total_return', axis=1)
+
     # Split profits_df into training windows and the modeling period
     training_profits_df, training_windows_profits_dfs, modeling_profits_df, validation_profits_df =  wtd.split_window_dfs(windows_profits_df)
 
