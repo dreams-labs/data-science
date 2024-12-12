@@ -99,9 +99,9 @@ data_cleaning:
   # Variables used to clean and filter raw data before training data is built
 
   # Wallet filters
-  profitability_filter: 15000000  # Exclude wallets with profits or losses greater than or equal to this amount (USD)
-  inflows_filter: 10000000  # Exclude wallets with inflows greater than or equal to this amount (USD)
-  minimum_wallet_inflows: 10 # The amount of lifetime USD inflows a wallet must have to be included in the training data
+  max_wallet_coin_profits: 15000000  # Exclude wallets with profits or losses greater than or equal to this amount (USD)
+  max_wallet_coin_inflows: 10000000  # Exclude wallets with inflows greater than or equal to this amount (USD)
+  min_wallet_coin_inflows: 10 # The amount of lifetime USD inflows a wallet-coin pair must have to be included in the training data
   maximum_market_cap_share: 0.3 # if a wallet ever owns more than this % of a coin's market cap, remove it
 
   # market_data_df filters: Define how to handle missing price data

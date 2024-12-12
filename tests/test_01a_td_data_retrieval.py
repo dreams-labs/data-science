@@ -387,8 +387,8 @@ def sample_data_cleaning_config():
     Fixture to create a sample data cleaning configuration.
     """
     return {
-        'profitability_filter': 7500,
-        'inflows_filter': 15000
+        'max_wallet_coin_profits': 7500,
+        'max_wallet_coin_inflows': 15000
     }
 
 @pytest.mark.unit
@@ -440,8 +440,8 @@ def profits_at_threshold_config():
     Fixture to create a data cleaning configuration with a specific profitability threshold.
     """
     return {
-        'profitability_filter': 7500,
-        'inflows_filter': 15000
+        'max_wallet_coin_profits': 7500,
+        'max_wallet_coin_inflows': 15000
     }
 
 @pytest.mark.unit
@@ -501,8 +501,8 @@ def negative_profits_config():
     Fixture to create a data cleaning configuration with a specific profitability threshold.
     """
     return {
-        'profitability_filter': 7500,
-        'inflows_filter': 15000
+        'max_wallet_coin_profits': 7500,
+        'max_wallet_coin_inflows': 15000
     }
 
 @pytest.mark.unit
@@ -584,7 +584,7 @@ def profits_df_base():
     # retrieve profits data
     profits_df = dr.retrieve_profits_data(TRAINING_PERIOD_START,
                                           MODELING_PERIOD_END,
-                                          config['data_cleaning']['minimum_wallet_inflows'])
+                                          config['data_cleaning']['min_wallet_coin_inflows'])
 
     # filter data to only 5% of coin_ids
     np.random.seed(42)
@@ -869,13 +869,13 @@ def test_clean_profits_exclusions(cleaned_profits_df, profits_df_base):
                                        .reset_index())
 
     # Apply threshold check from the config
-    profitability_filter = config['data_cleaning']['profitability_filter']
-    inflows_filter = config['data_cleaning']['inflows_filter']
+    max_wallet_coin_profits = config['data_cleaning']['max_wallet_coin_profits']
+    max_wallet_coin_inflows = config['data_cleaning']['max_wallet_coin_inflows']
 
     breaches_df = wallet_agg_df[
-        (wallet_agg_df['profits_cumulative'] >= profitability_filter) |
-        (wallet_agg_df['profits_cumulative'] <= -profitability_filter) |
-        (wallet_agg_df['usd_inflows_cumulative'] >= inflows_filter)
+        (wallet_agg_df['profits_cumulative'] >= max_wallet_coin_profits) |
+        (wallet_agg_df['profits_cumulative'] <= -max_wallet_coin_profits) |
+        (wallet_agg_df['usd_inflows_cumulative'] >= max_wallet_coin_inflows)
     ]
     # Assert that all excluded wallets breached a threshold
     assert len(exclusions_df) == len(breaches_df), "Some excluded wallets do not breach a threshold."
@@ -922,13 +922,13 @@ def test_clean_profits_aggregate_sums(cleaned_profits_df):
 
 
     # Apply the thresholds from the config
-    profitability_filter = config['data_cleaning']['profitability_filter']
-    inflows_filter = config['data_cleaning']['inflows_filter']
+    max_wallet_coin_profits = config['data_cleaning']['max_wallet_coin_profits']
+    max_wallet_coin_inflows = config['data_cleaning']['max_wallet_coin_inflows']
     # Ensure no remaining wallets exceed the thresholds
     over_threshold_wallets = remaining_wallets_agg_df[
-        (remaining_wallets_agg_df['profits_cumulative'] >= profitability_filter) |
-        (remaining_wallets_agg_df['profits_cumulative'] <= -profitability_filter) |
-        (remaining_wallets_agg_df['usd_inflows_cumulative'] >= inflows_filter)
+        (remaining_wallets_agg_df['profits_cumulative'] >= max_wallet_coin_profits) |
+        (remaining_wallets_agg_df['profits_cumulative'] <= -max_wallet_coin_profits) |
+        (remaining_wallets_agg_df['usd_inflows_cumulative'] >= max_wallet_coin_inflows)
     ]
 
     # Assert that no wallets in the cleaned DataFrame breach the thresholds

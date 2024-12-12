@@ -11,9 +11,10 @@ import numpy as np
 import pandas_gbq
 import yaml
 import utils as u
-from wallet_insights import wallet_model_evaluation as wme
+import wallet_insights.wallet_model_evaluation as wime
 import wallet_insights.coin_forecasting as wicf
 from wallet_modeling.wallets_config_manager import WalletsConfig
+
 
 logger = logging.getLogger(__name__)
 
@@ -147,9 +148,12 @@ def load_model_artifacts(model_id, base_path):
         'coin_metrics': coin_metrics
     }
 
+
+
 def generate_and_save_model_artifacts(model_results, validation_profits_df, base_path):
     """
     Wrapper function to generate evaluations, metrics, and save all model artifacts.
+    Uses RegressionEvaluator for model evaluation.
 
     Parameters:
     - model_results (dict): Output from train_xgb_model containing:
@@ -167,15 +171,20 @@ def generate_and_save_model_artifacts(model_results, validation_profits_df, base
         - wallet_scores: DataFrame of wallet-level predictions
         - coin_validation: DataFrame of coin-level metrics
     """
-    # 1. Generate model evaluation metrics
+    # 1. Generate model evaluation metrics using RegressionEvaluator
     model = model_results['pipeline'].named_steps['regressor']
-    evaluation = wme.evaluate_regression_model(
-        model_results['y_test'],
-        model_results['y_pred'],
+    evaluator = wime.RegressionEvaluator(
+        y_true=model_results['y_test'],
+        y_pred=model_results['y_pred'],
         model=model,
-        feature_names=model_results['X'].columns.tolist(),
-        show_plot=False
+        feature_names=model_results['X'].columns.tolist()
     )
+
+    # Create evaluation dictionary with the same structure as before
+    evaluation = {
+        **evaluator.metrics,  # Include all basic metrics
+        'summary_report': evaluator.get_summary_report()
+    }
 
     # 2. Create wallet scores DataFrame
     wallet_scores_df = pd.DataFrame({
@@ -191,7 +200,9 @@ def generate_and_save_model_artifacts(model_results, validation_profits_df, base
     # 4. Load configurations
     wallets_config = WalletsConfig()
     wallets_metrics_config = u.load_config('../config/wallets_metrics_config.yaml')
-    wallets_features_config = yaml.safe_load(Path('../config/wallets_features_config.yaml').read_text(encoding='utf-8'))
+    wallets_features_config = yaml.safe_load(
+        Path('../config/wallets_features_config.yaml').read_text(encoding='utf-8')
+    )
 
     configs = {
         'wallets_config': wallets_config.config,

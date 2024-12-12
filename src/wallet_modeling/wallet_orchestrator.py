@@ -37,7 +37,7 @@ def retrieve_datasets():
             dr.retrieve_profits_data,
             earliest_date,
             latest_date,
-            wallets_config['data_cleaning']['minimum_wallet_inflows']
+            wallets_config['data_cleaning']['min_wallet_coin_inflows']
         )
         market_future = executor.submit(dr.retrieve_market_data)
 
@@ -148,6 +148,9 @@ def split_profits_df(profits_df,market_data_df,wallet_cohort):
     windows_profits_df = pri.impute_profits_for_multiple_dates(cohort_profits_df, market_data_df,
                                                                imputation_dates, n_threads=24)
 
+    # drop imputed total_return column
+    windows_profits_df = windows_profits_df.drop('total_return', axis=1)
+
     # Split profits_df into training windows and the modeling period
     training_profits_df, training_windows_profits_dfs, modeling_profits_df, validation_profits_df =  wtd.split_window_dfs(windows_profits_df)
 
@@ -192,18 +195,24 @@ def filter_modeling_period_wallets(modeling_period_profits_df):
     modeling_period_profits_df = wcf.add_cash_flow_transfers_logic(modeling_period_profits_df)
     modeling_wallets_df = wf.calculate_wallet_trading_features(modeling_period_profits_df)
 
+    # Extract thresholds
+    min_modeling_investment = wallets_config['data_cleaning']['min_modeling_investment']
+    min_modeling_transaction_days = wallets_config['data_cleaning']['min_modeling_transaction_days']
+
     # Remove wallets with below the minimum investment threshold
     base_wallets = len(modeling_wallets_df)
     modeling_wallets_df = modeling_wallets_df[
-        modeling_wallets_df['invested']>=wallets_config['data_cleaning']['min_modeling_investment']]
-    logger.info("Removed %s/%s wallets with modeling period investments below the threshold.",
-                base_wallets - len(modeling_wallets_df), base_wallets)
+        modeling_wallets_df['invested'] >= min_modeling_investment]
+    logger.info("Removed %s/%s wallets with modeling period investments below $%s.",
+                base_wallets - len(modeling_wallets_df), base_wallets,
+                min_modeling_investment)
 
     # Remove wallets with transaction counts below the threshold
     base_wallets = len(modeling_wallets_df)
     modeling_wallets_df = modeling_wallets_df[
-        modeling_wallets_df['transaction_days']>=wallets_config['data_cleaning']['min_modeling_transaction_days']]
-    logger.info("Removed %s/%s wallets with modeling period transaction days below the threshold.",
-                base_wallets - len(modeling_wallets_df), base_wallets)
+        modeling_wallets_df['transaction_days'] >= min_modeling_transaction_days]
+    logger.info("Removed %s/%s wallets with modeling period transaction days below %s.",
+                base_wallets - len(modeling_wallets_df), base_wallets,
+                min_modeling_transaction_days)
 
     return modeling_wallets_df

@@ -225,7 +225,7 @@ def set_nested_value(config, key_path, value):
 
     Args:
     - config (dict): The configuration dictionary to update.
-    - key_path (str): The flattened key path (e.g., 'config.data_cleaning.inflows_filter').
+    - key_path (str): The flattened key path (e.g., 'config.data_cleaning.max_wallet_coin_inflows').
     - value: The value to set at the given key path.
     """
     keys = key_path.split('.')
@@ -242,7 +242,7 @@ def validate_key_in_config(config, key_path):
     Args:
     - config (dict): The configuration dictionary to validate.
     - key_path (str): The flattened key path to check.
-        (e.g. 'config.data_cleaning.inflows_filter')
+        (e.g. 'config.data_cleaning.max_wallet_coin_inflows')
 
     Raises:
     - KeyError: If the key path does not exist in the config.
@@ -291,7 +291,7 @@ def rebuild_profits_df_if_necessary(config, prices_df, profits_df=None):
     # retrieve profits data
     profits_df = dr.retrieve_profits_data(config['training_data']['training_period_start'],
                                           config['training_data']['modeling_period_end'],
-                                          config['data_cleaning']['minimum_wallet_inflows'])
+                                          config['data_cleaning']['min_wallet_coin_inflows'])
     profits_df, _ = cwm.split_dataframe_by_coverage(profits_df,
                                                     config['training_data']['training_period_start'],
                                                     config['training_data']['modeling_period_end'],
