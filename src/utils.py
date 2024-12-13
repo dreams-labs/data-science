@@ -683,7 +683,7 @@ def play_notification(sound_file_path=None):
         sound.play()
 
         # Don't wait for the sound to finish - return immediately
-        return "Sound playing started"
+        return
 
     except Exception as e:  # pylint:disable=broad-exception-caught
         return f"Error playing sound: {e}"

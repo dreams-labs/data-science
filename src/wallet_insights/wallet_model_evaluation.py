@@ -124,7 +124,7 @@ class RegressionEvaluator:
         print("\n".join(summary))
 
 
-    def plot_evaluation(self, plot_type='all'):
+    def plot_evaluation(self, plot_type='all', display=True):
         """
         Generate and display specific evaluation plots.
 
@@ -133,10 +133,11 @@ class RegressionEvaluator:
         plot_type : str
             Type of plot to display: 'actual_vs_predicted', 'residuals',
             'residuals_dist', 'feature_importance', or 'all'
+        display : bool, default=True
+            If True, displays the plot using plt.show(). If False, returns the figure.
         """
-
         # Dark mode charts
-        plt.rcParams['figure.facecolor'] = '#181818'  # Custom background color (dark gray in this case)
+        plt.rcParams['figure.facecolor'] = '#181818'
         plt.rcParams['axes.facecolor'] = '#181818'
         plt.rcParams['text.color'] = '#afc6ba'
         plt.rcParams['axes.labelcolor'] = '#afc6ba'
@@ -145,18 +146,14 @@ class RegressionEvaluator:
         plt.rcParams['axes.titlecolor'] = '#afc6ba'
 
         # Create custom colormap that starts from background color
-        self.custom_cmap = mcolors.LinearSegmentedColormap.from_list(  # pylint:disable=attribute-defined-outside-init
-            'custom_blues', ['#181818', '#1f77b4']
+        self.custom_cmap = mcolors.LinearSegmentedColormap.from_list(
+            'custom_blues', ['#181818', '#145a8d', '#69c4ff']
         )
 
         if plot_type == 'all':
-            # Create figure with width-optimized layout
             fig = plt.figure(figsize=(15, 12))
-
-            # Define grid with wider top plots
             gs = plt.GridSpec(2, 2, height_ratios=[1, 1], width_ratios=[1, 1])
 
-            # Create axes with appropriate grid positions
             ax1 = fig.add_subplot(gs[0, 0])
             ax2 = fig.add_subplot(gs[0, 1])
             ax3 = fig.add_subplot(gs[1, 0])
@@ -166,21 +163,22 @@ class RegressionEvaluator:
             self._plot_residuals(ax2)
             self._plot_residuals_distribution(ax3)
             self._plot_feature_importance(ax4)
+        else:
+            fig, ax = plt.subplots(figsize=(8, 6))
+            if plot_type == 'actual_vs_predicted':
+                self._plot_actual_vs_predicted(ax)
+            elif plot_type == 'residuals':
+                self._plot_residuals(ax)
+            elif plot_type == 'residuals_dist':
+                self._plot_residuals_distribution(ax)
+            elif plot_type == 'feature_importance':
+                self._plot_feature_importance(ax)
 
-            plt.tight_layout()
-            return fig
-
-        # Single plot handling remains the same
-        fig, ax = plt.subplots(figsize=(8, 6))
-        if plot_type == 'actual_vs_predicted':
-            self._plot_actual_vs_predicted(ax)
-        elif plot_type == 'residuals':
-            self._plot_residuals(ax)
-        elif plot_type == 'residuals_dist':
-            self._plot_residuals_distribution(ax)
-        elif plot_type == 'feature_importance':
-            self._plot_feature_importance(ax)
         plt.tight_layout()
+
+        if display:
+            plt.show()
+            return None
         return fig
 
     def _plot_actual_vs_predicted(self, ax):
