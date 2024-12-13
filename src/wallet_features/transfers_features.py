@@ -17,7 +17,7 @@ wallets_config = WalletsConfig()
 
 
 
-def retrieve_transfers_data():
+def retrieve_transfers_sequencing():
     """
     Returns the buyer number for each wallet-coin pairing, where the first buyer
     receives rank 1 and the count increases for each subsequence wallet.
@@ -64,12 +64,50 @@ def retrieve_transfers_data():
         join temp.wallet_modeling_cohort wc on wc.wallet_id = xw.wallet_id
         """
 
-    transfers_data_df = dgc().run_sql(transfers_data_sql)
+    transfers_sequencing_df = dgc().run_sql(transfers_data_sql)
     logger.info("Retrieved transfers data for %s wallet-coin pairs associated with %s wallets "
                 "in temp.wallet_modeling_cohort.",
-                len(transfers_data_df), len(transfers_data_df['wallet_id'].unique()))
+                len(transfers_sequencing_df), len(transfers_sequencing_df['wallet_id'].unique()))
 
-    return transfers_data_df
+    return transfers_sequencing_df
+
+
+
+def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df):
+    """
+    Retrieves facts about the wallet's transfer activity based on blockchain data.
+
+    Params:
+        profits_df (df): the profits_df for the period that the features will reflect
+        transfers_sequencing_df (df): each wallet's lifetime transfers data
+
+    Returns:
+        transfers_sequencing_features_df (df): dataframe indexed on wallet_id with transfers feature columns
+    """
+    # Inner join lifetime transfers with the profits_df window to filter on date
+    window_transfers_data_df = pd.merge(
+        profits_df,
+        transfers_sequencing_df,
+        left_on=['coin_id', 'date', 'wallet_address'],
+        right_on=['coin_id', 'first_transaction', 'wallet_id'],
+        how='inner'
+    )
+
+    # Append buyer numbers to the merged_df
+    transfers_sequencing_features_df = window_transfers_data_df.groupby('wallet_id').agg({
+        'buyer_number': ['count', 'mean', 'median', 'min']
+    })
+    transfers_sequencing_features_df.columns = [
+        'new_coin_buy_counts',
+        'avg_buyer_number',
+        'median_buyer_number',
+        'min_buyer_number'
+    ]
+
+    # Rename to the wallet_id index to "wallet_address" to be consistent with the other functions
+    transfers_sequencing_features_df.index.name = 'wallet_address'
+
+    return transfers_sequencing_features_df
 
 
 
@@ -163,10 +201,13 @@ def calculate_average_holding_period(transfers_df):
 
     # Calculate average holding period
     # When balance is 0, set average holding period to 0 to avoid division by zero
-    result_df['average_holding_period'] = (result_df['hdays'] / result_df['balance']).where(result_df['balance'] != 0, 0)
+    result_df['average_holding_period'] = ((result_df['hdays'] / result_df['balance'])
+                                           .where(result_df['balance'] != 0, 0))
 
     # Clean up intermediate columns if desired
     columns_to_keep = ['date', 'net_transfers', 'balance', 'average_holding_period']
     result_df = result_df[columns_to_keep]
 
     return result_df
+
+

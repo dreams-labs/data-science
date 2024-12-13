@@ -13,6 +13,7 @@ import wallet_modeling.wallet_modeling as wm
 import wallet_features.wallet_coin_features as wcf
 import wallet_features.wallet_coin_date_features as wcdf
 import wallet_features.trading_features as wtf
+import wallet_features.transfers_features as wts
 import utils as u
 
 # Set up logger at the module level
@@ -24,14 +25,14 @@ wallets_metrics_config = u.load_config('../config/wallets_metrics_config.yaml')
 wallets_features_config = yaml.safe_load(Path('../config/wallets_features_config.yaml').read_text(encoding='utf-8'))
 
 
-def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_data_df, wallet_cohort):
+def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_sequencing_df, wallet_cohort):
     """
     Calculates all features for the wallets in a given profits_df
 
     Params:
     - profits_df (df): for the window over which the metrics should be computed
     - market_indicators_data_df (df): the full market data df with indicators added
-    - transfers_data_df (df): each wallet's lifetime transfers data
+    - transfers_sequencing_df (df): each wallet's lifetime transfers data
     - wallet_cohort (array-like): Array of all wallet addresses that should be present
 
     Returns:
@@ -58,7 +59,7 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_d
         .fillna({col: 0 for col in market_features.columns})
 
     # Transfers features (fill -1)
-    transfers_features = calculate_transfers_features(profits_df, transfers_data_df)
+    transfers_features = wts.calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
     wallet_features_df = wallet_features_df.join(transfers_features, how='left')\
         .fillna({col: -1 for col in transfers_features.columns})
 
@@ -130,41 +131,3 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
                 time.time() - start_time)
 
     return wallet_timing_features_df
-
-
-
-def calculate_transfers_features(profits_df, transfers_data_df):
-    """
-    Retrieves facts about the wallet's transfer activity based on blockchain data.
-
-    Params:
-        profits_df (df): the profits_df for the period that the features will reflect
-        transfers_data_df (df): each wallet's lifetime transfers data
-
-    Returns:
-        transfers_features_df (df): dataframe indexed on wallet_id with transfers feature columns
-    """
-    # Inner join lifetime transfers with the profits_df window to filter on date
-    window_transfers_data_df = pd.merge(
-        profits_df,
-        transfers_data_df,
-        left_on=['coin_id', 'date', 'wallet_address'],
-        right_on=['coin_id', 'first_transaction', 'wallet_id'],
-        how='inner'
-    )
-
-    # Append buyer numbers to the merged_df
-    transfers_features_df = window_transfers_data_df.groupby('wallet_id').agg({
-        'buyer_number': ['count', 'mean', 'median', 'min']
-    })
-    transfers_features_df.columns = [
-        'new_coin_buy_counts',
-        'avg_buyer_number',
-        'median_buyer_number',
-        'min_buyer_number'
-    ]
-
-    # Rename to the wallet_id index to "wallet_address" to be consistent with the other functions
-    transfers_features_df.index.name = 'wallet_address'
-
-    return transfers_features_df
