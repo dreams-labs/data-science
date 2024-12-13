@@ -664,27 +664,26 @@ def winsorize(data: pd.Series, cutoff: float = 0.01) -> pd.Series:
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 def play_notification(sound_file_path=None):
     """
-    Play a notification sound from a local audio file using pygame.
+    Play a notification sound from a local audio file using pygame asynchronously.
     Falls back to ALERT_SOUND_FILEPATH environment variable if no path provided.
     Returns early if no valid sound file path is found.
 
     Args:
-        sound_file_path (str, optional): Path to the sound file (supports .mp3, .wav, etc.)
+        sound_file_path (str, optional): Path to the sound file (supports .wav format)
     """
     sound_file_path = sound_file_path or os.getenv('ALERT_SOUND_FILEPATH')
     if not sound_file_path:
         return "No sound file found."
 
     try:
-        pygame.mixer.init()
-        pygame.mixer.music.load(sound_file_path)
-        pygame.mixer.music.play()
+        if not pygame.mixer.get_init():  # Initialize mixer if not already done
+            pygame.mixer.init()
 
-        # Wait for the sound to finish playing
-        while pygame.mixer.music.get_busy():
-            pygame.time.Clock().tick(10)
+        sound = pygame.mixer.Sound(sound_file_path)
+        sound.play()
+
+        # Don't wait for the sound to finish - return immediately
+        return "Sound playing started"
 
     except Exception as e:  # pylint:disable=broad-exception-caught
         return f"Error playing sound: {e}"
-    finally:
-        pygame.mixer.quit()
