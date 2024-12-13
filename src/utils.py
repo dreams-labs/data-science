@@ -660,7 +660,8 @@ def winsorize(data: pd.Series, cutoff: float = 0.01) -> pd.Series:
     # Clip the data
     return np.clip(winsorized, lower_bound, upper_bound)
 
-
+# silence donation message
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 def play_notification(sound_file_path=None):
     """
     Play a notification sound from a local audio file using pygame.
@@ -687,4 +688,3 @@ def play_notification(sound_file_path=None):
         return f"Error playing sound: {e}"
     finally:
         pygame.mixer.quit()
-

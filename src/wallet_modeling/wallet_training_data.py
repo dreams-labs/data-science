@@ -53,42 +53,6 @@ def generate_imputation_dates():
     return imputation_dates
 
 
-def add_cash_flow_transfers_logic(profits_df):
-    """
-    Adds a cash_flow_transfers column to profits_df that can be used to compute
-    the wallet's gain and investment amount by converting their starting and ending
-    balances to cash flow equivilants.
-
-    Params:
-    - profits_df (df): profits_df that needs wallet investment peformance computed
-        based on the earliest and latest dates in the df.
-
-    Returns:
-    - adj_profits_df (df): input df with the cash_flow_transfers column added
-    """
-
-    def adjust_end_transfers(df, target_date):
-        df.loc[df['date'] == target_date, 'cash_flow_transfers'] -= df.loc[df['date'] == target_date, 'usd_balance']
-        return df
-
-    def adjust_start_transfers(df, target_date):
-        df.loc[df['date'] == target_date, 'cash_flow_transfers'] = df.loc[df['date'] == target_date, 'usd_balance']
-        return df
-
-    # Copy df and add cash flow column
-    adj_profits_df = profits_df.copy()
-    adj_profits_df['cash_flow_transfers'] = adj_profits_df['usd_net_transfers']
-
-    # Modify the records on the start and end dates to reflect the balances
-    start_date = adj_profits_df['date'].min()
-    end_date = adj_profits_df['date'].max()
-
-    adj_profits_df = adjust_start_transfers(adj_profits_df,start_date)
-    adj_profits_df = adjust_end_transfers(adj_profits_df,end_date)
-
-    return adj_profits_df
-
-
 
 def apply_wallet_thresholds(wallet_metrics_df):
     """
@@ -171,6 +135,7 @@ def apply_wallet_thresholds(wallet_metrics_df):
     return filtered_wallet_metrics_df
 
 
+
 def split_window_dfs(windows_profits_df):
     """
     Splits the full profits_df into separate dfs for each training window and the modeling period.
@@ -198,11 +163,11 @@ def split_window_dfs(windows_profits_df):
 
     # Extract training, modeling, and validation period DataFrames
     training_profits_df = windows_profits_df[
-            (windows_profits_df['date'] >= training_period_start) & (windows_profits_df['date'] <= training_period_end)]
+        (windows_profits_df['date'] >= training_period_start) & (windows_profits_df['date'] <= training_period_end)]
     modeling_profits_df = windows_profits_df[
-            (windows_profits_df['date'] >= modeling_period_start) & (windows_profits_df['date'] <= modeling_period_end)]
+        (windows_profits_df['date'] >= modeling_period_start) & (windows_profits_df['date'] <= modeling_period_end)]
     validation_profits_df = windows_profits_df[
-            (windows_profits_df['date'] >= validation_period_start) & (windows_profits_df['date'] <= validation_period_end)]
+        (windows_profits_df['date'] >= validation_period_start) & (windows_profits_df['date'] <= validation_period_end)]
 
 
     # 2. Training Windows Datasets

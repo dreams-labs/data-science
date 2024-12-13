@@ -2,7 +2,6 @@
 Calculates metrics aggregated at the wallet level
 """
 import logging
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -25,6 +24,21 @@ wallets_config = WalletsConfig()
 
 
 class RegressionEvaluator:
+    """
+    A utility class for evaluating and visualizing regression model performance.
+
+    Methods:
+        get_summary_report(): Returns a formatted text summary of model performance
+        plot_evaluation(plot_type='all'): Creates visualization plots of model performance
+
+    Internal Methods:
+        __init__(y_true, y_pred, model=None, feature_names=None): Initialize with actual and predicted values
+        _calculate_metrics(): Computes regression performance metrics like RMSE, MAE, R2
+        _plot_actual_vs_predicted(ax): Plots actual vs predicted values
+        _plot_residuals(ax): Plots residuals vs predicted values
+        _plot_residuals_distribution(ax): Plots histogram of residuals
+        _plot_feature_importance(ax): Plots feature importance if available from model
+    """
     def __init__(self, y_true, y_pred, model=None, feature_names=None):
         """
         Initialize the evaluator with actual and predicted values.
