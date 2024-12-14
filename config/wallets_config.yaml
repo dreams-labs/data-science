@@ -3,13 +3,13 @@ training_data:
     training_window_starts: [
         # "2023-09-01",
         # "2024-04-01",
-        "2024-09-01",
-        "2024-10-01",
+        # "2024-09-01",
+        "2024-10-01"
     ]
     # modeling_period_start: "2024-02-01"
     # modeling_period_end: "2024-03-31"
     modeling_period_start: "2024-11-01"
-    modeling_period_end: "2024-11-30"
+    modeling_period_end: "2024-11-15"
     validation_period_end: "2024-12-07"
 
 

@@ -16,9 +16,9 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 
 
-# ____________________________________________________________________________
+# -------------------------------------------------
 # Transfers Sequencing Features
-# ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
+# -------------------------------------------------
 # these identify which buyer number a wallet was to a given coin
 
 def retrieve_transfers_sequencing():
@@ -114,9 +114,9 @@ def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
     return transfers_sequencing_features_df
 
 
-# ____________________________________________________________________________
+# -------------------------------------------------
 # Holding Behavior Features
-# ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
+# -------------------------------------------------
 # these identify which how long a wallet held their tokens
 
 def retrieve_transfers():
@@ -157,7 +157,7 @@ def retrieve_transfers():
 # # needs to be moved to profits_df with a USD value floor
 # def calculate_days_since_last_buy(transfers_df):
 #     """
-#     Calculate days since last buy for each wallet-coin combination at each date.
+#     Calculate days since last buy for a single wallet-coin pair as of each date.
 
 #     Parameters:
 #     transfers_df: pandas DataFrame with columns [date, wallet_address, coin_id, net_transfers]

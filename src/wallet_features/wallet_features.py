@@ -9,7 +9,7 @@ import yaml
 # Local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
 import wallet_modeling.wallet_modeling as wm
-import wallet_features.wallet_coin_date_features as wcdf
+import wallet_features.market_cap_features as wmc
 import wallet_features.trading_features as wtf
 import wallet_features.transfers_features as wts
 import wallet_features.market_timing_features as wmt
@@ -53,7 +53,7 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
         .fillna({col: 0 for col in timing_features.columns})
 
     # Market cap features (fill zeros)
-    market_features = wcdf.calculate_market_cap_features(profits_df, market_indicators_data_df)
+    market_features = wmc.calculate_market_cap_features(profits_df, market_indicators_data_df)
     wallet_features_df = wallet_features_df.join(market_features, how='left')\
         .fillna({col: 0 for col in market_features.columns})
 
