@@ -1,7 +1,6 @@
 """
 Calculates metrics aggregated at the wallet level
 """
-import time
 import logging
 from pathlib import Path
 import pandas as pd
