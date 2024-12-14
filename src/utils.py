@@ -691,7 +691,7 @@ def play_notification(sound_file_path=None):
         return f"Error playing sound: {e}"
 
 
-def consolidate_files(
+def consolidate_code(
     parent_directory="..//src",
     config_directory="..//config",
     notebook_directory="..//notebooks",
@@ -785,31 +785,39 @@ def consolidate_files(
                     outfile.write(f"# {'-'*80}\n\n")
 
         # Optionally consolidate cells from a Jupyter Notebook
-        if notebook_directory and ipynb_notebook:
-            notebook_path = os.path.join(notebook_directory, ipynb_notebook)
+        if notebook_directory:
+            if not ipynb_notebook:
+                # Get newest notebook in directory if none specified
+                notebooks = [f for f in os.listdir(notebook_directory) if f.endswith('.ipynb')]
+                if notebooks:
+                    ipynb_notebook = sorted(notebooks, reverse=True)[0]
+                    logger.info(f"Using most recent notebook: {ipynb_notebook}")
 
-            # Check if the notebook file exists
-            if not os.path.isfile(notebook_path):
-                logger.warning(f"Notebook '{notebook_path}' does not exist. Skipping.")
-            else:
-                # Write notebook section header
-                outfile.write(f"# {'-'*80}\n")
-                outfile.write(f"# Jupyter Notebook: {ipynb_notebook}\n")
-                outfile.write(f"# {'-'*80}\n\n")
+            if ipynb_notebook:
+                notebook_path = os.path.join(notebook_directory, ipynb_notebook)
 
-                # Load the notebook and extract code cells
-                with open(notebook_path, 'r', encoding='utf-8') as notebook_file:
-                    notebook_data = json.load(notebook_file)
-                    for cell in notebook_data.get('cells', []):
-                        if cell.get('cell_type') == 'code':
-                            code_lines = cell.get('source', [])
-                            outfile.write("# Code from notebook cell:\n")
-                            outfile.writelines(code_lines)
-                            outfile.write("\n\n")
+                # Check if the notebook file exists
+                if not os.path.isfile(notebook_path):
+                    logger.warning(f"Notebook '{notebook_path}' does not exist. Skipping.")
+                else:
+                    # Write notebook section header
+                    outfile.write(f"# {'-'*80}\n")
+                    outfile.write(f"# Jupyter Notebook: {ipynb_notebook}\n")
+                    outfile.write(f"# {'-'*80}\n\n")
 
-                # Write notebook section footer
-                outfile.write(f"# {'-'*80}\n")
-                outfile.write(f"# End of Jupyter Notebook: {ipynb_notebook}\n")
-                outfile.write(f"# {'-'*80}\n\n")
+                    # Load the notebook and extract code cells
+                    with open(notebook_path, 'r', encoding='utf-8') as notebook_file:
+                        notebook_data = json.load(notebook_file)
+                        for cell in notebook_data.get('cells', []):
+                            if cell.get('cell_type') == 'code':
+                                code_lines = cell.get('source', [])
+                                outfile.write("# Code from notebook cell:\n")
+                                outfile.writelines(code_lines)
+                                outfile.write("\n\n")
+
+                    # Write notebook section footer
+                    outfile.write(f"# {'-'*80}\n")
+                    outfile.write(f"# End of Jupyter Notebook: {ipynb_notebook}\n")
+                    outfile.write(f"# {'-'*80}\n\n")
 
     logger.info(f"Consolidation complete. All files are saved in {output_file}")

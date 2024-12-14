@@ -7,7 +7,7 @@ Intended function sequence:
 profits_df = wtf.add_cash_flow_transfers_logic(profits_df)
 trading_features = wtf.calculate_wallet_trading_features(profits_df)
 
-# Only if records for wallets not in profits_df need to be filled
+# Fills values for wallets in wallet_cohort but not in profits_df
 trading_features = wtf.fill_trading_features_data(trading_features, wallet_cohort)
 """
 import time
@@ -32,11 +32,13 @@ def add_cash_flow_transfers_logic(profits_df):
     - adj_profits_df (df): input df with the cash_flow_transfers column added
     """
 
-    def adjust_end_transfers(df, target_date):
+    def adjust_start_transfers(df, target_date):
+        """Initial balances are negative flows that will be recouped upon sale (or ending balance)"""
         df.loc[df['date'] == target_date, 'cash_flow_transfers'] -= df.loc[df['date'] == target_date, 'usd_balance']
         return df
 
-    def adjust_start_transfers(df, target_date):
+    def adjust_end_transfers(df, target_date):
+        """End balances are positive cash flows that increase profitability"""
         df.loc[df['date'] == target_date, 'cash_flow_transfers'] = df.loc[df['date'] == target_date, 'usd_balance']
         return df
 
@@ -97,7 +99,7 @@ def calculate_wallet_trading_features(profits_df):
     logger.debug("Calculating wallet metrics based on imputed performance...")
     imputed_metrics_df = profits_df.groupby('wallet_address').agg(
         invested=('cumsum_cash_flow_transfers', 'max'),
-        net_gain=('cash_flow_transfers', lambda x: -1 * x.sum()),  # outflows reflect profit-taking
+        net_gain=('cash_flow_transfers', 'sum'),  # Positive sum = profit
         unique_coins_traded=('coin_id', 'nunique'),
         first_activity=('date', 'min'),
         last_activity=('date', 'max')
@@ -125,6 +127,9 @@ def calculate_wallet_trading_features(profits_df):
                                         wallet_trading_features_df['first_activity']).dt.days + 1
     wallet_trading_features_df['activity_density'] = (wallet_trading_features_df['transaction_days']
                                                       / wallet_trading_features_df['activity_days'])
+
+    # Remove helper columns
+    wallet_trading_features_df = wallet_trading_features_df.drop(['first_activity','last_activity'], axis=1)
 
     logger.info(f"Wallet trading features computed after {time.time() - start_time:.2f} seconds")
 

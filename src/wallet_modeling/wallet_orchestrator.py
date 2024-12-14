@@ -69,9 +69,11 @@ def retrieve_datasets():
     logger.info("Removed data for %s coins with a market cap above $%s at the start of the training period."
                 ,len(above_initial_threshold_coins),dc.human_format(max_initial_market_cap))
 
-
     # Remove the filtered coins from profits_df
     profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
+
+    # Clean profits_df
+    profits_df, _ = dr.clean_profits_df(profits_df, wallets_config['data_cleaning'])
 
     # Drop unneeded columns
     columns_to_drop = ['total_return']
@@ -88,6 +90,12 @@ def retrieve_datasets():
     profits_df[columns_to_round] = profits_df[columns_to_round].round(2)
     profits_df[columns_to_round] = profits_df[columns_to_round].replace(-0, 0)
 
+    # Remove rows with a rounded 0 balance and 0 transfers
+    profits_df = profits_df[
+        ~((profits_df['usd_balance'] == 0) &
+        (profits_df['usd_net_transfers'] == 0))
+    ]
+
     return profits_df,market_data_df
 
 
@@ -100,11 +108,9 @@ def define_wallet_cohort(profits_df,market_data_df):
     logger.info("Defining wallet cohort based on cleaning params...")
 
     # Impute the training period end (training period start is pre-imputed into profits_df generation)
-    training_period_boundary_dates = [
-        wallets_config['training_data']['training_period_end']
-    ]
+    training_period_end = [wallets_config['training_data']['training_period_end']]
     imputed_profits_df = pri.impute_profits_for_multiple_dates(profits_df, market_data_df,
-                                                            training_period_boundary_dates, n_threads=24)
+                                                            training_period_end, n_threads=24)
 
     # Create a training period only profits_df
     training_profits_df = imputed_profits_df[

@@ -324,12 +324,15 @@ def retrieve_profits_data(start_date, end_date, min_wallet_coin_inflows):
             from profits_base_filtered
             -- transfers prior to the training period are summarized in training_start_new_rows
             where date >= '{start_date}'
+            and (usd_balance != 0 or usd_net_transfers != 0)
 
             union all
 
             select *,
             True as is_imputed
             from training_start_new_rows
+            where (usd_balance != 0 or usd_net_transfers != 0)
+
         )
 
         select coin_id
@@ -370,6 +373,23 @@ def retrieve_profits_data(start_date, end_date, min_wallet_coin_inflows):
     profits_df = u.safe_downcast(profits_df, 'usd_inflows', 'float32')
     profits_df = u.safe_downcast(profits_df, 'usd_inflows_cumulative', 'float32')
     profits_df = u.safe_downcast(profits_df, 'total_return', 'float32')
+
+    # Round relevant columns
+    columns_to_round = [
+        'profits_cumulative'
+        ,'usd_balance'
+        ,'usd_net_transfers'
+        ,'usd_inflows'
+        ,'usd_inflows_cumulative'
+    ]
+    profits_df[columns_to_round] = profits_df[columns_to_round].round(2)
+    profits_df[columns_to_round] = profits_df[columns_to_round].replace(-0, 0)
+
+    # Remove rows with a rounded 0 balance and 0 transfers
+    profits_df = profits_df[
+        ~((profits_df['usd_balance'] == 0) &
+        (profits_df['usd_net_transfers'] == 0))
+    ]
 
     logger.info('Retrieved profits_df with %s unique coins and %s rows after %.2f seconds',
                 len(set(profits_df['coin_id'])),
