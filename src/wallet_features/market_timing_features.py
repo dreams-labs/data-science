@@ -66,7 +66,7 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
     market_timing_df,relative_change_columns = calculate_relative_changes(market_timing_df)
 
     # flatten the wallet-coin-date transactions into wallet-indexed features
-    wallet_timing_features_df = wcf.generate_all_timing_features(
+    wallet_timing_features_df = generate_all_timing_features(
         profits_df,
         market_timing_df,
         relative_change_columns,
