@@ -31,20 +31,20 @@ data_cleaning:
 
     # Wallet cohort thresholds
     min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
-    max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
-    min_wallet_investment: 50000 # The amount of lifetime USD investment a wallet must have to be included in the training data
-    max_wallet_investment: 25_000_000 # The amount of lifetime USD investment a wallet must have to be included in the training data
+    max_coins_traded: 100  # Exclude wallets that have traded more coins than this during the training period
+    min_wallet_investment: 30000 # The amount of lifetime USD investment a wallet must have to be included in the training data
+    max_wallet_investment: 50_000_000 # The amount of lifetime USD investment a wallet must have to be included in the training data
     min_wallet_volume: 50000  # Exclude wallets with fewer than this amount of training period USD volume
     max_wallet_volume: 50_000_000  # Exclude wallets with fewer than this amount of training period USD volume
-    max_wallet_profits: 25_000_000  # Exclude wallets with more than this total net gain from analysis
+    max_wallet_profits: 50_000_000  # Exclude wallets with more than this total net gain from analysis
 
     # Coin-wallet pair thresholds
-    max_wallet_coin_profits: 15_000_000  # Exclude wallets with profits or losses greater than or equal to this amount (USD)
-    max_wallet_coin_inflows: 15_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
+    max_wallet_coin_profits: 25_000_000  # Exclude wallets with profits or losses greater than or equal to this amount (USD)
+    max_wallet_coin_inflows: 25_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
     min_wallet_coin_inflows: 2000  # The amount of lifetime USD inflows a wallet must have to be included in the training data
 
     # Market data filters
-    max_initial_market_cap: 150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
+    max_initial_market_cap: 999150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
     max_gap_days: 50  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
     min_daily_volume: 3000 # Minimum average daily volume the coin must have
 
