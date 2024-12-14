@@ -5,6 +5,7 @@ import time
 import sys
 import gc
 import os
+import json
 from datetime import datetime, timedelta
 from typing import List,Dict,Any
 import importlib
@@ -13,7 +14,6 @@ import logging
 import warnings
 import functools
 import yaml
-import json
 import progressbar
 import pandas as pd
 import numpy as np
@@ -691,133 +691,132 @@ def play_notification(sound_file_path=None):
         return f"Error playing sound: {e}"
 
 
+# pylint: disable=dangerous-default-value
 def consolidate_code(
     parent_directory="..//src",
+    code_directories=[],
+    include_config=False,
     config_directory="..//config",
     notebook_directory="..//notebooks",
     ipynb_notebook=None,
     output_file="temp/consolidated_code.py"
 ):
     """
-    Utility function used to compress all relevant code into a single file that can be provided to an AI.
+    Utility function used to compress specific code directories and relevant files into a single file.
 
-    Consolidates all .py files in the specified parent directory and its subdirectories,
+    Consolidates all .py files in the specified code directories (relative to the parent directory),
     all .yaml files in the specified config directory, and optionally the cells from a Jupyter Notebook.
 
     Params:
-    - parent_directory (str): Path to the parent directory containing .py files to consolidate.
+    - parent_directory (str): Base directory for the code directories to consolidate.
+    - code_directories (list): List of subdirectories (relative to parent_directory) containing .py files to consolidate.
+    - include_config (bool): Whether to include the config files in the export
     - config_directory (str): Path to the directory containing .yaml config files.
     - notebook_directory (str): Path to the directory containing the Jupyter Notebook (optional).
     - ipynb_notebook (str): Filename of the Jupyter Notebook to consolidate cells from (optional).
     - output_file (str): Path to the output consolidated .py file.
-
-    Example Use:
-    consolidate_files(parent_directory="..//src", config_directory="..//config",
-                      notebook_directory="..//notebooks", ipynb_notebook="analysis.ipynb")
     """
-    # Check if the parent directory exists
+    # Validate the parent directory
     if not os.path.exists(parent_directory):
         logger.error(f"Parent directory '{parent_directory}' does not exist.")
         raise FileNotFoundError(f"Parent directory '{parent_directory}' does not exist.")
 
-    # Check if the config directory exists
+    # If no specific code directories are provided, default to all subdirectories
+    if not code_directories:
+        logger.warning("No code directories specified. Defaulting to all directories under the parent directory.")
+        code_directories = [d for d in os.listdir(parent_directory) if os.path.isdir(os.path.join(parent_directory, d))]
+
+    # Validate each code directory
+    valid_directories = []
+    for directory in code_directories:
+        full_path = os.path.join(parent_directory, directory)
+        if not os.path.exists(full_path):
+            logger.warning(f"Code directory '{full_path}' does not exist. Skipping.")
+        else:
+            valid_directories.append(full_path)
+
+    if not valid_directories:
+        logger.error("No valid code directories found.")
+        raise ValueError("None of the specified code directories exist under the parent directory.")
+
+    # Check the config directory
     if not os.path.exists(config_directory):
         logger.error(f"Config directory '{config_directory}' does not exist.")
         raise FileNotFoundError(f"Config directory '{config_directory}' does not exist.")
 
-    # Open the output file and write the linting disable lines at the top
+    # Open the output file and write linting disable lines at the top
     with open(output_file, 'w', encoding='utf-8') as outfile:
         outfile.write("# pylint: skip-file\n")
         outfile.write("# pyright: reportUnusedImport=false\n\n")
 
-        # Consolidate .py files from the parent directory
-        for root, _, files in os.walk(parent_directory):
-            for file in files:
-                if file.endswith('.py'):
-                    file_path = os.path.join(root, file)
+        # Consolidate .py files from the specified code directories
+        for directory in valid_directories:
+            for root, _, files in os.walk(directory):
+                for file in files:
+                    if file.endswith('.py'):
+                        file_path = os.path.join(root, file)
 
-                    # Check if the file exists (redundant but safe for edge cases)
-                    if not os.path.isfile(file_path):
-                        logger.warning(f"File '{file_path}' does not exist. Skipping.")
-                        continue
+                        if not os.path.isfile(file_path):
+                            logger.warning(f"File '{file_path}' does not exist. Skipping.")
+                            continue
 
-                    relative_path = os.path.relpath(file_path, start=os.getcwd())
+                        relative_path = os.path.relpath(file_path, start=os.getcwd())
+                        outfile.write(f"# {'-'*80}\n")
+                        outfile.write(f"# Python File: {relative_path}\n")
+                        outfile.write(f"# {'-'*80}\n\n")
 
-                    # Write section header
-                    outfile.write(f"# {'-'*80}\n")
-                    outfile.write(f"# Python File: {relative_path}\n")
-                    outfile.write(f"# {'-'*80}\n\n")
+                        with open(file_path, 'r', encoding='utf-8') as infile:
+                            outfile.write(infile.read())
 
-                    # Append file content
-                    with open(file_path, 'r', encoding='utf-8') as infile:
-                        outfile.write(infile.read())
-
-                    # Write section footer
-                    outfile.write(f"\n# {'-'*80}\n")
-                    outfile.write(f"# End of Python File: {relative_path}\n")
-                    outfile.write(f"# {'-'*80}\n\n")
+                        outfile.write(f"\n# {'-'*80}\n")
+                        outfile.write(f"# End of Python File: {relative_path}\n")
+                        outfile.write(f"# {'-'*80}\n\n")
 
         # Consolidate .yaml files from the config directory
-        for root, _, files in os.walk(config_directory):
-            for file in files:
-                if file.endswith('.yaml'):
-                    file_path = os.path.join(root, file)
+        if include_config:
+            for root, _, files in os.walk(config_directory):
+                for file in files:
+                    if file.endswith('.yaml'):
+                        file_path = os.path.join(root, file)
 
-                    # Check if the file exists
-                    if not os.path.isfile(file_path):
-                        logger.warning(f"File '{file_path}' does not exist. Skipping.")
-                        continue
+                        if not os.path.isfile(file_path):
+                            logger.warning(f"File '{file_path}' does not exist. Skipping.")
+                            continue
 
-                    relative_path = os.path.relpath(file_path, start=os.getcwd())
+                        relative_path = os.path.relpath(file_path, start=os.getcwd())
+                        outfile.write(f"# {'-'*80}\n")
+                        outfile.write(f"# YAML Config File: {relative_path}\n")
+                        outfile.write(f"# {'-'*80}\n\n")
 
-                    # Write section header
-                    outfile.write(f"# {'-'*80}\n")
-                    outfile.write(f"# YAML Config File: {relative_path}\n")
-                    outfile.write(f"# {'-'*80}\n\n")
+                        with open(file_path, 'r', encoding='utf-8') as infile:
+                            outfile.write(infile.read())
 
-                    # Append file content
-                    with open(file_path, 'r', encoding='utf-8') as infile:
-                        outfile.write(infile.read())
-
-                    # Write section footer
-                    outfile.write(f"\n# {'-'*80}\n")
-                    outfile.write(f"# End of YAML Config File: {relative_path}\n")
-                    outfile.write(f"# {'-'*80}\n\n")
+                        outfile.write(f"\n# {'-'*80}\n")
+                        outfile.write(f"# End of YAML Config File: {relative_path}\n")
+                        outfile.write(f"# {'-'*80}\n\n")
 
         # Optionally consolidate cells from a Jupyter Notebook
-        if notebook_directory:
-            if not ipynb_notebook:
-                # Get newest notebook in directory if none specified
-                notebooks = [f for f in os.listdir(notebook_directory) if f.endswith('.ipynb')]
-                if notebooks:
-                    ipynb_notebook = sorted(notebooks, reverse=True)[0]
-                    logger.info(f"Using most recent notebook: {ipynb_notebook}")
+        if notebook_directory and ipynb_notebook:
+            notebook_path = os.path.join(notebook_directory, ipynb_notebook)
 
-            if ipynb_notebook:
-                notebook_path = os.path.join(notebook_directory, ipynb_notebook)
+            if not os.path.isfile(notebook_path):
+                logger.warning(f"Notebook '{notebook_path}' does not exist. Skipping.")
+            else:
+                outfile.write(f"# {'-'*80}\n")
+                outfile.write(f"# Jupyter Notebook: {ipynb_notebook}\n")
+                outfile.write(f"# {'-'*80}\n\n")
 
-                # Check if the notebook file exists
-                if not os.path.isfile(notebook_path):
-                    logger.warning(f"Notebook '{notebook_path}' does not exist. Skipping.")
-                else:
-                    # Write notebook section header
-                    outfile.write(f"# {'-'*80}\n")
-                    outfile.write(f"# Jupyter Notebook: {ipynb_notebook}\n")
-                    outfile.write(f"# {'-'*80}\n\n")
+                with open(notebook_path, 'r', encoding='utf-8') as notebook_file:
+                    notebook_data = json.load(notebook_file)
+                    for cell in notebook_data.get('cells', []):
+                        if cell.get('cell_type') == 'code':
+                            code_lines = cell.get('source', [])
+                            outfile.write("# Code from notebook cell:\n")
+                            outfile.writelines(code_lines)
+                            outfile.write("\n\n")
 
-                    # Load the notebook and extract code cells
-                    with open(notebook_path, 'r', encoding='utf-8') as notebook_file:
-                        notebook_data = json.load(notebook_file)
-                        for cell in notebook_data.get('cells', []):
-                            if cell.get('cell_type') == 'code':
-                                code_lines = cell.get('source', [])
-                                outfile.write("# Code from notebook cell:\n")
-                                outfile.writelines(code_lines)
-                                outfile.write("\n\n")
-
-                    # Write notebook section footer
-                    outfile.write(f"# {'-'*80}\n")
-                    outfile.write(f"# End of Jupyter Notebook: {ipynb_notebook}\n")
-                    outfile.write(f"# {'-'*80}\n\n")
+                outfile.write(f"# {'-'*80}\n")
+                outfile.write(f"# End of Jupyter Notebook: {ipynb_notebook}\n")
+                outfile.write(f"# {'-'*80}\n\n")
 
     logger.info(f"Consolidation complete. All files are saved in {output_file}")
