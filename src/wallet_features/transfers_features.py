@@ -196,7 +196,8 @@ def retrieve_transfers():
 
 def calculate_average_holding_period(transfers_df):
     """
-    Calculate the average holding period for tokens in each wallet at each timestamp.
+    Calculate the average holding period based on the dates included for a
+    single wallet-coin pair.
 
     The calculation handles:
     - New tokens starting with 0 days held
@@ -204,23 +205,20 @@ def calculate_average_holding_period(transfers_df):
     - Proportional reduction in holding days when tokens are sold
 
     Parameters:
-    df: pandas DataFrame with columns [date, net_transfers]
-        date: timestamp of the transfer
-        net_transfers: denominated in tokens. positive for buys, negative for sells.
-        balance: number of tokens a wallet holds on the date
+    - transfers_df: pandas DataFrame containing columns [date, net_transfers, balance]
 
     Returns:
-    DataFrame with additional columns including average_holding_period
+    - holding_days_df: DataFrame with columns [date, average_holding_period]
     """
-    result_df = transfers_df.copy().sort_values('date')
-    result_df['date'] = pd.to_datetime(result_df['date'])
+    holding_days_df = transfers_df[['date','net_transfers','balance']].copy().sort_values('date')
+    holding_days_df['date'] = pd.to_datetime(holding_days_df['date'])
 
     avg_age = 0
     balance = 0
     last_date = None
     ages = []
 
-    for _, row in result_df.iterrows():
+    for _, row in holding_days_df.iterrows():
         current_date = row['date']
         net = row['net_transfers']
 
@@ -245,10 +243,10 @@ def calculate_average_holding_period(transfers_df):
         current_avg = avg_age if balance > 0 else 0
         ages.append(current_avg)
 
-    result_df['average_holding_period'] = ages
+    holding_days_df['average_holding_period'] = ages
 
     # Clean up intermediate columns if desired
-    columns_to_keep = ['coin_id', 'wallet_address', 'date', 'average_holding_period']
-    result_df = result_df[columns_to_keep]
+    columns_to_keep = ['date', 'average_holding_period']
+    holding_days_df = holding_days_df[columns_to_keep]
 
-    return result_df
+    return holding_days_df

@@ -93,6 +93,8 @@ def test_calculate_average_holding_period():
         ],
         'net_transfers': [100, -50, 75, -25, 0, 0, -100]
     })
+    df['balance'] = df['net_transfers'].cumsum()
+
     # Expected results from the calculation logic above
     expected = np.array([0, 4, 3.6, 8.6, 13.6, 22.6, 0])
 
@@ -101,4 +103,3 @@ def test_calculate_average_holding_period():
     # Compare expected and actual using np.allclose for floating-point tolerance
     assert np.allclose(result['average_holding_period'].values,
                        expected, rtol=1e-05, equal_nan=True)
-
