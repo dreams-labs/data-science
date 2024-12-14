@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import pandas_gbq
 from google.cloud import bigquery
+from dreams_core import core as dc
 
 # Local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
@@ -123,15 +124,15 @@ def apply_wallet_thresholds(wallet_metrics_df):
                 len(excess_coins_traded_wallets), max_coins)
 
     logger.info(" - %s wallets invested less than $%s, %s wallets invested more than $%s",
-                len(low_investment_wallets), min_wallet_investment,
-                len(excess_investment_wallets), max_wallet_investment)
+                len(low_investment_wallets), dc.human_format(min_wallet_investment),
+                len(excess_investment_wallets), dc.human_format(max_wallet_investment))
 
     logger.info(" - %s wallets with volume below $%s, %s wallets with volume above $%s",
-                len(low_volume_wallets), min_wallet_volume,
-                len(excess_volume_wallets), max_wallet_volume)
+                len(low_volume_wallets), dc.human_format(min_wallet_volume),
+                len(excess_volume_wallets), dc.human_format(max_wallet_volume))
 
-    logger.info(" - %s wallets with profits above %s",
-                len(excess_profits_wallets), max_wallet_profits)
+    logger.info(" - %s wallets with profits above $%s",
+                len(excess_profits_wallets), dc.human_format(max_wallet_profits))
 
     return filtered_wallet_metrics_df
 

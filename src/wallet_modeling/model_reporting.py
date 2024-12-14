@@ -32,7 +32,7 @@ def get_wallet_addresses():
     """
     wallet_addresses_df = dgc().run_sql(wallet_query)
 
-    logger.info(f"Retrieved {len(wallet_addresses_df)} wallet addresses")
+    logger.debug(f"Retrieved {len(wallet_addresses_df)} wallet addresses")
     return wallet_addresses_df
 
 

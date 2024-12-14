@@ -1,7 +1,7 @@
 # Variables used to define the training data
 training_data:
     training_window_starts: [
-        "2023-08-01"
+        "2023-08-01",
         # ,"2023-11-01"
         "2024-01-01",
         # "2024-04-01",
@@ -19,8 +19,8 @@ training_data:
 # Variables used to define features
 features:
     # Clustering params
-    clustering_n_components: 15
-    clustering_n_clusters: 5
+    clustering_n_components: 25
+    clustering_n_clusters: 4
 
     timing_metrics_min_transaction_size: 20  # trades below this USD threshold will not be evaluated for market timing peformance
 
