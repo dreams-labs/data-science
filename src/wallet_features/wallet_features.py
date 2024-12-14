@@ -10,10 +10,10 @@ import yaml
 # Local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
 import wallet_modeling.wallet_modeling as wm
-import wallet_features.wallet_coin_features as wcf
 import wallet_features.wallet_coin_date_features as wcdf
 import wallet_features.trading_features as wtf
 import wallet_features.transfers_features as wts
+import wallet_features.market_timing_features as wmt
 import utils as u
 
 # Set up logger at the module level
@@ -49,7 +49,7 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     wallet_features_df = wallet_features_df.join(trading_features, how='inner')
 
     # Market timing features (fill zeros)
-    timing_features = calculate_market_timing_features(profits_df, market_indicators_data_df)
+    timing_features = wmt.calculate_market_timing_features(profits_df, market_indicators_data_df)
     wallet_features_df = wallet_features_df.join(timing_features, how='left')\
         .fillna({col: 0 for col in timing_features.columns})
 
@@ -71,63 +71,3 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     )
 
     return wallet_features_df
-
-
-
-
-
-def calculate_market_timing_features(profits_df, market_indicators_data_df):
-    """
-    Calculate features capturing how wallet transaction timing aligns with future market movements.
-
-    This function performs a sequence of transformations to assess wallet timing performance:
-    1. Enriches market data with technical indicators (RSIs, SMAs) on price and volume
-    2. Calculates future values of these indicators at different time offsets (e.g., 7, 14, 30 days ahead)
-    3. Computes relative changes between current and future indicator values
-    4. For each wallet's transactions, calculates value-weighted and unweighted averages of these future changes,
-        treating buys and sells separately
-
-    Args:
-        profits_df (pd.DataFrame): Wallet transaction data with columns:
-            - wallet_address (pd.Categorical): Unique wallet identifier
-            - coin_id (str): Identifier for the traded coin
-            - date (pd.Timestamp): Transaction date
-            - usd_net_transfers (float): USD value of transaction (positive=buy, negative=sell)
-
-        market_indicators_data_df (pd.DataFrame): Raw market data with columns:
-            - coin_id (str): Identifier for the coin
-            - date (pd.Timestamp): Date of market data
-            - price (float): Asset price
-            - volume (float): Trading volume
-            - all of the indicators specific in wallets_metrics_config
-
-    Returns:
-        pd.DataFrame: Features indexed by wallet_address with columns for each market timing metric:
-            {indicator}_vs_lead_{n}_{direction}_{type}
-            where:
-            - indicator: The base metric (e.g., price_rsi_14, volume_sma_7)
-            - n: The forward-looking period (e.g., 7, 14, 30 days)
-            - direction: 'buy' or 'sell'
-            - type: 'weighted' (by USD value) or 'mean'
-
-            All wallet_addresses from the categorical index are included with zeros for missing data.
-    """
-    start_time = time.time()
-    logger.info("Calculating market timing features...")
-
-    # add timing offset features
-    market_timing_df = wcdf.calculate_offsets(market_indicators_data_df,wallets_features_config)
-    market_timing_df,relative_change_columns = wcdf.calculate_relative_changes(market_timing_df,wallets_features_config)
-
-    # flatten the wallet-coin-date transactions into wallet-indexed features
-    wallet_timing_features_df = wcf.generate_all_timing_features(
-        profits_df,
-        market_timing_df,
-        relative_change_columns,
-        wallets_config['features']['timing_metrics_min_transaction_size'],
-    )
-
-    logger.info("Calculated market timing features after %.2f seconds.",
-                time.time() - start_time)
-
-    return wallet_timing_features_df
