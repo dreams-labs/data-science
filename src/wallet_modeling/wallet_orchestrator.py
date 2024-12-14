@@ -12,7 +12,6 @@ import training_data.data_retrieval as dr
 import training_data.profits_row_imputation as pri
 import wallet_modeling.wallet_training_data as wtd
 import wallet_features.trading_features as wtf
-import wallet_features.wallet_coin_date_features as wcdf
 from wallet_modeling.wallets_config_manager import WalletsConfig
 
 # Set up logger at the module level
