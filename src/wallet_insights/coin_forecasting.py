@@ -12,7 +12,7 @@ from scipy import stats
 from dreams_core import core as dc
 
 # Local module imports
-import wallet_features.wallet_coin_date_features as wcdf
+import wallet_features.market_cap_features as wmc
 from wallet_modeling.wallets_config_manager import WalletsConfig
 
 # pylint: disable=unused-variable  # messy stats functions in visualizations
@@ -226,7 +226,7 @@ def calculate_coin_performance(market_data_df, start_date, end_date):
     end_data = market_data_df[market_data_df['date'] == end_date].set_index('coin_id')[['price']]
 
     # Fill market cap
-    market_data_filled_df = wcdf.force_fill_market_cap(market_data_df)
+    market_data_filled_df = wmc.force_fill_market_cap(market_data_df)
     start_market_cap_filled = market_data_filled_df[
         market_data_filled_df['date'] == start_date
     ].set_index('coin_id')['market_cap_filled']

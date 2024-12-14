@@ -8,9 +8,9 @@ from pathlib import Path
 import logging
 import pandas as pd
 import numpy as np
-import pandas_gbq
 import yaml
 import utils as u
+from dreams_core.googlecloud import GoogleCloud as dgc
 import wallet_insights.wallet_model_evaluation as wime
 import wallet_insights.coin_forecasting as wicf
 from wallet_modeling.wallets_config_manager import WalletsConfig
@@ -30,12 +30,12 @@ def get_wallet_addresses():
     from `temp.wallet_modeling_cohort` wc
     join `reference.wallet_ids` wi on wi.wallet_id = wc.wallet_id
     """
-    wallet_addresses = pandas_gbq.read_gbq(
-        wallet_query,
-        project_id='western-verve-411004'
-    )
-    logger.info(f"Retrieved {len(wallet_addresses)} wallet addresses")
-    return wallet_addresses
+    wallet_addresses_df = dgc().run_sql(wallet_query)
+
+    logger.info(f"Retrieved {len(wallet_addresses_df)} wallet addresses")
+    return wallet_addresses_df
+
+
 
 def save_model_artifacts(model_results, evaluation_dict, configs, coin_validation_df, base_path):
     """
@@ -177,7 +177,7 @@ def generate_and_save_model_artifacts(model_results, validation_profits_df, base
         y_true=model_results['y_test'],
         y_pred=model_results['y_pred'],
         model=model,
-        feature_names=model_results['X'].columns.tolist()
+        feature_names=model_results['X_train'].columns.tolist()
     )
 
     # Create evaluation dictionary with the same structure as before

@@ -1,20 +1,24 @@
 # Variables used to define the training data
 training_data:
     training_window_starts: [
-        # "2023-09-01",
+        "2023-08-01"
+        ,"2023-11-01"
+        # "2024-01-01",
         # "2024-04-01",
-        # "2024-09-01",
-        "2024-10-01"
+        # "2024-07-01",
+        # "2024-09-01"
     ]
-    # modeling_period_start: "2024-02-01"
-    # modeling_period_end: "2024-03-31"
-    modeling_period_start: "2024-11-01"
-    modeling_period_end: "2024-11-15"
-    validation_period_end: "2024-12-07"
+    modeling_period_start: "2024-02-01"
+    modeling_period_end: "2024-02-29"
+    validation_period_end: "2024-03-15"
 
 
 # Variables used to define features
 features:
+    # Clustering params
+    clustering_n_components: 15
+    clustering_n_clusters: 5
+
     timing_metrics_min_transaction_size: 20  # trades below this USD threshold will not be evaluated for market timing peformance
 
 
@@ -69,7 +73,16 @@ coin_forecasting:
 
 # Variables used for model generation
 modeling:
+    model_type: "xgb"
+    model_params:
+        n_estimators: 200
+        max_depth: 4
+        learning_rate: 0.05
+        subsample: 0.8
+        colsample_bytree: 1.0
+        min_child_weight: 5
+        random_state: 42
+        n_jobs: -1
     target_variable: "performance_score"
     returns_winsorization: 0.01
-    drop_columns: [
-    ]
+    drop_columns: []
