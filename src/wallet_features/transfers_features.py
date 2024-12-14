@@ -16,6 +16,10 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 
 
+# ____________________________________________________________________________
+# Transfers Sequencing Features
+# ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
+# these identify which buyer number a wallet was to a given coin
 
 def retrieve_transfers_sequencing():
     """
@@ -36,7 +40,7 @@ def retrieve_transfers_sequencing():
     # All data after the training period must be ignored to avoid data leakage
     training_period_end = wallets_config['training_data']['training_period_end']
 
-    transfers_data_sql = f"""
+    sequencing_sql = f"""
         with transaction_rank as (
             select coin_id
             ,wallet_address
@@ -64,7 +68,7 @@ def retrieve_transfers_sequencing():
         join temp.wallet_modeling_cohort wc on wc.wallet_id = xw.wallet_id
         """
 
-    transfers_sequencing_df = dgc().run_sql(transfers_data_sql)
+    transfers_sequencing_df = dgc().run_sql(sequencing_sql)
     logger.info("Retrieved transfers data for %s wallet-coin pairs associated with %s wallets "
                 "in temp.wallet_modeling_cohort.",
                 len(transfers_sequencing_df), len(transfers_sequencing_df['wallet_id'].unique()))
@@ -110,41 +114,83 @@ def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
     return transfers_sequencing_features_df
 
 
+# ____________________________________________________________________________
+# Holding Behavior Features
+# ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
+# these identify which how long a wallet held their tokens
 
-def calculate_days_since_last_buy(transfers_df):
+def retrieve_transfers():
     """
-    Calculate days since last buy for each wallet-coin combination at each date.
+    Returns the buyer number for each wallet-coin pairing, where the first buyer
+    receives rank 1 and the count increases for each subsequence wallet.
 
-    Parameters:
-    transfers_df: pandas DataFrame with columns [date, wallet_address, coin_id, net_transfers]
-        date can be string or datetime format
-        net_transfers should be positive for buys, negative for sells
+    Buyer numbers are calculated for all wallets but the returned df only includes
+    wallets that were uploaded to the temp.wallet_modeling_cohort table.
 
     Returns:
-    DataFrame with additional column 'days_since_last_buy'
+    - buyer_numbers_df (df): dataframe showing that buyer number a wallet was for
+        the associated coin_id.
     """
-    # Create a copy to avoid modifying original dataframe
-    result_df = transfers_df.copy()
+    # All data after the training period must be ignored to avoid data leakage
+    training_period_end = wallets_config['training_data']['training_period_end']
 
-    # Convert dates to datetime if they aren't already
-    result_df['date'] = pd.to_datetime(result_df['date'])
+    transfers_sql = f"""select cwt.coin_id
+    ,cwt.wallet_address
+    ,cwt.date
+    ,cwt.net_transfers
+    ,cwt.balance
+    from core.coin_wallet_transfers cwt
+    join temp.wallet_modeling_cohort wmc on wmc.wallet_address = cwt.wallet_address
+    and cwt.date <= '{training_period_end}'
+    order by 1,2,3"""
 
-    # Mark buy transactions and get last buy date for each wallet-coin combination
-    result_df['is_buy'] = result_df['net_transfers'] > 0
+    transfers_df = dgc().run_sql(transfers_sql)
 
-    # First create the series of dates where is_buy is True, then group and forward fill
-    buy_dates = result_df['date'].where(result_df['is_buy'])
-    result_df['last_buy_date'] = buy_dates.groupby([result_df['wallet_address'], result_df['coin_id']]).ffill()
+    logger.info("Retrieved transfers data for %s wallet-coin-date records.",
+                len(transfers_df))
 
-    # Calculate days since last buy
-    result_df['days_since_last_buy'] = (
-        result_df['date'] - result_df['last_buy_date']
-    ).dt.days
+    return transfers_df
 
-    # Clean up intermediate columns
-    result_df = result_df.drop(['is_buy', 'last_buy_date'], axis=1)
 
-    return result_df
+
+
+# # needs to be moved to profits_df with a USD value floor
+# def calculate_days_since_last_buy(transfers_df):
+#     """
+#     Calculate days since last buy for each wallet-coin combination at each date.
+
+#     Parameters:
+#     transfers_df: pandas DataFrame with columns [date, wallet_address, coin_id, net_transfers]
+#         date can be string or datetime format
+#         net_transfers should be positive for buys, negative for sells
+
+#     Returns:
+#     DataFrame with additional column 'days_since_last_buy'
+#     """
+#     # Create a copy to avoid modifying original dataframe
+#     result_df = transfers_df.copy()
+
+#     # Convert dates to datetime if they aren't already
+#     result_df['date'] = pd.to_datetime(result_df['date'])
+
+#     # Mark buy transactions and get last buy date for each wallet-coin combination
+#     result_df['is_buy'] = result_df['net_transfers'] > 0
+
+#     # First create the series of dates where is_buy is True, then group and forward fill
+#     buy_dates = result_df['date'].where(result_df['is_buy'])
+#     result_df['last_buy_date'] = buy_dates.groupby([result_df['wallet_address'], result_df['coin_id']]).ffill()
+
+#     # Calculate days since last buy
+#     result_df['days_since_last_buy'] = (
+#         result_df['date'] - result_df['last_buy_date']
+#     ).dt.days
+
+#     # Clean up intermediate columns
+#     columns_to_keep = ['coin_id', 'wallet_address', 'date', 'days_since_last_buy']
+#     result_df = result_df[columns_to_keep]
+
+
+#     return result_df
 
 
 
@@ -166,48 +212,43 @@ def calculate_average_holding_period(transfers_df):
     Returns:
     DataFrame with additional columns including average_holding_period
     """
-    result_df = transfers_df.copy()
-
-    # Ensure date is in datetime format
+    result_df = transfers_df.copy().sort_values('date')
     result_df['date'] = pd.to_datetime(result_df['date'])
 
-    # Calculate running balance after each transfer
-    result_df['balance'] = result_df['net_transfers'].cumsum()
+    avg_age = 0
+    balance = 0
+    last_date = None
+    ages = []
 
-    # Calculate time elapsed since previous transaction
-    result_df['previous_date'] = result_df['date'].shift(1)
-    result_df['days_passed'] = (result_df['date'] - result_df['previous_date']).dt.days.fillna(0)
+    for _, row in result_df.iterrows():
+        current_date = row['date']
+        net = row['net_transfers']
 
-    # Track balance at start of each period
-    result_df['opening_balance'] = result_df['balance'].shift(1).fillna(0)
+        # Calculate days passed
+        days_passed = (current_date - last_date).days if last_date else 0
+        last_date = current_date
 
-    # Calculate holding days added during this period
-    # This is: (opening balance) * (days since last transaction)
-    result_df['new_hdays'] = result_df['opening_balance'] * result_df['days_passed']
+        # Age current holdings
+        if balance > 0:
+            avg_age += days_passed
 
-    # Handle sells by reducing holding days proportionally
-    # If we sell 50% of tokens, we reduce holding days by 50%
-    result_df['sold_tokens'] = result_df['net_transfers'].clip(upper=0)  # Keep only sells (negative values)
-    result_df['sold_hdays'] = result_df['sold_tokens'] * result_df['days_passed']  # Reduce holding days proportionally
+        # Adjust for buy/sell
+        if net > 0:  # Buy: blend with new coins (age=0)
+            total_coins = balance + net
+            avg_age = (avg_age * (balance / total_coins)) + (0 * (net / total_coins))
+            balance = total_coins
+        elif net < 0:  # Sell: remove coins at current avg age
+            balance += net  # net is negative
+            # Average age stays the same since we remove equally aged coins
 
-    # Combine effects of time passing and sales
-    result_df['net_change_hdays'] = result_df['new_hdays'] + result_df['sold_hdays']
-    result_df['previous_change_hdays'] = result_df['net_change_hdays'].shift(1).fillna(0)
+        # Compute average holding period
+        current_avg = avg_age if balance > 0 else 0
+        ages.append(current_avg)
 
-    # Calculate cumulative holding days
-    result_df['closing_hdays'] = result_df['net_change_hdays'] + result_df['previous_change_hdays']
-    result_df['opening_hdays'] = result_df['closing_hdays'].shift(1).fillna(0)
-    result_df['hdays'] = result_df['opening_hdays'] + result_df['net_change_hdays']
-
-    # Calculate average holding period
-    # When balance is 0, set average holding period to 0 to avoid division by zero
-    result_df['average_holding_period'] = ((result_df['hdays'] / result_df['balance'])
-                                           .where(result_df['balance'] != 0, 0))
+    result_df['average_holding_period'] = ages
 
     # Clean up intermediate columns if desired
-    columns_to_keep = ['date', 'net_transfers', 'balance', 'average_holding_period']
+    columns_to_keep = ['coin_id', 'wallet_address', 'date', 'average_holding_period']
     result_df = result_df[columns_to_keep]
 
     return result_df
-
-

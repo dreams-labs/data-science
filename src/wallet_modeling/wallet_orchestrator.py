@@ -127,7 +127,7 @@ def define_wallet_cohort(profits_df,market_data_df):
     # Upload the cohort to BigQuery for additional complex feature generation
     wtd.upload_wallet_cohort(wallet_cohort)
 
-    logger.info("Cohort defined as %s wallets after %.2f.",
+    logger.info("Cohort defined as %s wallets after %.2f seconds.",
                 len(wallet_cohort), time.time()-start_time)
 
     return filtered_training_wallet_metrics_df,wallet_cohort

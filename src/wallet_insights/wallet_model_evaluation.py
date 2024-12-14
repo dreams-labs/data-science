@@ -146,7 +146,7 @@ class RegressionEvaluator:
         plt.rcParams['axes.titlecolor'] = '#afc6ba'
 
         # Create custom colormap that starts from background color
-        self.custom_cmap = mcolors.LinearSegmentedColormap.from_list(
+        self.custom_cmap = mcolors.LinearSegmentedColormap.from_list(  # pylint:disable=attribute-defined-outside-init
             'custom_blues', ['#181818', '#145a8d', '#69c4ff']
         )
 

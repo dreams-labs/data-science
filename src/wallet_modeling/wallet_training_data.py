@@ -7,6 +7,7 @@ from datetime import datetime,timedelta
 import pandas as pd
 import numpy as np
 import pandas_gbq
+from google.cloud import bigquery
 
 # Local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
@@ -254,3 +255,25 @@ def upload_wallet_cohort(wallet_cohort):
         ,progress_bar=False
     )
     logger.info('Uploaded cohort of %s wallets to temp.wallet_modeling_cohort.', len(upload_df))
+
+    # Add wallet_address column and populate it
+    client = bigquery.Client(project=project_id)
+
+    # Add column if it doesn't exist
+    add_column_query = f"""
+    ALTER TABLE `{project_id}.{table_name}`
+    ADD COLUMN IF NOT EXISTS wallet_address STRING
+    """
+    client.query(add_column_query).result()
+
+    # Update the wallet_address values
+    update_query = f"""
+    UPDATE `{project_id}.{table_name}` t
+    SET wallet_address = w.wallet_address
+    FROM `reference.wallet_ids` w
+    WHERE t.wallet_id = w.wallet_id
+    """
+    client.query(update_query).result()
+
+    logger.info('Uploaded cohort of %s wallets to temp.wallet_modeling_cohort and added wallet addresses.',
+                len(upload_df))
