@@ -11,9 +11,7 @@ from dreams_core import core as dc
 import training_data.data_retrieval as dr
 import training_data.profits_row_imputation as pri
 import wallet_modeling.wallet_training_data as wtd
-import wallet_modeling.wallet_modeling as wm
-import wallet_features.wallet_features as wf
-import wallet_features.wallet_coin_features as wcf
+import wallet_features.trading_features as wtf
 import wallet_features.wallet_coin_date_features as wcdf
 from wallet_modeling.wallets_config_manager import WalletsConfig
 
@@ -115,10 +113,10 @@ def define_wallet_cohort(profits_df,market_data_df):
         ].copy()
 
     # Add cash flows logic column
-    training_profits_df = wcf.add_cash_flow_transfers_logic(training_profits_df)
+    training_profits_df = wtf.add_cash_flow_transfers_logic(training_profits_df)
 
     # Compute wallet level metrics over duration of training period
-    training_wallet_metrics_df = wf.calculate_wallet_trading_features(training_profits_df)
+    training_wallet_metrics_df = wtf.calculate_wallet_trading_features(training_profits_df)
 
     # Apply filters based on wallet behavior during the training period
     filtered_training_wallet_metrics_df = wtd.apply_wallet_thresholds(training_wallet_metrics_df)
@@ -129,7 +127,7 @@ def define_wallet_cohort(profits_df,market_data_df):
     # Upload the cohort to BigQuery for additional complex feature generation
     wtd.upload_wallet_cohort(wallet_cohort)
 
-    logger.info("Cohort defined as %s wallets after %.2f.",
+    logger.info("Cohort defined as %s wallets after %.2f seconds.",
                 len(wallet_cohort), time.time()-start_time)
 
     return filtered_training_wallet_metrics_df,wallet_cohort
@@ -152,39 +150,11 @@ def split_profits_df(profits_df,market_data_df,wallet_cohort):
     windows_profits_df = windows_profits_df.drop('total_return', axis=1)
 
     # Split profits_df into training windows and the modeling period
-    training_profits_df, training_windows_profits_dfs, modeling_profits_df, validation_profits_df =  wtd.split_window_dfs(windows_profits_df)
+    (training_profits_df, training_windows_profits_dfs,
+    modeling_profits_df, validation_profits_df) = wtd.split_window_dfs(windows_profits_df)
 
     return training_profits_df, training_windows_profits_dfs, modeling_profits_df, validation_profits_df
 
-
-
-def generate_wallet_performance_features(training_windows_profits_dfs,training_wallet_metrics_df,wallet_cohort):
-    """
-    Generates wallet financial performance features for the full training period and each window
-    """
-    # Create training data df with full training period metrics
-    training_data_df = wf.fill_missing_wallet_data(training_wallet_metrics_df, wallet_cohort)
-    training_data_df = training_data_df.add_suffix("_all_windows")
-
-    # Generate and join dfs for each training window
-    for i, window_profits_df in enumerate(training_windows_profits_dfs, 1):
-        # Add transaction metrics
-        window_profits_df = wcf.add_cash_flow_transfers_logic(window_profits_df)
-        window_wallets_df = wf.calculate_wallet_features(window_profits_df)
-
-        # Fill missing values and Join to training_data_df
-        window_wallets_df = wf.fill_missing_wallet_data(window_wallets_df, wallet_cohort)
-
-        # Add performance metrics
-        window_performance_df = wm.generate_target_variables(window_wallets_df)
-        window_performance_df = window_performance_df.drop(['invested','net_gain'],axis=1)
-        window_wallets_df = window_wallets_df.join(window_performance_df)
-
-        # Add column suffix and join to training_data_df
-        window_wallets_df = window_wallets_df.add_suffix(f'_w{i}')  # no need for i+1 now
-        training_data_df = training_data_df.join(window_wallets_df, how='left')
-
-    return training_data_df
 
 
 def filter_modeling_period_wallets(modeling_period_profits_df):
@@ -192,8 +162,8 @@ def filter_modeling_period_wallets(modeling_period_profits_df):
     Applies data cleaning filters to remove modeling period wallets without sufficient activity
     """
     # Calculate modeling period wallet metrics
-    modeling_period_profits_df = wcf.add_cash_flow_transfers_logic(modeling_period_profits_df)
-    modeling_wallets_df = wf.calculate_wallet_trading_features(modeling_period_profits_df)
+    modeling_period_profits_df = wtf.add_cash_flow_transfers_logic(modeling_period_profits_df)
+    modeling_wallets_df = wtf.calculate_wallet_trading_features(modeling_period_profits_df)
 
     # Extract thresholds
     min_modeling_investment = wallets_config['data_cleaning']['min_modeling_investment']

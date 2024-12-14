@@ -7,8 +7,7 @@ import numpy as np
 
 # local module imports
 import wallet_modeling.wallet_modeling as wm
-import wallet_features.wallet_features as wf
-import wallet_features.wallet_coin_features as wcf
+import wallet_features.trading_features as wtf
 from wallet_modeling.wallets_config_manager import WalletsConfig
 
 # pylint:disable=invalid-name  # "X_test" doesn't conform to snake_case naming
@@ -45,8 +44,8 @@ def calculate_validation_metrics(X_test, y_pred, validation_profits_df):
         - Mean and median returns
     """
     # Calculate validation period wallet metrics
-    validation_profits_df = wcf.add_cash_flow_transfers_logic(validation_profits_df)
-    wallet_trading_features_df = wf.calculate_wallet_trading_features(validation_profits_df)
+    validation_profits_df = wtf.add_cash_flow_transfers_logic(validation_profits_df)
+    wallet_trading_features_df = wtf.calculate_wallet_trading_features(validation_profits_df)
     validation_wallets_df = wm.generate_target_variables(wallet_trading_features_df)
 
     # Attach validation period performance to modeling period scores
