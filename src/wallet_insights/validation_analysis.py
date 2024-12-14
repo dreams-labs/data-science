@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 
 # local module imports
-import wallet_modeling.wallet_modeling as wm
+import wallet_features.performance_features as wp
 import wallet_features.trading_features as wtf
 from wallet_modeling.wallets_config_manager import WalletsConfig
 
@@ -46,7 +46,7 @@ def calculate_validation_metrics(X_test, y_pred, validation_profits_df):
     # Calculate validation period wallet metrics
     validation_profits_df = wtf.add_cash_flow_transfers_logic(validation_profits_df)
     wallet_trading_features_df = wtf.calculate_wallet_trading_features(validation_profits_df)
-    validation_wallets_df = wm.generate_target_variables(wallet_trading_features_df)
+    validation_wallets_df = wp.calculate_performance_features(wallet_trading_features_df)
 
     # Attach validation period performance to modeling period scores
     wallet_performance_df = pd.DataFrame()

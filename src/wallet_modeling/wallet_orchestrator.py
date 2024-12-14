@@ -12,6 +12,7 @@ import training_data.data_retrieval as dr
 import training_data.profits_row_imputation as pri
 import wallet_modeling.wallet_training_data as wtd
 import wallet_features.trading_features as wtf
+import wallet_features.market_cap_features as wmc
 from wallet_modeling.wallets_config_manager import WalletsConfig
 
 # Set up logger at the module level
@@ -56,7 +57,7 @@ def retrieve_datasets():
                                         wallets_config['data_cleaning']['max_mc_imputation_multiple'])
 
     # Crudely fill all remaining gaps in market cap data
-    market_data_df = wcdf.force_fill_market_cap(market_data_df)
+    market_data_df = wmc.force_fill_market_cap(market_data_df)
 
     # Remove market data records for coins that exceed the initial market cap threshold
     max_initial_market_cap = wallets_config['data_cleaning']['max_initial_market_cap']
@@ -98,9 +99,8 @@ def define_wallet_cohort(profits_df,market_data_df):
     start_time = time.time()
     logger.info("Defining wallet cohort based on cleaning params...")
 
-    # Impute the training period boundary dates
+    # Impute the training period end (training period start is pre-imputed into profits_df generation)
     training_period_boundary_dates = [
-        wallets_config['training_data']['training_period_start'],
         wallets_config['training_data']['training_period_end']
     ]
     imputed_profits_df = pri.impute_profits_for_multiple_dates(profits_df, market_data_df,

@@ -8,7 +8,7 @@ import yaml
 
 # Local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
-import wallet_modeling.wallet_modeling as wm
+import wallet_features.performance_features as wp
 import wallet_features.market_cap_features as wmc
 import wallet_features.trading_features as wtf
 import wallet_features.transfers_features as wts
@@ -63,7 +63,7 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
         .fillna({col: -1 for col in transfers_features.columns})
 
     # Performance features (inner join, no fill)
-    performance_features = wm.generate_target_variables(wallet_features_df)
+    performance_features = wp.calculate_performance_features(wallet_features_df)
     wallet_features_df = wallet_features_df.join(
         performance_features.drop(['invested', 'net_gain'], axis=1),
         how='inner'
