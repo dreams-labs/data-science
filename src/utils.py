@@ -660,6 +660,7 @@ def winsorize(data: pd.Series, cutoff: float = 0.01) -> pd.Series:
     # Clip the data
     return np.clip(winsorized, lower_bound, upper_bound)
 
+
 # silence donation message
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 def play_notification(sound_file_path=None):
@@ -687,3 +688,64 @@ def play_notification(sound_file_path=None):
 
     except Exception as e:  # pylint:disable=broad-exception-caught
         return f"Error playing sound: {e}"
+
+
+def consolidate_python_files(source_dirs, output_file="temp/consolidated_code.py", parent_directory="..//src"):
+    """
+    Consolidates all .py files in the specified directories into a single .py file.
+
+    Params:
+    - parent_directory (str): Path to the parent directory containing the source directories.
+    - source_dirs (list of str): List of directories (relative to parent_directory) containing .py files to consolidate.
+    - output_file (str): Path to the output consolidated .py file.
+
+    Example Use:
+    source_directories = [
+        "wallet_features",
+        "wallet_insights",
+        "wallet_modeling"
+    ]
+    consolidate_python_files(source_directories)
+    """
+    # Check if the parent directory exists
+    if not os.path.exists(parent_directory):
+        logger.error(f"Parent directory '{parent_directory}' does not exist.")
+        raise FileNotFoundError(f"Parent directory '{parent_directory}' does not exist.")
+
+    with open(output_file, 'w', encoding='utf-8') as outfile:
+        for source_dir in source_dirs:
+            # Construct the full path to the source directory
+            full_source_dir = os.path.join(parent_directory, source_dir)
+
+            # Check if the source directory exists
+            if not os.path.exists(full_source_dir):
+                logger.warning(f"Directory '{full_source_dir}' does not exist. Skipping.")
+                continue
+
+            for root, _, files in os.walk(full_source_dir):
+                for file in files:
+                    if file.endswith('.py'):
+                        file_path = os.path.join(root, file)
+
+                        # Check if the file exists (redundant but safe for edge cases)
+                        if not os.path.isfile(file_path):
+                            logger.warning(f"File '{file_path}' does not exist. Skipping.")
+                            continue
+
+                        relative_path = os.path.relpath(file_path, start=os.getcwd())
+
+                        # Write section header
+                        outfile.write(f"# {'-'*80}\n")
+                        outfile.write(f"# File: {relative_path}\n")
+                        outfile.write(f"# {'-'*80}\n\n")
+
+                        # Append file content
+                        with open(file_path, 'r', encoding='utf-8') as infile:
+                            outfile.write(infile.read())
+
+                        # Write section footer
+                        outfile.write(f"\n# {'-'*80}\n")
+                        outfile.write(f"# End of: {relative_path}\n")
+                        outfile.write(f"# {'-'*80}\n\n")
+
+    logger.info(f"Consolidation complete. All files are saved in {output_file}")
