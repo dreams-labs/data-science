@@ -8,6 +8,9 @@ time_series:
                 sma:
                     parameters:
                         window: [5]
+                rsi:
+                    parameters:
+                        window: [5]
         volume:
             indicators:
                 sma:

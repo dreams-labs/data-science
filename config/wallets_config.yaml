@@ -11,16 +11,37 @@ training_data:
     # modeling_period_start: "2024-02-01"
     # modeling_period_end: "2024-02-29"
     # validation_period_end: "2024-03-15"
-    modeling_period_start: "2024-11-01"
-    modeling_period_end: "2024-11-20"
+    modeling_period_start: "2024-9-01"
+    modeling_period_end: "2024-10-30"
     validation_period_end: "2024-12-07"
+
+
+# Variables used for model generation
+modeling:
+    # Which wallet performance metric to use as the target variable. Options are:
+    # invested, net_gain, return, risk_adj_return, performance_score, log_weighted_return, hybrid_score, size_adjusted_rank
+    target_variable: "performance_score"
+    returns_winsorization: 0.02
+    drop_columns: []
+
+    # Model specifics
+    model_type: "xgb"
+    model_params:
+        n_estimators: 200
+        max_depth: 4
+        learning_rate: 0.05
+        subsample: 0.8
+        colsample_bytree: 1.0
+        min_child_weight: 5
+        random_state: 42
+        n_jobs: -1
 
 
 # Variables used to define features
 features:
     # Clustering params
     clustering_n_components: 25
-    clustering_n_clusters: 4
+    clustering_n_clusters: 2
 
     timing_metrics_min_transaction_size: 20  # trades below this USD threshold will not be evaluated for market timing peformance
 
@@ -30,12 +51,12 @@ data_cleaning:
 
     # Modeling period filters
     min_modeling_investment: 2000
-    min_modeling_transaction_days: 2
+    min_modeling_transaction_days: 1
 
     # Wallet cohort thresholds
     min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
     max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
-    min_wallet_investment: 50000 # The amount of lifetime USD investment a wallet must have to be included in the training data
+    min_wallet_investment: 25000 # The amount of lifetime USD investment a wallet must have to be included in the training data
     max_wallet_investment: 25_000_000 # The amount of lifetime USD investment a wallet must have to be included in the training data
     min_wallet_volume: 50000  # Exclude wallets with fewer than this amount of training period USD volume
     max_wallet_volume: 50_000_000  # Exclude wallets with fewer than this amount of training period USD volume
@@ -73,19 +94,3 @@ coin_forecasting:
     min_market_cap: 2_000_000  # coins below this market cap will not be included in performance assessments
     max_market_cap: 30_000_000  # coins above this market cap will not be included in performance assessments
 
-
-# Variables used for model generation
-modeling:
-    model_type: "xgb"
-    model_params:
-        n_estimators: 200
-        max_depth: 4
-        learning_rate: 0.05
-        subsample: 0.8
-        colsample_bytree: 1.0
-        min_child_weight: 5
-        random_state: 42
-        n_jobs: -1
-    target_variable: "performance_score"
-    returns_winsorization: 0.01
-    drop_columns: []

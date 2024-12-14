@@ -12,22 +12,10 @@ trading_features = wtf.fill_trading_features_data(trading_features, wallet_cohor
 """
 import time
 import logging
-from pathlib import Path
 import pandas as pd
-import yaml
-
-# Local module imports
-from wallet_modeling.wallets_config_manager import WalletsConfig
-import utils as u
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
-
-# Load wallets_config at the module level
-wallets_config = WalletsConfig()
-wallets_metrics_config = u.load_config('../config/wallets_metrics_config.yaml')
-wallets_features_config = yaml.safe_load(Path('../config/wallets_features_config.yaml').read_text(encoding='utf-8'))
-
 
 
 def add_cash_flow_transfers_logic(profits_df):
@@ -88,7 +76,7 @@ def calculate_wallet_trading_features(profits_df):
 
     Returns:
     - wallet_metrics_df (pd.DataFrame): df keyed on wallet_address with columns
-        'invested', 'net_gain', 'return', and additional aggregation metrics
+        'invested', 'net_gain', and additional aggregation metrics
     """
     start_time = time.time()
     logger.info("Calculating wallet trading features...")
@@ -104,9 +92,6 @@ def calculate_wallet_trading_features(profits_df):
 
     # Calculate cumsum by wallet, respecting date order
     profits_df['cumsum_cash_flow_transfers'] = profits_df.groupby('wallet_address')['cash_flow_transfers'].cumsum()
-
-    # Calculate per-coin cumulative flows to catch potential issues
-    profits_df['cumsum_by_coin'] = profits_df.groupby(['wallet_address', 'coin_id'])['cash_flow_transfers'].cumsum()
 
     # Metrics that take into account imputed rows/profits
     logger.debug("Calculating wallet metrics based on imputed performance...")
@@ -167,6 +152,8 @@ def fill_trading_features_data(wallet_trading_features_df, wallet_cohort):
         'transaction_days': 0,
         'total_volume': 0,
         'average_transaction': 0,
+        'activity_days': 0,
+        'activity_density': 0
     }
 
     # Create a DataFrame with all wallets that should exist
