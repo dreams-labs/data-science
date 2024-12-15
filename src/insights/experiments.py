@@ -225,7 +225,7 @@ def set_nested_value(config, key_path, value):
 
     Args:
     - config (dict): The configuration dictionary to update.
-    - key_path (str): The flattened key path (e.g., 'config.data_cleaning.max_wallet_coin_inflows').
+    - key_path (str): The flattened key path (e.g., 'config.data_cleaning.max_wallet_inflows').
     - value: The value to set at the given key path.
     """
     keys = key_path.split('.')
@@ -242,7 +242,7 @@ def validate_key_in_config(config, key_path):
     Args:
     - config (dict): The configuration dictionary to validate.
     - key_path (str): The flattened key path to check.
-        (e.g. 'config.data_cleaning.max_wallet_coin_inflows')
+        (e.g. 'config.data_cleaning.max_wallet_inflows')
 
     Raises:
     - KeyError: If the key path does not exist in the config.

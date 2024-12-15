@@ -186,7 +186,7 @@
 #     # Create mock config files
 #     config_yaml = """
 #     data_cleaning:
-#       max_wallet_coin_inflows: 5000000
+#       max_wallet_inflows: 5000000
 #       max_wallet_coin_profits: 10000000
 #     training_data:
 #       modeling_period_duration: 30
@@ -219,7 +219,7 @@
 
 #     # Valid override parameters
 #     override_params = {
-#         'config.data_cleaning.max_wallet_coin_inflows': 10000000,
+#         'config.data_cleaning.max_wallet_inflows': 10000000,
 #         'config.training_data.modeling_period_duration': 14,
 #         'metrics_config.wallet_cohorts.sharks.buyers_new.aggregations.mean.scaling': 'standard',
 #         'modeling_config.preprocessing.drop_features': ['buyers_new_median'],
@@ -230,7 +230,7 @@
 #     config, metrics_config, modeling_config = exp.prepare_configs(str(config_folder), override_params)
 
 #     # Assert the overrides were applied correctly
-#     assert config['data_cleaning']['max_wallet_coin_inflows'] == 10000000
+#     assert config['data_cleaning']['max_wallet_inflows'] == 10000000
 #     assert config['training_data']['modeling_period_duration'] == 14
 #     assert metrics_config['wallet_cohorts']['sharks']['buyers_new']['aggregations']['mean']['scaling'] == 'standard'
 #     assert modeling_config['preprocessing']['drop_features'] == ['buyers_new_median']
@@ -250,7 +250,7 @@
 #     # Create mock config files
 #     config_yaml = """
 #     data_cleaning:
-#       max_wallet_coin_inflows: 5000000
+#       max_wallet_inflows: 5000000
 #       max_wallet_coin_profits: 10000000
 #     training_data:
 #       modeling_period_duration: 30

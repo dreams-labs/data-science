@@ -2,7 +2,6 @@
 Calculates metrics aggregated at the wallet-coin level
 """
 
-import time
 import logging
 import pandas as pd
 from dreams_core.googlecloud import GoogleCloud as dgc

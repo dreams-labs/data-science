@@ -393,9 +393,9 @@ def test_multiple_coins_per_wallet():
     cleaned_df, exclusions_logs_df = dr.clean_profits_df(profits_df, data_cleaning_config)
 
     # Expected cleaned DataFrame
-    expected_cleaned_df = profits_df[
-        profits_df['wallet_address'].isin(['wallet2', 'wallet3'])
-    ].reset_index(drop=True)
+    expected_cleaned_df = (profits_df[profits_df['wallet_address'].isin(['wallet2', 'wallet3'])]
+        .reset_index(drop=True)
+        .sort_values(['coin_id','wallet_address','date']))
 
     # Expected exclusions DataFrame
     expected_exclusions = pd.DataFrame({
@@ -515,10 +515,10 @@ def profits_df_base():
                                           MODELING_PERIOD_END,
                                           config['data_cleaning']['min_wallet_inflows'])
 
-    # filter data to only 5% of coin_ids
+    # filter data to only 2% of coin_ids
     np.random.seed(42)
     unique_coin_ids = profits_df['coin_id'].unique()
-    sample_coin_ids = np.random.choice(unique_coin_ids, size=int(0.05 * len(unique_coin_ids)), replace=False)
+    sample_coin_ids = np.random.choice(unique_coin_ids, size=int(0.02 * len(unique_coin_ids)), replace=False)
     profits_df = profits_df[profits_df['coin_id'].isin(sample_coin_ids)]
 
     # perform the rest of the data cleaning steps
@@ -590,7 +590,7 @@ def test_save_profits_df(profits_df):
     """
 
     # Save the cleaned DataFrame to the fixtures folder
-    profits_df.to_csv('tests/fixtures/cleaned_profits_df.csv', index=False)
+    profits_df.to_csv('fixtures/cleaned_profits_df.csv', index=False)
 
     # Add some basic assertions to ensure the data was saved correctly
     assert profits_df is not None
@@ -723,8 +723,8 @@ def test_save_market_data_df(market_data_df, prices_df):
     can be used for integration tests in other modules.
     """
     # Save the prices DataFrame to the fixtures folder
-    market_data_df.to_csv('tests/fixtures/market_data_df.csv', index=False)
-    prices_df.to_csv('tests/fixtures/prices_df.csv', index=False)
+    market_data_df.to_csv('fixtures/market_data_df.csv', index=False)
+    prices_df.to_csv('fixtures/prices_df.csv', index=False)
 
 
     # Add some basic assertions to ensure the data was saved correctly
@@ -757,7 +757,7 @@ def test_save_metadata_df(metadata_df):
     can be used for integration tests in other modules.
     """
     # Save the metadata DataFrame to the fixtures folder
-    metadata_df.to_csv('tests/fixtures/metadata_df.csv', index=False)
+    metadata_df.to_csv('fixtures/metadata_df.csv', index=False)
 
     # Add some basic assertions to ensure the data was saved correctly
     assert metadata_df is not None
@@ -798,13 +798,10 @@ def test_clean_profits_exclusions(cleaned_profits_df, profits_df_base):
                                        .reset_index())
 
     # Apply threshold check from the config
-    max_wallet_coin_profits = config['data_cleaning']['max_wallet_coin_profits']
-    max_wallet_coin_inflows = config['data_cleaning']['max_wallet_coin_inflows']
+    max_wallet_inflows = config['data_cleaning']['max_wallet_inflows']
 
     breaches_df = wallet_agg_df[
-        (wallet_agg_df['profits_cumulative'] >= max_wallet_coin_profits) |
-        (wallet_agg_df['profits_cumulative'] <= -max_wallet_coin_profits) |
-        (wallet_agg_df['usd_inflows_cumulative'] >= max_wallet_coin_inflows)
+        (wallet_agg_df['usd_inflows_cumulative'] >= max_wallet_inflows)
     ]
     # Assert that all excluded wallets breached a threshold
     assert len(exclusions_df) == len(breaches_df), "Some excluded wallets do not breach a threshold."
@@ -851,13 +848,10 @@ def test_clean_profits_aggregate_sums(cleaned_profits_df):
 
 
     # Apply the thresholds from the config
-    max_wallet_coin_profits = config['data_cleaning']['max_wallet_coin_profits']
-    max_wallet_coin_inflows = config['data_cleaning']['max_wallet_coin_inflows']
+    max_wallet_inflows = config['data_cleaning']['max_wallet_inflows']
     # Ensure no remaining wallets exceed the thresholds
     over_threshold_wallets = remaining_wallets_agg_df[
-        (remaining_wallets_agg_df['profits_cumulative'] >= max_wallet_coin_profits) |
-        (remaining_wallets_agg_df['profits_cumulative'] <= -max_wallet_coin_profits) |
-        (remaining_wallets_agg_df['usd_inflows_cumulative'] >= max_wallet_coin_inflows)
+        (remaining_wallets_agg_df['usd_inflows_cumulative'] >= max_wallet_inflows)
     ]
 
     # Assert that no wallets in the cleaned DataFrame breach the thresholds

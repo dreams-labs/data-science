@@ -350,6 +350,7 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows):
         ,is_imputed
         from profits_merged pm
         join reference.wallet_ids id on id.wallet_address = pm.wallet_address
+        order by coin_id,wallet_address,date
     """
 
     # Run the SQL query using dgc's run_sql method
@@ -385,12 +386,6 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows):
     profits_df[columns_to_round] = profits_df[columns_to_round].round(2)
     profits_df[columns_to_round] = profits_df[columns_to_round].replace(-0, 0)
 
-    # Remove rows with a rounded 0 balance and 0 transfers
-    profits_df = profits_df[
-        ~((profits_df['usd_balance'] == 0) &
-        (profits_df['usd_net_transfers'] == 0))
-    ]
-
     logger.info('Retrieved profits_df with %s unique coins and %s rows after %.2f seconds',
                 len(set(profits_df['coin_id'])),
                 len(profits_df),
@@ -403,13 +398,13 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows):
 def clean_profits_df(profits_df, data_cleaning_config):
     """
     Clean the profits DataFrame by excluding all records for any wallet_addresses that
-    have aggregate USD inflows above the max_wallet_coin_inflows.
+    have aggregate USD inflows above the max_wallet_inflows.
     The goal is to filter outliers such as minting/burning/contract addresses.
 
     Parameters:
     - profits_df: DataFrame with columns 'coin_id', 'wallet_address', 'date', 'usd_inflows_cumulative'
     - data_cleaning_config:
-        - max_wallet_coin_inflows: exclude wallets with total all time USD inflows above this level
+        - max_wallet_inflows: exclude wallets with total all time USD inflows above this level
 
     Returns:
     - Cleaned DataFrame with records for coin_id-wallet_address pairs filtered out.
@@ -441,6 +436,18 @@ def clean_profits_df(profits_df, data_cleaning_config):
 
     # Remove records from profits_df where wallet_address is in the exclusion list
     profits_cleaned_df = profits_df[~profits_df['wallet_address'].isin(wallet_exclusions_inflows)]
+
+    # Sort final output df
+    profits_cleaned_df = profits_cleaned_df.sort_values(by=['coin_id','wallet_address','date'])
+
+
+
+    # # Remove rows with a rounded 0 balance and 0 transfers
+    # profits_df = profits_df[
+    #     ~((profits_df['usd_balance'] == 0) &
+    #     (profits_df['usd_net_transfers'] == 0))
+    # ]
+
 
     # 3. Prepare exclusions_df and output logs
     # ----------------------------------------

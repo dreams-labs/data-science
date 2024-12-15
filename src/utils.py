@@ -693,8 +693,8 @@ def play_notification(sound_file_path=None):
 
 # pylint: disable=dangerous-default-value
 def export_code(
-    parent_directory="..//src",
     code_directories=[],
+    parent_directory="..//src",
     include_config=False,
     config_directory="..//config",
     notebook_directory="..//notebooks",
