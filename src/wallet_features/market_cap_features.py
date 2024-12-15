@@ -8,6 +8,7 @@ import numpy as np
 
 # Local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
+import utils as u
 
 # set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -138,7 +139,7 @@ def calculate_balance_weighted_market_cap(profits_market_features_df):
     return balance_wtd_df
 
 
-
+@u.timing_decorator
 def calculate_market_cap_features(profits_df,market_data_df):
     """
     Calculates each wallet's total volume and ending balance, and the average market cap of coins
@@ -154,7 +155,7 @@ def calculate_market_cap_features(profits_df,market_data_df):
 
     """
     start_time = time.time()
-    logger.info("Calculating market cap features...")
+    logger.debug("Calculating market cap features...")
 
     # Fully fill market cap data
     filled_market_cap_df = force_fill_market_cap(market_data_df)
@@ -181,8 +182,7 @@ def calculate_market_cap_features(profits_df,market_data_df):
     # Drop total_volume which isn't needed as a market cap feature
     market_features_df = market_features_df.drop('total_volume', axis=1)
 
-    logger.info("Calculated market cap features after %.2f seconds.",
+    logger.debug("Calculated market cap features after %.2f seconds.",
                  time.time() - start_time)
 
     return market_features_df
-

@@ -692,7 +692,7 @@ def play_notification(sound_file_path=None):
 
 
 # pylint: disable=dangerous-default-value
-def consolidate_code(
+def export_code(
     parent_directory="..//src",
     code_directories=[],
     include_config=False,

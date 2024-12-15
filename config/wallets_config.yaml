@@ -60,7 +60,9 @@ data_cleaning:
     max_wallet_investment: 25_000_000 # The amount of lifetime USD investment a wallet must have to be included in the training data
     min_wallet_volume: 50000  # Exclude wallets with fewer than this amount of training period USD volume
     max_wallet_volume: 50_000_000  # Exclude wallets with fewer than this amount of training period USD volume
+    min_wallet_inflows: 25000  # Exclude wallets with inflows greater than or equal to this amount (USD)
     max_wallet_inflows: 25_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
+    max_wallet_profits: 50_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
 
     # Market data filters
     max_initial_market_cap: 150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets

@@ -323,7 +323,7 @@
 #         },
 #         'data_cleaning': {
 #             'max_gap_days': 7,
-#             'min_wallet_coin_inflows': 10
+#             'min_wallet_inflows': 10
 #         }
 #     }
 
@@ -358,7 +358,7 @@
 #     mock_retrieve_profits_data.assert_called_once_with(
 #         mock_config['training_data']['training_period_start'],
 #         mock_config['training_data']['modeling_period_end'],
-#         mock_config['data_cleaning']['min_wallet_coin_inflows']
+#         mock_config['data_cleaning']['min_wallet_inflows']
 #     )
 #     mock_split_dataframe.assert_called_once_with(
 #         mock_profits_df,

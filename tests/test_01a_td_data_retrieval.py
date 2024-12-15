@@ -513,7 +513,7 @@ def profits_df_base():
     # retrieve profits data
     profits_df = dr.retrieve_profits_data(TRAINING_PERIOD_START,
                                           MODELING_PERIOD_END,
-                                          config['data_cleaning']['min_wallet_coin_inflows'])
+                                          config['data_cleaning']['min_wallet_inflows'])
 
     # filter data to only 5% of coin_ids
     np.random.seed(42)

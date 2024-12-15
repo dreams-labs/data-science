@@ -81,13 +81,13 @@ def calculate_wallet_trading_features(profits_df):
         'invested', 'net_gain', and additional aggregation metrics
     """
     start_time = time.time()
-    logger.info("Calculating wallet trading features...")
+    logger.debug("Calculating wallet trading features...")
 
     # Ensure date is in datetime format
     profits_df['date'] = pd.to_datetime(profits_df['date'])
 
     # Sort by date and wallet_address to ensure proper cumulative calculations
-    profits_df = profits_df.sort_values(['wallet_address', 'date'])
+    profits_df = profits_df.sort_values(['wallet_address','coin_id','date'])
 
     # Precompute necessary transformations
     profits_df['abs_usd_net_transfers'] = profits_df['usd_net_transfers'].abs()
@@ -115,6 +115,11 @@ def calculate_wallet_trading_features(profits_df):
 
     # Join all metrics together
     wallet_trading_features_df = imputed_metrics_df.join(observed_metrics_df)
+
+    # Data quality checks
+    if wallet_trading_features_df['invested'].min() < 0:
+        raise ValueError(f"Found {len(wallet_trading_features_df[wallet_trading_features_df['invested']<0])} "
+                         "wallets with negative invested values.")
 
     # Fill 0s for wallets without observed activity
     wallet_trading_features_df = wallet_trading_features_df.fillna(0)

@@ -291,7 +291,7 @@ def rebuild_profits_df_if_necessary(config, prices_df, profits_df=None):
     # retrieve profits data
     profits_df = dr.retrieve_profits_data(config['training_data']['training_period_start'],
                                           config['training_data']['modeling_period_end'],
-                                          config['data_cleaning']['min_wallet_coin_inflows'])
+                                          config['data_cleaning']['min_wallet_inflows'])
     profits_df, _ = cwm.split_dataframe_by_coverage(profits_df,
                                                     config['training_data']['training_period_start'],
                                                     config['training_data']['modeling_period_end'],

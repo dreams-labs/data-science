@@ -208,7 +208,7 @@ def impute_market_cap(market_data_df, min_coverage=0.7, max_multiple=1.0):
 
 
 
-def retrieve_profits_data(start_date, end_date, min_wallet_coin_inflows):
+def retrieve_profits_data(start_date, end_date, min_wallet_inflows):
     """
     Retrieves data from the core.coin_wallet_profits table and converts columns to
     memory-efficient formats. Records prior to the start_date are excluded but a new
@@ -218,7 +218,7 @@ def retrieve_profits_data(start_date, end_date, min_wallet_coin_inflows):
     Params:
     - start_date (String): The earliest date to retrieve records for with format 'YYYY-MM-DD'
     - start_date (String): The latest date to retrieve records for with format 'YYYY-MM-DD'
-    - min_wallet_coin_inflows (Float): Wallet-coin pairs with fewer than this amount of total
+    - min_wallet_inflows (Float): Wallets with fewer than this amount of lifetime
         USD inflows will be removed from the profits_df dataset
 
     Returns:
@@ -261,10 +261,10 @@ def retrieve_profits_data(start_date, end_date, min_wallet_coin_inflows):
             select pb.*
             from profits_base pb
 
-            -- filter to remove wallet-coin pairs below the min_wallet_coin_inflows
+            -- filter to remove wallet-coin pairs below the min_wallet_inflows
             join usd_inflows_filter f on f.coin_id = pb.coin_id
                 and f.wallet_address = pb.wallet_address
-                and f.total_usd_inflows >= {min_wallet_coin_inflows}
+                and f.total_usd_inflows >= {min_wallet_inflows}
         ),
 
 
