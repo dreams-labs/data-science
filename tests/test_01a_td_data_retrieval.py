@@ -220,7 +220,7 @@ def test_multiple_coins_varying_coverage():
         result_df.sort_values(['coin_id','date'])['market_cap_imputed'],
         expected_df.sort_values(['coin_id','date'])['market_cap_imputed'],
         equal_nan=True
-    ), "The market_cap_imputed values don't correctly handle multiple coins with varying coverage and max_multiple threshold"
+    ), "The market_cap_imputed values don't correctly handle multiple coins"
 
     # Assert that the market_cap_imputed column is of type Int64
     assert result_df['market_cap_imputed'].dtype == 'Int64', (
