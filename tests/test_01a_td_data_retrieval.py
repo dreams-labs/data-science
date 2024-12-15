@@ -561,7 +561,7 @@ def test_negative_profits_losses(negative_profits_df, negative_profits_config):
 # set up config and module-level variables
 # ---------------------------------- #
 
-config = load_config('tests/test_config/test_config.yaml')
+config = load_config('test_config/test_config.yaml')
 
 # Module-level variables
 TRAINING_PERIOD_START = config['training_data']['training_period_start']
@@ -661,7 +661,7 @@ def test_save_profits_df(profits_df):
     """
 
     # Save the cleaned DataFrame to the fixtures folder
-    profits_df.to_csv('tests/fixtures/cleaned_profits_df.csv', index=False)
+    profits_df.to_csv('fixtures/cleaned_profits_df.csv', index=False)
 
     # Add some basic assertions to ensure the data was saved correctly
     assert profits_df is not None
@@ -794,8 +794,8 @@ def test_save_market_data_df(market_data_df, prices_df):
     can be used for integration tests in other modules.
     """
     # Save the prices DataFrame to the fixtures folder
-    market_data_df.to_csv('tests/fixtures/market_data_df.csv', index=False)
-    prices_df.to_csv('tests/fixtures/prices_df.csv', index=False)
+    market_data_df.to_csv('fixtures/market_data_df.csv', index=False)
+    prices_df.to_csv('fixtures/prices_df.csv', index=False)
 
 
     # Add some basic assertions to ensure the data was saved correctly
@@ -828,7 +828,7 @@ def test_save_metadata_df(metadata_df):
     can be used for integration tests in other modules.
     """
     # Save the metadata DataFrame to the fixtures folder
-    metadata_df.to_csv('tests/fixtures/metadata_df.csv', index=False)
+    metadata_df.to_csv('fixtures/metadata_df.csv', index=False)
 
     # Add some basic assertions to ensure the data was saved correctly
     assert metadata_df is not None

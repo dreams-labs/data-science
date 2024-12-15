@@ -7,15 +7,12 @@ time_series:
             indicators:
                 sma:
                     parameters:
-                        window: [7]
-                rsi:
-                    parameters:
-                        window: [14]
+                        window: [5]
         volume:
             indicators:
                 sma:
                     parameters:
-                        window: [7]
+                        window: [5]
 
 # # Time series keyed on only date
 # macro_trends:
