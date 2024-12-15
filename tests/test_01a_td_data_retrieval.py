@@ -367,32 +367,9 @@ def test_market_cap_missing_intermittently():
 # clean_profits_df() unit tests
 # ---------------------------------------- #
 
-@pytest.fixture
-def sample_profits_df_for_cleaning():
-    """
-    Fixture to create a sample profits DataFrame with multiple coins per wallet.
-    """
-    return pd.DataFrame({
-        'coin_id': ['BTC', 'ETH', 'BTC', 'ETH', 'LTC', 'BTC', 'ETH'],
-        'wallet_address': ['wallet1', 'wallet1', 'wallet2', 'wallet2','wallet2',
-                           'wallet3', 'wallet3'],
-        'date': pd.date_range(start='2023-01-01', periods=7),
-        'profits_cumulative': [5000, 3000, 1000, 500, 500, 100, 50],
-        'usd_inflows_cumulative': [10000, 8000, 2000, 1500, 1500, 500, 250]
-    })
-
-@pytest.fixture
-def sample_data_cleaning_config():
-    """
-    Fixture to create a sample data cleaning configuration.
-    """
-    return {
-        'max_wallet_coin_profits': 7500,
-        'max_wallet_coin_inflows': 15000
-    }
 
 @pytest.mark.unit
-def test_multiple_coins_per_wallet(sample_profits_df_for_cleaning, sample_data_cleaning_config):
+def test_multiple_coins_per_wallet():
     """
     Test the clean_profits_df function to ensure wallets with excessive inflows
     are correctly excluded and logged.
