@@ -132,15 +132,15 @@ def impute_market_cap(market_data_df, min_coverage=0.7, max_multiple=1.0):
         maximum known market cap. Rows exceeding this threshold will be set to np.nan
 
     Returns:
-    - df_copy (DataFrame): DataFrame with new 'market_cap_imputed' column containing original and
+    - market_data_imputed_df (DataFrame): DataFrame with new 'market_cap_imputed' column containing original and
         imputed values as int64
     """
     # Make a copy of input data
-    df_copy = market_data_df.copy()
-    df_copy = df_copy.sort_values(['coin_id','date'])
+    market_data_imputed_df = market_data_df.copy()
+    market_data_imputed_df = market_data_imputed_df.sort_values(['coin_id','date'])
 
     # Calculate coverage and historical maximums per coin
-    coverage = df_copy.groupby('coin_id', observed=True).agg(
+    coverage = market_data_imputed_df.groupby('coin_id', observed=True).agg(
         records=('price', 'count'),
         has_cap=('market_cap', 'count'),
         max_cap=('market_cap', 'max')
@@ -154,30 +154,30 @@ def impute_market_cap(market_data_df, min_coverage=0.7, max_multiple=1.0):
     ].index
 
     # Initialize imputed column with original values as int64
-    df_copy['market_cap_imputed'] = df_copy['market_cap'].astype('Int64')
+    market_data_imputed_df['market_cap_imputed'] = market_data_imputed_df['market_cap'].astype('Int64')
 
     # Process only eligible coins
-    mask_eligible = df_copy['coin_id'].isin(eligible_coins)
+    mask_eligible = market_data_imputed_df['coin_id'].isin(eligible_coins)
 
     # Calculate ratio for all valid records of eligible coins
-    df_copy.loc[mask_eligible, 'ratio'] = (
-        df_copy.loc[mask_eligible, 'market_cap'] /
-        df_copy.loc[mask_eligible, 'price']
+    market_data_imputed_df.loc[mask_eligible, 'ratio'] = (
+        market_data_imputed_df.loc[mask_eligible, 'market_cap'] /
+        market_data_imputed_df.loc[mask_eligible, 'price']
     )
 
     # Backfill and forward fill ratios within each coin group
-    df_copy['ratio'] = df_copy.groupby('coin_id',observed=True)['ratio'].bfill()
-    df_copy['ratio'] = df_copy.groupby('coin_id',observed=True)['ratio'].ffill()
+    market_data_imputed_df['ratio'] = market_data_imputed_df.groupby('coin_id',observed=True)['ratio'].bfill()
+    market_data_imputed_df['ratio'] = market_data_imputed_df.groupby('coin_id',observed=True)['ratio'].ffill()
 
     # Calculate imputed market caps using the filled ratios
-    mask_missing = df_copy['market_cap_imputed'].isna() & mask_eligible
-    df_copy.loc[mask_missing, 'market_cap_imputed'] = (
-        (df_copy.loc[mask_missing, 'price'] *
-         df_copy.loc[mask_missing, 'ratio']).round().astype('Int64')
+    mask_missing = market_data_imputed_df['market_cap_imputed'].isna() & mask_eligible
+    market_data_imputed_df.loc[mask_missing, 'market_cap_imputed'] = (
+        (market_data_imputed_df.loc[mask_missing, 'price'] *
+         market_data_imputed_df.loc[mask_missing, 'ratio']).round().astype('Int64')
     )
 
     # Join max historical values and apply max_multiple check vectorized
-    df_copy = df_copy.merge(
+    market_data_imputed_df = market_data_imputed_df.merge(
         coverage[['max_cap']],
         left_on='coin_id',
         right_index=True,
@@ -186,25 +186,25 @@ def impute_market_cap(market_data_df, min_coverage=0.7, max_multiple=1.0):
 
     # Set imputed values exceeding max_multiple * historical max to np.nan
     mask_exceeds_max = (
-        df_copy['market_cap_imputed'] >
-        (df_copy['max_cap'] * max_multiple)
+        market_data_imputed_df['market_cap_imputed'] >
+        (market_data_imputed_df['max_cap'] * max_multiple)
     )
-    df_copy.loc[mask_exceeds_max, 'market_cap_imputed'] = pd.NA
+    market_data_imputed_df.loc[mask_exceeds_max, 'market_cap_imputed'] = pd.NA
 
     # Drop temporary columns
-    df_copy = df_copy.drop(['ratio', 'max_cap'], axis=1)
+    market_data_imputed_df = market_data_imputed_df.drop(['ratio', 'max_cap'], axis=1)
 
     # Logger calculations and output
-    all_rows = len(df_copy)
-    known = df_copy['market_cap'].count()
-    imputed = df_copy['market_cap_imputed'].count()
+    all_rows = len(market_data_imputed_df)
+    known = market_data_imputed_df['market_cap'].count()
+    imputed = market_data_imputed_df['market_cap_imputed'].count()
     logger.info("Imputation increased market cap coverage by %.1f%% to %.1f%% (%s/%s) vs base of %.1f%% (%s/%s)",
                 100*(imputed-known)/all_rows,
                 100*imputed/all_rows, dc.human_format(imputed), dc.human_format(all_rows),
                 100*known/all_rows, dc.human_format(known), dc.human_format(all_rows))
 
 
-    return df_copy
+    return market_data_imputed_df
 
 
 
