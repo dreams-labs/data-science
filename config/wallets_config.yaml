@@ -92,20 +92,3 @@ coin_forecasting:
     min_balance: 10000  # how much USD all wallets must hold for the coin to be elegible for forecasting
     min_market_cap: 2_000_000  # coins below this market cap will not be included in performance assessments
     max_market_cap: 30_000_000  # coins above this market cap will not be included in performance assessments
-
-
-# Variables used for model generation
-modeling:
-    model_type: "xgb"
-    model_params:
-        n_estimators: 200
-        max_depth: 4
-        learning_rate: 0.05
-        subsample: 0.8
-        colsample_bytree: 1.0
-        min_child_weight: 5
-        random_state: 42
-        n_jobs: -1
-    target_variable: "performance_score"
-    returns_winsorization: 0.01
-    drop_columns: []
