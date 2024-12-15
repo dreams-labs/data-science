@@ -57,6 +57,9 @@ data_cleaning:
     max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
     min_wallet_investment: 25000 # The amount of lifetime USD investment a wallet must have to be included in the training data
     max_wallet_investment: 25_000_000 # The amount of lifetime USD investment a wallet must have to be included in the training data
+    max_coins_traded: 100  # Exclude wallets that have traded more coins than this during the training period
+    min_wallet_investment: 30000 # The amount of lifetime USD investment a wallet must have to be included in the training data
+    max_wallet_investment: 50_000_000 # The amount of lifetime USD investment a wallet must have to be included in the training data
     min_wallet_volume: 50000  # Exclude wallets with fewer than this amount of training period USD volume
     max_wallet_volume: 50_000_000  # Exclude wallets with fewer than this amount of training period USD volume
     min_wallet_inflows: 25000  # Exclude wallets with inflows greater than or equal to this amount (USD)
@@ -64,7 +67,7 @@ data_cleaning:
     max_wallet_profits: 50_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
 
     # Market data filters
-    max_initial_market_cap: 150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
+    max_initial_market_cap: 999150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
     max_gap_days: 50  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
     min_daily_volume: 3000 # Minimum average daily volume the coin must have
 
@@ -90,3 +93,19 @@ coin_forecasting:
     min_market_cap: 2_000_000  # coins below this market cap will not be included in performance assessments
     max_market_cap: 30_000_000  # coins above this market cap will not be included in performance assessments
 
+
+# Variables used for model generation
+modeling:
+    model_type: "xgb"
+    model_params:
+        n_estimators: 200
+        max_depth: 4
+        learning_rate: 0.05
+        subsample: 0.8
+        colsample_bytree: 1.0
+        min_child_weight: 5
+        random_state: 42
+        n_jobs: -1
+    target_variable: "performance_score"
+    returns_winsorization: 0.01
+    drop_columns: []
