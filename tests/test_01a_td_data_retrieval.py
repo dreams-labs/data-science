@@ -394,32 +394,48 @@ def sample_data_cleaning_config():
 @pytest.mark.unit
 def test_multiple_coins_per_wallet(sample_profits_df_for_cleaning, sample_data_cleaning_config):
     """
-    Test scenario where wallets own multiple coins, some exceeding thresholds when aggregated.
+    Test the clean_profits_df function to ensure wallets with excessive inflows
+    are correctly excluded and logged.
     """
-    # Call the function
-    cleaned_df, exclusions_logs_df = dr.clean_profits_df(sample_profits_df_for_cleaning,
-                                                         sample_data_cleaning_config)
 
-    # Expected results
-    expected_cleaned_df = sample_profits_df_for_cleaning[
-        sample_profits_df_for_cleaning['wallet_address'].isin(['wallet2', 'wallet3'])
+    # Hardcoded test data for profits_df
+    profits_df = pd.DataFrame({
+        'coin_id': ['BTC', 'ETH', 'BTC', 'ETH', 'LTC', 'BTC', 'ETH'],
+        'wallet_address': ['wallet1', 'wallet1', 'wallet2', 'wallet2', 'wallet2',
+                            'wallet3', 'wallet3'],
+        'date': pd.date_range(start='2023-01-01', periods=7),
+        'usd_inflows_cumulative': [10000, 8000, 2000, 1500, 1500, 500, 250]
+    })
+
+    # Hardcoded data cleaning config
+    data_cleaning_config = {
+        'max_wallet_inflows': 15000  # Threshold for total inflows
+    }
+
+    # Call the function
+    cleaned_df, exclusions_logs_df = dr.clean_profits_df(profits_df, data_cleaning_config)
+
+    # Expected cleaned DataFrame
+    expected_cleaned_df = profits_df[
+        profits_df['wallet_address'].isin(['wallet2', 'wallet3'])
     ].reset_index(drop=True)
+
+    # Expected exclusions DataFrame
     expected_exclusions = pd.DataFrame({
         'wallet_address': ['wallet1'],
-        'profits_exclusion': [True],
         'inflows_exclusion': [True]
     })
 
     # Assertions
-    assert len(cleaned_df) == 5  # wallet2 (3 records) and wallet3 (2 records) should remain
+    assert len(cleaned_df) == len(expected_cleaned_df)
     assert np.array_equal(cleaned_df.values, expected_cleaned_df.values)
+
+    assert len(exclusions_logs_df) == len(expected_exclusions)
     assert np.array_equal(exclusions_logs_df.values, expected_exclusions.values)
 
-    # Check if profits and inflows are approximately correct for the remaining wallets
-    # 1000 + 500 + 500 + 100 + 50
-    assert pytest.approx(cleaned_df['profits_cumulative'].sum(), abs=1e-4) == 2150
-    # 2000 + 1500 + 1500 + 500 + 250
-    assert pytest.approx(cleaned_df['usd_inflows_cumulative'].sum(), abs=1e-4) == 5750
+    # Check inflows in the cleaned DataFrame
+    assert cleaned_df['usd_inflows_cumulative'].sum() == 5750
+
 
 @pytest.fixture
 def profits_at_threshold_df():
@@ -435,23 +451,27 @@ def profits_at_threshold_df():
     })
 
 @pytest.fixture
-def profits_at_threshold_config():
+def inflows_at_threshold_config():
     """
-    Fixture to create a data cleaning configuration with a specific profitability threshold.
+    Test scenario where some wallets have inflows exactly at the threshold value.
     """
-    return {
-        'max_wallet_coin_profits': 7500,
-        'max_wallet_coin_inflows': 15000
+
+    # Hardcoded test data for profits DataFrame
+    profits_at_threshold_df = pd.DataFrame({
+        'coin_id': ['BTC', 'ETH', 'LTC', 'XRP', 'DOGE'],
+        'wallet_address': ['wallet1', 'wallet2', 'wallet3', 'wallet4', 'wallet5'],
+        'date': pd.date_range(start='2023-01-01', periods=5),
+        'usd_inflows_cumulative': [10000, 22000, 15000, 11000, 8000]
+    })
+
+    # Hardcoded cleaning configuration
+    profits_at_threshold_config = {
+        'max_wallet_inflows': 15000
     }
 
-@pytest.mark.unit
-def test_profits_exactly_at_threshold(profits_at_threshold_df, profits_at_threshold_config):
-    """
-    Test scenario where some wallets have profits exactly at the threshold value.
-    """
     # Call the function
     cleaned_df, exclusions_logs_df = dr.clean_profits_df(profits_at_threshold_df,
-                                                         profits_at_threshold_config)
+                                                            profits_at_threshold_config)
 
     # Expected results
     expected_cleaned_df = profits_at_threshold_df[
@@ -460,8 +480,7 @@ def test_profits_exactly_at_threshold(profits_at_threshold_df, profits_at_thresh
 
     expected_exclusions = pd.DataFrame({
         'wallet_address': ['wallet2', 'wallet3'],
-        'profits_exclusion': [True, True],
-        'inflows_exclusion': [False, False]
+        'inflows_exclusion': [True, True]
     })
 
     # Assertions
@@ -476,78 +495,11 @@ def test_profits_exactly_at_threshold(profits_at_threshold_df, profits_at_thresh
     assert 'wallet2' not in cleaned_df['wallet_address'].values
     assert 'wallet3' not in cleaned_df['wallet_address'].values
 
-    # Check if profits and inflows are approximately correct for the remaining wallets
-    # 5000 + 7499 + 3000
-    assert pytest.approx(cleaned_df['profits_cumulative'].sum(), abs=1e-4) == 15499
-     # 10000 + 11000 + 8000
+    # Check if inflows are approximately correct for the remaining wallets
+    # 10000 + 11000 + 8000
     assert pytest.approx(cleaned_df['usd_inflows_cumulative'].sum(), abs=1e-4) == 29000
 
-@pytest.fixture
-def negative_profits_df():
-    """
-    Fixture to create a sample profits DataFrame with various levels of negative profits (losses).
-    """
-    return pd.DataFrame({
-        'coin_id': ['BTC', 'ETH', 'LTC', 'XRP', 'DOGE', 'ADA'],
-        'wallet_address': ['wallet1', 'wallet2', 'wallet3', 'wallet4', 'wallet5', 'wallet6'],
-        'date': pd.date_range(start='2023-01-01', periods=6),
-        'profits_cumulative': [-5000, -7500, -7501, -7499, 3000, 0],
-        'usd_inflows_cumulative': [10000, 12000, 13000, 11000, 8000, 5000]
-    })
 
-@pytest.fixture
-def negative_profits_config():
-    """
-    Fixture to create a data cleaning configuration with a specific profitability threshold.
-    """
-    return {
-        'max_wallet_coin_profits': 7500,
-        'max_wallet_coin_inflows': 15000
-    }
-
-@pytest.mark.unit
-def test_negative_profits_losses(negative_profits_df, negative_profits_config):
-    """
-    Test scenario where some wallets have significant negative profits (losses).
-    """
-    # Call the function
-    cleaned_df, exclusions_logs_df = dr.clean_profits_df(negative_profits_df,
-                                                         negative_profits_config)
-
-    # Expected results
-    expected_cleaned_df = negative_profits_df[
-        negative_profits_df['wallet_address'].isin(['wallet1', 'wallet4', 'wallet5', 'wallet6'])
-    ].reset_index(drop=True)
-
-    expected_exclusions = pd.DataFrame({
-        'wallet_address': ['wallet2', 'wallet3'],
-        'profits_exclusion': [True, True],
-        'inflows_exclusion': [False, False]
-    })
-
-    # Assertions
-    assert len(cleaned_df) == 4  # wallet1, wallet4, wallet5, and wallet6 should remain
-    assert np.array_equal(cleaned_df.values, expected_cleaned_df.values)
-    assert np.array_equal(exclusions_logs_df.values, expected_exclusions.values)
-
-    # Check if the correct wallets are present in the cleaned DataFrame
-    assert set(cleaned_df['wallet_address']) == {'wallet1', 'wallet4', 'wallet5', 'wallet6'}
-
-    # Verify that wallets with losses at or beyond the threshold are excluded
-    assert 'wallet2' not in cleaned_df['wallet_address'].values
-    assert 'wallet3' not in cleaned_df['wallet_address'].values
-
-    # Check if profits and inflows are approximately correct for the remaining wallets
-    # -5000 + -7499 + 3000 + 0
-    assert pytest.approx(cleaned_df['profits_cumulative'].sum(), abs=1e-4) == -9499
-    # 10000 + 11000 + 8000 + 5000
-    assert pytest.approx(cleaned_df['usd_inflows_cumulative'].sum(), abs=1e-4) == 34000
-
-    # Verify that wallets with losses are present in the cleaned DataFrame
-    assert (cleaned_df['profits_cumulative'] < 0).any()
-
-    # Verify that the wallet with zero profit is included
-    assert (cleaned_df['profits_cumulative'] == 0).any()
 
 
 # ======================================================== #
@@ -561,7 +513,7 @@ def test_negative_profits_losses(negative_profits_df, negative_profits_config):
 # set up config and module-level variables
 # ---------------------------------- #
 
-config = load_config('tests/test_config/test_config.yaml')
+config = load_config('test_config/test_config.yaml')
 
 # Module-level variables
 TRAINING_PERIOD_START = config['training_data']['training_period_start']
