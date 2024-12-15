@@ -120,7 +120,6 @@ def clean_market_data(market_data_df, config, earliest_date, latest_date):
     return cleaned_df
 
 
-
 def impute_market_cap(market_data_df, min_coverage=0.7, max_multiple=1.0):
     """
     Create a new column with imputed market cap values based on price movements.
@@ -133,15 +132,15 @@ def impute_market_cap(market_data_df, min_coverage=0.7, max_multiple=1.0):
         maximum known market cap. Rows exceeding this threshold will be set to np.nan
 
     Returns:
-    - market_data_imputed_df (DataFrame): DataFrame with new 'market_cap_imputed' column containing original and
+    - df_copy (DataFrame): DataFrame with new 'market_cap_imputed' column containing original and
         imputed values as int64
     """
     # Make a copy of input data
-    market_data_imputed_df = market_data_df.copy()
-    market_data_imputed_df = market_data_imputed_df.sort_values(['coin_id','date'])
+    df_copy = market_data_df.copy()
+    df_copy = df_copy.sort_values(['coin_id','date'])
 
     # Calculate coverage and historical maximums per coin
-    coverage = market_data_imputed_df.groupby('coin_id', observed=True).agg(
+    coverage = df_copy.groupby('coin_id', observed=True).agg(
         records=('price', 'count'),
         has_cap=('market_cap', 'count'),
         max_cap=('market_cap', 'max')
@@ -155,30 +154,30 @@ def impute_market_cap(market_data_df, min_coverage=0.7, max_multiple=1.0):
     ].index
 
     # Initialize imputed column with original values as int64
-    market_data_imputed_df['market_cap_imputed'] = market_data_imputed_df['market_cap'].astype('Int64')
+    df_copy['market_cap_imputed'] = df_copy['market_cap'].astype('Int64')
 
     # Process only eligible coins
-    mask_eligible = market_data_imputed_df['coin_id'].isin(eligible_coins)
+    mask_eligible = df_copy['coin_id'].isin(eligible_coins)
 
     # Calculate ratio for all valid records of eligible coins
-    market_data_imputed_df.loc[mask_eligible, 'ratio'] = (
-        market_data_imputed_df.loc[mask_eligible, 'market_cap'] /
-        market_data_imputed_df.loc[mask_eligible, 'price']
+    df_copy.loc[mask_eligible, 'ratio'] = (
+        df_copy.loc[mask_eligible, 'market_cap'] /
+        df_copy.loc[mask_eligible, 'price']
     )
 
     # Backfill and forward fill ratios within each coin group
-    market_data_imputed_df['ratio'] = market_data_imputed_df.groupby('coin_id',observed=True)['ratio'].bfill()
-    market_data_imputed_df['ratio'] = market_data_imputed_df.groupby('coin_id',observed=True)['ratio'].ffill()
+    df_copy['ratio'] = df_copy.groupby('coin_id',observed=True)['ratio'].bfill()
+    df_copy['ratio'] = df_copy.groupby('coin_id',observed=True)['ratio'].ffill()
 
     # Calculate imputed market caps using the filled ratios
-    mask_missing = market_data_imputed_df['market_cap_imputed'].isna() & mask_eligible
-    market_data_imputed_df.loc[mask_missing, 'market_cap_imputed'] = (
-        (market_data_imputed_df.loc[mask_missing, 'price'] *
-         market_data_imputed_df.loc[mask_missing, 'ratio']).round().astype('Int64')
+    mask_missing = df_copy['market_cap_imputed'].isna() & mask_eligible
+    df_copy.loc[mask_missing, 'market_cap_imputed'] = (
+        (df_copy.loc[mask_missing, 'price'] *
+         df_copy.loc[mask_missing, 'ratio']).round().astype('Int64')
     )
 
     # Join max historical values and apply max_multiple check vectorized
-    market_data_imputed_df = market_data_imputed_df.merge(
+    df_copy = df_copy.merge(
         coverage[['max_cap']],
         left_on='coin_id',
         right_index=True,
@@ -187,25 +186,25 @@ def impute_market_cap(market_data_df, min_coverage=0.7, max_multiple=1.0):
 
     # Set imputed values exceeding max_multiple * historical max to np.nan
     mask_exceeds_max = (
-        market_data_imputed_df['market_cap_imputed'] >
-        (market_data_imputed_df['max_cap'] * max_multiple)
+        df_copy['market_cap_imputed'] >
+        (df_copy['max_cap'] * max_multiple)
     )
-    market_data_imputed_df.loc[mask_exceeds_max, 'market_cap_imputed'] = pd.NA
+    df_copy.loc[mask_exceeds_max, 'market_cap_imputed'] = pd.NA
 
     # Drop temporary columns
-    market_data_imputed_df = market_data_imputed_df.drop(['ratio', 'max_cap'], axis=1)
+    df_copy = df_copy.drop(['ratio', 'max_cap'], axis=1)
 
     # Logger calculations and output
-    all_rows = len(market_data_imputed_df)
-    known = market_data_imputed_df['market_cap'].count()
-    imputed = market_data_imputed_df['market_cap_imputed'].count()
+    all_rows = len(df_copy)
+    known = df_copy['market_cap'].count()
+    imputed = df_copy['market_cap_imputed'].count()
     logger.info("Imputation increased market cap coverage by %.1f%% to %.1f%% (%s/%s) vs base of %.1f%% (%s/%s)",
                 100*(imputed-known)/all_rows,
                 100*imputed/all_rows, dc.human_format(imputed), dc.human_format(all_rows),
                 100*known/all_rows, dc.human_format(known), dc.human_format(all_rows))
 
 
-    return market_data_imputed_df
+    return df_copy
 
 
 
@@ -219,7 +218,7 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows):
     Params:
     - start_date (String): The earliest date to retrieve records for with format 'YYYY-MM-DD'
     - start_date (String): The latest date to retrieve records for with format 'YYYY-MM-DD'
-    - min_wallet_inflows (Float): Wallets with fewer than this amount of lifetime
+    - min_wallet_inflows (Float): Wallet-coin pairs with fewer than this amount of total
         USD inflows will be removed from the profits_df dataset
 
     Returns:
@@ -325,15 +324,12 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows):
             from profits_base_filtered
             -- transfers prior to the training period are summarized in training_start_new_rows
             where date >= '{start_date}'
-            and (usd_balance != 0 or usd_net_transfers != 0)
 
             union all
 
             select *,
             True as is_imputed
             from training_start_new_rows
-            where (usd_balance != 0 or usd_net_transfers != 0)
-
         )
 
         select coin_id
@@ -351,7 +347,6 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows):
         ,is_imputed
         from profits_merged pm
         join reference.wallet_ids id on id.wallet_address = pm.wallet_address
-        order by coin_id,wallet_address,date
     """
 
     # Run the SQL query using dgc's run_sql method
@@ -376,17 +371,6 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows):
     profits_df = u.safe_downcast(profits_df, 'usd_inflows_cumulative', 'float32')
     profits_df = u.safe_downcast(profits_df, 'total_return', 'float32')
 
-    # Round relevant columns
-    columns_to_round = [
-        'profits_cumulative'
-        ,'usd_balance'
-        ,'usd_net_transfers'
-        ,'usd_inflows'
-        ,'usd_inflows_cumulative'
-    ]
-    profits_df[columns_to_round] = profits_df[columns_to_round].round(2)
-    profits_df[columns_to_round] = profits_df[columns_to_round].replace(-0, 0)
-
     logger.info('Retrieved profits_df with %s unique coins and %s rows after %.2f seconds',
                 len(set(profits_df['coin_id'])),
                 len(profits_df),
@@ -399,23 +383,17 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows):
 def clean_profits_df(profits_df, data_cleaning_config):
     """
     Clean the profits DataFrame by excluding all records for any wallet_addresses that
-    have aggregate USD inflows above the max_wallet_inflows.
+    have aggregate USD inflows above the max_wallet_coin_inflows.
     The goal is to filter outliers such as minting/burning/contract addresses.
 
     Parameters:
     - profits_df: DataFrame with columns 'coin_id', 'wallet_address', 'date', 'usd_inflows_cumulative'
     - data_cleaning_config:
-        - max_wallet_inflows: exclude wallets with total all time USD inflows above this level
+        - max_wallet_coin_inflows: exclude wallets with total all time USD inflows above this level
 
     Returns:
     - Cleaned DataFrame with records for coin_id-wallet_address pairs filtered out.
     """
-    # 0. Remove rows with a rounded 0 balance and 0 transfers
-    # -------------------------------------------------------
-    profits_df = profits_df[
-        ~((profits_df['usd_balance'] == 0) &
-        (profits_df['usd_net_transfers'] == 0))
-    ]
 
     # 1. Calculate total inflows for each wallet across all coins
     # -----------------------------------------------------------
@@ -443,10 +421,6 @@ def clean_profits_df(profits_df, data_cleaning_config):
 
     # Remove records from profits_df where wallet_address is in the exclusion list
     profits_cleaned_df = profits_df[~profits_df['wallet_address'].isin(wallet_exclusions_inflows)]
-
-    # Sort final output df
-    profits_cleaned_df = profits_cleaned_df.sort_values(by=['coin_id','wallet_address','date'])
-
 
     # 3. Prepare exclusions_df and output logs
     # ----------------------------------------

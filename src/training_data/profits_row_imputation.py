@@ -99,12 +99,8 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
     # Concatenate all new rows at once
     all_new_rows = pd.concat(new_rows_list, ignore_index=True)
 
-    # Filter out imputed rows with no activity before adding to profits_df
-    active_rows = ((all_new_rows['usd_balance'] != 0) |
-                  (all_new_rows['usd_net_transfers'] != 0))
-    new_active_rows = all_new_rows[active_rows]
-
-    updated_profits_df = pd.concat([profits_df, new_active_rows], ignore_index=True)
+    # Append all new rows to profits_df
+    updated_profits_df = pd.concat([profits_df, all_new_rows], ignore_index=True)
 
     logger.info("Completed new row generation after %.2f seconds. Total rows after imputation: %s",
                 time.time() - start_time,
