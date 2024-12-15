@@ -120,6 +120,7 @@ def clean_market_data(market_data_df, config, earliest_date, latest_date):
     return cleaned_df
 
 
+
 def impute_market_cap(market_data_df, min_coverage=0.7, max_multiple=1.0):
     """
     Create a new column with imputed market cap values based on price movements.
@@ -409,6 +410,12 @@ def clean_profits_df(profits_df, data_cleaning_config):
     Returns:
     - Cleaned DataFrame with records for coin_id-wallet_address pairs filtered out.
     """
+    # 0. Remove rows with a rounded 0 balance and 0 transfers
+    # -------------------------------------------------------
+    profits_df = profits_df[
+        ~((profits_df['usd_balance'] == 0) &
+        (profits_df['usd_net_transfers'] == 0))
+    ]
 
     # 1. Calculate total inflows for each wallet across all coins
     # -----------------------------------------------------------
@@ -439,14 +446,6 @@ def clean_profits_df(profits_df, data_cleaning_config):
 
     # Sort final output df
     profits_cleaned_df = profits_cleaned_df.sort_values(by=['coin_id','wallet_address','date'])
-
-
-
-    # # Remove rows with a rounded 0 balance and 0 transfers
-    # profits_df = profits_df[
-    #     ~((profits_df['usd_balance'] == 0) &
-    #     (profits_df['usd_net_transfers'] == 0))
-    # ]
 
 
     # 3. Prepare exclusions_df and output logs
