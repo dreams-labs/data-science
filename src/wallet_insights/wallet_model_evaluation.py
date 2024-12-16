@@ -129,6 +129,54 @@ class RegressionEvaluator:
         return "\n".join(summary)
 
 
+
+    def importance_summary(self):
+        """
+        Generate and return a df showing total importance by feature category and the best performing
+        feature in each category.
+
+        Returns:
+        - importance_summary_df (df): formatted df showing importance metrics for each feature category
+        """
+
+        feature_importance_df = pd.DataFrame(self.metrics['importances'])
+
+        # Extract prefix before first underscore
+        feature_importance_df['prefix'] = feature_importance_df['feature'].str.split('_').str[0]
+
+        # Calculate total_importance by summing importance for each prefix
+        importance_summary_df = feature_importance_df.groupby('prefix').agg(
+            total_importance=('importance', 'sum'),
+        )
+
+        # Take the highest importance feature from each prefix
+        highest_importances_df = (feature_importance_df
+                                .sort_values(by='importance', ascending=False)
+                                .groupby('prefix')
+                                .first())
+        highest_importances_df.columns = ['best_feature','best_importance']
+
+        # Join the total importances with the highest importances
+        importance_summary_df = (importance_summary_df
+                            .join(highest_importances_df)
+                            .sort_values(by='total_importance', ascending=False))
+
+        # Format output
+        importance_summary_df = (importance_summary_df
+                                .rename(columns={
+                                    'total_importance': 'Total Importance',
+                                    'best_feature': 'Best Feature',
+                                    'best_importance': 'Best Importance'
+                                })
+                                .style.format({
+                                    'Total Importance': '{:.3f}',
+                                    'Best Importance': '{:.3f}'
+                                }))
+
+        return importance_summary_df
+
+
+
     def plot_evaluation(self, plot_type='all', display=True):
         """
         Generate and display specific evaluation plots.
@@ -238,20 +286,29 @@ class RegressionEvaluator:
         ax.set_title('Distribution of Residuals')
 
     def _plot_feature_importance(self, ax):
-        """Plot feature importance if available."""
+        """Plot feature importance if available with color-coded feature prefixes."""
         if 'importances' in self.metrics:
-            # Create DataFrame with lowercase column names
+            # Create DataFrame with feature prefixes
             df = pd.DataFrame(self.metrics['importances']).head(20)
+            df['prefix'] = df['feature'].str.split('_').str[0]
 
-            # Plot with uppercase axis labels
+            # Create color palette for prefixes
+            unique_prefixes = df['prefix'].unique()
+            palette = dict(zip(unique_prefixes, sns.color_palette("husl", len(unique_prefixes))))
+
+            # Plot using hue instead of explicit colors
             sns.barplot(
                 data=df,
-                x='importance',  # lowercase to match DataFrame
-                y='feature',     # lowercase to match DataFrame
-                ax=ax
+                x='importance',
+                y='feature',
+                ax=ax,
+                hue='prefix',
+                palette=palette
             )
 
-            # Set uppercase axis labels
+            # Adjust legend position
+            ax.legend(title='Feature Type', bbox_to_anchor=(1.05, 1), loc='upper left')
+
             ax.set_xlabel('Importance')
             ax.set_ylabel('Feature')
             ax.set_title('Top 20 Feature Importances')
