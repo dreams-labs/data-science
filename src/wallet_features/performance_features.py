@@ -106,25 +106,25 @@ def calculate_performance_features(wallets_df):
     Generates various target variables for modeling wallet performance.
 
     Parameters:
-    - wallets_df: pandas DataFrame with columns ['total_net_flows', 'max_investment']
+    - wallets_df: pandas DataFrame with columns ['net_gain', 'max_investment']
 
     Returns:
     - DataFrame with additional target variables
     """
-    metrics_df = wallets_df[['max_investment','total_net_flows']].copy().round(6)
+    metrics_df = wallets_df[['max_investment','net_gain']].copy().round(6)
     returns_winsorization = wallets_config['modeling']['returns_winsorization']
     epsilon = 1e-10
 
     # Calculate base return
     metrics_df['return'] = np.where(abs(metrics_df['max_investment']) == 0,0,
-                                    metrics_df['total_net_flows'] / metrics_df['max_investment'])
+                                    metrics_df['net_gain'] / metrics_df['max_investment'])
 
     # Apply winsorization
     if returns_winsorization > 0:
         metrics_df['return'] = u.winsorize(metrics_df['return'],returns_winsorization)
 
     # Risk-Adjusted Dollar Return
-    metrics_df['risk_adj_return'] = metrics_df['total_net_flows'] * \
+    metrics_df['risk_adj_return'] = metrics_df['net_gain'] * \
         (1 + np.log10(metrics_df['max_investment'] + epsilon))
 
     # Normalize returns
@@ -145,8 +145,8 @@ def calculate_performance_features(wallets_df):
         np.log10(metrics_df['max_investment'] + epsilon)
 
     # Hybrid score (combining absolute and relative performance)
-    max_gain = metrics_df['total_net_flows'].abs().max()
-    metrics_df['norm_gain'] = metrics_df['total_net_flows'] / max_gain
+    max_gain = metrics_df['net_gain'].abs().max()
+    metrics_df['norm_gain'] = metrics_df['net_gain'] / max_gain
     metrics_df['hybrid_score'] = (metrics_df['norm_gain'] +
                                 metrics_df['norm_return']) / 2
 
