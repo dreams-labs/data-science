@@ -59,9 +59,9 @@ def calculate_validation_metrics(X_test, y_pred, validation_profits_df):
     # Group wallets by score bucket and assess performance
     bucketed_performance_df = wallet_performance_df.groupby('score_rounded').agg(
         wallets=('score', 'count'),
-        mean_invested=('invested', 'mean'),
+        mean_invested=('max_investment', 'mean'),
         mean_net_gain=('net_gain', 'mean'),
-        median_invested=('invested', 'median'),
+        median_invested=('max_investment', 'median'),
         median_net_gain=('net_gain', 'median'),
     )
 

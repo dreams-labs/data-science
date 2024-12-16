@@ -94,7 +94,7 @@ def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
     - wallet_metrics_df (DataFrame): Trading metrics keyed on wallet_address
     """
     start_time = time.time()
-    logger.debug("Calculating wallet trading features...")
+    logger.info("Calculating wallet trading features...")
 
     # Calculate base trading features
     profits_df['date'] = pd.to_datetime(profits_df['date'])
@@ -109,7 +109,7 @@ def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
         total_inflows=('cash_flow_transfers', lambda x: x[x > 0].sum()),
         total_outflows=('cash_flow_transfers', lambda x: abs(x[x < 0].sum())),
         total_net_flows=('cash_flow_transfers', lambda x: -x.sum()),
-        invested=('cumsum_cash_flow_transfers', 'max'),
+        max_investment=('cumsum_cash_flow_transfers', 'max'),
         net_gain=('cash_flow_transfers', lambda x: -x.sum()),
     )
 
@@ -144,8 +144,8 @@ def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
         wallet_trading_features_df['transaction_days'] / period_duration
     )
     wallet_trading_features_df['volume_vs_investment_ratio'] = np.where(
-        wallet_trading_features_df['invested'] > 0,
-        wallet_trading_features_df['total_volume'] / wallet_trading_features_df['invested'],
+        wallet_trading_features_df['max_investment'] > 0,
+        wallet_trading_features_df['total_volume'] / wallet_trading_features_df['max_investment'],
         0
     )
 
@@ -169,7 +169,7 @@ def fill_trading_features_data(wallet_trading_features_df, wallet_cohort):
 
     # Create the fill value dictionary
     fill_values = {
-        'invested': 0,
+        'max_investment': 0,
         'net_gain': 0,
         'unique_coins_traded': 0,
         'transaction_days': 0,

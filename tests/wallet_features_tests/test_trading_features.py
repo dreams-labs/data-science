@@ -257,7 +257,7 @@ def test_volume_matches_transfers(test_profits_df, test_trading_features_df):
     np.allclose(actual, expected)
 
 
-# # ===== Cash Flow Tests =====
+# ===== Cash Flow Tests =====
 def test_cash_flows_sum_correctly(test_trading_features_df):
     """Verify cash flow components sum correctly"""
     cash_invested = test_trading_features_df['cash_buy_inflows']

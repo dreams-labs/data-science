@@ -177,7 +177,7 @@ def filter_modeling_period_wallets(modeling_period_profits_df):
     # Remove wallets with below the minimum investment threshold
     base_wallets = len(modeling_wallets_df)
     modeling_wallets_df = modeling_wallets_df[
-        modeling_wallets_df['invested'] >= min_modeling_investment]
+        modeling_wallets_df['max_investment'] >= min_modeling_investment]
     logger.info("Removed %s/%s wallets with modeling period investments below $%s.",
                 base_wallets - len(modeling_wallets_df), base_wallets,
                 min_modeling_investment)

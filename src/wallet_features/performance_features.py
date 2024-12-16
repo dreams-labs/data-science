@@ -21,18 +21,18 @@ def calculate_performance_features(wallets_df):
     Generates various target variables for modeling wallet performance.
 
     Parameters:
-    - wallets_df: pandas DataFrame with columns ['net_gain', 'invested']
+    - wallets_df: pandas DataFrame with columns ['net_gain', 'max_investment']
 
     Returns:
     - DataFrame with additional target variables
     """
-    metrics_df = wallets_df[['invested','net_gain']].copy().round(6)
+    metrics_df = wallets_df[['max_investment','net_gain']].copy().round(6)
     returns_winsorization = wallets_config['modeling']['returns_winsorization']
     epsilon = 1e-10
 
     # Calculate base return
-    metrics_df['return'] = np.where(abs(metrics_df['invested']) == 0,0,
-                                    metrics_df['net_gain'] / metrics_df['invested'])
+    metrics_df['return'] = np.where(abs(metrics_df['max_investment']) == 0,0,
+                                    metrics_df['net_gain'] / metrics_df['max_investment'])
 
     # Apply winsorization
     if returns_winsorization > 0:
@@ -40,14 +40,14 @@ def calculate_performance_features(wallets_df):
 
     # Risk-Adjusted Dollar Return
     metrics_df['risk_adj_return'] = metrics_df['net_gain'] * \
-        (1 + np.log10(metrics_df['invested'] + epsilon))
+        (1 + np.log10(metrics_df['max_investment'] + epsilon))
 
     # Normalize returns
     metrics_df['norm_return'] = (metrics_df['return'] - metrics_df['return'].min()) / \
         (metrics_df['return'].max() - metrics_df['return'].min())
 
     # Normalize logged investments
-    log_invested = np.log10(metrics_df['invested'] + epsilon)
+    log_invested = np.log10(metrics_df['max_investment'] + epsilon)
     metrics_df['norm_invested'] = (log_invested - log_invested.min()) / \
         (log_invested.max() - log_invested.min())
 
@@ -57,7 +57,7 @@ def calculate_performance_features(wallets_df):
 
     # Log-weighted return
     metrics_df['log_weighted_return'] = metrics_df['return'] * \
-        np.log10(metrics_df['invested'] + epsilon)
+        np.log10(metrics_df['max_investment'] + epsilon)
 
     # Hybrid score (combining absolute and relative performance)
     max_gain = metrics_df['net_gain'].abs().max()
@@ -67,13 +67,13 @@ def calculate_performance_features(wallets_df):
 
     # Size-adjusted rank
     # Create mask for zero values
-    zero_mask = metrics_df['invested'] == 0
+    zero_mask = metrics_df['max_investment'] == 0
 
     # Create quartiles series initialized with 'q0' for zero values
     quartiles = pd.Series('q0', index=metrics_df.index)
 
     # Calculate quartiles for non-zero values
-    non_zero_quartiles = pd.qcut(metrics_df['invested'][~zero_mask],
+    non_zero_quartiles = pd.qcut(metrics_df['max_investment'][~zero_mask],
                                 q=4,
                                 labels=['q1', 'q2', 'q3', 'q4'])
 

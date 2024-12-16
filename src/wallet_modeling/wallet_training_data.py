@@ -84,11 +84,11 @@ def apply_wallet_thresholds(wallet_metrics_df):
 
     # filter based on wallet investment amount
     low_investment_wallets = wallet_metrics_df[
-        wallet_metrics_df['invested'] < min_wallet_investment
+        wallet_metrics_df['max_investment'] < min_wallet_investment
     ].index.values
 
     excess_investment_wallets = wallet_metrics_df[
-        wallet_metrics_df['invested'] >= max_wallet_investment
+        wallet_metrics_df['max_investment'] >= max_wallet_investment
     ].index.values
 
     # filter based on wallet volume

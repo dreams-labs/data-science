@@ -65,7 +65,7 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     # Performance features (inner join, no fill)
     performance_features = wp.calculate_performance_features(wallet_features_df)
     wallet_features_df = wallet_features_df.join(
-        performance_features.drop(['invested', 'net_gain'], axis=1),
+        performance_features.drop(['max_investment', 'net_gain'], axis=1),
         how='inner'
     )
 
