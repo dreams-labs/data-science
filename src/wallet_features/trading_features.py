@@ -91,30 +91,34 @@ def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
     profits_df['abs_usd_net_transfers'] = profits_df['usd_net_transfers'].abs()
     profits_df['cumsum_cash_flow_transfers'] = profits_df.groupby('wallet_address')['cash_flow_transfers'].cumsum()
 
-    # Base metrics calculation
+    # Metrics that incorporate imputed rows
     base_metrics_df = profits_df.groupby('wallet_address').agg(
+        imputed_deposits=('cash_flow_transfers', lambda x: x[x > 0].sum()),
+        imputed_withdrawals=('cash_flow_transfers', lambda x: abs(x[x < 0].sum())),
+        imputed_net_cash_flows=('cash_flow_transfers', lambda x: -x.sum()),
         invested=('cumsum_cash_flow_transfers', 'max'),
         net_gain=('cash_flow_transfers', lambda x: -x.sum()),
-        unique_coins_traded=('coin_id', 'nunique')
-    )
-
-    # Observed activity metrics
-    observed_metrics_df = profits_df[~profits_df['is_imputed']].groupby('wallet_address').agg(
-        transaction_days=('date', 'nunique'),
-        agg_realized_cash_flows=('usd_net_transfers', 'sum'),
-        total_volume=('abs_usd_net_transfers', 'sum'),
-        average_transaction=('abs_usd_net_transfers', 'mean')
     )
 
     # Calculate additional return metrics using existing functions
     twr_df = calculate_time_weighted_returns(profits_df)
-    realized_returns_df = calculate_realized_returns(profits_df)
+
+    # Observed activity metrics
+    observed_metrics_df = profits_df[~profits_df['is_imputed']].groupby('wallet_address').agg(
+        transaction_days=('date', 'nunique'),
+        unique_coins_traded=('coin_id', 'nunique'),
+        realized_deposits=('usd_net_transfers', lambda x: x[x > 0].sum()),
+        realized_withdrawals=('usd_net_transfers', lambda x: abs(x[x < 0].sum())),
+        realized_net_cash_flows=('usd_net_transfers', lambda x: -x.sum()),
+        total_volume=('abs_usd_net_transfers', 'sum'),
+        average_transaction=('abs_usd_net_transfers', 'mean'),
+    )
 
     # Combine all metrics
-    wallet_trading_features_df = (base_metrics_df
+    wallet_trading_features_df = (
+        base_metrics_df
         .join(observed_metrics_df)
         .join(twr_df)
-        .join(realized_returns_df)
     )
 
     # Fill missing values and clean up
@@ -174,42 +178,50 @@ def fill_trading_features_data(wallet_trading_features_df, wallet_cohort):
 
 def calculate_time_weighted_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calculates time-weighted returns (TWR) for each wallet-coin pair, neutralizing
-    the impact of cash flows to measure pure trading performance.
+    Calculates time-weighted returns (TWR) using actual holding period in days.
 
     Params:
-    - profits_df (DataFrame): Daily profits data with columns:
-        wallet_address, coin_id, date, usd_balance, usd_net_transfers
+    - profits_df (DataFrame): Daily profits data
 
     Returns:
-    - twr_df (DataFrame): TWR metrics keyed on wallet_address with columns:
-        twr, annualized_twr
+    - twr_df (DataFrame): TWR metrics keyed on wallet_address
     """
     profits_df = profits_df.sort_values(['wallet_address', 'coin_id', 'date'])
 
-    # Calculate balance before transfers
+    # Calculate holding period returns
     profits_df['pre_transfer_balance'] = profits_df['usd_balance'] - profits_df['usd_net_transfers']
-
-    # Get previous day's end balance
     profits_df['prev_balance'] = profits_df.groupby(['wallet_address', 'coin_id'])['usd_balance'].shift()
+    profits_df['days_held'] = profits_df.groupby(['wallet_address', 'coin_id'])['date'].diff().dt.days
 
-    # Use pre-transfer vs previous balance for days with transfers
-    # Use end balance vs previous balance for days without transfers
-    profits_df['daily_twr'] = np.where(
+    # Calculate period returns and weights
+    profits_df['period_return'] = np.where(
         profits_df['usd_net_transfers'] != 0,
         profits_df['pre_transfer_balance'] / profits_df['prev_balance'],
         profits_df['usd_balance'] / profits_df['prev_balance']
     )
+    profits_df['period_return'] = profits_df['period_return'].replace([np.inf, -np.inf], 1).fillna(1)
 
-    # Replace inf/null values with 1 (no return) for first days
-    profits_df['daily_twr'] = profits_df['daily_twr'].replace([np.inf, -np.inf], 1).fillna(1)
+    # Weight by holding period duration
+    profits_df['weighted_return'] = (profits_df['period_return'] - 1) * profits_df['days_held']
 
+    # Get total days for each wallet
+    total_days = profits_df.groupby('wallet_address')['date'].agg(lambda x: (x.max() - x.min()).days)
+
+    # Calculate TWR using total days held
+    def safe_twr(weighted_returns, wallet):
+        if len(weighted_returns) == 0 or weighted_returns.isna().all():
+            return 0
+        days = max(total_days[wallet], 1)  # Get days for this wallet, minimum 1
+        return weighted_returns.sum() / days
+
+    # Aggregate by wallet
     twr_df = profits_df.groupby('wallet_address').agg(
-        twr=('daily_twr', lambda x: x.prod() - 1),
-        days_held=('date', lambda x: (x.max() - x.min()).days)
+        time_weighted_return=('weighted_return', lambda x: safe_twr(x, x.name)),
+        days_held=('date', lambda x: max((x.max() - x.min()).days, 1))
     )
 
-    twr_df['annualized_twr'] = ((1 + twr_df['twr']) ** (365 / twr_df['days_held'])) - 1
+    # Annualize returns
+    twr_df['annualized_twr'] = ((1 + twr_df['time_weighted_return']) ** (365 / twr_df['days_held'])) - 1
     twr_df = twr_df.replace([np.inf, -np.inf], np.nan)
 
     return twr_df
@@ -226,21 +238,21 @@ def calculate_realized_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
 
     Returns:
     - realized_returns_df (DataFrame): Metrics for each wallet:
-        - total_investments: Sum of positive cash flows
-        - total_withdrawals: Sum of negative cash flows (converted to positive)
+        - imputed_deposits: Sum of positive cash flows
+        - imputed_withdrawals: Sum of negative cash flows (converted to positive)
         - realized_return: (withdrawals/investments) - 1
     """
     realized_returns_df = profits_df.groupby('wallet_address').agg(
-        total_investments=('cash_flow_transfers', lambda x: x[x > 0].sum()),
-        total_withdrawals=('cash_flow_transfers', lambda x: -x[x < 0].sum())
+        imputed_deposits=('cash_flow_transfers', lambda x: x[x > 0].sum()),
+        imputed_withdrawals=('cash_flow_transfers', lambda x: -x[x < 0].sum())
     )
 
     realized_returns_df['realized_return'] = (
-        realized_returns_df['total_withdrawals'] /
-        realized_returns_df['total_investments']
+        realized_returns_df['imputed_withdrawals'] /
+        realized_returns_df['imputed_deposits']
     ) - 1
 
     # Handle edge case where wallet has no investments
-    realized_returns_df.loc[realized_returns_df['total_investments'] == 0, 'realized_return'] = 0
+    realized_returns_df.loc[realized_returns_df['imputed_deposits'] == 0, 'realized_return'] = 0
 
     return realized_returns_df
