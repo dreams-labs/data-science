@@ -33,6 +33,12 @@ wallets_config = WalletsConfig.load_from_yaml(config_path)
 #                                                       #
 # ===================================================== #
 
+
+# ------------------------------------------------ #
+# add_cash_flow_transfers_logic() unit tests +
+# calculate_wallet_trading_features() unit tests
+# ------------------------------------------------ #
+
 @dataclass
 class ProfitsValidator:
     """
@@ -82,8 +88,6 @@ class ProfitsValidator:
     def check_no_missing_values(self, profits_df):
         """Check for missing values"""
         return not profits_df.isna().any().any()
-
-
 
 
 # pylint:disable=line-too-long
@@ -221,6 +225,8 @@ def test_trading_features_df(test_profits_df):
     return wtf.calculate_wallet_trading_features(test_profits_df)
 
 
+# Initial Tests for Individual Wallet Edge Cases
+# -----------------------------------------------------
 @pytest.mark.unit
 def test_w01_multiple_coins(test_profits_df, test_trading_features_df):
     """
@@ -319,7 +325,8 @@ def test_return_ratios_in_reasonable_range(test_trading_features_df):
     )
 
 
-
+# Supplementary Tests for Many to Many Coin-Wallet Relationships
+# --------------------------------------------------------------
 @pytest.fixture
 def test_remapped_profits_df(test_profits_data):
     """
@@ -342,12 +349,12 @@ def test_remapped_profits_df(test_profits_data):
         'w08_offsetting_transactions': 'w1',
         'w09_memecoin_winner': 'w3',
         'w10_memecoin_loser': 'w4',
-        'w11_sells_early': 'w5',
-        'w12_buys_late': 'w5'
+        'w11_sells_early': 'w6',
+        'w12_buys_late': 'w6'
     }
     remapped_profits_df = test_profits_data.copy()
     remapped_profits_df['wallet_address_original'] = remapped_profits_df['wallet_address']
-    remapped_profits_df['wallet_address_original'] = remapped_profits_df['wallet_address'].map(reassign_dict)
+    remapped_profits_df['wallet_address'] = remapped_profits_df['wallet_address'].map(reassign_dict)
 
     # Rest of the sequence remains unchanged
     profits_df = remapped_profits_df.copy()
@@ -372,6 +379,10 @@ def test_remapped_profits_df(test_profits_data):
     # Add cash flow transfers logic
     cash_flow_profits_df = wtf.add_cash_flow_transfers_logic(profits_df)
 
+    # Confirm that all the addresses have been mapped
+    expected_addresses = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6']
+    assert sorted(list(cash_flow_profits_df['wallet_address'].unique())) == expected_addresses
+
     return cash_flow_profits_df
 
 @pytest.fixture
@@ -379,7 +390,12 @@ def test_remapped_trading_features_df(test_remapped_profits_df):
     """
     Returns trading features computed from test profits data.
     """
-    return wtf.calculate_wallet_trading_features(test_remapped_profits_df)
+    remapped_trading_features_df = wtf.calculate_wallet_trading_features(test_remapped_profits_df)
+    # Confirm that all the addresses have been mapped
+    expected_addresses = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6']
+    assert sorted(list(remapped_trading_features_df.index.values)) == expected_addresses
+
+    return remapped_trading_features_df
 
 
 @pytest.mark.unit
@@ -400,3 +416,257 @@ def test_reassigned_cash_flows_match(test_remapped_profits_df,test_profits_df):
     )
 
     assert np.allclose(merged_df['cash_flow_transfers_demapped'],merged_df['cash_flow_transfers_cash_flow'])
+
+
+@pytest.mark.unit
+def test_volume_aggregation_after_remapping(test_profits_df, test_trading_features_df,
+                                        test_remapped_profits_df, test_remapped_trading_features_df):
+    """
+    Verifies that total volume metrics are preserved when wallets are consolidated through remapping.
+
+    Tests:
+    1. Total volume sums match when grouping original wallets to their remapped versions
+    2. Volumes are properly consolidated when multiple original wallets map to the same new wallet
+
+    Example:
+    If w1, w2 -> new_w1 and w3, w4 -> new_w2, then:
+    - sum(volume of w1, w2) should equal volume of new_w1
+    - sum(volume of w3, w4) should equal volume of new_w2
+    """
+    # Create mapping from original to new wallets
+    wallet_mapping = (test_remapped_profits_df[['wallet_address', 'wallet_address_original']]
+                        .drop_duplicates()
+                        .set_index('wallet_address_original')['wallet_address'])
+
+    # Join original trading features with mapping
+    original_volumes = pd.DataFrame({'total_volume': test_trading_features_df['total_volume']})
+    original_volumes['new_wallet'] = original_volumes.index.map(wallet_mapping)
+
+    # Calculate expected volumes by grouping by new wallet address
+    expected_volumes = original_volumes.groupby('new_wallet')['total_volume'].sum()
+
+    # Get actual volumes from remapped features
+    actual_volumes = test_remapped_trading_features_df['total_volume']
+
+    # Sort both Series to ensure alignment
+    expected_volumes = expected_volumes.sort_index()
+    actual_volumes = actual_volumes.sort_index()
+
+    assert np.allclose(expected_volumes, actual_volumes, equal_nan=True), \
+        "Total volumes don't match after remapping"
+
+
+@pytest.mark.unit
+def test_cash_flow_aggregation_after_remapping(test_profits_df, test_trading_features_df,
+                                             test_remapped_profits_df, test_remapped_trading_features_df):
+    """
+    Verifies that all flow metrics are preserved when wallets are consolidated through remapping.
+
+    Tests both observed cash flows and total flows (including imputed):
+    1. Observed cash flows (real transfers only):
+        - cash_buy_inflows (buys)
+        - cash_sell_outflows (sells)
+        - cash_net_flows (net position)
+    2. Total flows (including imputed rows):
+        - total_inflows (all positive flows)
+        - total_outflows (all negative flows)
+        - total_net_flows (net including imputed)
+
+    Example calculation:
+    If w1 and w2 are merged into new_w1:
+    w1 (with imputed end balance):
+    - buys=$100, sells=$30, final_balance=$90
+    - cash_flows: buys=$100, sells=$30, net=$70
+    - total_flows: inflows=$100, outflows=$120 ($30 sells + $90 end balance), net=-$20
+
+    w2 (with imputed end balance):
+    - buys=$50, sells=$20, final_balance=$40
+    - cash_flows: buys=$50, sells=$20, net=$30
+    - total_flows: inflows=$50, outflows=$60 ($20 sells + $40 end balance), net=-$10
+
+    Then new_w1 should have:
+    - cash_flows: buys=$150, sells=$50, net=$100
+    - total_flows: inflows=$150, outflows=$180, net=-$30
+    """
+    # Create mapping from original to new wallets
+    wallet_mapping = (test_remapped_profits_df[['wallet_address', 'wallet_address_original']]
+                     .drop_duplicates()
+                     .set_index('wallet_address_original')['wallet_address'])
+
+    # Create DataFrame with all flow metrics for original wallets
+    flow_cols = ['cash_buy_inflows', 'cash_sell_outflows', 'cash_net_flows',
+                 'total_inflows', 'total_outflows', 'total_net_flows']
+    original_flows = pd.DataFrame(test_trading_features_df[flow_cols])
+    original_flows['new_wallet'] = original_flows.index.map(wallet_mapping)
+
+    # Calculate expected values by grouping by new wallet address
+    expected_flows = original_flows.groupby('new_wallet')[flow_cols].agg({
+        'cash_buy_inflows': 'sum',  # Observed buys
+        'cash_sell_outflows': 'sum',  # Observed sells
+        'cash_net_flows': 'sum',  # Net of observed flows
+        'total_inflows': 'sum',  # All positive flows including imputed
+        'total_outflows': 'sum',  # All negative flows including imputed
+        'total_net_flows': 'sum',  # Net of all flows including imputed
+    }).sort_index()
+
+    # Get actual values from remapped features
+    actual_flows = test_remapped_trading_features_df[flow_cols].sort_index()
+
+    # Compare each metric
+    for col in flow_cols:
+        assert np.allclose(expected_flows[col], actual_flows[col], equal_nan=True), \
+            f"Remapped {col} doesn't match expected values"
+
+
+@pytest.mark.unit
+def test_max_investment_after_remapping(test_profits_df, test_trading_features_df,
+                                      test_remapped_profits_df, test_remapped_trading_features_df):
+    """
+    Verifies max_investment is calculated correctly after wallet remapping by:
+    1. First aggregating cash flows by date for each remapped wallet
+    2. Then finding the peak cumulative investment
+
+    Example:
+    Original wallets w1 and w2 map to new_w1:
+    w1: coin1 peaks at $100 on Jan 1, coin2 peaks at $50 on Feb 1
+    w2: coin3 peaks at $80 on Jan 1
+    new_w1 max_investment should be $180 (combined Jan 1 peak) not $230 (sum of individual peaks)
+    """
+    # Create mapping from original to new wallets
+    wallet_mapping = (test_remapped_profits_df[['wallet_address', 'wallet_address_original']]
+                     .drop_duplicates()
+                     .set_index('wallet_address_original')['wallet_address'])
+
+    # Group cash flows by date and new wallet
+    orig_flows = test_profits_df.copy()
+    orig_flows['new_wallet'] = orig_flows['wallet_address'].map(wallet_mapping)
+
+    # Step 1: Sum all cash flows for each wallet-date combination
+    daily_flows = orig_flows.groupby(['new_wallet', 'date'])['cash_flow_transfers'].sum()
+
+    # Step 2: Reset index to allow cumsum operation by wallet
+    daily_flows = daily_flows.reset_index()
+
+    # Step 3: Sort by wallet and date to ensure correct cumsum
+    daily_flows = daily_flows.sort_values(['new_wallet', 'date'])
+
+    # Step 4: Calculate running total of flows for each wallet
+    daily_flows['cumulative_flows'] = (daily_flows.groupby('new_wallet')['cash_flow_transfers']
+                                     .cumsum())
+
+    # Step 5: Find the maximum cumulative investment for each wallet
+    expected_max_inv = (daily_flows.groupby('new_wallet')['cumulative_flows']
+                       .max()
+                       .sort_index())
+
+    # Get actual max investments
+    actual_max_inv = test_remapped_trading_features_df['max_investment'].sort_index()
+
+    assert np.allclose(expected_max_inv, actual_max_inv, equal_nan=True), \
+        "Max investment doesn't match when calculated from remapped cash flows"
+
+
+@pytest.mark.unit
+def test_activity_metrics_after_remapping(test_profits_df, test_trading_features_df,
+                                        test_remapped_profits_df, test_remapped_trading_features_df):
+    """
+    Verifies activity metrics are calculated correctly after wallet remapping.
+
+    Tests:
+    1. transaction_days: Number of unique days with non-imputed transactions
+    2. unique_coins_traded: Count of unique coins across merged wallets
+    3. activity_density: transaction_days / total_period_days
+
+    Example:
+    If w1 and w2 map to new_w1:
+    w1: trades btc on Jan 1, eth on Jan 1 and Mar 1
+    w2: trades eth on Jan 1, sol on Feb 1
+    Then new_w1 should have:
+    - transaction_days = 3 (Jan 1, Feb 1, Mar 1)
+    - unique_coins = 3 (btc, eth, sol)
+    - activity_density = 3 / period_days
+    """
+    # Create mapping from original to new wallets
+    wallet_mapping = (test_remapped_profits_df[['wallet_address', 'wallet_address_original']]
+                     .drop_duplicates()
+                     .set_index('wallet_address_original')['wallet_address'])
+
+    # Calculate transaction days
+    active_dates = (test_profits_df[~test_profits_df['is_imputed']]
+                   .assign(new_wallet=lambda x: x['wallet_address'].map(wallet_mapping))
+                   .groupby('new_wallet')['date']
+                   .nunique())
+
+    # Calculate unique coins traded
+    unique_coins = (test_profits_df[~test_profits_df['is_imputed']]
+                   .assign(new_wallet=lambda x: x['wallet_address'].map(wallet_mapping))
+                   .groupby('new_wallet')['coin_id']
+                   .nunique())
+
+    # Calculate activity density
+    period_days = (test_profits_df['date'].max() - test_profits_df['date'].min()).days + 1
+    expected_density = active_dates / period_days
+
+    # Get actual metrics
+    actual_activity = test_remapped_trading_features_df[['transaction_days', 'unique_coins_traded', 'activity_density']]
+
+    # Compare metrics
+    assert np.allclose(active_dates, actual_activity['transaction_days'], equal_nan=True), \
+        "Transaction days don't match after remapping"
+    assert np.allclose(unique_coins, actual_activity['unique_coins_traded'], equal_nan=True), \
+        "Unique coins traded don't match after remapping"
+    assert np.allclose(expected_density, actual_activity['activity_density'], equal_nan=True), \
+        "Activity density doesn't match after remapping"
+
+
+@pytest.mark.unit
+def test_ratio_metrics_after_remapping(test_profits_df, test_trading_features_df,
+                                     test_remapped_profits_df, test_remapped_trading_features_df):
+    """
+    Verifies ratio-based metrics are calculated correctly after wallet remapping.
+
+    Tests:
+    1. average_transaction = total_volume / number of transactions
+    2. volume_vs_investment_ratio = total_volume / max_investment
+
+    Example:
+    If w1 and w2 map to new_w1:
+    w1: volume=$300 (3 trades), max_inv=$200
+    w2: volume=$100 (2 trades), max_inv=$100
+    Then new_w1 should have:
+    - average_transaction = $400/5 = $80
+    - volume_vs_investment_ratio = $400/$300 = 1.33
+    """
+    # Create mapping from original to new wallets
+    wallet_mapping = (test_remapped_profits_df[['wallet_address', 'wallet_address_original']]
+                     .drop_duplicates()
+                     .set_index('wallet_address_original')['wallet_address'])
+
+    # Count transactions (non-imputed rows with non-zero transfers)
+    transaction_counts = (test_profits_df[
+        (~test_profits_df['is_imputed']) &
+        (test_profits_df['usd_net_transfers'] != 0)
+    ]
+    .assign(new_wallet=lambda x: x['wallet_address'].map(wallet_mapping))
+    .groupby('new_wallet')
+    .size())
+
+    # Calculate expected average transaction using total_volume from features
+    expected_avg_transaction = (test_remapped_trading_features_df['total_volume'] /
+                              transaction_counts)
+
+    # Calculate expected volume vs investment ratio using features
+    expected_vol_inv_ratio = np.where(
+        test_remapped_trading_features_df['max_investment'] > 0,
+        test_remapped_trading_features_df['total_volume'] /
+        test_remapped_trading_features_df['max_investment'],
+        0
+    )
+
+    # Compare metrics
+    assert np.allclose(expected_avg_transaction,
+                      test_remapped_trading_features_df['average_transaction'],
+                      equal_nan=True), "Average transaction doesn't match after remapping"
+    assert np.allclose(expected_vol_inv_ratio,
+                      test_remapped_trading_features_df['volume_vs_investment_ratio'],
+                      equal_nan=True), "Volume vs investment ratio doesn't match after remapping"

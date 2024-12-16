@@ -102,7 +102,9 @@ def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
 
     # Precompute necessary transformations
     profits_df['abs_usd_net_transfers'] = profits_df['usd_net_transfers'].abs()
-    profits_df['cumsum_cash_flow_transfers'] = profits_df.groupby('wallet_address')['cash_flow_transfers'].cumsum()
+    profits_df['cumsum_cash_flow_transfers'] = (profits_df.sort_values(by='date')
+                                            .groupby('wallet_address')['cash_flow_transfers']
+                                            .cumsum())
 
     # Metrics that incorporate imputed rows
     base_metrics_df = profits_df.groupby('wallet_address').agg(
