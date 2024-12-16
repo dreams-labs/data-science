@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 
 # local module imports
-import wallet_features.performance_features as wp
+import wallet_features.performance_features as wpf
 import wallet_features.trading_features as wtf
 from wallet_modeling.wallets_config_manager import WalletsConfig
 
@@ -46,7 +46,7 @@ def calculate_validation_metrics(X_test, y_pred, validation_profits_df):
     # Calculate validation period wallet metrics
     validation_profits_df = wtf.add_cash_flow_transfers_logic(validation_profits_df)
     wallet_trading_features_df = wtf.calculate_wallet_trading_features(validation_profits_df)
-    validation_wallets_df = wp.calculate_performance_features(wallet_trading_features_df)
+    validation_wallets_df = wpf.calculate_performance_features(wallet_trading_features_df)
 
     # Attach validation period performance to modeling period scores
     wallet_performance_df = pd.DataFrame()
@@ -59,16 +59,16 @@ def calculate_validation_metrics(X_test, y_pred, validation_profits_df):
     # Group wallets by score bucket and assess performance
     bucketed_performance_df = wallet_performance_df.groupby('score_rounded').agg(
         wallets=('score', 'count'),
-        mean_invested=('invested', 'mean'),
-        mean_net_gain=('net_gain', 'mean'),
-        median_invested=('invested', 'median'),
-        median_net_gain=('net_gain', 'median'),
+        mean_invested=('max_investment', 'mean'),
+        mean_total_net_flows=('total_net_flows', 'mean'),
+        median_invested=('max_investment', 'median'),
+        median_total_net_flows=('total_net_flows', 'median'),
     )
 
     # Calculate return metrics
-    bucketed_performance_df['mean_return'] = (bucketed_performance_df['mean_net_gain']
+    bucketed_performance_df['mean_return'] = (bucketed_performance_df['mean_total_net_flows']
                                                      / bucketed_performance_df['mean_invested'])
-    bucketed_performance_df['median_return'] = (bucketed_performance_df['median_net_gain']
+    bucketed_performance_df['median_return'] = (bucketed_performance_df['median_total_net_flows']
                                                        / bucketed_performance_df['median_invested'])
 
     return wallet_performance_df, bucketed_performance_df

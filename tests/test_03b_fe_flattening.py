@@ -496,7 +496,7 @@ def test_save_flattened_outputs(mock_coin_df):
     Confirms that the mock file saves correctly
     """
     # Hard-code test output location directly within the test function
-    test_output_path = os.path.join(os.getcwd(), "tests", "test_modeling", "outputs", "flattened_outputs")
+    test_output_path = os.path.join(os.getcwd(), "test_modeling", "outputs", "flattened_outputs")
     metric_description = 'buysell'
     modeling_period_start = '2024-04-01'
 
@@ -517,7 +517,7 @@ def test_save_flattened_outputs_non_unique_coin_id(mock_non_unique_coin_id_df):
     """
     Confirms that the function raises a ValueError if 'coin_id' values are not unique
     """
-    test_output_path = os.path.join(os.getcwd(), "tests", "test_modeling", "outputs", "flattened_outputs")
+    test_output_path = os.path.join(os.getcwd(), "test_modeling", "outputs", "flattened_outputs")
     metric_description = 'buysell'
     modeling_period_start = '2024-04-01'
 

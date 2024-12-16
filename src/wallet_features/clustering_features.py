@@ -78,7 +78,7 @@ def create_basic_cluster_features(training_data_df, include_pca=False, include_c
 
 
 
-def optimize_parameters(df, max_components=10, max_clusters=10):
+def optimize_parameters(df, max_clusters=10):
     """
     Analyze optimal number of components and clusters using multiple methods.
 
@@ -89,6 +89,10 @@ def optimize_parameters(df, max_components=10, max_clusters=10):
 
     Returns:
     Dictionary with analysis results and plots
+
+    Example Use:
+    results = wcl.optimize_parameters(training_data_df)
+
     """
     # Prepare data
     numeric_df = df.select_dtypes(include=[np.number])
@@ -171,7 +175,7 @@ def optimize_parameters(df, max_components=10, max_clusters=10):
     plt.tight_layout()
     plt.show()
 
-    return {
+    results = {
         'optimal_components': {
             'n_components_80_variance': n_components_80,
             'explained_variance_ratio': explained_variance,
@@ -185,3 +189,9 @@ def optimize_parameters(df, max_components=10, max_clusters=10):
         }
     }
 
+    logger.info(f"Number of components explaining 80% variance: \
+                {results['optimal_components']['n_components_80_variance']}")
+    logger.info(f"Optimal k from elbow method: {results['optimal_clusters']['elbow_k']}")
+    logger.info(f"Optimal k from silhouette score: {results['optimal_clusters']['silhouette_k']}")
+
+    return results

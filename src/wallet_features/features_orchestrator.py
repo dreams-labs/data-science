@@ -8,7 +8,7 @@ import yaml
 
 # Local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
-import wallet_features.performance_features as wp
+import wallet_features.performance_features as wpf
 import wallet_features.market_cap_features as wmc
 import wallet_features.trading_features as wtf
 import wallet_features.transfers_features as wts
@@ -43,29 +43,29 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
 
     # Trading features (inner join, custom fill)
     profits_df = wtf.add_cash_flow_transfers_logic(profits_df)
-    trading_features = wtf.calculate_wallet_trading_features(profits_df)
-    trading_features = wtf.fill_trading_features_data(trading_features, wallet_cohort)
-    wallet_features_df = wallet_features_df.join(trading_features, how='inner')
+    trading_features_df = wtf.calculate_wallet_trading_features(profits_df)
+    trading_features_df = wtf.fill_trading_features_data(trading_features_df, wallet_cohort)
+    wallet_features_df = wallet_features_df.join(trading_features_df, how='inner')
 
     # Market timing features (fill zeros)
-    timing_features = wmt.calculate_market_timing_features(profits_df, market_indicators_data_df)
-    wallet_features_df = wallet_features_df.join(timing_features, how='left')\
-        .fillna({col: 0 for col in timing_features.columns})
+    timing_features_df = wmt.calculate_market_timing_features(profits_df, market_indicators_data_df)
+    wallet_features_df = wallet_features_df.join(timing_features_df, how='left')\
+        .fillna({col: 0 for col in timing_features_df.columns})
 
     # Market cap features (fill zeros)
-    market_features = wmc.calculate_market_cap_features(profits_df, market_indicators_data_df)
-    wallet_features_df = wallet_features_df.join(market_features, how='left')\
-        .fillna({col: 0 for col in market_features.columns})
+    market_features_df = wmc.calculate_market_cap_features(profits_df, market_indicators_data_df)
+    wallet_features_df = wallet_features_df.join(market_features_df, how='left')\
+        .fillna({col: 0 for col in market_features_df.columns})
 
     # Transfers features (fill -1)
-    transfers_features = wts.calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
-    wallet_features_df = wallet_features_df.join(transfers_features, how='left')\
-        .fillna({col: -1 for col in transfers_features.columns})
+    transfers_features_df = wts.calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
+    wallet_features_df = wallet_features_df.join(transfers_features_df, how='left')\
+        .fillna({col: -1 for col in transfers_features_df.columns})
 
     # Performance features (inner join, no fill)
-    performance_features = wp.calculate_performance_features(wallet_features_df)
+    performance_features_df = wpf.calculate_performance_features(wallet_features_df)
     wallet_features_df = wallet_features_df.join(
-        performance_features.drop(['invested', 'net_gain'], axis=1),
+        performance_features_df.drop(['max_investment', 'total_net_flows'], axis=1),
         how='inner'
     )
 

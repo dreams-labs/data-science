@@ -1,19 +1,47 @@
 # Variables used to define the training data
 training_data:
     training_window_starts: [
-        "2023-11-01",
-        "2024-04-01",
-        "2024-08-01"
+        # "2023-08-01",
+        # # ,"2023-11-01"
+        "2024-01-01",
+        "2024-02-01",
+        # "2024-09-01"
     ]
     # modeling_period_start: "2024-02-01"
-    # modeling_period_end: "2024-03-31"
-    modeling_period_start: "2024-11-01"
-    modeling_period_end: "2024-11-30"
-    validation_period_end: "2024-12-07"
+    # modeling_period_end: "2024-02-29"
+    # validation_period_end: "2024-03-15"
+    modeling_period_start: "2024-3-01"
+    modeling_period_end: "2024-3-15"
+    validation_period_end: "2024-03-30"
+
+
+# Variables used for model generation
+modeling:
+    # Which wallet performance metric to use as the target variable. Options are:
+    # invested, total_net_flows, return, risk_adj_return, performance_score, log_weighted_return, hybrid_score, size_adjusted_rank
+    target_variable: "performance_score"
+    returns_winsorization: 0.02
+    drop_columns: []
+
+    # Model specifics
+    model_type: "xgb"
+    model_params:
+        n_estimators: 200
+        max_depth: 4
+        learning_rate: 0.05
+        subsample: 0.8
+        colsample_bytree: 1.0
+        min_child_weight: 5
+        random_state: 42
+        n_jobs: -1
 
 
 # Variables used to define features
 features:
+    # Clustering params
+    clustering_n_components: 25
+    clustering_n_clusters: 2
+
     timing_metrics_min_transaction_size: 20  # trades below this USD threshold will not be evaluated for market timing peformance
 
 
@@ -22,71 +50,43 @@ data_cleaning:
 
     # Modeling period filters
     min_modeling_investment: 2000
-    min_modeling_transaction_days: 2
+    min_modeling_transaction_days: 1
 
-    # Wallet minimum thresholds
-    min_wallet_investment: 25000 # The amount of lifetime USD inflows a wallet must have to be included in the training data
-    min_wallet_volume: 50000  # Exclude wallets with fewer than this amount of training period USD volume
+    # Wallet cohort thresholds
     min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
+    max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
+    min_wallet_investment: 25000 # The amount of lifetime USD investment a wallet must have to be included in the training data
+    max_wallet_investment: 25_000_000 # The amount of lifetime USD investment a wallet must have to be included in the training data
+    min_wallet_volume: 50000  # Exclude wallets with fewer than this amount of training period USD volume
+    max_wallet_volume: 50_000_000  # Exclude wallets with fewer than this amount of training period USD volume
+    min_wallet_inflows: 25000  # Exclude wallets with inflows greater than or equal to this amount (USD)
+    max_wallet_inflows: 25_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
+    max_wallet_profits: 50_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
 
-    # Wallet maximum thresholds
-    max_wallet_coin_profits: 25000000  # Exclude wallets with profits or losses greater than or equal to this amount (USD)
-    max_wallet_coin_inflows: 25000000  # Exclude wallets with inflows greater than or equal to this amount (USD)
-
-    # market_data_df filters: Define how to handle missing price data
+    # Market data filters
+    max_initial_market_cap: 150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
     max_gap_days: 50  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
     min_daily_volume: 3000 # Minimum average daily volume the coin must have
 
-    # market cap imputation filters
+    # Market cap imputation filters
     min_mc_imputation_coverage: 0.3  # coins with market cap coverage below this level will have hardcoded market cap values filled
     max_mc_imputation_multiple: 2.0  # don't impute dates where the imputed market cap exceeds the max known market cap * this ratio
     market_cap_default_fill:  500000  # coins below the imputation coverage level will have empty values filled with this
 
-    # offset calculation limits
+    # Offset calculation limits
     offset_winsorization: 0.01 # comparisons between metrics and their offset values will be winsorized by this amount
 
 
-modeling:
-    target_variable: "performance_score"
-    returns_winsorization: 0.01
-    drop_columns: [
-        'return_w3',
-        'total_volume_w1',
-        'return_w1',
-        'risk_adj_return_w1',
-        'transaction_days_w3',
-        'net_gain_w1',
-        'average_transaction_w1',
-        'log_weighted_return_w1',
-        'return_w4',
-        'unique_coins_traded_w3',
-        'unique_coins_traded_w2',
-        'size_adjusted_rank_w1',
-        'return_w2',
-        'net_gain_w2',
-        'risk_adj_return_w2',
-        'invested_w2',
-        'average_transaction_w3',
-        'average_transaction_w4',
-        'unique_coins_traded_w1',
-        'performance_score_w2',
-        'hybrid_score_w2',
-        'total_volume_w3',
-        'invested_w1',
-        'size_adjusted_rank_w3',
-        'portfolio_wtd_market_cap_w2',
-        'log_weighted_return_w3',
-        'ending_portfolio_usd_w3',
-        'volume_wtd_market_cap_w1',
-        'average_transaction_w2',
-        'hybrid_score_w1',
-        'transaction_days_w2',
-        'risk_adj_return_all_windows',
-        'net_gain_all_windows',
-        'transaction_days_w1',
-        'unique_coins_traded_all_windows',
-        'ending_portfolio_usd_w2',
-        'ending_portfolio_usd_w1',
-        'portfolio_wtd_market_cap_w1',
-        'portfolio_wtd_market_cap_w3'
-    ]
+# Variables used for comnverting the wallet scores into coin forecasts
+coin_forecasting:
+
+    # Forecasting methods
+    top_n: 10  # how many of the top coins of a given sort method will be included in performance assessments
+    sort_method: "top_wallet_balance_pct"  # which coin wallet metric to use for coin forecast rankings
+
+    # Thresholds for coin inclusion in forecasts
+    min_wallets: 5  # how many wallets must hold a coin for the coin to be elegible for forecasting
+    min_balance: 10000  # how much USD all wallets must hold for the coin to be elegible for forecasting
+    min_market_cap: 2_000_000  # coins below this market cap will not be included in performance assessments
+    max_market_cap: 30_000_000  # coins above this market cap will not be included in performance assessments
+

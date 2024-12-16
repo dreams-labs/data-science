@@ -8,6 +8,7 @@ from dreams_core.googlecloud import GoogleCloud as dgc
 
 # Local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
+import utils as u
 
 # set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -76,7 +77,7 @@ def retrieve_transfers_sequencing():
     return transfers_sequencing_df
 
 
-
+@u.timing_decorator
 def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df):
     """
     Retrieves facts about the wallet's transfer activity based on blockchain data.
@@ -88,6 +89,7 @@ def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
     Returns:
         transfers_sequencing_features_df (df): dataframe indexed on wallet_id with transfers feature columns
     """
+
     # Inner join lifetime transfers with the profits_df window to filter on date
     window_transfers_data_df = pd.merge(
         profits_df,
