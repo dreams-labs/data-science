@@ -13,6 +13,7 @@ trading_features = wtf.fill_trading_features_data(trading_features, wallet_cohor
 import time
 import logging
 import pandas as pd
+import numpy as np
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -20,119 +21,111 @@ logger = logging.getLogger(__name__)
 
 def add_cash_flow_transfers_logic(profits_df):
     """
-    Adds a cash_flow_transfers column to profits_df that can be used to compute
-    the wallet's gain and investment amount by converting their starting and ending
-    balances to cash flow equivilants.
+    Adds a cash_flow_transfers column that converts starting/ending balances to cash flow equivalents
+    for performance calculations. Handles the timing of transfers by treating:
+    - Start date: Balance is the only inflow since balances already have transfers added
+    - End date: Both final balance and transfers are outflows since the transfers are
+        removed from the end balance
 
     Params:
-    - profits_df (df): profits_df that needs wallet investment peformance computed
-        based on the earliest and latest dates in the df.
+    - profits_df (df): Daily profits data to compute performance metrics for
 
     Returns:
-    - adj_profits_df (df): input df with the cash_flow_transfers column added
+    - adj_profits_df (df): Input df with cash_flow_transfers column added
     """
 
     def adjust_start_transfers(df, target_date):
-        """Initial balance cash flow impact is the same as a positive transfer into a coin balance"""
+        """
+        Sets start date cash flow to just the balance, ignoring transfers since they
+        are already added to the balance. For example, if opening balance is $100
+        with a $50 transfer, the cash inflow is just $100.
+        """
         df.loc[df['date'] == target_date, 'cash_flow_transfers'] = df.loc[df['date'] == target_date, 'usd_balance']
         return df
 
     def adjust_end_transfers(df, target_date):
-        """End balances cash flow impact is the same as a negative transfer out of a coin balance"""
-        df.loc[df['date'] == target_date, 'cash_flow_transfers'] = -df.loc[df['date'] == target_date, 'usd_balance']
+        """
+        Sets end date cash flow to negative balance plus transfers, since transfers happen
+        before the balance is measured. For example, if ending balance is $80 with a -$20
+        transfer, the total cash outflow is -$100.
+        """
+        end_mask = df['date'] == target_date
+        df.loc[end_mask, 'cash_flow_transfers'] = -(
+            df.loc[end_mask, 'usd_balance'] - df.loc[end_mask, 'usd_net_transfers']
+        )
         return df
 
-    # Copy df and add cash flow column
     adj_profits_df = profits_df.copy()
     adj_profits_df['cash_flow_transfers'] = adj_profits_df['usd_net_transfers']
 
-    # Modify the records on the start and end dates to reflect the balances
     start_date = adj_profits_df['date'].min()
     end_date = adj_profits_df['date'].max()
 
-    adj_profits_df = adjust_start_transfers(adj_profits_df,start_date)
-    adj_profits_df = adjust_end_transfers(adj_profits_df,end_date)
+    adj_profits_df = adjust_start_transfers(adj_profits_df, start_date)
+    adj_profits_df = adjust_end_transfers(adj_profits_df, end_date)
 
     return adj_profits_df
 
 
 
-def calculate_wallet_trading_features(profits_df):
+def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calculates the return on investment for the wallet and additional aggregation metrics,
-    ensuring proper date-based ordering for cumulative calculations.
-
-    Profits_df must have initial balances reflected as positive cash_flow_transfers
-    and ending balances reflected as negative cash_flow_transfers for calculations to
-    be accurately reflected.
-
-    - Invested: the maximum amount of cumulative net inflows for the wallet,
-        properly ordered by date to ensure accurate running totals
-    - Return: All net transfers summed together, showing the combined change
-        in assets and balance
+    Calculates comprehensive trading metrics by combining base trading features with
+    time-weighted and realized returns.
 
     Params:
-    - profits_df (pd.DataFrame): df showing all usd net transfers for coin-wallet pairs,
-        with columns coin_id, wallet_address, date, cash_flow_transfers, usd_net_transfers,
-        and is_imputed
+    - profits_df (DataFrame): Daily profits with columns: wallet_address, coin_id, date,
+      cash_flow_transfers, usd_net_transfers, usd_balance, is_imputed
 
     Returns:
-    - wallet_metrics_df (pd.DataFrame): df keyed on wallet_address with columns
-        'invested', 'net_gain', and additional aggregation metrics
+    - wallet_metrics_df (DataFrame): Trading metrics keyed on wallet_address
     """
     start_time = time.time()
     logger.debug("Calculating wallet trading features...")
 
-    # Ensure date is in datetime format
+    # Calculate base trading features
     profits_df['date'] = pd.to_datetime(profits_df['date'])
-
-    # Sort by date and wallet_address to ensure proper cumulative calculations
-    profits_df = profits_df.sort_values(['wallet_address','coin_id','date'])
+    profits_df = profits_df.sort_values(['wallet_address', 'coin_id', 'date'])
 
     # Precompute necessary transformations
     profits_df['abs_usd_net_transfers'] = profits_df['usd_net_transfers'].abs()
-
-    # Calculate cumsum by wallet, respecting date order
     profits_df['cumsum_cash_flow_transfers'] = profits_df.groupby('wallet_address')['cash_flow_transfers'].cumsum()
 
-    # Metrics that take into account imputed rows/profits
-    logger.debug("Calculating wallet metrics based on imputed performance...")
-    imputed_metrics_df = profits_df.groupby('wallet_address').agg(
+    # Base metrics calculation
+    base_metrics_df = profits_df.groupby('wallet_address').agg(
         invested=('cumsum_cash_flow_transfers', 'max'),
         net_gain=('cash_flow_transfers', lambda x: -x.sum()),
         unique_coins_traded=('coin_id', 'nunique')
     )
 
-    # Metrics only based on observed activity
-    logger.debug("Calculating wallet metrics based on observed behavior...")
+    # Observed activity metrics
     observed_metrics_df = profits_df[~profits_df['is_imputed']].groupby('wallet_address').agg(
-        transaction_days=('date', 'nunique'),  # Changed from count to nunique for actual trading days
+        transaction_days=('date', 'nunique'),
+        agg_realized_cash_flows=('usd_net_transfers', 'sum'),
         total_volume=('abs_usd_net_transfers', 'sum'),
-        average_transaction=('abs_usd_net_transfers', 'mean'),
-        first_activity=('date', 'min'),
-        last_activity=('date', 'max')
+        average_transaction=('abs_usd_net_transfers', 'mean')
     )
-    # Join all metrics together
-    wallet_trading_features_df = imputed_metrics_df.join(observed_metrics_df)
 
-    # Data quality checks
-    if wallet_trading_features_df['invested'].min() < 0:
-        logger.error(f"Found {len(wallet_trading_features_df[wallet_trading_features_df['invested']<0])} "
-                         "wallets with negative invested values.")
+    # Calculate additional return metrics using existing functions
+    twr_df = calculate_time_weighted_returns(profits_df)
+    realized_returns_df = calculate_realized_returns(profits_df)
 
-    # Fill 0s for wallets without observed activity
+    # Combine all metrics
+    wallet_trading_features_df = (base_metrics_df
+        .join(observed_metrics_df)
+        .join(twr_df)
+        .join(realized_returns_df)
+    )
+
+    # Fill missing values and clean up
     wallet_trading_features_df = wallet_trading_features_df.fillna(0)
+    wallet_trading_features_df = wallet_trading_features_df.replace(-0, 0)
 
-    # Remove any negative 0s
-    wallet_trading_features_df = wallet_trading_features_df.replace(-0,0)
-
-    # Compute additional derived metrics
+    # Calculate activity density
     period_duration = (profits_df['date'].max() - profits_df['date'].min()).days + 1
-    wallet_trading_features_df['activity_density'] = (wallet_trading_features_df['transaction_days']
-                                                      / period_duration)
-
-    # Remove helper columns
-    wallet_trading_features_df = wallet_trading_features_df.drop(['first_activity','last_activity'], axis=1)
+    wallet_trading_features_df['activity_density'] = (
+        wallet_trading_features_df['transaction_days'] / period_duration
+    )
 
     logger.info(f"Wallet trading features computed after {time.time() - start_time:.2f} seconds")
 
@@ -176,3 +169,78 @@ def fill_trading_features_data(wallet_trading_features_df, wallet_cohort):
     complete_df.update(wallet_trading_features_df)
 
     return complete_df
+
+
+
+def calculate_time_weighted_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculates time-weighted returns (TWR) for each wallet-coin pair, neutralizing
+    the impact of cash flows to measure pure trading performance.
+
+    Params:
+    - profits_df (DataFrame): Daily profits data with columns:
+        wallet_address, coin_id, date, usd_balance, usd_net_transfers
+
+    Returns:
+    - twr_df (DataFrame): TWR metrics keyed on wallet_address with columns:
+        twr, annualized_twr
+    """
+    profits_df = profits_df.sort_values(['wallet_address', 'coin_id', 'date'])
+
+    # Calculate balance before transfers
+    profits_df['pre_transfer_balance'] = profits_df['usd_balance'] - profits_df['usd_net_transfers']
+
+    # Get previous day's end balance
+    profits_df['prev_balance'] = profits_df.groupby(['wallet_address', 'coin_id'])['usd_balance'].shift()
+
+    # Use pre-transfer vs previous balance for days with transfers
+    # Use end balance vs previous balance for days without transfers
+    profits_df['daily_twr'] = np.where(
+        profits_df['usd_net_transfers'] != 0,
+        profits_df['pre_transfer_balance'] / profits_df['prev_balance'],
+        profits_df['usd_balance'] / profits_df['prev_balance']
+    )
+
+    # Replace inf/null values with 1 (no return) for first days
+    profits_df['daily_twr'] = profits_df['daily_twr'].replace([np.inf, -np.inf], 1).fillna(1)
+
+    twr_df = profits_df.groupby('wallet_address').agg(
+        twr=('daily_twr', lambda x: x.prod() - 1),
+        days_held=('date', lambda x: (x.max() - x.min()).days)
+    )
+
+    twr_df['annualized_twr'] = ((1 + twr_df['twr']) ** (365 / twr_df['days_held'])) - 1
+    twr_df = twr_df.replace([np.inf, -np.inf], np.nan)
+
+    return twr_df
+
+
+
+def calculate_realized_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculates realized returns using cash flow transfers through a simple sum of
+    inflows vs outflow.
+
+    Params:
+    - profits_df (DataFrame): input profits data with cash_flow_transfers column
+
+    Returns:
+    - realized_returns_df (DataFrame): Metrics for each wallet:
+        - total_investments: Sum of positive cash flows
+        - total_withdrawals: Sum of negative cash flows (converted to positive)
+        - realized_return: (withdrawals/investments) - 1
+    """
+    realized_returns_df = profits_df.groupby('wallet_address').agg(
+        total_investments=('cash_flow_transfers', lambda x: x[x > 0].sum()),
+        total_withdrawals=('cash_flow_transfers', lambda x: -x[x < 0].sum())
+    )
+
+    realized_returns_df['realized_return'] = (
+        realized_returns_df['total_withdrawals'] /
+        realized_returns_df['total_investments']
+    ) - 1
+
+    # Handle edge case where wallet has no investments
+    realized_returns_df.loc[realized_returns_df['total_investments'] == 0, 'realized_return'] = 0
+
+    return realized_returns_df
