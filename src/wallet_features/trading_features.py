@@ -120,8 +120,8 @@ def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
     observed_metrics_df = profits_df[~profits_df['is_imputed']].groupby('wallet_address').agg(
         transaction_days=('date', 'nunique'),
         unique_coins_traded=('coin_id', 'nunique'),
-        cash_inflows=('usd_net_transfers', lambda x: x[x > 0].sum()),
-        cash_outflows=('usd_net_transfers', lambda x: abs(x[x < 0].sum())),
+        cash_buy_inflows=('usd_net_transfers', lambda x: x[x > 0].sum()),
+        cash_sell_outflows=('usd_net_transfers', lambda x: abs(x[x < 0].sum())),
         cash_net_flows=('usd_net_transfers', lambda x: -x.sum()),
         total_volume=('abs_usd_net_transfers', 'sum'),
         average_transaction=('abs_usd_net_transfers', 'mean'),
@@ -232,9 +232,10 @@ def calculate_time_weighted_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
         days = max(total_days[wallet], 1)  # Get days for this wallet, minimum 1
         return weighted_returns.sum() / days
 
-    # Aggregate by wallet
+    # Compute TWR and days_held using vectorized operations
     twr_df = profits_df.groupby('wallet_address').agg(
-        time_weighted_return=('weighted_return', lambda x: safe_twr(x, x.name)),
+        time_weighted_return=('weighted_return',
+                              lambda x: safe_twr(x, profits_df.loc[x.index, 'wallet_address'].iloc[0])),
         days_held=('date', lambda x: max((x.max() - x.min()).days, 1))
     )
 

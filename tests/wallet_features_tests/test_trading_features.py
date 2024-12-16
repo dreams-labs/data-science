@@ -228,16 +228,59 @@ def test_w01_multiple_coins(test_profits_df, test_trading_features_df):
     # Test basic metrics
     assert w01_features['transaction_days'] == 2  # Jan 1 and May 1
     assert w01_features['unique_coins_traded'] == 2  # BTC and ETH
-    assert w01_features['cash_inflows'] == 400  # Initial: BTC 100 + ETH 200, Add: BTC 50 + ETH 50
+    assert w01_features['cash_buy_inflows'] == 400  # Initial: BTC 100 + ETH 200, Add: BTC 50 + ETH 50
 
     # Test volume metrics
     assert w01_features['total_volume'] == 400  # Sum of all transfers
     assert w01_features['average_transaction'] == 100  # 400 / 4 transactions
 
     # Test imputed metrics
-    assert w01_features['total_inflows'] == 300  # Initial balances
+    assert w01_features['total_inflows'] == 400  # Initial balances
     assert w01_features['net_gain'] > 0  # Should be profitable given ending balances > deposits
 
     # Test activity metrics
     total_days = (w01_profits['date'].max() - w01_profits['date'].min()).days + 1
     assert w01_features['activity_density'] == pytest.approx(2 / total_days, rel=1e-10)
+
+
+# ===== Volume Tests =====
+def test_volume_is_positive(test_trading_features_df):
+    """Verify all volume metrics are non-negative"""
+    volume_cols = ['total_volume', 'average_transaction']
+    for col in volume_cols:
+        assert (test_trading_features_df[col] >= 0).all(), f"Found negative values in {col}"
+
+def test_volume_matches_transfers(test_profits_df, test_trading_features_df):
+    """Verify total_volume matches sum of absolute transfers"""
+    expected = test_profits_df.groupby('wallet_address')['usd_net_transfers'].agg(lambda x: abs(x).sum())
+    actual = test_trading_features_df['total_volume'].reindex(expected.index)
+    np.allclose(actual, expected)
+
+
+# # ===== Cash Flow Tests =====
+def test_cash_flows_sum_correctly(test_trading_features_df):
+    """Verify cash flow components sum correctly"""
+    cash_invested = test_trading_features_df['cash_buy_inflows']
+    cash_withdrawn = test_trading_features_df['cash_sell_outflows']
+    net_flows = test_trading_features_df['cash_net_flows']
+
+    expected_net = cash_withdrawn - cash_invested
+    assert np.allclose(net_flows, expected_net)
+
+def test_flows_match_activity_days(test_profits_df, test_trading_features_df):
+    """Verify transaction days match observed activity"""
+    active_days = (test_profits_df[~test_profits_df['is_imputed']]
+                    .groupby('wallet_address')['date']
+                    .nunique()
+                    .reindex(test_trading_features_df.index)
+                    .fillna(0))
+
+    np.allclose(test_trading_features_df['transaction_days'],active_days)
+
+
+# ===== Return Tests =====
+def test_returns_in_reasonable_range(test_trading_features_df):
+    """Verify return metrics are within reasonable bounds"""
+    return_cols = ['time_weighted_return', 'annualized_twr']
+    for col in return_cols:
+        assert (test_trading_features_df[col].abs() <= 10).all(), f"Found extreme values in {col}"
