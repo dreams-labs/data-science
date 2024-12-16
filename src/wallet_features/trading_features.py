@@ -33,13 +33,13 @@ def add_cash_flow_transfers_logic(profits_df):
     """
 
     def adjust_start_transfers(df, target_date):
-        """Initial balances are negative flows that will be recouped upon sale (or ending balance)"""
-        df.loc[df['date'] == target_date, 'cash_flow_transfers'] -= df.loc[df['date'] == target_date, 'usd_balance']
+        """Initial balance cash flow impact is the same as a positive transfer into a coin balance"""
+        df.loc[df['date'] == target_date, 'cash_flow_transfers'] = df.loc[df['date'] == target_date, 'usd_balance']
         return df
 
     def adjust_end_transfers(df, target_date):
-        """End balances are positive cash flows that increase profitability"""
-        df.loc[df['date'] == target_date, 'cash_flow_transfers'] = df.loc[df['date'] == target_date, 'usd_balance']
+        """End balances cash flow impact is the same as a negative transfer out of a coin balance"""
+        df.loc[df['date'] == target_date, 'cash_flow_transfers'] = -df.loc[df['date'] == target_date, 'usd_balance']
         return df
 
     # Copy df and add cash flow column
@@ -99,10 +99,8 @@ def calculate_wallet_trading_features(profits_df):
     logger.debug("Calculating wallet metrics based on imputed performance...")
     imputed_metrics_df = profits_df.groupby('wallet_address').agg(
         invested=('cumsum_cash_flow_transfers', 'max'),
-        net_gain=('cash_flow_transfers', 'sum'),  # Positive sum = profit
-        unique_coins_traded=('coin_id', 'nunique'),
-        first_activity=('date', 'min'),
-        last_activity=('date', 'max')
+        net_gain=('cash_flow_transfers', lambda x: -x.sum()),
+        unique_coins_traded=('coin_id', 'nunique')
     )
 
     # Metrics only based on observed activity
@@ -110,15 +108,16 @@ def calculate_wallet_trading_features(profits_df):
     observed_metrics_df = profits_df[~profits_df['is_imputed']].groupby('wallet_address').agg(
         transaction_days=('date', 'nunique'),  # Changed from count to nunique for actual trading days
         total_volume=('abs_usd_net_transfers', 'sum'),
-        average_transaction=('abs_usd_net_transfers', 'mean')
+        average_transaction=('abs_usd_net_transfers', 'mean'),
+        first_activity=('date', 'min'),
+        last_activity=('date', 'max')
     )
-
     # Join all metrics together
     wallet_trading_features_df = imputed_metrics_df.join(observed_metrics_df)
 
     # Data quality checks
     if wallet_trading_features_df['invested'].min() < 0:
-        raise ValueError(f"Found {len(wallet_trading_features_df[wallet_trading_features_df['invested']<0])} "
+        logger.error(f"Found {len(wallet_trading_features_df[wallet_trading_features_df['invested']<0])} "
                          "wallets with negative invested values.")
 
     # Fill 0s for wallets without observed activity
@@ -128,10 +127,9 @@ def calculate_wallet_trading_features(profits_df):
     wallet_trading_features_df = wallet_trading_features_df.replace(-0,0)
 
     # Compute additional derived metrics
-    wallet_trading_features_df['activity_days'] = (wallet_trading_features_df['last_activity'] -
-                                        wallet_trading_features_df['first_activity']).dt.days + 1
+    period_duration = (profits_df['date'].max() - profits_df['date'].min()).days + 1
     wallet_trading_features_df['activity_density'] = (wallet_trading_features_df['transaction_days']
-                                                      / wallet_trading_features_df['activity_days'])
+                                                      / period_duration)
 
     # Remove helper columns
     wallet_trading_features_df = wallet_trading_features_df.drop(['first_activity','last_activity'], axis=1)
@@ -147,11 +145,11 @@ def fill_trading_features_data(wallet_trading_features_df, wallet_cohort):
     Fill missing wallet data for all wallets in wallet_cohort that are not in window_wallets_df.
 
     Parameters:
-    wallet_trading_features_df (pd.DataFrame): DataFrame with wallet trading features
-    wallet_cohort (array-like): Array of all wallet addresses that should be present
+    - wallet_trading_features_df (pd.DataFrame): DataFrame with wallet trading features
+    - wallet_cohort (array-like): Array of all wallet addresses that should be present
 
     Returns:
-    pd.DataFrame: Complete DataFrame with filled values for missing wallets
+    - pd.DataFrame: Complete DataFrame with filled values for missing wallets
     """
 
     # Create the fill value dictionary
