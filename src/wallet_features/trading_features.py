@@ -37,8 +37,14 @@ def add_cash_flow_transfers_logic(profits_df):
     def adjust_start_transfers(df, target_date):
         """
         Sets start date cash flow to just the balance, ignoring transfers since they
-        are already added to the balance. For example, if opening balance is $100
-        with a $50 transfer, the cash inflow is just $100.
+        are already added to the balance.
+
+        Example Cases
+        -------------
+        Imputation Case: Opening balance of $75 with a $0 buy. Net flow is $75 start + $0 buy = $75 inflows.
+        Buy Case: Opening balance of $100 with a $30 buy. Net flow is $70 start + $30 buy = $100 inflows.
+        Sell Partial Case: Opening balance of $80 after a $40 sell. Net flow is $120 start - $40 sell = $80 inflows.
+        Sell All Case: Opening balance of $0 after a $50 sell. Net flow is $50 start - $50 sell = $0 inflows.
         """
         df.loc[df['date'] == target_date, 'cash_flow_transfers'] = df.loc[df['date'] == target_date, 'usd_balance']
         return df
@@ -46,8 +52,15 @@ def add_cash_flow_transfers_logic(profits_df):
     def adjust_end_transfers(df, target_date):
         """
         Sets end date cash flow to negative balance plus transfers, since transfers happen
-        before the balance is measured. For example, if ending balance is $80 with a -$20
-        transfer, the total cash outflow is -$100.
+        before the balance is measured.
+
+        Example Cases
+        -------------
+        Imputation Case: Ending balance of $75 with a $0 buy: Net flow is -$75 end + $0 buy = -$75 outflows
+        Buy Case: Ending balance of $100 after a $30 buy. Net flow is -$100 end + $30 buy = -$70 outflows
+        Sell Partial Case: Ending balance of $80 after a $40 sell. Net flow is -$80 end - $40 sell = $120 outflows
+        Sell All Case: Ending balance of $0 after a $50 sell. Net flow is $0 end - $50 sell = -$50 outflows
+
         """
         end_mask = df['date'] == target_date
         df.loc[end_mask, 'cash_flow_transfers'] = -(
