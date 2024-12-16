@@ -30,7 +30,7 @@ class RegressionEvaluator:
     A utility class for evaluating and visualizing regression model performance.
 
     Methods:
-        get_summary_report(): Returns a formatted text summary of model performance
+        summary_report(): Returns a formatted text summary of model performance
         plot_evaluation(plot_type='all'): Creates visualization plots of model performance
 
     Internal Methods:
@@ -104,8 +104,13 @@ class RegressionEvaluator:
             }
 
 
-    def get_summary_report(self):
-        """Generate and return a formatted text summary of the model's performance."""
+    def summary_report(self):
+        """
+        Generate and return a formatted text summary of the model's performance.
+
+        Returns:
+        - str: Formatted summary of model metrics
+        """
         summary = [
             "Model Performance Summary",
             "=" * 25,
@@ -121,7 +126,7 @@ class RegressionEvaluator:
             f"95% Prediction Interval:     ±{self.metrics['prediction_interval_95']:.3f}"
         ]
 
-        print("\n".join(summary))
+        return "\n".join(summary)
 
 
     def plot_evaluation(self, plot_type='all', display=True):

@@ -28,13 +28,13 @@ def create_basic_cluster_features(training_data_df, include_pca=False, include_c
     Parameters:
     - training_data_df (df): DataFrame keyed on wallet_address
     - include_pca (bool): whether to include PCA component features in the output
-    - include_categorical (bool): whether to include the cluster number as a categorical feature
+    - include_categorical (bool): whether to include the cluster number as categorical feature
 
     Returns:
     - cluster_features_df (df): dataframe with original index plus new cluster features
     """
     n_components = wallets_config['features']['clustering_n_components']
-    n_clusters = wallets_config['features']['clustering_n_clusters']
+    cluster_counts = wallets_config['features']['clustering_n_clusters']  # Now a list
 
     # Store original index
     original_index = training_data_df.index
@@ -50,29 +50,28 @@ def create_basic_cluster_features(training_data_df, include_pca=False, include_c
     pca = PCA(n_components=n_components)
     pca_result = pca.fit_transform(scaled_data)
 
-    # Apply KMeans clustering
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-    cluster_labels = kmeans.fit_predict(pca_result)
-
     # Create new features DataFrame
     cluster_features_df = pd.DataFrame(index=original_index)
 
-    # Add cluster as categorical
-    if include_categorical:
-        cluster_features_df['cluster'] = pd.Categorical(
-            [f'cluster_{i}' for i in cluster_labels],
-            categories=[f'cluster_{i}' for i in range(n_clusters)]
-        )
-
-    # Add PCA components
+    # Add PCA components once
     if include_pca:
         for i in range(n_components):
             cluster_features_df[f'pca_component_{i+1}'] = pca_result[:, i]
 
-    # Add distance to cluster centers
-    distances = kmeans.transform(pca_result)
-    for i in range(n_clusters):
-        cluster_features_df[f'distance_to_cluster_{i}'] = distances[:, i]
+    # Generate features for each cluster count
+    for n_clusters in cluster_counts:
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+        cluster_labels = kmeans.fit_predict(pca_result)
+
+        if include_categorical:
+            cluster_features_df[f'cluster_{n_clusters}'] = pd.Categorical(
+                [f'cluster_{i}' for i in cluster_labels],
+                categories=[f'cluster_{i}' for i in range(n_clusters)]
+            )
+
+        distances = kmeans.transform(pca_result)
+        for i in range(n_clusters):
+            cluster_features_df[f'k{n_clusters}_distance_to_cluster_{i}'] = distances[:, i]
 
     return cluster_features_df
 

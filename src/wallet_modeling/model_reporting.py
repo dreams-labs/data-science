@@ -66,16 +66,23 @@ def save_model_artifacts(model_results, evaluation_dict, configs, coin_validatio
 
     # Generate single UUID for all artifacts
     model_id = str(uuid.uuid4())
+
+    # Generate additional metadata for the filename
+    model_time = datetime.now()
+    filename_timestamp = model_time.strftime('%Y%m%d_%Hh%Mm%Ss')
+    model_r2 = evaluation_dict['r2']
+    model_report_filename = f"model_report_{filename_timestamp}_{model_r2:.3f}_{model_id}.json"
     base_dir = Path(base_path)
 
     # Create necessary directories
     for dir_name in ['model_reports', 'wallet_scores', 'coin_metrics']:
         (base_dir / dir_name).mkdir(parents=True, exist_ok=True)
 
+
     # 1. Save model report
     report = {
         'model_id': model_id,
-        'timestamp': datetime.now().isoformat(),
+        'timestamp': model_time.isoformat(),
         'training_data': {
             'n_samples': model_results['X'].shape[0] if 'X' in model_results else None,
             'n_features': model_results['X'].shape[1] if 'X' in model_results else None
@@ -84,7 +91,7 @@ def save_model_artifacts(model_results, evaluation_dict, configs, coin_validatio
         'evaluation': evaluation_dict
     }
 
-    report_path = base_dir / 'model_reports' / f"model_report_{model_id}.json"
+    report_path = base_dir / 'model_reports' / model_report_filename
     with open(report_path, 'w', encoding='utf-8') as f:
         json.dump(report, f, indent=2, default=numpy_type_converter)
     logger.info(f"Saved model report to {report_path}")
@@ -183,7 +190,7 @@ def generate_and_save_model_artifacts(model_results, validation_profits_df, base
     # Create evaluation dictionary with the same structure as before
     evaluation = {
         **evaluator.metrics,  # Include all basic metrics
-        'summary_report': evaluator.get_summary_report()
+        'summary_report': evaluator.summary_report()
     }
 
     # 2. Create wallet scores DataFrame

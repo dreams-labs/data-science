@@ -168,7 +168,7 @@ def calculate_relative_changes(
     # Get the offsets configuration
     try:
         offset_config = wallets_features_config['market_timing']['offsets']
-        winsor_coef = wallets_config['data_cleaning']['offset_winsorization']
+        winsor_coef = wallets_config['features']['offset_winsorization']
     except KeyError as e:
         raise FeatureConfigError("Required config key not found in wallets_features_config: " + str(e)) from e
 
