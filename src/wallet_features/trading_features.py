@@ -110,7 +110,6 @@ def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
         total_outflows=('cash_flow_transfers', lambda x: abs(x[x < 0].sum())),
         total_net_flows=('cash_flow_transfers', lambda x: -x.sum()),
         max_investment=('cumsum_cash_flow_transfers', 'max'),
-        net_gain=('cash_flow_transfers', lambda x: -x.sum()),
     )
 
     # Observed activity metrics
@@ -163,7 +162,7 @@ def fill_trading_features_data(wallet_trading_features_df, wallet_cohort):
     # Create the fill value dictionary
     fill_values = {
         'max_investment': 0,
-        'net_gain': 0,
+        'total_net_flows': 0,
         'unique_coins_traded': 0,
         'transaction_days': 0,
         'total_volume': 0,

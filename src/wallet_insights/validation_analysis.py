@@ -60,15 +60,15 @@ def calculate_validation_metrics(X_test, y_pred, validation_profits_df):
     bucketed_performance_df = wallet_performance_df.groupby('score_rounded').agg(
         wallets=('score', 'count'),
         mean_invested=('max_investment', 'mean'),
-        mean_net_gain=('net_gain', 'mean'),
+        mean_total_net_flows=('total_net_flows', 'mean'),
         median_invested=('max_investment', 'median'),
-        median_net_gain=('net_gain', 'median'),
+        median_total_net_flows=('total_net_flows', 'median'),
     )
 
     # Calculate return metrics
-    bucketed_performance_df['mean_return'] = (bucketed_performance_df['mean_net_gain']
+    bucketed_performance_df['mean_return'] = (bucketed_performance_df['mean_total_net_flows']
                                                      / bucketed_performance_df['mean_invested'])
-    bucketed_performance_df['median_return'] = (bucketed_performance_df['median_net_gain']
+    bucketed_performance_df['median_return'] = (bucketed_performance_df['median_total_net_flows']
                                                        / bucketed_performance_df['median_invested'])
 
     return wallet_performance_df, bucketed_performance_df

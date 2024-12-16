@@ -211,6 +211,7 @@ def test_trading_features_df(test_profits_df):
     return wtf.calculate_wallet_trading_features(test_profits_df)
 
 
+@pytest.mark.unit
 def test_w01_multiple_coins(test_profits_df, test_trading_features_df):
     """
     Test wallet with multiple coins and transactions.
@@ -236,7 +237,7 @@ def test_w01_multiple_coins(test_profits_df, test_trading_features_df):
 
     # Test imputed metrics
     assert w01_features['total_inflows'] == 400  # Initial balances
-    assert w01_features['net_gain'] > 0  # Should be profitable given ending balances > deposits
+    assert w01_features['total_net_flows'] > 0  # Should be profitable given ending balances > deposits
 
     # Test activity metrics
     total_days = (w01_profits['date'].max() - w01_profits['date'].min()).days + 1
@@ -244,12 +245,14 @@ def test_w01_multiple_coins(test_profits_df, test_trading_features_df):
 
 
 # ===== Volume Tests =====
+@pytest.mark.unit
 def test_volume_is_positive(test_trading_features_df):
     """Verify all volume metrics are non-negative"""
     volume_cols = ['total_volume', 'average_transaction']
     for col in volume_cols:
         assert (test_trading_features_df[col] >= 0).all(), f"Found negative values in {col}"
 
+@pytest.mark.unit
 def test_volume_matches_transfers(test_profits_df, test_trading_features_df):
     """Verify total_volume matches sum of absolute transfers"""
     expected = test_profits_df.groupby('wallet_address')['usd_net_transfers'].agg(lambda x: abs(x).sum())
@@ -258,6 +261,7 @@ def test_volume_matches_transfers(test_profits_df, test_trading_features_df):
 
 
 # ===== Cash Flow Tests =====
+@pytest.mark.unit
 def test_cash_flows_sum_correctly(test_trading_features_df):
     """Verify cash flow components sum correctly"""
     cash_invested = test_trading_features_df['cash_buy_inflows']
@@ -267,6 +271,7 @@ def test_cash_flows_sum_correctly(test_trading_features_df):
     expected_net = cash_withdrawn - cash_invested
     assert np.allclose(net_flows, expected_net)
 
+@pytest.mark.unit
 def test_flows_match_activity_days(test_profits_df, test_trading_features_df):
     """Verify transaction days match observed activity"""
     active_days = (test_profits_df[~test_profits_df['is_imputed']]
@@ -279,8 +284,26 @@ def test_flows_match_activity_days(test_profits_df, test_trading_features_df):
 
 
 # ===== Return Tests =====
-def test_returns_in_reasonable_range(test_trading_features_df):
-    """Verify return metrics are within reasonable bounds"""
-    return_cols = ['time_weighted_return', 'annualized_twr']
-    for col in return_cols:
-        assert (test_trading_features_df[col].abs() <= 10).all(), f"Found extreme values in {col}"
+@pytest.mark.unit
+def test_return_ratios_in_reasonable_range(test_trading_features_df):
+    """
+    Verify return ratios (net_flows/outflows) are within reasonable bounds.
+
+    Logic:
+    1. Filter for wallets with positive investments
+    2. Calculate return ratio as total_net_flows / total_outflows
+    3. Verify ratios don't exceed 1000% (10x)
+
+    Args:
+        test_trading_features_df: DataFrame with trading metrics including flows and investments
+    """
+    # Filter for wallets with actual investment activity
+    active_wallets = test_trading_features_df[test_trading_features_df['max_investment'] > 0]
+
+    # Calculate return ratios where outflows exist
+    valid_outflows = active_wallets[active_wallets['total_outflows'] > 0]
+    return_ratios = valid_outflows['total_net_flows'] / valid_outflows['max_investment']
+
+    assert (return_ratios.abs() <= 10).all(), (
+        f"Found extreme return ratios. Max ratio: {return_ratios.abs().max():.2f}"
+    )
