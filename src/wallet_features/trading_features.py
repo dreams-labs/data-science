@@ -41,10 +41,10 @@ def add_cash_flow_transfers_logic(profits_df):
 
         Example Cases
         -------------
-        Imputation Case: Opening balance of $75 with a $0 buy. Net flow is $75 start + $0 buy = $75 inflows.
-        Buy Case: Opening balance of $100 with a $30 buy. Net flow is $70 start + $30 buy = $100 inflows.
-        Sell Partial Case: Opening balance of $80 after a $40 sell. Net flow is $120 start - $40 sell = $80 inflows.
-        Sell All Case: Opening balance of $0 after a $50 sell. Net flow is $50 start - $50 sell = $0 inflows.
+        1. Imputation Case: Opening balance of $75 with a $0 transfer. Net flow is $75 start + $0 buy = $75 inflows.
+        2. Buy Case: Opening balance of $100 with a $30 buy. Net flow is $70 start + $30 buy = $100 inflows.
+        3. Sell Partial Case: Opening balance of $80 after a $40 sell. Net flow is $120 start - $40 sell = $80 inflows.
+        4. Sell All Case: Opening balance of $0 after a $50 sell. Net flow is $50 start - $50 sell = $0 inflows.
         """
         df.loc[df['date'] == target_date, 'cash_flow_transfers'] = df.loc[df['date'] == target_date, 'usd_balance']
         return df
@@ -56,10 +56,10 @@ def add_cash_flow_transfers_logic(profits_df):
 
         Example Cases
         -------------
-        Imputation Case: Ending balance of $75 with a $0 buy: Net flow is -$75 end + $0 buy = -$75 outflows
-        Buy Case: Ending balance of $100 after a $30 buy. Net flow is -$100 end + $30 buy = -$70 outflows
-        Sell Partial Case: Ending balance of $80 after a $40 sell. Net flow is -$80 end - $40 sell = $120 outflows
-        Sell All Case: Ending balance of $0 after a $50 sell. Net flow is $0 end - $50 sell = -$50 outflows
+        1. Imputation Case: Ending balance of $75 with a $0 transfer: Net flow is -$75 end + $0 buy = -$75 outflows
+        2. Buy Case: Ending balance of $100 after a $30 buy. Net flow is -$100 end + $30 buy = -$70 outflows
+        3. Sell Partial Case: Ending balance of $80 after a $40 sell. Net flow is -$80 end - $40 sell = $120 outflows
+        4. Sell All Case: Ending balance of $0 after a $50 sell. Net flow is $0 end - $50 sell = -$50 outflows
 
         """
         end_mask = df['date'] == target_date
@@ -106,9 +106,9 @@ def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
 
     # Metrics that incorporate imputed rows
     base_metrics_df = profits_df.groupby('wallet_address').agg(
-        imputed_deposits=('cash_flow_transfers', lambda x: x[x > 0].sum()),
-        imputed_withdrawals=('cash_flow_transfers', lambda x: abs(x[x < 0].sum())),
-        imputed_net_cash_flows=('cash_flow_transfers', lambda x: -x.sum()),
+        total_inflows=('cash_flow_transfers', lambda x: x[x > 0].sum()),
+        total_outflows=('cash_flow_transfers', lambda x: abs(x[x < 0].sum())),
+        total_net_flows=('cash_flow_transfers', lambda x: -x.sum()),
         invested=('cumsum_cash_flow_transfers', 'max'),
         net_gain=('cash_flow_transfers', lambda x: -x.sum()),
     )
@@ -120,9 +120,9 @@ def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
     observed_metrics_df = profits_df[~profits_df['is_imputed']].groupby('wallet_address').agg(
         transaction_days=('date', 'nunique'),
         unique_coins_traded=('coin_id', 'nunique'),
-        realized_deposits=('usd_net_transfers', lambda x: x[x > 0].sum()),
-        realized_withdrawals=('usd_net_transfers', lambda x: abs(x[x < 0].sum())),
-        realized_net_cash_flows=('usd_net_transfers', lambda x: -x.sum()),
+        cash_inflows=('usd_net_transfers', lambda x: x[x > 0].sum()),
+        cash_outflows=('usd_net_transfers', lambda x: abs(x[x < 0].sum())),
+        cash_net_flows=('usd_net_transfers', lambda x: -x.sum()),
         total_volume=('abs_usd_net_transfers', 'sum'),
         average_transaction=('abs_usd_net_transfers', 'mean'),
     )
@@ -138,10 +138,15 @@ def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
     wallet_trading_features_df = wallet_trading_features_df.fillna(0)
     wallet_trading_features_df = wallet_trading_features_df.replace(-0, 0)
 
-    # Calculate activity density
+    # Calculate wallet-level ratio metrics
     period_duration = (profits_df['date'].max() - profits_df['date'].min()).days + 1
     wallet_trading_features_df['activity_density'] = (
         wallet_trading_features_df['transaction_days'] / period_duration
+    )
+    wallet_trading_features_df['volume_vs_investment_ratio'] = np.where(
+        wallet_trading_features_df['invested'] > 0,
+        wallet_trading_features_df['total_volume'] / wallet_trading_features_df['invested'],
+        0
     )
 
     logger.info(f"Wallet trading features computed after {time.time() - start_time:.2f} seconds")
@@ -251,21 +256,21 @@ def calculate_realized_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
 
     Returns:
     - realized_returns_df (DataFrame): Metrics for each wallet:
-        - imputed_deposits: Sum of positive cash flows
-        - imputed_withdrawals: Sum of negative cash flows (converted to positive)
+        - total_inflows: Sum of positive cash flows
+        - total_outflows: Sum of negative cash flows (converted to positive)
         - realized_return: (withdrawals/investments) - 1
     """
     realized_returns_df = profits_df.groupby('wallet_address').agg(
-        imputed_deposits=('cash_flow_transfers', lambda x: x[x > 0].sum()),
-        imputed_withdrawals=('cash_flow_transfers', lambda x: -x[x < 0].sum())
+        total_inflows=('cash_flow_transfers', lambda x: x[x > 0].sum()),
+        total_outflows=('cash_flow_transfers', lambda x: -x[x < 0].sum())
     )
 
     realized_returns_df['realized_return'] = (
-        realized_returns_df['imputed_withdrawals'] /
-        realized_returns_df['imputed_deposits']
+        realized_returns_df['total_outflows'] /
+        realized_returns_df['total_inflows']
     ) - 1
 
     # Handle edge case where wallet has no investments
-    realized_returns_df.loc[realized_returns_df['imputed_deposits'] == 0, 'realized_return'] = 0
+    realized_returns_df.loc[realized_returns_df['total_inflows'] == 0, 'realized_return'] = 0
 
     return realized_returns_df
