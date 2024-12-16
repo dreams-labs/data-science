@@ -161,14 +161,19 @@ def fill_trading_features_data(wallet_trading_features_df, wallet_cohort):
 
     # Create the fill value dictionary
     fill_values = {
-        'max_investment': 0,
+        'total_inflows': 0,
+        'total_outflows': 0,
         'total_net_flows': 0,
-        'unique_coins_traded': 0,
+        'max_investment': 0,
         'transaction_days': 0,
+        'unique_coins_traded': 0,
+        'cash_buy_inflows': 0,
+        'cash_sell_outflows': 0,
+        'cash_net_flows': 0,
         'total_volume': 0,
         'average_transaction': 0,
-        'activity_days': 0,
-        'activity_density': 0
+        'activity_density': 0,
+        'volume_vs_investment_ratio': 0,
     }
 
     # Create a DataFrame with all wallets that should exist
