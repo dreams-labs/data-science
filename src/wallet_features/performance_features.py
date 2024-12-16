@@ -66,52 +66,28 @@ def calculate_time_weighted_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
     twr_df['annualized_twr'] = ((1 + twr_df['time_weighted_return']) ** (365 / twr_df['days_held'])) - 1
     twr_df = twr_df.replace([np.inf, -np.inf], np.nan)
 
+    # Winsorize output
+    returns_winsorization = wallets_config['modeling']['returns_winsorization']
+    if returns_winsorization > 0:
+        twr_df['time_weighted_return'] = u.winsorize(twr_df['time_weighted_return'],returns_winsorization)
+        twr_df['annualized_twr'] = u.winsorize(twr_df['annualized_twr'],returns_winsorization)
+
     return twr_df
 
 
 
-def calculate_realized_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Calculates realized returns using cash flow transfers through a simple sum of
-    inflows vs outflow.
 
-    Params:
-    - profits_df (DataFrame): input profits data with cash_flow_transfers column
-
-    Returns:
-    - realized_returns_df (DataFrame): Metrics for each wallet:
-        - total_inflows: Sum of positive cash flows
-        - total_outflows: Sum of negative cash flows (converted to positive)
-        - realized_return: (withdrawals/investments) - 1
-    """
-    realized_returns_df = profits_df.groupby('wallet_address').agg(
-        total_inflows=('cash_flow_transfers', lambda x: x[x > 0].sum()),
-        total_outflows=('cash_flow_transfers', lambda x: -x[x < 0].sum())
-    )
-
-    realized_returns_df['realized_return'] = (
-        realized_returns_df['total_outflows'] /
-        realized_returns_df['total_inflows']
-    ) - 1
-
-    # Handle edge case where wallet has no investments
-    realized_returns_df.loc[realized_returns_df['total_inflows'] == 0, 'realized_return'] = 0
-
-    return realized_returns_df
-
-
-
-def calculate_performance_features(wallets_df):
+def calculate_performance_features(wallet_features_df):
     """
     Generates various target variables for modeling wallet performance.
 
     Parameters:
-    - wallets_df: pandas DataFrame with columns ['total_net_flows', 'max_investment']
+    - wallet_features_df: pandas DataFrame with columns ['total_net_flows', 'max_investment']
 
     Returns:
     - DataFrame with additional target variables
     """
-    metrics_df = wallets_df[['max_investment','total_net_flows']].copy().round(6)
+    metrics_df = wallet_features_df[['max_investment','total_net_flows']].copy().round(6)
     returns_winsorization = wallets_config['modeling']['returns_winsorization']
     epsilon = 1e-10
 
@@ -122,10 +98,6 @@ def calculate_performance_features(wallets_df):
     # Apply winsorization
     if returns_winsorization > 0:
         metrics_df['return'] = u.winsorize(metrics_df['return'],returns_winsorization)
-
-    # Risk-Adjusted Dollar Return
-    metrics_df['risk_adj_return'] = metrics_df['total_net_flows'] * \
-        (1 + np.log10(metrics_df['max_investment'] + epsilon))
 
     # Normalize returns
     metrics_df['norm_return'] = (metrics_df['return'] - metrics_df['return'].min()) / \
@@ -139,16 +111,6 @@ def calculate_performance_features(wallets_df):
     # Performance score
     metrics_df['performance_score'] = (0.6 * metrics_df['norm_return'] +
                                      0.4 * metrics_df['norm_invested'])
-
-    # Log-weighted return
-    metrics_df['log_weighted_return'] = metrics_df['return'] * \
-        np.log10(metrics_df['max_investment'] + epsilon)
-
-    # Hybrid score (combining absolute and relative performance)
-    max_gain = metrics_df['total_net_flows'].abs().max()
-    metrics_df['norm_gain'] = metrics_df['total_net_flows'] / max_gain
-    metrics_df['hybrid_score'] = (metrics_df['norm_gain'] +
-                                metrics_df['norm_return']) / 2
 
     # Size-adjusted rank
     # Create mask for zero values

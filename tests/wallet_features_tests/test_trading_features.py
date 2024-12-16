@@ -84,11 +84,13 @@ class ProfitsValidator:
         return not profits_df.isna().any().any()
 
 
+
+
 # pylint:disable=line-too-long
 @pytest.fixture
-def test_profits_df():
+def test_profits_data():
     """
-    Returns test profits DataFrame with cash flow transfers added.
+    Returns raw profits data that can be remapped for many-to-many testing.
     """
     profits_data = [
         # w01_multiple_coins - btc & eth (multiple transactions, multiple coins)
@@ -105,38 +107,38 @@ def test_profits_df():
         {'coin_id': 'btc', 'wallet_address': 'w02_net_loss', 'date': '2024-05-01', 'usd_balance': 250, 'usd_net_transfers': -100, 'is_imputed': False},
         {'coin_id': 'btc', 'wallet_address': 'w02_net_loss', 'date': '2024-10-01', 'usd_balance': 100, 'usd_net_transfers': 0, 'is_imputed': True},
 
-        # w03_sell_all_and_rebuy - ada (sell full balance mid-way and repurchase)
-        {'coin_id': 'ada', 'wallet_address': 'w03_sell_all_and_rebuy', 'date': '2024-01-01', 'usd_balance': 50, 'usd_net_transfers': 50, 'is_imputed': False},
-        {'coin_id': 'ada', 'wallet_address': 'w03_sell_all_and_rebuy', 'date': '2024-03-01', 'usd_balance': 0,  'usd_net_transfers': -50, 'is_imputed': False},
-        {'coin_id': 'ada', 'wallet_address': 'w03_sell_all_and_rebuy', 'date': '2024-08-01', 'usd_balance': 40, 'usd_net_transfers': 40, 'is_imputed': False},
-        {'coin_id': 'ada', 'wallet_address': 'w03_sell_all_and_rebuy', 'date': '2024-10-01', 'usd_balance': 42, 'usd_net_transfers': 0, 'is_imputed': True},
+        # w03_sell_all_and_rebuy
+        {'coin_id': 'eth', 'wallet_address': 'w03_sell_all_and_rebuy', 'date': '2024-01-01', 'usd_balance': 50, 'usd_net_transfers': 50, 'is_imputed': False},
+        {'coin_id': 'eth', 'wallet_address': 'w03_sell_all_and_rebuy', 'date': '2024-03-01', 'usd_balance': 0,  'usd_net_transfers': -50, 'is_imputed': False},
+        {'coin_id': 'eth', 'wallet_address': 'w03_sell_all_and_rebuy', 'date': '2024-08-01', 'usd_balance': 40, 'usd_net_transfers': 40, 'is_imputed': False},
+        {'coin_id': 'eth', 'wallet_address': 'w03_sell_all_and_rebuy', 'date': '2024-10-01', 'usd_balance': 42, 'usd_net_transfers': 0, 'is_imputed': True},
 
         # w04_only_period_end - btc (only final row)
-        {'coin_id': 'btc', 'wallet_address': 'w04_only_period_end', 'date': '2024-10-01', 'usd_balance': 70, 'usd_net_transfers': 70, 'is_imputed': False},
+        {'coin_id': 'sol', 'wallet_address': 'w04_only_period_end', 'date': '2024-10-01', 'usd_balance': 70, 'usd_net_transfers': 70, 'is_imputed': False},
 
         # w04a_only_period_end_w_balance - btc
-        {'coin_id': 'btc', 'wallet_address': 'w04a_only_period_end_w_balance', 'date': '2024-01-01', 'usd_balance': 30, 'usd_net_transfers': 0, 'is_imputed': True},
-        {'coin_id': 'btc', 'wallet_address': 'w04a_only_period_end_w_balance', 'date': '2024-10-01', 'usd_balance': 90, 'usd_net_transfers': 50, 'is_imputed': False},
+        {'coin_id': 'eth', 'wallet_address': 'w04a_only_period_end_w_balance', 'date': '2024-01-01', 'usd_balance': 30, 'usd_net_transfers': 0, 'is_imputed': True},
+        {'coin_id': 'eth', 'wallet_address': 'w04a_only_period_end_w_balance', 'date': '2024-10-01', 'usd_balance': 90, 'usd_net_transfers': 50, 'is_imputed': False},
 
         # w04b_only_period_start_buy
-        {'coin_id': 'btc', 'wallet_address': 'w04b_only_period_start_buy', 'date': '2024-01-01', 'usd_balance': 300, 'usd_net_transfers': 300, 'is_imputed': False},
-        {'coin_id': 'btc', 'wallet_address': 'w04b_only_period_start_buy', 'date': '2024-10-01', 'usd_balance': 900, 'usd_net_transfers': 0, 'is_imputed': True},
+        {'coin_id': 'sol', 'wallet_address': 'w04b_only_period_start_buy', 'date': '2024-01-01', 'usd_balance': 300, 'usd_net_transfers': 300, 'is_imputed': False},
+        {'coin_id': 'sol', 'wallet_address': 'w04b_only_period_start_buy', 'date': '2024-10-01', 'usd_balance': 900, 'usd_net_transfers': 0, 'is_imputed': True},
 
         # w04c_only_period_start_buy_w_existing_balance
         {'coin_id': 'btc', 'wallet_address': 'w04c_only_period_start_buy_w_existing_balance', 'date': '2024-01-01', 'usd_balance': 350, 'usd_net_transfers': 300, 'is_imputed': False},
         {'coin_id': 'btc', 'wallet_address': 'w04c_only_period_start_buy_w_existing_balance', 'date': '2024-10-01', 'usd_balance': 1050, 'usd_net_transfers': 0, 'is_imputed': True},
 
         # w04d_only_period_start_sell
-        {'coin_id': 'btc', 'wallet_address': 'w04d_only_period_start_sell', 'date': '2024-01-01', 'usd_balance': 0, 'usd_net_transfers': -200, 'is_imputed': False},
-        {'coin_id': 'btc', 'wallet_address': 'w04d_only_period_start_sell', 'date': '2024-10-01', 'usd_balance': 0, 'usd_net_transfers': 0, 'is_imputed': True},
+        {'coin_id': 'sol', 'wallet_address': 'w04d_only_period_start_sell', 'date': '2024-01-01', 'usd_balance': 0, 'usd_net_transfers': -200, 'is_imputed': False},
+        {'coin_id': 'sol', 'wallet_address': 'w04d_only_period_start_sell', 'date': '2024-10-01', 'usd_balance': 0, 'usd_net_transfers': 0, 'is_imputed': True},
 
         # w04e_only_period_start_sell_partial
         {'coin_id': 'btc', 'wallet_address': 'w04e_only_period_start_sell_partial', 'date': '2024-01-01', 'usd_balance': 500, 'usd_net_transfers': -10, 'is_imputed': False},
         {'coin_id': 'btc', 'wallet_address': 'w04e_only_period_start_sell_partial', 'date': '2024-10-01', 'usd_balance': 600, 'usd_net_transfers': 0, 'is_imputed': True},
 
         # w05_only_imputed - btc (only imputed rows at start and end)
-        {'coin_id': 'btc', 'wallet_address': 'w05_only_imputed', 'date': '2024-01-01', 'usd_balance': 50, 'usd_net_transfers': 0, 'is_imputed': True},
-        {'coin_id': 'btc', 'wallet_address': 'w05_only_imputed', 'date': '2024-10-01', 'usd_balance': 70, 'usd_net_transfers': 0, 'is_imputed': True},
+        {'coin_id': 'sol', 'wallet_address': 'w05_only_imputed', 'date': '2024-01-01', 'usd_balance': 50, 'usd_net_transfers': 0, 'is_imputed': True},
+        {'coin_id': 'sol', 'wallet_address': 'w05_only_imputed', 'date': '2024-10-01', 'usd_balance': 70, 'usd_net_transfers': 0, 'is_imputed': True},
 
         # w06_tiny_transactions - very small transactions relative to portfolio size
         {'coin_id': 'myro', 'wallet_address': 'w06_tiny_transactions', 'date': '2024-01-01', 'usd_balance': 1250, 'usd_net_transfers': 0, 'is_imputed': True},
@@ -151,20 +153,20 @@ def test_profits_df():
         {'coin_id': 'floki', 'wallet_address': 'w07_tiny_transactions2', 'date': '2024-10-01', 'usd_balance': 0, 'usd_net_transfers': 0, 'is_imputed': True},
 
         # w08_offsetting_transactions - large offsetting transactions in the middle of the period
-        {'coin_id': 'floki', 'wallet_address': 'w08_offsetting_transactions', 'date': '2024-01-01', 'usd_balance': 500, 'usd_net_transfers': 0, 'is_imputed': True},
-        {'coin_id': 'floki', 'wallet_address': 'w08_offsetting_transactions', 'date': '2024-02-01', 'usd_balance': 10400, 'usd_net_transfers': 10000, 'is_imputed': False},
-        {'coin_id': 'floki', 'wallet_address': 'w08_offsetting_transactions', 'date': '2024-02-02', 'usd_balance': 400, 'usd_net_transfers': -10000, 'is_imputed': False},
-        {'coin_id': 'floki', 'wallet_address': 'w08_offsetting_transactions', 'date': '2024-10-01', 'usd_balance': 750, 'usd_net_transfers': 0, 'is_imputed': True},
+        {'coin_id': 'sol', 'wallet_address': 'w08_offsetting_transactions', 'date': '2024-01-01', 'usd_balance': 500, 'usd_net_transfers': 0, 'is_imputed': True},
+        {'coin_id': 'sol', 'wallet_address': 'w08_offsetting_transactions', 'date': '2024-02-01', 'usd_balance': 10400, 'usd_net_transfers': 10000, 'is_imputed': False},
+        {'coin_id': 'sol', 'wallet_address': 'w08_offsetting_transactions', 'date': '2024-02-02', 'usd_balance': 400, 'usd_net_transfers': -10000, 'is_imputed': False},
+        {'coin_id': 'sol', 'wallet_address': 'w08_offsetting_transactions', 'date': '2024-10-01', 'usd_balance': 750, 'usd_net_transfers': 0, 'is_imputed': True},
 
         # w09_memecoin_winner - Large swings in portfolio value
-        {'coin_id': 'pepe', 'wallet_address': 'w09_memecoin_winner', 'date': '2024-01-01', 'usd_balance': 100, 'usd_net_transfers': 100, 'is_imputed': False},
-        {'coin_id': 'pepe', 'wallet_address': 'w09_memecoin_winner', 'date': '2024-03-01', 'usd_balance': 250, 'usd_net_transfers': -500, 'is_imputed': False},
-        {'coin_id': 'pepe', 'wallet_address': 'w09_memecoin_winner', 'date': '2024-05-01', 'usd_balance': 50, 'usd_net_transfers': -100, 'is_imputed': False},
-        {'coin_id': 'pepe', 'wallet_address': 'w09_memecoin_winner', 'date': '2024-10-01', 'usd_balance': 10, 'usd_net_transfers': 0, 'is_imputed': True},
+        {'coin_id': 'floki', 'wallet_address': 'w09_memecoin_winner', 'date': '2024-01-01', 'usd_balance': 100, 'usd_net_transfers': 100, 'is_imputed': False},
+        {'coin_id': 'floki', 'wallet_address': 'w09_memecoin_winner', 'date': '2024-03-01', 'usd_balance': 250, 'usd_net_transfers': -500, 'is_imputed': False},
+        {'coin_id': 'floki', 'wallet_address': 'w09_memecoin_winner', 'date': '2024-05-01', 'usd_balance': 50, 'usd_net_transfers': -100, 'is_imputed': False},
+        {'coin_id': 'floki', 'wallet_address': 'w09_memecoin_winner', 'date': '2024-10-01', 'usd_balance': 10, 'usd_net_transfers': 0, 'is_imputed': True},
 
         # w10_memecoin_loser - Large swings in portfolio value
-        {'coin_id': 'bome', 'wallet_address': 'w10_memecoin_loser', 'date': '2024-03-01', 'usd_balance': 250, 'usd_net_transfers': 250, 'is_imputed': False},
-        {'coin_id': 'bome', 'wallet_address': 'w10_memecoin_loser', 'date': '2024-10-01', 'usd_balance': 0, 'usd_net_transfers': -20, 'is_imputed': False},
+        {'coin_id': 'myro', 'wallet_address': 'w10_memecoin_loser', 'date': '2024-03-01', 'usd_balance': 250, 'usd_net_transfers': 250, 'is_imputed': False},
+        {'coin_id': 'myro', 'wallet_address': 'w10_memecoin_loser', 'date': '2024-10-01', 'usd_balance': 0, 'usd_net_transfers': -20, 'is_imputed': False},
 
         # w11_sells_early
         {'coin_id': 'btc', 'wallet_address': 'w11_sells_early', 'date': '2024-03-01', 'usd_balance': 0, 'usd_net_transfers': 0, 'is_imputed': True},
@@ -173,12 +175,20 @@ def test_profits_df():
         {'coin_id': 'btc', 'wallet_address': 'w11_sells_early', 'date': '2024-10-01', 'usd_balance': 0, 'usd_net_transfers': 0, 'is_imputed': True},
 
         # w12_buys_late
-        {'coin_id': 'btc', 'wallet_address': 'w12_buys_late', 'date': '2024-03-01', 'usd_balance': 0, 'usd_net_transfers': 0, 'is_imputed': True},
-        {'coin_id': 'btc', 'wallet_address': 'w12_buys_late', 'date': '2024-09-01', 'usd_balance': 500, 'usd_net_transfers': 250, 'is_imputed': False},
-        {'coin_id': 'btc', 'wallet_address': 'w12_buys_late', 'date': '2024-10-01', 'usd_balance': 550, 'usd_net_transfers': 0, 'is_imputed': True},
-
+        {'coin_id': 'sol', 'wallet_address': 'w12_buys_late', 'date': '2024-03-01', 'usd_balance': 0, 'usd_net_transfers': 0, 'is_imputed': True},
+        {'coin_id': 'sol', 'wallet_address': 'w12_buys_late', 'date': '2024-09-01', 'usd_balance': 500, 'usd_net_transfers': 250, 'is_imputed': False},
+        {'coin_id': 'sol', 'wallet_address': 'w12_buys_late', 'date': '2024-10-01', 'usd_balance': 550, 'usd_net_transfers': 0, 'is_imputed': True},
     ]
-    profits_df = pd.DataFrame(profits_data)
+
+    return pd.DataFrame(profits_data)
+
+
+@pytest.fixture
+def test_profits_df(test_profits_data):
+    """
+    Returns test profits DataFrame with cash flow transfers added.
+    """
+    profits_df = test_profits_data.copy()
     training_period_start = '2024-01-01'
     training_period_end = '2024-10-01'
 
@@ -307,3 +317,86 @@ def test_return_ratios_in_reasonable_range(test_trading_features_df):
     assert (return_ratios.abs() <= 10).all(), (
         f"Found extreme return ratios. Max ratio: {return_ratios.abs().max():.2f}"
     )
+
+
+
+@pytest.fixture
+def test_remapped_profits_df(test_profits_data):
+    """
+    Remaps the base profits data so many wallets hold many of the same coins and adds cash flow transfers.
+    """
+    # Reassign wallets to create a lot of overlap
+    reassign_dict = {
+        'w01_multiple_coins': 'w1',
+        'w02_net_loss': 'w2',
+        'w03_sell_all_and_rebuy': 'w2',
+        'w04_only_period_end': 'w3',
+        'w04a_only_period_end_w_balance': 'w3',
+        'w04b_only_period_start_buy': 'w2',
+        'w04c_only_period_start_buy_w_existing_balance': 'w4',
+        'w04d_only_period_start_sell': 'w4',
+        'w04e_only_period_start_sell_partial': 'w5',
+        'w05_only_imputed': 'w5',
+        'w06_tiny_transactions': 'w5',
+        'w07_tiny_transactions2': 'w2',
+        'w08_offsetting_transactions': 'w1',
+        'w09_memecoin_winner': 'w3',
+        'w10_memecoin_loser': 'w4',
+        'w11_sells_early': 'w5',
+        'w12_buys_late': 'w5'
+    }
+    remapped_profits_df = test_profits_data.copy()
+    remapped_profits_df['wallet_address_original'] = remapped_profits_df['wallet_address']
+    remapped_profits_df['wallet_address_original'] = remapped_profits_df['wallet_address'].map(reassign_dict)
+
+    # Rest of the sequence remains unchanged
+    profits_df = remapped_profits_df.copy()
+    training_period_start = '2024-01-01'
+    training_period_end = '2024-10-01'
+
+    # Validate test data format before proceeding
+    validator = ProfitsValidator()
+    validation_results = validator.validate_all(
+        profits_df,
+        training_period_start,
+        training_period_end
+    )
+    assert all(validation_results.values()), "Test data failed validation checks."
+
+    # Remove rows with a rounded 0 balance and 0 transfers which happens in wmo.retrieve_datasets() once validation checks are passed
+    profits_df = profits_df[
+        ~((profits_df['usd_balance'] == 0) &
+        (profits_df['usd_net_transfers'] == 0))
+    ]
+
+    # Add cash flow transfers logic
+    cash_flow_profits_df = wtf.add_cash_flow_transfers_logic(profits_df)
+
+    return cash_flow_profits_df
+
+@pytest.fixture
+def test_remapped_trading_features_df(test_remapped_profits_df):
+    """
+    Returns trading features computed from test profits data.
+    """
+    return wtf.calculate_wallet_trading_features(test_remapped_profits_df)
+
+
+@pytest.mark.unit
+def test_reassigned_cash_flows_match(test_remapped_profits_df,test_profits_df):
+    """
+    Checks if any cash flows outputs have changed after the remapping was applied to create a lot of
+    many to many relationships between wallets and coins.
+    """
+    # Retrieve the original columns from the remapped profits_df
+    demapped_profits_df = test_remapped_profits_df[['coin_id','wallet_address_original','date','cash_flow_transfers']].copy()
+    demapped_profits_df = demapped_profits_df.rename(columns={'wallet_address_original': 'wallet_address'})
+
+    # Merge the original version with the demapped version and
+    merged_df = demapped_profits_df.merge(
+        test_profits_df[['coin_id', 'wallet_address', 'date', 'cash_flow_transfers']],
+        on=['coin_id', 'wallet_address', 'date'],
+        suffixes=('_demapped', '_cash_flow')
+    )
+
+    assert np.allclose(merged_df['cash_flow_transfers_demapped'],merged_df['cash_flow_transfers_cash_flow'])
