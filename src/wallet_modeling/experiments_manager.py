@@ -1,4 +1,5 @@
 import logging
+import itertools
 from typing import Dict, Optional
 import pandas as pd
 import numpy as np
@@ -59,9 +60,9 @@ class ExperimentsManager:
         return modeling_df
 
     def run_experiment(self,
-                      experiment_name: str,
-                      modeling_df: pd.DataFrame,
-                      experiment_config: Optional[dict] = None) -> Dict:
+                    experiment_name: str,
+                    modeling_df: pd.DataFrame,
+                    experiment_config: Optional[dict] = None) -> Dict:
         """
         Params:
         - experiment_name (str): unique identifier for this experiment
@@ -75,6 +76,7 @@ class ExperimentsManager:
         config = experiment_config or self.config
 
         # Initialize and run experiment
+        logger.info(f"Initializing model for experiment: {experiment_name}")
         experiment = wm.WalletModel(config)
         results = experiment.run_experiment(modeling_df)
 
@@ -86,6 +88,8 @@ class ExperimentsManager:
             for name, metric_fn in self.metrics_config.items()
         }
 
+        logger.info(f"Experiment {experiment_name} complete. Metrics: {metrics}")
+
         # Store results
         self.experiments[experiment_name] = experiment
         self.model_results[experiment_name] = {
@@ -96,66 +100,74 @@ class ExperimentsManager:
 
         return self.model_results[experiment_name]
 
-    def run_experiment_sequence(self,
-                              modeling_df: pd.DataFrame,
-                              sequence_config: Dict) -> pd.DataFrame:
+
+    def _get_variation_paths(self, d: Dict, path: Optional[list] = None) -> list:
         """
-        Run a sequence of experiments defined in config.
+        Helper function to get all paths to lists in nested dict.
 
         Params:
-        - modeling_df (DataFrame): prepared modeling data
-        - sequence_config (dict): configuration for experiment sequence
-            Example format:
-            {
-                'parameter_variations': {
-                    'learning_rate': [0.01, 0.1],
-                    'max_depth': [3, 5]
-                },
-                'target_variations': ['target1', 'target2'],
-                ...
-            }
+        - d (dict): dictionary to search
+        - path (list, optional): current path in recursion
 
         Returns:
-        - comparison_df (DataFrame): metrics comparison across experiments
+        - paths (list): list of tuples (path, values)
         """
-        # Run baseline first if specified
-        if sequence_config.get('run_baseline', True):
-            self.run_experiment('baseline', modeling_df)
+        path = path or []
+        paths = []
 
-        # Run parameter variations
+        for k, v in d.items():
+            current = path + [k]
+            if isinstance(v, list):
+                paths.append((current, v))
+            elif isinstance(v, dict):
+                paths.extend(self._get_variation_paths(v, current))
+        return paths
+
+    def run_experiment_sequence(self,
+                            modeling_df: pd.DataFrame,
+                            sequence_config: Dict) -> pd.DataFrame:
+        """
+        Run a sequence of experiments defined in config.
+        """
+        # Calculate total experiments
+        n_experiments = 1 if sequence_config.get('run_baseline', True) else 0
+
+        # Count parameter combinations
         param_vars = sequence_config.get('parameter_variations', {})
         if param_vars:
-            self._run_parameter_variations(modeling_df, param_vars)
+            variation_paths = self._get_variation_paths(param_vars)
+            param_values = [values for _, values in variation_paths]
+            n_combinations = len(list(itertools.product(*param_values)))
+            n_experiments += n_combinations
 
-        # Run target variations
-        target_vars = sequence_config.get('target_variations', [])
-        if target_vars:
-            self._run_target_variations(modeling_df, target_vars)
+        logger.info(f"Beginning experiment sequence with {n_experiments} total experiments")
 
+        # Run baseline first if specified
+        current_exp = 1
+        if sequence_config.get('run_baseline', True):
+            logger.info(f"Running experiment {current_exp}/{n_experiments}: baseline")
+            self.run_experiment('baseline', modeling_df)
+            current_exp += 1
+
+        # Run parameter variations
+        if param_vars:
+            logger.info("Starting parameter variation experiments")
+            self._run_parameter_variations(modeling_df, param_vars, current_exp, n_experiments)
+
+        logger.info("Experiment sequence complete. Generating comparison.")
         return self.compare_experiments()
 
     def _run_parameter_variations(self,
                                 modeling_df: pd.DataFrame,
-                                param_variations: Dict) -> None:
+                                param_variations: Dict,
+                                current_exp: int,
+                                total_experiments: int) -> None:
         """Helper method to run parameter sweep experiments"""
         import itertools
         from copy import deepcopy
 
-        # Helper function to get all paths to lists in nested dict
-        def get_variation_paths(d, path=None):
-            path = path or []
-            paths = []
-
-            for k, v in d.items():
-                current = path + [k]
-                if isinstance(v, list):
-                    paths.append((current, v))
-                elif isinstance(v, dict):
-                    paths.extend(get_variation_paths(v, current))
-            return paths
-
         # Get all parameter paths and their values
-        variation_paths = get_variation_paths(param_variations)
+        variation_paths = self._get_variation_paths(param_variations)
         param_names = ['/'.join(path) for path, _ in variation_paths]
         param_values = [values for _, values in variation_paths]
 
@@ -168,17 +180,23 @@ class ExperimentsManager:
             param_dict = dict(zip(param_names, params))
 
             # Update nested config values
+            param_desc = []
             for path_str, value in param_dict.items():
                 path = path_str.split('/')
                 current = config
                 for key in path[:-1]:
                     current = current[key]
                 current[path[-1]] = value
+                param_desc.append(f"{path[-1]}={value}")
 
-            # Create experiment name from parameters
+            # Create experiment name and log
             exp_name = 'params_' + '_'.join(f"{p.replace('/', '_')}{v}"
                                         for p, v in param_dict.items())
+            logger.info(f"Running experiment {current_exp}/{total_experiments}: {', '.join(param_desc)}")
+
+            # Run experiment
             self.run_experiment(exp_name, modeling_df, config)
+            current_exp += 1
 
     def _run_target_variations(self,
                              modeling_df: pd.DataFrame,
