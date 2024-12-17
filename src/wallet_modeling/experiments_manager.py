@@ -1,6 +1,3 @@
-"""
-Calculates metrics aggregated at the wallet level
-"""
 import logging
 from typing import Dict, Optional
 import pandas as pd
@@ -12,9 +9,7 @@ import wallet_modeling.wallet_modeling_orchestrator as wmo
 import wallet_modeling.wallet_model as wm
 import wallet_features.performance_features as wpf
 
-# Set up logger at the module level
 logger = logging.getLogger(__name__)
-
 
 class ExperimentsManager:
     """
@@ -22,14 +17,25 @@ class ExperimentsManager:
     and tracks experiment results.
     """
 
-    def __init__(self, config: dict, training_data_df: pd.DataFrame):
+    def __init__(self,
+                 config: dict,
+                 training_data_df: pd.DataFrame,
+                 metrics_config: Optional[Dict] = None):
         """
         Params:
         - config (dict): configuration dictionary containing modeling parameters
         - training_data_df (DataFrame): pre-computed training features
+        - metrics_config (dict, optional): mapping of metric names to scoring functions
         """
         self.config = config
         self.training_data_df = training_data_df
+
+        # Default metrics if none provided
+        self.metrics_config = metrics_config or {
+            'rmse': lambda y_true, y_pred: np.sqrt(mean_squared_error(y_true, y_pred)),
+            'r2': r2_score
+        }
+
         self.experiments: Dict[str, Dict] = {}
         self.model_results: Dict[str, Dict] = {}
 
@@ -45,9 +51,10 @@ class ExperimentsManager:
         modeling_wallets_df = wmo.filter_modeling_period_wallets(modeling_profits_df)
         target_vars_df = wpf.calculate_performance_features(modeling_wallets_df)
 
+        target_var = self.config['modeling']['target_variable']
         modeling_df = self.training_data_df.join(
-            target_vars_df[self.config['modeling']['target_variable']],
-            how='inner'
+            target_vars_df[target_var],
+            how=self.config['modeling'].get('join_type', 'inner')
         )
         return modeling_df
 
@@ -71,12 +78,12 @@ class ExperimentsManager:
         experiment = wm.WalletModel(config)
         results = experiment.run_experiment(modeling_df)
 
-        # Calculate metrics
+        # Calculate all configured metrics
         y_pred = results['y_pred']
         y_test = results['y_test']
         metrics = {
-            'rmse': np.sqrt(mean_squared_error(y_test, y_pred)),
-            'r2': r2_score(y_test, y_pred)
+            name: metric_fn(y_test, y_pred)
+            for name, metric_fn in self.metrics_config.items()
         }
 
         # Store results
@@ -84,10 +91,103 @@ class ExperimentsManager:
         self.model_results[experiment_name] = {
             'results': results,
             'metrics': metrics,
-            'config': config.config
+            'config': config
         }
 
         return self.model_results[experiment_name]
+
+    def run_experiment_sequence(self,
+                              modeling_df: pd.DataFrame,
+                              sequence_config: Dict) -> pd.DataFrame:
+        """
+        Run a sequence of experiments defined in config.
+
+        Params:
+        - modeling_df (DataFrame): prepared modeling data
+        - sequence_config (dict): configuration for experiment sequence
+            Example format:
+            {
+                'parameter_variations': {
+                    'learning_rate': [0.01, 0.1],
+                    'max_depth': [3, 5]
+                },
+                'target_variations': ['target1', 'target2'],
+                ...
+            }
+
+        Returns:
+        - comparison_df (DataFrame): metrics comparison across experiments
+        """
+        # Run baseline first if specified
+        if sequence_config.get('run_baseline', True):
+            self.run_experiment('baseline', modeling_df)
+
+        # Run parameter variations
+        param_vars = sequence_config.get('parameter_variations', {})
+        if param_vars:
+            self._run_parameter_variations(modeling_df, param_vars)
+
+        # Run target variations
+        target_vars = sequence_config.get('target_variations', [])
+        if target_vars:
+            self._run_target_variations(modeling_df, target_vars)
+
+        return self.compare_experiments()
+
+    def _run_parameter_variations(self,
+                                modeling_df: pd.DataFrame,
+                                param_variations: Dict) -> None:
+        """Helper method to run parameter sweep experiments"""
+        import itertools
+        from copy import deepcopy
+
+        # Helper function to get all paths to lists in nested dict
+        def get_variation_paths(d, path=None):
+            path = path or []
+            paths = []
+
+            for k, v in d.items():
+                current = path + [k]
+                if isinstance(v, list):
+                    paths.append((current, v))
+                elif isinstance(v, dict):
+                    paths.extend(get_variation_paths(v, current))
+            return paths
+
+        # Get all parameter paths and their values
+        variation_paths = get_variation_paths(param_variations)
+        param_names = ['/'.join(path) for path, _ in variation_paths]
+        param_values = [values for _, values in variation_paths]
+
+        # Get all combinations
+        param_combinations = list(itertools.product(*param_values))
+
+        # Run experiment for each combination
+        for params in param_combinations:
+            config = deepcopy(self.config)
+            param_dict = dict(zip(param_names, params))
+
+            # Update nested config values
+            for path_str, value in param_dict.items():
+                path = path_str.split('/')
+                current = config
+                for key in path[:-1]:
+                    current = current[key]
+                current[path[-1]] = value
+
+            # Create experiment name from parameters
+            exp_name = 'params_' + '_'.join(f"{p.replace('/', '_')}{v}"
+                                        for p, v in param_dict.items())
+            self.run_experiment(exp_name, modeling_df, config)
+
+    def _run_target_variations(self,
+                             modeling_df: pd.DataFrame,
+                             target_variations: list) -> None:
+        """Helper method to run target variable variations"""
+        for target in target_variations:
+            config = self.config.copy()
+            config['modeling']['target_variable'] = target
+            self.run_experiment(f'target_{target}', modeling_df, config)
 
     def compare_experiments(self) -> pd.DataFrame:
         """
