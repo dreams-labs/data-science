@@ -15,11 +15,14 @@ import utils as u
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
 
+# Locate the config directory
+current_dir = Path(__file__).parent
+config_directory = current_dir / '..' / '..' / 'config'
+
 # Load wallets_config at the module level
 wallets_config = WalletsConfig()
-wallets_metrics_config = u.load_config('../config/wallets_metrics_config.yaml')
-wallets_features_config = yaml.safe_load(Path('../config/wallets_features_config.yaml').read_text(encoding='utf-8'))
-
+wallets_metrics_config = u.load_config(config_directory / 'wallets_metrics_config.yaml')
+wallets_features_config = yaml.safe_load((config_directory / 'wallets_features_config.yaml').read_text(encoding='utf-8'))
 
 @u.timing_decorator
 def calculate_market_timing_features(profits_df, market_indicators_data_df):
@@ -165,7 +168,7 @@ def calculate_relative_changes(
         offset_config = wallets_features_config['market_timing']['offsets']
         winsor_coef = wallets_config['features']['offset_winsorization']
     except KeyError as e:
-        raise FeatureConfigError("Required config key not found in wallets_features_config: " + str(e)) from e
+        raise FeatureConfigError("Required config key not found in wallets_config['features']: " + str(e)) from e
 
     # Keep track of columns to drop
     columns_to_drop = set()

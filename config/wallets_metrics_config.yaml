@@ -17,13 +17,15 @@ time_series:
                     parameters:
                         window: [5]
         mfi:
-            aggregations:
-                last:
-                    scaling: "none"
+            indicators:
+                sma:
+                    parameters:
+                        window: [5]
         obv:
-            aggregations:
-                last:
-                    scaling: "none"
+            indicators:
+                sma:
+                    parameters:
+                        window: [5]
 
 # # Time series keyed on only date
 # macro_trends:

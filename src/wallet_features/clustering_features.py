@@ -2,6 +2,7 @@
 Conducts PCA anlysis of wallet facts and outputs wallet-keyed clustering features
 """
 import logging
+from typing import Dict
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
@@ -77,7 +78,7 @@ def create_basic_cluster_features(training_data_df, include_pca=False, include_c
 
 
 
-def optimize_parameters(df, max_clusters=10):
+def optimize_parameters(df: pd.DataFrame, max_clusters: int = 10) -> Dict[str, Dict]:
     """
     Analyze optimal number of components and clusters using multiple methods.
 
