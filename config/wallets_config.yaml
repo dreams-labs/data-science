@@ -20,6 +20,8 @@ modeling:
     # Which wallet performance metric to use as the target variable. Options are:
     # invested, total_net_flows, return, risk_adj_return, performance_score, log_weighted_return, hybrid_score, size_adjusted_rank
     target_variable: "performance_score"
+    target_var_params:
+        performance_score_return_weight: 0.6
     returns_winsorization: 0.02
     drop_columns: []
 

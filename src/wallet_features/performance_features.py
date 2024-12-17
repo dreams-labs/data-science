@@ -53,8 +53,9 @@ def calculate_performance_features(wallet_features_df):
         (log_invested.max() - log_invested.min())
 
     # Performance score
-    metrics_df['performance_score'] = (0.6 * metrics_df['norm_return'] +
-                                     0.4 * metrics_df['norm_invested'])
+    return_weight = wallets_config['modeling']['target_var_params']['performance_score_return_weight']
+    metrics_df['performance_score'] = (return_weight * metrics_df['norm_return'] +
+                                     (1-return_weight) * metrics_df['norm_invested'])
 
     # Size-adjusted rank
     # Create mask for zero values

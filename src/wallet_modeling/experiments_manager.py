@@ -1,5 +1,6 @@
 import logging
 import itertools
+from copy import deepcopy
 from typing import Dict, Optional
 import pandas as pd
 import numpy as np
@@ -40,33 +41,42 @@ class ExperimentsManager:
         self.experiments: Dict[str, Dict] = {}
         self.model_results: Dict[str, Dict] = {}
 
-    def prepare_modeling_data(self, modeling_profits_df: pd.DataFrame) -> pd.DataFrame:
+    def prepare_modeling_data(self, modeling_profits_df: pd.DataFrame, config: Dict) -> pd.DataFrame:
         """
         Params:
         - modeling_profits_df (DataFrame): raw profits data from the modeling period only
+        - config (Dict): experiment-specific config to use
 
         Returns:
-        - modeling_df (DataFrame): prepared modeling DataFrame
+        - modeling_df (DataFrame): prepared modeling DataFrame with all target variables
         """
+        logger.info("Preparing modeling data")
+
         # Create modeling dataset using existing pipeline
         modeling_wallets_df = wmo.filter_modeling_period_wallets(modeling_profits_df)
         target_vars_df = wpf.calculate_performance_features(modeling_wallets_df)
 
-        target_var = self.config['modeling']['target_variable']
+        # Use experiment-specific target variable
+        target_var = config['modeling']['target_variable']
+        logger.info(f"Using target variable: {target_var}")
+
+        # Join with target variable
         modeling_df = self.training_data_df.join(
             target_vars_df[target_var],
-            how=self.config['modeling'].get('join_type', 'inner')
+            how=config['modeling'].get('join_type', 'inner')
         )
+
         return modeling_df
 
     def run_experiment(self,
                     experiment_name: str,
-                    modeling_df: pd.DataFrame,
+                    modeling_profits_df: pd.DataFrame,
                     experiment_config: Optional[dict] = None) -> Dict:
+
         """
         Params:
         - experiment_name (str): unique identifier for this experiment
-        - modeling_df (DataFrame): prepared modeling data
+        - modeling_profits_df (DataFrame): raw profits data from modeling period
         - experiment_config (dict, optional): override default config for this experiment
 
         Returns:
@@ -74,6 +84,11 @@ class ExperimentsManager:
         """
         # Use experiment-specific config if provided
         config = experiment_config or self.config
+
+        # Generate modeling data with this experiment's config
+        logger.info(f"Preparing data for experiment: {experiment_name}")
+        modeling_df = self.prepare_modeling_data(modeling_profits_df, config)
+
 
         # Initialize and run experiment
         logger.info(f"Initializing model for experiment: {experiment_name}")
@@ -99,7 +114,6 @@ class ExperimentsManager:
         }
 
         return self.model_results[experiment_name]
-
 
     def _get_variation_paths(self, d: Dict, path: Optional[list] = None) -> list:
         """
@@ -163,8 +177,6 @@ class ExperimentsManager:
                                 current_exp: int,
                                 total_experiments: int) -> None:
         """Helper method to run parameter sweep experiments"""
-        import itertools
-        from copy import deepcopy
 
         # Get all parameter paths and their values
         variation_paths = self._get_variation_paths(param_variations)
