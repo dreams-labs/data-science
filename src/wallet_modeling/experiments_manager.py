@@ -9,6 +9,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 # Local module imports
 import wallet_modeling.wallet_modeling_orchestrator as wmo
 import wallet_modeling.wallet_model as wm
+import wallet_modeling.model_reporting as wmr
 import wallet_features.performance_features as wpf
 
 logger = logging.getLogger(__name__)
@@ -20,24 +21,21 @@ class ExperimentsManager:
     """
 
     def __init__(self,
-                 config: dict,
-                 training_data_df: pd.DataFrame,
-                 metrics_config: Optional[Dict] = None):
+                config: dict,
+                training_data_df: pd.DataFrame,
+                validation_profits_df: pd.DataFrame,  # Add validation data
+                base_path: str = '../wallet_modeling'):  # Add base path for artifacts
         """
         Params:
         - config (dict): configuration dictionary containing modeling parameters
         - training_data_df (DataFrame): pre-computed training features
-        - metrics_config (dict, optional): mapping of metric names to scoring functions
+        - validation_profits_df (DataFrame): profits data for validation period
+        - base_path (str): path for saving model artifacts
         """
         self.config = config
         self.training_data_df = training_data_df
-
-        # Default metrics if none provided
-        self.metrics_config = metrics_config or {
-            'rmse': lambda y_true, y_pred: np.sqrt(mean_squared_error(y_true, y_pred)),
-            'r2': r2_score
-        }
-
+        self.validation_profits_df = validation_profits_df
+        self.base_path = base_path
         self.experiments: Dict[str, Dict] = {}
         self.model_results: Dict[str, Dict] = {}
 
@@ -72,7 +70,6 @@ class ExperimentsManager:
                     experiment_name: str,
                     modeling_profits_df: pd.DataFrame,
                     experiment_config: Optional[dict] = None) -> Dict:
-
         """
         Params:
         - experiment_name (str): unique identifier for this experiment
@@ -89,27 +86,32 @@ class ExperimentsManager:
         logger.info(f"Preparing data for experiment: {experiment_name}")
         modeling_df = self.prepare_modeling_data(modeling_profits_df, config)
 
-
         # Initialize and run experiment
         logger.info(f"Initializing model for experiment: {experiment_name}")
         experiment = wm.WalletModel(config)
         results = experiment.run_experiment(modeling_df)
 
-        # Calculate all configured metrics
-        y_pred = results['y_pred']
-        y_test = results['y_test']
-        metrics = {
-            name: metric_fn(y_test, y_pred)
-            for name, metric_fn in self.metrics_config.items()
-        }
+        # Save model artifacts
+        logger.info(f"Saving artifacts for experiment: {experiment_name}")
+        model_id, evaluator, wallet_scores_df, coin_validation_df = wmr.generate_and_save_model_artifacts(
+            model_results=results,
+            validation_profits_df=self.validation_profits_df,
+            base_path=self.base_path
+        )
 
+        # Calculate metrics using evaluator
+        metrics = evaluator.metrics
         logger.info(f"Experiment {experiment_name} complete. Metrics: {metrics}")
 
-        # Store results
+        # Store results with additional data
         self.experiments[experiment_name] = experiment
         self.model_results[experiment_name] = {
             'results': results,
             'metrics': metrics,
+            'model_id': model_id,
+            'evaluator': evaluator,
+            'wallet_scores': wallet_scores_df,
+            'coin_validation': coin_validation_df,
             'config': config
         }
 
