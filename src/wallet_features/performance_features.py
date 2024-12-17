@@ -26,7 +26,7 @@ def calculate_performance_features(wallet_features_df):
     Returns:
     - DataFrame with additional target variables
     """
-    metrics_df = wallet_features_df[['max_investment','total_net_flows']].copy().round(6)
+    metrics_df = wallet_features_df[['max_investment','total_net_flows','cash_net_flows']].copy().round(6)
     returns_winsorization = wallets_config['modeling']['returns_winsorization']
     epsilon = 1e-10
 
@@ -76,7 +76,7 @@ def calculate_performance_features(wallet_features_df):
 
 
     # Clean up intermediate columns
-    cols_to_drop = ['norm_return', 'norm_invested', 'norm_gain']
+    cols_to_drop = ['norm_return', 'norm_invested', 'norm_gain', 'cash_net_flows']
     metrics_df = metrics_df.drop(columns=[c for c in cols_to_drop
                                         if c in metrics_df.columns])
 
