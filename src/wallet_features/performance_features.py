@@ -36,10 +36,11 @@ def calculate_performance_features(wallet_features_df):
 
     # Calculate realized return, based on actual cash flows only
     metrics_df['realized_return'] = np.where(abs(metrics_df['max_investment']) == 0,0,
-                                    metrics_df['total_net_flows'] / metrics_df['max_investment'])
+                                    metrics_df['cash_net_flows'] / metrics_df['max_investment'])
 
     # Apply winsorization
     if returns_winsorization > 0:
+        metrics_df['return_unwinsorized'] = metrics_df['return']
         metrics_df['return'] = u.winsorize(metrics_df['return'],returns_winsorization)
 
     # Normalize returns
