@@ -73,7 +73,7 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     performance_features_df = (wpf.calculate_performance_features(wallet_features_df)
                                   .drop(['max_investment', 'total_net_flows'], axis=1))  # already exist as trading features
     feature_column_names['performance_'] = performance_features_df.columns
-    wallet_features_df = wallet_features_df.join(how='inner')
+    wallet_features_df = wallet_features_df.join(performance_features_df, how='inner')
 
     # Bulk rename all columns with their respective prefixes to make data lineage clear
     rename_map = {}
