@@ -369,13 +369,18 @@ def analyze_cluster_metrics(modeling_df: pd.DataFrame,
     for k in cluster_counts:
         cluster_col = f'k{k}_cluster'
 
-        # Calculate medians for each metric by cluster
-        medians = modeling_df.groupby(cluster_col)[comparison_metrics].median()
-
-        # Add cluster size info
+        # Calculate cluster size info first
         cluster_sizes = modeling_df[cluster_col].value_counts()
-        medians['cluster_size'] = cluster_sizes
-        medians['cluster_pct'] = (cluster_sizes / len(modeling_df) * 100).round(2)
+
+        # Create initial DataFrame with size metrics
+        medians = pd.DataFrame({
+            'cluster_size': cluster_sizes,
+            'cluster_pct': (cluster_sizes / len(modeling_df) * 100).round(2)
+        })
+
+        # Add the median metrics
+        metric_medians = modeling_df.groupby(cluster_col)[comparison_metrics].median()
+        medians = pd.concat([medians, metric_medians], axis=1)
 
         results[k] = medians
 
@@ -517,7 +522,6 @@ def style_rows(df: pd.DataFrame) -> pd.DataFrame.style:
     return styled.format(format_dict)
 
 
-
 def create_cluster_report(modeling_df, model_results, n, comparison_metrics):
     """
     Generates a formatted dataframe report on the clusters' sizes, performance, and median
@@ -558,8 +562,19 @@ def create_cluster_report(modeling_df, model_results, n, comparison_metrics):
         model_results['y_pred']   # Predictions
     )
 
-    # Join metrics with performance and display results
+    # Join metrics with performance and reorder rows
     cluster_results_df = cluster_profiles[n].join(cluster_performance[n]).T
+
+    # Define the desired row order
+    size_metrics = ['cluster_size', 'cluster_pct']
+    perf_metrics = ['r2', 'rmse', 'mae', 'mape', 'explained_variance']
+    remaining_metrics = [col for col in cluster_results_df.index
+                        if col not in size_metrics + perf_metrics]
+
+    # Reorder the rows
+    ordered_rows = size_metrics + perf_metrics + remaining_metrics
+    cluster_results_df = cluster_results_df.reindex(ordered_rows)
+
     styled_df = style_rows(cluster_results_df)
 
     return styled_df
