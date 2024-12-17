@@ -112,6 +112,11 @@ def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
         max_investment=('cumsum_cash_flow_transfers', 'max'),
     )
 
+    # Set floor of 0 on max_investment to match the business constraint that wallet balances cannot be negative.
+    # This handles edge cases where very small initial balances (< $0.01) get rounded to 0 and subsequent outflows
+    # create artificial negative "max_investment" values.
+    base_metrics_df['max_investment'] = base_metrics_df['max_investment'].clip(lower=0)
+
     # Observed activity metrics
     observed_metrics_df = profits_df[~profits_df['is_imputed']].groupby('wallet_address').agg(
         transaction_days=('date', 'nunique'),
