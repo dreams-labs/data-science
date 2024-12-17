@@ -47,9 +47,9 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     # Trading features (inner join, custom fill)
     profits_df = wtf.add_cash_flow_transfers_logic(profits_df)
     trading_features_df = wtf.calculate_wallet_trading_features(profits_df)
-    trading_features_df = wtf.fill_trading_features_data(trading_features_df, wallet_cohort)
     feature_column_names['trading_'] = trading_features_df.columns
-    wallet_features_df = wallet_features_df.join(trading_features_df, how='inner')
+    wallet_features_df = wallet_features_df.join(trading_features_df, how='left')\
+        .fillna({col: 0 for col in trading_features_df.columns})
 
     # Market timing features (fill zeros)
     timing_features_df = wmt.calculate_market_timing_features(profits_df, market_indicators_data_df)
@@ -70,12 +70,10 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
         .fillna({col: -1 for col in transfers_features_df.columns})
 
     # Performance features (inner join, no fill)
-    performance_features_df = wpf.calculate_performance_features(wallet_features_df)
-    feature_column_names['performance_'] = performance_features_df.drop(['max_investment', 'total_net_flows'], axis=1).columns
-    wallet_features_df = wallet_features_df.join(
-        performance_features_df.drop(['max_investment', 'total_net_flows'], axis=1),
-        how='inner'
-    )
+    performance_features_df = (wpf.calculate_performance_features(wallet_features_df)
+                                  .drop(['max_investment', 'total_net_flows'], axis=1))  # already exist as trading features
+    feature_column_names['performance_'] = performance_features_df.columns
+    wallet_features_df = wallet_features_df.join(how='inner')
 
     # Bulk rename all columns with their respective prefixes to make data lineage clear
     rename_map = {}

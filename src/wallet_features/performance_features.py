@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 
 
+@u.timing_decorator
 def calculate_performance_features(wallet_features_df):
     """
     Generates various target variables for modeling wallet performance.
@@ -80,6 +81,11 @@ def calculate_performance_features(wallet_features_df):
     cols_to_drop = ['norm_return', 'norm_invested', 'norm_gain', 'cash_net_flows']
     metrics_df = metrics_df.drop(columns=[c for c in cols_to_drop
                                         if c in metrics_df.columns])
+
+    # Verify all input wallets exist in output
+    missing_wallets = set(wallet_features_df.index) - set(metrics_df.index)
+    if missing_wallets:
+        raise ValueError(f"Found {len(missing_wallets)} wallets in input that are missing from output")
 
     return metrics_df.round(6)
 

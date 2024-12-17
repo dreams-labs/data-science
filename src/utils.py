@@ -590,6 +590,16 @@ def cw_filter_df(df, coin_id, wallet_address):
     return filtered_df
 
 
+def df_nans(df):
+    """
+    Returns rows and cells in a df that contain NaN values.
+    """
+    na_rows = df[df.isna().any(axis=1)]
+    na_cells = na_rows.loc[:, na_rows.isna().any()]
+
+    return na_rows, na_cells
+
+
 def df_mem(df):
     """
     Checks how much memory a dataframe is using
