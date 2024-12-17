@@ -67,8 +67,10 @@ data_cleaning:
     max_initial_market_cap: 999150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
     max_gap_days: 50  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
     min_daily_volume: 3000 # Minimum average daily volume the coin must have
-    price_imputation_warning_min_coin_increase: 100  # if this many coin prices has recently become imputed... (plus the below flag)
-    price_imputation_warning_min_pct_increase: 0.05  # if the % of imputed coin prices has increased by this value, issue a warning
+    price_coverage_warning_min_coin_increase: 100  # if this many coin prices has recently become imputed...
+    price_coverage_warning_min_pct_increase: 0.05  # ...and the % of imputed coin prices has increased by this value, issue a warning
+    transfers_coverage_warning_min_coin_increase: 10  # if this many coins have lost transfers data...
+    transfers_coverage_warning_min_pct_increase: 0.001  # ...and the % of coin without transfers data has increased by this value, issue a warning
 
     # Market cap imputation filters
     min_mc_imputation_coverage: 0.3  # coins with market cap coverage below this level will have hardcoded market cap values filled

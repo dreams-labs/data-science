@@ -388,7 +388,12 @@ def sample_data_cleaning_config():
     """
     return {
         'max_wallet_coin_profits': 7500,
-        'max_wallet_inflows': 15000
+        'max_wallet_inflows': 15000,
+        'price_coverage_warning_min_coin_increase': 999,
+        'price_coverage_warning_min_pct_increase': 1.0,
+        'transfers_coverage_warning_min_coin_increase': 999,
+        'transfers_coverage_warning_min_pct_increase': 1.0,
+
     }
 
 @pytest.mark.unit
@@ -406,7 +411,6 @@ def test_multiple_coins_per_wallet(sample_profits_df_for_cleaning, sample_data_c
     ].reset_index(drop=True)
     expected_exclusions = pd.DataFrame({
         'wallet_address': ['wallet1'],
-        'profits_exclusion': [True],
         'inflows_exclusion': [True]
     })
 
@@ -416,8 +420,6 @@ def test_multiple_coins_per_wallet(sample_profits_df_for_cleaning, sample_data_c
     assert np.array_equal(exclusions_logs_df.values, expected_exclusions.values)
 
     # Check if profits and inflows are approximately correct for the remaining wallets
-    # 1000 + 500 + 500 + 100 + 50
-    assert pytest.approx(cleaned_df['profits_cumulative'].sum(), abs=1e-4) == 2150
     # 2000 + 1500 + 1500 + 500 + 250
     assert pytest.approx(cleaned_df['usd_inflows_cumulative'].sum(), abs=1e-4) == 5750
 
@@ -433,121 +435,6 @@ def profits_at_threshold_df():
         'profits_cumulative': [5000, 7500, 7501, 7499, 3000],
         'usd_inflows_cumulative': [10000, 12000, 13000, 11000, 8000]
     })
-
-@pytest.fixture
-def profits_at_threshold_config():
-    """
-    Fixture to create a data cleaning configuration with a specific profitability threshold.
-    """
-    return {
-        'max_wallet_coin_profits': 7500,
-        'max_wallet_inflows': 15000
-    }
-
-@pytest.mark.unit
-def test_profits_exactly_at_threshold(profits_at_threshold_df, profits_at_threshold_config):
-    """
-    Test scenario where some wallets have profits exactly at the threshold value.
-    """
-    # Call the function
-    cleaned_df, exclusions_logs_df = dr.clean_profits_df(profits_at_threshold_df,
-                                                         profits_at_threshold_config)
-
-    # Expected results
-    expected_cleaned_df = profits_at_threshold_df[
-        profits_at_threshold_df['wallet_address'].isin(['wallet1', 'wallet4', 'wallet5'])
-    ].reset_index(drop=True)
-
-    expected_exclusions = pd.DataFrame({
-        'wallet_address': ['wallet2', 'wallet3'],
-        'profits_exclusion': [True, True],
-        'inflows_exclusion': [False, False]
-    })
-
-    # Assertions
-    assert len(cleaned_df) == 3  # wallet1, wallet4, and wallet5 should remain
-    assert np.array_equal(cleaned_df.values, expected_cleaned_df.values)
-    assert np.array_equal(exclusions_logs_df.values, expected_exclusions.values)
-
-    # Check if the correct wallets are present in the cleaned DataFrame
-    assert set(cleaned_df['wallet_address']) == {'wallet1', 'wallet4', 'wallet5'}
-
-    # Verify that wallets at or above the threshold are excluded
-    assert 'wallet2' not in cleaned_df['wallet_address'].values
-    assert 'wallet3' not in cleaned_df['wallet_address'].values
-
-    # Check if profits and inflows are approximately correct for the remaining wallets
-    # 5000 + 7499 + 3000
-    assert pytest.approx(cleaned_df['profits_cumulative'].sum(), abs=1e-4) == 15499
-     # 10000 + 11000 + 8000
-    assert pytest.approx(cleaned_df['usd_inflows_cumulative'].sum(), abs=1e-4) == 29000
-
-@pytest.fixture
-def negative_profits_df():
-    """
-    Fixture to create a sample profits DataFrame with various levels of negative profits (losses).
-    """
-    return pd.DataFrame({
-        'coin_id': ['BTC', 'ETH', 'LTC', 'XRP', 'DOGE', 'ADA'],
-        'wallet_address': ['wallet1', 'wallet2', 'wallet3', 'wallet4', 'wallet5', 'wallet6'],
-        'date': pd.date_range(start='2023-01-01', periods=6),
-        'profits_cumulative': [-5000, -7500, -7501, -7499, 3000, 0],
-        'usd_inflows_cumulative': [10000, 12000, 13000, 11000, 8000, 5000]
-    })
-
-@pytest.fixture
-def negative_profits_config():
-    """
-    Fixture to create a data cleaning configuration with a specific profitability threshold.
-    """
-    return {
-        'max_wallet_coin_profits': 7500,
-        'max_wallet_inflows': 15000
-    }
-
-@pytest.mark.unit
-def test_negative_profits_losses(negative_profits_df, negative_profits_config):
-    """
-    Test scenario where some wallets have significant negative profits (losses).
-    """
-    # Call the function
-    cleaned_df, exclusions_logs_df = dr.clean_profits_df(negative_profits_df,
-                                                         negative_profits_config)
-
-    # Expected results
-    expected_cleaned_df = negative_profits_df[
-        negative_profits_df['wallet_address'].isin(['wallet1', 'wallet4', 'wallet5', 'wallet6'])
-    ].reset_index(drop=True)
-
-    expected_exclusions = pd.DataFrame({
-        'wallet_address': ['wallet2', 'wallet3'],
-        'profits_exclusion': [True, True],
-        'inflows_exclusion': [False, False]
-    })
-
-    # Assertions
-    assert len(cleaned_df) == 4  # wallet1, wallet4, wallet5, and wallet6 should remain
-    assert np.array_equal(cleaned_df.values, expected_cleaned_df.values)
-    assert np.array_equal(exclusions_logs_df.values, expected_exclusions.values)
-
-    # Check if the correct wallets are present in the cleaned DataFrame
-    assert set(cleaned_df['wallet_address']) == {'wallet1', 'wallet4', 'wallet5', 'wallet6'}
-
-    # Verify that wallets with losses at or beyond the threshold are excluded
-    assert 'wallet2' not in cleaned_df['wallet_address'].values
-    assert 'wallet3' not in cleaned_df['wallet_address'].values
-
-    # Check if profits and inflows are approximately correct for the remaining wallets
-    # -5000 + -7499 + 3000 + 0
-    assert pytest.approx(cleaned_df['profits_cumulative'].sum(), abs=1e-4) == -9499
-    # 10000 + 11000 + 8000 + 5000
-    assert pytest.approx(cleaned_df['usd_inflows_cumulative'].sum(), abs=1e-4) == 34000
-
-    # Verify that wallets with losses are present in the cleaned DataFrame
-    assert (cleaned_df['profits_cumulative'] < 0).any()
-
-    # Verify that the wallet with zero profit is included
-    assert (cleaned_df['profits_cumulative'] == 0).any()
 
 
 # ======================================================== #

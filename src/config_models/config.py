@@ -28,6 +28,7 @@ class MainConfig(NoExtrasBaseModel):
 # ----------------------------------------------------------------------------
 # Training Data Section
 # ----------------------------------------------------------------------------
+
 class TrainingDataConfig(NoExtrasBaseModel):
     """
     These variables relate to how the training period is defined
@@ -48,8 +49,6 @@ class TrainingDataConfig(NoExtrasBaseModel):
 # ----------------------------------------------------------------------------
 # Datasets Section
 # ----------------------------------------------------------------------------
-
-
 
 class DatasetsConfig(NoExtrasBaseModel):
     """
@@ -109,6 +108,7 @@ class MacroTrendsConfig(NoExtrasBaseModel):
 # ----------------------------------------------------------------------------
 # Data Cleaning Section
 # ----------------------------------------------------------------------------
+
 class DataCleaningConfig(NoExtrasBaseModel):
     """
     Variables used to clean and filter raw data before training data is built
@@ -119,6 +119,11 @@ class DataCleaningConfig(NoExtrasBaseModel):
     min_wallet_inflows: float = Field(..., gt=0)
     maximum_market_cap_share: float = Field(..., gt=0)
     exclude_coins_without_transfers: bool = Field(False)
+    price_coverage_warning_min_coin_increase: int = Field(..., gt=0)  # if this many coin prices has recently become imputed...
+    price_coverage_warning_min_pct_increase: float = Field(..., gt=0)  # ...and the % of imputed coin prices has increased by this value, issue a warning
+    transfers_coverage_warning_min_coin_increase: int = Field(..., gt=0)  # if this many coins have lost transfers data...
+    transfers_coverage_warning_min_pct_increase: float = Field(..., gt=0)  # ...and the % of coin without transfers data has increased by this value, issue a warning
+
 
 
 # ============================================================================

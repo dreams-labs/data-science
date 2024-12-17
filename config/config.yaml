@@ -107,3 +107,9 @@ data_cleaning:
   max_gap_days: 3  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
   min_daily_volume: 10000 # Minimum average daily volume the coin must have
   exclude_coins_without_transfers: True  # determines whether to create price features for coins without transfers data
+
+  # coverage filters
+  price_coverage_warning_min_coin_increase: 100  # if this many coin prices has recently become imputed...
+  price_coverage_warning_min_pct_increase: 0.05  # ...and the % of imputed coin prices has increased by this value, issue a warning
+  transfers_coverage_warning_min_coin_increase: 10  # if this many coins have lost transfers data...
+  transfers_coverage_warning_min_pct_increase: 0.001  # ...and the % of coin without transfers data has increased by this value, issue a warning

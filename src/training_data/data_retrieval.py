@@ -37,9 +37,9 @@ def retrieve_market_data():
         from core.coin_market_data cmd
         order by 1,2
     """
-
     # Run the SQL query using dgc's run_sql method
     market_data_df = dgc().run_sql(query_sql)
+    logger.debug('Base market data retrieved, beginning memory optimized formatting...')
 
     # Convert coin_id column to categorical to reduce memory usage
     market_data_df['coin_id'] = market_data_df['coin_id'].astype('category')
@@ -66,10 +66,10 @@ def retrieve_market_data():
     return market_data_df
 
 
-def detect_data_staleness(market_data_df, config, lookback_days=7):
+def detect_price_data_staleness(market_data_df, config, lookback_days=7):
     """
-    Find concerning patterns in data freshness where imputed count rises and stays high.
-    Issues a logger.warning if issues above the data cleaning flags are detected.
+    Find concerning patterns in data freshness where imputed prices count rises and stays
+    high. Issues a logger.warning if issues above the data cleaning flags are detected.
 
     Params:
     - market_data_df (DataFrame): Dataframe with dates and days_imputed column
@@ -79,8 +79,8 @@ def detect_data_staleness(market_data_df, config, lookback_days=7):
     - bool: True if concerning staleness pattern detected
     """
     # Define thresholds
-    count_threshold = config['data_cleaning']['price_imputation_warning_min_coin_increase']
-    percent_threshold = config['data_cleaning']['price_imputation_warning_min_pct_increase']
+    count_threshold = config['data_cleaning']['price_coverage_warning_min_coin_increase']
+    percent_threshold = config['data_cleaning']['price_coverage_warning_min_pct_increase']
 
     # Summarize as daily records
     df = market_data_df.groupby('date')['days_imputed'].count().to_frame()
@@ -168,11 +168,10 @@ def clean_market_data(market_data_df, config, earliest_date, latest_date):
                 len(market_data_df) - len(cleaned_df))
 
     # Assess potential staleness of prices based on imputation trends
+    _ = detect_price_data_staleness(cleaned_df[cleaned_df['date'] <= latest_date],config)
 
-    _ = detect_data_staleness(cleaned_df[cleaned_df['date'] <= latest_date],config)
-
-    # # Drop helper column
-    # cleaned_df = cleaned_df.drop(columns='days_imputed')
+    # Drop imputation lineage column
+    cleaned_df = cleaned_df.drop(columns='days_imputed')
 
     return cleaned_df
 
@@ -436,6 +435,37 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows):
     return profits_df
 
 
+def check_coin_transfers_coverage(profits_df, data_cleaning_config) -> None:
+    """
+    Warns if coin count changes exceed specified thresholds.
+
+    Params:
+    - profits_df (df): df showing coin-wallet-date records where transers exist
+    """
+    # Extract thresholds
+    count_threshold=data_cleaning_config['transfers_coverage_warning_min_coin_increase'],
+    percent_threshold=data_cleaning_config['transfers_coverage_warning_min_pct_increase']
+
+    # Create counts of coins with transfers
+    daily_counts = profits_df.groupby('date')['coin_id'].nunique().copy()
+    latest_count = daily_counts.iloc[-1]
+    latest_date = daily_counts.index[-1]
+    cutoff_date = latest_date - pd.Timedelta(days=7)
+    week_data = daily_counts.loc[cutoff_date:]
+
+    count_increase = latest_count - week_data.min()
+    min_date = week_data.idxmin()
+    pct_increase = count_increase / week_data.min() * 100
+
+    if count_increase > count_threshold and pct_increase > percent_threshold:
+        logging.warning(
+            f"Coin transfers coverage alert on {latest_date.date()}:\n"
+            f"Transfers coverage changed from {week_data.min():.0f} coins ({min_date.date()}) "
+            f"to {latest_count:.0f} coins ({latest_date.date()}), "
+            f"a {pct_increase:.1f}% increase."
+        )
+
+
 @u.timing_decorator
 def clean_profits_df(profits_df, data_cleaning_config):
     """
@@ -451,6 +481,10 @@ def clean_profits_df(profits_df, data_cleaning_config):
     Returns:
     - Cleaned DataFrame with records for coin_id-wallet_address pairs filtered out.
     """
+    # 0. Check coin coverage to see if transfers data may be stale
+    # ------------------------------------------------------------
+    check_coin_transfers_coverage(profits_df,data_cleaning_config)
+
 
     # 1. Calculate total inflows for each wallet across all coins
     # -----------------------------------------------------------
