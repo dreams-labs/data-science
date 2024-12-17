@@ -3,8 +3,6 @@ import itertools
 from copy import deepcopy
 from typing import Dict, Optional
 import pandas as pd
-import numpy as np
-from sklearn.metrics import mean_squared_error, r2_score
 
 # Local module imports
 import wallet_modeling.wallet_modeling_orchestrator as wmo

@@ -1,8 +1,9 @@
 # Variables used to define the training data
 training_data:
     training_window_starts: [
-        # "2023-08-01",
-        "2023-09-01",
+        "2022-01-01",
+        "2023-01-01",
+        "2023-06-01",
         "2024-01-01",
         "2024-04-01",
         "2024-08-01"
@@ -41,8 +42,8 @@ modeling:
 # Variables used to define features
 features:
     # Clustering params
-    clustering_n_components: 20
-    clustering_n_clusters: [2,4,7]
+    clustering_n_components: 25
+    clustering_n_clusters: [2,4]
 
     # Market timing params
     offset_winsorization: 0.01 # comparisons between metrics and their offset values will be winsorized by this amount
@@ -59,11 +60,11 @@ data_cleaning:
     # Wallet cohort thresholds
     min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
     max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
-    min_wallet_investment: 5000 # The amount of lifetime USD investment a wallet must have to be included in the training data
+    min_wallet_investment: 100000 # The amount of lifetime USD investment a wallet must have to be included in the training data
     max_wallet_investment: 100_000_000 # The amount of lifetime USD investment a wallet must have to be included in the training data
-    min_wallet_volume: 10000  # Exclude wallets with fewer than this amount of training period USD volume
+    min_wallet_volume: 200000  # Exclude wallets with fewer than this amount of training period USD volume
     max_wallet_volume: 250_000_000  # Exclude wallets with fewer than this amount of training period USD volume
-    min_wallet_inflows: 5000  # Exclude wallets with inflows below this amount (USD)
+    min_wallet_inflows: 100000  # Exclude wallets with inflows below this amount (USD)
     max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
     max_wallet_profits: 100_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
 
