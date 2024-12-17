@@ -166,6 +166,16 @@ def filter_modeling_period_wallets(modeling_period_profits_df):
     """
     Applies data cleaning filters to remove modeling period wallets without sufficient activity
     """
+    # Validate date range
+    modeling_period_start = wallets_config['training_data']['modeling_period_start']
+    modeling_period_end = wallets_config['training_data']['modeling_period_end']
+
+    if not modeling_period_profits_df['date'].between(modeling_period_start, modeling_period_end).all():
+        raise ValueError(
+            f"Detected dates outside the modeling period range: "
+            f"{modeling_period_start} to {modeling_period_end}"
+        )
+
     # Calculate modeling period wallet metrics
     modeling_period_profits_df = wtf.add_cash_flow_transfers_logic(modeling_period_profits_df)
     modeling_wallets_df = wtf.calculate_wallet_trading_features(modeling_period_profits_df)

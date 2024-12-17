@@ -6,14 +6,13 @@ Intended function sequence:
 # Base feature calculation
 profits_df = wtf.add_cash_flow_transfers_logic(profits_df)
 trading_features = wtf.calculate_wallet_trading_features(profits_df)
-
-# Fills values for wallets in wallet_cohort but not in profits_df
-trading_features = wtf.fill_trading_features_data(trading_features, wallet_cohort)
 """
-import time
 import logging
 import pandas as pd
 import numpy as np
+
+# Local module imports
+import utils as u
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -81,6 +80,7 @@ def add_cash_flow_transfers_logic(profits_df):
 
 
 
+@u.timing_decorator
 def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
     Calculates comprehensive trading metrics by combining base trading features with
@@ -93,8 +93,6 @@ def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
     Returns:
     - wallet_metrics_df (DataFrame): Trading metrics keyed on wallet_address
     """
-    start_time = time.time()
-    logger.info("Calculating wallet trading features...")
 
     # Calculate base trading features
     profits_df['date'] = pd.to_datetime(profits_df['date'])
@@ -113,6 +111,11 @@ def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
         total_net_flows=('cash_flow_transfers', lambda x: -x.sum()),
         max_investment=('cumsum_cash_flow_transfers', 'max'),
     )
+
+    # Set floor of 0 on max_investment to match the business constraint that wallet balances cannot be negative.
+    # This handles edge cases where very small initial balances (< $0.01) get rounded to 0 and subsequent outflows
+    # create artificial negative "max_investment" values.
+    base_metrics_df['max_investment'] = base_metrics_df['max_investment'].clip(lower=0)
 
     # Observed activity metrics
     observed_metrics_df = profits_df[~profits_df['is_imputed']].groupby('wallet_address').agg(
@@ -143,50 +146,4 @@ def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
         0
     )
 
-    logger.info(f"Wallet trading features computed after {time.time() - start_time:.2f} seconds")
-
     return wallet_trading_features_df
-
-
-
-def fill_trading_features_data(wallet_trading_features_df, wallet_cohort):
-    """
-    Fill missing wallet data for all wallets in wallet_cohort that are not in window_wallets_df.
-
-    Parameters:
-    - wallet_trading_features_df (pd.DataFrame): DataFrame with wallet trading features
-    - wallet_cohort (array-like): Array of all wallet addresses that should be present
-
-    Returns:
-    - pd.DataFrame: Complete DataFrame with filled values for missing wallets
-    """
-
-    # Create the fill value dictionary
-    fill_values = {
-        'total_inflows': 0,
-        'total_outflows': 0,
-        'total_net_flows': 0,
-        'max_investment': 0,
-        'transaction_days': 0,
-        'unique_coins_traded': 0,
-        'cash_buy_inflows': 0,
-        'cash_sell_outflows': 0,
-        'cash_net_flows': 0,
-        'total_volume': 0,
-        'average_transaction': 0,
-        'activity_density': 0,
-        'volume_vs_investment_ratio': 0,
-    }
-
-    # Create a DataFrame with all wallets that should exist
-    complete_df = pd.DataFrame(index=wallet_cohort)
-    complete_df.index.name = 'wallet_address'
-
-    # Add the fill value columns
-    for column, fill_value in fill_values.items():
-        complete_df[column] = fill_value
-
-    # Update with actual values where they exist
-    complete_df.update(wallet_trading_features_df)
-
-    return complete_df

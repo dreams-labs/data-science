@@ -16,6 +16,16 @@ time_series:
                 sma:
                     parameters:
                         window: [5]
+        mfi:
+            indicators:
+                sma:
+                    parameters:
+                        window: [5]
+        obv:
+            indicators:
+                sma:
+                    parameters:
+                        window: [5]
 
 # # Time series keyed on only date
 # macro_trends:

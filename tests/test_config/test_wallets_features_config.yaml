@@ -9,3 +9,9 @@ market_timing:
     volume_sma_5:
       offsets: [7,21,50]
       retain_base_columns: True
+    mfi_sma_5:
+      offsets: [21,50]
+      retain_base_columns: True
+    obv_sma_5:
+      offsets: [21,50]
+      retain_base_columns: True

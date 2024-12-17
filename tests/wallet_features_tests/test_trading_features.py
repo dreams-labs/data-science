@@ -325,8 +325,11 @@ def test_return_ratios_in_reasonable_range(test_trading_features_df):
     )
 
 
-# Supplementary Tests for Many to Many Coin-Wallet Relationships
-# --------------------------------------------------------------
+
+
+
+# Remapping Tests for Many to Many Coin-Wallet Relationships
+# ----------------------------------------------------------
 @pytest.fixture
 def test_remapped_profits_df(test_profits_data):
     """

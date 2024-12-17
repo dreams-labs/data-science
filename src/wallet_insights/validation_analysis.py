@@ -21,27 +21,14 @@ wallets_config = WalletsConfig()
 
 def calculate_validation_metrics(X_test, y_pred, validation_profits_df):
     """
-    Calculate validation period metrics for wallet scoring and group performance by score buckets.
-
-    Parameters:
-    -----------
-    X_test : pandas.DataFrame
-        Test set features with wallet addresses as index
-    y_pred : array-like
-        Predicted scores from the model
-    validation_profits_df : pandas.DataFrame
-        DataFrame containing validation period profit data
+    Params:
+    - X_test (DataFrame): test set features with wallet addresses as index
+    - y_pred (array): predicted scores from model
+    - validation_profits_df (DataFrame): validation period profit data
 
     Returns:
-    --------
-    wallet_performance_df (pd.DataFrame)
-        Wallet-indexed dataframe showing performance metrics over the validation period
-    bucketed_wallet_performance_df (pd.DataFrame)
-        Grouped validation metrics by score bucket, including:
-        - Number of wallets
-        - Mean and median invested amounts
-        - Mean and median net gains
-        - Mean and median returns
+    - wallet_performance_df (DataFrame): wallet-level validation metrics
+    - bucketed_wallet_performance_df (DataFrame): grouped metrics by score bucket
     """
     # Calculate validation period wallet metrics
     validation_profits_df = wtf.add_cash_flow_transfers_logic(validation_profits_df)
@@ -52,11 +39,12 @@ def calculate_validation_metrics(X_test, y_pred, validation_profits_df):
     wallet_performance_df = pd.DataFrame()
     wallet_performance_df['wallet_address'] = X_test.index.values
     wallet_performance_df['score'] = y_pred
-    wallet_performance_df['score_rounded'] = np.ceil(wallet_performance_df['score']*20)/20
+    # Convert to float64 first, then round to avoid float32 precision issues
+    wallet_performance_df['score_rounded'] = (np.ceil(wallet_performance_df['score'].astype(np.float64)*20)/20).round(2)
     wallet_performance_df = wallet_performance_df.set_index('wallet_address')
     wallet_performance_df = wallet_performance_df.join(validation_wallets_df, how='left')
 
-    # Group wallets by score bucket and assess performance
+    # Rest of the function remains the same...
     bucketed_performance_df = wallet_performance_df.groupby('score_rounded').agg(
         wallets=('score', 'count'),
         mean_invested=('max_investment', 'mean'),
@@ -65,7 +53,6 @@ def calculate_validation_metrics(X_test, y_pred, validation_profits_df):
         median_total_net_flows=('total_net_flows', 'median'),
     )
 
-    # Calculate return metrics
     bucketed_performance_df['mean_return'] = (bucketed_performance_df['mean_total_net_flows']
                                                      / bucketed_performance_df['mean_invested'])
     bucketed_performance_df['median_return'] = (bucketed_performance_df['median_total_net_flows']

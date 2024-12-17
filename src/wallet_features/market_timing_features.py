@@ -1,7 +1,6 @@
 """
 Calculates metrics aggregated at the wallet level
 """
-import time
 import logging
 from pathlib import Path
 import pandas as pd
@@ -16,12 +15,16 @@ import utils as u
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
 
+# Locate the config directory
+current_dir = Path(__file__).parent
+config_directory = current_dir / '..' / '..' / 'config'
+
 # Load wallets_config at the module level
 wallets_config = WalletsConfig()
-wallets_metrics_config = u.load_config('../config/wallets_metrics_config.yaml')
-wallets_features_config = yaml.safe_load(Path('../config/wallets_features_config.yaml').read_text(encoding='utf-8'))
+wallets_metrics_config = u.load_config(config_directory / 'wallets_metrics_config.yaml')
+wallets_features_config = yaml.safe_load((config_directory / 'wallets_features_config.yaml').read_text(encoding='utf-8'))
 
-
+@u.timing_decorator
 def calculate_market_timing_features(profits_df, market_indicators_data_df):
     """
     Calculate features capturing how wallet transaction timing aligns with future market movements.
@@ -58,8 +61,6 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
 
             All wallet_addresses from the categorical index are included with zeros for missing data.
     """
-    start_time = time.time()
-    logger.info("Calculating market timing features...")
 
     # add timing offset features
     market_timing_df = calculate_offsets(market_indicators_data_df)
@@ -72,9 +73,6 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
         relative_change_columns,
         wallets_config['features']['timing_metrics_min_transaction_size'],
     )
-
-    logger.info("Calculated market timing features after %.2f seconds.",
-                time.time() - start_time)
 
     return wallet_timing_features_df
 
@@ -168,9 +166,9 @@ def calculate_relative_changes(
     # Get the offsets configuration
     try:
         offset_config = wallets_features_config['market_timing']['offsets']
-        winsor_coef = wallets_config['data_cleaning']['offset_winsorization']
+        winsor_coef = wallets_config['features']['offset_winsorization']
     except KeyError as e:
-        raise FeatureConfigError("Required config key not found in wallets_features_config: " + str(e)) from e
+        raise FeatureConfigError("Required config key not found in wallets_config['features']: " + str(e)) from e
 
     # Keep track of columns to drop
     columns_to_drop = set()
