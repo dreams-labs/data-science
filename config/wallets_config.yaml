@@ -1,9 +1,9 @@
 # Variables used to define the training data
 training_data:
     training_window_starts: [
-        "2023-06-01",
-        "2024-01-01",
-        "2024-04-01",
+        # "2023-06-01",
+        # "2024-01-01",
+        # "2024-04-01",
         "2024-08-01"
     ]
     modeling_period_start: "2024-11-01"
@@ -67,6 +67,8 @@ data_cleaning:
     max_initial_market_cap: 999150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
     max_gap_days: 50  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
     min_daily_volume: 3000 # Minimum average daily volume the coin must have
+    price_imputation_warning_min_coin_increase: 100  # if this many coin prices has recently become imputed... (plus the below flag)
+    price_imputation_warning_min_pct_increase: 0.05  # if the % of imputed coin prices has increased by this value, issue a warning
 
     # Market cap imputation filters
     min_mc_imputation_coverage: 0.3  # coins with market cap coverage below this level will have hardcoded market cap values filled

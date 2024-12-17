@@ -66,6 +66,59 @@ def retrieve_market_data():
     return market_data_df
 
 
+def detect_data_staleness(market_data_df, config, lookback_days=7):
+    """
+    Find concerning patterns in data freshness where imputed count rises and stays high.
+    Issues a logger.warning if issues above the data cleaning flags are detected.
+
+    Params:
+    - market_data_df (DataFrame): Dataframe with dates and days_imputed column
+    - lookback_days (int): Number of days to look back for minimum value
+
+    Returns:
+    - bool: True if concerning staleness pattern detected
+    """
+    # Define thresholds
+    count_threshold = config['data_cleaning']['price_imputation_warning_min_coin_increase']
+    percent_threshold = config['data_cleaning']['price_imputation_warning_min_pct_increase']
+
+    # Summarize as daily records
+    df = market_data_df.groupby('date')['days_imputed'].count().to_frame()
+    total_coins = market_data_df.groupby('date')['coin_id'].nunique()
+
+    # Convert index to datetime if not already
+    if not isinstance(df.index, pd.DatetimeIndex):
+        df = df.set_index(pd.to_datetime(df.index))
+
+    # Get most recent date and lookback period
+    latest_date = df.index.max()
+    lookback_date = latest_date - pd.Timedelta(days=lookback_days)
+
+    # Get relevant values
+    latest_count = df.loc[latest_date, 'days_imputed']
+    min_date = df.loc[lookback_date:latest_date, 'days_imputed'].idxmin()
+    recent_min = df.loc[min_date, 'days_imputed']
+    latest_total = total_coins.loc[latest_date]
+
+    # Calculate the increases
+    count_increase = latest_count - recent_min
+    pct_increase = (count_increase / recent_min) if recent_min > 0 else float('inf')
+
+    # Calculate percentages
+    latest_pct = (latest_count / latest_total)
+    min_pct = (recent_min / total_coins.loc[min_date])
+
+    if count_increase > count_threshold and pct_increase > percent_threshold:
+        logging.warning(
+            f"Data freshness issue detected on {latest_date.date()}:\n"
+            f"- {count_increase:.0f} records have become stale since {min_date.date()}.\n"
+            f"- Imputed records increased from {min_pct*100:.1f}% ({recent_min} coins) on {min_date.date()} to "
+            f"{latest_pct*100:.1f}% ({latest_count:.0f} coins) on {latest_date.date()}\n"
+        )
+        return True
+
+    return False
+
 
 def clean_market_data(market_data_df, config, earliest_date, latest_date):
     """
@@ -108,14 +161,18 @@ def clean_market_data(market_data_df, config, earliest_date, latest_date):
     # Remove ALL records for problematic coins
     cleaned_df = market_data_df[~market_data_df['coin_id'].isin(coins_to_remove)]
 
-    # Drop helper column
-    cleaned_df = cleaned_df.drop(columns='days_imputed')
-
     logger.info("Removed %s coins (%s for gaps, %s for volume) and %s total records.",
                 len(coins_to_remove),
                 len(gap_coin_ids),
                 len(low_volume_coins),
                 len(market_data_df) - len(cleaned_df))
+
+    # Assess potential staleness of prices based on imputation trends
+
+    _ = detect_data_staleness(cleaned_df[cleaned_df['date'] <= latest_date],config)
+
+    # # Drop helper column
+    # cleaned_df = cleaned_df.drop(columns='days_imputed')
 
     return cleaned_df
 
