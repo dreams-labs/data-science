@@ -409,7 +409,7 @@ def analyze_cluster_performance(modeling_df: pd.DataFrame,
     - Dict[int, DataFrame]: Performance metrics for each k value's clusters
     """
     # Clusters with fewer than this amount of wallets will have NaNs instead of metrics.
-    cluster_required_sample_size = 2
+    cluster_required_sample_size = 100
 
     # Filter modeling_df to only include test set wallets
     test_wallets = y_true.index
@@ -433,8 +433,8 @@ def analyze_cluster_performance(modeling_df: pd.DataFrame,
             # If a cluster has fewer than the required samples, log a warning and return NaN metrics
             if n_samples < cluster_required_sample_size:
                 logger.warning(
-                    f"Cluster {cluster} (k={k}) has only {n_samples} samples - insufficient for reliable metrics. "
-                    f"Metrics will be reported as NaN."
+                    f"Cluster {cluster} (k={k}) has only {n_samples} test set samples. "
+                    f"Test set performance metrics will be reported as NaN."
                 )
                 cluster_metrics = {
                     'pct_total': 0.0,
