@@ -3,7 +3,6 @@ utility functions use in data science notebooks
 """
 import time
 import sys
-import gc
 import os
 import json
 from datetime import datetime, timedelta
@@ -616,24 +615,49 @@ def df_mem(df):
     print(f'Total memory usage: {total_memory / 1024 ** 2:.2f} MB')
 
 
-def obj_mem():
+def obj_mem() -> pd.DataFrame:
     """
-    Checks how much memory all objects are using
+    Tracks memory usage of large objects with proper name detection.
 
-    name logic needs to be redone
+    Returns:
+    - mem_df (DataFrame): Memory stats with object names and sizes
     """
+    # Get current frame's variables
+    frame = sys._getframe()
+    variables: Dict = {}
+
+    # Check all frames up to module level
+    while frame:
+        variables.update(frame.f_locals)
+        variables.update(frame.f_globals)
+        frame = frame.f_back
+
     objects = []
-    for obj in gc.get_objects():
-        # try:
-        size = sys.getsizeof(obj)
-        if size >= 1000:  # Filter out objects smaller than 1000 bytes
-            obj_type = type(obj).__name__
-            obj_name = str(getattr(obj, '__name__', 'Unnamed'))  # Get name if available
-            objects.append((obj_name, obj_type, size / (1024 * 1024)))  # Convert size to MB
-        # except:
-        #     continue
-    mem_df = pd.DataFrame(objects, columns=['Name', 'Type', 'Size (MB)'])
-    mem_df = mem_df.sort_values(by='Size (MB)', ascending=False).reset_index(drop=True)
+    for name, obj in variables.items():
+        try:
+            size = sys.getsizeof(obj)
+            if size >= 1000:  # Filter objects below 10 MB
+                obj_type = type(obj).__name__
+
+                # Add shape for DataFrames/Series
+                shape = getattr(obj, 'shape', None) if obj_type in ('DataFrame', 'Series') else None
+
+                objects.append({
+                    'name': name,
+                    'type': obj_type,
+                    'size_mb': round(size / (1024 * 1024),1),
+                    'shape': str(shape) if shape else None
+                })
+        except:
+            continue
+
+    # Convert to sorted dataframe and remove objects below 10 MB
+    mem_df = pd.DataFrame(objects)
+    mem_df = mem_df[mem_df['size_mb']>=5]
+    mem_df = mem_df.sort_values('size_mb', ascending=False).reset_index(drop=True)
+    mem_df
+
+
     return mem_df
 
 
