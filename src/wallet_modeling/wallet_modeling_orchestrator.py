@@ -22,19 +22,17 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 
 
-def retrieve_datasets():
+def retrieve_period_datasets(start_date,end_date):
     """
     Retrieves market and profits data
     """
-    earliest_date = wallets_config['training_data']['training_period_start']
-    latest_date = wallets_config['training_data']['validation_period_end']
 
     # Retrieve profits_df and market_data_df concurrently
     with ThreadPoolExecutor(max_workers=2) as executor:
         profits_future = executor.submit(
             dr.retrieve_profits_data,
-            earliest_date,
-            latest_date,
+            start_date,
+            end_date,
             wallets_config['data_cleaning']['min_wallet_inflows']
         )
         market_future = executor.submit(dr.retrieve_market_data)
@@ -43,15 +41,15 @@ def retrieve_datasets():
         market_data_df = market_future.result()
 
     # Remove all records after the training period end to ensure no data leakage
-    market_data_df = market_data_df[market_data_df['date']<=wallets_config['training_data']['training_period_end']]
+    market_data_df = market_data_df[market_data_df['date']<=end_date]
 
     # Clean market_data_df
     market_data_df = market_data_df[market_data_df['coin_id'].isin(profits_df['coin_id'])]
     market_data_df = dr.clean_market_data(
         market_data_df,
         wallets_config,
-        earliest_date,
-        latest_date
+        start_date,
+        end_date
     )
 
     # Intelligently impute market cap data in market_data_df when good data is available
@@ -62,10 +60,10 @@ def retrieve_datasets():
     # Crudely fill all remaining gaps in market cap data
     market_data_df = wmc.force_fill_market_cap(market_data_df)
 
-    # Remove market data records for coins that exceed the initial market cap threshold
+    # Remove coins that exceeded the initial market cap threshold at the start of the training period
     max_initial_market_cap = wallets_config['data_cleaning']['max_initial_market_cap']
     above_initial_threshold_coins = market_data_df[
-        (market_data_df['date']==earliest_date)
+        (market_data_df['date']==wallets_config['training_data']['training_period_start'])
         & (market_data_df['market_cap_filled']>max_initial_market_cap)
     ]['coin_id']
     market_data_df = market_data_df[~market_data_df['coin_id'].isin(above_initial_threshold_coins)]
@@ -142,26 +140,25 @@ def define_wallet_cohort(profits_df,market_data_df):
 
 
 
-def split_profits_df(profits_df,market_data_df,wallet_cohort):
+def split_profits_df(training_profits_df,training_market_data_df,wallet_cohort):
     """
     Adds imputed rows at the start and end date of all windows
     """
     # Filter to only wallet cohort
-    cohort_profits_df = profits_df[profits_df['wallet_address'].isin(wallet_cohort)]
+    cohort_profits_df = training_profits_df[training_profits_df['wallet_address'].isin(wallet_cohort)]
 
-    # Impute all required dates
-    imputation_dates = wtd.generate_imputation_dates()
-    windows_profits_df = pri.impute_profits_for_multiple_dates(cohort_profits_df, market_data_df,
-                                                               imputation_dates, n_threads=24)
+    # Impute all training window dates
+    training_window_dates = wtd.generate_training_window_dates()
+    training_windows_profits_df = pri.impute_profits_for_multiple_dates(cohort_profits_df, training_market_data_df,
+                                                               training_window_dates, n_threads=24)
 
     # drop imputed total_return column
-    windows_profits_df = windows_profits_df.drop('total_return', axis=1)
+    training_windows_profits_df = training_windows_profits_df.drop('total_return', axis=1)
 
-    # Split profits_df into training windows and the modeling period
-    (training_profits_df, training_windows_profits_dfs,
-    modeling_profits_df, validation_profits_df) = wtd.split_window_dfs(windows_profits_df)
+    # Split profits_df into training windows
+    training_profits_df, training_windows_profits_dfs = wtd.split_training_window_dfs(training_windows_profits_df)
 
-    return training_profits_df, training_windows_profits_dfs, modeling_profits_df, validation_profits_df
+    return training_profits_df, training_windows_profits_dfs
 
 
 
