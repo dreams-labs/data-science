@@ -42,6 +42,9 @@ def retrieve_datasets():
         profits_df = profits_future.result()
         market_data_df = market_future.result()
 
+    # Remove all records after the training period end to ensure no data leakage
+    market_data_df = market_data_df[market_data_df['date']<=wallets_config['training_data']['training_period_end']]
+
     # Clean market_data_df
     market_data_df = market_data_df[market_data_df['coin_id'].isin(profits_df['coin_id'])]
     market_data_df = dr.clean_market_data(
