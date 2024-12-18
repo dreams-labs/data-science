@@ -608,11 +608,15 @@ def df_mem(df):
     """
     # Memory usage of each column
     memory_usage = df.memory_usage(deep=True) / (1024 ** 2)
-    print(memory_usage.round(2))
+    mem_df = pd.DataFrame(memory_usage)
+    mem_df.columns = ['mb']
+    mem_df['dtype'] = df.dtypes
 
     # Total memory usage in bytes
     total_memory = df.memory_usage(deep=True).sum()
     print(f'Total memory usage: {total_memory / 1024 ** 2:.2f} MB')
+
+    return mem_df.sort_values(by='mb',ascending=False)
 
 
 def obj_mem() -> pd.DataFrame:

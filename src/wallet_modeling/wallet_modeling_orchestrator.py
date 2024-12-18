@@ -4,7 +4,6 @@ Orchestrates groups of functions to generate wallet model pipeline
 
 import time
 import logging
-import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
 from dreams_core import core as dc
 
@@ -25,7 +24,7 @@ wallets_config = WalletsConfig()
 
 
 def retrieve_period_datasets(start_date,end_date,
-                             parquet_prefix,parquet_folder="temp/wallet_modeling_dfs"):
+                             parquet_prefix=None,parquet_folder="temp/wallet_modeling_dfs"):
     """
     Retrieves market and profits data
     """
@@ -152,7 +151,7 @@ def define_wallet_cohort(profits_df,market_data_df):
     logger.info("Cohort defined as %s wallets after %.2f seconds.",
                 len(wallet_cohort), time.time()-start_time)
 
-    return filtered_training_wallet_metrics_df,wallet_cohort
+    return wallet_cohort
 
 
 
