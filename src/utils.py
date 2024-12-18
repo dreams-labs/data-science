@@ -674,7 +674,7 @@ def winsorize(data: pd.Series, cutoff: float = 0.01) -> pd.Series:
 
 # silence donation message
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-def play_notification(sound_file_path=None):
+def notify(sound_file_path=None):
     """
     Play a notification sound from a local audio file using pygame asynchronously.
     Falls back to ALERT_SOUND_FILEPATH environment variable if no path provided.
