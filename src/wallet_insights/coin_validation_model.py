@@ -1,9 +1,15 @@
 import logging
 import pandas as pd
 import numpy as np
+from sklearn.model_selection import train_test_split
+from xgboost import XGBRegressor
 
 # local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
+import wallet_insights.coin_validation_analysis as wicv
+import wallet_insights.wallet_model_evaluation as wime
+import utils as u
+
 
 # pylint:disable=invalid-name  # X doesn't conform to snake case
 
@@ -14,42 +20,124 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 
 
-def prepare_features(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+def prepare_features_and_targets(
+    coin_validation_df: pd.DataFrame,
+    modeling_profits_df: pd.DataFrame,
+    modeling_market_data_df: pd.DataFrame,
+    wallet_scores_df: pd.DataFrame
+) -> pd.DataFrame:
     """
-    Prepare features and target with better transformations.
+    Prepares modeling dataset using modeling period data instead of validation period.
 
     Params:
-    - df (DataFrame): input dataframe with coin metrics
+    - coin_validation_df (DataFrame): Contains wallet metrics and market stats
+    - modeling_profits_df (DataFrame): Raw profits data from modeling period
+    - modeling_market_data_df (DataFrame): Market data from modeling period
+    - wallet_scores_df (DataFrame): Wallet scores from model predictions
 
     Returns:
-    - X (ndarray): processed feature matrix
-    - y (ndarray): target values
+    - modeling_df (DataFrame): Prepared modeling data with features and target
     """
-    # Keep market_cap this time but log transform it
-    df = df.copy()
-    df['log_market_cap'] = np.log1p(df['market_cap_filled'])
+    # 1. Calculate modeling period coin performance
+    coin_performance_df = wicv.calculate_coin_performance(
+        modeling_market_data_df,
+        wallets_config['training_data']['modeling_period_start'],
+        wallets_config['training_data']['modeling_period_end']
+    )
 
-    # Log transform highly skewed numeric columns
-    skewed_cols = [
-        'weighted_avg_score', 'top_wallet_balance',
-        'total_balance', 'avg_wallet_balance'
-    ]
-    for col in skewed_cols:
-        df[f'log_{col}'] = np.log1p(df[col])
+    # 2. Calculate modeling period wallet metrics
+    modeling_wallet_metrics = wicv.calculate_coin_metrics_from_wallet_scores(
+        modeling_profits_df,
+        wallet_scores_df
+    )
 
-    # Create ratios that might be predictive
-    df['wallet_concentration'] = df['top_wallet_balance'] / (df['total_balance'] + 1)
+    # 3. Create feature matrix
+    coin_modeling_df = modeling_wallet_metrics.join(
+        coin_performance_df[['coin_return', 'market_cap_filled']],
+        how='inner'
+    )
 
-    # Select features including new transformations
+    # 4. Add engineered features
+    coin_modeling_df['log_market_cap'] = np.log1p(coin_modeling_df['market_cap_filled'])
+    coin_modeling_df['log_total_balance'] = np.log1p(coin_modeling_df['total_balance'])
+    coin_modeling_df['log_avg_wallet_balance'] = np.log1p(coin_modeling_df['avg_wallet_balance'])
+    coin_modeling_df['wallet_concentration'] = coin_modeling_df['top_wallet_balance'] / coin_modeling_df['total_balance']
+    coin_modeling_df['wallet_activity'] = coin_modeling_df['total_wallets'] * coin_modeling_df['score_confidence']
+
+    # 5. Calculate ratios and interaction terms
+    coin_modeling_df['top_wallet_score_ratio'] = (
+        coin_modeling_df['weighted_avg_score'] / coin_modeling_df['mean_score']
+    )
+    coin_modeling_df['balance_weighted_confidence'] = (
+        coin_modeling_df['score_confidence'] *
+        coin_modeling_df['top_wallet_balance_pct']
+    )
+
+    # 6. Add market cap segment indicators
+    coin_modeling_df['is_micro_cap'] = coin_modeling_df['market_cap_filled'] < 1e6
+    coin_modeling_df['is_small_cap'] = (
+        (coin_modeling_df['market_cap_filled'] >= 1e6) &
+        (coin_modeling_df['market_cap_filled'] < 35e6)
+    )
+    coin_modeling_df['is_mid_cap'] = coin_modeling_df['market_cap_filled'] >= 35e6
+
+    # 7. Winsorize target to reduce impact of outliers
+    coin_modeling_df['coin_return_raw'] = coin_modeling_df['coin_return']
+    coin_modeling_df['coin_return'] = u.winsorize(coin_modeling_df['coin_return'],0.05)
+
+    return coin_modeling_df
+
+def train_coin_prediction_model(modeling_df: pd.DataFrame):
+    """
+    Trains coin prediction model with proper validation and feature selection.
+    """
+    # 1. Define features to use
     feature_cols = [
-        'log_market_cap', 'log_weighted_avg_score',
-        'log_top_wallet_balance', 'log_total_balance',
-        'top_wallet_count', 'total_wallets', 'mean_score',
-        'score_std', 'top_wallet_balance_pct', 'wallet_concentration',
-        'score_confidence'
+        # Market cap features
+        'log_market_cap', 'is_micro_cap', 'is_small_cap', 'is_mid_cap',
+
+        # Wallet metrics
+        'weighted_avg_score', 'mean_score', 'score_std', 'score_confidence',
+        'top_wallet_score_ratio',
+
+        # Balance metrics
+        'log_total_balance', 'log_avg_wallet_balance',
+        'top_wallet_balance_pct', 'wallet_concentration',
+
+        # Activity metrics
+        'total_wallets', 'wallet_activity', 'balance_weighted_confidence'
     ]
 
-    X = df[feature_cols].values
-    y = df['coin_return'].values
+    # 2. Prepare train/test split
+    X = modeling_df[feature_cols].values
+    y = modeling_df['coin_return'].values
 
-    return X, y
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=modeling_df['is_mid_cap']
+    )
+
+    # 3. Create model with proper parameters
+    model = XGBRegressor(
+        n_estimators=200,
+        max_depth=4,
+        learning_rate=0.05,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        min_child_weight=3,
+        random_state=42
+    )
+
+    # 4. Train and evaluate
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+
+    # 5. Create evaluator with feature names
+    evaluator = wime.RegressionEvaluator(
+        y_train=y_train,
+        y_true=y_test,
+        y_pred=y_pred,
+        model=model,
+        feature_names=feature_cols
+    )
+
+    return model, evaluator

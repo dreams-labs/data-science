@@ -12,7 +12,6 @@ import yaml
 import utils as u
 from dreams_core.googlecloud import GoogleCloud as dgc
 import wallet_insights.wallet_model_evaluation as wime
-import wallet_insights.coin_validation_analysis as wicv
 from wallet_modeling.wallets_config_manager import WalletsConfig
 
 
@@ -37,7 +36,7 @@ def get_wallet_addresses():
 
 
 
-def save_model_artifacts(model_results, evaluation_dict, configs, coin_validation_df, base_path):
+def save_model_artifacts(model_results, evaluation_dict, configs, base_path):
     """
     Saves all model-related artifacts with a consistent UUID across files.
 
@@ -48,7 +47,6 @@ def save_model_artifacts(model_results, evaluation_dict, configs, coin_validatio
         - wallets_config: Main wallet modeling configuration
         - wallets_metrics_config: Metrics calculation configuration
         - wallets_features_config: Feature engineering configuration
-    - coin_validation_df (pd.DataFrame): DataFrame containing coin-level metrics and validation results
     - base_path (str): Base path for saving all model artifacts
 
     Returns:
@@ -111,11 +109,6 @@ def save_model_artifacts(model_results, evaluation_dict, configs, coin_validatio
     wallet_scores_df.to_csv(wallet_scores_path, index=False)
     logger.info(f"Saved wallet scores and addresses to {wallet_scores_path}")
 
-    # 3. Save coin metrics
-    coin_metrics_path = base_dir / 'coin_metrics' / f"coin_metrics_{model_id}.csv"
-    coin_validation_df.to_csv(coin_metrics_path, index=True)
-    logger.info(f"Saved coin metrics to {coin_metrics_path}")
-
     return model_id
 
 
@@ -157,7 +150,7 @@ def load_model_artifacts(model_id, base_path):
 
 
 
-def generate_and_save_model_artifacts(model_results, validation_profits_df, base_path):
+def generate_and_save_model_artifacts(model_results, base_path):
     """
     Wrapper function to generate evaluations, metrics, and save all model artifacts.
     Uses RegressionEvaluator for model evaluation.
@@ -168,7 +161,6 @@ def generate_and_save_model_artifacts(model_results, validation_profits_df, base
         - X, X_train, X_test: Feature data
         - y_train, y_test: Target data
         - y_pred: Model predictions
-    - validation_profits_df (pd.DataFrame): Profits DataFrame for validation period
     - base_path (str): Base path for saving artifacts
 
     Returns:
@@ -176,7 +168,6 @@ def generate_and_save_model_artifacts(model_results, validation_profits_df, base
         - model_id: UUID of the saved artifacts
         - evaluation: Model evaluation metrics
         - wallet_scores: DataFrame of wallet-level predictions
-        - coin_validation: DataFrame of coin-level metrics
     """
     # 1. Generate model evaluation metrics using RegressionEvaluator
     model = model_results['pipeline'].named_steps['regressor']
@@ -194,18 +185,12 @@ def generate_and_save_model_artifacts(model_results, validation_profits_df, base
         'summary_report': evaluator.summary_report()
     }
 
-    # 2. Create wallet scores DataFrame
+    # Create wallet scores DataFrame
     wallet_scores_df = pd.DataFrame({
         'score': model_results['y_pred']
     }, index=model_results['y_test'].index)
 
-    # 3. Calculate coin-level metrics
-    coin_validation_df = wicv.calculate_coin_metrics_from_wallet_scores(
-        validation_profits_df,
-        wallet_scores_df
-    )
-
-    # 4. Load configurations
+    # Load configurations
     wallets_config = WalletsConfig()
     wallets_metrics_config = u.load_config('../config/wallets_metrics_config.yaml')
     wallets_features_config = yaml.safe_load(
@@ -223,8 +208,7 @@ def generate_and_save_model_artifacts(model_results, validation_profits_df, base
         model_results=model_results,
         evaluation_dict=evaluation,
         configs=configs,
-        coin_validation_df=coin_validation_df,
         base_path=base_path
     )
 
-    return model_id, evaluator, wallet_scores_df, coin_validation_df
+    return model_id, evaluator, wallet_scores_df
