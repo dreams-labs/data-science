@@ -74,6 +74,9 @@ def retrieve_transfers_sequencing():
                 "in temp.wallet_modeling_cohort.",
                 len(transfers_sequencing_df), len(transfers_sequencing_df['wallet_id'].unique()))
 
+    # Convert coin_id column to categorical to reduce memory usage
+    transfers_sequencing_df['coin_id'] = transfers_sequencing_df['coin_id'].astype('category')
+
     return transfers_sequencing_df
 
 
