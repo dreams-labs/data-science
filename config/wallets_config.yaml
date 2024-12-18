@@ -97,3 +97,9 @@ coin_validation_analysis:
     min_balance: 10000  # how much USD all wallets must hold for the coin to be elegible for forecasting
     min_market_cap: 600_000  # coins below this market cap will not be included in performance assessments
     max_market_cap: 50_000_000  # coins above this market cap will not be included in performance assessments
+
+
+# Variables used in the generation of the validation period coin model
+coin_validation_model:
+
+    target_variable: "coin_return"
