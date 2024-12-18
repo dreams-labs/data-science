@@ -4,6 +4,7 @@ Orchestrates groups of functions to generate wallet model pipeline
 
 import time
 import logging
+import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
 from dreams_core import core as dc
 
@@ -22,7 +23,9 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 
 
-def retrieve_period_datasets(start_date,end_date):
+
+def retrieve_period_datasets(start_date,end_date,
+                             parquet_prefix,parquet_folder="temp/wallet_modeling_dfs"):
     """
     Retrieves market and profits data
     """
@@ -97,7 +100,22 @@ def retrieve_period_datasets(start_date,end_date):
         (profits_df['usd_net_transfers'] == 0))
     ]
 
-    return profits_df,market_data_df
+    # If a parquet file location is specified, store the files there and return nothing
+    if parquet_prefix:
+        # Store profits
+        profits_file = f"{parquet_folder}/{parquet_prefix}_profits_full.parquet"
+        profits_df.to_parquet(profits_file,index=False)
+        logger.info(f"Stored profits_df with shape {profits_df.shape} to {profits_file}.")
+
+        # Store market data
+        market_data_file = f"{parquet_folder}/{parquet_prefix}_market_data_df_full.parquet"
+        market_data_df.to_parquet(market_data_file,index=False)
+        logger.info(f"Stored market_data_df with shape {market_data_df.shape} to {market_data_file}.")
+
+
+    # Otherwise return the dfs
+    else:
+        return profits_df,market_data_df
 
 
 
@@ -118,16 +136,14 @@ def define_wallet_cohort(profits_df,market_data_df):
         imputed_profits_df['date']<=wallets_config['training_data']['training_period_end']
         ].copy()
 
-    # Add cash flows logic column
-    training_profits_df = wtf.add_cash_flow_transfers_logic(training_profits_df)
-
     # Compute wallet level metrics over duration of training period
+    logger.info("Generating training period trading features...")
+    training_profits_df = wtf.add_cash_flow_transfers_logic(training_profits_df)
     training_wallet_metrics_df = wtf.calculate_wallet_trading_features(training_profits_df)
 
     # Apply filters based on wallet behavior during the training period
+    logger.info("Identifying and uploading wallet cohort...")
     filtered_training_wallet_metrics_df = wtd.apply_wallet_thresholds(training_wallet_metrics_df)
-
-    # Identify cohort
     wallet_cohort = filtered_training_wallet_metrics_df.index.values
 
     # Upload the cohort to BigQuery for additional complex feature generation
