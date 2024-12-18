@@ -40,6 +40,11 @@ importlib.reload(py_e)
 logger = dc.setup_logger()
 
 
+
+# ---------------------------------------- #
+#         Config Related Functions
+# ---------------------------------------- #
+
 def load_all_configs(config_folder):
     """
     Loads and returns all config files
@@ -430,68 +435,14 @@ def get_expected_columns(metrics_config: Dict[str, Any]) -> List[str]:
 
 
 
-def check_nan_values(series):
-    """
-    Check if NaN values are only at the start or end of the series.
-
-    Returns:
-    - True if NaN values are in the middle of the series
-    - False if NaN values are only at start/end or if there are no NaN values
-    """
-    # Get the index of the first and last non-NaN value
-    first_valid = series.first_valid_index()
-    last_valid = series.last_valid_index()
-
-    # Check if there are any NaN values between the first and last valid value
-    has_nans_in_series = (series.loc[first_valid:last_valid] # selects the range between first and last valid value
-                             .isna() # checks for NaN values in this range
-                             .any()) # returns True if there are any NaN values in this range
-
-    return has_nans_in_series
 
 
-def safe_downcast(df, column, dtype):
-    """
-    Safe method to downcast a column datatype. If the column has no values that exceed the
-    limits of the new dtype, it will be downcasted. If it has values that will result in
-    overflow errors, it will raise an error.
-    """
-    # Check if the column is numeric
-    if not pd.api.types.is_numeric_dtype(df[column]):
-        logger.warning("Column '%s' is not numeric. Skipping downcast.", column)
-        return df
 
-    # Get the original dtype of the column
-    original_dtype = df[column].dtype
 
-    # Get the min and max values of the column
-    col_min = df[column].min()
-    col_max = df[column].max()
 
-    # Get the limits of the target dtype
-    if dtype in ['float32', 'float64']:
-        type_info = np.finfo(dtype)
-    elif dtype in ['int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64']:
-        type_info = np.iinfo(dtype)
-    else:
-        logger.error("Unsupported dtype: %s", dtype)
-        return df
-
-    # Check if the column values are within the limits of the target dtype
-    if col_min < type_info.min or col_max > type_info.max:
-        logger.warning("Cannot safely downcast column '%s' to %s. "
-                       "Values are outside the range of %s. "
-                       "Min: %s, Max: %s",
-                       column, dtype, dtype, col_min, col_max)
-        return df
-
-    # If we've made it here, it's safe to downcast
-    df[column] = df[column].astype(dtype)
-
-    logger.debug("Successfully downcasted column '%s' from %s to %s",
-                 column, original_dtype, dtype)
-    return df
-
+# --------------------------------- #
+#        Function Modifiers
+# --------------------------------- #
 
 def timing_decorator(func):
     """
@@ -569,6 +520,58 @@ def create_progress_bar(total_items):
 
     return progress_bar
 
+
+
+
+
+
+
+
+# ---------------------------------------- #
+#     DataFrame Manipulation Functions
+# ---------------------------------------- #
+
+def safe_downcast(df, column, dtype):
+    """
+    Safe method to downcast a column datatype. If the column has no values that exceed the
+    limits of the new dtype, it will be downcasted. If it has values that will result in
+    overflow errors, it will raise an error.
+    """
+    # Check if the column is numeric
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        logger.warning("Column '%s' is not numeric. Skipping downcast.", column)
+        return df
+
+    # Get the original dtype of the column
+    original_dtype = df[column].dtype
+
+    # Get the min and max values of the column
+    col_min = df[column].min()
+    col_max = df[column].max()
+
+    # Get the limits of the target dtype
+    if dtype in ['float32', 'float64']:
+        type_info = np.finfo(dtype)
+    elif dtype in ['int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64']:
+        type_info = np.iinfo(dtype)
+    else:
+        logger.error("Unsupported dtype: %s", dtype)
+        return df
+
+    # Check if the column values are within the limits of the target dtype
+    if col_min < type_info.min or col_max > type_info.max:
+        logger.warning("Cannot safely downcast column '%s' to %s. "
+                       "Values are outside the range of %s. "
+                       "Min: %s, Max: %s",
+                       column, dtype, dtype, col_min, col_max)
+        return df
+
+    # If we've made it here, it's safe to downcast
+    df[column] = df[column].astype(dtype)
+
+    logger.debug("Successfully downcasted column '%s' from %s to %s",
+                 column, original_dtype, dtype)
+    return df
 
 
 def cw_filter_df(df, coin_id, wallet_address):
@@ -649,6 +652,36 @@ def log_nan_counts(df):
     logger.critical(log_message)
 
 
+
+
+
+
+
+
+# ---------------------------------------- #
+#      Series Manipulation Functions
+# ---------------------------------------- #
+
+def check_nan_values(series):
+    """
+    Check if NaN values are only at the start or end of the series.
+
+    Returns:
+    - True if NaN values are in the middle of the series
+    - False if NaN values are only at start/end or if there are no NaN values
+    """
+    # Get the index of the first and last non-NaN value
+    first_valid = series.first_valid_index()
+    last_valid = series.last_valid_index()
+
+    # Check if there are any NaN values between the first and last valid value
+    has_nans_in_series = (series.loc[first_valid:last_valid] # selects the range between first and last valid value
+                             .isna() # checks for NaN values in this range
+                             .any()) # returns True if there are any NaN values in this range
+
+    return has_nans_in_series
+
+
 def winsorize(data: pd.Series, cutoff: float = 0.01) -> pd.Series:
     """
     Winsorize a data series at specified cutoff levels.
@@ -671,6 +704,15 @@ def winsorize(data: pd.Series, cutoff: float = 0.01) -> pd.Series:
     # Clip the data
     return np.clip(winsorized, lower_bound, upper_bound)
 
+
+
+
+
+
+
+# ---------------------------------------- #
+#     Misc Notebook Support Functions
+# ---------------------------------------- #
 
 # silence donation message
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
