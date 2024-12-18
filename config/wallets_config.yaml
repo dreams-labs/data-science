@@ -16,7 +16,7 @@ data_cleaning:
 
     # Modeling period filters
     min_modeling_investment: 3000
-    min_modeling_transaction_days: 2
+    min_modeling_transaction_days: 1
 
     # Wallet cohort thresholds
     min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
@@ -63,7 +63,7 @@ features:
 modeling:
     # Which wallet performance metric to use as the target variable. Options are:
     # invested, total_net_flows, return, risk_adj_return, performance_score, log_weighted_return, hybrid_score, size_adjusted_rank
-    target_variable: "performance_score"
+    target_variable: "size_adjusted_rank"
     target_var_params:
         performance_score_return_weight: 0.6
     returns_winsorization: 0.02

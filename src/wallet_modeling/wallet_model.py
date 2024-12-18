@@ -96,15 +96,18 @@ class WalletModel:
         # Train pipeline
         self.pipeline.fit(self.X_train, self.y_train)
 
-    def predict(self) -> np.ndarray:
+    def predict(self) -> pd.Series:
         """
         Make predictions on the test set.
 
         Returns:
-        - predictions (ndarray): predicted values for the test set.
+        - predictions (Series): predicted values for the test set, indexed like y_test
         """
-        # Store predictions for later use
-        self.y_pred = self.pipeline.predict(self.X_test)
+        # Get raw predictions from pipeline
+        raw_predictions = self.pipeline.predict(self.X_test)
+
+        # Convert to Series with same index as test data
+        self.y_pred = pd.Series(raw_predictions, index=self.X_test.index)
         return self.y_pred
 
     def run_experiment(self, modeling_df: pd.DataFrame, return_data: bool = True

@@ -12,7 +12,7 @@ import yaml
 import utils as u
 from dreams_core.googlecloud import GoogleCloud as dgc
 import wallet_insights.wallet_model_evaluation as wime
-import wallet_insights.coin_validation_analysis as wica
+import wallet_insights.coin_validation_analysis as wicv
 from wallet_modeling.wallets_config_manager import WalletsConfig
 
 
@@ -200,7 +200,7 @@ def generate_and_save_model_artifacts(model_results, validation_profits_df, base
     }, index=model_results['y_test'].index)
 
     # 3. Calculate coin-level metrics
-    coin_validation_df = wica.calculate_coin_metrics_from_wallet_scores(
+    coin_validation_df = wicv.calculate_coin_metrics_from_wallet_scores(
         validation_profits_df,
         wallet_scores_df
     )

@@ -11,6 +11,7 @@ from dreams_core import core as dc
 import wallet_features.performance_features as wpf
 import wallet_features.trading_features as wtf
 import wallet_features.market_cap_features as wmc
+import wallet_insights.wallet_model_evaluation as wime
 from wallet_modeling.wallets_config_manager import WalletsConfig
 
 # pylint: disable=unused-variable  # messy stats functions in visualizations
@@ -771,73 +772,97 @@ def create_visualizations(df):
     plt.show()
 
 
-
-def analyze_top_performing_coins(df, return_percentile=75):
+def create_performance_analysis_df(df: pd.DataFrame,
+                                 percentile: int = 75) -> pd.DataFrame:
     """
-    Analyzes how wallet and scoring metrics differ between top performing coins and others.
-    Top performers defined as coins with returns >= 75th percentile.
+    Creates a formatted DataFrame comparing metrics between top performing coins and others.
 
-    Args:
-        df: DataFrame with coin metrics including 'coin_return' and scoring metrics
-        return_percentile: Threshold for defining top performers (default 75)
+    Params:
+    - df (DataFrame): DataFrame with coin metrics and returns
+    - percentile (int): Percentile threshold for top performers
 
     Returns:
-        Dict containing statistical comparison of metrics between top performers and others
+    - DataFrame: Analysis results formatted for styling
     """
     # Split coins into performance groups
-    return_threshold = np.percentile(df['coin_return'], return_percentile)
+    return_threshold = np.percentile(df['coin_return'], percentile)
     top_coins = df[df['coin_return'] >= return_threshold]
     other_coins = df[df['coin_return'] < return_threshold]
 
-    # Keep original metric names for consistency
-    metrics_to_analyze = [
+    # Basic size metrics
+    results = {
+        'cohort_size': {
+            'top_quartile': len(top_coins),
+            'other': len(other_coins),
+            'population': len(df)
+        },
+        'cohort_pct': {
+            'top_quartile': len(top_coins) / len(df) * 100,
+            'other': len(other_coins) / len(df) * 100,
+            'population': 100.0
+        }
+    }
+
+    # Core metrics to analyze
+    metrics = [
         'weighted_avg_score',
         'composite_score',
         'top_wallet_balance_pct',
         'top_wallet_count_pct',
-        'score_confidence'
+        'score_confidence',
+        'total_balance',
+        'avg_wallet_balance',
+        'total_wallets',
     ]
 
-    results = {}
-    for metric in metrics_to_analyze:
-        # Calculate group means
-        top_mean = top_coins[metric].mean()
-        other_mean = other_coins[metric].mean()
-
-        # T-test between groups
-        t_stat, p_value = stats.ttest_ind(
-            top_coins[metric].fillna(0),
-            other_coins[metric].fillna(0)
-        )
-
-        # Effect size calculation
-        pooled_std = np.sqrt((top_coins[metric].var() + other_coins[metric].var()) / 2)
-        cohens_d = (top_mean - other_mean) / pooled_std if pooled_std != 0 else 0
-
+    # Calculate medians for each group
+    for metric in metrics:
         results[metric] = {
-            'top_quartile_mean': top_mean,  # mean for coins with returns >= 75th percentile
-            'other_mean': other_mean,       # mean for coins with returns < 75th percentile
-            'abs_diff': top_mean - other_mean,
-            'pct_diff': ((top_mean - other_mean) / other_mean * 100) if other_mean != 0 else 0,
-            'p_value': p_value,
-            'effect_size': cohens_d
+            'top_quartile': top_coins[metric].median(),
+            'other': other_coins[metric].median(),
+            'population': df[metric].median()
         }
 
-    return results
+    # Calculate returns
+    returns_metrics = ['coin_return']
+    for metric in returns_metrics:
+        for stat, func in [('mean', np.mean), ('median', np.median)]:
+            metric_name = f'{metric}_{stat}'
+            results[metric_name] = {
+                'top_quartile': func(top_coins[metric]),
+                'other': func(other_coins[metric]),
+                'population': func(df[metric])
+            }
 
-def print_performance_analysis(df):
-    """
-    Prints formatted comparison of metrics between top performing coins and others.
-    Top performing defined as returns >= 75th percentile.
-    """
-    results = analyze_top_performing_coins(df)
+    # Convert to DataFrame and transpose
+    results_df = pd.DataFrame(results).T
 
-    print(f"\n=== Metric Analysis: Returns >= {75}th percentile vs Others ===")
-    for metric, metric_stats in results.items():
-        print(f"\n{metric}:")
-        print(f"  Top quartile mean (returns >= p75): {metric_stats['top_quartile_mean']:.4f}")
-        print(f"  Other coins mean (returns < p75): {metric_stats['other_mean']:.4f}")
-        print(f"  Absolute difference: {metric_stats['abs_diff']:.4f}")
-        print(f"  Percent difference: {metric_stats['pct_diff']:.1f}%")
-        print(f"  P-value: {metric_stats['p_value']:.4f}")
-        print(f"  Effect size: {metric_stats['effect_size']:.4f}")
+    # Order rows
+    size_metrics = ['cohort_size', 'cohort_pct']
+    core_metrics = metrics
+
+    # Reorder rows
+    ordered_rows = size_metrics + core_metrics
+    results_df = results_df.reindex(ordered_rows)
+
+    return results_df
+
+def create_performance_report(df: pd.DataFrame,
+                            percentile: int = 75) -> pd.DataFrame.style:
+    """
+    Creates a styled performance analysis report.
+
+    Params:
+    - df (DataFrame): DataFrame with coin metrics and returns
+    - percentile (int): Percentile threshold for top performers
+
+    Returns:
+    - styled_df (DataFrame.style): Styled analysis results
+    """
+    # Generate results DataFrame
+    results_df = create_performance_analysis_df(df, percentile)
+
+    # Apply consistent styling
+    styled_df = wime.style_rows(results_df)
+
+    return styled_df
