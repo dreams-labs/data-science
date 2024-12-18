@@ -66,7 +66,7 @@ def retrieve_market_data():
     return market_data_df
 
 
-def detect_price_data_staleness(market_data_df, config, lookback_days=7):
+def detect_price_data_staleness(market_data_df, config):
     """
     Find concerning patterns in data freshness where imputed prices count rises and stays
     high. Issues a logger.warning if issues above the data cleaning flags are detected.
@@ -81,6 +81,8 @@ def detect_price_data_staleness(market_data_df, config, lookback_days=7):
     # Define thresholds
     count_threshold = config['data_cleaning']['price_coverage_warning_min_coin_increase']
     percent_threshold = config['data_cleaning']['price_coverage_warning_min_pct_increase']
+    audit_window=config['data_cleaning']['coverage_decrease_audit_window']
+
 
     # Summarize as daily records
     df = market_data_df.groupby('date')['days_imputed'].count().to_frame()
@@ -92,7 +94,7 @@ def detect_price_data_staleness(market_data_df, config, lookback_days=7):
 
     # Get most recent date and lookback period
     latest_date = df.index.max()
-    lookback_date = latest_date - pd.Timedelta(days=lookback_days)
+    lookback_date = latest_date - pd.Timedelta(days=audit_window)
 
     # Get relevant values
     latest_count = df.loc[latest_date, 'days_imputed']
@@ -110,7 +112,7 @@ def detect_price_data_staleness(market_data_df, config, lookback_days=7):
 
     if count_increase > count_threshold and pct_increase > percent_threshold:
         logging.warning(
-            f"Data freshness issue detected on {latest_date.date()}:\n"
+            f"Price data freshness issue detected on {latest_date.date()}:\n"
             f"- {count_increase:.0f} records have become stale since {min_date.date()}.\n"
             f"- Imputed records increased from {min_pct*100:.1f}% ({recent_min} coins) on {min_date.date()} to "
             f"{latest_pct*100:.1f}% ({latest_count:.0f} coins) on {latest_date.date()}\n"
@@ -435,9 +437,13 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows):
     return profits_df
 
 
-def check_coin_transfers_coverage(profits_df, data_cleaning_config) -> None:
+def check_coin_transfers_staleness(profits_df, data_cleaning_config) -> None:
     """
-    Warns if coin count changes exceed specified thresholds.
+    Warns if recent counts of coins with transfers data has dramatically decreased
+    in recent periods, which could indicate partial data staleness.
+
+    e.g. if  Dune hasn't been updated in 5 days but Ethereum chain transfers have,
+    catastrophic training data inconsistencies will be created.
 
     Params:
     - profits_df (df): df showing coin-wallet-date records where transers exist
@@ -445,25 +451,28 @@ def check_coin_transfers_coverage(profits_df, data_cleaning_config) -> None:
     # Extract thresholds
     count_threshold=data_cleaning_config['transfers_coverage_warning_min_coin_increase'],
     percent_threshold=data_cleaning_config['transfers_coverage_warning_min_pct_increase']
+    audit_window=data_cleaning_config['coverage_decrease_audit_window']
 
     # Create counts of coins with transfers
     daily_counts = profits_df.groupby('date')['coin_id'].nunique().copy()
     latest_count = daily_counts.iloc[-1]
     latest_date = daily_counts.index[-1]
-    cutoff_date = latest_date - pd.Timedelta(days=7)
+    cutoff_date = latest_date - pd.Timedelta(days=audit_window)
     week_data = daily_counts.loc[cutoff_date:]
 
-    count_increase = latest_count - week_data.min()
+    count_decrease = week_data.max() - latest_count
     min_date = week_data.idxmin()
-    pct_increase = count_increase / week_data.min() * 100
+    pct_decrease = count_decrease / week_data.max() * 100
 
-    if count_increase > count_threshold and pct_increase > percent_threshold:
+    if count_decrease > count_threshold and pct_decrease > percent_threshold:
         logging.warning(
-            f"Coin transfers coverage alert on {latest_date.date()}:\n"
-            f"Transfers coverage changed from {week_data.min():.0f} coins ({min_date.date()}) "
+            f"Transfers data coverage alert on {latest_date.date()}:\n"
+            f"- {count_decrease:.0f} coins have become stale since {min_date.date()}."
+            f"- Transfers coverage decreased from {week_data.max():.0f} coins ({min_date.date()}) "
             f"to {latest_count:.0f} coins ({latest_date.date()}), "
-            f"a {pct_increase:.1f}% increase."
+            f"a {pct_decrease:.1f}% decrease."
         )
+
 
 
 @u.timing_decorator
@@ -483,7 +492,7 @@ def clean_profits_df(profits_df, data_cleaning_config):
     """
     # 0. Check coin coverage to see if transfers data may be stale
     # ------------------------------------------------------------
-    check_coin_transfers_coverage(profits_df,data_cleaning_config)
+    check_coin_transfers_staleness(profits_df,data_cleaning_config)
 
 
     # 1. Calculate total inflows for each wallet across all coins

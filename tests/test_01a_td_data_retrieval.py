@@ -389,6 +389,7 @@ def sample_data_cleaning_config():
     return {
         'max_wallet_coin_profits': 7500,
         'max_wallet_inflows': 15000,
+        'coverage_decrease_audit_window': 1,
         'price_coverage_warning_min_coin_increase': 999,
         'price_coverage_warning_min_pct_increase': 1.0,
         'transfers_coverage_warning_min_coin_increase': 999,

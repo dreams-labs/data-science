@@ -1,6 +1,3 @@
-"""
-Calculates metrics aggregated at the wallet level
-"""
 import logging
 from typing import List,Dict
 import pandas as pd
@@ -43,12 +40,14 @@ class RegressionEvaluator:
         _plot_residuals_distribution(ax): Plots histogram of residuals
         _plot_feature_importance(ax): Plots feature importance if available from model
     """
-    def __init__(self, y_true, y_pred, model=None, feature_names=None):
+    def __init__(self, y_train, y_true, y_pred, model=None, feature_names=None):
         """
         Initialize the evaluator with actual and predicted values.
 
         Parameters:
         -----------
+        y_train : array-like
+            Training set values (used for reporting)
         y_true : array-like
             Actual target values
         y_pred : array-like
@@ -58,6 +57,7 @@ class RegressionEvaluator:
         feature_names : list, optional
             List of feature names for feature importance plot
         """
+        self.y_train = np.array(y_train)
         self.y_true = np.array(y_true)
         self.y_pred = np.array(y_pred)
         self.model = model
@@ -68,6 +68,10 @@ class RegressionEvaluator:
     def _calculate_metrics(self):
         """Calculate all regression metrics."""
         self.metrics = {}
+
+        # Add sample counts
+        self.metrics['train_samples'] = len(self.y_train)  # Add this line
+        self.metrics['test_samples'] = len(self.y_pred)   # Add this line
 
         # Basic metrics
         self.metrics['mse'] = mean_squared_error(self.y_true, self.y_pred)
@@ -115,6 +119,7 @@ class RegressionEvaluator:
         """
         summary = [
             "Model Performance Summary",
+            f"Train {self.metrics['train_samples']:,d} | Test {self.metrics['test_samples']:,d}",
             "=" * 25,
             f"R² Score:                    {self.metrics['r2']:.3f}",
             f"RMSE:                        {self.metrics['rmse']:.3f}",
@@ -539,9 +544,15 @@ def create_cluster_report(modeling_df, model_results, n, comparison_metrics):
     - styled_df (pandas.io.formats.style.Styler): a pretty df with metrics
 
     """
-    # Create df that includes comparison metrics and all cluster feature columns
+    # Create df that includes base metrics, all cluster columns, and param comparison metrics
+    base_metrics = [
+        'trading_max_investment_all_windows',
+        'trading_total_net_flows_all_windows',
+        'performance_return_all_windows',
+        'mktcap_portfolio_wtd_market_cap_all_windows',
+    ]
     cluster_cols = [col for col in modeling_df.columns if col.startswith('cluster_')]
-    cluster_analysis_df = modeling_df[cluster_cols + comparison_metrics].copy()
+    cluster_analysis_df = modeling_df[list(set(cluster_cols + base_metrics + comparison_metrics))].copy()
 
     # Assign wallets to categorical clusters based on the distance values
     cluster_analysis_df = assign_clusters_from_distances(cluster_analysis_df,
@@ -551,7 +562,7 @@ def create_cluster_report(modeling_df, model_results, n, comparison_metrics):
     cluster_profiles = analyze_cluster_metrics(
         cluster_analysis_df,
         wallets_config['features']['clustering_n_clusters'],
-        comparison_metrics
+        list(set(base_metrics + comparison_metrics))
     )
 
     # Assess model performance in the test set of each cluster
@@ -569,10 +580,10 @@ def create_cluster_report(modeling_df, model_results, n, comparison_metrics):
     size_metrics = ['cluster_size', 'cluster_pct']
     perf_metrics = ['r2', 'rmse', 'mae', 'mape', 'explained_variance']
     remaining_metrics = [col for col in cluster_results_df.index
-                        if col not in size_metrics + perf_metrics]
+                        if col not in size_metrics + perf_metrics + base_metrics]
 
     # Reorder the rows
-    ordered_rows = size_metrics + perf_metrics + remaining_metrics
+    ordered_rows = (size_metrics + base_metrics + perf_metrics + remaining_metrics)
     cluster_results_df = cluster_results_df.reindex(ordered_rows)
 
     styled_df = style_rows(cluster_results_df)
