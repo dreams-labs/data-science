@@ -627,7 +627,7 @@ def obj_mem() -> pd.DataFrame:
     - mem_df (DataFrame): Memory stats with object names and sizes
     """
     # Get current frame's variables
-    frame = sys._getframe()
+    frame = sys._getframe()  # pylint:disable=protected-access
     variables: Dict = {}
 
     # Check all frames up to module level
@@ -652,15 +652,13 @@ def obj_mem() -> pd.DataFrame:
                     'size_mb': round(size / (1024 * 1024),1),
                     'shape': str(shape) if shape else None
                 })
-        except:
+        except:    # pylint:disable=bare-except
             continue
 
     # Convert to sorted dataframe and remove objects below 10 MB
     mem_df = pd.DataFrame(objects)
     mem_df = mem_df[mem_df['size_mb']>=5]
     mem_df = mem_df.sort_values('size_mb', ascending=False).reset_index(drop=True)
-    mem_df
-
 
     return mem_df
 
@@ -789,7 +787,7 @@ def export_code(
 
     Params:
     - parent_directory (str): Base directory for the code directories to consolidate.
-    - code_directories (list): List of subdirectories (relative to parent_directory) containing .py files to consolidate.
+    - code_directories (list): List of subdirectories containing .py files to consolidate.
     - include_config (bool): Whether to include the config files in the export
     - config_directory (str): Path to the directory containing .yaml config files.
     - notebook_directory (str): Path to the directory containing the Jupyter Notebook (optional).

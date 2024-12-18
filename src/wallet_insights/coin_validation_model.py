@@ -21,7 +21,6 @@ wallets_config = WalletsConfig()
 
 
 def prepare_features_and_targets(
-    coin_validation_df: pd.DataFrame,
     modeling_profits_df: pd.DataFrame,
     modeling_market_data_df: pd.DataFrame,
     wallet_scores_df: pd.DataFrame
