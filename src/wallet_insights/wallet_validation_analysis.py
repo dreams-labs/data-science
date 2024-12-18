@@ -113,6 +113,7 @@ def analyze_cohort_performance(performance_df: pd.DataFrame,
 
     return results_df
 
+
 def create_cohort_report(performance_df: pd.DataFrame,
                         cohort_dict: Dict[str, List[str]],
                         comparison_metrics: List[str],
@@ -143,74 +144,92 @@ def create_cohort_report(performance_df: pd.DataFrame,
     return styled_df
 
 
-def create_prediction_cohorts(y_pred: pd.Series,
-                            n_bands: int = 5) -> Dict[str, List[str]]:
+def create_prediction_quantiles(
+    model_scores: pd.Series,
+    num_quantiles: int = 5
+) -> Dict[str, List[str]]:
     """
-    Creates cohorts based on prediction score ranges.
+    Splits wallets into equal-sized groups based on their prediction scores.
 
     Params:
-    - y_pred (Series): Predicted values, indexed by wallet_address
-    - n_bands (int): Number of bands to split predictions into
+    - model_scores (Series): Prediction scores (0-1) indexed by wallet_address
+    - num_quantiles (int): Number of equal-sized groups to create
 
     Returns:
-    - Dict mapping band names to lists of wallet addresses
+    - Dict mapping quantile names to lists of wallet addresses, including:
+        - quantile_1 through quantile_N: Wallets in each quantile (lowest to highest)
+        - all_wallets: All wallet addresses
     """
-    # Calculate band boundaries
-    quantiles = np.linspace(0, 1, n_bands + 1)
-    boundaries = np.quantile(y_pred, quantiles)
+    labels = [f'quantile_{i+1}' for i in range(num_quantiles)]
+    wallet_quantiles = pd.qcut(model_scores, num_quantiles, labels=labels)
 
-    # Initialize cohorts
-    cohorts = {}
+    quantile_groups = {
+        label: model_scores[wallet_quantiles == label].index.tolist()
+        for label in labels
+    }
+    quantile_groups['all_wallets'] = model_scores.index.tolist()
 
-    # Create each band
-    for i in range(n_bands):
-        band_name = f"pred_{i+1}"
-        if i == 0:
-            mask = (y_pred >= boundaries[i]) & (y_pred <= boundaries[i+1])
-        else:
-            mask = (y_pred > boundaries[i]) & (y_pred <= boundaries[i+1])
-        cohorts[band_name] = y_pred[mask].index.tolist()
+    return quantile_groups
 
-    # Add full population
-    cohorts['population'] = y_pred.index.tolist()
-
-    return cohorts
-
-
-def analyze_prediction_bands(validation_performance_df: pd.DataFrame,
-                           y_pred: pd.Series,
-                           metrics: List[str],
-                           n_bands: int = 5,
-                           min_activity_threshold: float = 100) -> pd.DataFrame.style:
+def create_quantile_report(
+    wallet_metrics: pd.DataFrame,
+    model_scores: pd.Series,
+    metrics_to_compare: List[str],
+    num_quantiles: int = 5,
+    min_wallet_volume_usd: float = 100
+) -> pd.DataFrame.style:
     """
-    Analyzes performance across prediction score bands.
+    Creates a styled report comparing metrics across prediction score quantiles.
 
     Params:
-    - validation_performance_df (DataFrame): Validation period performance metrics
-    - y_pred (Series): Model predictions
-    - metrics (List[str]): Metrics to analyze
-    - n_bands (int): Number of prediction bands to create
-    - min_activity_threshold (float): Minimum activity threshold
+    - wallet_metrics (DataFrame): Performance metrics for each wallet
+    - model_scores (Series): Prediction scores (0-1) indexed by wallet_address
+    - metrics_to_compare (List[str]): Metrics to analyze
+    - num_quantiles (int): Number of equal-sized quantiles to create
+    - min_wallet_volume_usd (float): Minimum USD volume to include wallet
 
     Returns:
-    - styled_df (DataFrame.style): Styled analysis results
+    - styled_df (DataFrame.style): Styled comparison table
     """
-    # Create prediction-based cohorts
-    pred_cohorts = create_prediction_cohorts(y_pred, n_bands)
+    # Ensure indices match before filtering
+    common_wallets = wallet_metrics.index.intersection(model_scores.index)
+    wallet_metrics = wallet_metrics.loc[common_wallets]
+    model_scores = model_scores[common_wallets]
 
-    # Add mean prediction to results
-    validation_performance_df = validation_performance_df.copy()
-    validation_performance_df['predicted_score'] = y_pred
+    # Filter for minimum activity
+    active_wallets = wallet_metrics[
+        wallet_metrics['total_volume'] >= min_wallet_volume_usd
+    ].index
 
-    # Add to base metrics
-    metrics = ['predicted_score'] + metrics
+    # Filter scores for active wallets
+    active_scores = model_scores[active_wallets]
 
-    # Generate report
-    styled_df = create_cohort_report(
-        validation_performance_df,
-        pred_cohorts,
-        metrics,
-        min_activity_threshold
-    )
+    # Create quantile groups from active wallets
+    wallet_groups = create_prediction_quantiles(active_scores, num_quantiles)
+
+    results = []
+    for group_name, wallet_list in wallet_groups.items():
+        group_data = {'group': group_name}
+
+        # Add size metrics
+        group_data['wallets_count'] = len(wallet_list)
+        group_data['pct_of_wallets'] = (
+            len(wallet_list) / len(active_wallets) * 100
+        )
+
+        # Add average prediction score
+        group_data['avg_pred_score'] = active_scores[wallet_list].mean()
+
+        # Add performance metrics
+        for metric in metrics_to_compare:
+            group_data[metric] = wallet_metrics.loc[
+                wallet_list, metric
+            ].mean()
+
+        results.append(group_data)
+
+    # Convert to DataFrame and transpose
+    results_df = pd.DataFrame(results).set_index('group').T
+    styled_df = wime.style_rows(results_df)
 
     return styled_df
