@@ -168,6 +168,7 @@ def generate_and_save_model_artifacts(model_results, base_path):
         y_train=model_results['y_train'],
         y_true=model_results['y_test'],
         y_pred=model_results['y_pred'],
+        training_cohort_pred=model_results['training_cohort_pred'],
         model=model,
         feature_names=model_results['X_train'].columns.tolist()
     )

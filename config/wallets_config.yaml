@@ -66,7 +66,7 @@ modeling:
     target_variable: "size_adjusted_rank"
     target_var_params:
         performance_score_return_weight: 0.6
-    returns_winsorization: 0.02
+    returns_winsorization: 0.01
     drop_columns: []
 
     # Model specifics

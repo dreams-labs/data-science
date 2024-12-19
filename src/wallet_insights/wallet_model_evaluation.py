@@ -40,7 +40,7 @@ class RegressionEvaluator:
         _plot_residuals_distribution(ax): Plots histogram of residuals
         _plot_feature_importance(ax): Plots feature importance if available from model
     """
-    def __init__(self, y_train, y_true, y_pred, model=None, feature_names=None):
+    def __init__(self, y_train, y_true, y_pred, training_cohort_pred, model=None, feature_names=None):
         """
         Initialize the evaluator with actual and predicted values.
 
@@ -60,20 +60,23 @@ class RegressionEvaluator:
         self.y_train = np.array(y_train)
         self.y_true = np.array(y_true)
         self.y_pred = np.array(y_pred)
+        self.training_cohort_pred = np.array(training_cohort_pred)
         self.model = model
         self.feature_names = feature_names
         self.metrics = None
+        self.custom_cmap = None
         self._calculate_metrics()
 
+
     def _calculate_metrics(self):
-        """Calculate all regression metrics."""
+        """Calculate all regression metrics including cohort comparisons."""
         self.metrics = {}
 
         # Add sample counts
-        self.metrics['train_samples'] = len(self.y_train)  # Add this line
-        self.metrics['test_samples'] = len(self.y_pred)   # Add this line
+        self.metrics['train_samples'] = len(self.y_train)
+        self.metrics['test_samples'] = len(self.y_pred)
 
-        # Basic metrics
+        # Basic regression metrics
         self.metrics['mse'] = mean_squared_error(self.y_true, self.y_pred)
         self.metrics['rmse'] = np.sqrt(self.metrics['mse'])
         self.metrics['mae'] = mean_absolute_error(self.y_true, self.y_pred)
@@ -81,33 +84,43 @@ class RegressionEvaluator:
         self.metrics['r2'] = r2_score(self.y_true, self.y_pred)
         self.metrics['explained_variance'] = explained_variance_score(self.y_true, self.y_pred)
 
-        # Additional statistical metrics
+        # Residuals analysis
         self.residuals = self.y_true - self.y_pred
         self.metrics['residuals_mean'] = np.mean(self.residuals)
         self.metrics['residuals_std'] = np.std(self.residuals)
 
-        # Calculate prediction intervals
+        # Prediction intervals
         z_score = 1.96  # 95% confidence interval
         self.metrics['prediction_interval_95'] = z_score * self.metrics['residuals_std']
 
-        # Calculate and sort feature importances if available
+        # Cohort comparison metrics
+        self.metrics['cohort_comparison'] = {
+            'modeling_mean': np.mean(self.y_pred),
+            'modeling_std': np.std(self.y_pred),
+            'modeling_q25': np.percentile(self.y_pred, 25),
+            'modeling_q75': np.percentile(self.y_pred, 75),
+            'training_mean': np.mean(self.training_cohort_pred),
+            'training_std': np.std(self.training_cohort_pred),
+            'training_q25': np.percentile(self.training_cohort_pred, 25),
+            'training_q75': np.percentile(self.training_cohort_pred, 75)
+        }
+
+        # Calculate feature importances if available
         if self.model is not None and hasattr(self.model, 'feature_importances_'):
             importances = self.model.feature_importances_
             if self.feature_names is None:
                 self.feature_names = [f'Feature {i}' for i in range(len(importances))]
 
-            # Create list of (feature, importance) pairs and sort by importance
+            # Sort feature importances
             feature_importance_pairs = list(zip(self.feature_names, importances))
             feature_importance_pairs.sort(key=lambda x: x[1], reverse=True)
-
-            # Unzip the sorted pairs
             sorted_features, sorted_values = zip(*feature_importance_pairs)
 
-            # Store sorted values
             self.metrics['importances'] = {
-                'feature': list(sorted_features),  # Convert tuple to list
-                'importance': list(sorted_values)      # Convert tuple to list
+                'feature': list(sorted_features),
+                'importance': list(sorted_values)
             }
+
 
 
     def summary_report(self):
@@ -185,18 +198,8 @@ class RegressionEvaluator:
 
 
     def plot_evaluation(self, plot_type='all', display=True):
-        """
-        Generate and display specific evaluation plots.
-
-        Parameters:
-        -----------
-        plot_type : str
-            Type of plot to display: 'actual_vs_predicted', 'residuals',
-            'residuals_dist', 'feature_importance', or 'all'
-        display : bool, default=True
-            If True, displays the plot using plt.show(). If False, returns the figure.
-        """
-        # Dark mode charts
+        """Generate evaluation plots with updated layout."""
+        # Dark mode styling
         plt.rcParams['figure.facecolor'] = '#181818'
         plt.rcParams['axes.facecolor'] = '#181818'
         plt.rcParams['text.color'] = '#afc6ba'
@@ -205,8 +208,8 @@ class RegressionEvaluator:
         plt.rcParams['ytick.color'] = '#afc6ba'
         plt.rcParams['axes.titlecolor'] = '#afc6ba'
 
-        # Create custom colormap that starts from background color
-        self.custom_cmap = mcolors.LinearSegmentedColormap.from_list(  # pylint:disable=attribute-defined-outside-init
+        # Custom colormap
+        self.custom_cmap = mcolors.LinearSegmentedColormap.from_list(
             'custom_blues', ['#181818', '#145a8d', '#69c4ff']
         )
 
@@ -214,23 +217,25 @@ class RegressionEvaluator:
             fig = plt.figure(figsize=(15, 12))
             gs = plt.GridSpec(2, 2, height_ratios=[1, 1], width_ratios=[1, 1])
 
-            ax1 = fig.add_subplot(gs[0, 0])
-            ax2 = fig.add_subplot(gs[0, 1])
-            ax3 = fig.add_subplot(gs[1, 0])
-            ax4 = fig.add_subplot(gs[1, 1])
+            # Create subplots
+            ax1 = fig.add_subplot(gs[0, 0])  # Actual vs Predicted
+            ax2 = fig.add_subplot(gs[0, 1])  # Residuals vs Predicted
+            ax3 = fig.add_subplot(gs[1, 0])  # Cohort Comparison
+            ax4 = fig.add_subplot(gs[1, 1])  # Feature Importance
 
             self._plot_actual_vs_predicted(ax1)
             self._plot_residuals(ax2)
-            self._plot_residuals_distribution(ax3)
+            self._plot_cohort_comparison(ax3)  # New cohort comparison plot
             self._plot_feature_importance(ax4)
         else:
+            # Individual plot handling remains the same
             fig, ax = plt.subplots(figsize=(8, 6))
             if plot_type == 'actual_vs_predicted':
                 self._plot_actual_vs_predicted(ax)
             elif plot_type == 'residuals':
                 self._plot_residuals(ax)
-            elif plot_type == 'residuals_dist':
-                self._plot_residuals_distribution(ax)
+            elif plot_type == 'cohort_comparison':
+                self._plot_cohort_comparison(ax)
             elif plot_type == 'feature_importance':
                 self._plot_feature_importance(ax)
 
@@ -240,6 +245,7 @@ class RegressionEvaluator:
             plt.show()
             return None
         return fig
+
 
     def _plot_actual_vs_predicted(self, ax):
         """Plot actual vs predicted values using hexbin without colorbar."""
@@ -271,6 +277,7 @@ class RegressionEvaluator:
         ax.set_ylabel('Predicted Values')
         ax.set_title('Actual vs Predicted Values')
 
+
     def _plot_residuals(self, ax):
         """Plot residuals vs predicted values using hexbin without colorbar."""
         # Create hexbin plot
@@ -287,13 +294,30 @@ class RegressionEvaluator:
         ax.set_ylabel('Residuals')
         ax.set_title('Residuals vs Predicted Values')
 
-    def _plot_residuals_distribution(self, ax):
-        """Plot distribution of residuals."""
-        sns.histplot(self.residuals, kde=True, ax=ax)
-        ax.set_title('Distribution of Residuals')
+
+    def _plot_cohort_comparison(self, ax):
+        """Plot density comparison of modeling vs training cohort predictions."""
+        # Create KDE plots for both distributions
+        sns.kdeplot(data=self.y_pred, ax=ax, label='Modeling Cohort', color='#69c4ff')
+        sns.kdeplot(data=self.training_cohort_pred, ax=ax, label='Training Cohort', color='#ff6969')
+
+        # Add mean lines
+        ax.axvline(np.mean(self.y_pred), color='#69c4ff', linestyle='--', alpha=0.5)
+        ax.axvline(np.mean(self.training_cohort_pred), color='#ff6969', linestyle='--', alpha=0.5)
+
+        # Add quartile markers
+        for q in [25, 75]:
+            ax.axvline(np.percentile(self.y_pred, q), color='#69c4ff', linestyle=':', alpha=0.3)
+            ax.axvline(np.percentile(self.training_cohort_pred, q), color='#ff6969', linestyle=':', alpha=0.3)
+
+        ax.set_title('Score Distribution by Cohort')
+        ax.set_xlabel('Predicted Values')
+        ax.set_ylabel('Density')
+        ax.legend()
+
 
     def _plot_feature_importance(self, ax):
-        """Plot feature importance if available with color-coded feature prefixes."""
+        """Plot feature importance with inset legend."""
         if 'importances' in self.metrics:
             # Create DataFrame with feature prefixes
             df = pd.DataFrame(self.metrics['importances']).head(20)
@@ -303,7 +327,7 @@ class RegressionEvaluator:
             unique_prefixes = df['prefix'].unique()
             palette = dict(zip(unique_prefixes, sns.color_palette("husl", len(unique_prefixes))))
 
-            # Plot using hue instead of explicit colors
+            # Plot using hue
             sns.barplot(
                 data=df,
                 x='importance',
@@ -313,15 +337,15 @@ class RegressionEvaluator:
                 palette=palette
             )
 
-            # Adjust legend position
-            ax.legend(title='Feature Type', bbox_to_anchor=(1.05, 1), loc='upper left')
+            # Move legend inside plot
+            ax.legend(title='Feature Type', loc='lower right', bbox_to_anchor=(0.98, 0.02))
 
             ax.set_xlabel('Importance')
             ax.set_ylabel('Feature')
             ax.set_title('Top 20 Feature Importances')
         else:
-            ax.text(0.5, 0.5, 'Feature Importance Not Available',
-                ha='center', va='center')
+            ax.text(0.5, 0.5, 'Feature Importance Not Available', ha='center', va='center')
+
 
 
 
