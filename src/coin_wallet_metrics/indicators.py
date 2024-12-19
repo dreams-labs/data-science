@@ -179,7 +179,10 @@ def add_market_data_dualcolumn_indicators(market_data_df):
     Adds multi-column indicators to market_data_df
     """
     market_data_df = add_mfi_column(market_data_df, price_col='price', volume_col='volume', window=14)
+    logger.info("Generated mfi time series column...")
+
     market_data_df['obv'] = generalized_obv(market_data_df['price'], market_data_df['volume'])
+    logger.info("Generated obv time series column...")
 
     return market_data_df
 
