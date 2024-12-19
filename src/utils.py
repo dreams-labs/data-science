@@ -576,6 +576,34 @@ def safe_downcast(df, column, dtype):
     return df
 
 
+def assert_period(config, df: pd.DataFrame, period: str) -> None:
+    """
+    Validates if DataFrame dates fall within configured period boundaries.
+
+    Params:
+    - config (dict): config with dates in the 'training_data' section
+    - df (DataFrame): Input DataFrame with 'date' column
+    - period (str): Period type ('training'/'modeling'/'validation')
+
+    Raises:
+    - ValueError: If dates fall outside period boundaries
+    """
+    config = config['training_data']
+    period_start = pd.to_datetime(config[f"{period}_period_start"])
+    period_end = pd.to_datetime(config[f"{period}_period_end"])
+
+    # Vectorized min/max comparison
+    df_min = df['date'].min()
+    df_max = df['date'].max()
+
+    if df_min < period_start or df_max > period_end:
+        raise ValueError(
+            f"Data outside {period} period boundaries.\n"
+            f"Data range: {df_min} to {df_max}\n"
+            f"Period bounds: {period_start} to {period_end}"
+        )
+
+
 def cw_filter_df(df, coin_id, wallet_address):
     """
     Filter DataFrame by coin_id and wallet_address.

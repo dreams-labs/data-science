@@ -5,15 +5,18 @@ Orchestrates groups of functions to generate wallet model pipeline
 import time
 import logging
 from concurrent.futures import ThreadPoolExecutor
+import pandas as pd
 from dreams_core import core as dc
 
 # Local module imports
 import training_data.data_retrieval as dr
 import training_data.profits_row_imputation as pri
+import coin_wallet_metrics.indicators as ind
 import wallet_modeling.wallet_training_data as wtd
 import wallet_features.trading_features as wtf
 import wallet_features.market_cap_features as wmc
 from wallet_modeling.wallets_config_manager import WalletsConfig
+import utils as u
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -22,7 +25,7 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 
 
-
+@u.timing_decorator
 def retrieve_period_datasets(start_date,end_date,
                              parquet_prefix=None,parquet_folder="temp/wallet_modeling_dfs"):
     """
@@ -102,7 +105,7 @@ def retrieve_period_datasets(start_date,end_date,
     # If a parquet file location is specified, store the files there and return nothing
     if parquet_prefix:
         # Store profits
-        profits_file = f"{parquet_folder}/{parquet_prefix}_profits_full.parquet"
+        profits_file = f"{parquet_folder}/{parquet_prefix}_profits_df_full.parquet"
         profits_df.to_parquet(profits_file,index=False)
         logger.info(f"Stored profits_df with shape {profits_df.shape} to {profits_file}.")
 
@@ -117,7 +120,7 @@ def retrieve_period_datasets(start_date,end_date,
         return profits_df,market_data_df
 
 
-
+@u.timing_decorator
 def define_wallet_cohort(profits_df,market_data_df):
     """
     Applies transformations and filters to identify wallets that pass data cleaning filters
@@ -155,6 +158,7 @@ def define_wallet_cohort(profits_df,market_data_df):
 
 
 
+@u.timing_decorator
 def split_profits_df(training_profits_df,training_market_data_df,wallet_cohort):
     """
     Adds imputed rows at the start and end date of all windows
@@ -177,6 +181,61 @@ def split_profits_df(training_profits_df,training_market_data_df,wallet_cohort):
 
 
 
+@u.timing_decorator
+def generate_training_indicators_df(training_market_data_df_full,wallets_metrics_config,
+                                    parquet_filename="training_market_indicators_data_df",
+                                    parquet_folder="temp/wallet_modeling_dfs"):
+    """
+    Adds the configured indicators to the training period market_data_df and stores it
+    as a parquet file by default (or returns it).
+
+    Default save location: temp/wallet_modeling_dfs/market_indicators_data_df.parquet
+
+    Params:
+    - training_market_data_df_full (df): market_data_df with complete historical data, because indicators can
+        have long lookback periods (e.g. SMA 200)
+    - wallets_metrics_config (dict): metrics_config.py compatible metrics definitions
+    - parquet_file, parquet_folder (strings): if these have values, the output df will be saved to this
+        location instead of being returned
+
+    Returns:
+    - market_indicators_data_df (df): market_data_df for the training period only
+    """
+    # Validate date range
+    training_period_end = wallets_config['training_data']['training_period_end']
+    latest_market_data_record = training_market_data_df_full['date'].max()
+    if latest_market_data_record > pd.to_datetime(training_period_end):
+        raise ValueError(
+            f"Detected data after the end of the training period in training_market_data_df_full."
+            f"Latest record found: {latest_market_data_record} vs period end of {training_period_end}"
+        )
+
+    # Adds time series ratio metrics that can have additional indicators applied to them
+    market_indicators_data_df = ind.add_market_data_dualcolumn_indicators(training_market_data_df_full)
+
+    # Adds indicators to all configured time series
+    market_indicators_data_df = ind.generate_time_series_indicators(market_indicators_data_df,
+                                                            wallets_metrics_config['time_series']['market_data'],
+                                                            'coin_id')
+
+    # Filters out pre-training period records now that we've computed lookback and rolling metrics
+    market_indicators_data_df = market_indicators_data_df[market_indicators_data_df['date']
+                                                        >=wallets_config['training_data']['training_period_start']]
+
+    # If a parquet file location is specified, store the files there and return nothing
+    if parquet_filename:
+        parquet_filepath = f"{parquet_folder}/{parquet_filename}.parquet"
+        market_indicators_data_df.to_parquet(parquet_filepath,index=False)
+        logger.info(f"Stored market_indicators_data_df with shape {market_indicators_data_df.shape} "
+                    f"to {parquet_filepath}.")
+
+    # If no parquet file is configured then return the df
+    else:
+        return market_indicators_data_df
+
+
+
+@u.timing_decorator
 def filter_modeling_period_wallets(modeling_period_profits_df):
     """
     Applies data cleaning filters to remove modeling period wallets without sufficient activity
@@ -214,5 +273,8 @@ def filter_modeling_period_wallets(modeling_period_profits_df):
     logger.info("Removed %s/%s wallets with modeling period transaction days below %s.",
                 base_wallets - len(modeling_wallets_df), base_wallets,
                 min_modeling_transaction_days)
+
+    logger.info("Selected wallet cohort of %s using %0.2f%% the %s training cohort wallets.",
+                len(modeling_wallets_df), 100*len(modeling_wallets_df)/base_wallets, base_wallets)
 
     return modeling_wallets_df

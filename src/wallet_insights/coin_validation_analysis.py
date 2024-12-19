@@ -84,7 +84,7 @@ def calculate_validation_metrics(X_test, y_pred, validation_profits_df, n_bucket
 
 
 
-def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scores_df):
+def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scores_df, modeling_market_data_df):
     """
     Consolidates wallet scores and metrics to coin-level metrics, creating a comprehensive
     metrics system that considers wallet quality, balance distribution, and activity levels.
@@ -216,6 +216,15 @@ def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scor
                                                     / coin_wallet_metrics_df['total_wallets'])
     coin_wallet_metrics_df['score_confidence'] = 1 - (
         1 / np.sqrt(coin_wallet_metrics_df['total_wallets'] + 1))  # Added +1 to avoid division by zero
+
+
+    # Append the market cap at the end of the modeling period
+    modeling_end_market_cap_df = modeling_market_data_df[modeling_market_data_df['date']
+                                                     ==wallets_config['training_data']['modeling_period_end']]
+
+    modeling_end_market_cap_df = modeling_end_market_cap_df.set_index('coin_id')
+    modeling_end_market_cap_df = modeling_end_market_cap_df[['market_cap','market_cap_imputed','market_cap_filled']]
+    coin_wallet_metrics_df = coin_wallet_metrics_df.join(modeling_end_market_cap_df, how='inner')
 
 
     # 3. Apply filters based on wallets_config
