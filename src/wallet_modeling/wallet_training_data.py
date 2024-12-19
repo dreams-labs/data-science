@@ -20,31 +20,31 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 
 
-def generate_training_window_dates():
+
+def generate_training_window_boundary_dates():
     """
-    Generates a list of all dates that need imputation, including the first
-    and last date of each training window and modeling period.
+    Generates a list of all dates that need imputation. Each period needs:
+    1. an imputed row as of the balance end date
+    2. an imputed row as of the period end date
+
+    Because the period end date for window 1 is the same as the balance end date for window 2,
+    we only need to impute one new row per window.
 
     Returns:
-    - imputation_dates (list): list that includes all start and end dates
+    - window_boundary_dates (list): list that includes all starting balance and end dates
+
     """
-    # Extract all window start dates
-    window_start_dates = sorted([datetime.strptime(date, "%Y-%m-%d")
+    # Make a list of the starting balance dates for all windows
+    window_boundary_dates = sorted([
+                    datetime.strptime(date, "%Y-%m-%d") - timedelta(days=1)
                     for date in wallets_config['training_data']['training_window_starts']
                     ])
 
-    # Generate the output array
-    imputation_dates = [window_start_dates[0].strftime("%Y-%m-%d")]  # Include the first date
-    for i in range(1, len(window_start_dates)):
-        # Append the day before each window start
-        imputation_dates.append((window_start_dates[i] - timedelta(days=1)).strftime("%Y-%m-%d"))
-        # Append window start date
-        imputation_dates.append(window_start_dates[i].strftime("%Y-%m-%d"))
+    # Add the end date for the final window
+    final_window_end_date = datetime.strptime(wallets_config['training_data']['training_period_end'], "%Y-%m-%d")
+    window_boundary_dates = [window_boundary_dates + [final_window_end_date]]
 
-    # Append training period end
-    imputation_dates.append(wallets_config['training_data']['training_period_end'])
-
-    return imputation_dates
+    return window_boundary_dates
 
 
 
@@ -55,6 +55,7 @@ def apply_wallet_thresholds(wallet_metrics_df):
     Params:
     - wallet_metrics_df (df): dataframe with index wallet_address and columns with
         metrics that the filters will be applied to
+
     """
     # Extract thresholds
     min_coins = wallets_config['data_cleaning']['min_coins_traded']
@@ -141,6 +142,7 @@ def split_training_window_dfs(training_profits_df):
     Returns:
     - training_profits_df (list of dfs): list of profits_dfs for each training window
     - training_windows_dfs (list of dfs): list of profits_dfs for each training window
+
     """
     logger.info("Generating window-specific profits_dfs...")
 
@@ -188,6 +190,7 @@ def upload_wallet_cohort(wallet_cohort):
 
     Params:
     - wallet_cohort (np.array): the wallet_ids included in the cohort
+
     """
     # generate upload_df from input df
     upload_df = pd.DataFrame()
