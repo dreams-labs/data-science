@@ -17,21 +17,21 @@ from wallet_modeling.wallets_config_manager import WalletsConfig
 
 logger = logging.getLogger(__name__)
 
-def get_wallet_addresses():
+def get_training_cohort_addresses():
     """
-    Retrieves wallet addresses for the current modeling cohort from BigQuery.
+    Retrieves wallet addresses for the full training cohort from BigQuery.
 
     Returns:
     - pd.DataFrame: DataFrame containing wallet_id and wallet_address mappings
     """
     wallet_query = """
     select wc.wallet_id, wi.wallet_address
-    from `temp.wallet_modeling_cohort` wc
+    from `temp.wallet_modeling_training_cohort` wc  # Update table name
     join `reference.wallet_ids` wi on wi.wallet_id = wc.wallet_id
     """
     wallet_addresses_df = dgc().run_sql(wallet_query)
+    logger.debug(f"Retrieved training cohort of {len(wallet_addresses_df)} wallet addresses")
 
-    logger.debug(f"Retrieved {len(wallet_addresses_df)} wallet addresses")
     return wallet_addresses_df
 
 
@@ -73,7 +73,7 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path):
     base_dir = Path(base_path)
 
     # Create necessary directories
-    for dir_name in ['model_reports', 'wallet_scores', 'coin_metrics']:
+    for dir_name in ['model_reports', 'wallet_scores']:
         (base_dir / dir_name).mkdir(parents=True, exist_ok=True)
 
 
@@ -81,10 +81,7 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path):
     report = {
         'model_id': model_id,
         'timestamp': model_time.isoformat(),
-        'training_data': {
-            'n_samples': model_results['X'].shape[0] if 'X' in model_results else None,
-            'n_features': model_results['X'].shape[1] if 'X' in model_results else None
-        },
+        'training_data': model_results['training_data'],
         'configurations': configs,
         'evaluation': evaluation_dict
     }
@@ -94,11 +91,12 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path):
         json.dump(report, f, indent=2, default=numpy_type_converter)
     logger.info(f"Saved model report to {report_path}")
 
-    # 2. Get wallet addresses and save wallet scores
-    wallet_addresses = get_wallet_addresses()
+    # Update wallet scores section
+    wallet_addresses = get_training_cohort_addresses()
     wallet_scores_df = pd.DataFrame({
-        'wallet_id': model_results['y_test'].index,
-        'score': model_results['y_pred']
+        'wallet_id': model_results['training_cohort_pred'].index,
+        'score': model_results['training_cohort_pred'],
+        'in_modeling_cohort': model_results['training_cohort_pred'].index.isin(model_results['y_test'].index)
     })
     wallet_scores_df = wallet_scores_df.merge(
         wallet_addresses,
@@ -125,7 +123,6 @@ def load_model_artifacts(model_id, base_path):
     - dict: Dictionary containing:
         - report: Model report dictionary
         - wallet_scores: DataFrame of wallet-level scores
-        - coin_metrics: DataFrame of coin-level metrics
     """
     base_dir = Path(base_path)
 
@@ -138,14 +135,9 @@ def load_model_artifacts(model_id, base_path):
     wallet_scores_path = base_dir / 'wallet_scores' / f"wallet_scores_{model_id}.csv"
     wallet_scores = pd.read_csv(wallet_scores_path)
 
-    # Load coin metrics
-    coin_metrics_path = base_dir / 'coin_metrics' / f"coin_metrics_{model_id}.csv"
-    coin_metrics = pd.read_csv(coin_metrics_path, index_col=0)
-
     return {
         'report': report,
         'wallet_scores': wallet_scores,
-        'coin_metrics': coin_metrics
     }
 
 
@@ -156,11 +148,12 @@ def generate_and_save_model_artifacts(model_results, base_path):
     Uses RegressionEvaluator for model evaluation.
 
     Parameters:
-    - model_results (dict): Output from train_xgb_model containing:
+    - model_results (dict): Output from WalletModel.run_experiment containing:
         - pipeline: The trained model pipeline
-        - X, X_train, X_test: Feature data
-        - y_train, y_test: Target data
-        - y_pred: Model predictions
+        - X_train, X_test: Feature data
+        - y_train, y_test: Target data (modeling cohort)
+        - y_pred: Model predictions on modeling cohort test set
+        - training_cohort_pred: Predictions for full training cohort
     - base_path (str): Base path for saving artifacts
 
     Returns:
@@ -181,14 +174,19 @@ def generate_and_save_model_artifacts(model_results, base_path):
 
     # Create evaluation dictionary with the same structure as before
     evaluation = {
-        **evaluator.metrics,  # Include all basic metrics
-        'summary_report': evaluator.summary_report()
+        **evaluator.metrics,
+        'summary_report': evaluator.summary_report(),
+        'cohort_sizes': {
+            'training_cohort': len(model_results['training_cohort_pred']),
+            'modeling_cohort': len(model_results['y_pred']),
+        }
     }
 
-    # Create wallet scores DataFrame
+    # Create wallet scores DataFrame with both cohorts
     wallet_scores_df = pd.DataFrame({
-        'score': model_results['y_pred']
-    }, index=model_results['y_test'].index)
+        'score': model_results['training_cohort_pred'],
+        'in_modeling_cohort': model_results['training_cohort_pred'].index.isin(model_results['y_test'].index)
+    })
 
     # Load configurations
     wallets_config = WalletsConfig()
@@ -205,7 +203,13 @@ def generate_and_save_model_artifacts(model_results, base_path):
 
     # 5. Save all artifacts
     model_id = save_model_artifacts(
-        model_results=model_results,
+        model_results={
+            **model_results,
+            'training_data': {
+                'n_samples': len(model_results['training_cohort_pred']),
+                'n_features': len(model_results['X_train'].columns)
+            }
+        },
         evaluation_dict=evaluation,
         configs=configs,
         base_path=base_path
