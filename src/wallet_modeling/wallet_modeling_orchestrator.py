@@ -236,10 +236,20 @@ def generate_training_indicators_df(training_market_data_df_full,wallets_metrics
 
 
 @u.timing_decorator
-def filter_modeling_period_wallets(modeling_period_profits_df):
+def identify_modeling_cohort(modeling_period_profits_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Applies data cleaning filters to remove modeling period wallets without sufficient activity
+    Adds boolean flag indicating if wallet meets modeling period activity criteria
+
+    Params:
+    - modeling_period_profits_df (DataFrame): Input profits data with index wallet_address
+
+    Returns:
+    - DataFrame: Original dataframe index wallet_address with added boolean in_wallet_cohort \
+        column that indicates if the wallet met the wallet cohort thresholds
     """
+
+    logger.info("Identifying modeling cohort...")
+
     # Validate date range
     modeling_period_start = wallets_config['training_data']['modeling_period_start']
     modeling_period_end = wallets_config['training_data']['modeling_period_end']
@@ -258,23 +268,23 @@ def filter_modeling_period_wallets(modeling_period_profits_df):
     min_modeling_investment = wallets_config['data_cleaning']['min_modeling_investment']
     min_modeling_transaction_days = wallets_config['data_cleaning']['min_modeling_transaction_days']
 
-    # Remove wallets with below the minimum investment threshold
-    base_wallets = len(modeling_wallets_df)
-    modeling_wallets_df = modeling_wallets_df[
-        modeling_wallets_df['max_investment'] >= min_modeling_investment]
-    logger.info("Removed %s/%s wallets with modeling period investments below $%s.",
-                base_wallets - len(modeling_wallets_df), base_wallets,
-                min_modeling_investment)
+    # Create boolean mask for qualifying wallets
+    meets_criteria = (
+        (modeling_wallets_df['max_investment'] >= min_modeling_investment) &
+        (modeling_wallets_df['transaction_days'] >= min_modeling_transaction_days)
+    )
 
-    # Remove wallets with transaction counts below the threshold
-    base_wallets = len(modeling_wallets_df)
-    modeling_wallets_df = modeling_wallets_df[
-        modeling_wallets_df['transaction_days'] >= min_modeling_transaction_days]
-    logger.info("Removed %s/%s wallets with modeling period transaction days below %s.",
-                base_wallets - len(modeling_wallets_df), base_wallets,
-                min_modeling_transaction_days)
+    # Log stats about wallet cohort
+    total_wallets = len(modeling_wallets_df)
+    qualifying_wallets = meets_criteria.sum()
+    logger.info(
+        f"Identified {qualifying_wallets} qualifying wallets ({100*qualifying_wallets/total_wallets:.2f}% "
+        f"of {total_wallets} total wallets with modeling period activity) meeting modeling cohort criteria: "
+        f"min_investment=${min_modeling_investment}, min_days={min_modeling_transaction_days}"
+    )
 
-    logger.info("Selected wallet cohort of %s using %0.2f%% the %s training cohort wallets.",
-                len(modeling_wallets_df), 100*len(modeling_wallets_df)/base_wallets, base_wallets)
+    # Add boolean flag column as 1s and 0s
+    modeling_wallets_df['in_modeling_cohort'] = meets_criteria.astype(int)
+
 
     return modeling_wallets_df

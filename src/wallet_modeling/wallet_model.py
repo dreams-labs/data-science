@@ -37,11 +37,12 @@ class WalletModel:
         self.training_data_df = None  # Store full training cohort dataset for later scoring
 
 
-    def _prepare_data(self, training_data_df: pd.DataFrame, modeling_cohort_target_var_df: pd.Series) -> None:
+    def _prepare_data(self, training_data_df: pd.DataFrame, modeling_cohort_target_var_df: pd.DataFrame) -> None:
         """
         Params:
         - training_data_df (DataFrame): full training cohort feature data
-        - modeling_cohort_target_var_df (Series): target variable for modeling cohort only
+        - modeling_cohort_target_var_df (DataFrame): Contains in_modeling_cohort flag and target variable
+                                                for full training cohort
 
         Returns:
         - None
@@ -49,12 +50,24 @@ class WalletModel:
         # Store full training cohort for later scoring
         self.training_data_df = training_data_df.copy()
 
-        # Create modeling_df by joining features to modeling cohort targets
-        modeling_df = training_data_df.join(modeling_cohort_target_var_df, how='inner')
+        # Validate indexes are wallet addresses and matching
+        if not (training_data_df.index.name == 'wallet_address' and
+                modeling_cohort_target_var_df.index.name == 'wallet_address'):
+            raise ValueError("Both dataframes must have wallet_address as index")
+
+        # Join target data to features
+        modeling_df = training_data_df.join(
+            modeling_cohort_target_var_df,
+            how='left'
+        )
+
+        # Filter to modeling cohort for training
+        modeling_cohort_mask = modeling_df['in_modeling_cohort'] == 1
+        modeling_df = modeling_df[modeling_cohort_mask]
 
         # Separate target variable
         target_var = self.wallets_config['modeling']['target_variable']
-        X = modeling_df.drop(target_var, axis=1)
+        X = modeling_df.drop([target_var, 'in_modeling_cohort'], axis=1)
         y = modeling_df[target_var]
 
         # Split into train/test
@@ -123,6 +136,7 @@ class WalletModel:
 
         Returns:
         - predictions (Series): predicted values for full training cohort
+        - actuals (Series): actual target values for full training cohort
         """
         if self.training_data_df is None:
             raise ValueError("No training cohort data found. Run prepare_data first.")
@@ -142,17 +156,25 @@ class WalletModel:
 
         return predictions
 
-    def run_experiment(self, training_data_df: pd.DataFrame, modeling_cohort_target_var_df: pd.Series,
-                      return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
+    def run_experiment(self, training_data_df: pd.DataFrame, modeling_cohort_target_var_df: pd.DataFrame,
+                    return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
         """
         Params:
         - training_data_df (DataFrame): full training cohort feature data
-        - modeling_cohort_target_var_df (Series): target variable for modeling cohort only
+        - modeling_cohort_target_var_df (DataFrame): Contains in_modeling_cohort flag and target variable
+                                                for full training cohort
         - return_data (bool): whether to return train/test splits and predictions
 
         Returns:
-        - result (dict): contains pipeline and optionally data splits and predictions
+        - result (dict): contains pipeline and optionally data splits, predictions, and full cohort actuals
         """
+        # Validate matching indexes and lengths
+        if not (training_data_df.index.equals(modeling_cohort_target_var_df.index)):
+            raise ValueError(
+                "training_data_df and modeling_cohort_target_var_df must have identical indexes. "
+                f"Found lengths {len(training_data_df)} and {len(modeling_cohort_target_var_df)}"
+            )
+
         # Run full experiment: prep data, build pipeline, fit model
         self._prepare_data(training_data_df, modeling_cohort_target_var_df)
         self._build_pipeline()
@@ -165,13 +187,17 @@ class WalletModel:
         if return_data:
             y_pred = self._predict()
             training_cohort_pred = self._predict_training_cohort()
+            target_var = self.wallets_config['modeling']['target_variable']
+            full_cohort_actuals = modeling_cohort_target_var_df[target_var]
+
             result.update({
                 'X_train': self.X_train,
                 'X_test': self.X_test,
                 'y_train': self.y_train,
                 'y_test': self.y_test,
                 'y_pred': y_pred,
-                'training_cohort_pred': training_cohort_pred
+                'training_cohort_pred': training_cohort_pred,
+                'training_cohort_actuals': full_cohort_actuals
             })
 
         return result
