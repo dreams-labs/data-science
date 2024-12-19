@@ -28,7 +28,7 @@ def retrieve_transfers_sequencing():
     receives rank 1 and the count increases for each subsequence wallet.
 
     Buyer numbers are calculated for all wallets but the returned df only includes
-    wallets that were uploaded to the temp.wallet_modeling_cohort table.
+    wallets that were uploaded to the temp.wallet_modeling_training_cohort table.
 
     Returns:
     - buyer_numbers_df (df): dataframe showing that buyer number a wallet was for
@@ -66,13 +66,16 @@ def retrieve_transfers_sequencing():
         ,o.buyer_number
         from buy_ordering o
         join reference.wallet_ids xw on xw.wallet_address = o.wallet_address
-        join temp.wallet_modeling_cohort wc on wc.wallet_id = xw.wallet_id
+        join temp.wallet_modeling_training_cohort wc on wc.wallet_id = xw.wallet_id
         """
 
     transfers_sequencing_df = dgc().run_sql(sequencing_sql)
     logger.info("Retrieved transfers data for %s wallet-coin pairs associated with %s wallets "
-                "in temp.wallet_modeling_cohort.",
+                "in temp.wallet_modeling_training_cohort.",
                 len(transfers_sequencing_df), len(transfers_sequencing_df['wallet_id'].unique()))
+
+    # Convert coin_id column to categorical to reduce memory usage
+    transfers_sequencing_df['coin_id'] = transfers_sequencing_df['coin_id'].astype('category')
 
     return transfers_sequencing_df
 
@@ -127,7 +130,7 @@ def retrieve_transfers():
     receives rank 1 and the count increases for each subsequence wallet.
 
     Buyer numbers are calculated for all wallets but the returned df only includes
-    wallets that were uploaded to the temp.wallet_modeling_cohort table.
+    wallets that were uploaded to the temp.wallet_modeling_training_cohort table.
 
     Returns:
     - buyer_numbers_df (df): dataframe showing that buyer number a wallet was for
@@ -142,7 +145,7 @@ def retrieve_transfers():
     ,cwt.net_transfers
     ,cwt.balance
     from core.coin_wallet_transfers cwt
-    join temp.wallet_modeling_cohort wmc on wmc.wallet_address = cwt.wallet_address
+    join temp.wallet_modeling_training_cohort wmc on wmc.wallet_address = cwt.wallet_address
     and cwt.date <= '{training_period_end}'
     order by 1,2,3"""
 

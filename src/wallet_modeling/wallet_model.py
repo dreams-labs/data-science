@@ -34,51 +34,58 @@ class WalletModel:
         self.y_train = None
         self.y_test = None
         self.y_pred = None
+        self.training_data_df = None  # Store full training cohort dataset for later scoring
 
-    def prepare_data(self, modeling_df: pd.DataFrame) -> None:
+
+    def _prepare_data(self, training_data_df: pd.DataFrame, modeling_cohort_target_var_df: pd.Series) -> None:
         """
         Params:
-        - modeling_df (DataFrame): full modeling DataFrame including features and target.
+        - training_data_df (DataFrame): full training cohort feature data
+        - modeling_cohort_target_var_df (Series): target variable for modeling cohort only
 
         Returns:
         - None
         """
-        # Make a copy to avoid mutating the original DataFrame
-        df = modeling_df.copy()
+        # Store full training cohort for later scoring
+        self.training_data_df = training_data_df.copy()
 
-        # Drop configured columns if they exist
-        drop_cols = self.wallets_config['modeling']['drop_columns']
-        if drop_cols:
-            existing_columns = [c for c in drop_cols if c in df.columns]
-            if existing_columns:
-                df = df.drop(columns=existing_columns)
+        # Create modeling_df by joining features to modeling cohort targets
+        modeling_df = training_data_df.join(modeling_cohort_target_var_df, how='inner')
 
         # Separate target variable
         target_var = self.wallets_config['modeling']['target_variable']
-        X = df.drop(target_var, axis=1)
-        y = df[target_var]
+        X = modeling_df.drop(target_var, axis=1)
+        y = modeling_df[target_var]
 
         # Split into train/test
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
             X, y, test_size=0.2, random_state=42
         )
 
-    def build_pipeline(self) -> None:
-        """
-        Build the pipeline with a numeric scaler and a model.
-        """
-        # Use all columns as numeric for now
-        numeric_features = self.X_train.columns.tolist()
 
-        # Simple numeric preprocessing
+    def _build_pipeline(self) -> None:
+        """
+        Build the pipeline with column dropping, numeric scaling, and model.
+        """
+        # Configure column dropping
+        drop_cols = self.wallets_config['modeling']['drop_columns']
+
+        # Get feature columns (all columns except those to be dropped)
+        feature_cols = [col for col in self.X_train.columns
+                    if col not in (drop_cols or [])]
+
+        # Create preprocessor with two steps:
+        # 1. Drop unwanted columns
+        # 2. Scale remaining features
         preprocessor = ColumnTransformer(
             transformers=[
-                ('num', StandardScaler(), numeric_features)
-            ]
+                ('features', StandardScaler(), feature_cols)
+            ],
+            remainder='drop'  # This will drop any columns not explicitly included
         )
 
         # Define the model
-        if self.wallets_config['modeling']['model_type']=='xgb':
+        if self.wallets_config['modeling']['model_type'] == 'xgb':
             model = XGBRegressor(**self.wallets_config['modeling']['model_params'])
         else:
             raise ValueError("Invalid model type found in wallets_config['modeling']['model_type'].")
@@ -89,14 +96,14 @@ class WalletModel:
             ('regressor', model)
         ])
 
-    def fit(self) -> None:
+    def _fit(self) -> None:
         """
         Fit the pipeline on training data.
         """
         # Train pipeline
         self.pipeline.fit(self.X_train, self.y_train)
 
-    def predict(self) -> pd.Series:
+    def _predict(self) -> pd.Series:
         """
         Make predictions on the test set.
 
@@ -110,33 +117,61 @@ class WalletModel:
         self.y_pred = pd.Series(raw_predictions, index=self.X_test.index)
         return self.y_pred
 
-    def run_experiment(self, modeling_df: pd.DataFrame, return_data: bool = True
-                       ) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
+    def _predict_training_cohort(self) -> pd.Series:
         """
-        Params:
-        - modeling_df (DataFrame): input modeling data.
-        - return_data (bool): whether to return train/test splits and predictions.
+        Make predictions on the full training cohort.
 
         Returns:
-        - result (dict): contains pipeline and optionally data splits and predictions.
+        - predictions (Series): predicted values for full training cohort
+        """
+        if self.training_data_df is None:
+            raise ValueError("No training cohort data found. Run prepare_data first.")
+
+        # Validate indexes are wallet addresses and matching
+        if not self.training_data_df.index.name == 'wallet_address':
+            raise ValueError("training_data_df index must be wallet_address")
+
+        predictions = pd.Series(
+            self.pipeline.predict(self.training_data_df),
+            index=self.training_data_df.index
+        )
+
+        # Verify no wallets were dropped during prediction
+        if not predictions.index.equals(self.training_data_df.index):
+            raise ValueError("Prediction dropped some wallet addresses")
+
+        return predictions
+
+    def run_experiment(self, training_data_df: pd.DataFrame, modeling_cohort_target_var_df: pd.Series,
+                      return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
+        """
+        Params:
+        - training_data_df (DataFrame): full training cohort feature data
+        - modeling_cohort_target_var_df (Series): target variable for modeling cohort only
+        - return_data (bool): whether to return train/test splits and predictions
+
+        Returns:
+        - result (dict): contains pipeline and optionally data splits and predictions
         """
         # Run full experiment: prep data, build pipeline, fit model
-        self.prepare_data(modeling_df)
-        self.build_pipeline()
-        self.fit()
+        self._prepare_data(training_data_df, modeling_cohort_target_var_df)
+        self._build_pipeline()
+        self._fit()
 
         # Always return the pipeline
         result = {'pipeline': self.pipeline}
 
         # Optionally return detailed data
         if return_data:
-            y_pred = self.predict()
+            y_pred = self._predict()
+            training_cohort_pred = self._predict_training_cohort()
             result.update({
                 'X_train': self.X_train,
                 'X_test': self.X_test,
                 'y_train': self.y_train,
                 'y_test': self.y_test,
-                'y_pred': y_pred
+                'y_pred': y_pred,
+                'training_cohort_pred': training_cohort_pred
             })
 
         return result

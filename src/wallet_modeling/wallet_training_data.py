@@ -203,7 +203,7 @@ def upload_wallet_cohort(wallet_cohort):
 
     # upload df to bigquery
     project_id = 'western-verve-411004'
-    table_name = 'temp.wallet_modeling_cohort'
+    table_name = 'temp.wallet_modeling_training_cohort'
     schema = [
         {'name':'wallet_id', 'type': 'int64'},
         {'name':'updated_at', 'type': 'datetime'}
@@ -216,7 +216,7 @@ def upload_wallet_cohort(wallet_cohort):
         ,table_schema=schema
         ,progress_bar=False
     )
-    logger.info('Uploaded cohort of %s wallets to temp.wallet_modeling_cohort.', len(upload_df))
+    logger.info('Uploaded cohort of %s wallets to temp.wallet_modeling_training_cohort.', len(upload_df))
 
     # Add wallet_address column and populate it
     client = bigquery.Client(project=project_id)
@@ -237,5 +237,5 @@ def upload_wallet_cohort(wallet_cohort):
     """
     client.query(update_query).result()
 
-    logger.info('Uploaded cohort of %s wallets to temp.wallet_modeling_cohort and added wallet addresses.',
+    logger.info('Uploaded cohort of %s wallets to temp.wallet_modeling_training_cohort and added wallet addresses.',
                 len(upload_df))

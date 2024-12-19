@@ -84,7 +84,7 @@ def calculate_validation_metrics(X_test, y_pred, validation_profits_df, n_bucket
 
 
 
-def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scores_df):
+def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scores_df, modeling_market_data_df):
     """
     Consolidates wallet scores and metrics to coin-level metrics, creating a comprehensive
     metrics system that considers wallet quality, balance distribution, and activity levels.
@@ -163,7 +163,8 @@ def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scor
     weighted_scores.columns = ['coin_id', 'weighted_avg_score']
 
     # Top wallet concentration
-    high_score_threshold = wallet_scores_df['score'].quantile(0.8)
+    top_wallets_cutoff = wallets_config['coin_validation_analysis']['top_wallets_cutoff']
+    high_score_threshold = wallet_scores_df['score'].quantile(1 - top_wallets_cutoff)
     top_wallet_metrics = analysis_df[analysis_df['score'] >= high_score_threshold].groupby('coin_id').agg({
         'usd_balance': 'sum',
         'wallet_address': 'count'
@@ -215,6 +216,15 @@ def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scor
                                                     / coin_wallet_metrics_df['total_wallets'])
     coin_wallet_metrics_df['score_confidence'] = 1 - (
         1 / np.sqrt(coin_wallet_metrics_df['total_wallets'] + 1))  # Added +1 to avoid division by zero
+
+
+    # Append the market cap at the end of the modeling period
+    modeling_end_market_cap_df = modeling_market_data_df[modeling_market_data_df['date']
+                                                     ==wallets_config['training_data']['modeling_period_end']]
+
+    modeling_end_market_cap_df = modeling_end_market_cap_df.set_index('coin_id')
+    modeling_end_market_cap_df = modeling_end_market_cap_df[['market_cap','market_cap_imputed','market_cap_filled']]
+    coin_wallet_metrics_df = coin_wallet_metrics_df.join(modeling_end_market_cap_df, how='inner')
 
 
     # 3. Apply filters based on wallets_config
@@ -399,8 +409,8 @@ def analyze_market_cap_segments(
     df: pd.DataFrame,
     market_cap_ranges: List[Tuple[float, float]] = [
         (0.1e6, 1e6),
-        (1e6, 15e6),
-        (15e6, 35e6),
+        # (1e6, 15e6),
+        (1e6, 35e6),
         (35e6, 100e6),
         (100e6, 1e10)
     ],
@@ -772,39 +782,55 @@ def create_visualizations(df):
     plt.show()
 
 
-def create_performance_analysis_df(df: pd.DataFrame,
-                                 percentile: int = 75) -> pd.DataFrame:
+def analyze_top_coins_wallet_metrics(df: pd.DataFrame,
+                                   percentile: int,
+                                   method: str = 'median') -> pd.DataFrame:
     """
-    Creates a formatted DataFrame comparing metrics between top performing coins and others.
+    Creates a formatted df comparing wallet metrics between top performing coins.
 
     Params:
     - df (DataFrame): DataFrame with coin metrics and returns
-    - percentile (int): Percentile threshold for top performers
+    - percentile (int): Percentile threshold for top performers (must be >50)
+    - method (str): Aggregation method - 'mean' or 'median'
 
     Returns:
     - DataFrame: Analysis results formatted for styling
     """
-    # Split coins into performance groups
-    return_threshold = np.percentile(df['coin_return'], percentile)
-    top_coins = df[df['coin_return'] >= return_threshold]
-    other_coins = df[df['coin_return'] < return_threshold]
+    if percentile <= 50:
+        raise ValueError("Percentile must be greater than 50")
 
-    # Basic size metrics
+    # Define column names and thresholds
+    ntile_column = f'top_{(100 - percentile):.0f}_pct_coins'
+    middle_column = f'next_{(percentile - 50):.0f}_pct_coins'
+    bottom_column = 'bottom_50_pct_coins'
+
+    top_threshold = np.percentile(df['coin_return'], percentile)
+    mid_threshold = np.percentile(df['coin_return'], 50)
+
+    # Split coins into three groups
+    top_coins = df[df['coin_return'] >= top_threshold]
+    middle_coins = df[(df['coin_return'] < top_threshold) & (df['coin_return'] >= mid_threshold)]
+    bottom_coins = df[df['coin_return'] < mid_threshold]
+
+    agg_func = np.mean if method == 'mean' else np.median
+
     results = {
-        'cohort_size': {
-            'top_quartile': len(top_coins),
-            'other': len(other_coins),
-            'population': len(df)
+        'number_of_coins': {
+            ntile_column: len(top_coins),
+            middle_column: len(middle_coins),
+            bottom_column: len(bottom_coins),
+            'all_coins': len(df)
         },
-        'cohort_pct': {
-            'top_quartile': len(top_coins) / len(df) * 100,
-            'other': len(other_coins) / len(df) * 100,
-            'population': 100.0
+        'pct_of_coins': {
+            ntile_column: len(top_coins) / len(df) * 100,
+            middle_column: len(middle_coins) / len(df) * 100,
+            bottom_column: len(bottom_coins) / len(df) * 100,
+            'all_coins': 100.0
         }
     }
 
-    # Core metrics to analyze
-    metrics = [
+    # Wallet metrics to analyze
+    wallet_metrics = [
         'weighted_avg_score',
         'composite_score',
         'top_wallet_balance_pct',
@@ -815,52 +841,53 @@ def create_performance_analysis_df(df: pd.DataFrame,
         'total_wallets',
     ]
 
-    # Calculate medians for each group
-    for metric in metrics:
+    # Calculate wallet metrics for ntiles
+    for metric in wallet_metrics:
         results[metric] = {
-            'top_quartile': top_coins[metric].median(),
-            'other': other_coins[metric].median(),
-            'population': df[metric].median()
+            ntile_column: agg_func(top_coins[metric]),
+            middle_column: agg_func(middle_coins[metric]),
+            bottom_column: agg_func(bottom_coins[metric]),
+            'all_coins': agg_func(df[metric])
         }
 
-    # Calculate returns
-    returns_metrics = ['coin_return']
-    for metric in returns_metrics:
-        for stat, func in [('mean', np.mean), ('median', np.median)]:
+
+    # Generate return metric names
+    return_metric_names = []
+    for metric in ['coin_return']:
+        for stat in ['mean', 'median']:
             metric_name = f'{metric}_{stat}'
+            return_metric_names.append(metric_name)
             results[metric_name] = {
-                'top_quartile': func(top_coins[metric]),
-                'other': func(other_coins[metric]),
-                'population': func(df[metric])
+                ntile_column: (np.mean if stat == 'mean' else np.median)(top_coins[metric]) * 100,
+                middle_column: (np.mean if stat == 'mean' else np.median)(middle_coins[metric]) * 100,
+                bottom_column: (np.mean if stat == 'mean' else np.median)(bottom_coins[metric]) * 100,
+                'all_coins': (np.mean if stat == 'mean' else np.median)(df[metric])
             }
 
-    # Convert to DataFrame and transpose
     results_df = pd.DataFrame(results).T
+    size_metrics = ['number_of_coins', 'pct_of_coins']
+    ordered_rows = size_metrics + return_metric_names + wallet_metrics
 
-    # Order rows
-    size_metrics = ['cohort_size', 'cohort_pct']
-    core_metrics = metrics
+    return results_df.reindex(ordered_rows)
 
-    # Reorder rows
-    ordered_rows = size_metrics + core_metrics
-    results_df = results_df.reindex(ordered_rows)
 
-    return results_df
-
-def create_performance_report(df: pd.DataFrame,
-                            percentile: int = 75) -> pd.DataFrame.style:
+def create_top_coins_wallet_metrics_report(df: pd.DataFrame,
+                            percentile: int = 75,
+                            method: str = 'median') -> pd.DataFrame.style:
     """
-    Creates a styled performance analysis report.
+    Creates a styled performance analysis report showing summary metrics of the
+    coin-level wallet metrics.
 
     Params:
     - df (DataFrame): DataFrame with coin metrics and returns
     - percentile (int): Percentile threshold for top performers
+    - how the metrics should be summarized (string): e.g. 'median','mean'
 
     Returns:
     - styled_df (DataFrame.style): Styled analysis results
     """
     # Generate results DataFrame
-    results_df = create_performance_analysis_df(df, percentile)
+    results_df = analyze_top_coins_wallet_metrics(df, percentile, method)
 
     # Apply consistent styling
     styled_df = wime.style_rows(results_df)

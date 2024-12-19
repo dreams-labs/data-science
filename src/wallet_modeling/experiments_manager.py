@@ -91,7 +91,7 @@ class ExperimentsManager:
 
         # Save model artifacts
         logger.info(f"Saving artifacts for experiment: {experiment_name}")
-        model_id, evaluator, wallet_scores_df, coin_validation_df = wmr.generate_and_save_model_artifacts(
+        model_id, evaluator, wallet_scores_df = wmr.generate_and_save_model_artifacts(
             model_results=results,
             validation_profits_df=self.validation_profits_df,
             base_path=self.base_path
@@ -109,7 +109,7 @@ class ExperimentsManager:
             'model_id': model_id,
             'evaluator': evaluator,
             'wallet_scores': wallet_scores_df,
-            'coin_validation': coin_validation_df,
+
             'config': config
         }
 

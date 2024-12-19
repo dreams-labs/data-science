@@ -3,9 +3,10 @@ utility functions use in data science notebooks
 """
 import time
 import sys
-import gc
 import os
 import json
+import gc
+import inspect
 from datetime import datetime, timedelta
 from typing import List,Dict,Any
 import importlib
@@ -14,6 +15,7 @@ import logging
 import warnings
 import functools
 import yaml
+import psutil
 import progressbar
 import pandas as pd
 import numpy as np
@@ -39,6 +41,11 @@ importlib.reload(py_e)
 # set up logger at the module level
 logger = dc.setup_logger()
 
+
+
+# ---------------------------------------- #
+#         Config Related Functions
+# ---------------------------------------- #
 
 def load_all_configs(config_folder):
     """
@@ -430,68 +437,14 @@ def get_expected_columns(metrics_config: Dict[str, Any]) -> List[str]:
 
 
 
-def check_nan_values(series):
-    """
-    Check if NaN values are only at the start or end of the series.
-
-    Returns:
-    - True if NaN values are in the middle of the series
-    - False if NaN values are only at start/end or if there are no NaN values
-    """
-    # Get the index of the first and last non-NaN value
-    first_valid = series.first_valid_index()
-    last_valid = series.last_valid_index()
-
-    # Check if there are any NaN values between the first and last valid value
-    has_nans_in_series = (series.loc[first_valid:last_valid] # selects the range between first and last valid value
-                             .isna() # checks for NaN values in this range
-                             .any()) # returns True if there are any NaN values in this range
-
-    return has_nans_in_series
 
 
-def safe_downcast(df, column, dtype):
-    """
-    Safe method to downcast a column datatype. If the column has no values that exceed the
-    limits of the new dtype, it will be downcasted. If it has values that will result in
-    overflow errors, it will raise an error.
-    """
-    # Check if the column is numeric
-    if not pd.api.types.is_numeric_dtype(df[column]):
-        logger.warning("Column '%s' is not numeric. Skipping downcast.", column)
-        return df
 
-    # Get the original dtype of the column
-    original_dtype = df[column].dtype
 
-    # Get the min and max values of the column
-    col_min = df[column].min()
-    col_max = df[column].max()
 
-    # Get the limits of the target dtype
-    if dtype in ['float32', 'float64']:
-        type_info = np.finfo(dtype)
-    elif dtype in ['int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64']:
-        type_info = np.iinfo(dtype)
-    else:
-        logger.error("Unsupported dtype: %s", dtype)
-        return df
-
-    # Check if the column values are within the limits of the target dtype
-    if col_min < type_info.min or col_max > type_info.max:
-        logger.warning("Cannot safely downcast column '%s' to %s. "
-                       "Values are outside the range of %s. "
-                       "Min: %s, Max: %s",
-                       column, dtype, dtype, col_min, col_max)
-        return df
-
-    # If we've made it here, it's safe to downcast
-    df[column] = df[column].astype(dtype)
-
-    logger.debug("Successfully downcasted column '%s' from %s to %s",
-                 column, original_dtype, dtype)
-    return df
-
+# --------------------------------- #
+#        Function Modifiers
+# --------------------------------- #
 
 def timing_decorator(func):
     """
@@ -571,6 +524,86 @@ def create_progress_bar(total_items):
 
 
 
+
+
+
+
+
+# ---------------------------------------- #
+#     DataFrame Manipulation Functions
+# ---------------------------------------- #
+
+def safe_downcast(df, column, dtype):
+    """
+    Safe method to downcast a column datatype. If the column has no values that exceed the
+    limits of the new dtype, it will be downcasted. If it has values that will result in
+    overflow errors, it will raise an error.
+    """
+    # Check if the column is numeric
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        logger.warning("Column '%s' is not numeric. Skipping downcast.", column)
+        return df
+
+    # Get the original dtype of the column
+    original_dtype = df[column].dtype
+
+    # Get the min and max values of the column
+    col_min = df[column].min()
+    col_max = df[column].max()
+
+    # Get the limits of the target dtype
+    if dtype in ['float32', 'float64']:
+        type_info = np.finfo(dtype)
+    elif dtype in ['int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64']:
+        type_info = np.iinfo(dtype)
+    else:
+        logger.error("Unsupported dtype: %s", dtype)
+        return df
+
+    # Check if the column values are within the limits of the target dtype
+    if col_min < type_info.min or col_max > type_info.max:
+        logger.warning("Cannot safely downcast column '%s' to %s. "
+                       "Values are outside the range of %s. "
+                       "Min: %s, Max: %s",
+                       column, dtype, dtype, col_min, col_max)
+        return df
+
+    # If we've made it here, it's safe to downcast
+    df[column] = df[column].astype(dtype)
+
+    logger.debug("Successfully downcasted column '%s' from %s to %s",
+                 column, original_dtype, dtype)
+    return df
+
+
+def assert_period(config, df: pd.DataFrame, period: str) -> None:
+    """
+    Validates if DataFrame dates fall within configured period boundaries.
+
+    Params:
+    - config (dict): config with dates in the 'training_data' section
+    - df (DataFrame): Input DataFrame with 'date' column
+    - period (str): Period type ('training'/'modeling'/'validation')
+
+    Raises:
+    - ValueError: If dates fall outside period boundaries
+    """
+    config = config['training_data']
+    period_start = pd.to_datetime(config[f"{period}_period_start"])
+    period_end = pd.to_datetime(config[f"{period}_period_end"])
+
+    # Vectorized min/max comparison
+    df_min = df['date'].min()
+    df_max = df['date'].max()
+
+    if df_min < period_start or df_max > period_end:
+        raise ValueError(
+            f"Data outside {period} period boundaries.\n"
+            f"Data range: {df_min} to {df_max}\n"
+            f"Period bounds: {period_start} to {period_end}"
+        )
+
+
 def cw_filter_df(df, coin_id, wallet_address):
     """
     Filter DataFrame by coin_id and wallet_address.
@@ -606,32 +639,126 @@ def df_mem(df):
     """
     # Memory usage of each column
     memory_usage = df.memory_usage(deep=True) / (1024 ** 2)
-    print(memory_usage.round(2))
+    mem_df = pd.DataFrame(memory_usage)
+    mem_df.columns = ['mb']
+    mem_df['dtype'] = df.dtypes
 
     # Total memory usage in bytes
     total_memory = df.memory_usage(deep=True).sum()
     print(f'Total memory usage: {total_memory / 1024 ** 2:.2f} MB')
 
+    return mem_df.sort_values(by='mb',ascending=False)
 
-def obj_mem():
-    """
-    Checks how much memory all objects are using
 
-    name logic needs to be redone
+def obj_mem(return_details=False) -> pd.DataFrame:
     """
+    Params:
+    - return_details (bool): whether to return column names, types, and memory usage
+
+    Tracks both object-level and process-level memory usage with enhanced metadata.
+    Handles nested data structures better.
+    """
+
+    process = psutil.Process()
+    total_rss = process.memory_info().rss / (1024 * 1024)
+
+    # Get the calling frame to access its locals
+    calling_frame = inspect.currentframe().f_back
+
+    def find_name(obj):
+        """Helper to find variable name across namespaces"""
+        # Check globals first
+        name = next((name for name, value in globals().items() if value is obj), None)
+        if name:
+            return name
+
+        # Check calling frame's locals
+        if calling_frame:
+            name = next((name for name, value in calling_frame.f_locals.items() if value is obj), None)
+            if name:
+                return name
+
+        return 'unnamed'
+
+    # Track DataFrames in containers
+    container_refs = {}
+    for obj in gc.get_objects():
+        if isinstance(obj, (list, dict, tuple)):
+            try:
+                name = find_name(obj)
+                if name != 'unnamed':
+                    for idx, item in enumerate(obj if isinstance(obj, (list, tuple)) else obj.values()):
+                        if isinstance(item, pd.DataFrame):
+                            container_refs[id(item)] = f"{name}[{idx}]"
+            except:  # pylint:disable=bare-except
+                continue
+
+    # Gather all DataFrame info
     objects = []
     for obj in gc.get_objects():
-        # try:
-        size = sys.getsizeof(obj)
-        if size >= 1000:  # Filter out objects smaller than 1000 bytes
-            obj_type = type(obj).__name__
-            obj_name = str(getattr(obj, '__name__', 'Unnamed'))  # Get name if available
-            objects.append((obj_name, obj_type, size / (1024 * 1024)))  # Convert size to MB
-        # except:
-        #     continue
-    mem_df = pd.DataFrame(objects, columns=['Name', 'Type', 'Size (MB)'])
-    mem_df = mem_df.sort_values(by='Size (MB)', ascending=False).reset_index(drop=True)
-    return mem_df
+        try:
+            if not isinstance(obj, (pd.DataFrame, pd.Series, np.ndarray)):
+                continue
+
+            name = find_name(obj)
+            if name == 'unnamed':
+                name = container_refs.get(id(obj), 'unnamed')
+
+            if hasattr(obj, 'memory_usage'):
+                size = (obj.memory_usage(deep=True).sum() /
+                        (1024 * 1024))  # Convert to MB
+            else:
+                size = sys.getsizeof(obj) / (1024 * 1024)
+
+            if size >= 5:
+                metadata = {
+                    'name': name,
+                    'type': type(obj).__name__,
+                    'size_mb': round(size, 1),
+                    'shape': str(getattr(obj, 'shape', None)),
+                    'percent_of_total': round((size / total_rss) * 100, 1),
+                }
+
+                if isinstance(obj, pd.DataFrame):
+                    metadata.update({
+                        'columns': (str(list(obj.columns)[:3] + ['...']) if len(obj.columns) > 3
+                                    else str(list(obj.columns))),
+                        'memory_usage': str({col: f"{mem/1024/1024:.1f}MB"
+                                           for col, mem in obj.memory_usage(deep=True).items()
+                                           if mem/1024/1024 >= 1}),
+                        'dtypes': str({col: str(dtype)
+                                     for col, dtype in obj.dtypes.items()
+                                     if obj[col].memory_usage(deep=True)/1024/1024 >= 1})
+                    })
+
+                objects.append(metadata)
+        except:  # pylint:disable=bare-except
+            continue
+
+    # Clean up
+    del calling_frame
+
+    mem_df = pd.DataFrame(objects)
+
+    summary = pd.DataFrame([{
+        'name': 'TOTAL_PROCESS_MEMORY',
+        'type': 'ProcessRSS',
+        'size_mb': round(total_rss, 1),
+        'shape': None,
+        'percent_of_total': 100.0
+    }])
+
+    mem_df = pd.concat([summary, mem_df], ignore_index=True)
+    mem_df = mem_df.sort_values('size_mb', ascending=False).reset_index(drop=True)
+
+    cols = ['name', 'type', 'size_mb', 'shape', 'percent_of_total']
+    extra_cols = [col for col in mem_df.columns if col not in cols]
+
+    if return_details:
+        # Return column details if requested
+        return mem_df[cols + extra_cols]
+    else:
+        return mem_df[cols]
 
 
 def log_nan_counts(df):
@@ -647,6 +774,36 @@ def log_nan_counts(df):
         log_message = "No NaN values found in any column."
 
     logger.critical(log_message)
+
+
+
+
+
+
+
+
+# ---------------------------------------- #
+#      Series Manipulation Functions
+# ---------------------------------------- #
+
+def check_nan_values(series):
+    """
+    Check if NaN values are only at the start or end of the series.
+
+    Returns:
+    - True if NaN values are in the middle of the series
+    - False if NaN values are only at start/end or if there are no NaN values
+    """
+    # Get the index of the first and last non-NaN value
+    first_valid = series.first_valid_index()
+    last_valid = series.last_valid_index()
+
+    # Check if there are any NaN values between the first and last valid value
+    has_nans_in_series = (series.loc[first_valid:last_valid] # selects the range between first and last valid value
+                             .isna() # checks for NaN values in this range
+                             .any()) # returns True if there are any NaN values in this range
+
+    return has_nans_in_series
 
 
 def winsorize(data: pd.Series, cutoff: float = 0.01) -> pd.Series:
@@ -671,6 +828,15 @@ def winsorize(data: pd.Series, cutoff: float = 0.01) -> pd.Series:
     # Clip the data
     return np.clip(winsorized, lower_bound, upper_bound)
 
+
+
+
+
+
+
+# ---------------------------------------- #
+#     Misc Notebook Support Functions
+# ---------------------------------------- #
 
 # silence donation message
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
@@ -719,7 +885,7 @@ def export_code(
 
     Params:
     - parent_directory (str): Base directory for the code directories to consolidate.
-    - code_directories (list): List of subdirectories (relative to parent_directory) containing .py files to consolidate.
+    - code_directories (list): List of subdirectories containing .py files to consolidate.
     - include_config (bool): Whether to include the config files in the export
     - config_directory (str): Path to the directory containing .yaml config files.
     - notebook_directory (str): Path to the directory containing the Jupyter Notebook (optional).
