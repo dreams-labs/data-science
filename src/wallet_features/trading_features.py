@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 @u.timing_decorator
-def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
+def calculate_wallet_trading_features_new(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
     Calculates comprehensive trading metrics for each wallet.
 
@@ -48,9 +48,9 @@ def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
 
     # Calculate base position metrics including original inflow/outflow columns
     base_metrics_df = profits_df.groupby('wallet_address').agg(
-        total_inflows=('usd_net_transfers', lambda x: x[x > 0].sum()),
-        total_outflows=('usd_net_transfers', lambda x: abs(x[x < 0].sum())),
-        total_net_flows=('usd_net_transfers', 'sum'),
+        total_inflows=('usd_net_transfers', lambda x: abs(x[x < 0].sum())),
+        total_outflows=('usd_net_transfers', lambda x: x[x > 0].sum()),
+        total_net_flows=('usd_net_transfers', lambda x: x.sum()),
         max_investment=('cumulative_position', 'max')
     )
 
@@ -61,9 +61,9 @@ def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
     observed_metrics_df = profits_df[~profits_df['is_imputed']].groupby('wallet_address').agg(
         transaction_days=('date', 'nunique'),
         unique_coins_traded=('coin_id', 'nunique'),
-        cash_buy_inflows=('usd_net_transfers', lambda x: x[x > 0].sum()),
-        cash_sell_outflows=('usd_net_transfers', lambda x: abs(x[x < 0].sum())),
-        cash_net_flows=('usd_net_transfers', 'sum'),
+        cash_buy_outflows=('usd_net_transfers', lambda x: x[x > 0].sum()),
+        cash_sell_inflows=('usd_net_transfers', lambda x: abs(x[x < 0].sum())),
+        cash_net_flows=('usd_net_transfers', lambda x: -x.sum()),
         total_volume=('abs_usd_net_transfers', 'sum'),
         average_transaction=('abs_usd_net_transfers', 'mean'),
     )
@@ -85,8 +85,6 @@ def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
     )
 
     return wallet_trading_features_df
-
-
 
 def adjust_start_transfers(df, target_date):
     """

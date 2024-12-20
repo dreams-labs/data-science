@@ -103,7 +103,7 @@ def clean_market_dataset(market_data_df, profits_df, period_start_date, period_e
     return market_data_df
 
 
-def format_and_save_datasets(profits_df, market_data_df, starting_balance_date, parquet_prefix=None):
+def format_and_save_datasets(profits_df, market_data_df, period_start_date, parquet_prefix=None):
     """
     Formats and optionally saves the final datasets.
 
@@ -120,6 +120,10 @@ def format_and_save_datasets(profits_df, market_data_df, starting_balance_date, 
     new_values = [True, 0, 0]
 
     # Apply the updates
+    # Training balance date (1 day before period start)
+    period_start_date = datetime.strptime(period_start_date, "%Y-%m-%d")
+    starting_balance_date = (period_start_date - timedelta(days=1)).strftime("%Y-%m-%d")
+
     mask = profits_df['date'] == starting_balance_date
     profits_df.loc[mask, columns_to_update] = new_values
 

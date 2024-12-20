@@ -51,6 +51,9 @@ def retrieve_period_datasets(period_start_date, period_end_date, coin_cohort=Non
         logger.info("Defined coin cohort of %s coins after applying data cleaning filters.",
                     len(coin_cohort))
 
+    # Impute period end date
+    
+
     # Format and optionally save the datasets
     profits_df_formatted, market_data_df_formatted = wtd.format_and_save_datasets(
         profits_df,

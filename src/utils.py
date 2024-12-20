@@ -606,7 +606,7 @@ def assert_period(config, df: pd.DataFrame, period: str) -> None:
 
 def cw_filter_df(df, coin_id, wallet_address):
     """
-    Filter DataFrame by coin_id and wallet_address.
+    Filter DataFrame by coin_id and wallet_address, sort by date if available.
 
     Args:
         df (pd.DataFrame): The DataFrame to filter.
@@ -614,12 +614,16 @@ def cw_filter_df(df, coin_id, wallet_address):
         wallet_address (str): The wallet address to filter by.
 
     Returns:
-        pd.DataFrame: Filtered DataFrame.
+        pd.DataFrame: Filtered DataFrame, optionally sorted by date.
     """
     filtered_df = df[
         (df['coin_id'] == coin_id) &
         (df['wallet_address'] == wallet_address)
     ]
+
+    if 'date' in df.columns:
+        filtered_df = filtered_df.sort_values('date')
+
     return filtered_df
 
 
