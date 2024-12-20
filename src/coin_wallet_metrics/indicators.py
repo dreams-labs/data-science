@@ -180,11 +180,9 @@ def add_market_data_dualcolumn_indicators(market_data_df):
     """
     # Money Flow Index
     market_data_df = add_mfi_column(market_data_df, price_col='price', volume_col='volume', window=14)
-    logger.info("Generated mfi time series column...")
 
     # On Balance Volume
     market_data_df['obv'] = generalized_obv(market_data_df['price'], market_data_df['volume'])
-    logger.info("Generated obv time series column...")
 
     return market_data_df
 
@@ -302,6 +300,7 @@ def calculate_rsi(timeseries: pd.Series, window: int = 14) -> pd.Series:
 # Dual Series Input Indicators
 # =====================================================================
 
+@u.timing_decorator
 def add_mfi_column(time_series_df, price_col='price', volume_col='volume', window=14, drop_price=False, drop_volume=False):
     """
     Adds a Money Flow Index (MFI) column to time_series_df based on the price and volume.
@@ -383,7 +382,7 @@ def calculate_mfi(price: pd.Series, volume: pd.Series, window: int = 14) -> pd.S
 
     return mfi
 
-
+@u.timing_decorator
 def add_crossover_column(time_series_df, col1, col2, drop_col1=False, drop_col2=False):
     """
     Adds a crossover column to time_series_df based on the crossovers between col1 and col2.
@@ -475,7 +474,7 @@ def identify_crossovers(series1, series2):
     return pd.Series(crossovers)
 
 
-
+@u.timing_decorator
 def generalized_obv(primary_series, secondary_series):
     """
     On-Balance Volume (OBV): OBV uses volume changes to predict price movements by showing whether
