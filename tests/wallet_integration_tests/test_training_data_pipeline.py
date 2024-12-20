@@ -242,11 +242,11 @@ def test_post_imputation_balance_consistency(period_datasets):
         # Find first non-imputed record for each wallet-coin pair after start date
         first_transfers = (
             df[
-                (df['is_imputed'] == False) &
+                (df['is_imputed'] is False) &
                 (df['date'] > start_date)
             ]
             .sort_values('date')
-            .groupby(['wallet_address', 'coin_id'])
+            .groupby(['wallet_address', 'coin_id'], observed=True)
             .first()
             .reset_index()
         )
