@@ -3,6 +3,7 @@ Orchestrates groups of functions to generate wallet model pipeline
 """
 
 import time
+from datetime import datetime,timedelta
 import logging
 from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
@@ -26,18 +27,43 @@ wallets_config = WalletsConfig()
 
 
 @u.timing_decorator
-def retrieve_period_datasets(start_date,end_date,
+def retrieve_period_datasets(period_start_date,period_end_date,
                              parquet_prefix=None,parquet_folder="temp/wallet_modeling_dfs"):
     """
-    Retrieves market and profits data
-    """
+    Retrieves market and profits data.
 
-    # Retrieve profits_df and market_data_df concurrently
+    profits_df
+    - Earliest record: an imputed row for the date before period_start_date with $0 transers and the
+        balance representing their date-end holdings at date-end prices.
+    - Latest record: period_end_date
+
+    market_data_df
+    - Earliest record: as far back as the database goes
+    - Latest record: period_end_date
+
+
+    Params:
+    - period_start_date,period_end_date (YYYY-MM-DD): The data period boundary dates. A row will be imputed
+        for the date directly before the period start date showing ending balances.
+    - parquet_prefix,parquet_folder (strings): Where to save the parquet file. If no value, returns the df.
+
+    Returns:
+    - profits_df: with imputed row
+    - market_data_df: from the beginning of time through period end
+
+    """
+    # 1. Retrieve base data concurrently
+    # ----------------------------------
+    # Identify the date we need ending balances from
+    period_start_date = datetime.strptime(period_start_date,'%Y-%m-%d')
+    starting_balance_date = period_start_date - timedelta(days=1)
+
+    # Retrieve both datasets
     with ThreadPoolExecutor(max_workers=2) as executor:
         profits_future = executor.submit(
             dr.retrieve_profits_data,
-            start_date,
-            end_date,
+            starting_balance_date,
+            period_end_date,
             wallets_config['data_cleaning']['min_wallet_inflows']
         )
         market_future = executor.submit(dr.retrieve_market_data)
@@ -45,16 +71,19 @@ def retrieve_period_datasets(start_date,end_date,
         profits_df = profits_future.result()
         market_data_df = market_future.result()
 
+
+    # 2. Generate market_data_df
+    # -----------------------
     # Remove all records after the training period end to ensure no data leakage
-    market_data_df = market_data_df[market_data_df['date']<=end_date]
+    market_data_df = market_data_df[market_data_df['date']<=period_end_date]
 
     # Clean market_data_df
     market_data_df = market_data_df[market_data_df['coin_id'].isin(profits_df['coin_id'])]
     market_data_df = dr.clean_market_data(
         market_data_df,
         wallets_config,
-        start_date,
-        end_date
+        period_start_date,
+        period_end_date
     )
 
     # Intelligently impute market cap data in market_data_df when good data is available
@@ -75,6 +104,9 @@ def retrieve_period_datasets(start_date,end_date,
     logger.info("Removed data for %s coins with a market cap above $%s at the start of the training period."
                 ,len(above_initial_threshold_coins),dc.human_format(max_initial_market_cap))
 
+
+    # 3. Generate profits_df
+    # ----------------------
     # Remove the filtered coins from profits_df
     profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
 
@@ -102,6 +134,8 @@ def retrieve_period_datasets(start_date,end_date,
         (profits_df['usd_net_transfers'] == 0))
     ]
 
+    # 4. Save or return file
+    # ----------------------
     # If a parquet file location is specified, store the files there and return nothing
     if parquet_prefix:
         # Store profits
@@ -113,7 +147,6 @@ def retrieve_period_datasets(start_date,end_date,
         market_data_file = f"{parquet_folder}/{parquet_prefix}_market_data_df_full.parquet"
         market_data_df.to_parquet(market_data_file,index=False)
         logger.info(f"Stored market_data_df with shape {market_data_df.shape} to {market_data_file}.")
-
 
     # Otherwise return the dfs
     else:
@@ -159,7 +192,7 @@ def define_wallet_cohort(profits_df,market_data_df):
 
 
 @u.timing_decorator
-def split_profits_df(training_profits_df,training_market_data_df,wallet_cohort):
+def split_training_window_profits_dfs(training_profits_df,training_market_data_df,wallet_cohort):
     """
     Adds imputed rows at the start and end date of all windows
     """
@@ -167,9 +200,11 @@ def split_profits_df(training_profits_df,training_market_data_df,wallet_cohort):
     cohort_profits_df = training_profits_df[training_profits_df['wallet_address'].isin(wallet_cohort)]
 
     # Impute all training window dates
-    training_window_dates = wtd.generate_training_window_dates()
-    training_windows_profits_df = pri.impute_profits_for_multiple_dates(cohort_profits_df, training_market_data_df,
-                                                               training_window_dates, n_threads=24)
+    training_window_boundary_dates = wtd.generate_training_window_imputation_dates()
+    training_windows_profits_df = pri.impute_profits_for_multiple_dates(cohort_profits_df,
+                                                                        training_market_data_df,
+                                                                        training_window_boundary_dates,
+                                                                        n_threads=1)
 
     # drop imputed total_return column
     training_windows_profits_df = training_windows_profits_df.drop('total_return', axis=1)
@@ -200,7 +235,10 @@ def generate_training_indicators_df(training_market_data_df_full,wallets_metrics
 
     Returns:
     - market_indicators_data_df (df): market_data_df for the training period only
+
     """
+    logger.info("Beginning indicator generation process...")
+
     # Validate date range
     training_period_end = wallets_config['training_data']['training_period_end']
     latest_market_data_record = training_market_data_df_full['date'].max()
