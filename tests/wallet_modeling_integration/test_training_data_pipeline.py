@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 from dotenv import load_dotenv
 import pytest
+import pandas as pd
 from dreams_core import core as dc
 
 # pyright: reportMissingImports=false
@@ -129,3 +130,54 @@ def test_time_period_boundaries_and_balances(period_datasets):
 
     # Balance difference must be within 0.0001%
     assert abs(training_end_balance / modeling_start_balance - 1) < 0.000001
+
+def test_wallet_coin_balance_continuity(period_datasets):
+    """
+    Test that all wallet-coin pair balances match at the training/modeling boundary
+    using vectorized operations. Allows for 0.0001% difference due to floating point math.
+    """
+    training_df, _, modeling_df, _, _, _ = period_datasets
+
+    # Get boundary data
+    training_last = training_df['date'].max()
+    training_end_df = training_df[training_df['date']==training_last]
+
+    modeling_first = modeling_df['date'].min()
+    modeling_start_df = modeling_df[modeling_df['date']==modeling_first]
+
+    # Create merged df on composite key
+    balance_compare_df = pd.merge(
+        training_end_df[['wallet_address', 'coin_id', 'usd_balance']],
+        modeling_start_df[['wallet_address', 'coin_id', 'usd_balance']],
+        on=['wallet_address', 'coin_id'],
+        suffixes=('_train', '_model')
+    )
+
+    # Convert to float64 for consistency
+    balance_compare_df['usd_balance_train'] = balance_compare_df['usd_balance_train'].astype('float64')
+    balance_compare_df['usd_balance_model'] = balance_compare_df['usd_balance_model'].astype('float64')
+
+    # Filter out zero balance pairs to avoid div by zero
+    nonzero_mask = ~((balance_compare_df['usd_balance_train'] == 0) &
+                        (balance_compare_df['usd_balance_model'] == 0))
+    balance_compare_df = balance_compare_df[nonzero_mask]
+
+    # Calculate both absolute and percentage differences
+    balance_compare_df['abs_diff'] = abs(
+        balance_compare_df['usd_balance_train'] -
+        balance_compare_df['usd_balance_model']
+    )
+
+    balance_compare_df['pct_diff'] = abs(
+        balance_compare_df['usd_balance_train'] /
+        balance_compare_df['usd_balance_model'] - 1
+    )
+
+    # Flag significant mismatches (both conditions must be true)
+    significant_diffs = balance_compare_df[
+        (balance_compare_df['abs_diff'] > 0.1) &
+        (balance_compare_df['pct_diff'] > 0.00001)
+    ]
+
+    assert len(significant_diffs) == 0, \
+        "Found wallet-coin pairs with significant balance mismatches (>$0.01 and >0.0001%)"
