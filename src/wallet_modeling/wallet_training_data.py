@@ -4,6 +4,7 @@ Primary sequence functions used as part of the wallet modeling pipeline
 
 import logging
 from datetime import datetime,timedelta
+from typing import List
 import pandas as pd
 import numpy as np
 import pandas_gbq
@@ -21,7 +22,7 @@ wallets_config = WalletsConfig()
 
 
 
-def generate_training_window_boundary_dates():
+def generate_training_window_imputation_dates() -> List[datetime]:
     """
     Generates a list of all dates that need imputation. Each period needs:
     1. an imputed row as of the balance end date
@@ -30,21 +31,26 @@ def generate_training_window_boundary_dates():
     Because the period end date for window 1 is the same as the balance end date for window 2,
     we only need to impute one new row per window.
 
-    Returns:
-    - window_boundary_dates (list): list that includes all starting balance and end dates
+    The training_period_start is not included because it's already imputed in the base df.
 
+    Returns:
+    - imputation_dates (List[datetime]): list of dates that need imputation
     """
     # Make a list of the starting balance dates for all windows
-    window_boundary_dates = sorted([
-                    datetime.strptime(date, "%Y-%m-%d") - timedelta(days=1)
-                    for date in wallets_config['training_data']['training_window_starts']
-                    ])
+    starting_balance_dates: List[datetime] = sorted([
+        datetime.strptime(date, "%Y-%m-%d") - timedelta(days=1)
+        for date in wallets_config['training_data']['training_window_starts']
+    ])
+
+    # Don't include the first value since training_period_start is already imputed
+    imputation_dates: List[datetime] = starting_balance_dates[1:]
 
     # Add the end date for the final window
-    final_window_end_date = datetime.strptime(wallets_config['training_data']['training_period_end'], "%Y-%m-%d")
-    window_boundary_dates = [window_boundary_dates + [final_window_end_date]]
+    final_window_end_date: datetime = datetime.strptime(wallets_config['training_data']['training_period_end'],
+                                                        "%Y-%m-%d")
+    imputation_dates += [final_window_end_date]
 
-    return window_boundary_dates
+    return imputation_dates
 
 
 
