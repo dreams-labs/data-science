@@ -58,6 +58,7 @@ def retrieve_raw_datasets(period_start_date, period_end_date):
 
     return profits_df, market_data_df
 
+
 def clean_market_dataset(market_data_df, profits_df, period_start_date, period_end_date):
     """
     Cleans and filters market data.
@@ -101,6 +102,7 @@ def clean_market_dataset(market_data_df, profits_df, period_start_date, period_e
                 ,len(above_initial_threshold_coins),dc.human_format(max_initial_market_cap))
 
     return market_data_df
+
 
 def format_and_save_datasets(profits_df, market_data_df, starting_balance_date, parquet_prefix=None, parquet_folder="temp/wallet_modeling_dfs"):
     """
@@ -146,7 +148,7 @@ def format_and_save_datasets(profits_df, market_data_df, starting_balance_date, 
         (profits_df['usd_net_transfers'] == 0))
     ]
 
-    # If a parquet file location is specified, store the files there and return nothing
+# If a parquet file location is specified, store the files and return None
     if parquet_prefix:
         # Store profits
         profits_file = f"{parquet_folder}/{parquet_prefix}_profits_df_full.parquet"
@@ -157,13 +159,37 @@ def format_and_save_datasets(profits_df, market_data_df, starting_balance_date, 
         market_data_file = f"{parquet_folder}/{parquet_prefix}_market_data_df_full.parquet"
         market_data_df.to_parquet(market_data_file,index=False)
         logger.info(f"Stored market_data_df with shape {market_data_df.shape} to {market_data_file}.")
-    else:
-        return profits_df, market_data_df
+        return None, None
+
+    return profits_df, market_data_df
+
 
 
 @u.timing_decorator
 def retrieve_period_datasets(period_start_date, period_end_date, parquet_prefix=None, parquet_folder="temp/wallet_modeling_dfs"):
-    """Original docstring remains the same"""
+    """
+    Retrieves market and profits data.
+
+    profits_df
+    - Earliest record: an imputed row for the date before period_start_date with $0 transers and the
+        balance representing their date-end holdings at date-end prices.
+    - Latest record: period_end_date
+
+    market_data_df
+    - Earliest record: as far back as the database goes
+    - Latest record: period_end_date
+
+
+    Params:
+    - period_start_date,period_end_date (YYYY-MM-DD): The data period boundary dates. A row will be imputed
+        for the date directly before the period start date showing ending balances.
+    - parquet_prefix,parquet_folder (strings): Where to save the parquet file. If no value, returns the df.
+
+    Returns:
+    - profits_df: with imputed row
+    - market_data_df: from the beginning of time through period end
+
+    """
     # Get raw data
     profits_df, market_data_df = retrieve_raw_datasets(period_start_date, period_end_date)
 
@@ -171,22 +197,16 @@ def retrieve_period_datasets(period_start_date, period_end_date, parquet_prefix=
     market_data_df = clean_market_dataset(market_data_df, profits_df, period_start_date, period_end_date)
     profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
 
-    # Format and optionally save
-    if parquet_prefix:
-        format_and_save_datasets(
-            profits_df,
-            market_data_df,
-            datetime.strptime(period_start_date,'%Y-%m-%d') - timedelta(days=1),
-            parquet_prefix,
-            parquet_folder
-        )
-    else:
-        profits_df, market_data_df = format_and_save_datasets(
-            profits_df,
-            market_data_df,
-            datetime.strptime(period_start_date,'%Y-%m-%d') - timedelta(days=1)
-        )
-        return profits_df, market_data_df
+    # Format datasets
+    profits_df, market_data_df = format_and_save_datasets(
+        profits_df,
+        market_data_df,
+        datetime.strptime(period_start_date,'%Y-%m-%d') - timedelta(days=1),
+        parquet_prefix,
+        parquet_folder
+    )
+
+    return profits_df, market_data_df
 
 
 
