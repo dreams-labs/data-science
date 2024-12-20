@@ -27,8 +27,8 @@ wallets_config = WalletsConfig()
 
 
 @u.timing_decorator
-def retrieve_period_datasets(period_start_date,period_end_date,
-                             parquet_prefix=None,parquet_folder="temp/wallet_modeling_dfs"):
+def retrieve_period_datasets(period_start_date, period_end_date,
+                             parquet_prefix=None, parquet_folder="temp/wallet_modeling_dfs"):
     """
     Retrieves market and profits data.
 
@@ -64,9 +64,11 @@ def retrieve_period_datasets(period_start_date,period_end_date,
             dr.retrieve_profits_data,
             starting_balance_date,
             period_end_date,
-            wallets_config['data_cleaning']['min_wallet_inflows']
+            wallets_config['data_cleaning']['min_wallet_inflows'],
+            wallets_config['training_data']['dataset']
         )
-        market_future = executor.submit(dr.retrieve_market_data)
+        market_future = executor.submit(dr.retrieve_market_data,
+                                        wallets_config['training_data']['dataset'])
 
         profits_df = profits_future.result()
         market_data_df = market_future.result()

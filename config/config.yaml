@@ -13,6 +13,10 @@ training_data:
   additional_windows: 0
   time_window_frequency: 20 # how many days apart each time_window should start
 
+  # Whether to query 'core' or 'dev_core' dataset tables
+  dataset: 'prod'
+
+
 datasets:
 
   # Keyed on coin_id-date

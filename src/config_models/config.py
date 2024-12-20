@@ -2,7 +2,7 @@
 Validation logic for items in config.yaml
 """
 from datetime import date
-from typing import Dict, Optional
+from typing import Dict, Optional, Literal
 from pydantic import BaseModel, Field
 
 # Custom base model to disable extra fields in all sections
@@ -43,7 +43,7 @@ class TrainingDataConfig(NoExtrasBaseModel):
     time_window_frequency: int = Field(..., gt=0)
     earliest_window_start: date = Field(...)
     earliest_cohort_lookback_start: date = Field(...)
-
+    dataset: Literal['prod', 'dev'] = Field(...)
 
 
 # ----------------------------------------------------------------------------
