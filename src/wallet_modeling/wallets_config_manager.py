@@ -87,20 +87,30 @@ class WalletsConfig:
         self._add_derived_values()  # Add derived training period boundary dates
 
     def _add_derived_values(self):
-        """Add calculated values to the config."""
+        """Add calculated values to the config including period boundaries and balance dates."""
         if 'training_data' in self.config:
             # Training Period Boundaries
-            # Get the first training window start date
             first_window = min(self.config['training_data']['training_window_starts'])
             self.config['training_data']['training_period_start'] = first_window
 
-            # Get the day before modeling period start
+            # Training balance date (1 day before period start)
+            training_start = datetime.strptime(first_window, "%Y-%m-%d")
+            training_balance_date = (training_start - timedelta(days=1)).strftime("%Y-%m-%d")
+            self.config['training_data']['training_starting_balance_date'] = training_balance_date
+
+
+            # Modeling Period Boundaries
             modeling_start = datetime.strptime(
                 self.config['training_data']['modeling_period_start'],
                 "%Y-%m-%d"
             )
             training_end = (modeling_start - timedelta(days=1)).strftime("%Y-%m-%d")
             self.config['training_data']['training_period_end'] = training_end
+
+            # Modeling Period Balance Date
+            modeling_balance_date = (modeling_start - timedelta(days=1)).strftime("%Y-%m-%d")
+            self.config['training_data']['modeling_starting_balance_date'] = modeling_balance_date
+
 
             # Validation Period Boundaries
             modeling_end = datetime.strptime(
@@ -110,6 +120,10 @@ class WalletsConfig:
             validation_start = (modeling_end + timedelta(days=1)).strftime("%Y-%m-%d")
             self.config['training_data']['validation_period_start'] = validation_start
 
+            # Validation Period Balance Date
+            validation_start_dt = datetime.strptime(validation_start, "%Y-%m-%d")
+            validation_balance_date = (validation_start_dt - timedelta(days=1)).strftime("%Y-%m-%d")
+            self.config['training_data']['validation_starting_balance_date'] = validation_balance_date
 
     def __getitem__(self, key):
         # Enable dictionary-style access with square brackets (config['key'])

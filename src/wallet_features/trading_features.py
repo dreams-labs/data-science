@@ -19,6 +19,74 @@ logger = logging.getLogger(__name__)
 
 
 
+@u.timing_decorator
+def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculates comprehensive trading metrics for each wallet.
+
+    Params:
+    - profits_df (DataFrame): Daily profits containing:
+        - starting_balance_date row (2024-05-31) to establish initial position
+        - Period transfer data (2023-06-01 to 2024-10-31)
+        - period_end_date row (2024-10-31) for final balance
+        Required columns: wallet_address, coin_id, date, usd_net_transfers,
+                        usd_balance, is_imputed
+
+    Returns:
+    - wallet_metrics_df (DataFrame): Trading metrics keyed on wallet_address
+    """
+    profits_df['date'] = pd.to_datetime(profits_df['date'])
+    profits_df = profits_df.sort_values(['wallet_address', 'coin_id', 'date'])
+
+    # Precompute common values
+    profits_df['abs_usd_net_transfers'] = profits_df['usd_net_transfers'].abs()
+
+    # Calculate investment exposure using starting balances + net transfers
+    profits_df['cumulative_position'] = profits_df.groupby('wallet_address')['usd_net_transfers'].cumsum()
+    starting_mask = profits_df['date'] == profits_df['date'].min()
+    profits_df.loc[starting_mask, 'cumulative_position'] += profits_df['usd_balance']
+
+    # Calculate base position metrics including original inflow/outflow columns
+    base_metrics_df = profits_df.groupby('wallet_address').agg(
+        total_inflows=('usd_net_transfers', lambda x: x[x > 0].sum()),
+        total_outflows=('usd_net_transfers', lambda x: abs(x[x < 0].sum())),
+        total_net_flows=('usd_net_transfers', 'sum'),
+        max_investment=('cumulative_position', 'max')
+    )
+
+    # Set floor of 0 on max_investment
+    base_metrics_df['max_investment'] = base_metrics_df['max_investment'].clip(lower=0)
+
+    # Real transfer activity metrics (filter imputed rows)
+    observed_metrics_df = profits_df[~profits_df['is_imputed']].groupby('wallet_address').agg(
+        transaction_days=('date', 'nunique'),
+        unique_coins_traded=('coin_id', 'nunique'),
+        cash_buy_inflows=('usd_net_transfers', lambda x: x[x > 0].sum()),
+        cash_sell_outflows=('usd_net_transfers', lambda x: abs(x[x < 0].sum())),
+        cash_net_flows=('usd_net_transfers', 'sum'),
+        total_volume=('abs_usd_net_transfers', 'sum'),
+        average_transaction=('abs_usd_net_transfers', 'mean'),
+    )
+
+    # Combine all metrics
+    wallet_trading_features_df = base_metrics_df.join(observed_metrics_df)
+    wallet_trading_features_df = wallet_trading_features_df.fillna(0)
+    wallet_trading_features_df = wallet_trading_features_df.replace(-0, 0)
+
+    # Ratio calculations
+    period_duration = (profits_df['date'].max() - profits_df['date'].min()).days + 1
+    wallet_trading_features_df['activity_density'] = (
+        wallet_trading_features_df['transaction_days'] / period_duration
+    )
+    wallet_trading_features_df['volume_vs_investment_ratio'] = np.where(
+        wallet_trading_features_df['max_investment'] > 0,
+        wallet_trading_features_df['total_volume'] / wallet_trading_features_df['max_investment'],
+        0
+    )
+
+    return wallet_trading_features_df
+
+
 
 def adjust_start_transfers(df, target_date):
     """

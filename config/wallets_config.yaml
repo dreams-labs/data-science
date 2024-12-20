@@ -1,10 +1,11 @@
 # Variables used to define the training data
 training_data:
     training_window_starts: [
-        "2023-06-01",
-        "2024-01-01",
-        "2024-04-01",
-        "2024-09-01"
+        # "2023-06-01",
+        # "2024-01-01",
+        # "2024-04-01",
+        "2024-09-01",
+        "2024-10-01"
     ]
     modeling_period_start: "2024-11-01"
     modeling_period_end: "2024-11-20"
@@ -21,7 +22,7 @@ data_cleaning:
     # Wallet cohort thresholds
     min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
     max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
-    min_wallet_investment: 5000 # The amount of lifetime USD investment a wallet must have to be included in the training data
+    min_wallet_investment: 500000 # The amount of lifetime USD investment a wallet must have to be included in the training data
     max_wallet_investment: 10_000_000 # The amount of lifetime USD investment a wallet must have to be included in the training data
     min_wallet_volume: 10000  # Exclude wallets with fewer than this amount of training period USD volume
     max_wallet_volume: 25_000_000  # Exclude wallets with fewer than this amount of training period USD volume
