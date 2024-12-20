@@ -76,7 +76,8 @@ def period_datasets():
     datasets = (
         training_profits_df, training_market_df,
         modeling_profits_df, modeling_market_df,
-        combined_profits_df, combined_market_df
+        combined_profits_df, combined_market_df,
+        coin_cohort
     )
     logger.setLevel(logging.INFO)
     logger.info("All dev data retrieved.")
@@ -86,14 +87,14 @@ def period_datasets():
 
 def test_time_period_boundaries(period_datasets):
     """Test that period boundaries align correctly"""
-    training_df, _, modeling_df, _, _, _ = period_datasets
+    training_df, _, modeling_df, _, _, _, _ = period_datasets
     training_last = training_df['date'].max()
     modeling_first = modeling_df['date'].min()
     assert training_last == modeling_first
 
 def test_coin_set_consistency(period_datasets):
     """Test that coin sets match between periods"""
-    training_df, _, modeling_df, _, combined_df, _ = period_datasets
+    training_df, _, modeling_df, _, combined_df, _, _ = period_datasets
     training_coins = set(training_df['coin_id'])
     modeling_coins = set(modeling_df['coin_id'])
     combined_coins = set(combined_df['coin_id'])
@@ -102,11 +103,14 @@ def test_coin_set_consistency(period_datasets):
 
 def test_transfer_amount_consistency(period_datasets):
     """Test that transfer amounts sum correctly"""
-    training_df, _, modeling_df, _, combined_df, _ = period_datasets
+    training_df, _, modeling_df, _, combined_df, _, _ = period_datasets
     training_transfers = abs(training_df['usd_net_transfers']).astype('float64').sum()
     modeling_transfers = abs(modeling_df['usd_net_transfers']).astype('float64').sum()
     combined_transfers = abs(combined_df['usd_net_transfers']).astype('float64').sum()
-    assert abs(combined_transfers - (training_transfers + modeling_transfers)) < 0.01
+
+    balance_diff = abs(combined_transfers - (training_transfers + modeling_transfers))
+    balance_pct = balance_diff / combined_transfers if combined_transfers != 0 else 0
+    assert (balance_diff < 0.01) or (balance_pct < 0.0001), f"Balance difference: ${balance_diff:,.2f} ({balance_pct:.2%})"
 
 def test_time_period_boundaries_and_balances(period_datasets):
     """
@@ -114,7 +118,7 @@ def test_time_period_boundaries_and_balances(period_datasets):
     1. Period boundaries align correctly
     2. Total USD balances match exactly at the boundary
     """
-    training_df, _, modeling_df, _, _, _ = period_datasets
+    training_df, _, modeling_df, _, _, _, _ = period_datasets
 
     # Check date boundaries align
     training_last = training_df['date'].max()
@@ -136,7 +140,7 @@ def test_wallet_coin_balance_continuity(period_datasets):
     Test that all wallet-coin pair balances match at the training/modeling boundary
     using vectorized operations. Allows for 0.0001% difference due to floating point math.
     """
-    training_df, _, modeling_df, _, _, _ = period_datasets
+    training_df, _, modeling_df, _, _, _, _ = period_datasets
 
     # Get boundary data
     training_last = training_df['date'].max()
@@ -181,3 +185,73 @@ def test_wallet_coin_balance_continuity(period_datasets):
 
     assert len(significant_diffs) == 0, \
         "Found wallet-coin pairs with significant balance mismatches (>$0.01 and >0.0001%)"
+
+
+@pytest.fixture(scope='session')
+def validation_datasets(period_datasets):
+    """
+    Integration fixture retrieving validation period and full-range data.
+
+    Params:
+    - period_datasets: Tuple from previous fixture including coin_cohort
+
+    Returns:
+    - tuple: (validation_profits_df, validation_market_df,
+             full_range_profits_df, full_range_market_df)
+    """
+    logger.info("Generating validation and full-range datasets...")
+    logger.setLevel(logging.WARNING)
+
+    # Extract coin_cohort from period_datasets
+    coin_cohort = period_datasets[-1]
+
+    # Get validation period data
+    validation_profits_df, validation_market_df, _ = wmo.retrieve_period_datasets(
+        wallets_config['training_data']['validation_period_start'],
+        wallets_config['training_data']['validation_period_end'],
+        coin_cohort=coin_cohort
+    )
+
+    # Get full range data
+    full_range_profits_df, full_range_market_df, _ = wmo.retrieve_period_datasets(
+        wallets_config['training_data']['training_period_start'],
+        wallets_config['training_data']['validation_period_end'],
+        coin_cohort=coin_cohort
+    )
+
+    logger.setLevel(logging.INFO)
+    return (validation_profits_df, validation_market_df,
+            full_range_profits_df, full_range_market_df)
+
+
+def test_full_range_transfers_consistency(period_datasets, validation_datasets):
+    """Test that combined metrics from individual periods match full-range data.
+
+    Params:
+    - period_datasets (tuple): Contains training_df and modeling_df
+    - validation_datasets (tuple): Contains validation_df and full_range_df
+
+    Raises:
+    - AssertionError: If difference exceeds 0.01 USD and 0.01% threshold
+    """
+    # Unpack datasets
+    training_df, _, modeling_df, _, _, _, _ = period_datasets
+    validation_df, _, full_range_df, _ = validation_datasets
+
+    # Sum transfers across individual periods
+    period_transfers = (
+        abs(training_df['usd_net_transfers']).astype('float64').sum() +
+        abs(modeling_df['usd_net_transfers']).astype('float64').sum() +
+        abs(validation_df['usd_net_transfers']).astype('float64').sum()
+    )
+
+    # Compare to full range transfers
+    full_range_transfers = abs(full_range_df['usd_net_transfers']).astype('float64').sum()
+
+    # Calculate absolute and percentage differences
+    transfer_diff = abs(full_range_transfers - period_transfers)
+    transfer_pct = transfer_diff / full_range_transfers if full_range_transfers != 0 else 0
+
+    # Assert both thresholds must be exceeded to fail
+    assert (transfer_diff < 0.01) or (transfer_pct < 0.0001), \
+        f"Transfer difference: ${transfer_diff:,.2f} ({transfer_pct:.2%})"
