@@ -51,12 +51,13 @@ def retrieve_period_datasets(period_start_date, period_end_date, coin_cohort=Non
         logger.info("Defined coin cohort of %s coins after applying data cleaning filters.",
                     len(coin_cohort))
 
-    # Impute period end date
-    
+    # Impute the period end (period start is pre-imputed during profits_df generation)
+    imputed_profits_df = pri.impute_profits_for_multiple_dates(profits_df, market_data_df,
+                                                               [period_end_date], n_threads=1)
 
     # Format and optionally save the datasets
     profits_df_formatted, market_data_df_formatted = wtd.format_and_save_datasets(
-        profits_df,
+        imputed_profits_df,
         market_data_df,
         period_start_date,
         parquet_prefix

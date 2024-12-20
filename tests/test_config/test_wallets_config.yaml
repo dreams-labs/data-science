@@ -1,14 +1,19 @@
 # Variables used to define the training data
 training_data:
     training_window_starts: [
-        "2023-06-01",
-        "2024-01-01",
-        "2024-04-01",
-        "2024-08-01"
+        # "2023-06-01",
+        # "2024-01-01",
+        # "2024-04-01",
+        "2024-09-01",
+        "2024-10-01"
     ]
     modeling_period_start: "2024-11-01"
     modeling_period_end: "2024-11-20"
     validation_period_end: "2024-11-30"
+
+
+    dataset: 'dev'  # Whether to query 'core' or 'dev_core' dataset tables
+    parquet_folder: 'temp/wallet_modeling_dfs'  # where to store parquet files
 
 
 # Variables used to clean and filter raw data before training data is built
@@ -16,15 +21,15 @@ data_cleaning:
 
     # Modeling period filters
     min_modeling_investment: 3000
-    min_modeling_transaction_days: 2
+    min_modeling_transaction_days: 1
 
     # Wallet cohort thresholds
     min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
     max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
-    min_wallet_investment: 5000 # The amount of lifetime USD investment a wallet must have to be included in the training data
-    max_wallet_investment: 100_000_000 # The amount of lifetime USD investment a wallet must have to be included in the training data
+    min_wallet_investment: 50000 # The amount of lifetime USD investment a wallet must have to be included in the training data
+    max_wallet_investment: 10_000_000 # The amount of lifetime USD investment a wallet must have to be included in the training data
     min_wallet_volume: 10000  # Exclude wallets with fewer than this amount of training period USD volume
-    max_wallet_volume: 250_000_000  # Exclude wallets with fewer than this amount of training period USD volume
+    max_wallet_volume: 25_000_000  # Exclude wallets with fewer than this amount of training period USD volume
     min_wallet_inflows: 5000  # Exclude wallets with inflows below this amount (USD)
     max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
     max_wallet_profits: 100_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
@@ -54,7 +59,7 @@ features:
     clustering_n_clusters: [2,4]
 
     # Market timing params
-    offset_winsorization: 0.03 # comparisons between metrics and their offset values will be winsorized by this amount
+    offset_winsorization: 0.02 # comparisons between metrics and their offset values will be winsorized by this amount
     timing_metrics_min_transaction_size: 20  # trades below this USD threshold will not be evaluated for market timing peformance or transfers buyer sequencing
 
 
@@ -63,10 +68,10 @@ features:
 modeling:
     # Which wallet performance metric to use as the target variable. Options are:
     # invested, total_net_flows, return, risk_adj_return, performance_score, log_weighted_return, hybrid_score, size_adjusted_rank
-    target_variable: "performance_score"
+    target_variable: "size_adjusted_rank"
     target_var_params:
         performance_score_return_weight: 0.6
-    returns_winsorization: 0.02
+    returns_winsorization: 0.01
     drop_columns: []
 
     # Model specifics
@@ -85,6 +90,9 @@ modeling:
 # Variables used for comnverting the wallet scores into coin forecasts
 coin_validation_analysis:
 
+    # Params for coin_validation_df
+    top_wallets_cutoff: 0.2  # what ntile a wallet's score has to be to counted as a top wallet
+
     # Forecasting methods
     top_n: 5  # how many of the top coins of a given sort method will be included in performance assessments
     sort_method: "top_wallet_balance_pct"  # which coin wallet metric to use for coin forecast rankings
@@ -92,5 +100,11 @@ coin_validation_analysis:
     # Thresholds for coin inclusion in forecasts
     min_wallets: 3  # how many wallets must hold a coin for the coin to be elegible for forecasting
     min_balance: 10000  # how much USD all wallets must hold for the coin to be elegible for forecasting
-    min_market_cap: 2_000_000  # coins below this market cap will not be included in performance assessments
-    max_market_cap: 99950_000_000  # coins above this market cap will not be included in performance assessments
+    min_market_cap: 600_000  # coins below this market cap will not be included in performance assessments
+    max_market_cap: 50_000_000  # coins above this market cap will not be included in performance assessments
+
+
+# Variables used in the generation of the validation period coin model
+coin_validation_model:
+
+    target_variable: "coin_return"
