@@ -1,6 +1,3 @@
-"""
-tests used to audit the files in the data-science/src folder
-"""
 # pylint: disable=wrong-import-position  # import not at top of doc (due to local import)
 # pylint: disable=redefined-outer-name  # redefining from outer scope triggering on pytest fixtures
 # pylint: disable=unused-argument
@@ -37,6 +34,9 @@ wallets_config = WalletsConfig.load_from_yaml(config_path)
 # ------------------------------------------ #
 
 
+# Target the dev schema for integration testing
+wallets_config['training_data']['dataset'] = 'dev'
+
 @pytest.fixture(scope='session')
 def period_datasets():
     """
@@ -49,9 +49,6 @@ def period_datasets():
     # Temporarily adjust log level
     logger.info("Generating training, modeling, and combined datasets...")
     logger.setLevel(logging.WARNING)
-
-    # Target the dev schema to avoid a very long runtime
-    wallets_config['training_data']['dataset'] = 'dev'
 
     # Get initial training data and coin cohort
     training_profits_df, training_market_df, coin_cohort = wmo.retrieve_period_datasets(
@@ -73,7 +70,7 @@ def period_datasets():
         coin_cohort=coin_cohort
     )
 
-    datasets = (
+    period_datasets = (
         training_profits_df, training_market_df,
         modeling_profits_df, modeling_market_df,
         combined_profits_df, combined_market_df,
@@ -82,9 +79,10 @@ def period_datasets():
     logger.setLevel(logging.INFO)
     logger.info("All dev data retrieved.")
 
-    return datasets
+    return period_datasets
 
 
+@pytest.mark.integration
 def test_time_period_boundaries(period_datasets):
     """Test that period boundaries align correctly"""
     training_df, _, modeling_df, _, _, _, _ = period_datasets
@@ -92,6 +90,7 @@ def test_time_period_boundaries(period_datasets):
     modeling_first = modeling_df['date'].min()
     assert training_last == modeling_first
 
+@pytest.mark.integration
 def test_coin_set_consistency(period_datasets):
     """Test that coin sets match between periods"""
     training_df, _, modeling_df, _, combined_df, _, _ = period_datasets
@@ -101,6 +100,7 @@ def test_coin_set_consistency(period_datasets):
     assert training_coins == combined_coins
     assert len(training_coins - modeling_coins) == 0
 
+@pytest.mark.integration
 def test_transfer_amount_consistency(period_datasets):
     """Test that transfer amounts sum correctly"""
     training_df, _, modeling_df, _, combined_df, _, _ = period_datasets
@@ -110,8 +110,11 @@ def test_transfer_amount_consistency(period_datasets):
 
     balance_diff = abs(combined_transfers - (training_transfers + modeling_transfers))
     balance_pct = balance_diff / combined_transfers if combined_transfers != 0 else 0
-    assert (balance_diff < 0.01) or (balance_pct < 0.0001), f"Balance difference: ${balance_diff:,.2f} ({balance_pct:.2%})"
+    assert (balance_diff < 0.01) or (balance_pct < 0.0001), \
+        f"Balance difference: ${balance_diff:,.2f} ({balance_pct:.2%})"
 
+
+@pytest.mark.integration
 def test_time_period_boundaries_and_balances(period_datasets):
     """
     Test that:
@@ -135,6 +138,8 @@ def test_time_period_boundaries_and_balances(period_datasets):
     # Balance difference must be within 0.0001%
     assert abs(training_end_balance / modeling_start_balance - 1) < 0.000001
 
+
+@pytest.mark.integration
 def test_wallet_coin_balance_continuity(period_datasets):
     """
     Test that all wallet-coin pair balances match at the training/modeling boundary
@@ -187,6 +192,82 @@ def test_wallet_coin_balance_continuity(period_datasets):
         "Found wallet-coin pairs with significant balance mismatches (>$0.01 and >0.0001%)"
 
 
+@pytest.mark.integration
+def test_starting_balance_conditions(period_datasets):
+    """
+    Test starting balance records for both training and modeling periods.
+    Validates imputation flags, transfer values, and balance positivity.
+    """
+    training_df, _, modeling_df, _, _, _, _ = period_datasets
+
+    # Get first date records for each period
+    training_starting_balance_date = wallets_config['training_data']['training_starting_balance_date']
+    modeling_starting_balance_date = wallets_config['training_data']['modeling_starting_balance_date']
+
+    training_first = training_df[training_df['date'] == training_starting_balance_date]
+    modeling_first = modeling_df[modeling_df['date'] == modeling_starting_balance_date]
+
+    for df, period in [(training_first, 'training'), (modeling_first, 'modeling')]:
+        # Check imputation flags
+        assert df['is_imputed'].all(), f"Found non-imputed records on first {period} date"
+
+        # Check zero transfers and inflows
+        assert (df['usd_net_transfers'] == 0).all(), f"Found non-zero transfers on first {period} date"
+        assert (df['usd_inflows'] == 0).all(), f"Found non-zero inflows on first {period} date"
+
+        # Check positive balances
+        assert (df['usd_balance'] > 0).all(), f"Found non-positive balances on first {period} date"
+
+
+@pytest.mark.integration
+def test_post_imputation_balance_consistency(period_datasets):
+    """
+    Test that when wallet-coin pairs transition from imputed to actual records,
+    their balance exceeds their net transfers, using vectorized operations.
+    """
+    training_df, _, modeling_df, _, _, _, _ = period_datasets
+
+    training_starting_balance_date = wallets_config['training_data']['training_starting_balance_date']
+    modeling_starting_balance_date = wallets_config['training_data']['modeling_starting_balance_date']
+
+    for df, period, start_date in [
+        (training_df, 'training', training_starting_balance_date),
+        (modeling_df, 'modeling', modeling_starting_balance_date)
+    ]:
+        # Get all wallet-coin pairs from starting balance date
+        start_pairs = df[
+            df['date'] == start_date
+        ][['wallet_address', 'coin_id']].drop_duplicates()
+
+        # Find first non-imputed record for each wallet-coin pair after start date
+        first_transfers = (
+            df[
+                (df['is_imputed'] == False) &
+                (df['date'] > start_date)
+            ]
+            .sort_values('date')
+            .groupby(['wallet_address', 'coin_id'])
+            .first()
+            .reset_index()
+        )
+
+        # Join starting pairs with their first transfer records
+        comparison_df = pd.merge(
+            start_pairs,
+            first_transfers[['wallet_address', 'coin_id', 'usd_balance', 'usd_net_transfers']],
+            on=['wallet_address', 'coin_id'],
+            how='inner'
+        )
+
+        # Validate all balances exceed transfers
+        invalid_pairs = comparison_df[
+            comparison_df['usd_balance'] < comparison_df['usd_net_transfers']
+        ]
+
+        assert len(invalid_pairs) == 0, \
+            f"Found {len(invalid_pairs)} {period} wallet-coin pairs with balance less than transfers"
+
+
 @pytest.fixture(scope='session')
 def validation_datasets(period_datasets):
     """
@@ -224,6 +305,7 @@ def validation_datasets(period_datasets):
             full_range_profits_df, full_range_market_df)
 
 
+@pytest.mark.integration
 def test_full_range_transfers_consistency(period_datasets, validation_datasets):
     """Test that combined metrics from individual periods match full-range data.
 
@@ -255,3 +337,5 @@ def test_full_range_transfers_consistency(period_datasets, validation_datasets):
     # Assert both thresholds must be exceeded to fail
     assert (transfer_diff < 0.01) or (transfer_pct < 0.0001), \
         f"Transfer difference: ${transfer_diff:,.2f} ({transfer_pct:.2%})"
+
+
