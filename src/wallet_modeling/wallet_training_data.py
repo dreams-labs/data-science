@@ -5,6 +5,7 @@ Primary sequence functions used as part of the wallet modeling pipeline
 import logging
 from datetime import datetime,timedelta
 from typing import List
+from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import numpy as np
 import pandas_gbq
@@ -12,7 +13,10 @@ from google.cloud import bigquery
 from dreams_core import core as dc
 
 # Local module imports
+import training_data.data_retrieval as dr
+import wallet_features.market_cap_features as wmc
 from wallet_modeling.wallets_config_manager import WalletsConfig
+import utils as u
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -20,6 +24,144 @@ logger = logging.getLogger(__name__)
 # Load wallets_config at the module level
 wallets_config = WalletsConfig()
 
+
+
+@u.timing_decorator
+def retrieve_raw_datasets(period_start_date, period_end_date):
+    """
+    Retrieves raw market and profits data without any cleaning or formatting.
+
+    Params:
+    - period_start_date,period_end_date (YYYY-MM-DD): The data period boundary dates.
+
+    Returns:
+    - tuple: (profits_df, market_data_df) raw dataframes
+    """
+    # Identify the date we need ending balances from
+    period_start_date = datetime.strptime(period_start_date,'%Y-%m-%d')
+    starting_balance_date = period_start_date - timedelta(days=1)
+
+    # Retrieve both datasets
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        profits_future = executor.submit(
+            dr.retrieve_profits_data,
+            starting_balance_date,
+            period_end_date,
+            wallets_config['training_data']['dataset']
+        )
+        market_future = executor.submit(dr.retrieve_market_data,
+                                        wallets_config['training_data']['dataset'])
+
+        profits_df = profits_future.result()
+        market_data_df = market_future.result()
+
+    return profits_df, market_data_df
+
+
+def clean_market_dataset(market_data_df, profits_df, period_start_date, period_end_date):
+    """
+    Cleans and filters market data.
+
+    Params:
+    - market_data_df (DataFrame): Raw market data
+    - profits_df (DataFrame): Profits data for coin filtering
+    - period_start_date,period_end_date: Period boundary dates
+
+    Returns:
+    - DataFrame: Cleaned market data
+    """
+    # Remove all records after the training period end to ensure no data leakage
+    market_data_df = market_data_df[market_data_df['date']<=period_end_date]
+
+    # Clean market_data_df
+    market_data_df = market_data_df[market_data_df['coin_id'].isin(profits_df['coin_id'])]
+    market_data_df = dr.clean_market_data(
+        market_data_df,
+        wallets_config,
+        period_start_date,
+        period_end_date
+    )
+
+    # Intelligently impute market cap data in market_data_df when good data is available
+    market_data_df = dr.impute_market_cap(market_data_df,
+                                        wallets_config['data_cleaning']['min_mc_imputation_coverage'],
+                                        wallets_config['data_cleaning']['max_mc_imputation_multiple'])
+
+    # Crudely fill all remaining gaps in market cap data
+    market_data_df = wmc.force_fill_market_cap(market_data_df)
+
+    # Remove coins that exceeded the initial market cap threshold at the start of the training period
+    max_initial_market_cap = wallets_config['data_cleaning']['max_initial_market_cap']
+    above_initial_threshold_coins = market_data_df[
+        (market_data_df['date']==wallets_config['training_data']['training_period_start'])
+        & (market_data_df['market_cap_filled']>max_initial_market_cap)
+    ]['coin_id']
+    market_data_df = market_data_df[~market_data_df['coin_id'].isin(above_initial_threshold_coins)]
+    logger.info("Removed data for %s coins with a market cap above $%s at the start of the training period."
+                ,len(above_initial_threshold_coins),dc.human_format(max_initial_market_cap))
+
+    return market_data_df
+
+
+def format_and_save_datasets(profits_df, market_data_df, starting_balance_date, parquet_prefix=None):
+    """
+    Formats and optionally saves the final datasets.
+
+    Params:
+    - profits_df, market_data_df (DataFrames): Input dataframes
+    - starting_balance_date (datetime): Balance imputation date
+    - parquet_prefix,parquet_folder (str): Save location params
+
+    Returns:
+    - tuple or None: (profits_df, market_data_df) if no save location specified
+    """
+    # Adjust all records on the starting_balance_date to be imputed with $0 transfers
+    columns_to_update = ['is_imputed', 'usd_net_transfers', 'usd_inflows']
+    new_values = [True, 0, 0]
+
+    # Apply the updates
+    mask = profits_df['date'] == starting_balance_date
+    profits_df.loc[mask, columns_to_update] = new_values
+
+    # Clean profits_df
+    profits_df, _ = dr.clean_profits_df(profits_df, wallets_config['data_cleaning'])
+
+    # Drop unneeded columns
+    columns_to_drop = ['total_return']
+    profits_df = profits_df.drop(columns_to_drop,axis=1)
+
+    # Round relevant columns
+    columns_to_round = [
+        'profits_cumulative'
+        ,'usd_balance'
+        ,'usd_net_transfers'
+        ,'usd_inflows'
+        ,'usd_inflows_cumulative'
+    ]
+    profits_df[columns_to_round] = profits_df[columns_to_round].round(2)
+    profits_df[columns_to_round] = profits_df[columns_to_round].replace(-0, 0)
+
+    # Remove rows with a rounded 0 balance and 0 transfers
+    profits_df = profits_df[
+        ~((profits_df['usd_balance'] == 0) &
+        (profits_df['usd_net_transfers'] == 0))
+    ]
+
+    # If a parquet file location is specified, store the files and return None
+    if parquet_prefix:
+        # Store profits
+        parquet_folder = wallets_config['training_data']['parquet_folder']
+        profits_file = f"{parquet_folder}/{parquet_prefix}_profits_df_full.parquet"
+        profits_df.to_parquet(profits_file,index=False)
+        logger.info(f"Stored profits_df with shape {profits_df.shape} to {profits_file}.")
+
+        # Store market data
+        market_data_file = f"{parquet_folder}/{parquet_prefix}_market_data_df_full.parquet"
+        market_data_df.to_parquet(market_data_file,index=False)
+        logger.info(f"Stored market_data_df with shape {market_data_df.shape} to {market_data_file}.")
+        return None, None
+
+    return profits_df, market_data_df
 
 
 def generate_training_window_imputation_dates() -> List[datetime]:
