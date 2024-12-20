@@ -47,7 +47,6 @@ def retrieve_raw_datasets(period_start_date, period_end_date):
             dr.retrieve_profits_data,
             starting_balance_date,
             period_end_date,
-            wallets_config['data_cleaning']['min_wallet_inflows'],
             wallets_config['training_data']['dataset']
         )
         market_future = executor.submit(dr.retrieve_market_data,
@@ -166,48 +165,43 @@ def format_and_save_datasets(profits_df, market_data_df, starting_balance_date, 
 
 
 @u.timing_decorator
-def retrieve_period_datasets(period_start_date, period_end_date, parquet_prefix=None, parquet_folder="temp/wallet_modeling_dfs"):
+def retrieve_period_data(period_start_date, period_end_date, coin_cohort=None, parquet_prefix=None):
     """
-    Retrieves market and profits data.
-
-    profits_df
-    - Earliest record: an imputed row for the date before period_start_date with $0 transers and the
-        balance representing their date-end holdings at date-end prices.
-    - Latest record: period_end_date
-
-    market_data_df
-    - Earliest record: as far back as the database goes
-    - Latest record: period_end_date
-
+    Retrieves and processes data for a specific period. If coin_cohort provided,
+    filters to those coins. Otherwise applies full cleaning pipeline to establish cohort.
 
     Params:
-    - period_start_date,period_end_date (YYYY-MM-DD): The data period boundary dates. A row will be imputed
-        for the date directly before the period start date showing ending balances.
-    - parquet_prefix,parquet_folder (strings): Where to save the parquet file. If no value, returns the df.
+    - period_start_date,period_end_date (str): Period boundaries
+    - coin_cohort (set, optional): Coin IDs from training cohort
+    - parquet_prefix (str, optional): Prefix for saved parquet files
 
     Returns:
-    - profits_df: with imputed row
-    - market_data_df: from the beginning of time through period end
-
+    - tuple: (profits_df, market_data_df, coin_cohort) for the period
     """
-    # Get raw data
+    # Get raw period data
     profits_df, market_data_df = retrieve_raw_datasets(period_start_date, period_end_date)
 
-    # Clean market data and filter profits accordingly
-    market_data_df = clean_market_dataset(market_data_df, profits_df, period_start_date, period_end_date)
-    profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
+    if coin_cohort is not None:
+        # Filter to existing cohort before processing
+        profits_df = profits_df[profits_df['coin_id'].isin(coin_cohort)]
+        market_data_df = market_data_df[market_data_df['coin_id'].isin(coin_cohort)]
+    else:
+        # Apply full cleaning to establish cohort
+        market_data_df = clean_market_dataset(market_data_df, profits_df, period_start_date, period_end_date)
+        profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
+        coin_cohort = set(market_data_df['coin_id'].unique())
 
-    # Format datasets
-    profits_df, market_data_df = format_and_save_datasets(
+    # Format and optionally save the datasets
+    parquet_folder = wallets_config['training_data']['parquet_folder'] if parquet_prefix else None
+    formatted_data = format_and_save_datasets(
         profits_df,
         market_data_df,
-        datetime.strptime(period_start_date,'%Y-%m-%d') - timedelta(days=1),
+        period_start_date,
         parquet_prefix,
         parquet_folder
     )
 
-    return profits_df, market_data_df
-
+    return formatted_data, coin_cohort
 
 
 @u.timing_decorator
