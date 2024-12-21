@@ -4,17 +4,13 @@ Orchestrates groups of functions to generate wallet model pipeline
 
 import time
 import logging
-from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
-from dreams_core import core as dc
 
 # Local module imports
-import training_data.data_retrieval as dr
 import training_data.profits_row_imputation as pri
 import coin_wallet_metrics.indicators as ind
 import wallet_modeling.wallet_training_data as wtd
 import wallet_features.trading_features as wtf
-import wallet_features.market_cap_features as wmc
 from wallet_modeling.wallets_config_manager import WalletsConfig
 import utils as u
 
@@ -25,99 +21,49 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 
 
+
 @u.timing_decorator
-def retrieve_period_datasets(start_date,end_date,
-                             parquet_prefix=None,parquet_folder="temp/wallet_modeling_dfs"):
+def retrieve_period_datasets(period_start_date, period_end_date, coin_cohort=None, parquet_prefix=None):
     """
-    Retrieves market and profits data
+    Retrieves and processes data for a specific period. If coin_cohort provided,
+    filters to those coins. Otherwise applies full cleaning pipeline to establish cohort.
+
+    Params:
+    - period_start_date,period_end_date (str): Period boundaries
+    - coin_cohort (set, optional): Coin IDs from training cohort
+    - parquet_prefix (str, optional): Prefix for saved parquet files
+
+    Returns:
+    - tuple: (profits_df, market_data_df, coin_cohort) for the period
     """
+    # Get raw period data
+    profits_df, market_data_df = wtd.retrieve_raw_datasets(period_start_date, period_end_date)
 
-    # Retrieve profits_df and market_data_df concurrently
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        profits_future = executor.submit(
-            dr.retrieve_profits_data,
-            start_date,
-            end_date,
-            wallets_config['data_cleaning']['min_wallet_inflows']
-        )
-        market_future = executor.submit(dr.retrieve_market_data)
+    if coin_cohort is not None:
+        # Filter to existing cohort before processing
+        profits_df = profits_df[profits_df['coin_id'].isin(coin_cohort)]
+        market_data_df = market_data_df[market_data_df['coin_id'].isin(coin_cohort)]
+    else:
+        # Apply full cleaning to establish cohort
+        market_data_df = wtd.clean_market_dataset(market_data_df, profits_df, period_start_date, period_end_date)
+        profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
+        coin_cohort = set(market_data_df['coin_id'].unique())
+        logger.info("Defined coin cohort of %s coins after applying data cleaning filters.",
+                    len(coin_cohort))
 
-        profits_df = profits_future.result()
-        market_data_df = market_future.result()
+    # Impute the period end (period start is pre-imputed during profits_df generation)
+    imputed_profits_df = pri.impute_profits_for_multiple_dates(profits_df, market_data_df,
+                                                               [period_end_date], n_threads=1)
 
-    # Remove all records after the training period end to ensure no data leakage
-    market_data_df = market_data_df[market_data_df['date']<=end_date]
-
-    # Clean market_data_df
-    market_data_df = market_data_df[market_data_df['coin_id'].isin(profits_df['coin_id'])]
-    market_data_df = dr.clean_market_data(
+    # Format and optionally save the datasets
+    profits_df_formatted, market_data_df_formatted = wtd.format_and_save_datasets(
+        imputed_profits_df,
         market_data_df,
-        wallets_config,
-        start_date,
-        end_date
+        period_start_date,
+        parquet_prefix
     )
 
-    # Intelligently impute market cap data in market_data_df when good data is available
-    market_data_df = dr.impute_market_cap(market_data_df,
-                                        wallets_config['data_cleaning']['min_mc_imputation_coverage'],
-                                        wallets_config['data_cleaning']['max_mc_imputation_multiple'])
-
-    # Crudely fill all remaining gaps in market cap data
-    market_data_df = wmc.force_fill_market_cap(market_data_df)
-
-    # Remove coins that exceeded the initial market cap threshold at the start of the training period
-    max_initial_market_cap = wallets_config['data_cleaning']['max_initial_market_cap']
-    above_initial_threshold_coins = market_data_df[
-        (market_data_df['date']==wallets_config['training_data']['training_period_start'])
-        & (market_data_df['market_cap_filled']>max_initial_market_cap)
-    ]['coin_id']
-    market_data_df = market_data_df[~market_data_df['coin_id'].isin(above_initial_threshold_coins)]
-    logger.info("Removed data for %s coins with a market cap above $%s at the start of the training period."
-                ,len(above_initial_threshold_coins),dc.human_format(max_initial_market_cap))
-
-    # Remove the filtered coins from profits_df
-    profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
-
-    # Clean profits_df
-    profits_df, _ = dr.clean_profits_df(profits_df, wallets_config['data_cleaning'])
-
-    # Drop unneeded columns
-    columns_to_drop = ['total_return']
-    profits_df = profits_df.drop(columns_to_drop,axis=1)
-
-    # Round relevant columns
-    columns_to_round = [
-        'profits_cumulative'
-        ,'usd_balance'
-        ,'usd_net_transfers'
-        ,'usd_inflows'
-        ,'usd_inflows_cumulative'
-    ]
-    profits_df[columns_to_round] = profits_df[columns_to_round].round(2)
-    profits_df[columns_to_round] = profits_df[columns_to_round].replace(-0, 0)
-
-    # Remove rows with a rounded 0 balance and 0 transfers
-    profits_df = profits_df[
-        ~((profits_df['usd_balance'] == 0) &
-        (profits_df['usd_net_transfers'] == 0))
-    ]
-
-    # If a parquet file location is specified, store the files there and return nothing
-    if parquet_prefix:
-        # Store profits
-        profits_file = f"{parquet_folder}/{parquet_prefix}_profits_df_full.parquet"
-        profits_df.to_parquet(profits_file,index=False)
-        logger.info(f"Stored profits_df with shape {profits_df.shape} to {profits_file}.")
-
-        # Store market data
-        market_data_file = f"{parquet_folder}/{parquet_prefix}_market_data_df_full.parquet"
-        market_data_df.to_parquet(market_data_file,index=False)
-        logger.info(f"Stored market_data_df with shape {market_data_df.shape} to {market_data_file}.")
-
-
-    # Otherwise return the dfs
-    else:
-        return profits_df,market_data_df
+    return profits_df_formatted, market_data_df_formatted, coin_cohort
 
 
 @u.timing_decorator
@@ -127,21 +73,24 @@ def define_wallet_cohort(profits_df,market_data_df):
     """
     start_time = time.time()
     logger.info("Defining wallet cohort based on cleaning params...")
+    training_period_start = wallets_config['training_data']['training_period_start']
+    training_period_end = wallets_config['training_data']['training_period_end']
 
     # Impute the training period end (training period start is pre-imputed into profits_df generation)
-    training_period_end = [wallets_config['training_data']['training_period_end']]
     imputed_profits_df = pri.impute_profits_for_multiple_dates(profits_df, market_data_df,
-                                                            training_period_end, n_threads=24)
+                                                               [training_period_end], n_threads=24)
 
     # Create a training period only profits_df
     training_profits_df = imputed_profits_df[
-        imputed_profits_df['date']<=wallets_config['training_data']['training_period_end']
+        imputed_profits_df['date']<=training_period_end
         ].copy()
 
     # Compute wallet level metrics over duration of training period
     logger.info("Generating training period trading features...")
-    training_profits_df = wtf.add_cash_flow_transfers_logic(training_profits_df)
-    training_wallet_metrics_df = wtf.calculate_wallet_trading_features(training_profits_df)
+    training_wallet_metrics_df = wtf.calculate_wallet_trading_features(training_profits_df,
+                                                                       training_period_start,
+                                                                       training_period_end,
+                                                                       calculate_full_metrics=False)
 
     # Apply filters based on wallet behavior during the training period
     logger.info("Identifying and uploading wallet cohort...")
@@ -159,7 +108,7 @@ def define_wallet_cohort(profits_df,market_data_df):
 
 
 @u.timing_decorator
-def split_profits_df(training_profits_df,training_market_data_df,wallet_cohort):
+def split_training_window_profits_dfs(training_profits_df,training_market_data_df,wallet_cohort):
     """
     Adds imputed rows at the start and end date of all windows
     """
@@ -167,9 +116,11 @@ def split_profits_df(training_profits_df,training_market_data_df,wallet_cohort):
     cohort_profits_df = training_profits_df[training_profits_df['wallet_address'].isin(wallet_cohort)]
 
     # Impute all training window dates
-    training_window_dates = wtd.generate_training_window_dates()
-    training_windows_profits_df = pri.impute_profits_for_multiple_dates(cohort_profits_df, training_market_data_df,
-                                                               training_window_dates, n_threads=24)
+    training_window_boundary_dates = wtd.generate_training_window_imputation_dates()
+    training_windows_profits_df = pri.impute_profits_for_multiple_dates(cohort_profits_df,
+                                                                        training_market_data_df,
+                                                                        training_window_boundary_dates,
+                                                                        n_threads=1)
 
     # drop imputed total_return column
     training_windows_profits_df = training_windows_profits_df.drop('total_return', axis=1)
@@ -200,7 +151,10 @@ def generate_training_indicators_df(training_market_data_df_full,wallets_metrics
 
     Returns:
     - market_indicators_data_df (df): market_data_df for the training period only
+
     """
+    logger.info("Beginning indicator generation process...")
+
     # Validate date range
     training_period_end = wallets_config['training_data']['training_period_end']
     latest_market_data_record = training_market_data_df_full['date'].max()
@@ -236,45 +190,50 @@ def generate_training_indicators_df(training_market_data_df_full,wallets_metrics
 
 
 @u.timing_decorator
-def filter_modeling_period_wallets(modeling_period_profits_df):
+def identify_modeling_cohort(modeling_period_profits_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Applies data cleaning filters to remove modeling period wallets without sufficient activity
-    """
-    # Validate date range
-    modeling_period_start = wallets_config['training_data']['modeling_period_start']
-    modeling_period_end = wallets_config['training_data']['modeling_period_end']
+    Adds boolean flag indicating if wallet meets modeling period activity criteria
 
-    if not modeling_period_profits_df['date'].between(modeling_period_start, modeling_period_end).all():
-        raise ValueError(
-            f"Detected dates outside the modeling period range: "
-            f"{modeling_period_start} to {modeling_period_end}"
-        )
+    Params:
+    - modeling_period_profits_df (DataFrame): Input profits data with index wallet_address
+
+    Returns:
+    - DataFrame: Original dataframe index wallet_address with added boolean in_wallet_cohort \
+        column that indicates if the wallet met the wallet cohort thresholds
+    """
+
+    logger.info("Identifying modeling cohort...")
+
+    # Validate date range
+    u.assert_period(wallets_config,modeling_period_profits_df,'modeling')
 
     # Calculate modeling period wallet metrics
-    modeling_period_profits_df = wtf.add_cash_flow_transfers_logic(modeling_period_profits_df)
-    modeling_wallets_df = wtf.calculate_wallet_trading_features(modeling_period_profits_df)
+    modeling_wallets_df = wtf.calculate_wallet_trading_features(modeling_period_profits_df,
+                                            wallets_config['training_data']['modeling_period_start'],
+                                            wallets_config['training_data']['modeling_period_end'],
+                                            calculate_full_metrics=True)
 
     # Extract thresholds
-    min_modeling_investment = wallets_config['data_cleaning']['min_modeling_investment']
-    min_modeling_transaction_days = wallets_config['data_cleaning']['min_modeling_transaction_days']
+    modeling_min_investment = wallets_config['data_cleaning']['modeling_min_investment']
+    modeling_min_coins_traded = wallets_config['data_cleaning']['modeling_min_coins_traded']
 
-    # Remove wallets with below the minimum investment threshold
-    base_wallets = len(modeling_wallets_df)
-    modeling_wallets_df = modeling_wallets_df[
-        modeling_wallets_df['max_investment'] >= min_modeling_investment]
-    logger.info("Removed %s/%s wallets with modeling period investments below $%s.",
-                base_wallets - len(modeling_wallets_df), base_wallets,
-                min_modeling_investment)
+    # Create boolean mask for qualifying wallets
+    meets_criteria = (
+        (modeling_wallets_df['max_investment'] >= modeling_min_investment) &
+        (modeling_wallets_df['unique_coins_traded'] >= modeling_min_coins_traded)
+    )
 
-    # Remove wallets with transaction counts below the threshold
-    base_wallets = len(modeling_wallets_df)
-    modeling_wallets_df = modeling_wallets_df[
-        modeling_wallets_df['transaction_days'] >= min_modeling_transaction_days]
-    logger.info("Removed %s/%s wallets with modeling period transaction days below %s.",
-                base_wallets - len(modeling_wallets_df), base_wallets,
-                min_modeling_transaction_days)
+    # Log stats about wallet cohort
+    total_wallets = len(modeling_wallets_df)
+    qualifying_wallets = meets_criteria.sum()
+    logger.info(
+        f"Identified {qualifying_wallets} qualifying wallets ({100*qualifying_wallets/total_wallets:.2f}% "
+        f"of {total_wallets} total wallets with modeling period activity) meeting modeling cohort criteria: "
+        f"min_investment=${modeling_min_investment}, min_days={modeling_min_coins_traded}"
+    )
 
-    logger.info("Selected wallet cohort of %s using %0.2f%% the %s training cohort wallets.",
-                len(modeling_wallets_df), 100*len(modeling_wallets_df)/base_wallets, base_wallets)
+    # Add boolean flag column as 1s and 0s
+    modeling_wallets_df['in_modeling_cohort'] = meets_criteria.astype(int)
+
 
     return modeling_wallets_df

@@ -81,7 +81,11 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
 
     Raises:
         ValueError: If any NaN values are found in the new_rows_df DataFrames.
+
     """
+    if not isinstance(dates, list):
+        raise TypeError(f"dates parameter '{dates}' must be a list.")
+
     start_time = time.time()
     logger.info("Starting profits_df imputation for %s dates...", len(dates))
 

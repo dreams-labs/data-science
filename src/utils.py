@@ -591,12 +591,13 @@ def assert_period(config, df: pd.DataFrame, period: str) -> None:
     config = config['training_data']
     period_start = pd.to_datetime(config[f"{period}_period_start"])
     period_end = pd.to_datetime(config[f"{period}_period_end"])
+    period_starting_balance = pd.to_datetime(config[f"{period}_starting_balance_date"])
 
     # Vectorized min/max comparison
     df_min = df['date'].min()
     df_max = df['date'].max()
 
-    if df_min < period_start or df_max > period_end:
+    if df_min < period_starting_balance or df_max > period_end:
         raise ValueError(
             f"Data outside {period} period boundaries.\n"
             f"Data range: {df_min} to {df_max}\n"
@@ -604,9 +605,9 @@ def assert_period(config, df: pd.DataFrame, period: str) -> None:
         )
 
 
-def cw_filter_df(df, coin_id, wallet_address):
+def cw_filter(df, coin_id, wallet_address):
     """
-    Filter DataFrame by coin_id and wallet_address.
+    Filter DataFrame by coin_id and wallet_address, sort by date if available.
 
     Args:
         df (pd.DataFrame): The DataFrame to filter.
@@ -614,13 +615,46 @@ def cw_filter_df(df, coin_id, wallet_address):
         wallet_address (str): The wallet address to filter by.
 
     Returns:
-        pd.DataFrame: Filtered DataFrame.
+        pd.DataFrame: Filtered DataFrame, optionally sorted by date.
     """
     filtered_df = df[
         (df['coin_id'] == coin_id) &
         (df['wallet_address'] == wallet_address)
     ]
+
+    if 'date' in df.columns:
+        filtered_df = filtered_df.sort_values('date')
+
     return filtered_df
+
+
+def cw_sample(profits_df: pd.DataFrame, n: int = 5) -> pd.DataFrame:
+    """
+    Retrieve all rows for n random coin-wallet pairs.
+
+    Params:
+    - profits_df (DataFrame): Input profits data with coin_id, wallet_address columns
+    - n (int): Number of coin-wallet pairs to retrieve
+
+    Returns:
+    - subset_df (DataFrame): All rows for selected coin-wallet pairs
+    """
+    # Get unique combinations efficiently using drop_duplicates
+    unique_pairs = profits_df[['coin_id', 'wallet_address']].drop_duplicates()
+
+    # Sample n random pairs
+    selected_pairs = unique_pairs.sample(n=n)
+
+    # Create efficient boolean mask using isin() on multi-column condition
+    mask = profits_df.set_index(['coin_id', 'wallet_address'])\
+                    .index\
+                    .isin(selected_pairs.set_index(['coin_id', 'wallet_address'])\
+                    .index)
+
+    # Return filtered dataframe
+    subset_df = profits_df[mask].sort_values(['coin_id', 'wallet_address', 'date'])
+
+    return subset_df
 
 
 def df_nans(df):

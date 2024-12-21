@@ -24,62 +24,87 @@ wallets_metrics_config = u.load_config('../config/wallets_metrics_config.yaml')
 wallets_features_config = yaml.safe_load(Path('../config/wallets_features_config.yaml').read_text(encoding='utf-8'))
 
 
-def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_sequencing_df, wallet_cohort):
+def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_sequencing_df,
+                              wallet_cohort, period_start_date, period_end_date):
     """
-    Calculates all features for the wallets in a given profits_df
+    Calculates all features for the wallet_cohort in a given profits_df, returning a df with a
+    row for every wallet in the cohort.
+
+    Imputed Row Dependencies:
+    - Trading Features: Requires starting_balance_date and period_end_date for performance calculation
+    - Performance Features: Inherits from trading features
+    - Market Cap Features:
+        - Volume weighted: Uses only real transfers (~is_imputed)
+        - Balance weighted: Uses period_end_date balances
+    - Market Timing Features: Uses only real transfers (~is_imputed)
+    - Transfers Features: Uses only real transfers (~is_imputed)
+
+    Function Dependencies:
+    1. Trading features must precede Performance features
+    2. All other features can be calculated independently
 
     Params:
-    - profits_df (df): for the window over which the metrics should be computed
-    - market_indicators_data_df (df): the full market data df with indicators added
-    - transfers_sequencing_df (df): each wallet's lifetime transfers data
-    - wallet_cohort (array-like): Array of all wallet addresses that should be present
+    - profits_df (df): Daily profits with imputed rows on:
+        1. starting_balance_date (period start reference)
+        2. period_end_date (period end reference)
+    - market_indicators_data_df (df): Market data with technical indicators
+    - transfers_sequencing_df (df): Lifetime transfers data
+    - wallet_cohort (array-like): All wallet addresses to include
+    - period_start_date (str): Period start in 'YYYY-MM-DD' format
+    - period_end_date (str): Period end in 'YYYY-MM-DD' format
 
     Returns:
-    - wallet_features_df (df): df indexed on wallet_address with all features
+    - wallet_features_df (df): Wallet-indexed features dataframe with a row for every wallet_cohort
     """
-    # Create a DataFrame with all wallets that should exist
+    # Initialize output dataframe
     wallet_features_df = pd.DataFrame(index=wallet_cohort)
     wallet_features_df.index.name = 'wallet_address'
-
-    # Store feature sets with their prefixes for bulk renaming
     feature_column_names = {}
 
-    # Trading features (inner join, custom fill)
-    profits_df = wtf.add_cash_flow_transfers_logic(profits_df)
-    trading_features_df = wtf.calculate_wallet_trading_features(profits_df)
+    # Trading features (left join, fill 0s)
+    # Requires both starting_balance_date and period_end_date imputed rows
+    # -----------------------------------------------------------------------
+    trading_features_df = wtf.calculate_wallet_trading_features(profits_df,period_start_date,period_end_date)
     feature_column_names['trading_'] = trading_features_df.columns
     wallet_features_df = wallet_features_df.join(trading_features_df, how='left')\
         .fillna({col: 0 for col in trading_features_df.columns})
 
-    # Market timing features (fill zeros)
+    # Performance features (left join, fill 0s)
+    # Inherits trading features imputed rows requirement
+    # -----------------------------------------------------------------------
+    performance_features_df = (wpf.calculate_performance_features(wallet_features_df)
+                            .drop(['max_investment', 'crypto_net_gain'], axis=1))
+    feature_column_names['performance_'] = performance_features_df.columns
+    wallet_features_df = wallet_features_df.join(performance_features_df, how='left')\
+        .fillna({col: 0 for col in performance_features_df.columns})
+
+    # Market timing features (left join, fill 0s)
+    # Uses only real transfers (~is_imputed)
+    # -----------------------------------------------------------------------
     timing_features_df = wmt.calculate_market_timing_features(profits_df, market_indicators_data_df)
     feature_column_names['timing_'] = timing_features_df.columns
     wallet_features_df = wallet_features_df.join(timing_features_df, how='left')\
         .fillna({col: 0 for col in timing_features_df.columns})
 
-    # Market cap features (fill zeros)
+    # Market cap features (left join, fill 0s)
+    # Volume weighted uses real transfers, balance weighted uses period_end_date
+    # -----------------------------------------------------------------------
     market_features_df = wmc.calculate_market_cap_features(profits_df, market_indicators_data_df)
     feature_column_names['mktcap_'] = market_features_df.columns
     wallet_features_df = wallet_features_df.join(market_features_df, how='left')\
         .fillna({col: 0 for col in market_features_df.columns})
 
-    # Transfers features (fill -1)
+    # Transfers features (left join, fill -1s)
+    # Uses only real transfers (~is_imputed)
+    # -----------------------------------------------------------------------
     transfers_features_df = wts.calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
     feature_column_names['transfers_'] = transfers_features_df.columns
     wallet_features_df = wallet_features_df.join(transfers_features_df, how='left')\
         .fillna({col: -1 for col in transfers_features_df.columns})
 
-    # Performance features (inner join, no fill)
-    performance_features_df = (wpf.calculate_performance_features(wallet_features_df)
-                                  .drop(['max_investment', 'total_net_flows'], axis=1))  # already exist as trading features
-    feature_column_names['performance_'] = performance_features_df.columns
-    wallet_features_df = wallet_features_df.join(performance_features_df, how='inner')
+    # Apply feature prefixes
+    rename_map = {col: f"{prefix}{col}"
+                for prefix, cols in feature_column_names.items()
+                for col in cols}
 
-    # Bulk rename all columns with their respective prefixes to make data lineage clear
-    rename_map = {}
-    for prefix, cols in feature_column_names.items():
-        rename_map.update({col: f"{prefix}{col}" for col in cols})
-
-    wallet_features_df = wallet_features_df.rename(columns=rename_map)
-
-    return wallet_features_df
+    return wallet_features_df.rename(columns=rename_map)

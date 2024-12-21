@@ -150,7 +150,6 @@ def prepare_all_windows_base_data(config, metrics_config):
     # Profits: retrieve and clean profits data spanning the earliest to latest training periods
     profits_df = dr.retrieve_profits_data(config['training_data']['earliest_cohort_lookback_start'],
                                           config['training_data']['training_period_end'],
-                                          config['data_cleaning']['min_wallet_inflows'],
                                           config['data_cleaning']['maximum_market_cap_share'])
     profits_df, _ = dr.clean_profits_df(profits_df, config['data_cleaning'])
 

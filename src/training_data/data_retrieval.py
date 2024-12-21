@@ -16,25 +16,34 @@ import utils as u  # pylint: disable=C0413  # import must be at top
 logger = logging.getLogger(__name__)
 
 
-def retrieve_market_data():
+def retrieve_market_data(dataset='prod'):
     """
     Retrieves market data from the core.coin_market_data table and converts coin_id to categorical
+    Params:
+    - dataset (str): 'prod' targets core dataset, 'dev' targets dev_core dataset
 
     Returns:
     - market_data_df: DataFrame containing market data with 'coin_id' as a categorical column.
     """
     start_time = time.time()
-    logger.info('Retrieving market data...')
+
+    if dataset == 'prod':
+        core_dataset = 'core'
+    elif dataset == 'dev':
+        core_dataset = 'dev_core'
+    else:
+        raise ValueError("Invalid dataset parameter '%s', dataset must be 'dev' or 'prod'.")
 
     # SQL query to retrieve market data
-    query_sql = """
+    logger.info(f"Retrieving market data from {dataset} dataset '{core_dataset}'...")
+    query_sql = f"""
         select cmd.coin_id
         ,date
         ,cast(cmd.price as float64) as price
         ,cast(cmd.volume as int64) as volume
         ,cast(cmd.market_cap as int64) as market_cap
         ,days_imputed
-        from core.coin_market_data cmd
+        from {core_dataset}.coin_market_data cmd
         order by 1,2
     """
     # Run the SQL query using dgc's run_sql method
@@ -266,7 +275,7 @@ def impute_market_cap(market_data_df, min_coverage=0.7, max_multiple=1.0):
 
 
 
-def retrieve_profits_data(start_date, end_date, min_wallet_inflows):
+def retrieve_profits_data(start_date, end_date, min_wallet_inflows, dataset='prod'):
     """
     Retrieves data from the core.coin_wallet_profits table and converts columns to
     memory-efficient formats. Records prior to the start_date are excluded but a new
@@ -276,8 +285,10 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows):
     Params:
     - start_date (String): The earliest date to retrieve records for with format 'YYYY-MM-DD'
     - start_date (String): The latest date to retrieve records for with format 'YYYY-MM-DD'
-    - min_wallet_inflows (Float): Wallet-coin pairs with fewer than this amount of total
-        USD inflows will be removed from the profits_df dataset
+    - min_wallet_inflows (Float): Wallets with fewer than this amount of total USD inflows
+        across all coins will be removed from the profits_df dataset
+    - dataset (String): determines bigquery dataset. 'prod' targets 'core._'; 'dev' targets 'dev_core._'
+
 
     Returns:
     - profits_df (DataFrame): contains coin-wallet-date keyed profits data denominated in USD
@@ -286,13 +297,22 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows):
         memory optimization
     """
     start_time = time.time()
-    logger.info('Retrieving profits data...')
+
+    if dataset == 'prod':
+        core_dataset = 'core'
+    elif dataset == 'dev':
+        core_dataset = 'dev_core'
+    else:
+        raise ValueError("Invalid dataset parameter '%s', dataset must be 'dev' or 'prod'.")
+
 
     # SQL query to retrieve profits data
+    logger.info(f"Retrieving profits data from {dataset} dataset '{core_dataset}'...")
+
     query_sql = f"""
         -- STEP 1: retrieve profits data and apply USD inflows filter
         -------------------------------------------------------------
-        with profits_base as (
+        with profits_full as (
             select coin_id
             ,date
             ,wallet_address
@@ -301,7 +321,7 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows):
             ,usd_net_transfers
             ,usd_inflows
             ,usd_inflows_cumulative
-            from core.coin_wallet_profits
+            from {core_dataset}.coin_wallet_profits
             where date <= '{end_date}'
         ),
 
@@ -309,20 +329,18 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows):
             select coin_id
             ,wallet_address
             ,max(usd_inflows_cumulative) as total_usd_inflows
-            from profits_base
-            -- we don't need to include coin-wallet pairs that have no transactions between
-            -- the start and end dates
+            from profits_full
             group by 1,2
         ),
 
-        profits_base_filtered as (
-            select pb.*
-            from profits_base pb
+        profits_base as (
+            select pf.*
+            from profits_full pf
 
             -- filter to remove wallet-coin pairs below the min_wallet_inflows
-            join usd_inflows_filter f on f.coin_id = pb.coin_id
-                and f.wallet_address = pb.wallet_address
-                and f.total_usd_inflows >= {min_wallet_inflows}
+            join usd_inflows_filter f on f.coin_id = pf.coin_id
+                and f.wallet_address = pf.wallet_address
+            where f.total_usd_inflows >= {min_wallet_inflows}
         ),
 
 
@@ -332,7 +350,7 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows):
         training_start_existing_rows as (
             -- identify coin-wallet pairs that already have a balance as of the period end
             select *
-            from profits_base_filtered
+            from profits_base
             where date = '{start_date}'
         ),
         training_start_needs_rows as (
@@ -341,15 +359,15 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows):
             ,cmd_previous.price as price_previous
             ,cmd_training.price as price_current
             ,row_number() over (partition by t.coin_id,t.wallet_address order by t.date desc) as rn
-            from profits_base_filtered t
+            from profits_base t
             left join training_start_existing_rows e on e.coin_id = t.coin_id
                 and e.wallet_address = t.wallet_address
 
             -- obtain the last price used to compute the balance and profits data
-            join core.coin_market_data cmd_previous on cmd_previous.coin_id = t.coin_id and cmd_previous.date = t.date
+            join {core_dataset}.coin_market_data cmd_previous on cmd_previous.coin_id = t.coin_id and cmd_previous.date = t.date
 
             -- obtain the training_period_start price so we can update the calculations
-            join core.coin_market_data cmd_training on cmd_training.coin_id = t.coin_id and cmd_training.date = '{start_date}'
+            join {core_dataset}.coin_market_data cmd_training on cmd_training.coin_id = t.coin_id and cmd_training.date = '{start_date}'
             where t.date < '{start_date}'
             and e.coin_id is null
         ),
@@ -379,7 +397,7 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows):
         profits_merged as (
             select *,
             False as is_imputed
-            from profits_base_filtered
+            from profits_base
             -- transfers prior to the training period are summarized in training_start_new_rows
             where date >= '{start_date}'
 

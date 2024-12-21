@@ -40,7 +40,7 @@ class RegressionEvaluator:
         _plot_residuals_distribution(ax): Plots histogram of residuals
         _plot_feature_importance(ax): Plots feature importance if available from model
     """
-    def __init__(self, y_train, y_true, y_pred, training_cohort_pred, model=None, feature_names=None):
+    def __init__(self, y_train, y_true, y_pred, training_cohort_pred, training_cohort_actuals, model=None, feature_names=None):
         """
         Initialize the evaluator with actual and predicted values.
 
@@ -49,9 +49,13 @@ class RegressionEvaluator:
         y_train : array-like
             Training set values (used for reporting)
         y_true : array-like
-            Actual target values
+            Actual target values for modeling cohort test set
         y_pred : array-like
-            Predicted target values
+            Predicted target values for modeling cohort test set
+        training_cohort_pred : array-like
+            Predicted values for full training cohort
+        training_cohort_actuals : array-like
+            Actual values for full training cohort
         model : sklearn estimator, optional
             The fitted model object
         feature_names : list, optional
@@ -61,6 +65,7 @@ class RegressionEvaluator:
         self.y_true = np.array(y_true)
         self.y_pred = np.array(y_pred)
         self.training_cohort_pred = np.array(training_cohort_pred)
+        self.training_cohort_actuals = np.array(training_cohort_actuals)
         self.model = model
         self.feature_names = feature_names
         self.metrics = None
@@ -68,15 +73,17 @@ class RegressionEvaluator:
         self._calculate_metrics()
 
 
+
     def _calculate_metrics(self):
-        """Calculate all regression metrics including cohort comparisons."""
+        """Calculate regression metrics for both modeling and training cohorts."""
         self.metrics = {}
 
         # Add sample counts
         self.metrics['train_samples'] = len(self.y_train)
         self.metrics['test_samples'] = len(self.y_pred)
+        self.metrics['total_cohort_samples'] = len(self.training_cohort_actuals)
 
-        # Basic regression metrics
+        # Modeling cohort test set metrics
         self.metrics['mse'] = mean_squared_error(self.y_true, self.y_pred)
         self.metrics['rmse'] = np.sqrt(self.metrics['mse'])
         self.metrics['mae'] = mean_absolute_error(self.y_true, self.y_pred)
@@ -84,7 +91,16 @@ class RegressionEvaluator:
         self.metrics['r2'] = r2_score(self.y_true, self.y_pred)
         self.metrics['explained_variance'] = explained_variance_score(self.y_true, self.y_pred)
 
-        # Residuals analysis
+        # Training cohort metrics
+        self.metrics['training_cohort'] = {
+            'mse': mean_squared_error(self.training_cohort_actuals, self.training_cohort_pred),
+            'rmse': np.sqrt(mean_squared_error(self.training_cohort_actuals, self.training_cohort_pred)),
+            'mae': mean_absolute_error(self.training_cohort_actuals, self.training_cohort_pred),
+            'mape': mean_absolute_percentage_error(self.training_cohort_actuals, self.training_cohort_pred),
+            'r2': r2_score(self.training_cohort_actuals, self.training_cohort_pred),
+        }
+
+        # Residuals analysis (on modeling cohort test set)
         self.residuals = self.y_true - self.y_pred
         self.metrics['residuals_mean'] = np.mean(self.residuals)
         self.metrics['residuals_std'] = np.std(self.residuals)
@@ -99,13 +115,17 @@ class RegressionEvaluator:
             'modeling_std': np.std(self.y_pred),
             'modeling_q25': np.percentile(self.y_pred, 25),
             'modeling_q75': np.percentile(self.y_pred, 75),
-            'training_mean': np.mean(self.training_cohort_pred),
-            'training_std': np.std(self.training_cohort_pred),
-            'training_q25': np.percentile(self.training_cohort_pred, 25),
-            'training_q75': np.percentile(self.training_cohort_pred, 75)
+            'training_mean_pred': np.mean(self.training_cohort_pred),
+            'training_std_pred': np.std(self.training_cohort_pred),
+            'training_q25_pred': np.percentile(self.training_cohort_pred, 25),
+            'training_q75_pred': np.percentile(self.training_cohort_pred, 75),
+            'training_mean_actual': np.mean(self.training_cohort_actuals),
+            'training_std_actual': np.std(self.training_cohort_actuals),
+            'training_q25_actual': np.percentile(self.training_cohort_actuals, 25),
+            'training_q75_actual': np.percentile(self.training_cohort_actuals, 75)
         }
 
-        # Calculate feature importances if available
+        # Feature importances calculation remains unchanged
         if self.model is not None and hasattr(self.model, 'feature_importances_'):
             importances = self.model.feature_importances_
             if self.feature_names is None:
@@ -124,26 +144,34 @@ class RegressionEvaluator:
 
 
     def summary_report(self):
-        """
-        Generate and return a formatted text summary of the model's performance.
-
-        Returns:
-        - str: Formatted summary of model metrics
-        """
+        """Generate and return a formatted summary of model performance by cohort."""
         summary = [
             "Model Performance Summary",
-            f"Train {self.metrics['train_samples']:,d} | Test {self.metrics['test_samples']:,d}",
-            "=" * 25,
-            f"R² Score:                    {self.metrics['r2']:.3f}",
-            f"RMSE:                        {self.metrics['rmse']:.3f}",
-            f"MAE:                         {self.metrics['mae']:.3f}",
-            f"MAPE:                        {self.metrics['mape']:.1f}%",
+            "=" * 50,
+            "Sample Sizes:",
+            f"Training Cohort:          {self.metrics['total_cohort_samples']:,d}",
+            f"Modeling Cohort Train:    {self.metrics['train_samples']:,d}",
+            f"Modeling Cohort Test:     {self.metrics['test_samples']:,d}",
+            "",
+            "Modeling Cohort Metrics (Test Set)",
+            "-" * 35,
+            f"R² Score:                 {self.metrics['r2']:.3f}",
+            f"RMSE:                     {self.metrics['rmse']:.3f}",
+            f"MAE:                      {self.metrics['mae']:.3f}",
+            f"MAPE:                     {self.metrics['mape']:.1f}%",
+            "",
+            "Training Cohort Metrics",
+            "-" * 35,
+            f"R² Score:                 {self.metrics['training_cohort']['r2']:.3f}",
+            f"RMSE:                     {self.metrics['training_cohort']['rmse']:.3f}",
+            f"MAE:                      {self.metrics['training_cohort']['mae']:.3f}",
+            f"MAPE:                     {self.metrics['training_cohort']['mape']:.1f}%",
             "",
             "Residuals Analysis",
-            "=" * 25,
-            f"Mean of Residuals:           {self.metrics['residuals_mean']:.3f}",
-            f"Standard Dev of Residuals:   {self.metrics['residuals_std']:.3f}",
-            f"95% Prediction Interval:     ±{self.metrics['prediction_interval_95']:.3f}"
+            "-" * 35,
+            f"Mean of Residuals:        {self.metrics['residuals_mean']:.3f}",
+            f"Standard Dev of Residuals:{self.metrics['residuals_std']:.3f}",
+            f"95% Prediction Interval:  ±{self.metrics['prediction_interval_95']:.3f}"
         ]
 
         return "\n".join(summary)
@@ -296,24 +324,28 @@ class RegressionEvaluator:
 
 
     def _plot_cohort_comparison(self, ax):
-        """Plot density comparison of modeling vs training cohort predictions."""
-        # Create KDE plots for both distributions
-        sns.kdeplot(data=self.y_pred, ax=ax, label='Modeling Cohort', color='#69c4ff')
-        sns.kdeplot(data=self.training_cohort_pred, ax=ax, label='Training Cohort', color='#ff6969')
+        """Plot density comparison of both cohorts' predictions and training cohort actuals."""
+        # Create KDE plots for distributions
+        sns.kdeplot(data=self.y_pred, ax=ax, label='Modeling Cohort (pred)', color='#69c4ff')
+        sns.kdeplot(data=self.training_cohort_pred, ax=ax, label='Training Cohort (pred)', color='#ff6969')
+        sns.kdeplot(data=self.training_cohort_actuals, ax=ax, label='Actual Values', color='#69ff69')
 
         # Add mean lines
         ax.axvline(np.mean(self.y_pred), color='#69c4ff', linestyle='--', alpha=0.5)
         ax.axvline(np.mean(self.training_cohort_pred), color='#ff6969', linestyle='--', alpha=0.5)
+        ax.axvline(np.mean(self.training_cohort_actuals), color='#69ff69', linestyle='--', alpha=0.5)
 
         # Add quartile markers
         for q in [25, 75]:
             ax.axvline(np.percentile(self.y_pred, q), color='#69c4ff', linestyle=':', alpha=0.3)
             ax.axvline(np.percentile(self.training_cohort_pred, q), color='#ff6969', linestyle=':', alpha=0.3)
+            ax.axvline(np.percentile(self.training_cohort_actuals, q), color='#69ff69', linestyle=':', alpha=0.3)
 
         ax.set_title('Score Distribution by Cohort')
-        ax.set_xlabel('Predicted Values')
+        ax.set_xlabel('Values')
         ax.set_ylabel('Density')
         ax.legend()
+
 
 
     def _plot_feature_importance(self, ax):
@@ -571,7 +603,7 @@ def create_cluster_report(modeling_df, model_results, n, comparison_metrics):
     # Create df that includes base metrics, all cluster columns, and param comparison metrics
     base_metrics = [
         'trading_max_investment_all_windows',
-        'trading_total_net_flows_all_windows',
+        'trading_crypto_net_gain_all_windows',
         'performance_return_all_windows',
         'mktcap_portfolio_wtd_market_cap_all_windows',
     ]
