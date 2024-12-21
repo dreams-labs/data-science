@@ -58,13 +58,21 @@ def calculate_wallet_trading_features(
     profits_df['date'] = pd.to_datetime(profits_df['date'])
     profits_df = profits_df.sort_values(['wallet_address', 'coin_id', 'date'])
 
-    # Calculate core wallet metrics
-    base_metrics_df = profits_df.groupby('wallet_address').agg(
+    # Get last rows per coin-wallet for final gain calculation
+    last_rows = profits_df.sort_values('date').groupby(['wallet_address', 'coin_id']).last()
+    gains_df = last_rows.groupby('wallet_address').agg(
+        current_gain=('crypto_cumulative_net_gain', 'sum')
+    )
+
+    # Calculate transaction metrics at wallet level
+    transaction_metrics_df = profits_df.groupby('wallet_address').agg(
         total_crypto_buys=('crypto_balance_change', lambda x: abs(x[x > 0].sum())),
         total_crypto_sells=('crypto_balance_change', lambda x: abs(x[x < 0].sum())),
-        net_crypto_investment=('crypto_balance_change', 'sum'),
-        current_gain=('crypto_cumulative_net_gain', lambda x: x.iloc[-1])
+        net_crypto_investment=('crypto_balance_change', 'sum')
     )
+
+    # Combine the metrics
+    base_metrics_df = transaction_metrics_df.join(gains_df)
 
     # Calculate metrics for actual transaction activity (excluding imputed rows)
     observed_metrics_df = profits_df[~profits_df['is_imputed']].groupby('wallet_address').agg(
@@ -102,6 +110,8 @@ def calculate_wallet_trading_features(
 
     return wallet_trading_features_df
 
+
+
 def buy_crypto_start_balance(df: pd.DataFrame, period_start_date: str) -> pd.DataFrame:
     """
     Sets start date crypto balance change as the initial balance value.
@@ -127,6 +137,45 @@ def buy_crypto_start_balance(df: pd.DataFrame, period_start_date: str) -> pd.Dat
 
     return df
 
+def calculate_crypto_cost_basis(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculate running cost basis accounting for buys and proportional sells.
+
+    Params:
+    - df (DataFrame): profits data with required columns
+
+    Returns:
+    - DataFrame with crypto_cost_basis column added
+    """
+    df = df.copy()
+
+    # Calculate opening balance before transfers
+    df['opening_balance'] = df['usd_balance'] - df['usd_net_transfers']
+
+    # Calculate % sold when transfers are negative
+    df['pct_sold'] = np.where(
+        df['usd_net_transfers'] < 0,
+        -df['usd_net_transfers'] / df['opening_balance'],
+        0
+    ).astype('float64')
+
+    # Track new cost basis from buys
+    df['cost_basis_bought'] = np.where(
+        df['usd_net_transfers'] > 0,
+        df['usd_net_transfers'],
+        0
+    ).astype('float64')
+
+    # Calculate running cost basis that gets reduced by sells
+    df['crypto_cost_basis'] = df['cost_basis_bought'].astype('float64')
+    for idx in range(1, len(df)):
+        prev_cost = df['crypto_cost_basis'].iloc[idx-1]
+        pct_kept = 1 - df['pct_sold'].iloc[idx]
+        new_cost = df['cost_basis_bought'].iloc[idx]
+        df.loc[df.index[idx], 'crypto_cost_basis'] = prev_cost * pct_kept + new_cost
+
+    result = df[['crypto_cost_basis']].copy()
+    return result
 
 
 def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
@@ -148,12 +197,12 @@ def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
     # Sort by wallet, coin, and date for accurate cumulative calculations
     profits_df = profits_df.sort_values(['wallet_address', 'coin_id', 'date'])
 
-    # Add a column showing crypto balance change from real and imputed transfers
+    # Crypto balance change equals usd_net_transfers except on the starting_balance_date
     profits_df['crypto_balance_change'] = profits_df['usd_net_transfers']
     profits_df = buy_crypto_start_balance(profits_df, period_start_date)
 
     # Calculate crypto cost based on lifetime usd transfers
-    profits_df['crypto_balance_cost'] = (profits_df
+    profits_df['crypto_cumulative_transfers'] = (profits_df
                                        .groupby(['wallet_address', 'coin_id'],
                                                observed=True,
                                                sort=False)  # sort=False since we pre-sorted
@@ -161,7 +210,7 @@ def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
                                        .cumsum())
 
     # Net gain is the current balance less the cost basis
-    profits_df['crypto_cumulative_net_gain'] = profits_df['usd_balance'] - profits_df['crypto_balance_cost']
+    profits_df['crypto_cumulative_net_gain'] = profits_df['usd_balance'] - profits_df['crypto_cumulative_transfers']
 
     return profits_df
 
@@ -169,8 +218,9 @@ def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
 
 def aggregate_time_weighted_balance(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calculates time weighted average balance for each wallet.
-    Uses crypto_balance_cost which represents capital deployed.
+    Calculates time weighted average balance for each wallet by:
+    1. Computing TWB for each coin-wallet combination
+    2. Summing the TWBs up to wallet level
 
     Params:
     - profits_df (DataFrame): Daily profits data with balances and dates
@@ -179,33 +229,33 @@ def aggregate_time_weighted_balance(profits_df: pd.DataFrame) -> pd.DataFrame:
     - wallet_metrics_df (DataFrame): Time weighted metrics by wallet
     """
     # Sort by date and calculate holding period for each balance
-    profits_df = profits_df.sort_values(['wallet_address', 'date'])
+    profits_df = profits_df.sort_values(['wallet_address', 'coin_id', 'date'])
 
     # Calculate days held for each balance level
-    profits_df['next_date'] = profits_df.groupby('wallet_address')['date'].shift(-1)
+    profits_df['next_date'] = profits_df.groupby(['wallet_address', 'coin_id'])['date'].shift(-1)
     profits_df['days_held'] = (
         profits_df['next_date'] - profits_df['date']
-    ).dt.total_seconds() / (24 * 60 * 60)  # convert to days
+    ).dt.total_seconds() / (24 * 60 * 60)
 
-    # For the final period, use the last known date
+    # For the final period of each coin, use the last known date
     last_mask = profits_df['next_date'].isna()
-    profits_df.loc[last_mask, 'days_held'] = 1  # or we could exclude last period
+    profits_df.loc[last_mask, 'days_held'] = 1
 
     # Calculate weighted cost (balance * days held)
-    profits_df['weighted_cost'] = profits_df['crypto_balance_cost'] * profits_df['days_held']
+    profits_df['weighted_cost'] = profits_df['crypto_cumulative_transfers'] * profits_df['days_held']
 
-    # Group by wallet to get time weighted average
-    time_weighted_df = profits_df.groupby('wallet_address').agg(
+    # First group by wallet-coin to get coin-level TWB
+    coin_level_twb = profits_df.groupby(['wallet_address', 'coin_id']).agg(
         total_days=('days_held', 'sum'),
         sum_weighted_cost=('weighted_cost', 'sum')
     )
-
-    time_weighted_df['time_weighted_balance'] = (
-        time_weighted_df['sum_weighted_cost'] / time_weighted_df['total_days']
+    coin_level_twb['coin_twb'] = (
+        coin_level_twb['sum_weighted_cost'] / coin_level_twb['total_days']
     )
 
-    return time_weighted_df[['time_weighted_balance']]
-
+    # Then sum up to wallet level
+    wallet_twb = coin_level_twb.groupby('wallet_address')['coin_twb'].sum()
+    return pd.DataFrame(wallet_twb).rename(columns={'coin_twb': 'time_weighted_balance'})
 
 
 # def adjust_start_transfers(df: pd.DataFrame, target_date: str) -> pd.DataFrame:
