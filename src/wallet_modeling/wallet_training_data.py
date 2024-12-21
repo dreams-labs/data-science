@@ -212,8 +212,8 @@ def apply_wallet_thresholds(wallet_metrics_df):
     # Extract thresholds
     min_coins = wallets_config['data_cleaning']['min_coins_traded']
     max_coins = wallets_config['data_cleaning']['max_coins_traded']
-    min_wallet_investment = wallets_config['data_cleaning']['min_wallet_investment']
-    max_wallet_investment = wallets_config['data_cleaning']['max_wallet_investment']
+    min_wallet_avg_balance = wallets_config['data_cleaning']['min_wallet_avg_balance']
+    max_wallet_avg_balance = wallets_config['data_cleaning']['max_wallet_avg_balance']
     min_wallet_volume = wallets_config['data_cleaning']['min_wallet_volume']
     max_wallet_volume = wallets_config['data_cleaning']['max_wallet_volume']
     max_wallet_profits = wallets_config['data_cleaning']['max_wallet_profits']
@@ -229,11 +229,11 @@ def apply_wallet_thresholds(wallet_metrics_df):
 
     # filter based on wallet investment amount
     low_investment_wallets = wallet_metrics_df[
-        wallet_metrics_df['max_investment'] < min_wallet_investment
+        wallet_metrics_df['time_weighted_balance'] < min_wallet_avg_balance
     ].index.values
 
     excess_investment_wallets = wallet_metrics_df[
-        wallet_metrics_df['max_investment'] >= max_wallet_investment
+        wallet_metrics_df['time_weighted_balance'] >= max_wallet_avg_balance
     ].index.values
 
     # filter based on wallet volume
@@ -247,7 +247,7 @@ def apply_wallet_thresholds(wallet_metrics_df):
 
     # max_wallet_coin_profits flagged wallets
     excess_profits_wallets = wallet_metrics_df[
-        abs(wallet_metrics_df['total_net_flows']) >= max_wallet_profits
+        abs(wallet_metrics_df['current_gain']) >= max_wallet_profits
     ].index.values
 
     # combine all exclusion lists and apply them
@@ -268,9 +268,9 @@ def apply_wallet_thresholds(wallet_metrics_df):
                 len(low_coins_traded_wallets), min_coins,
                 len(excess_coins_traded_wallets), max_coins)
 
-    logger.info(" - %s wallets invested less than $%s, %s wallets invested more than $%s",
-                len(low_investment_wallets), dc.human_format(min_wallet_investment),
-                len(excess_investment_wallets), dc.human_format(max_wallet_investment))
+    logger.info(" - %s wallets average balance below $%s, %s wallets average balance above $%s",
+                len(low_investment_wallets), dc.human_format(min_wallet_avg_balance),
+                len(excess_investment_wallets), dc.human_format(max_wallet_avg_balance))
 
     logger.info(" - %s wallets with volume below $%s, %s wallets with volume above $%s",
                 len(low_volume_wallets), dc.human_format(min_wallet_volume),

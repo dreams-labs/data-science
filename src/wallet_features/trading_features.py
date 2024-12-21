@@ -133,7 +133,7 @@ def calculate_wallet_trading_features(
     return wallet_trading_features_df
 
 
-@u.timing_decorator
+
 def buy_crypto_start_balance(df: pd.DataFrame, period_start_date: str) -> pd.DataFrame:
     """
     Sets start date crypto balance change as the initial balance value.
