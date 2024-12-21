@@ -111,7 +111,7 @@ def calculate_wallet_trading_features(
     return wallet_trading_features_df
 
 
-
+@u.timing_decorator
 def buy_crypto_start_balance(df: pd.DataFrame, period_start_date: str) -> pd.DataFrame:
     """
     Sets start date crypto balance change as the initial balance value.
@@ -137,9 +137,13 @@ def buy_crypto_start_balance(df: pd.DataFrame, period_start_date: str) -> pd.Dat
 
     return df
 
+
+
+
+@u.timing_decorator
 def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calculate cost basis for each wallet-coin pair.
+    Vectorized cost basis calculation matching original logic.
 
     Params:
     - profits_df (DataFrame): profits data with required columns
@@ -147,35 +151,7 @@ def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
     Returns:
     - DataFrame with cost basis for each wallet-coin-date
     """
-    cost_basis_dfs = []
-    wallet_coin_groups = profits_df.copy().groupby(['wallet_address', 'coin_id'], observed=True)
-
-    for (wallet, coin), group_df in wallet_coin_groups:
-        group_result = calculate_coin_wallet_pair_cost_basis(group_df)
-        group_result['wallet_address'] = wallet
-        group_result['coin_id'] = coin
-        cost_basis_dfs.append(group_result)
-
-    cost_basis_df = pd.concat(cost_basis_dfs, axis=0)
-
-    if len(profits_df) != len(cost_basis_df):
-        raise ValueError(f'Records in profits_df {profits_df.shape} were improperly removed in generation of '
-                         f'cost_basis_df {cost_basis_df.shape}')
-
-    return cost_basis_df
-
-
-def calculate_coin_wallet_pair_cost_basis(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Calculate running cost basis accounting for buys and proportional sells.
-
-    Params:
-    - df (DataFrame): profits data with required columns
-
-    Returns:
-    - DataFrame with crypto_cost_basis column added
-    """
-    df = df.copy()
+    df = profits_df.copy()
 
     # Calculate opening balance before transfers
     df['opening_balance'] = df['usd_balance'] - df['usd_net_transfers']
@@ -194,19 +170,29 @@ def calculate_coin_wallet_pair_cost_basis(df: pd.DataFrame) -> pd.DataFrame:
         0
     ).astype('float64')
 
-    # Calculate running cost basis that gets reduced by sells
-    df['crypto_cost_basis'] = df['cost_basis_bought'].astype('float64')
-    for idx in range(1, len(df)):
-        prev_cost = df['crypto_cost_basis'].iloc[idx-1]
-        pct_kept = 1 - df['pct_sold'].iloc[idx]
-        new_cost = df['cost_basis_bought'].iloc[idx]
-        df.loc[df.index[idx], 'crypto_cost_basis'] = prev_cost * pct_kept + new_cost
+    # Calculate running cost basis by group
+    for _, group in df.groupby(['wallet_address', 'coin_id']):
+        pct_kept = 1 - group['pct_sold']
+        cost_basis = np.zeros(len(group))
+
+        for i in range(len(group)):
+            if i == 0:
+                cost_basis[i] = group['cost_basis_bought'].iloc[i]
+            else:
+                cost_basis[i] = (cost_basis[i-1] * pct_kept.iloc[i] +
+                               group['cost_basis_bought'].iloc[i])
+
+        df.loc[group.index, 'crypto_cost_basis'] = cost_basis
+
+    result_df = df[['wallet_address', 'coin_id', 'date', 'crypto_cost_basis']].copy()
+
+    if len(profits_df) != len(result_df):
+        raise ValueError('Record count mismatch')
+
+    return result_df
 
 
-    result = df[['date', 'crypto_cost_basis']].copy()
-    return result
-
-
+@u.timing_decorator
 def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
                                    period_start_date: str
                                    ) -> pd.DataFrame:
@@ -253,6 +239,7 @@ def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
 
 
 
+@u.timing_decorator
 def aggregate_time_weighted_balance(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
     Calculates time weighted average balance for each wallet by:
@@ -294,144 +281,3 @@ def aggregate_time_weighted_balance(profits_df: pd.DataFrame) -> pd.DataFrame:
     # Then sum up to wallet level
     wallet_twb = coin_level_twb.groupby('wallet_address')['coin_twb'].sum()
     return pd.DataFrame(wallet_twb).rename(columns={'coin_twb': 'time_weighted_balance'})
-
-
-# def adjust_start_transfers(df: pd.DataFrame, target_date: str) -> pd.DataFrame:
-#     """
-#     Sets start date cash flow as the negative period_start_date balance.
-
-#     Params:
-#     - df (DataFrame): Input dataframe with usd_balance and cash_flow_transfers
-#     - target_date (str): Date to adjust transfers for
-
-#     Returns:
-#     - df (DataFrame): DataFrame with adjusted cash_flow_transfers
-
-#     Example Case
-#     ------------
-#     1. Opening balance of $75 with a $0 transfer. Net cash flows are -$75 out of the bank account.
-#     No other scenario is possible as the period_starting_balance is always imputed with $0 transfers.
-#     """
-#     mask = df['date'] == target_date
-#     target_balances = df.loc[mask, 'usd_balance']
-#     df.loc[mask, 'cash_flow_transfers'] = -target_balances
-
-#     return df
-
-# def adjust_end_transfers(df, target_date):
-#     """
-#     Sets end date cash flow to a positive balance plus transfers, since transfers happen
-#     before the balance is measured.
-
-#     Example Cases
-#     -------------
-#     1. Imputation Case: Ending balance of $75 with a $0 transfer: Net flow is +$75 end + $0 buy = $75 inflows
-#     2. Buy Case: Ending balance of $100 after a $30 buy. Net flow is +$100 end -$30 buy = $70 inflows
-#     3. Sell Partial Case: Ending balance of $80 after a $40 sell. Net flow is +$80 end +$40 sell = $120 inflows
-#     4. Sell All Case: Ending balance of $0 after a $50 sell. Net flow is $0 end +$50 sell = $50 inflows
-
-#     """
-#     end_mask = df['date'] == target_date
-#     df.loc[end_mask, 'cash_flow_transfers'] = (
-#         df.loc[end_mask, 'usd_balance'] - df.loc[end_mask, 'usd_net_transfers']
-#     )
-#     return df
-
-# def add_cash_flows_logic(profits_df):
-#     """
-#     Adds a cash_flow_transfers column that converts starting/ending balances to cash flow equivalents
-#     for performance calculations. Handles the timing of transfers by treating:
-#     - Start date: Balance is the only inflow since balances already have transfers added
-#     - End date: Both final balance and transfers are outflows since the transfers are
-#         removed from the end balance
-
-#     Params:
-#     - profits_df (df): Daily profits data to compute performance metrics for
-
-#     Returns:
-#     - adj_profits_df (df): Input df with cash_flow_transfers column added
-
-#     """
-#     adj_profits_df = profits_df.copy()
-#     adj_profits_df['cash_flow_transfers'] = -1 * adj_profits_df['usd_net_transfers']
-
-#     start_date = adj_profits_df['date'].min()
-#     end_date = adj_profits_df['date'].max()
-
-#     adj_profits_df = adjust_start_transfers(adj_profits_df, start_date)
-#     adj_profits_df = adjust_end_transfers(adj_profits_df, end_date)
-
-#     return adj_profits_df
-
-
-
-
-# @u.timing_decorator
-# def calculate_wallet_trading_features(profits_df: pd.DataFrame) -> pd.DataFrame:
-#     """
-#     Calculates comprehensive trading metrics by combining base trading features with
-#     time-weighted and realized returns.
-
-#     Params:
-#     - profits_df (DataFrame): Daily profits with columns: wallet_address, coin_id, date,
-#       cash_flow_transfers, usd_net_transfers, usd_balance, is_imputed
-
-#     Returns:
-#     - wallet_metrics_df (DataFrame): Trading metrics keyed on wallet_address
-#     """
-
-#     # Calculate base trading features
-#     profits_df['date'] = pd.to_datetime(profits_df['date'])
-#     profits_df = profits_df.sort_values(['wallet_address', 'coin_id', 'date'])
-
-#     # Precompute necessary transformations
-#     profits_df['abs_usd_net_transfers'] = profits_df['usd_net_transfers'].abs()
-#     profits_df['cumsum_cash_flow_transfers'] = (profits_df.sort_values(by='date')
-#                                             .groupby('wallet_address')['cash_flow_transfers']
-#                                             .cumsum())
-
-#     # Metrics that incorporate imputed rows
-#     base_metrics_df = profits_df.groupby('wallet_address').agg(
-#         total_inflows=('cash_flow_transfers', lambda x: x[x > 0].sum()),
-#         total_outflows=('cash_flow_transfers', lambda x: abs(x[x < 0].sum())),
-#         total_net_flows=('cash_flow_transfers', lambda x: -x.sum()),
-#         max_investment=('cumsum_cash_flow_transfers', 'max'),
-#     )
-
-#     # Set floor of 0 on max_investment to match the business constraint that wallet balances cannot be negative.
-#     # This handles edge cases where very small initial balances (< $0.01) get rounded to 0 and subsequent outflows
-#     # create artificial negative "max_investment" values.
-#     base_metrics_df['max_investment'] = base_metrics_df['max_investment'].clip(lower=0)
-
-#     # Observed activity metrics
-#     observed_metrics_df = profits_df[~profits_df['is_imputed']].groupby('wallet_address').agg(
-#         transaction_days=('date', 'nunique'),
-#         unique_coins_traded=('coin_id', 'nunique'),
-#         cash_buy_inflows=('usd_net_transfers', lambda x: x[x > 0].sum()),
-#         cash_sell_outflows=('usd_net_transfers', lambda x: abs(x[x < 0].sum())),
-#         cash_net_flows=('usd_net_transfers', lambda x: -x.sum()),
-#         total_volume=('abs_usd_net_transfers', 'sum'),
-#         average_transaction=('abs_usd_net_transfers', 'mean'),
-#     )
-
-#     # Combine all metrics
-#     wallet_trading_features_df = base_metrics_df.join(observed_metrics_df)
-
-#     # Fill missing values and clean up
-#     wallet_trading_features_df = wallet_trading_features_df.fillna(0)
-#     wallet_trading_features_df = wallet_trading_features_df.replace(-0, 0)
-
-#     # Calculate wallet-level ratio metrics
-#     period_duration = (profits_df['date'].max() - profits_df['date'].min()).days + 1
-#     wallet_trading_features_df['activity_density'] = (
-#         wallet_trading_features_df['transaction_days'] / period_duration
-#     )
-#     wallet_trading_features_df['volume_vs_investment_ratio'] = np.where(
-#         wallet_trading_features_df['max_investment'] > 0,
-#         wallet_trading_features_df['total_volume'] / wallet_trading_features_df['max_investment'],
-#         0
-#     )
-
-#     return wallet_trading_features_df
-
-

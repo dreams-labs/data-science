@@ -73,21 +73,23 @@ def define_wallet_cohort(profits_df,market_data_df):
     """
     start_time = time.time()
     logger.info("Defining wallet cohort based on cleaning params...")
+    training_period_start = wallets_config['training_data']['training_period_start']
+    training_period_end = wallets_config['training_data']['training_period_end']
 
     # Impute the training period end (training period start is pre-imputed into profits_df generation)
-    training_period_end = [wallets_config['training_data']['training_period_end']]
     imputed_profits_df = pri.impute_profits_for_multiple_dates(profits_df, market_data_df,
-                                                            training_period_end, n_threads=24)
+                                                               [training_period_end], n_threads=24)
 
     # Create a training period only profits_df
     training_profits_df = imputed_profits_df[
-        imputed_profits_df['date']<=wallets_config['training_data']['training_period_end']
+        imputed_profits_df['date']<=training_period_end
         ].copy()
 
     # Compute wallet level metrics over duration of training period
     logger.info("Generating training period trading features...")
-    training_profits_df = wtf.add_cash_flow_transfers_logic(training_profits_df)
-    training_wallet_metrics_df = wtf.calculate_wallet_trading_features(training_profits_df)
+    training_wallet_metrics_df = wtf.calculate_wallet_trading_features(training_profits_df,
+                                                                       training_period_start,
+                                                                       training_period_end)
 
     # Apply filters based on wallet behavior during the training period
     logger.info("Identifying and uploading wallet cohort...")
