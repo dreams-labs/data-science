@@ -591,12 +591,13 @@ def assert_period(config, df: pd.DataFrame, period: str) -> None:
     config = config['training_data']
     period_start = pd.to_datetime(config[f"{period}_period_start"])
     period_end = pd.to_datetime(config[f"{period}_period_end"])
+    period_starting_balance = pd.to_datetime(config[f"{period}_starting_balance_date"])
 
     # Vectorized min/max comparison
     df_min = df['date'].min()
     df_max = df['date'].max()
 
-    if df_min < period_start or df_max > period_end:
+    if df_min < period_starting_balance or df_max > period_end:
         raise ValueError(
             f"Data outside {period} period boundaries.\n"
             f"Data range: {df_min} to {df_max}\n"

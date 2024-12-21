@@ -148,7 +148,7 @@ class RegressionEvaluator:
         summary = [
             "Model Performance Summary",
             "=" * 50,
-            f"Sample Sizes:",
+            "Sample Sizes:",
             f"Training Cohort:          {self.metrics['total_cohort_samples']:,d}",
             f"Modeling Cohort Train:    {self.metrics['train_samples']:,d}",
             f"Modeling Cohort Test:     {self.metrics['test_samples']:,d}",

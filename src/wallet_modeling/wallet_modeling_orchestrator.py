@@ -204,18 +204,12 @@ def identify_modeling_cohort(modeling_period_profits_df: pd.DataFrame) -> pd.Dat
     logger.info("Identifying modeling cohort...")
 
     # Validate date range
-    modeling_period_start = wallets_config['training_data']['modeling_period_start']
-    modeling_period_end = wallets_config['training_data']['modeling_period_end']
-
-    if not modeling_period_profits_df['date'].between(modeling_period_start, modeling_period_end).all():
-        raise ValueError(
-            f"Detected dates outside the modeling period range: "
-            f"{modeling_period_start} to {modeling_period_end}"
-        )
+    u.assert_period(wallets_config,modeling_period_profits_df,'modeling')
 
     # Calculate modeling period wallet metrics
-    modeling_period_profits_df = wtf.add_cash_flow_transfers_logic(modeling_period_profits_df)
-    modeling_wallets_df = wtf.calculate_wallet_trading_features(modeling_period_profits_df)
+    modeling_wallets_df = wtf.calculate_wallet_trading_features(modeling_period_profits_df,
+                                            wallets_config['training_data']['modeling_period_start'],
+                                            wallets_config['training_data']['modeling_period_end'])
 
     # Extract thresholds
     min_modeling_investment = wallets_config['data_cleaning']['min_modeling_investment']
