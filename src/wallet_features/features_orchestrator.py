@@ -24,7 +24,8 @@ wallets_metrics_config = u.load_config('../config/wallets_metrics_config.yaml')
 wallets_features_config = yaml.safe_load(Path('../config/wallets_features_config.yaml').read_text(encoding='utf-8'))
 
 
-def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_sequencing_df, wallet_cohort):
+def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_sequencing_df,
+                              wallet_cohort, period_start_date, period_end_date):
     """
     Calculates all features for the wallets in a given profits_df.
 
@@ -48,6 +49,8 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     - market_indicators_data_df (df): Market data with technical indicators
     - transfers_sequencing_df (df): Lifetime transfers data
     - wallet_cohort (array-like): All wallet addresses to include
+    - period_start_date (str): Period start in 'YYYY-MM-DD' format
+    - period_end_date (str): Period end in 'YYYY-MM-DD' format
 
     Returns:
     - wallet_features_df (df): Wallet-indexed features dataframe
@@ -60,8 +63,7 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     # Trading features (inner join)
     # Requires both starting_balance_date and period_end_date imputed rows
     # -----------------------------------------------------------------------
-    profits_df = wtf.add_cash_flow_transfers_logic(profits_df)
-    trading_features_df = wtf.calculate_wallet_trading_features(profits_df)
+    trading_features_df = wtf.calculate_wallet_trading_features(profits_df,period_start_date,period_end_date)
     feature_column_names['trading_'] = trading_features_df.columns
     wallet_features_df = wallet_features_df.join(trading_features_df, how='inner')
 

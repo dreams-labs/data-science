@@ -161,7 +161,7 @@ def calculate_market_cap_features(profits_df,market_data_df):
 
     # Merge market cap data
     profits_market_cap_df = profits_df.merge(
-        filled_market_cap_df[['date', 'coin_id', 'market_cap_filled']],
+        filled_market_cap_df[['date', 'coin_id', 'market_cap_filled', 'volume']],
         on=['date', 'coin_id'],
         how='inner'
     )
