@@ -11,8 +11,8 @@ training_data:
     modeling_period_end: "2024-11-20"
     validation_period_end: "2024-11-30"
 
-
-    dataset: 'dev'  # Whether to query 'core' or 'dev_core' dataset tables
+    # Local pipeline configs
+    dataset: 'prod'  # Whether to query 'core' or 'dev_core' dataset tables
     parquet_folder: 'temp/wallet_modeling_dfs'  # where to store parquet files
 
 
