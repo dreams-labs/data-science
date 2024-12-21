@@ -58,7 +58,7 @@ def calculate_wallet_trading_features(
     profits_df['date'] = pd.to_datetime(profits_df['date'])
     profits_df = profits_df.sort_values(['wallet_address', 'coin_id', 'date'])
 
-    logger.info("1")
+    logger.debug("1")
     # Extract the last row per wallet-coin from the pre-sorted DataFrame
     last_rows = profits_df.drop_duplicates(subset=['wallet_address', 'coin_id'], keep='last')
 
@@ -67,7 +67,7 @@ def calculate_wallet_trading_features(
         current_gain=('crypto_cumulative_net_gain', 'sum')
     ).set_index('wallet_address')
 
-    logger.info("2")
+    logger.debug("2")
     # Precompute metrics in a single pass
     profits_df['positive_changes'] = np.where(profits_df['crypto_balance_change'] > 0, profits_df['crypto_balance_change'], 0)
     profits_df['negative_changes'] = np.where(profits_df['crypto_balance_change'] < 0, -profits_df['crypto_balance_change'], 0)
@@ -79,11 +79,11 @@ def calculate_wallet_trading_features(
         net_crypto_investment=('crypto_balance_change', 'sum')
     )
 
-    logger.info("3")
+    logger.debug("3")
     # Combine the metrics
     base_metrics_df = transaction_metrics_df.join(gains_df)
 
-    logger.info("4")
+    logger.debug("4")
     # Calculate metrics for actual transaction activity (excluding imputed rows)
     # Filter only necessary rows and columns
     filtered_df = profits_df.loc[~profits_df['is_imputed'],
@@ -100,11 +100,11 @@ def calculate_wallet_trading_features(
         average_transaction=('abs_balance_change', 'mean')
     ).set_index('wallet_address')
 
-    logger.info("5")
+    logger.debug("5")
     # Calculate time weighted balance
     time_weighted_df = aggregate_time_weighted_balance(profits_df)
 
-    logger.info("6")
+    logger.debug("6")
     # Combine all metrics and handle edge cases
     wallet_trading_features_df = base_metrics_df.join([
         observed_metrics_df,
@@ -113,7 +113,7 @@ def calculate_wallet_trading_features(
     wallet_trading_features_df = wallet_trading_features_df.fillna(0)
     wallet_trading_features_df = wallet_trading_features_df.replace(-0, 0)
 
-    logger.info("7")
+    logger.debug("7")
     # Calculate activity density (frequency of trading)
     start = datetime.strptime(period_start_date, '%Y-%m-%d')
     end = datetime.strptime(period_end_date, '%Y-%m-%d')
@@ -122,7 +122,7 @@ def calculate_wallet_trading_features(
         wallet_trading_features_df['transaction_days'] / period_duration
     )
 
-    logger.info("8")
+    logger.debug("8")
     # Calculate volume to time-weighted balance ratio
     wallet_trading_features_df['volume_vs_twb_ratio'] = np.where(
         wallet_trading_features_df['time_weighted_balance'] > 0,
