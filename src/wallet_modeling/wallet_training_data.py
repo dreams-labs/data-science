@@ -344,7 +344,8 @@ def upload_wallet_cohort(wallet_cohort):
     - wallet_cohort (np.array): the wallet_ids included in the cohort
 
     """
-    # generate upload_df from input df
+    # 1. Generate upload_df from input df
+    # -----------------------------------
     upload_df = pd.DataFrame()
     upload_df['wallet_id'] = wallet_cohort
     upload_df['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -356,41 +357,41 @@ def upload_wallet_cohort(wallet_cohort):
     }
     upload_df = upload_df.astype(dtype_mapping)
 
-    # upload df to bigquery
+
+    # 2. Upload list of wallet IDs to bigquery
+    # ----------------------------------------
     project_id = 'western-verve-411004'
-    table_name = 'temp.wallet_modeling_training_cohort'
+    client = bigquery.Client(project=project_id)
+
+    wallet_ids_table = f"{project_id}.temp.wallet_modeling_training_cohort_ids"
     schema = [
         {'name':'wallet_id', 'type': 'int64'},
         {'name':'updated_at', 'type': 'datetime'}
     ]
     pandas_gbq.to_gbq(
         upload_df
-        ,table_name
+        ,wallet_ids_table
         ,project_id=project_id
         ,if_exists='replace'
         ,table_schema=schema
         ,progress_bar=False
     )
-    logger.info('Uploaded cohort of %s wallets to temp.wallet_modeling_training_cohort.', len(upload_df))
 
-    # Add wallet_address column and populate it
-    client = bigquery.Client(project=project_id)
 
-    # Add column if it doesn't exist
-    add_column_query = f"""
-    ALTER TABLE `{project_id}.{table_name}`
-    ADD COLUMN IF NOT EXISTS wallet_address STRING
+    # 3. Create updated table with full wallet_address values
+    # -------------------------------------------------------
+    # Single query to create final table with all fields
+    create_query = f"""
+    CREATE OR REPLACE TABLE `{project_id}.temp.wallet_modeling_training_cohort` AS
+    SELECT
+        t.wallet_id,
+        w.wallet_address,
+        CURRENT_TIMESTAMP() as updated_at
+    FROM `{wallet_ids_table}` t
+    LEFT JOIN `reference.wallet_ids` w
+        ON t.wallet_id = w.wallet_id
     """
-    client.query(add_column_query).result()
 
-    # Update the wallet_address values
-    update_query = f"""
-    UPDATE `{project_id}.{table_name}` t
-    SET wallet_address = w.wallet_address
-    FROM `reference.wallet_ids` w
-    WHERE t.wallet_id = w.wallet_id
-    """
-    client.query(update_query).result()
-
-    logger.info('Uploaded cohort of %s wallets to temp.wallet_modeling_training_cohort and added wallet addresses.',
-                len(upload_df))
+    client.query(create_query).result()
+    logger.info('Uploaded cohort of %s wallets with addresses to temp.wallet_modeling_training_cohort.',
+                len(wallet_cohort))
