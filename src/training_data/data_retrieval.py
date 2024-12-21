@@ -427,8 +427,6 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows, dataset='pro
 
     # Run the SQL query using dgc's run_sql method
     profits_df = dgc().run_sql(query_sql)
-    print(min_wallet_inflows)
-    print(profits_df.shape)
 
     logger.debug('Converting columns to memory-optimized formats...')
 

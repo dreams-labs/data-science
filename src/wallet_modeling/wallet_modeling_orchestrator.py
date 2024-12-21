@@ -211,16 +211,16 @@ def identify_modeling_cohort(modeling_period_profits_df: pd.DataFrame) -> pd.Dat
     modeling_wallets_df = wtf.calculate_wallet_trading_features(modeling_period_profits_df,
                                             wallets_config['training_data']['modeling_period_start'],
                                             wallets_config['training_data']['modeling_period_end'],
-                                            calculate_full_metrics=False)
+                                            calculate_full_metrics=True)
 
     # Extract thresholds
-    min_modeling_investment = wallets_config['data_cleaning']['min_modeling_investment']
-    min_modeling_transaction_days = wallets_config['data_cleaning']['min_modeling_transaction_days']
+    modeling_min_investment = wallets_config['data_cleaning']['modeling_min_investment']
+    modeling_min_coins_traded = wallets_config['data_cleaning']['modeling_min_coins_traded']
 
     # Create boolean mask for qualifying wallets
     meets_criteria = (
-        (modeling_wallets_df['max_investment'] >= min_modeling_investment) &
-        (modeling_wallets_df['transaction_days'] >= min_modeling_transaction_days)
+        (modeling_wallets_df['max_investment'] >= modeling_min_investment) &
+        (modeling_wallets_df['unique_coins_traded'] >= modeling_min_coins_traded)
     )
 
     # Log stats about wallet cohort
@@ -229,7 +229,7 @@ def identify_modeling_cohort(modeling_period_profits_df: pd.DataFrame) -> pd.Dat
     logger.info(
         f"Identified {qualifying_wallets} qualifying wallets ({100*qualifying_wallets/total_wallets:.2f}% "
         f"of {total_wallets} total wallets with modeling period activity) meeting modeling cohort criteria: "
-        f"min_investment=${min_modeling_investment}, min_days={min_modeling_transaction_days}"
+        f"min_investment=${modeling_min_investment}, min_days={modeling_min_coins_traded}"
     )
 
     # Add boolean flag column as 1s and 0s
