@@ -139,11 +139,10 @@ def buy_crypto_start_balance(df: pd.DataFrame, period_start_date: str) -> pd.Dat
 
 
 
-
 @u.timing_decorator
 def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Vectorized cost basis calculation matching original logic.
+    Optimized cost basis calculation focusing on maintaining original loop efficiency.
 
     Params:
     - profits_df (DataFrame): profits data with required columns
@@ -170,26 +169,42 @@ def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
         0
     ).astype('float64')
 
-    # Calculate running cost basis by group
-    for _, group in df.groupby(['wallet_address', 'coin_id']):
-        pct_kept = 1 - group['pct_sold']
-        cost_basis = np.zeros(len(group))
+    # Pre-sort the DataFrame to simplify iteration
+    df = df.sort_values(['wallet_address', 'coin_id', 'date']).reset_index(drop=True)
 
-        for i in range(len(group)):
-            if i == 0:
-                cost_basis[i] = group['cost_basis_bought'].iloc[i]
-            else:
-                cost_basis[i] = (cost_basis[i-1] * pct_kept.iloc[i] +
-                               group['cost_basis_bought'].iloc[i])
+    # Initialize an array for the cost basis
+    crypto_cost_basis = np.zeros(len(df))
 
-        df.loc[group.index, 'crypto_cost_basis'] = cost_basis
+    # Efficient iteration: Avoid grouping by working directly on pre-sorted indices
+    current_wallet_coin = None
+    cumulative_cost_basis = 0
 
-    result_df = df[['wallet_address', 'coin_id', 'date', 'crypto_cost_basis']].copy()
+    for i in range(len(df)):
+        wallet_coin = (df.at[i, 'wallet_address'], df.at[i, 'coin_id'])
 
+        if wallet_coin != current_wallet_coin:
+            # New wallet-coin group
+            cumulative_cost_basis = 0
+            current_wallet_coin = wallet_coin
+
+        # Update cumulative cost basis
+        cumulative_cost_basis = (
+            cumulative_cost_basis * (1 - df.at[i, 'pct_sold']) +
+            df.at[i, 'cost_basis_bought']
+        )
+        crypto_cost_basis[i] = cumulative_cost_basis
+
+    # Assign the calculated values back to the DataFrame
+    df['crypto_cost_basis'] = crypto_cost_basis
+
+    result_df = df[['wallet_address', 'coin_id', 'date', 'crypto_cost_basis']]
+
+    # Validation check to ensure the result DataFrame has the same number of rows as the input
     if len(profits_df) != len(result_df):
         raise ValueError('Record count mismatch')
 
     return result_df
+
 
 
 @u.timing_decorator
