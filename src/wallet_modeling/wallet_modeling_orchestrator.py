@@ -183,6 +183,8 @@ def generate_training_indicators_df(training_market_data_df_full,wallets_metrics
         logger.info(f"Stored market_indicators_data_df with shape {market_indicators_data_df.shape} "
                     f"to {parquet_filepath}.")
 
+        return None
+
     # If no parquet file is configured then return the df
     else:
         return market_indicators_data_df

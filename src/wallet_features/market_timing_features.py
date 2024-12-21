@@ -22,7 +22,7 @@ config_directory = current_dir / '..' / '..' / 'config'
 # Load wallets_config at the module level
 wallets_config = WalletsConfig()
 wallets_metrics_config = u.load_config(config_directory / 'wallets_metrics_config.yaml')
-wallets_features_config = yaml.safe_load((config_directory / 'wallets_features_config.yaml').read_text(encoding='utf-8'))
+wallets_features_config = yaml.safe_load((config_directory / 'wallets_features_config.yaml').read_text(encoding='utf-8'))  # pylint:disable=line-too-long
 
 @u.timing_decorator
 def calculate_market_timing_features(profits_df, market_indicators_data_df):
@@ -130,7 +130,7 @@ def calculate_offsets(
         for lead in offsets:
             new_column = f"{column}_lead_{lead}"
             try:
-                result_df[new_column] = result_df.groupby('coin_id')[column].shift(-lead)
+                result_df[new_column] = result_df.groupby('coin_id',observed=True)[column].shift(-lead)
             except Exception as e:
                 raise FeatureConfigError(f"Error calculating offset for column '{column}' " \
                                       f"with lead {lead}: {str(e)}") from e

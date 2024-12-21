@@ -311,7 +311,8 @@ def aggregate_time_weighted_balance(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
     # Calculate days held for each balance level
     logger.debug('a')
-    profits_df['next_date'] = profits_df.groupby(['wallet_address', 'coin_id'])['date'].shift(-1)
+    profits_df['next_date'] = (profits_df.groupby(['wallet_address', 'coin_id'],observed=True)
+                               ['date'].shift(-1))
     profits_df['days_held'] = (
         profits_df['next_date'] - profits_df['date']
     ).dt.total_seconds() / (24 * 60 * 60)
@@ -327,8 +328,8 @@ def aggregate_time_weighted_balance(profits_df: pd.DataFrame) -> pd.DataFrame:
 
     logger.debug('d')
     # Precompute totals using a single aggregation for each metric
-    total_days = profits_df.groupby(['wallet_address', 'coin_id'])['days_held'].sum()
-    sum_weighted_cost = profits_df.groupby(['wallet_address', 'coin_id'])['weighted_cost'].sum()
+    total_days = profits_df.groupby(['wallet_address', 'coin_id'],observed=True)['days_held'].sum()
+    sum_weighted_cost = profits_df.groupby(['wallet_address', 'coin_id'],observed=True)['weighted_cost'].sum()
 
     # Combine results into a single DataFrame
     coin_level_twb = pd.concat([total_days, sum_weighted_cost], axis=1)
