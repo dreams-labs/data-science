@@ -27,7 +27,8 @@ wallets_features_config = yaml.safe_load(Path('../config/wallets_features_config
 def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_sequencing_df,
                               wallet_cohort, period_start_date, period_end_date):
     """
-    Calculates all features for the wallets in a given profits_df.
+    Calculates all features for the wallet_cohort in a given profits_df, returning a df with a
+    row for every wallet in the cohort.
 
     Imputed Row Dependencies:
     - Trading Features: Requires starting_balance_date and period_end_date for performance calculation
@@ -53,27 +54,29 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     - period_end_date (str): Period end in 'YYYY-MM-DD' format
 
     Returns:
-    - wallet_features_df (df): Wallet-indexed features dataframe
+    - wallet_features_df (df): Wallet-indexed features dataframe with a row for every wallet_cohort
     """
     # Initialize output dataframe
     wallet_features_df = pd.DataFrame(index=wallet_cohort)
     wallet_features_df.index.name = 'wallet_address'
     feature_column_names = {}
 
-    # Trading features (inner join)
+    # Trading features (left join, fill 0s)
     # Requires both starting_balance_date and period_end_date imputed rows
     # -----------------------------------------------------------------------
     trading_features_df = wtf.calculate_wallet_trading_features(profits_df,period_start_date,period_end_date)
     feature_column_names['trading_'] = trading_features_df.columns
-    wallet_features_df = wallet_features_df.join(trading_features_df, how='inner')
+    wallet_features_df = wallet_features_df.join(trading_features_df, how='left')\
+        .fillna({col: 0 for col in trading_features_df.columns})
 
-    # Performance features (inner join)
+    # Performance features (left join, fill 0s)
     # Inherits trading features imputed rows requirement
     # -----------------------------------------------------------------------
     performance_features_df = (wpf.calculate_performance_features(wallet_features_df)
                             .drop(['max_investment', 'crypto_net_gain'], axis=1))
     feature_column_names['performance_'] = performance_features_df.columns
-    wallet_features_df = wallet_features_df.join(performance_features_df, how='inner')
+    wallet_features_df = wallet_features_df.join(performance_features_df, how='left')\
+        .fillna({col: 0 for col in performance_features_df.columns})
 
     # Market timing features (left join, fill 0s)
     # Uses only real transfers (~is_imputed)
