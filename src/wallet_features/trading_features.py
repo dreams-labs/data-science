@@ -69,8 +69,10 @@ def calculate_wallet_trading_features(
 
     logger.debug("2")
     # Precompute metrics in a single pass
-    profits_df['positive_changes'] = np.where(profits_df['crypto_balance_change'] > 0, profits_df['crypto_balance_change'], 0)
-    profits_df['negative_changes'] = np.where(profits_df['crypto_balance_change'] < 0, -profits_df['crypto_balance_change'], 0)
+    profits_df['positive_changes'] = np.where(profits_df['crypto_balance_change'] > 0,
+                                              profits_df['crypto_balance_change'], 0)
+    profits_df['negative_changes'] = np.where(profits_df['crypto_balance_change'] < 0,
+                                              -profits_df['crypto_balance_change'], 0)
 
     # Group and aggregate precomputed columns
     transaction_metrics_df = profits_df.groupby('wallet_address').agg(
