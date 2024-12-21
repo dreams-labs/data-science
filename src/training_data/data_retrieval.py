@@ -330,8 +330,6 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows, dataset='pro
             ,wallet_address
             ,max(usd_inflows_cumulative) as total_usd_inflows
             from profits_full
-            -- we don't need to include coin-wallet pairs that have no transactions between
-            -- the start and end dates
             group by 1,2
         ),
 
@@ -342,7 +340,7 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows, dataset='pro
             -- filter to remove wallet-coin pairs below the min_wallet_inflows
             join usd_inflows_filter f on f.coin_id = pf.coin_id
                 and f.wallet_address = pf.wallet_address
-                and f.total_usd_inflows >= {min_wallet_inflows}
+            where f.total_usd_inflows >= {min_wallet_inflows}
         ),
 
 
@@ -429,6 +427,8 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows, dataset='pro
 
     # Run the SQL query using dgc's run_sql method
     profits_df = dgc().run_sql(query_sql)
+    print(min_wallet_inflows)
+    print(profits_df.shape)
 
     logger.debug('Converting columns to memory-optimized formats...')
 

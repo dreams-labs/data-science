@@ -29,13 +29,15 @@ wallets_config = WalletsConfig()
 @u.timing_decorator
 def retrieve_raw_datasets(period_start_date, period_end_date):
     """
-    Retrieves raw market and profits data without any cleaning or formatting.
+    Retrieves raw market and profits data after applying the min_wallet_inflows filter at the
+    wallet level. Because the filter is applied cumulatively, later period_end_dates will return
+    additional wallets whose newly included inflows put them over the threshold.
 
     Params:
     - period_start_date,period_end_date (YYYY-MM-DD): The data period boundary dates.
 
     Returns:
-    - tuple: (profits_df, market_data_df) raw dataframes
+    - profits_df, market_data_df: raw dataframes
     """
     # Identify the date we need ending balances from
     period_start_date = datetime.strptime(period_start_date,'%Y-%m-%d')
@@ -47,6 +49,7 @@ def retrieve_raw_datasets(period_start_date, period_end_date):
             dr.retrieve_profits_data,
             starting_balance_date,
             period_end_date,
+            wallets_config['data_cleaning']['min_wallet_inflows'],
             wallets_config['training_data']['dataset']
         )
         market_future = executor.submit(dr.retrieve_market_data,
