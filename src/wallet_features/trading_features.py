@@ -78,8 +78,14 @@ def calculate_wallet_trading_features(
     transaction_metrics_df = profits_df.groupby('wallet_address').agg(
         total_crypto_buys=('positive_changes', 'sum'),
         total_crypto_sells=('negative_changes', 'sum'),
-        net_crypto_investment=('crypto_balance_change', 'sum')
+        net_crypto_investment=('crypto_balance_change', 'sum'),
+        max_investment=('crypto_cumulative_transfers', 'max')
     )
+
+    # Set floor of 0 on max_investment to match the business constraint that wallet balances cannot be negative.
+    # This handles edge cases where very small initial balances (< $0.01) get rounded to 0 and subsequent outflows
+    # create artificial negative "max_investment" values.
+    transaction_metrics_df['max_investment'] = transaction_metrics_df['max_investment'].clip(lower=0)
 
     logger.debug("3")
     # Combine the metrics
