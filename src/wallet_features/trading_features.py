@@ -66,11 +66,6 @@ def calculate_wallet_trading_features(
     gains_df = last_rows.groupby('wallet_address', as_index=False).agg(
         current_gain=('crypto_cumulative_net_gain', 'sum')
     ).set_index('wallet_address')
-    # # Get last rows per coin-wallet for final gain calculation
-    # last_rows = profits_df.sort_values('date').groupby(['wallet_address', 'coin_id']).last()
-    # gains_df = last_rows.groupby('wallet_address').agg(
-    #     current_gain=('crypto_cumulative_net_gain', 'sum')
-    # )
 
     logger.info("2")
     # Precompute metrics in a single pass
@@ -90,12 +85,20 @@ def calculate_wallet_trading_features(
 
     logger.info("4")
     # Calculate metrics for actual transaction activity (excluding imputed rows)
-    observed_metrics_df = profits_df[~profits_df['is_imputed']].groupby('wallet_address').agg(
+    # Filter only necessary rows and columns
+    filtered_df = profits_df.loc[~profits_df['is_imputed'],
+                                 ['wallet_address', 'date', 'coin_id', 'crypto_balance_change']]
+
+    # Precompute absolute balance changes
+    filtered_df['abs_balance_change'] = filtered_df['crypto_balance_change'].abs()
+
+    # Group by wallet and aggregate metrics
+    observed_metrics_df = filtered_df.groupby('wallet_address', as_index=False).agg(
         transaction_days=('date', 'nunique'),
         unique_coins_traded=('coin_id', 'nunique'),
-        total_volume=('crypto_balance_change', lambda x: abs(x).sum()),
-        average_transaction=('crypto_balance_change', lambda x: abs(x).mean())
-    )
+        total_volume=('abs_balance_change', 'sum'),
+        average_transaction=('abs_balance_change', 'mean')
+    ).set_index('wallet_address')
 
     logger.info("5")
     # Calculate time weighted balance
@@ -286,31 +289,37 @@ def aggregate_time_weighted_balance(profits_df: pd.DataFrame) -> pd.DataFrame:
     Returns:
     - wallet_metrics_df (DataFrame): Time weighted metrics by wallet
     """
-    # Sort by date and calculate holding period for each balance
-    profits_df = profits_df.sort_values(['wallet_address', 'coin_id', 'date'])
-
     # Calculate days held for each balance level
+    logger.debug('a')
     profits_df['next_date'] = profits_df.groupby(['wallet_address', 'coin_id'])['date'].shift(-1)
     profits_df['days_held'] = (
         profits_df['next_date'] - profits_df['date']
     ).dt.total_seconds() / (24 * 60 * 60)
 
+    logger.debug('b')
     # There is no hold time for the closing balance on the final day
     last_mask = profits_df['next_date'].isna()
     profits_df.loc[last_mask, 'days_held'] = 0
 
+    logger.debug('c')
     # Calculate weighted cost (balance * days held)
     profits_df['weighted_cost'] = profits_df['crypto_cost_basis'] * profits_df['days_held']
 
-    # First group by wallet-coin to get coin-level TWB
-    coin_level_twb = profits_df.groupby(['wallet_address', 'coin_id']).agg(
-        total_days=('days_held', 'sum'),
-        sum_weighted_cost=('weighted_cost', 'sum')
-    )
+    logger.debug('d')
+    # Precompute totals using a single aggregation for each metric
+    total_days = profits_df.groupby(['wallet_address', 'coin_id'])['days_held'].sum()
+    sum_weighted_cost = profits_df.groupby(['wallet_address', 'coin_id'])['weighted_cost'].sum()
+
+    # Combine results into a single DataFrame
+    coin_level_twb = pd.concat([total_days, sum_weighted_cost], axis=1)
+    coin_level_twb.columns = ['total_days', 'sum_weighted_cost']
+
+    logger.debug('e')
     coin_level_twb['coin_twb'] = (
         coin_level_twb['sum_weighted_cost'] / coin_level_twb['total_days']
     )
 
+    logger.debug('f')
     # Then sum up to wallet level
     wallet_twb = coin_level_twb.groupby('wallet_address')['coin_twb'].sum()
     return pd.DataFrame(wallet_twb).rename(columns={'coin_twb': 'time_weighted_balance'})
