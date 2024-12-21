@@ -247,7 +247,7 @@ def apply_wallet_thresholds(wallet_metrics_df):
 
     # max_wallet_coin_profits flagged wallets
     excess_profits_wallets = wallet_metrics_df[
-        abs(wallet_metrics_df['current_gain']) >= max_wallet_profits
+        abs(wallet_metrics_df['crypto_net_gain']) >= max_wallet_profits
     ].index.values
 
     # combine all exclusion lists and apply them

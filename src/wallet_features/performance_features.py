@@ -22,22 +22,22 @@ def calculate_performance_features(wallet_features_df):
     Generates various target variables for modeling wallet performance.
 
     Parameters:
-    - wallet_features_df: pandas DataFrame with columns ['total_net_flows', 'max_investment']
+    - wallet_features_df: pandas DataFrame with columns ['crypto_net_gain', 'max_investment']
 
     Returns:
     - DataFrame with additional target variables
     """
-    metrics_df = wallet_features_df[['max_investment','total_net_flows','cash_net_flows']].copy().round(6)
+    metrics_df = wallet_features_df[['max_investment','crypto_net_gain','net_crypto_investment']].copy().round(6)
     returns_winsorization = wallets_config['modeling']['returns_winsorization']
     epsilon = 1e-10
 
     # Calculate base return, including unrealized price change impacts
     metrics_df['return'] = np.where(abs(metrics_df['max_investment']) == 0,0,
-                                    metrics_df['total_net_flows'] / metrics_df['max_investment'])
+                                    metrics_df['crypto_net_gain'] / metrics_df['max_investment'])
 
     # Calculate realized return, based on actual cash flows only
     metrics_df['realized_return'] = np.where(abs(metrics_df['max_investment']) == 0,0,
-                                    metrics_df['cash_net_flows'] / metrics_df['max_investment'])
+                                    metrics_df['net_crypto_investment'] / metrics_df['max_investment'])
 
     # Apply winsorization
     if returns_winsorization > 0:
@@ -78,7 +78,7 @@ def calculate_performance_features(wallet_features_df):
 
 
     # Clean up intermediate columns
-    cols_to_drop = ['norm_return', 'norm_invested', 'norm_gain', 'cash_net_flows']
+    cols_to_drop = ['norm_return', 'norm_invested', 'norm_gain', 'net_crypto_investment']
     metrics_df = metrics_df.drop(columns=[c for c in cols_to_drop
                                         if c in metrics_df.columns])
 

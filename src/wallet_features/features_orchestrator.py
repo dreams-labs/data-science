@@ -69,7 +69,7 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     # Inherits trading features imputed rows requirement
     # -----------------------------------------------------------------------
     performance_features_df = (wpf.calculate_performance_features(wallet_features_df)
-                            .drop(['max_investment', 'total_net_flows'], axis=1))
+                            .drop(['max_investment', 'crypto_net_gain'], axis=1))
     feature_column_names['performance_'] = performance_features_df.columns
     wallet_features_df = wallet_features_df.join(performance_features_df, how='inner')
 

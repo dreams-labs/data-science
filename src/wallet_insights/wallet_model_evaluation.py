@@ -603,7 +603,7 @@ def create_cluster_report(modeling_df, model_results, n, comparison_metrics):
     # Create df that includes base metrics, all cluster columns, and param comparison metrics
     base_metrics = [
         'trading_max_investment_all_windows',
-        'trading_total_net_flows_all_windows',
+        'trading_crypto_net_gain_all_windows',
         'performance_return_all_windows',
         'mktcap_portfolio_wtd_market_cap_all_windows',
     ]

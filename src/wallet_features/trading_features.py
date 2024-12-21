@@ -42,7 +42,7 @@ def calculate_wallet_trading_features(
         - total_crypto_buys: Sum of positive balance changes
         - total_crypto_sells: Sum of negative balance changes
         - net_crypto_investment: Net sum of all balance changes
-        - current_gain: Final unrealized gain
+        - crypto_net_gain: Final unrealized gain
         - transaction_days: Number of days with activity
         - unique_coins_traded: Number of unique coins
         - total_volume: Sum of absolute balance changes
@@ -64,7 +64,7 @@ def calculate_wallet_trading_features(
 
     # Group by wallet to calculate the total current gain
     gains_df = last_rows.groupby('wallet_address', as_index=False).agg(
-        current_gain=('crypto_cumulative_net_gain', 'sum')
+        crypto_net_gain=('crypto_cumulative_net_gain', 'sum')
     ).set_index('wallet_address')
 
     logger.debug("2")

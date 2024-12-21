@@ -263,7 +263,7 @@ def test_w01_multiple_coins(test_trading_features_df):
     # net_crypto_investment: 400 - 0 = 400
     expected_net = 400
 
-    # current_gain: (180 + 280) - 400 = 60
+    # crypto_net_gain: (180 + 280) - 400 = 60
     expected_gain = 60
 
     # transaction_days: 2 days (1/1 and 5/1)
@@ -294,7 +294,7 @@ def test_w01_multiple_coins(test_trading_features_df):
     assert wallet_features['total_crypto_buys'] == expected_buys
     assert wallet_features['total_crypto_sells'] == expected_sells
     assert wallet_features['net_crypto_investment'] == expected_net
-    assert wallet_features['current_gain'] == expected_gain
+    assert wallet_features['crypto_net_gain'] == expected_gain
     assert wallet_features['transaction_days'] == expected_txn_days
     assert wallet_features['unique_coins_traded'] == expected_coins
     assert wallet_features['total_volume'] == expected_volume
@@ -328,7 +328,7 @@ def test_w08_offsetting_transactions(test_trading_features_df):
     # net_crypto_investment: 10500 - 10000 = 500
     expected_net = 500
 
-    # current_gain: 750 ending - 500 cost basis = 250
+    # crypto_net_gain: 750 ending - 500 cost basis = 250
     expected_gain = 250
 
     # transaction_days: 2 days with non-imputed transactions (2/1 and 2/2)
@@ -363,7 +363,7 @@ def test_w08_offsetting_transactions(test_trading_features_df):
     assert wallet_features['total_crypto_buys'] == expected_buys
     assert wallet_features['total_crypto_sells'] == expected_sells
     assert wallet_features['net_crypto_investment'] == expected_net
-    assert wallet_features['current_gain'] == expected_gain
+    assert wallet_features['crypto_net_gain'] == expected_gain
     assert wallet_features['transaction_days'] == expected_txn_days
     assert wallet_features['unique_coins_traded'] == expected_coins
     assert wallet_features['total_volume'] == expected_volume
@@ -397,7 +397,7 @@ def test_w09_memecoin_winner(test_trading_features_df):
     # net_crypto_investment: 100 - 600 = -500
     expected_net = -500
 
-    # current_gain: 10 ending - (-500 net investment) = 510
+    # crypto_net_gain: 10 ending - (-500 net investment) = 510
     expected_gain = 510
 
     # transaction_days: 2 days with non-imputed transactions (3/1 and 5/1)
@@ -428,7 +428,7 @@ def test_w09_memecoin_winner(test_trading_features_df):
     assert wallet_features['total_crypto_buys'] == expected_buys
     assert wallet_features['total_crypto_sells'] == expected_sells
     assert wallet_features['net_crypto_investment'] == expected_net
-    assert wallet_features['current_gain'] == expected_gain
+    assert wallet_features['crypto_net_gain'] == expected_gain
     assert wallet_features['transaction_days'] == expected_txn_days
     assert wallet_features['unique_coins_traded'] == expected_coins
     assert wallet_features['total_volume'] == expected_volume
@@ -747,7 +747,7 @@ def test_trading_metrics_aggregation(test_trading_features_df,
         'total_crypto_buys',
         'total_crypto_sells',
         'net_crypto_investment',
-        'current_gain'
+        'crypto_net_gain'
     ]])
     original_metrics['new_wallet'] = original_metrics.index.map(wallet_mapping)
     expected = original_metrics.groupby('new_wallet').sum().sort_index()
@@ -757,7 +757,7 @@ def test_trading_metrics_aggregation(test_trading_features_df,
         'total_crypto_buys',
         'total_crypto_sells',
         'net_crypto_investment',
-        'current_gain'
+        'crypto_net_gain'
     ]].sort_index()
 
     # Compare each metric
