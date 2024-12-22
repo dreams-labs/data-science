@@ -16,82 +16,187 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 
 
-@u.timing_decorator
-def calculate_performance_features(wallet_features_df):
-    """
-    Generates various target variables for modeling wallet performance.
+# def calculate_performance_metrics(wallet_features_df: pd.DataFrame) -> pd.DataFrame:
+#     """
+#     Orchestrates calculation of all performance metrics.
 
-    Parameters:
-    - wallet_features_df: pandas DataFrame with columns ['crypto_net_gain', 'max_investment']
+#     Params:
+#     - wallet_features_df (DataFrame): Must include columns:
+#         max_investment, time_weighted_balance, crypto_net_gain, net_crypto_investment
+
+#     Returns:
+#     - metrics_df (DataFrame): All performance metrics calculated on both bases
+#     """
+#     # Calculate basic metrics first
+#     basic_metrics = calculate_basic_performance_metrics(wallet_features_df)
+
+#     # Use basic metrics to calculate enhanced scores
+#     enhanced_metrics = calculate_enhanced_performance_metrics(basic_metrics)
+
+#     # Combine metrics
+#     return pd.concat([basic_metrics, enhanced_metrics], axis=1)
+
+
+def calculate_basic_performance_metrics(wallet_features_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculates standard return metrics using max_investment and both TWB versions.
+
+    Params:
+    - wallet_features_df (DataFrame): Input metrics with required columns:
+        max_investment, time_weighted_balance, active_time_weighted_balance,
+        crypto_net_gain, net_crypto_investment
 
     Returns:
-    - DataFrame with additional target variables
+    - basic_metrics_df (DataFrame): Standard performance metrics
     """
-    metrics_df = wallet_features_df[['max_investment','crypto_net_gain','net_crypto_investment']].copy().round(6)
-    returns_winsorization = wallets_config['modeling']['returns_winsorization']
+    metrics_df = wallet_features_df[['max_investment', 'time_weighted_balance',
+                                   'active_time_weighted_balance', 'crypto_net_gain',
+                                   'net_crypto_investment']].copy().round(6)
+    returns_winsorization = 0.02
     epsilon = 1e-10
 
-    # Calculate base return, including unrealized price change impacts
-    metrics_df['return'] = np.where(abs(metrics_df['max_investment']) == 0,0,
-                                    metrics_df['crypto_net_gain'] / metrics_df['max_investment'])
+    # Calculate returns on max_investment
+    metrics_df['max_investment_return'] = np.where(
+        abs(metrics_df['max_investment']) == 0, 0,
+        metrics_df['crypto_net_gain'] / metrics_df['max_investment']
+    )
 
-    # Calculate realized return, based on actual cash flows only
-    metrics_df['realized_return'] = np.where(abs(metrics_df['max_investment']) == 0,0,
-                                    metrics_df['net_crypto_investment'] / metrics_df['max_investment'])
+    metrics_df['max_investment_realized_return'] = np.where(
+        abs(metrics_df['max_investment']) == 0, 0,
+        metrics_df['net_crypto_investment'] / metrics_df['max_investment']
+    )
+
+    # Calculate returns on total TWB
+    metrics_df['twb_return'] = np.where(
+        abs(metrics_df['time_weighted_balance']) == 0, 0,
+        metrics_df['crypto_net_gain'] / metrics_df['time_weighted_balance']
+    )
+
+    metrics_df['twb_realized_return'] = np.where(
+        abs(metrics_df['time_weighted_balance']) == 0, 0,
+        metrics_df['net_crypto_investment'] / metrics_df['time_weighted_balance']
+    )
+
+    # Calculate returns on active TWB
+    metrics_df['active_twb_return'] = np.where(
+        abs(metrics_df['active_time_weighted_balance']) == 0, 0,
+        metrics_df['crypto_net_gain'] / metrics_df['active_time_weighted_balance']
+    )
+
+    metrics_df['active_twb_realized_return'] = np.where(
+        abs(metrics_df['active_time_weighted_balance']) == 0, 0,
+        metrics_df['net_crypto_investment'] / metrics_df['active_time_weighted_balance']
+    )
+
+    # Store unwinsorized versions
+    metrics_df['max_investment_return_unwinsorized'] = metrics_df['max_investment_return']
+    metrics_df['twb_return_unwinsorized'] = metrics_df['twb_return']
+    metrics_df['active_twb_return_unwinsorized'] = metrics_df['active_twb_return']
 
     # Apply winsorization
     if returns_winsorization > 0:
-        metrics_df['return_unwinsorized'] = metrics_df['return']
-        metrics_df['return'] = u.winsorize(metrics_df['return'],returns_winsorization)
+        for col in ['max_investment_return', 'twb_return', 'active_twb_return',
+                   'max_investment_realized_return', 'twb_realized_return',
+                   'active_twb_realized_return']:
+            metrics_df[col] = u.winsorize(metrics_df[col], returns_winsorization)
 
-    # Normalize returns
-    metrics_df['norm_return'] = (metrics_df['return'] - metrics_df['return'].min()) / \
-        (metrics_df['return'].max() - metrics_df['return'].min())
+    # Calculate normalized versions
+    for prefix in ['max_investment', 'twb', 'active_twb']:
+        metrics_df[f'norm_{prefix}_return'] = (
+            (metrics_df[f'{prefix}_return'] - metrics_df[f'{prefix}_return'].min()) /
+            (metrics_df[f'{prefix}_return'].max() - metrics_df[f'{prefix}_return'].min() + epsilon)
+        )
 
-    # Normalize logged investments
-    log_invested = np.log10(metrics_df['max_investment'] + epsilon)
-    metrics_df['norm_invested'] = (log_invested - log_invested.min()) / \
-        (log_invested.max() - log_invested.min())
+    # Normalize investment bases
+    for col, prefix in [('max_investment', 'max_investment'),
+                       ('time_weighted_balance', 'twb'),
+                       ('active_time_weighted_balance', 'active_twb')]:
+        log_value = np.log10(metrics_df[col] + epsilon)
+        metrics_df[f'norm_{prefix}_invested'] = (
+            (log_value - log_value.min()) /
+            (log_value.max() - log_value.min() + epsilon)
+        )
 
-    # Performance score
-    return_weight = wallets_config['modeling']['target_var_params']['performance_score_return_weight']
-    metrics_df['performance_score'] = (return_weight * metrics_df['norm_return'] +
-                                     (1-return_weight) * metrics_df['norm_invested'])
-
-    # Size-adjusted rank
-    # Create mask for zero values
-    zero_mask = metrics_df['max_investment'] == 0
-
-    # Create quartiles series initialized with 'q0' for zero values
-    quartiles = pd.Series('q0', index=metrics_df.index)
-
-    # Calculate quartiles for non-zero values
-    non_zero_quartiles = pd.qcut(metrics_df['max_investment'][~zero_mask],
-                                q=4,
-                                labels=['q1', 'q2', 'q3', 'q4'])
-
-    # Assign the quartiles to non-zero values
-    quartiles[~zero_mask] = non_zero_quartiles
-
-    # Calculate size-adjusted rank within each quartile
-    metrics_df['size_adjusted_rank'] = metrics_df.groupby(quartiles)['return'].rank(pct=True)
-
-
-    # Clean up intermediate columns
-    cols_to_drop = ['norm_return', 'norm_invested', 'norm_gain', 'net_crypto_investment']
-    metrics_df = metrics_df.drop(columns=[c for c in cols_to_drop
-                                        if c in metrics_df.columns])
-
-    # Verify all input wallets exist in output
-    missing_wallets = set(wallet_features_df.index) - set(metrics_df.index)
-    if missing_wallets:
-        raise ValueError(f"Found {len(missing_wallets)} wallets in input that are missing from output")
-
-    return metrics_df.round(6)
+    return metrics_df
 
 
 
-# TO DO: ADD FULL PRICE DATA
+# @u.timing_decorator
+# def calculate_performance_features(wallet_features_df):
+#     """
+#     Generates various target variables for modeling wallet performance.
+
+#     Parameters:
+#     - wallet_features_df: pandas DataFrame with columns ['crypto_net_gain', 'max_investment']
+
+#     Returns:
+#     - DataFrame with additional target variables
+#     """
+#     metrics_df = wallet_features_df[['max_investment','crypto_net_gain','net_crypto_investment']].copy().round(6)
+#     returns_winsorization = wallets_config['modeling']['returns_winsorization']
+#     epsilon = 1e-10
+
+#     # Calculate base return, including unrealized price change impacts
+#     metrics_df['return'] = np.where(abs(metrics_df['max_investment']) == 0,0,
+#                                     metrics_df['crypto_net_gain'] / metrics_df['max_investment'])
+
+#     # Calculate realized return, based on actual cash flows only
+#     metrics_df['realized_return'] = np.where(abs(metrics_df['max_investment']) == 0,0,
+#                                     metrics_df['net_crypto_investment'] / metrics_df['max_investment'])
+
+#     # Apply winsorization
+#     if returns_winsorization > 0:
+#         metrics_df['return_unwinsorized'] = metrics_df['return']
+#         metrics_df['return'] = u.winsorize(metrics_df['return'],returns_winsorization)
+
+#     # Normalize returns
+#     metrics_df['norm_return'] = (metrics_df['return'] - metrics_df['return'].min()) / \
+#         (metrics_df['return'].max() - metrics_df['return'].min())
+
+#     # Normalize logged investments
+#     log_invested = np.log10(metrics_df['max_investment'] + epsilon)
+#     metrics_df['norm_invested'] = (log_invested - log_invested.min()) / \
+#         (log_invested.max() - log_invested.min())
+
+#     # Performance score
+#     return_weight = wallets_config['modeling']['target_var_params']['performance_score_return_weight']
+#     metrics_df['performance_score'] = (return_weight * metrics_df['norm_return'] +
+#                                      (1-return_weight) * metrics_df['norm_invested'])
+
+#     # Size-adjusted rank
+#     # Create mask for zero values
+#     zero_mask = metrics_df['max_investment'] == 0
+
+#     # Create quartiles series initialized with 'q0' for zero values
+#     quartiles = pd.Series('q0', index=metrics_df.index)
+
+#     # Calculate quartiles for non-zero values
+#     non_zero_quartiles = pd.qcut(metrics_df['max_investment'][~zero_mask],
+#                                 q=4,
+#                                 labels=['q1', 'q2', 'q3', 'q4'])
+
+#     # Assign the quartiles to non-zero values
+#     quartiles[~zero_mask] = non_zero_quartiles
+
+#     # Calculate size-adjusted rank within each quartile
+#     metrics_df['size_adjusted_rank'] = metrics_df.groupby(quartiles)['return'].rank(pct=True)
+
+
+#     # Clean up intermediate columns
+#     cols_to_drop = ['norm_return', 'norm_invested', 'norm_gain', 'net_crypto_investment']
+#     metrics_df = metrics_df.drop(columns=[c for c in cols_to_drop
+#                                         if c in metrics_df.columns])
+
+#     # Verify all input wallets exist in output
+#     missing_wallets = set(wallet_features_df.index) - set(metrics_df.index)
+#     if missing_wallets:
+#         raise ValueError(f"Found {len(missing_wallets)} wallets in input that are missing from output")
+
+#     return metrics_df.round(6)
+
+
+
+# TODO: NEEDS EVERY COIN-DATE TO HAVE PRICE DATA TO BE CALCULATED
 # --------------------------
 # the balances of each coin-wallet pair needs to be imputed for every date that the wallet
 # has a transaction in order for this calculation to work correctly against production data.
