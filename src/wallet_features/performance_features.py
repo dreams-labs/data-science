@@ -163,8 +163,12 @@ def calculate_performance_ratios(performance_features_df: pd.DataFrame) -> pd.Da
             b_feature = b_col.replace('balance_', '')
             ratio_name = f'performance_{p_feature}_v_{b_feature}'
 
-            # Calculate ratio vectorially
-            performance_ratios_df[ratio_name] = performance_features_df[p_col] / performance_features_df[b_col]
+            # Calculate ratio
+            performance_ratios_df[ratio_name] = np.where(
+                performance_features_df[b_col] != 0,
+                performance_features_df[p_col] / performance_features_df[b_col],
+                np.nan
+            )
     if performance_ratios_df.isin([np.inf, -np.inf]).any().any():
         print("Infinite values found in ratio columns")
     if performance_ratios_df.isnull().any().any():
