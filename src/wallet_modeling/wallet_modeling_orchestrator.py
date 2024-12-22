@@ -155,7 +155,7 @@ def generate_training_indicators_df(training_market_data_df_full,wallets_metrics
     """
     logger.info("Beginning indicator generation process...")
 
-    # Validate date range
+    # Validate that no records exist after the training period
     training_period_end = wallets_config['training_data']['training_period_end']
     latest_market_data_record = training_market_data_df_full['date'].max()
     if latest_market_data_record > pd.to_datetime(training_period_end):
@@ -174,7 +174,7 @@ def generate_training_indicators_df(training_market_data_df_full,wallets_metrics
 
     # Filters out pre-training period records now that we've computed lookback and rolling metrics
     market_indicators_data_df = market_indicators_data_df[market_indicators_data_df['date']
-                                                        >=wallets_config['training_data']['training_period_start']]
+                                                    >=wallets_config['training_data']['training_starting_balance_date']]
 
     # If a parquet file location is specified, store the files there and return nothing
     if parquet_filename:
