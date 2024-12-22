@@ -114,7 +114,7 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
 
 
 
-def validate_inputs(profits_df, market_data_df, transfers_sequencing_df=None):
+def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
     """
     Validates the input DataFrames for the feature calculation pipeline.
 
@@ -155,9 +155,8 @@ def validate_inputs(profits_df, market_data_df, transfers_sequencing_df=None):
     if missing_pairs:
         raise AssertionError(f"The following coin_id-date pairs are missing in market_data_df: {missing_pairs}")
 
-    # transfers_sequencing_df specific (if provided)
-    if transfers_sequencing_df:
-        if not set(transfers_sequencing_df['wallet_address']).issubset(profits_df['wallet_address']):
-            raise ValueError("transfers_sequencing_df has wallets not in profits_df.")
+    # transfers_sequencing_df specific
+    if not set(transfers_sequencing_df['wallet_address']).issubset(profits_df['wallet_address']):
+        raise ValueError("transfers_sequencing_df has wallets not in profits_df.")
 
     logger.info("All input dataframes passed validation checks.")
