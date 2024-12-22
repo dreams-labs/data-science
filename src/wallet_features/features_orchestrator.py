@@ -75,8 +75,7 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     # Performance features (left join, fill 0s)
     # Inherits trading features imputed rows requirement
     # -----------------------------------------------------------------------
-    performance_features_df = (wpf.calculate_performance_features(wallet_features_df)
-                            .drop(['max_investment', 'crypto_net_gain'], axis=1))
+    performance_features_df = wpf.calculate_performance_features(wallet_features_df)
     feature_column_names['performance_'] = performance_features_df.columns
     wallet_features_df = wallet_features_df.join(performance_features_df, how='left')\
         .fillna({col: 0 for col in performance_features_df.columns})
@@ -156,7 +155,7 @@ def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
         raise AssertionError(f"The following coin_id-date pairs are missing in market_data_df: {missing_pairs}")
 
     # transfers_sequencing_df specific
-    if not set(transfers_sequencing_df['wallet_address']).issubset(profits_df['wallet_address']):
-        raise ValueError("transfers_sequencing_df has wallets not in profits_df.")
+    if not set(profits_df['wallet_address']).issubset(transfers_sequencing_df['wallet_address']):
+        raise ValueError("profits_df has wallets not in transfers_sequencing_df.")
 
     logger.info("All input dataframes passed validation checks.")
