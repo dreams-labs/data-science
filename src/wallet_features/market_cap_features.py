@@ -2,7 +2,6 @@
 Calculates metrics aggregated at the wallet-coin-date level
 """
 import logging
-import pandas as pd
 import numpy as np
 
 # Local module imports

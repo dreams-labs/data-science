@@ -576,7 +576,7 @@ def safe_downcast(df, column, dtype):
     return df
 
 
-def assert_period(config, df: pd.DataFrame, period: str) -> None:
+def assert_period(config, df: pd.DataFrame, period: str, ignore_starting_balance: bool = False) -> None:
     """
     Validates if DataFrame dates fall within configured period boundaries.
 
@@ -593,15 +593,29 @@ def assert_period(config, df: pd.DataFrame, period: str) -> None:
     period_end = pd.to_datetime(config[f"{period}_period_end"])
     period_starting_balance = pd.to_datetime(config[f"{period}_starting_balance_date"])
 
+    if ignore_starting_balance:
+        start_name = 'period start date'
+        start_boundary = period_start
+    else:
+        start_name = 'starting balance date'
+        start_boundary = period_starting_balance
+
     # Vectorized min/max comparison
     df_min = df['date'].min()
     df_max = df['date'].max()
 
-    if df_min < period_starting_balance or df_max > period_end:
+    if df_min < start_boundary or df_max > period_end:
         raise ValueError(
             f"Data outside {period} period boundaries.\n"
             f"Data range: {df_min} to {df_max}\n"
-            f"Period bounds: {period_start} to {period_end}"
+            f"Period bounds: {start_boundary} {start_name} date to {period_end} end date"
+        )
+
+    if df_min > period_starting_balance or df_max < period_end:
+        raise ValueError(
+            f"Data coverage does not extend to {period} period boundaries.\n"
+            f"Data range: {df_min} to {df_max}\n"
+            f"Period bounds: {start_boundary} {start_name} date to {period_end} end date"
         )
 
 

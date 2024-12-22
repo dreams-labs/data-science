@@ -56,6 +56,9 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     Returns:
     - wallet_features_df (df): Wallet-indexed features dataframe with a row for every wallet_cohort
     """
+    # Validate inputs
+    validate_inputs(profits_df, market_indicators_data_df, transfers_sequencing_df)
+
     # Initialize output dataframe
     wallet_features_df = pd.DataFrame(index=wallet_cohort)
     wallet_features_df.index.name = 'wallet_address'
@@ -108,3 +111,53 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
                 for col in cols}
 
     return wallet_features_df.rename(columns=rename_map)
+
+
+
+def validate_inputs(profits_df, market_data_df, transfers_sequencing_df=None):
+    """
+    Validates the input DataFrames for the feature calculation pipeline.
+
+    Parameters:
+    - profits_df (pd.DataFrame): Contains wallet-level profits data with columns:
+        ['wallet_address', 'coin_id', 'date', 'usd_balance', 'usd_net_transfers'].
+    - market_data_df (pd.DataFrame): Contains market data with columns:
+        ['coin_id', 'date', 'price', 'volume', 'market_cap_filled'].
+    - transfers_sequencing_df (pd.DataFrame): Contains wallet-level transfer sequencing data
+        with columns: ['wallet_address', 'coin_id', ...].
+
+    Raises:
+    - ValueError: If any of the following issues are found:
+        - Any DataFrame is empty.
+        - DataFrames contain NaN values in critical columns.
+        - `profits_df` or `market_data_df` contain duplicate rows for `(coin_id, date)`.
+        - Wallets in `transfers_sequencing_df` are not present in `profits_df`.
+    - AssertionError: If there are `(coin_id, date)` pairs in `profits_df` that are missing from `market_data_df`.
+
+    Logs:
+    - Information message indicating all checks passed if no exceptions are raised.
+    """
+    # profits_df specific
+    if profits_df.isnull().any().any():
+        raise ValueError("profits_df contains NaN values.")
+    if profits_df[['wallet_address', 'coin_id', 'date']].duplicated().any():
+        raise ValueError("profits_df contains duplicate wallet-coin-date rows.")
+
+    # market_data_df specific
+    if market_data_df[['price', 'volume', 'market_cap_filled']].isnull().any().any():
+        raise ValueError("market_data_df contains NaN values in critical columns.")
+    if market_data_df[['coin_id', 'date']].duplicated().any():
+        raise ValueError("market_data_df contains duplicate coin_id-date rows.")
+
+    # Full data coverage check
+    missing_pairs = set(profits_df[['coin_id', 'date']].itertuples(index=False)) - \
+                    set(market_data_df[['coin_id', 'date']].itertuples(index=False))
+    if missing_pairs:
+        raise AssertionError(f"The following coin_id-date pairs are missing in market_data_df: {missing_pairs}")
+
+    # transfers_sequencing_df specific (if provided)
+    if transfers_sequencing_df:
+        if not set(transfers_sequencing_df['wallet_address']).issubset(profits_df['wallet_address']):
+            raise ValueError("transfers_sequencing_df has wallets not in profits_df.")
+
+    logger.info("All input dataframes passed validation checks.")
