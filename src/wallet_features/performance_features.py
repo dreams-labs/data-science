@@ -165,9 +165,8 @@ def calculate_performance_ratios(performance_features_df: pd.DataFrame) -> pd.Da
 
             # Calculate ratio
             performance_ratios_df[ratio_name] = np.where(
-                performance_features_df[b_col] != 0,
+                performance_features_df[b_col] == 0, 0,
                 performance_features_df[p_col] / performance_features_df[b_col],
-                np.nan
             )
     if performance_ratios_df.isin([np.inf, -np.inf]).any().any():
         print("Infinite values found in ratio columns")
@@ -288,64 +287,64 @@ def calculate_performance_features(trading_features_df):
 
 
 
-# IN PROGRESS: needs price data for every coin-date pair to be computed accurately
-# --------------------------------------------------------------------------------
-# the balances of each coin-wallet pair needs to be imputed for every date that the wallet
-# has a transaction in order for this calculation to work correctly against production data.
+# # IN PROGRESS: needs price data for every coin-date pair to be computed accurately
+# # --------------------------------------------------------------------------------
+# # the balances of each coin-wallet pair needs to be imputed for every date that the wallet
+# # has a transaction in order for this calculation to work correctly against production data.
 
-def calculate_time_weighted_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Calculates time-weighted returns (TWR) using actual holding period in days.
+# def calculate_time_weighted_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
+#     """
+#     Calculates time-weighted returns (TWR) using actual holding period in days.
 
-    Params:
-    - profits_df (DataFrame): Daily profits data
+#     Params:
+#     - profits_df (DataFrame): Daily profits data
 
-    Returns:
-    - twr_df (DataFrame): TWR metrics keyed on wallet_address
-    """
-    profits_df = profits_df.sort_values(['wallet_address', 'coin_id', 'date'])
+#     Returns:
+#     - twr_df (DataFrame): TWR metrics keyed on wallet_address
+#     """
+#     profits_df = profits_df.sort_values(['wallet_address', 'coin_id', 'date'])
 
-    # Calculate holding period returns
-    profits_df['pre_transfer_balance'] = profits_df['usd_balance'] - profits_df['usd_net_transfers']
-    profits_df['prev_balance'] = profits_df.groupby(['wallet_address', 'coin_id'])['usd_balance'].shift()
-    profits_df['days_held'] = profits_df.groupby(['wallet_address', 'coin_id'])['date'].diff().dt.days
+#     # Calculate holding period returns
+#     profits_df['pre_transfer_balance'] = profits_df['usd_balance'] - profits_df['usd_net_transfers']
+#     profits_df['prev_balance'] = profits_df.groupby(['wallet_address', 'coin_id'])['usd_balance'].shift()
+#     profits_df['days_held'] = profits_df.groupby(['wallet_address', 'coin_id'])['date'].diff().dt.days
 
-    # Calculate period returns and weights
-    profits_df['period_return'] = np.where(
-        profits_df['usd_net_transfers'] != 0,
-        profits_df['pre_transfer_balance'] / profits_df['prev_balance'],
-        profits_df['usd_balance'] / profits_df['prev_balance']
-    )
-    profits_df['period_return'] = profits_df['period_return'].replace([np.inf, -np.inf], 1).fillna(1)
+#     # Calculate period returns and weights
+#     profits_df['period_return'] = np.where(
+#         profits_df['usd_net_transfers'] != 0,
+#         profits_df['pre_transfer_balance'] / profits_df['prev_balance'],
+#         profits_df['usd_balance'] / profits_df['prev_balance']
+#     )
+#     profits_df['period_return'] = profits_df['period_return'].replace([np.inf, -np.inf], 1).fillna(1)
 
-    # Weight by holding period duration
-    profits_df['weighted_return'] = (profits_df['period_return'] - 1) * profits_df['days_held']
+#     # Weight by holding period duration
+#     profits_df['weighted_return'] = (profits_df['period_return'] - 1) * profits_df['days_held']
 
-    # Get total days for each wallet
-    total_days = profits_df.groupby('wallet_address')['date'].agg(lambda x: (x.max() - x.min()).days)
+#     # Get total days for each wallet
+#     total_days = profits_df.groupby('wallet_address')['date'].agg(lambda x: (x.max() - x.min()).days)
 
-    # Calculate TWR using total days held
-    def safe_twr(weighted_returns, wallet):
-        if len(weighted_returns) == 0 or weighted_returns.isna().all():
-            return 0
-        days = max(total_days[wallet], 1)  # Get days for this wallet, minimum 1
-        return weighted_returns.sum() / days
+#     # Calculate TWR using total days held
+#     def safe_twr(weighted_returns, wallet):
+#         if len(weighted_returns) == 0 or weighted_returns.isna().all():
+#             return 0
+#         days = max(total_days[wallet], 1)  # Get days for this wallet, minimum 1
+#         return weighted_returns.sum() / days
 
-    # Compute TWR and days_held using vectorized operations
-    twr_df = profits_df.groupby('wallet_address').agg(
-        time_weighted_return=('weighted_return',
-                              lambda x: safe_twr(x, profits_df.loc[x.index, 'wallet_address'].iloc[0])),
-        days_held=('date', lambda x: max((x.max() - x.min()).days, 1))
-    )
+#     # Compute TWR and days_held using vectorized operations
+#     twr_df = profits_df.groupby('wallet_address').agg(
+#         time_weighted_return=('weighted_return',
+#                               lambda x: safe_twr(x, profits_df.loc[x.index, 'wallet_address'].iloc[0])),
+#         days_held=('date', lambda x: max((x.max() - x.min()).days, 1))
+#     )
 
-    # Annualize returns
-    twr_df['annualized_twr'] = ((1 + twr_df['time_weighted_return']) ** (365 / twr_df['days_held'])) - 1
-    twr_df = twr_df.replace([np.inf, -np.inf], np.nan)
+#     # Annualize returns
+#     twr_df['annualized_twr'] = ((1 + twr_df['time_weighted_return']) ** (365 / twr_df['days_held'])) - 1
+#     twr_df = twr_df.replace([np.inf, -np.inf], np.nan)
 
-    # Winsorize output
-    returns_winsorization = wallets_config['modeling']['returns_winsorization']
-    if returns_winsorization > 0:
-        twr_df['time_weighted_return'] = u.winsorize(twr_df['time_weighted_return'],returns_winsorization)
-        twr_df['annualized_twr'] = u.winsorize(twr_df['annualized_twr'],returns_winsorization)
+#     # Winsorize output
+#     returns_winsorization = wallets_config['modeling']['returns_winsorization']
+#     if returns_winsorization > 0:
+#         twr_df['time_weighted_return'] = u.winsorize(twr_df['time_weighted_return'],returns_winsorization)
+#         twr_df['annualized_twr'] = u.winsorize(twr_df['annualized_twr'],returns_winsorization)
 
-    return twr_df
+#     return twr_df
