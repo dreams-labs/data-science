@@ -8,7 +8,7 @@ training_data:
         "2024-10-01"
     ]
     modeling_period_start: "2024-11-01"
-    modeling_period_end: "2024-11-20"w
+    modeling_period_end: "2024-11-20"
     validation_period_end: "2024-11-30"
 
     # Local pipeline configs
