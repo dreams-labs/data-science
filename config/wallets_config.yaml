@@ -62,16 +62,15 @@ features:
     offset_winsorization: 0.02 # comparisons between metrics and their offset values will be winsorized by this amount
     timing_metrics_min_transaction_size: 20  # trades below this USD threshold will not be evaluated for market timing peformance or transfers buyer sequencing
 
-
+    # Performance params
+    ranking_ntiles: 5
+    returns_winsorization: 0.01
 
 # Variables used for model generation
 modeling:
     # Which wallet performance metric to use as the target variable. Options are:
     # invested, crypto_net_gain, return, risk_adj_return, performance_score, log_weighted_return, hybrid_score, size_adjusted_rank
-    target_variable: "size_adjusted_rank"
-    target_var_params:
-        performance_score_return_weight: 0.6
-    returns_winsorization: 0.01
+    target_variable: "performance_total_gain_v_max_investment_within_group_rank"
     drop_columns: []
 
     # Model specifics

@@ -4,6 +4,7 @@ Calculates wallet-level financial performance metrics
 import logging
 import pandas as pd
 import numpy as np
+import scipy
 
 # local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
@@ -16,9 +17,9 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 
 
-def calculate_profitability_features(wallet_features_df: pd.DataFrame) -> pd.DataFrame:
+def calculate_profits_features(wallet_features_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Generates candidate profit profitability_features for return calculations.
+    Generates candidate profit profits_features for return calculations.
 
     Params:
     - wallet_features_df (DataFrame): Required columns:
@@ -28,40 +29,35 @@ def calculate_profitability_features(wallet_features_df: pd.DataFrame) -> pd.Dat
         - total_crypto_sells: Sum of sell transactions
 
     Returns:
-    - profitability_df (DataFrame): Profit profitability_features with columns:
+    - profits_df (DataFrame): Profit profits_features with columns:
         - total_gain: Total gain including unrealized P&L
         - realized_gain: Net cash flows from trading
         - unrealized_gain: Mark-to-market gains not yet realized
-        - buy_volume: Total buy transactions
-        - sell_volume: Total sell transactions
-        - total_volume: Total transaction volume
-        - net_volume: Net transaction flow
+
     """
-    profitability_features_df = pd.DataFrame(index=wallet_features_df.index)
+    profits_features_df = pd.DataFrame(index=wallet_features_df.index)
 
-    # Primary gain profitability_features
-    profitability_features_df['total_gain'] = wallet_features_df['crypto_net_gain']
-    profitability_features_df['realized_gain'] = wallet_features_df['net_crypto_investment']
-    profitability_features_df['unrealized_gain'] = (
-        wallet_features_df['crypto_net_gain'] -
-        wallet_features_df['net_crypto_investment']
-    )
+    # Primary gain profits_features
+    profits_features_df['crypto_net_gain'] = wallet_features_df['crypto_net_gain']
+    profits_features_df['net_crypto_investment'] = wallet_features_df['net_crypto_investment']
 
-    # Volume-based profitability_features
-    profitability_features_df['buy_volume'] = wallet_features_df['total_crypto_buys']
-    profitability_features_df['sell_volume'] = wallet_features_df['total_crypto_sells']
-    profitability_features_df['total_volume'] = wallet_features_df['total_volume']
-    profitability_features_df['net_volume'] = profitability_features_df['buy_volume'] - profitability_features_df['sell_volume']
+    # profits_features_df['unrealized_gain'] = (
+    #     wallet_features_df['crypto_net_gain'] -
+    #     wallet_features_df['net_crypto_investment']
+    # )
+
+    # # Volume-based profits_features
+    # profits_features_df['buy_volume'] = wallet_features_df['total_crypto_buys']
+    # profits_features_df['sell_volume'] = wallet_features_df['total_crypto_sells']
+    # profits_features_df['total_volume'] = wallet_features_df['total_volume']
+    # profits_features_df['net_volume'] = profits_features_df['buy_volume'] - profits_features_df['sell_volume']
 
     # Verify no nulls produced
-    null_check = profitability_features_df.isnull().sum()
+    null_check = profits_features_df.isnull().sum()
     if null_check.any():
         raise ValueError(f"Null values found in columns: {null_check[null_check > 0].index.tolist()}")
 
-    # Prefix to identify which columns should be tried as numerators
-    profitability_features_df = profitability_features_df.add_prefix('profitability_')
-
-    return profitability_features_df
+    return profits_features_df
 
 
 
@@ -96,45 +92,39 @@ def calculate_balance_features(trading_features_df: pd.DataFrame) -> pd.DataFram
         - turnover_exposure: total_volume * (twb/max_investment)
     """
     balance_features_df = pd.DataFrame(index=trading_features_df.index)
-    epsilon = 1e-10
 
     # Basic size features
     balance_features_df['max_investment'] = trading_features_df['max_investment']
-    balance_features_df['time_weighted_balance'] = trading_features_df['time_weighted_balance']
-    balance_features_df['active_time_weighted_balance'] = trading_features_df['active_time_weighted_balance']
+    # balance_features_df['time_weighted_balance'] = trading_features_df['time_weighted_balance']
+    # balance_features_df['active_time_weighted_balance'] = trading_features_df['active_time_weighted_balance']
 
-    # Hybrid features combining size and activity
-    balance_features_df['activity_weighted_balance'] = (
-        trading_features_df['time_weighted_balance'] *
-        trading_features_df['activity_density']
-    )
+    # Disabled variables:
+    # # Hybrid features combining size and activity
+    # balance_features_df['activity_weighted_balance'] = (
+    #     trading_features_df['time_weighted_balance'] *
+    #     trading_features_df['activity_density']
+    # )
 
-    balance_features_df['transaction_weighted_balance'] = (
-        trading_features_df['time_weighted_balance'] *
-        np.log1p(trading_features_df['transaction_days'])
-    )
+    # balance_features_df['transaction_weighted_balance'] = (
+    #     trading_features_df['time_weighted_balance'] *
+    #     np.log1p(trading_features_df['transaction_days'])
+    # )
 
-    balance_features_df['velocity_weighted_balance'] = (
-        trading_features_df['time_weighted_balance'] *
-        trading_features_df['volume_vs_twb_ratio'].clip(0, 10)  # Cap extreme velocity
-    )
+    # balance_features_df['velocity_weighted_balance'] = (
+    #     trading_features_df['time_weighted_balance'] *
+    #     trading_features_df['volume_vs_twb_ratio'].clip(0, 10)  # Cap extreme velocity
+    # )
 
-    # Risk exposure features
-    balance_features_df['peak_exposure'] = np.maximum(
-        trading_features_df['total_crypto_buys'],
-        trading_features_df['total_crypto_sells']
-    )
+    # balance_features_df['sustained_exposure'] = (
+    #     trading_features_df['time_weighted_balance'] *
+    #     np.sqrt(trading_features_df['transaction_days'])
+    # )
 
-    balance_features_df['sustained_exposure'] = (
-        trading_features_df['time_weighted_balance'] *
-        np.sqrt(trading_features_df['transaction_days'])
-    )
-
-    balance_features_df['turnover_exposure'] = (
-        trading_features_df['total_volume'] *
-        (trading_features_df['time_weighted_balance'] /
-         (trading_features_df['max_investment'] + epsilon))
-    )
+    # balance_features_df['turnover_exposure'] = (
+    #     trading_features_df['total_volume'] *
+    #     (trading_features_df['time_weighted_balance'] /
+    #      (trading_features_df['max_investment']
+    # )
 
     # Verify no nulls produced
     null_check = balance_features_df.isnull().sum()
@@ -145,178 +135,139 @@ def calculate_balance_features(trading_features_df: pd.DataFrame) -> pd.DataFram
 
 
 
-def calculate_wallet_intelligence_metrics(wallet_features_df: pd.DataFrame) -> pd.DataFrame:
+def calculate_performance_ratios(performance_features_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calculates composite intelligence metrics capturing wallet's predictive capabilities
+    Creates ratio columns for each profits metric divided by each balance metric.
 
     Params:
-    - wallet_features_df (DataFrame): Required columns from various feature sets:
-        Timing: buyer_number, new_coin_buy_counts
-        Trading: activity_density, volume_vs_twb_ratio
-        Market Cap: volume_wtd_market_cap
-        Performance: returns metrics
+    - performance_features_df (DataFrame): Combined profits and balance metrics
 
     Returns:
-    - intelligence_df (DataFrame): Composite intelligence metrics including:
-        - early_mover_score: Early adoption + successful exits
-        - active_trader_score: Trading frequency weighted by success
-        - market_navigation_score: Timing of entries/exits
-        - capital_efficiency_score: Return per unit of deployed capital
+    - performance_ratios_df (DataFrame): DataFrame with columns for each profits/balance ratio
     """
-    metrics_df = pd.DataFrame(index=wallet_features_df.index)
-    epsilon = 1e-10
+    # Extract profits and balance columns using string matching
+    profit_cols = [col for col in performance_features_df.columns if col.startswith('profits_')]
+    balance_cols = [col for col in performance_features_df.columns if col.startswith('balance_')]
 
-    # Early Mover Intelligence
-    # Combines early adoption with exit timing success
-    metrics_df['early_mover_score'] = (
-        (1 / (wallet_features_df['avg_buyer_number'] + epsilon)) *
-        np.clip(wallet_features_df['volume_vs_twb_ratio'], 0, 10)
-    )
+    # Initialize empty DataFrame with same index
+    performance_ratios_df = pd.DataFrame(index=performance_features_df.index)
 
-    # Active Trading Intelligence
-    # Weight activity by return success to distinguish active winners
-    metrics_df['active_trader_score'] = (
-        wallet_features_df['activity_density'] *
-        np.clip(wallet_features_df['returns'], -1, 3) *
-        np.log1p(wallet_features_df['unique_coins_traded'])
-    )
+    # Vectorized calculation of all ratios
+    for p_col in profit_cols:
+        for b_col in balance_cols:
+            # Create ratio column name
+            p_feature = p_col.replace('profits_', '')
+            b_feature = b_col.replace('balance_', '')
+            ratio_name = f'performance_{p_feature}_v_{b_feature}'
 
-    # Market Navigation Intelligence
-    # How well they time entries/exits relative to market cap
-    metrics_df['market_navigation_score'] = (
-        wallet_features_df['volume_wtd_market_cap'] /
-        (wallet_features_df['end_portfolio_wtd_market_cap'] + epsilon)
-    )
+            # Calculate ratio vectorially
+            performance_ratios_df[ratio_name] = performance_features_df[p_col] / performance_features_df[b_col]
 
-    # Capital Efficiency Intelligence
-    # Return generation per unit of deployed capital
-    metrics_df['capital_efficiency_score'] = (
-        wallet_features_df['total_volume'] /
-        (wallet_features_df['active_time_weighted_balance'] + epsilon) *
-        np.clip(wallet_features_df['returns'], 0, None)
-    )
+    return performance_ratios_df
 
-    # Normalize all scores to 0-1 range
-    for col in metrics_df.columns:
-        metrics_df[col] = (
-            (metrics_df[col] - metrics_df[col].min()) /
-            (metrics_df[col].max() - metrics_df[col].min() + epsilon)
+
+
+def transform_performance_ratios(performance_ratios_df: pd.DataFrame, balance_features_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Applies transformations to performance ratios.
+
+    Params:
+    - performance_ratios_df (DataFrame): Raw performance ratios
+    - balance_features_df (DataFrame): Balance features for ntile calculation
+
+    Returns:
+    - performance_features_df (DataFrame): For each input ratio creates:
+        - {ratio}_base: unmodified ratio
+        - {ratio}_rank: the wallet's rank out of all wallets for the ratio
+        - {ratio}_log: signed log of the ratio
+        - {ratio}_winsorized: winsorized ratio using the config param 'returns_winsorization'
+        - {ratio}_ntile_rank: wallets ranking within its balance_feature ntile, with the ntile
+            count set in config param 'ranking_ntiles'
+
+    """
+    # Extract params from config
+    ntile_count = wallets_config['features']['ranking_ntiles']
+    returns_winsorization = wallets_config['features']['returns_winsorization']
+
+    # Create complete index in empty df
+    performance_features_df = pd.DataFrame(index=performance_ratios_df.index)
+
+    # For each ratio column, calculate multiple feature columns using transformations
+    for col in performance_ratios_df.columns:
+
+        series = performance_ratios_df[col]
+
+        # Unmodified ratio
+        performance_features_df[f'{col}_base'] = series
+
+        # Rank of ratio
+        performance_features_df[f'{col}_rank'] = series.rank(method='average', pct=True)
+
+        # Signed log of ratio
+        performance_features_df[f'{col}_log'] = np.sign(series) * np.log1p(series.abs())
+
+        # Winsorized ratio
+        performance_features_df[f'{col}_winsorized'] = scipy.stats.mstats.winsorize(
+            series,
+            limits=[returns_winsorization, returns_winsorization]
         )
 
-    # Create composite score weighted toward early adoption and capital efficiency
-    metrics_df['composite_intelligence_score'] = (
-        0.35 * metrics_df['early_mover_score'] +
-        0.15 * metrics_df['active_trader_score'] +
-        0.15 * metrics_df['market_navigation_score'] +
-        0.35 * metrics_df['capital_efficiency_score']
-    )
+        # Rank of ratio within denominator ntile
 
-    return metrics_df.round(6)
+        # Extract denominator and create ntils of balance values
+        denominator = col.split('_v_')[1]
+        balance_col = f'balance_{denominator}'
+        metric_ntiles = pd.qcut(
+            balance_features_df[balance_col],
+            q=ntile_count,
+            labels=False,
+            duplicates='drop'
+        )
 
+        # Rank within appropriate denominator-based groups
+        performance_features_df[f'{col}_ntile_rank'] = (
+            series.groupby(metric_ntiles)
+            .rank(method='average', pct=True)
+            .fillna(0)
+        )
 
+    null_check = performance_features_df.isnull().sum()
+    if null_check.any():
+        raise ValueError(f"Null values found in columns: {null_check[null_check > 0].index.tolist()}")
 
-# # def calculate_performance_metrics(wallet_features_df: pd.DataFrame) -> pd.DataFrame:
-# #     """
-# #     Orchestrates calculation of all performance metrics.
-
-# #     Params:
-# #     - wallet_features_df (DataFrame): Must include columns:
-# #         max_investment, time_weighted_balance, crypto_net_gain, net_crypto_investment
-
-# #     Returns:
-# #     - metrics_df (DataFrame): All performance metrics calculated on both bases
-# #     """
-# #     # Calculate basic metrics first
-# #     basic_metrics = calculate_basic_performance_metrics(wallet_features_df)
-
-# #     # Use basic metrics to calculate enhanced scores
-# #     enhanced_metrics = calculate_enhanced_performance_metrics(basic_metrics)
-
-# #     # Combine metrics
-# #     return pd.concat([basic_metrics, enhanced_metrics], axis=1)
+    return performance_features_df
 
 
-# def calculate_basic_performance_metrics(wallet_features_df: pd.DataFrame) -> pd.DataFrame:
-#     """
-#     Calculates standard return metrics using max_investment and both TWB versions.
 
-#     Params:
-#     - wallet_features_df (DataFrame): Input metrics with required columns:
-#         max_investment, time_weighted_balance, active_time_weighted_balance,
-#         crypto_net_gain, net_crypto_investment
+def calculate_performance_features(trading_features_df):
+    """
+    Calculates a set of profit numerators, investment denominators, ratio combinations,
+    and transformations of ratios to create a matrix of performance scores.
+    """
+    trading_features_df = trading_features_df.copy()
 
-#     Returns:
-#     - basic_metrics_df (DataFrame): Standard performance metrics
-#     """
-#     metrics_df = wallet_features_df[['max_investment', 'time_weighted_balance',
-#                                    'active_time_weighted_balance', 'crypto_net_gain',
-#                                    'net_crypto_investment']].copy().round(6)
-#     returns_winsorization = 0.02
-#     epsilon = 1e-10
+    # Features reflecting the profit/return rate/cash inflows/inflow
+    profits_features_df = calculate_profits_features(trading_features_df)
+    profits_features_df = profits_features_df.add_prefix('profits_')
 
-#     # Calculate returns on max_investment
-#     metrics_df['max_investment_return'] = np.where(
-#         abs(metrics_df['max_investment']) == 0, 0,
-#         metrics_df['crypto_net_gain'] / metrics_df['max_investment']
-#     )
+    # Features reflecting the balance/investment/outlays
+    balance_features_df = calculate_balance_features(trading_features_df)
+    balance_features_df = balance_features_df.add_prefix('balance_')
 
-#     metrics_df['max_investment_realized_return'] = np.where(
-#         abs(metrics_df['max_investment']) == 0, 0,
-#         metrics_df['net_crypto_investment'] / metrics_df['max_investment']
-#     )
+    # Compute ratios
+    performance_features_df = profits_features_df.join(balance_features_df)
+    performance_features_ratios_df = calculate_performance_ratios(performance_features_df)
 
-#     # Calculate returns on total TWB
-#     metrics_df['twb_return'] = np.where(
-#         abs(metrics_df['time_weighted_balance']) == 0, 0,
-#         metrics_df['crypto_net_gain'] / metrics_df['time_weighted_balance']
-#     )
+    # Generate features using transformations of ratios
+    performance_transformed_features_df = transform_performance_ratios(
+                                        performance_features_ratios_df,balance_features_df)
 
-#     metrics_df['twb_realized_return'] = np.where(
-#         abs(metrics_df['time_weighted_balance']) == 0, 0,
-#         metrics_df['net_crypto_investment'] / metrics_df['time_weighted_balance']
-#     )
+    return performance_transformed_features_df
 
-#     # Calculate returns on active TWB
-#     metrics_df['active_twb_return'] = np.where(
-#         abs(metrics_df['active_time_weighted_balance']) == 0, 0,
-#         metrics_df['crypto_net_gain'] / metrics_df['active_time_weighted_balance']
-#     )
 
-#     metrics_df['active_twb_realized_return'] = np.where(
-#         abs(metrics_df['active_time_weighted_balance']) == 0, 0,
-#         metrics_df['net_crypto_investment'] / metrics_df['active_time_weighted_balance']
-#     )
 
-#     # Store unwinsorized versions
-#     metrics_df['max_investment_return_unwinsorized'] = metrics_df['max_investment_return']
-#     metrics_df['twb_return_unwinsorized'] = metrics_df['twb_return']
-#     metrics_df['active_twb_return_unwinsorized'] = metrics_df['active_twb_return']
 
-#     # Apply winsorization
-#     if returns_winsorization > 0:
-#         for col in ['max_investment_return', 'twb_return', 'active_twb_return',
-#                    'max_investment_realized_return', 'twb_realized_return',
-#                    'active_twb_realized_return']:
-#             metrics_df[col] = u.winsorize(metrics_df[col], returns_winsorization)
 
-#     # Calculate normalized versions
-#     for prefix in ['max_investment', 'twb', 'active_twb']:
-#         metrics_df[f'norm_{prefix}_return'] = (
-#             (metrics_df[f'{prefix}_return'] - metrics_df[f'{prefix}_return'].min()) /
-#             (metrics_df[f'{prefix}_return'].max() - metrics_df[f'{prefix}_return'].min() + epsilon)
-#         )
-
-#     # Normalize investment bases
-#     for col, prefix in [('max_investment', 'max_investment'),
-#                        ('time_weighted_balance', 'twb'),
-#                        ('active_time_weighted_balance', 'active_twb')]:
-#         log_value = np.log10(metrics_df[col] + epsilon)
-#         metrics_df[f'norm_{prefix}_invested'] = (
-#             (log_value - log_value.min()) /
-#             (log_value.max() - log_value.min() + epsilon)
-#         )
-
-#     return metrics_df
 
 
 
