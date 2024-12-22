@@ -96,20 +96,20 @@ def test_calculate_volume_weighted_market_cap_mixed_scenarios():
     """
     input_df = pd.DataFrame([
         # Wallet 1: Normal varied volumes
-        {'wallet_address': 1, 'usd_net_transfers': 100, 'market_cap_filled': 1000},
-        {'wallet_address': 1, 'usd_net_transfers': 200, 'market_cap_filled': 2000},
-        {'wallet_address': 1, 'usd_net_transfers': -300, 'market_cap_filled': 3000},
+        {'wallet_address': 1, 'usd_net_transfers': 100, 'market_cap_filled': 1000, 'is_imputed': False},
+        {'wallet_address': 1, 'usd_net_transfers': 200, 'market_cap_filled': 2000, 'is_imputed': False},
+        {'wallet_address': 1, 'usd_net_transfers': -300, 'market_cap_filled': 3000, 'is_imputed': False},
 
         # Wallet 2: Zero volume case
-        {'wallet_address': 2, 'usd_net_transfers': 0, 'market_cap_filled': 1500},
-        {'wallet_address': 2, 'usd_net_transfers': 0, 'market_cap_filled': 2500},
+        {'wallet_address': 2, 'usd_net_transfers': 0, 'market_cap_filled': 1500, 'is_imputed': True},
+        {'wallet_address': 2, 'usd_net_transfers': 0, 'market_cap_filled': 2500, 'is_imputed': True},
 
         # Wallet 3: Single high volume
-        {'wallet_address': 3, 'usd_net_transfers': -1000, 'market_cap_filled': 5000},
+        {'wallet_address': 3, 'usd_net_transfers': -1000, 'market_cap_filled': 5000, 'is_imputed': False},
 
         # Wallet 4: Equal volumes
-        {'wallet_address': 4, 'usd_net_transfers': 50, 'market_cap_filled': 1000},
-        {'wallet_address': 4, 'usd_net_transfers': 50, 'market_cap_filled': 3000},
+        {'wallet_address': 4, 'usd_net_transfers': 50, 'market_cap_filled': 1000, 'is_imputed': False},
+        {'wallet_address': 4, 'usd_net_transfers': 50, 'market_cap_filled': 3000, 'is_imputed': False},
     ])
 
     result = wmc.calculate_volume_weighted_market_cap(input_df)
@@ -121,7 +121,7 @@ def test_calculate_volume_weighted_market_cap_mixed_scenarios():
     # Wallet 4: Equal weights (1000 + 3000)/2 = 2000
     expected_values = {
         1: 2333.33,
-        2: 2000.00,
+        2: 0,
         3: 5000.00,
         4: 2000.00
     }
@@ -132,75 +132,6 @@ def test_calculate_volume_weighted_market_cap_mixed_scenarios():
             expected,
             rtol=1e-2
         ), f"Incorrect weighted market cap for wallet {wallet}"
-
-
-@pytest.mark.unit
-def test_calculate_ending_balance_weighted_market_cap_mixed_scenarios():
-    """
-    Tests ending balance weighted market cap calculations with different wallet scenarios:
-    - Wallet 1: Multiple coins with different balances on final date
-    - Wallet 2: Zero balance on final date (should use simple average)
-    - Wallet 3: Single coin balance
-    - Wallet 4: Equal balances across coins (weighted avg should match simple avg)
-    """
-    latest_date = pd.Timestamp('2024-01-05')
-    earlier_date = pd.Timestamp('2024-01-04')
-
-    input_df = pd.DataFrame([
-        # Wallet 1: Multiple coins, varied balances
-        {'wallet_address': 1, 'date': latest_date, 'usd_balance': 1000, 'market_cap_filled': 10000},
-        {'wallet_address': 1, 'date': latest_date, 'usd_balance': 2000, 'market_cap_filled': 20000},
-        {'wallet_address': 1, 'date': latest_date, 'usd_balance': 3000, 'market_cap_filled': 30000},
-
-        # Wallet 2: Zero balance on final date
-        {'wallet_address': 2, 'date': latest_date, 'usd_balance': 0, 'market_cap_filled': 15000},
-        {'wallet_address': 2, 'date': latest_date, 'usd_balance': 0, 'market_cap_filled': 25000},
-        {'wallet_address': 2, 'date': earlier_date, 'usd_balance': 5000, 'market_cap_filled': 20000},
-
-        # Wallet 3: Single coin balance
-        {'wallet_address': 3, 'date': latest_date, 'usd_balance': 5000, 'market_cap_filled': 50000},
-
-        # Wallet 4: Equal balances
-        {'wallet_address': 4, 'date': latest_date, 'usd_balance': 1000, 'market_cap_filled': 10000},
-        {'wallet_address': 4, 'date': latest_date, 'usd_balance': 1000, 'market_cap_filled': 30000},
-    ])
-
-    result = wmc.calculate_ending_balance_weighted_market_cap(input_df)
-
-    # Calculate expected values:
-    # Wallet 1: (10000*1000 + 20000*2000 + 30000*3000)/(1000 + 2000 + 3000) = 23333.33
-    # Wallet 2: Simple average of (15000 + 25000)/2 = 20000 (earlier date ignored)
-    # Wallet 3: Single value = 50000
-    # Wallet 4: Equal weights (10000 + 30000)/2 = 20000
-    expected_portfolio_wtd = {
-        1: 23333.33,
-        2: 20000.00,
-        3: 50000.00,
-        4: 20000.00
-    }
-
-    expected_ending_balance = {
-        1: 6000.00,  # 1000 + 2000 + 3000
-        2: 0.00,     # All zero on final date
-        3: 5000.00,  # Single balance
-        4: 2000.00   # 1000 + 1000
-    }
-
-    for wallet, expected_wtd in expected_portfolio_wtd.items():
-        assert np.isclose(
-            result.loc[wallet, 'portfolio_wtd_market_cap'],
-            expected_wtd,
-            rtol=1e-2
-        ), f"Incorrect weighted market cap for wallet {wallet}"
-
-        assert np.isclose(
-            result.loc[wallet, 'ending_portfolio_usd'],
-            expected_ending_balance[wallet],
-            rtol=1e-2
-        ), f"Incorrect ending balance for wallet {wallet}"
-
-
-
 
 
 @dataclass
@@ -494,6 +425,7 @@ def test_calculate_volume_weighted_market_cap(test_market_cap_features_df):
             "expected: {expected['volume_wtd_market_cap']}."
 
 
+
 def test_calculate_portfolio_weighted_market_cap(test_profits_df,test_market_cap_data,
                                                  test_market_cap_features_df):
     """
@@ -517,38 +449,26 @@ def test_calculate_portfolio_weighted_market_cap(test_profits_df,test_market_cap
     # Updated expected values for validation
     expected_results = {
         'w01_multiple_coins': {
-            # (210M*100 + 105M*200 + 240M*120 + 115M*300) / (100+200+120+300) = Portfolio-weighted
-            'portfolio_wtd_market_cap': (210*100 + 105*200 + 240*120 + 115*300) / (100+200+120+300) * 1e6,
+            # Portfolio-weighted
+            'end_portfolio_wtd_market_cap': (180*250000000 + 280*125000000) / (180 + 280)
         },
         'w02_net_loss': {
-            # btc: (210M*300 + 240M*250) / (300+250) = Portfolio-weighted
-            'portfolio_wtd_market_cap': (210*300 + 240*250) / (300+250) * 1e6,
+            'end_portfolio_wtd_market_cap': 250000000,
         },
         'w03_sell_all_and_rebuy': {
-            # eth: (105M*50 + 110M*40 + 120M*42) / (50+40+42) = Portfolio-weighted
-            'portfolio_wtd_market_cap': (105*50 + 110*40 + 120*42) / (50+40+42) * 1e6,
+            'end_portfolio_wtd_market_cap': 125000000
         },
         'w04_only_period_end': {
-            # sol: No transfers => use simple average = 65M
-            'portfolio_wtd_market_cap': 65000000,
+            'end_portfolio_wtd_market_cap': 65000000,
         },
-        'w08_offsetting_transactions': {
-            # sol: (54M*10400 + 60M*400) / (10400+400) = Portfolio-weighted
-            'portfolio_wtd_market_cap': (54*10400 + 60*400) / (10400+400) * 1e6,
-        },
-        'w09_memecoin_winner': {
-            # floki: (600k*100 + 700k*250 + 1200k*50 + 1500k*10) / (100+250+50+10) = Portfolio-weighted
-            'portfolio_wtd_market_cap': (600*100 + 700*250 + 1200*50 + 1500*10) / (100+250+50+10) * 1e3,
-        },
-        'w10_memecoin_loser': {
-            # myro: (1600k*250 + 250k*0) / (250+0) = Portfolio-weighted
-            'portfolio_wtd_market_cap': 1600000,
+        'w07_tiny_transactions2': {
+            'end_portfolio_wtd_market_cap': -1
         },
     }
 
     # Validate results
     for wallet, expected in expected_results.items():
-        wallet_result = market_cap_features_df.loc[wallet, 'portfolio_wtd_market_cap']
-        assert np.isclose(wallet_result, expected['portfolio_wtd_market_cap'], atol=1e5), \
+        wallet_result = market_cap_features_df.loc[wallet, 'end_portfolio_wtd_market_cap']
+        assert np.isclose(wallet_result, expected['end_portfolio_wtd_market_cap'], atol=1e5), \
             f"Wallet {wallet} has incorrect portfolio-weighted market cap: {wallet_result}, " \
-            "expected: {expected['portfolio_wtd_market_cap']}."
+            f"expected: {expected['end_portfolio_wtd_market_cap']}."

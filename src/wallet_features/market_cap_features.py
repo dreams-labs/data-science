@@ -2,7 +2,6 @@
 Calculates metrics aggregated at the wallet-coin-date level
 """
 import logging
-import time
 import pandas as pd
 import numpy as np
 
@@ -53,42 +52,34 @@ def calculate_volume_weighted_market_cap(profits_market_features_df):
     - profits_market_features_df (df): DataFrame containing wallet_address, volume, and market_cap_filled
 
     Returns:
-    pandas.DataFrame: DataFrame with wallet addresses and their weighted average market caps
+    pandas.DataFrame: DataFrame with wallet addresses and column 'volume_wtd_market_cap'
     """
     # Create a copy to avoid modifying original
     df_calc = profits_market_features_df.copy()
 
-    df_calc = df_calc[~df_calc['is_imputed']]
+    # Volume is equal to absolute value of USD transfers
     df_calc['volume'] = abs(df_calc['usd_net_transfers'])
 
-    # Group by wallet_address
-    grouped = df_calc.groupby('wallet_address')
+    # Multiply volume by mc for weighted average calculations
+    df_calc['market_cap_volume'] = df_calc['volume'] * df_calc['market_cap_filled']
 
-    # Calculate weighted averages
-    results = []
 
-    for wallet, group in grouped:
-        total_volume = group['volume'].sum()
+    # Calculate each wallet's total ending crypto balance and market cap dollars
+    wallet_volume_wtd_mc_df = df_calc.groupby('wallet_address',observed=True).agg(
+        total_volume=('volume','sum'),
+        total_market_cap_volume=('market_cap_volume','sum')
+    )
 
-        if total_volume > 0:
-            # If there's volume, calculate volume-weighted average
-            weighted_avg = np.average(
-                group['market_cap_filled'],
-                weights=group['volume']
-            )
-        else:
-            # If no volume, use simple average
-            weighted_avg = group['market_cap_filled'].mean()
+    wallet_volume_wtd_mc_df['volume_wtd_market_cap'] =  np.where(
+        # set value to 0 if there is not volume
+        wallet_volume_wtd_mc_df['total_volume'] == 0,0,
 
-        results.append({
-            'wallet_address': wallet,
-            'volume_wtd_market_cap': weighted_avg
-        })
+        # calculate weighted average if there is volume
+        (wallet_volume_wtd_mc_df['total_market_cap_volume']
+        / wallet_volume_wtd_mc_df['total_volume'])
+    )
 
-    volume_wtd_df = pd.DataFrame(results)
-    volume_wtd_df = volume_wtd_df.set_index('wallet_address')
-
-    return volume_wtd_df
+    return wallet_volume_wtd_mc_df[['volume_wtd_market_cap']]
 
 
 def calculate_ending_balance_weighted_market_cap(profits_market_cap_df):
@@ -105,80 +96,81 @@ def calculate_ending_balance_weighted_market_cap(profits_market_cap_df):
         if the ending balance is 0
     """
     # Create a copy to avoid modifying original
-    ending_balances_profits_df = profits_market_cap_df.copy()
+    profits_df_end = profits_market_cap_df.copy()
 
     # Retrieve the ending balances of all coin-wallet pairs
-    ending_balances_profits_df = ending_balances_profits_df.drop_duplicates(subset=['coin_id', 'wallet_address'],
-                                                                            keep='last')
+    profits_df_end = profits_df_end.drop_duplicates(subset=['coin_id', 'wallet_address'],
+                                                    keep='last')
 
     # Compute the ending market cap dollars
-    ending_balances_profits_df['market_cap_balance'] = (ending_balances_profits_df['usd_balance']
-                                                        * ending_balances_profits_df['market_cap_filled'])
+    profits_df_end['market_cap_balance'] = (profits_df_end['usd_balance']
+                                            * profits_df_end['market_cap_filled'])
 
     # Calculate each wallet's total ending crypto balance and market cap dollars
-    wallet_end_balance_wtd_mc_df = ending_balances_profits_df.groupby('wallet_address',observed=True).agg(
+    wallet_end_balance_wtd_mc_df = profits_df_end.groupby('wallet_address',observed=True).agg(
         total_usd_balance=('usd_balance','sum'),
         total_market_cap_balance=('market_cap_balance','sum')
     )
 
     # Divide to find weighted average market cap
     wallet_end_balance_wtd_mc_df['end_portfolio_wtd_market_cap'] = np.where(
-                                    # indicates to xgboost there is no value
-                                    wallet_end_balance_wtd_mc_df['total_usd_balance'] == 0,-1,
+        # indicates to xgboost there is no value
+        wallet_end_balance_wtd_mc_df['total_usd_balance'] == 0,-1,
 
-                                    # finds weighted average
-                                    (wallet_end_balance_wtd_mc_df['total_market_cap_balance']
-                                        / wallet_end_balance_wtd_mc_df['total_usd_balance'])
-                                )
+        # finds weighted average
+        (wallet_end_balance_wtd_mc_df['total_market_cap_balance']
+            / wallet_end_balance_wtd_mc_df['total_usd_balance'])
+    )
 
     return wallet_end_balance_wtd_mc_df[['end_portfolio_wtd_market_cap']]
 
 
-# @u.timing_decorator
-# def calculate_market_cap_features(profits_df,market_data_df):
-#     """
-#     Calculates metrics about each wallet's interaction with coins of different market caps:
-#     1. Volume-weighted average market cap (uses only real transfers)
-#     2. Ending balance-weighted market cap (uses final period balances)
+@u.timing_decorator
+def calculate_market_cap_features(profits_df,market_data_df):
+    """
+    Calculates metrics about each wallet's interaction with coins of different market caps:
+    1. Volume-weighted average market cap (uses only real transfers)
+    2. Ending balance-weighted market cap (uses final period balances)
 
-#     Params:
-#     - profits_df (DataFrame): Daily profits with both real transfers and imputed period boundary rows
-#     - market_data_df (DataFrame): Price and market cap data
+    Params:
+    - profits_df (DataFrame): Daily profits with both real transfers and imputed period boundary rows
+    - market_data_df (DataFrame): Price and market cap data
 
-#     Returns:
-#     - market_cap_features_df (DataFrame): Market cap features indexed on wallet_address
+    Returns:
+    - market_cap_features_df (DataFrame): Market cap features indexed on wallet_address
 
-#     """
-#     logger.debug("Calculating market cap features...")
+    """
+    # Copy dfs
+    profits_df = profits_df.copy()
+    market_data_df = market_data_df.copy()
 
-#     # Confirm that all coin_id-date pairs with profits_df records have market data available
-#     profits_pairs = set(profits_df[['coin_id', 'date']].apply(tuple, axis=1))
-#     market_cap_pairs = set(market_data_df[['coin_id', 'date']].apply(tuple, axis=1))
-#     missing_in_market_cap = profits_pairs - market_cap_pairs
-#     if missing_in_market_cap:
-#         raise ValueError(f"Missing coin_id-date pairs in market_cap_df: {missing_in_market_cap}")
+    # Data quality check: all profits_df coin-date records have market data
+    profits_pairs = set(profits_df[['coin_id', 'date']].apply(tuple, axis=1))
+    market_cap_pairs = set(market_data_df[['coin_id', 'date']].apply(tuple, axis=1))
+    missing_in_market_cap = profits_pairs - market_cap_pairs
+    if missing_in_market_cap:
+        raise ValueError(f"Missing coin_id-date pairs in market_cap_df: {missing_in_market_cap}")
 
-#     # Force fill market cap gaps
-#     filled_market_cap_df = force_fill_market_cap(market_data_df)
+    # Force fill market cap gaps
+    filled_market_cap_df = force_fill_market_cap(market_data_df)
 
-#     # Merge market cap data and sort
-#     profits_market_cap_df = profits_df.merge(
-#         filled_market_cap_df[['date', 'coin_id', 'market_cap_filled']],
-#         on=['date', 'coin_id'],
-#         how='inner'
-#     )
-#     profits_market_cap_df = profits_market_cap_df.sort_values(by=['coin_id', 'wallet_address', 'date'])
+    # Merge market cap data
+    profits_market_cap_df = profits_df.merge(
+        filled_market_cap_df[['date', 'coin_id', 'market_cap_imputed', 'market_cap_filled']],
+        on=['date', 'coin_id'],
+        how='inner'
+    )
 
-#     # Calculate ending balance weighted metrics using period end rows
-#     profits_ending_balances_df = profits_market_cap_df.drop_duplicates(subset=['coin_id', 'wallet_address'],
-#                                                                        keep='last')
-#     ending_balance_wtd_df = calculate_ending_balance_weighted_market_cap(profits_ending_balances_df)
+    # Calculate ending balance weighted metrics
+    wallet_end_balance_wtd_mc_df = calculate_ending_balance_weighted_market_cap(profits_market_cap_df)
 
-#     # Calculate volume-weighted metrics using only real transfers
-#     volume_wtd_df = calculate_volume_weighted_market_cap(profits_market_cap_df[~profits_market_cap_df['is_imputed']])
+    # Calculate volume-weighted metrics using only real transfers
+    volume_wtd_df = calculate_volume_weighted_market_cap(profits_market_cap_df)
 
-#     # Merge into a wallet-indexed df of features
-#     market_cap_features_df = volume_wtd_df.copy()
-#     market_cap_features_df = market_cap_features_df.join(ending_balance_wtd_df)
+    # Merge into a wallet-indexed df of features
+    market_cap_features_df = wallet_end_balance_wtd_mc_df.join(volume_wtd_df,how='inner')
 
-#     return market_cap_features_df
+    # fill 0s for wallets with no volume
+    market_cap_features_df = market_cap_features_df.fillna(0)
+
+    return market_cap_features_df
