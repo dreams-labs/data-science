@@ -9,6 +9,7 @@ tests used to audit the files in the data-science/src folder
 import sys
 from pathlib import Path
 import pandas as pd
+import numpy as np
 from dotenv import load_dotenv
 import pytest
 from dreams_core import core as dc
@@ -31,6 +32,58 @@ wallets_config = WalletsConfig.load_from_yaml(config_path)
 #                 U N I T   T E S T S                   #
 #                                                       #
 # ===================================================== #
+
+# ------------------------------------------------- #
+# calculate_time_weighted_returns() unit tests
+# ------------------------------------------------- #
+
+
+def test_profits_features_calculation():
+    """Verify that crypto_net_gain and net_crypto_investment are correctly
+    calculated and preserved from input data"""
+    mock_input = pd.DataFrame({
+        'crypto_net_gain': [100, -50],
+        'net_crypto_investment': [80, -30],
+        'total_crypto_buys': [1000, 500],
+        'total_crypto_sells': [920, 530]
+    })
+    result = wpf.calculate_profits_features(mock_input)
+    assert np.allclose(result['crypto_net_gain'], mock_input['crypto_net_gain'])
+    assert np.allclose(result['net_crypto_investment'], mock_input['net_crypto_investment'])
+
+
+def test_balance_features_core_metrics():
+    """Verify that core balance metrics are preserved and non-negative"""
+    mock_input = pd.DataFrame({
+        'max_investment': [1000, 2000],
+        'time_weighted_balance': [800, 1500],
+        'active_time_weighted_balance': [900, 1800]
+    })
+    result = wpf.calculate_balance_features(mock_input)
+    assert (result >= 0).all().all()  # All balance metrics should be non-negative
+    assert np.allclose(result['max_investment'], mock_input['max_investment'])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # ------------------------------------------------- #
 # calculate_time_weighted_returns() unit tests

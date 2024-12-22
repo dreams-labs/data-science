@@ -165,6 +165,10 @@ def calculate_performance_ratios(performance_features_df: pd.DataFrame) -> pd.Da
 
             # Calculate ratio vectorially
             performance_ratios_df[ratio_name] = performance_features_df[p_col] / performance_features_df[b_col]
+    if performance_ratios_df.isin([np.inf, -np.inf]).any().any():
+        print("Infinite values found in ratio columns")
+    if performance_ratios_df.isnull().any().any():
+        print("NaN values found in ratio columns")
 
     return performance_ratios_df
 
@@ -211,13 +215,9 @@ def transform_performance_ratios(performance_ratios_df: pd.DataFrame,
         performance_features_df[f'{col}_log'] = np.sign(series) * np.log1p(series.abs())
 
         # Winsorized ratio
-        performance_features_df[f'{col}_winsorized'] = scipy.stats.mstats.winsorize(
-            series,
-            limits=[returns_winsorization, returns_winsorization]
-        )
+        performance_features_df[f'{col}_winsorized'] = u.winsorize(series,returns_winsorization)
 
-        # Rank of ratio within denominator ntile
-
+        # Ntile rank of ratio
         # Extract denominator and create ntils of balance values
         denominator = col.split('_v_')[1]
         balance_col = f'balance_{denominator}'
@@ -266,6 +266,14 @@ def calculate_performance_features(trading_features_df):
     null_check = performance_features_df.isnull().sum()
     if null_check.any():
         raise ValueError(f"Null values found in columns: {null_check[null_check > 0].index.tolist()}")
+
+    # Check for infinite values
+    inf_columns = (
+        performance_features_df.columns[
+            performance_features_df.isin([np.inf, -np.inf]).any()
+        ].tolist())
+    if inf_columns:
+        raise ValueError(f"Infinite values found in columns: {inf_columns}")
 
     # Check wallet_address index consistency
     if not performance_features_df.index.equals(trading_features_df.index):
