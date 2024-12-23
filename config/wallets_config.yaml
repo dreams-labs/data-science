@@ -70,7 +70,7 @@ features:
 modeling:
     # Which wallet performance metric to use as the target variable. Options are:
     # invested, crypto_net_gain, return, risk_adj_return, performance_score, log_weighted_return, hybrid_score, size_adjusted_rank
-    target_variable: "performance_crypto_net_gain_v_max_investment_ntile_rank"
+    target_variable: "performance_net_crypto_investment_v_active_time_weighted_balance_ntile_rank"
     drop_columns: []
 
     # Model specifics

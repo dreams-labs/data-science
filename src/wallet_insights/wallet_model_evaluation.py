@@ -567,8 +567,9 @@ def style_rows(df: pd.DataFrame) -> pd.DataFrame.style:
         if min_val == max_val:
             return ['background-color: rgba(0, 0, 255, 0)'] * len(row)
 
-        norm = (row - min_val) / (max_val - min_val)
-        colors = [f'background-color: rgba(0, 0, 255, {x:.2f})' if pd.notna(x) else '' for x in norm]
+        # Handle NaN explicitly during normalization
+        norm = row.apply(lambda x: (x - min_val) / (max_val - min_val) if pd.notna(x) else np.nan)
+        colors = [f'background-color: rgba(0, 0, 255, {x:.2f})' if not np.isnan(x) else '' for x in norm]
         return colors
 
     # Create the style object with background colors
