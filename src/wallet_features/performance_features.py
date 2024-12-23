@@ -4,7 +4,6 @@ Calculates wallet-level financial performance metrics
 import logging
 import pandas as pd
 import numpy as np
-import scipy
 
 # local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
