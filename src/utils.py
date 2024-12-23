@@ -1083,3 +1083,25 @@ def export_code(
                 outfile.write(f"# {'-'*80}\n\n")
 
     logger.info(f"Consolidation complete. All files are saved in {output_file}")
+
+
+# def setup_local_logging(base_logger):
+#     """
+#     Configures a logger to also write outputs to the env var LOGGING_FILE
+#     """
+#     # Get log file location
+#     log_file = os.environ.get('LOGGING_FILE')
+#     assert os.path.exists(log_file)
+
+#     # Create a file handler
+#     file_handler = logging.FileHandler(log_file)
+#     file_handler.setLevel(logging.INFO)  # Set the logging level for the file handler
+
+#     # Retrieve the formatter from the existing handlers (if any)
+#     existing_formatter = base_logger.handlers[0].formatter  # Get the formatter of the first handler
+#     file_handler.setFormatter(existing_formatter)
+
+#     # Add the file handler to the logger
+#     base_logger.addHandler(file_handler)
+
+#     return base_logger

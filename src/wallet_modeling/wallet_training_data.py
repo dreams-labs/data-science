@@ -298,7 +298,7 @@ def split_training_window_dfs(training_profits_df):
     - training_windows_dfs (list of dfs): list of profits_dfs for each training window
 
     """
-    logger.info("Generating window-specific profits_dfs...")
+    logger.debug("Generating window-specific profits_dfs...")
 
     # Convert training window starts to sorted datetime
     training_windows_starts = sorted([
@@ -345,12 +345,12 @@ def split_training_window_dfs(training_profits_df):
 
     # Result: array of DataFrames
     for i, df in enumerate(training_windows_profits_dfs):
-        logger.info("Training Window %s (%s to %s): %s",
+        logger.debug("Training Window %s (%s to %s): %s",
                     i + 1,
                     df['date'].min().strftime('%Y-%m-%d'),
                     df['date'].max().strftime('%Y-%m-%d'),
                     df.shape)
-    logger.info("Training Period (%s to %s): %s",
+    logger.debug("Training Period (%s to %s): %s",
                 training_profits_df['date'].min().strftime('%Y-%m-%d'),
                 training_profits_df['date'].max().strftime('%Y-%m-%d'),
                 training_profits_df.shape)

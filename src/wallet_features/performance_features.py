@@ -96,8 +96,8 @@ def calculate_balance_features(trading_features_df: pd.DataFrame) -> pd.DataFram
 
     # Basic size features
     balance_features_df['max_investment'] = trading_features_df['max_investment']
-    balance_features_df['time_weighted_balance'] = trading_features_df['time_weighted_balance']
-    balance_features_df['active_time_weighted_balance'] = trading_features_df['active_time_weighted_balance']
+    balance_features_df['twb'] = trading_features_df['time_weighted_balance']
+    balance_features_df['active_twb'] = trading_features_df['active_time_weighted_balance']
 
     # DISABLED FEATURES
     # -----------------------------------------------------

@@ -604,8 +604,9 @@ def create_cluster_report(modeling_df, model_results, n, comparison_metrics):
     base_metrics = [
         'trading_max_investment_all_windows',
         'trading_crypto_net_gain_all_windows',
-        'performance_return_all_windows',
-        'mktcap_portfolio_wtd_market_cap_all_windows',
+        'mktcap_end_portfolio_wtd_market_cap_all_windows',
+        'performance_crypto_net_gain_v_max_investment_base_all_windows',
+        'performance_crypto_net_gain_v_active_time_weighted_balance_base_all_windows',
     ]
     cluster_cols = [col for col in modeling_df.columns if col.startswith('cluster_')]
     cluster_analysis_df = modeling_df[list(set(cluster_cols + base_metrics + comparison_metrics))].copy()
