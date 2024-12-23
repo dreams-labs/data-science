@@ -58,7 +58,6 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     """
     # Validate inputs
     u.assert_period(profits_df, period_start_date, period_end_date)
-    u.assert_period(market_indicators_data_df, period_start_date, period_end_date)
     validate_inputs(profits_df, market_indicators_data_df, transfers_sequencing_df)
 
     # Initialize output dataframe
@@ -74,13 +73,12 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     wallet_features_df = wallet_features_df.join(trading_features_df, how='left')\
         .fillna({col: 0 for col in trading_features_df.columns})
 
-    # Performance features (left join, fill 0s)
+    # Performance features (left join, fill -1s)
     # Inherits trading features imputed rows requirement
     # -----------------------------------------------------------------------
     performance_features_df = wpf.calculate_performance_features(wallet_features_df)
-    feature_column_names['performance_'] = performance_features_df.columns
     wallet_features_df = wallet_features_df.join(performance_features_df, how='left')\
-        .fillna({col: 0 for col in performance_features_df.columns})
+        .fillna({col: -1 for col in performance_features_df.columns})
 
     # Market timing features (left join, fill 0s)
     # Uses only real transfers (~is_imputed)

@@ -212,7 +212,9 @@ def identify_modeling_cohort(modeling_period_profits_df: pd.DataFrame) -> pd.Dat
     logger.info("Identifying modeling cohort...")
 
     # Validate date range
-    u.assert_period(wallets_config,modeling_period_profits_df,'modeling')
+    u.assert_period(modeling_period_profits_df,
+                    wallets_config['training_data']['modeling_period_start'],
+                    wallets_config['training_data']['modeling_period_end'])
 
     # Calculate modeling period wallet metrics
     modeling_wallets_df = wtf.calculate_wallet_trading_features(modeling_period_profits_df,
