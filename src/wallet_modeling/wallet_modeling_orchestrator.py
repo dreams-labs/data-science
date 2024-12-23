@@ -67,7 +67,7 @@ def retrieve_period_datasets(period_start_date, period_end_date, coin_cohort=Non
 
 
 @u.timing_decorator
-def define_wallet_cohort(profits_df,market_data_df):
+def define_training_wallet_cohort(profits_df,market_data_df):
     """
     Applies transformations and filters to identify wallets that pass data cleaning filters
     """
@@ -84,6 +84,10 @@ def define_wallet_cohort(profits_df,market_data_df):
     training_profits_df = imputed_profits_df[
         imputed_profits_df['date']<=training_period_end
         ].copy()
+
+    # Confirm valid dates for training period
+    u.assert_period(profits_df, training_period_start, training_period_end)
+    u.assert_period(market_data_df, training_period_start, training_period_end)
 
     # Compute wallet level metrics over duration of training period
     logger.info("Generating training period trading features...")

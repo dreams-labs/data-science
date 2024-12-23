@@ -547,7 +547,7 @@ def safe_downcast(df, column, dtype):
     # Get the original dtype of the column
     original_dtype = df[column].dtype
 
-    # Get the min and max values of the column
+    # Get the min and max values of the colum
     col_min = df[column].min()
     col_max = df[column].max()
 
@@ -576,7 +576,7 @@ def safe_downcast(df, column, dtype):
     return df
 
 
-def assert_period(config, df: pd.DataFrame, period: str, ignore_starting_balance: bool = False) -> None:
+def assert_period(df, period_start, period_end) -> None:
     """
     Validates if DataFrame dates fall within configured period boundaries.
 
@@ -588,35 +588,74 @@ def assert_period(config, df: pd.DataFrame, period: str, ignore_starting_balance
     Raises:
     - ValueError: If dates fall outside period boundaries
     """
-    config = config['training_data']
-    period_start = pd.to_datetime(config[f"{period}_period_start"])
-    period_end = pd.to_datetime(config[f"{period}_period_end"])
-    period_starting_balance = pd.to_datetime(config[f"{period}_starting_balance_date"])
+    # Extract dates as datetimes
+    period_start = pd.to_datetime(period_start)
+    period_end = pd.to_datetime(period_end)
+    period_starting_balance_date = period_start - timedelta(days=1)
 
-    if ignore_starting_balance:
-        start_name = 'period start date'
-        start_boundary = period_start
-    else:
-        start_name = 'starting balance date'
-        start_boundary = period_starting_balance
+    # Confirm the earliest record is the period starting balance date
+    earliest_date = df['date'].min()
+    if earliest_date > period_starting_balance_date:
+        raise ValueError(f"Earliest date is {earliest_date.strftime('%Y-%m-%d')} which "
+                        "is later than the starting balance date of "
+                        f"{period_starting_balance_date.strftime('%Y-%m-%d')}.")
 
-    # Vectorized min/max comparison
-    df_min = df['date'].min()
-    df_max = df['date'].max()
+    if earliest_date < period_starting_balance_date:
+        raise ValueError(f"Earliest date is {earliest_date.strftime('%Y-%m-%d')} which "
+                        "is earlier than the starting balance date of "
+                        f"{period_starting_balance_date.strftime('%Y-%m-%d')}.")
 
-    if df_min < start_boundary or df_max > period_end:
-        raise ValueError(
-            f"Data outside {period} period boundaries.\n"
-            f"Data range: {df_min} to {df_max}\n"
-            f"Period bounds: {start_boundary} {start_name} date to {period_end} end date"
-        )
+    # Confirm the latest record is the period end
+    latest_date = df['date'].max()
+    if latest_date > period_end:
+        raise ValueError(f"Found dates up to {latest_date.strftime('%Y-%m-%d')} which "
+                        f"is later than the period end of {period_end.strftime('%Y-%m-%d')}.")
+    if latest_date < period_end:
+        raise ValueError(f"Latest record in dataframe is {latest_date.strftime('%Y-%m-%d')} which "
+                        f"is earlier than the period end of {period_end.strftime('%Y-%m-%d')}.")
 
-    if df_min > period_starting_balance or df_max < period_end:
-        raise ValueError(
-            f"Data coverage does not extend to {period} period boundaries.\n"
-            f"Data range: {df_min} to {df_max}\n"
-            f"Period bounds: {start_boundary} {start_name} date to {period_end} end date"
-        )
+    # Checks for profits_df specific values
+    if 'usd_balance' in df.columns:
+
+
+        # Confirm the profits_df columns are in df
+        profits_df_columns = ['usd_balance', 'usd_net_transfers', 'usd_inflows', 'is_imputed']
+        if not set(profits_df_columns).issubset(df.columns):
+            raise ValueError("Dataframe contains 'usd_balance' column but does not have the "
+                            f"expected profits_df columns of {profits_df_columns}.")
+
+        # Confirm imputed dates are only at the starting balance and period end dates
+        imputed_dates = set(df[df['is_imputed']]['date'])
+        unexpected_imputed_dates = imputed_dates - set([period_starting_balance_date, period_end])
+        if len(unexpected_imputed_dates) > 0:
+            formatted_dates = {d.strftime("%Y-%m-%d") for d in unexpected_imputed_dates}
+            raise ValueError(f"Unexpected imputed dates found on {formatted_dates}.")
+
+
+        # Starting Balance Values Checks
+        # ------------------------------
+        starting_balance_profits_df = df[df['date']==period_starting_balance_date]
+
+        # Confirm all transfers are set to $0
+        if starting_balance_profits_df['usd_net_transfers'].sum() != 0:
+            raise ValueError("Dataframe has non-zero usd_net_transfers on starting balance "
+                                f"date of {period_starting_balance_date.strftime('%Y-%m-%d')}.")
+
+        # Confirm all usd_inflows are set to $0
+        if starting_balance_profits_df['usd_inflows'].sum() != 0:
+            raise ValueError("Dataframe has non-zero usd_net_transfers on starting balance "
+                                f"date of {period_starting_balance_date.strftime('%Y-%m-%d')}.")
+
+        # Confirm all usd_inflows are set to $0
+        if starting_balance_profits_df['usd_inflows'].sum() != 0:
+            raise ValueError("Dataframe has non-zero usd_net_transfers on starting balance "
+                                f"date of {period_starting_balance_date.strftime('%Y-%m-%d')}.")
+
+        # Confirm all rows have is_imputed set to True
+        if not (starting_balance_profits_df['is_imputed'] == True).all():
+            raise ValueError("Found non-imputed records in starting balance")
+
+
 
 
 def cw_filter(df, coin_id, wallet_address):
