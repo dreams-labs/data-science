@@ -295,7 +295,6 @@ def split_training_window_dfs(training_profits_df):
         for each period window start and end
 
     Returns:
-    - training_profits_df (list of dfs): list of profits_dfs for each training window
     - training_windows_dfs (list of dfs): list of profits_dfs for each training window
 
     """
@@ -356,7 +355,7 @@ def split_training_window_dfs(training_profits_df):
                 training_profits_df['date'].max().strftime('%Y-%m-%d'),
                 training_profits_df.shape)
 
-    return training_profits_df, training_windows_profits_dfs
+    return training_windows_profits_dfs
 
 
 

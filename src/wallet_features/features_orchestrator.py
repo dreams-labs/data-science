@@ -57,6 +57,8 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     - wallet_features_df (df): Wallet-indexed features dataframe with a row for every wallet_cohort
     """
     # Validate inputs
+    u.assert_period(profits_df, period_start_date, period_end_date)
+    u.assert_period(market_indicators_data_df, period_start_date, period_end_date)
     validate_inputs(profits_df, market_indicators_data_df, transfers_sequencing_df)
 
     # Initialize output dataframe

@@ -72,7 +72,6 @@ def define_training_wallet_cohort(profits_df,market_data_df):
     Applies transformations and filters to identify wallets that pass data cleaning filters
     """
     start_time = time.time()
-    logger.info("Defining wallet cohort based on cleaning params...")
     training_period_start = wallets_config['training_data']['training_period_start']
     training_period_end = wallets_config['training_data']['training_period_end']
 
@@ -81,33 +80,35 @@ def define_training_wallet_cohort(profits_df,market_data_df):
                                                                [training_period_end], n_threads=24)
 
     # Create a training period only profits_df
-    training_profits_df = imputed_profits_df[
-        imputed_profits_df['date']<=training_period_end
-        ].copy()
+    training_profits_df = (
+        imputed_profits_df[imputed_profits_df['date'] <= training_period_end]
+        .copy()
+        .drop('total_return', axis=1)
+    )
 
     # Confirm valid dates for training period
     u.assert_period(profits_df, training_period_start, training_period_end)
     u.assert_period(market_data_df, training_period_start, training_period_end)
 
     # Compute wallet level metrics over duration of training period
-    logger.info("Generating training period trading features...")
     training_wallet_metrics_df = wtf.calculate_wallet_trading_features(training_profits_df,
                                                                        training_period_start,
                                                                        training_period_end,
                                                                        calculate_full_metrics=False)
 
     # Apply filters based on wallet behavior during the training period
-    logger.info("Identifying and uploading wallet cohort...")
     filtered_training_wallet_metrics_df = wtd.apply_wallet_thresholds(training_wallet_metrics_df)
-    wallet_cohort = filtered_training_wallet_metrics_df.index.values
+    training_wallet_cohort = filtered_training_wallet_metrics_df.index.values
 
     # Upload the cohort to BigQuery for additional complex feature generation
-    wtd.upload_wallet_cohort(wallet_cohort)
+    wtd.upload_wallet_cohort(training_wallet_cohort)
+    logger.info("Training wallet cohort defined as %s wallets after %.2f seconds.",
+                len(training_wallet_cohort), time.time()-start_time)
 
-    logger.info("Cohort defined as %s wallets after %.2f seconds.",
-                len(wallet_cohort), time.time()-start_time)
+    # Create a profits_df that only includes the wallet cohort
+    training_cohort_profits_df = training_profits_df[training_profits_df['wallet_address'].isin(training_wallet_cohort)]
 
-    return wallet_cohort
+    return training_cohort_profits_df, training_wallet_cohort
 
 
 
@@ -130,9 +131,9 @@ def split_training_window_profits_dfs(training_profits_df,training_market_data_d
     training_windows_profits_df = training_windows_profits_df.drop('total_return', axis=1)
 
     # Split profits_df into training windows
-    training_profits_df, training_windows_profits_dfs = wtd.split_training_window_dfs(training_windows_profits_df)
+    training_windows_profits_dfs = wtd.split_training_window_dfs(training_windows_profits_df)
 
-    return training_profits_df, training_windows_profits_dfs
+    return training_windows_profits_dfs
 
 
 
