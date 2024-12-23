@@ -567,8 +567,9 @@ def style_rows(df: pd.DataFrame) -> pd.DataFrame.style:
         if min_val == max_val:
             return ['background-color: rgba(0, 0, 255, 0)'] * len(row)
 
-        norm = (row - min_val) / (max_val - min_val)
-        colors = [f'background-color: rgba(0, 0, 255, {x:.2f})' if pd.notna(x) else '' for x in norm]
+        # Handle NaN explicitly during normalization
+        norm = row.apply(lambda x: (x - min_val) / (max_val - min_val) if pd.notna(x) else np.nan)
+        colors = [f'background-color: rgba(0, 0, 255, {x:.2f})' if not np.isnan(x) else '' for x in norm]
         return colors
 
     # Create the style object with background colors
@@ -604,8 +605,9 @@ def create_cluster_report(modeling_df, model_results, n, comparison_metrics):
     base_metrics = [
         'trading_max_investment_all_windows',
         'trading_crypto_net_gain_all_windows',
-        'performance_return_all_windows',
-        'mktcap_portfolio_wtd_market_cap_all_windows',
+        'mktcap_end_portfolio_wtd_market_cap_all_windows',
+        'performance_crypto_net_gain_v_max_investment_base_all_windows',
+        'performance_crypto_net_gain_v_active_time_weighted_balance_base_all_windows',
     ]
     cluster_cols = [col for col in modeling_df.columns if col.startswith('cluster_')]
     cluster_analysis_df = modeling_df[list(set(cluster_cols + base_metrics + comparison_metrics))].copy()

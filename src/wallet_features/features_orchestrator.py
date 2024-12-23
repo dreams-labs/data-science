@@ -56,6 +56,10 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     Returns:
     - wallet_features_df (df): Wallet-indexed features dataframe with a row for every wallet_cohort
     """
+    # Validate inputs
+    u.assert_period(profits_df, period_start_date, period_end_date)
+    validate_inputs(profits_df, market_indicators_data_df, transfers_sequencing_df)
+
     # Initialize output dataframe
     wallet_features_df = pd.DataFrame(index=wallet_cohort)
     wallet_features_df.index.name = 'wallet_address'
@@ -69,14 +73,12 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     wallet_features_df = wallet_features_df.join(trading_features_df, how='left')\
         .fillna({col: 0 for col in trading_features_df.columns})
 
-    # Performance features (left join, fill 0s)
+    # Performance features (left join, fill -1s)
     # Inherits trading features imputed rows requirement
     # -----------------------------------------------------------------------
-    performance_features_df = (wpf.calculate_performance_features(wallet_features_df)
-                            .drop(['max_investment', 'crypto_net_gain'], axis=1))
-    feature_column_names['performance_'] = performance_features_df.columns
+    performance_features_df = wpf.calculate_performance_features(wallet_features_df)
     wallet_features_df = wallet_features_df.join(performance_features_df, how='left')\
-        .fillna({col: 0 for col in performance_features_df.columns})
+        .fillna({col: -1 for col in performance_features_df.columns})
 
     # Market timing features (left join, fill 0s)
     # Uses only real transfers (~is_imputed)
@@ -108,3 +110,52 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
                 for col in cols}
 
     return wallet_features_df.rename(columns=rename_map)
+
+
+
+def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
+    """
+    Validates the input DataFrames for the feature calculation pipeline.
+
+    Parameters:
+    - profits_df (pd.DataFrame): Contains wallet-level profits data with columns:
+        ['wallet_address', 'coin_id', 'date', 'usd_balance', 'usd_net_transfers'].
+    - market_data_df (pd.DataFrame): Contains market data with columns:
+        ['coin_id', 'date', 'price', 'volume', 'market_cap_filled'].
+    - transfers_sequencing_df (pd.DataFrame): Contains wallet-level transfer sequencing data
+        with columns: ['wallet_address', 'coin_id', ...].
+
+    Raises:
+    - ValueError: If any of the following issues are found:
+        - Any DataFrame is empty.
+        - DataFrames contain NaN values in critical columns.
+        - `profits_df` or `market_data_df` contain duplicate rows for `(coin_id, date)`.
+        - Wallets in `transfers_sequencing_df` are not present in `profits_df`.
+    - AssertionError: If there are `(coin_id, date)` pairs in `profits_df` that are missing from `market_data_df`.
+
+    Logs:
+    - Information message indicating all checks passed if no exceptions are raised.
+    """
+    # profits_df specific
+    if profits_df.isnull().any().any():
+        raise ValueError("profits_df contains NaN values.")
+    if profits_df[['wallet_address', 'coin_id', 'date']].duplicated().any():
+        raise ValueError("profits_df contains duplicate wallet-coin-date rows.")
+
+    # market_data_df specific
+    if market_data_df[['price', 'volume', 'market_cap_filled']].isnull().any().any():
+        raise ValueError("market_data_df contains NaN values in critical columns.")
+    if market_data_df[['coin_id', 'date']].duplicated().any():
+        raise ValueError("market_data_df contains duplicate coin_id-date rows.")
+
+    # Full data coverage check
+    missing_pairs = set(profits_df[['coin_id', 'date']].itertuples(index=False)) - \
+                    set(market_data_df[['coin_id', 'date']].itertuples(index=False))
+    if missing_pairs:
+        raise AssertionError(f"The following coin_id-date pairs are missing in market_data_df: {missing_pairs}")
+
+    # transfers_sequencing_df specific
+    if not set(profits_df['wallet_address']).issubset(transfers_sequencing_df['wallet_address']):
+        raise ValueError("profits_df has wallets not in transfers_sequencing_df.")
+
+    logger.info("All input dataframes passed validation checks.")

@@ -13,11 +13,14 @@ import pandas as pd
 import numpy as np
 
 # Local module imports
+from wallet_modeling.wallets_config_manager import WalletsConfig
 import utils as u
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
 
+# Load wallets_config at the module level
+wallets_config = WalletsConfig()
 
 
 @u.timing_decorator
@@ -298,20 +301,21 @@ def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
 @u.timing_decorator
 def aggregate_time_weighted_balance(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calculates time weighted average balance for each wallet by:
-    1. Computing TWB for each coin-wallet combination
-    2. Summing the TWBs up to wallet level
+    Calculates time weighted average balance for each wallet.
+    Includes both total TWB and active-only TWB (periods with non-zero balance).
 
     Params:
     - profits_df (DataFrame): Daily profits data with balances and dates
-    - period_end_date (string): Period end as YYYY-MM-DD
 
     Returns:
     - wallet_metrics_df (DataFrame): Time weighted metrics by wallet
     """
+    active_period_threshold = wallets_config['features']['timing_metrics_min_transaction_size']
+
     # Calculate days held for each balance level
     logger.debug('a')
-    profits_df['next_date'] = profits_df.groupby(['wallet_address', 'coin_id'])['date'].shift(-1)
+    profits_df['next_date'] = (profits_df.groupby(['wallet_address', 'coin_id'],observed=True)
+                               ['date'].shift(-1))
     profits_df['days_held'] = (
         profits_df['next_date'] - profits_df['date']
     ).dt.total_seconds() / (24 * 60 * 60)
@@ -322,24 +326,49 @@ def aggregate_time_weighted_balance(profits_df: pd.DataFrame) -> pd.DataFrame:
     profits_df.loc[last_mask, 'days_held'] = 0
 
     logger.debug('c')
-    # Calculate weighted cost (balance * days held)
+    # Calculate weighted cost for both total and active periods
     profits_df['weighted_cost'] = profits_df['crypto_cost_basis'] * profits_df['days_held']
+    profits_df['active_weighted_cost'] = np.where(
+        profits_df['crypto_cost_basis'] > active_period_threshold,
+        profits_df['weighted_cost'],
+        0
+    )
+    profits_df['active_days'] = np.where(
+        profits_df['crypto_cost_basis'] > active_period_threshold,
+        profits_df['days_held'],
+        0
+    )
 
     logger.debug('d')
-    # Precompute totals using a single aggregation for each metric
-    total_days = profits_df.groupby(['wallet_address', 'coin_id'])['days_held'].sum()
-    sum_weighted_cost = profits_df.groupby(['wallet_address', 'coin_id'])['weighted_cost'].sum()
-
-    # Combine results into a single DataFrame
-    coin_level_twb = pd.concat([total_days, sum_weighted_cost], axis=1)
-    coin_level_twb.columns = ['total_days', 'sum_weighted_cost']
+    # Group by wallet-coin and calculate both versions
+    coin_level_metrics = profits_df.groupby(['wallet_address', 'coin_id'],observed=True).agg({
+        'days_held': 'sum',
+        'active_days': 'sum',
+        'weighted_cost': 'sum',
+        'active_weighted_cost': 'sum'
+    })
 
     logger.debug('e')
-    coin_level_twb['coin_twb'] = (
-        coin_level_twb['sum_weighted_cost'] / coin_level_twb['total_days']
+    # Calculate TWB for both versions
+    epsilon = 1e-10
+    coin_level_metrics['coin_twb'] = (
+        coin_level_metrics['weighted_cost'] /
+        (coin_level_metrics['days_held'] + epsilon)
+    )
+    coin_level_metrics['active_coin_twb'] = np.where(
+        coin_level_metrics['active_days'] > 0,
+        coin_level_metrics['active_weighted_cost'] / coin_level_metrics['active_days'],
+        0
     )
 
     logger.debug('f')
-    # Then sum up to wallet level
-    wallet_twb = coin_level_twb.groupby('wallet_address')['coin_twb'].sum()
-    return pd.DataFrame(wallet_twb).rename(columns={'coin_twb': 'time_weighted_balance'})
+    # Sum to wallet level
+    wallet_metrics = coin_level_metrics.groupby('wallet_address').agg({
+        'coin_twb': 'sum',
+        'active_coin_twb': 'sum'
+    })
+
+    return pd.DataFrame({
+        'time_weighted_balance': wallet_metrics['coin_twb'],
+        'active_time_weighted_balance': wallet_metrics['active_coin_twb']
+    })

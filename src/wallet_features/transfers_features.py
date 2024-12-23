@@ -60,7 +60,7 @@ def retrieve_transfers_sequencing():
             from transaction_rank tr
         )
 
-        select wc.wallet_id
+        select wc.wallet_id as wallet_address -- rename to match the rest of the pipeline
         ,o.coin_id
         ,o.first_transaction
         ,o.buyer_number
@@ -72,7 +72,7 @@ def retrieve_transfers_sequencing():
     transfers_sequencing_df = dgc().run_sql(sequencing_sql)
     logger.info("Retrieved transfers data for %s wallet-coin pairs associated with %s wallets "
                 "in temp.wallet_modeling_training_cohort.",
-                len(transfers_sequencing_df), len(transfers_sequencing_df['wallet_id'].unique()))
+                len(transfers_sequencing_df), len(transfers_sequencing_df['wallet_address'].unique()))
 
     # Convert coin_id column to categorical to reduce memory usage
     transfers_sequencing_df['coin_id'] = transfers_sequencing_df['coin_id'].astype('category')
@@ -90,7 +90,8 @@ def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
         transfers_sequencing_df (df): each wallet's lifetime transfers data
 
     Returns:
-        transfers_sequencing_features_df (df): dataframe indexed on wallet_id with transfers feature columns
+        transfers_sequencing_features_df (df): dataframe indexed on wallet_address with
+        transfers feature columns
     """
 
     # Inner join lifetime transfers with the profits_df window to filter on date
@@ -98,12 +99,12 @@ def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
         profits_df,
         transfers_sequencing_df,
         left_on=['coin_id', 'date', 'wallet_address'],
-        right_on=['coin_id', 'first_transaction', 'wallet_id'],
+        right_on=['coin_id', 'first_transaction', 'wallet_address'],
         how='inner'
     )
 
     # Append buyer numbers to the merged_df
-    transfers_sequencing_features_df = window_transfers_data_df.groupby('wallet_id').agg({
+    transfers_sequencing_features_df = window_transfers_data_df.groupby('wallet_address').agg({
         'buyer_number': ['count', 'mean', 'median', 'min']
     })
     transfers_sequencing_features_df.columns = [
@@ -112,9 +113,6 @@ def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
         'median_buyer_number',
         'min_buyer_number'
     ]
-
-    # Rename to the wallet_id index to "wallet_address" to be consistent with the other functions
-    transfers_sequencing_features_df.index.name = 'wallet_address'
 
     return transfers_sequencing_features_df
 
@@ -153,6 +151,8 @@ def retrieve_transfers():
 
     logger.info("Retrieved transfers data for %s wallet-coin-date records.",
                 len(transfers_df))
+
+    transfers_df = u.safe_downcast(transfers_df, 'wallet_address', 'int32')
 
     return transfers_df
 

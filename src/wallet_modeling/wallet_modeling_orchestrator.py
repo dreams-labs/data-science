@@ -67,12 +67,11 @@ def retrieve_period_datasets(period_start_date, period_end_date, coin_cohort=Non
 
 
 @u.timing_decorator
-def define_wallet_cohort(profits_df,market_data_df):
+def define_training_wallet_cohort(profits_df,market_data_df):
     """
     Applies transformations and filters to identify wallets that pass data cleaning filters
     """
     start_time = time.time()
-    logger.info("Defining wallet cohort based on cleaning params...")
     training_period_start = wallets_config['training_data']['training_period_start']
     training_period_end = wallets_config['training_data']['training_period_end']
 
@@ -81,29 +80,35 @@ def define_wallet_cohort(profits_df,market_data_df):
                                                                [training_period_end], n_threads=24)
 
     # Create a training period only profits_df
-    training_profits_df = imputed_profits_df[
-        imputed_profits_df['date']<=training_period_end
-        ].copy()
+    training_profits_df = (
+        imputed_profits_df[imputed_profits_df['date'] <= training_period_end]
+        .copy()
+        .drop('total_return', axis=1)
+    )
+
+    # Confirm valid dates for training period
+    u.assert_period(profits_df, training_period_start, training_period_end)
+    u.assert_period(market_data_df, training_period_start, training_period_end)
 
     # Compute wallet level metrics over duration of training period
-    logger.info("Generating training period trading features...")
     training_wallet_metrics_df = wtf.calculate_wallet_trading_features(training_profits_df,
                                                                        training_period_start,
                                                                        training_period_end,
                                                                        calculate_full_metrics=False)
 
     # Apply filters based on wallet behavior during the training period
-    logger.info("Identifying and uploading wallet cohort...")
     filtered_training_wallet_metrics_df = wtd.apply_wallet_thresholds(training_wallet_metrics_df)
-    wallet_cohort = filtered_training_wallet_metrics_df.index.values
+    training_wallet_cohort = filtered_training_wallet_metrics_df.index.values
 
     # Upload the cohort to BigQuery for additional complex feature generation
-    wtd.upload_wallet_cohort(wallet_cohort)
+    wtd.upload_wallet_cohort(training_wallet_cohort)
+    logger.info("Training wallet cohort defined as %s wallets after %.2f seconds.",
+                len(training_wallet_cohort), time.time()-start_time)
 
-    logger.info("Cohort defined as %s wallets after %.2f seconds.",
-                len(wallet_cohort), time.time()-start_time)
+    # Create a profits_df that only includes the wallet cohort
+    training_cohort_profits_df = training_profits_df[training_profits_df['wallet_address'].isin(training_wallet_cohort)]
 
-    return wallet_cohort
+    return training_cohort_profits_df, training_wallet_cohort
 
 
 
@@ -126,9 +131,9 @@ def split_training_window_profits_dfs(training_profits_df,training_market_data_d
     training_windows_profits_df = training_windows_profits_df.drop('total_return', axis=1)
 
     # Split profits_df into training windows
-    training_profits_df, training_windows_profits_dfs = wtd.split_training_window_dfs(training_windows_profits_df)
+    training_windows_profits_dfs = wtd.split_training_window_dfs(training_windows_profits_df)
 
-    return training_profits_df, training_windows_profits_dfs
+    return training_windows_profits_dfs
 
 
 
@@ -155,7 +160,7 @@ def generate_training_indicators_df(training_market_data_df_full,wallets_metrics
     """
     logger.info("Beginning indicator generation process...")
 
-    # Validate date range
+    # Validate that no records exist after the training period
     training_period_end = wallets_config['training_data']['training_period_end']
     latest_market_data_record = training_market_data_df_full['date'].max()
     if latest_market_data_record > pd.to_datetime(training_period_end):
@@ -174,7 +179,7 @@ def generate_training_indicators_df(training_market_data_df_full,wallets_metrics
 
     # Filters out pre-training period records now that we've computed lookback and rolling metrics
     market_indicators_data_df = market_indicators_data_df[market_indicators_data_df['date']
-                                                        >=wallets_config['training_data']['training_period_start']]
+                                                    >=wallets_config['training_data']['training_starting_balance_date']]
 
     # If a parquet file location is specified, store the files there and return nothing
     if parquet_filename:
@@ -182,6 +187,8 @@ def generate_training_indicators_df(training_market_data_df_full,wallets_metrics
         market_indicators_data_df.to_parquet(parquet_filepath,index=False)
         logger.info(f"Stored market_indicators_data_df with shape {market_indicators_data_df.shape} "
                     f"to {parquet_filepath}.")
+
+        return None
 
     # If no parquet file is configured then return the df
     else:
@@ -205,7 +212,9 @@ def identify_modeling_cohort(modeling_period_profits_df: pd.DataFrame) -> pd.Dat
     logger.info("Identifying modeling cohort...")
 
     # Validate date range
-    u.assert_period(wallets_config,modeling_period_profits_df,'modeling')
+    u.assert_period(modeling_period_profits_df,
+                    wallets_config['training_data']['modeling_period_start'],
+                    wallets_config['training_data']['modeling_period_end'])
 
     # Calculate modeling period wallet metrics
     modeling_wallets_df = wtf.calculate_wallet_trading_features(modeling_period_profits_df,

@@ -295,12 +295,10 @@ def split_training_window_dfs(training_profits_df):
         for each period window start and end
 
     Returns:
-    - training_profits_df (list of dfs): list of profits_dfs for each training window
     - training_windows_dfs (list of dfs): list of profits_dfs for each training window
 
     """
-    logger.info("Generating window-specific profits_dfs...")
-
+    logger.debug("Generating window-specific profits_dfs...")
 
     # Convert training window starts to sorted datetime
     training_windows_starts = sorted([
@@ -314,27 +312,50 @@ def split_training_window_dfs(training_profits_df):
         + [datetime.strptime(wallets_config['training_data']['training_period_end'], "%Y-%m-%d")]
     )
 
+    # Generate starting balance dates for each period
+    training_windows_starting_balance_dates = (
+        [training_windows_starts[0] - timedelta(days=1)] # The day before the first window start
+        + training_windows_ends[:-1] # the end date of one window is the starting balance date of the next
+    )
+
     # Create array of DataFrames for each training period
     training_windows_profits_dfs = []
-    for start, end in zip(training_windows_starts, training_windows_ends):
+    for start_bal_date, end_date in zip(training_windows_starting_balance_dates, training_windows_ends):
+
+        # Filter to between the starting balance date and end date
         window_df = training_profits_df[
-            (training_profits_df['date'] >= start) & (training_profits_df['date'] < end)
+            (training_profits_df['date'] >= start_bal_date) & (training_profits_df['date'] <= end_date)
         ]
+
+        # Override records on the starting balance date to remove transfers
+        window_df.loc[window_df['date'] == start_bal_date, ['usd_net_transfers', 'usd_inflows', 'is_imputed']] = [0, 0, True]
+
+        # Confirm the period boundaries are handled correctly
+        start_date = start_bal_date + timedelta(days=1)
+        u.assert_period(window_df, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
+
         training_windows_profits_dfs.append(window_df)
+
+    # Confirm that the USD transfers of each window adds up to the total transfers in the full training period
+    full_sum = training_profits_df['usd_net_transfers'].sum()
+    window_sum = sum(df['usd_net_transfers'].sum() for df in training_windows_profits_dfs)
+    if not np.isclose(full_sum, window_sum, rtol=1e-5):
+        raise ValueError(f"Net transfers in full training period ({full_sum}) do not match combined "
+                        f"sum of transfers in windows dfs ({window_sum})")
 
     # Result: array of DataFrames
     for i, df in enumerate(training_windows_profits_dfs):
-        logger.info("Training Window %s (%s to %s): %s",
+        logger.debug("Training Window %s (%s to %s): %s",
                     i + 1,
                     df['date'].min().strftime('%Y-%m-%d'),
                     df['date'].max().strftime('%Y-%m-%d'),
                     df.shape)
-    logger.info("Training Period (%s to %s): %s",
+    logger.debug("Training Period (%s to %s): %s",
                 training_profits_df['date'].min().strftime('%Y-%m-%d'),
                 training_profits_df['date'].max().strftime('%Y-%m-%d'),
                 training_profits_df.shape)
 
-    return training_profits_df, training_windows_profits_dfs
+    return training_windows_profits_dfs
 
 
 
