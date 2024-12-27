@@ -61,7 +61,7 @@ def retrieve_raw_datasets(period_start_date, period_end_date):
     return profits_df, market_data_df
 
 
-def clean_market_dataset(market_data_df, profits_df, period_start_date, period_end_date):
+def clean_market_dataset(market_data_df, profits_df, period_start_date, period_end_date, coin_cohort=None):
     """
     Cleans and filters market data.
 
@@ -69,6 +69,8 @@ def clean_market_dataset(market_data_df, profits_df, period_start_date, period_e
     - market_data_df (DataFrame): Raw market data
     - profits_df (DataFrame): Profits data for coin filtering
     - period_start_date,period_end_date: Period boundary dates
+    - coin_cohort (set, optional): Coin IDs to filter data to, rather than using cleaning params
+
 
     Returns:
     - DataFrame: Cleaned market data
@@ -76,14 +78,19 @@ def clean_market_dataset(market_data_df, profits_df, period_start_date, period_e
     # Remove all records after the training period end to ensure no data leakage
     market_data_df = market_data_df[market_data_df['date']<=period_end_date]
 
-    # Clean market_data_df
-    market_data_df = market_data_df[market_data_df['coin_id'].isin(profits_df['coin_id'])]
-    market_data_df = dr.clean_market_data(
-        market_data_df,
-        wallets_config,
-        period_start_date,
-        period_end_date
-    )
+    if not coin_cohort:
+        # Clean market_data_df if there isn't an existing coin cohort
+        market_data_df = market_data_df[market_data_df['coin_id'].isin(profits_df['coin_id'])]
+        market_data_df = dr.clean_market_data(
+            market_data_df,
+            wallets_config,
+            period_start_date,
+            period_end_date
+        )
+    else:
+        # Otherwise just filter to that cohort
+        market_data_df = market_data_df[market_data_df['coin_id'].isin(coin_cohort)]
+
 
     # Intelligently impute market cap data in market_data_df when good data is available
     market_data_df = dr.impute_market_cap(market_data_df,
@@ -93,15 +100,19 @@ def clean_market_dataset(market_data_df, profits_df, period_start_date, period_e
     # Crudely fill all remaining gaps in market cap data
     market_data_df = wmc.force_fill_market_cap(market_data_df)
 
-    # Remove coins that exceeded the initial market cap threshold at the start of the training period
-    max_initial_market_cap = wallets_config['data_cleaning']['max_initial_market_cap']
-    above_initial_threshold_coins = market_data_df[
-        (market_data_df['date']==wallets_config['training_data']['training_period_start'])
-        & (market_data_df['market_cap_filled']>max_initial_market_cap)
-    ]['coin_id']
-    market_data_df = market_data_df[~market_data_df['coin_id'].isin(above_initial_threshold_coins)]
-    logger.info("Removed data for %s coins with a market cap above $%s at the start of the training period."
-                ,len(above_initial_threshold_coins),dc.human_format(max_initial_market_cap))
+    if not coin_cohort:
+        # Apply initial market cap threshold filter if no coin cohort was passed
+        max_initial_market_cap = wallets_config['data_cleaning']['max_initial_market_cap']
+        above_initial_threshold_coins = market_data_df[
+            (market_data_df['date']==wallets_config['training_data']['training_period_start'])
+            & (market_data_df['market_cap_filled']>max_initial_market_cap)
+        ]['coin_id']
+        market_data_df = market_data_df[~market_data_df['coin_id'].isin(above_initial_threshold_coins)]
+        logger.info("Removed data for %s coins with a market cap above $%s at the start of the training period."
+                    ,len(above_initial_threshold_coins),dc.human_format(max_initial_market_cap))
+    else:
+        logger.info("Returned market data for the %s coins in the coin cohort passed as a parameter.",
+                    len(coin_cohort))
 
     return market_data_df
 

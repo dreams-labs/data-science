@@ -172,10 +172,14 @@ def multithreaded_impute_profits_rows(profits_df, prices_df, target_date, n_thre
 
     # Merge results together
     warnings.simplefilter(action='ignore', category=FutureWarning) # ignore NaN dtype warnings
-    all_new_rows_df = pd.concat(results, ignore_index=True)
-    logger.info("Generated %s new rows for date %s.",
-                len(all_new_rows_df),
-                target_date)
+    if len(results) == 0:
+        logger.warning("No new rows imputed for %s.", target_date)
+        all_new_rows_df = pd.DataFrame()
+    else:
+        all_new_rows_df = pd.concat(results, ignore_index=True)
+        logger.info("Generated %s new rows for date %s.",
+                    len(all_new_rows_df),
+                    target_date)
 
     return all_new_rows_df
 
