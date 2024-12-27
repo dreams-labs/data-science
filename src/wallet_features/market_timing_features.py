@@ -52,7 +52,7 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
 
     Returns:
         pd.DataFrame: Features indexed by wallet_address with columns for each market timing metric:
-            {indicator}_vs_lead_{n}_{direction}_{type}
+            {indicator}/lead_{n}_{direction}_{type}
             where:
             - indicator: The base metric (e.g., price_rsi_14, volume_sma_7)
             - n: The forward-looking period (e.g., 7, 14, 30 days)
@@ -146,7 +146,7 @@ def calculate_relative_changes(
 
     For each base column with offset columns (e.g., price_rsi_14 and price_rsi_14_lead_30),
     calculates the percentage change between them and stores it in a new column
-    (e.g., price_rsi_14_vs_lead_30). If retain_base_columns is False, drops the original
+    (e.g., price_rsi_14/lead_30). If retain_base_columns is False, drops the original
     base and offset columns after calculating the changes. All changes are winsorized
     using the configured coefficient.
 
@@ -203,7 +203,7 @@ def calculate_relative_changes(
                                       "Run calculate_offsets() first.")
 
             # Create new column name for relative change
-            change_column = f"{base_column}_vs_lead_{lead}"
+            change_column = f"{base_column}/lead_{lead}"
 
             try:
                 # Calculate percentage change
@@ -251,10 +251,10 @@ def calculate_timing_features_for_column(df, metric_column):
 
     Returns:
         pd.DataFrame: DataFrame indexed by wallet_address with columns:
-            - {metric_column}_buy_weighted
-            - {metric_column}_buy_mean
-            - {metric_column}_sell_weighted
-            - {metric_column}_sell_mean
+            - {metric_column}/buy_weighted
+            - {metric_column}/buy_mean
+            - {metric_column}/sell_weighted
+            - {metric_column}/sell_mean
     """
     # Split into buys and sells
     buys = df[df['usd_net_transfers'] > 0].copy()
@@ -265,7 +265,7 @@ def calculate_timing_features_for_column(df, metric_column):
     # Vectorized buy calculations
     if not buys.empty:
         # Regular mean
-        features[f"{metric_column}_buy_mean"] = (
+        features[f"{metric_column}/buy_mean"] = (
             buys.groupby('wallet_address')[metric_column].mean()
         )
 
@@ -273,18 +273,18 @@ def calculate_timing_features_for_column(df, metric_column):
         buys['weighted_values'] = buys[metric_column] * abs(buys['usd_net_transfers'])
         weighted_sums = buys.groupby('wallet_address')['weighted_values'].sum()
         weight_sums = buys.groupby('wallet_address')['usd_net_transfers'].apply(abs).sum()
-        features[f"{metric_column}_buy_weighted"] = weighted_sums / weight_sums
+        features[f"{metric_column}/buy_weighted"] = weighted_sums / weight_sums
 
     # Similar for sells
     if not sells.empty:
-        features[f"{metric_column}_sell_mean"] = (
+        features[f"{metric_column}/sell_mean"] = (
             sells.groupby('wallet_address')[metric_column].mean()
         )
 
         sells['weighted_values'] = sells[metric_column] * abs(sells['usd_net_transfers'])
         weighted_sums = sells.groupby('wallet_address')['weighted_values'].sum()
         weight_sums = sells.groupby('wallet_address')['usd_net_transfers'].apply(abs).sum()
-        features[f"{metric_column}_sell_weighted"] = weighted_sums / weight_sums
+        features[f"{metric_column}/sell_weighted"] = weighted_sums / weight_sums
 
     return features
 

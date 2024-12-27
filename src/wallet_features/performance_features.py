@@ -160,7 +160,7 @@ def calculate_performance_ratios(performance_features_df: pd.DataFrame) -> pd.Da
             # Create ratio column name
             p_feature = p_col.replace('profits_', '')
             b_feature = b_col.replace('balance_', '')
-            ratio_name = f'performance_{p_feature}_v_{b_feature}'
+            ratio_name = f'{p_feature}/{b_feature}'
 
             # Calculate ratio
             performance_ratios_df[ratio_name] = np.where(
@@ -208,20 +208,20 @@ def transform_performance_ratios(performance_ratios_df: pd.DataFrame,
         series = performance_ratios_df[col]
 
         # Unmodified ratio
-        performance_features_df[f'{col}_base'] = series
+        performance_features_df[f'{col}/base'] = series
 
         # Rank of ratio
-        performance_features_df[f'{col}_rank'] = series.rank(method='average', pct=True)
+        performance_features_df[f'{col}/rank'] = series.rank(method='average', pct=True)
 
         # Signed log of ratio
-        performance_features_df[f'{col}_log'] = np.sign(series) * np.log1p(series.abs())
+        performance_features_df[f'{col}/log'] = np.sign(series) * np.log1p(series.abs())
 
         # Winsorized ratio
-        performance_features_df[f'{col}_winsorized'] = u.winsorize(series,returns_winsorization)
+        performance_features_df[f'{col}/winsorized'] = u.winsorize(series,returns_winsorization)
 
         # Ntile rank of ratio
         # Extract denominator and create ntils of balance values
-        denominator = col.split('_v_')[1]
+        denominator = col.split('/')[1]
         balance_col = f'balance_{denominator}'
         metric_ntiles = pd.qcut(
             balance_features_df[balance_col],
@@ -231,7 +231,7 @@ def transform_performance_ratios(performance_ratios_df: pd.DataFrame,
         )
 
         # Rank within appropriate denominator-based groups
-        performance_features_df[f'{col}_ntile_rank'] = (
+        performance_features_df[f'{col}/ntile_rank'] = (
             series.groupby(metric_ntiles)
             .rank(method='average', pct=True)
             .fillna(0)

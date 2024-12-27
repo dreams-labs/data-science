@@ -190,7 +190,7 @@ class RegressionEvaluator:
         feature_importance_df = pd.DataFrame(self.metrics['importances'])
 
         # Extract prefix before first underscore
-        feature_importance_df['prefix'] = feature_importance_df['feature'].str.split('_').str[0]
+        feature_importance_df['prefix'] = feature_importance_df['feature'].str.split('|').str[0]
 
         # Calculate total_importance by summing importance for each prefix
         importance_summary_df = feature_importance_df.groupby('prefix').agg(
@@ -353,7 +353,7 @@ class RegressionEvaluator:
         if 'importances' in self.metrics:
             # Create DataFrame with feature prefixes
             df = pd.DataFrame(self.metrics['importances']).head(20)
-            df['prefix'] = df['feature'].str.split('_').str[0]
+            df['prefix'] = df['feature'].str.split('|').str[0]
 
             # Create color palette for prefixes
             unique_prefixes = df['prefix'].unique()
@@ -398,7 +398,7 @@ def assign_clusters_from_distances(modeling_df: pd.DataFrame, cluster_counts: Li
     """
     for k in cluster_counts:
         # Get distance columns for this k value
-        distance_cols = [f'cluster_k{k}_distance_to_cluster_{i}' for i in range(k)]
+        distance_cols = [f'cluster|k{k}/distance_to_cluster_{i}' for i in range(k)]
 
         # Assign cluster based on minimum distance
         modeling_df[f'k{k}_cluster'] = (
@@ -603,13 +603,13 @@ def create_cluster_report(modeling_df, model_results, n, comparison_metrics):
     """
     # Create df that includes base metrics, all cluster columns, and param comparison metrics
     base_metrics = [
-        'trading_max_investment_all_windows',
-        'trading_crypto_net_gain_all_windows',
-        'mktcap_end_portfolio_wtd_market_cap_all_windows',
-        'performance_crypto_net_gain_v_max_investment_base_all_windows',
-        'performance_crypto_net_gain_v_active_time_weighted_balance_base_all_windows',
+        'trading|max_investment|all_windows',
+        'trading|crypto_net_gain|all_windows',
+        'mktcap|end_portfolio_wtd_market_cap|all_windows',
+        'performance|crypto_net_gain/max_investment/base|all_windows',
+        'performance|crypto_net_gain/active_twb/base|all_windows',
     ]
-    cluster_cols = [col for col in modeling_df.columns if col.startswith('cluster_')]
+    cluster_cols = [col for col in modeling_df.columns if col.startswith('cluster|')]
     cluster_analysis_df = modeling_df[list(set(cluster_cols + base_metrics + comparison_metrics))].copy()
 
     # Assign wallets to categorical clusters based on the distance values
