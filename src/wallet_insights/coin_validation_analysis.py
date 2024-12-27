@@ -84,7 +84,7 @@ def calculate_validation_metrics(X_test, y_pred, validation_profits_df, n_bucket
 
 
 
-def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scores_df, modeling_market_data_df):
+def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scores_df, validation_market_data_df):
     """
     Consolidates wallet scores and metrics to coin-level metrics, creating a comprehensive
     metrics system that considers wallet quality, balance distribution, and activity levels.
@@ -147,7 +147,6 @@ def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scor
     analysis_df['usd_balance'] = analysis_df['usd_balance'].clip(lower=0)
     analysis_df['score'] = analysis_df['score'].fillna(0)
 
-
     # 2. Generate coin-level metrics from wallet behavior
     # ---------------------------------------------------
     # Calculate weighted average score differently
@@ -159,7 +158,7 @@ def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scor
 
     weighted_scores = analysis_df.groupby('coin_id').apply(
         lambda x: safe_weighted_average(x['score'].values, x['usd_balance'].values)
-    ).reset_index()
+    ,include_groups=False).reset_index()
     weighted_scores.columns = ['coin_id', 'weighted_avg_score']
 
     # Top wallet concentration
@@ -177,8 +176,7 @@ def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scor
         'wallet_address': 'count',
         'score': ['mean', 'std']
     }).reset_index()
-    total_metrics.columns = ['coin_id', 'total_balance', 'total_wallets',
-                           'mean_score', 'score_std']
+    total_metrics.columns = ['coin_id', 'total_balance', 'total_wallets', 'mean_score', 'score_std']
 
     # Combine metrics
     coin_wallet_metrics_df = pd.merge(weighted_scores, top_wallet_metrics, on='coin_id', how='left')
@@ -219,8 +217,8 @@ def calculate_coin_metrics_from_wallet_scores(validation_profits_df, wallet_scor
 
 
     # Append the market cap at the end of the modeling period
-    modeling_end_market_cap_df = modeling_market_data_df[modeling_market_data_df['date']
-                                                     ==wallets_config['training_data']['modeling_period_end']]
+    modeling_end_market_cap_df = validation_market_data_df[validation_market_data_df['date']
+                                            ==wallets_config['training_data']['validation_starting_balance_date']]
 
     modeling_end_market_cap_df = modeling_end_market_cap_df.set_index('coin_id')
     modeling_end_market_cap_df = modeling_end_market_cap_df[['market_cap','market_cap_imputed','market_cap_filled']]
