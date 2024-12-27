@@ -72,7 +72,7 @@ def create_basic_cluster_features(training_data_df, include_pca=False, include_c
 
         distances = kmeans.transform(pca_result)
         for i in range(n_clusters):
-            cluster_features_df[f'k{n_clusters}_distance_to_cluster_{i}'] = distances[:, i]
+            cluster_features_df[f'k{n_clusters}/distance_to_cluster_{i}'] = distances[:, i]
 
     return cluster_features_df
 
