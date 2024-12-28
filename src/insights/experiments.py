@@ -1,32 +1,32 @@
-# """
-# functions used to run experiments
-# """
-# # pylint: disable=C0103 # X_train violates camelcase
-# # pylint: disable=E0401 # can't find utils import
-# # pyright: reportMissingImports=false
-# # pyright: reportMissingModuleSource=false
+"""
+functions used to run experiments
+"""
+# pylint: disable=C0103 # X_train violates camelcase
+# pylint: disable=E0401 # can't find utils import
+# pyright: reportMissingImports=false
+# pyright: reportMissingModuleSource=false
 
-# import os
-# import uuid
-# import hashlib
-# from datetime import datetime
-# import random
-# import json
-# import pandas as pd
-# from sklearn.model_selection import ParameterGrid, ParameterSampler
-# import matplotlib.pyplot as plt
-# import seaborn as sns
-# import dreams_core.core as dc
+import os
+import uuid
+import hashlib
+from datetime import datetime
+import random
+import json
+import pandas as pd
+from sklearn.model_selection import ParameterGrid, ParameterSampler
+import matplotlib.pyplot as plt
+import seaborn as sns
+import dreams_core.core as dc
 
-# # project files
-# import utils as u
-# import training_data.data_retrieval as dr
-# import training_data.profits_row_imputation as pri
-# import coin_wallet_metrics.coin_wallet_metrics as cwm
-# import modeling as m
+# project files
+import utils as u
+import training_data.data_retrieval as dr
+import training_data.profits_row_imputation as pri
+import coin_wallet_metrics.coin_wallet_metrics as cwm
+import modeling as m
 
-# # set up logger at the module level
-# logger = dc.setup_logger()
+# set up logger at the module level
+logger = dc.setup_logger()
 
 # def run_experiment(modeling_config):
 #     """
@@ -167,96 +167,96 @@
 #     return experiment_id
 
 
-# def prepare_configs(config_folder, override_params):
-#     """
-#     Loads config files from the config_folder using load_config and applies overrides specified
-#     in override_params.
+def prepare_configs(config_folder, override_params):
+    """
+    Loads config files from the config_folder using load_config and applies overrides specified
+    in override_params.
 
-#     Args:
-#     - config_folder (str): Path to the folder containing the configuration files.
-#     - override_params (dict): Dictionary of flattened parameters to override in the loaded configs.
+    Args:
+    - config_folder (str): Path to the folder containing the configuration files.
+    - override_params (dict): Dictionary of flattened parameters to override in the loaded configs.
 
-#     Returns:
-#     - config (dict): The main config file with overrides applied.
-#     - metrics_config (dict): The metrics configuration with overrides applied.
-#     - modeling_config (dict): The modeling configuration with overrides applied.
+    Returns:
+    - config (dict): The main config file with overrides applied.
+    - metrics_config (dict): The metrics configuration with overrides applied.
+    - modeling_config (dict): The modeling configuration with overrides applied.
 
-#     Raises:
-#     - KeyError: if any key from override_params does not match an existing key in the
-#         corresponding config.
-#     """
+    Raises:
+    - KeyError: if any key from override_params does not match an existing key in the
+        corresponding config.
+    """
 
-#     # Load the main config files using load_config
-#     config_path = os.path.join(config_folder, 'config.yaml')
-#     metrics_config_path = os.path.join(config_folder, 'metrics_config.yaml')
-#     modeling_config_path = os.path.join(config_folder, 'modeling_config.yaml')
+    # Load the main config files using load_config
+    config_path = os.path.join(config_folder, 'config.yaml')
+    metrics_config_path = os.path.join(config_folder, 'metrics_config.yaml')
+    modeling_config_path = os.path.join(config_folder, 'modeling_config.yaml')
 
-#     config = u.load_config(config_path)
-#     metrics_config = u.load_config(metrics_config_path)
-#     modeling_config = u.load_config(modeling_config_path)
+    config = u.load_config(config_path)
+    metrics_config = u.load_config(metrics_config_path)
+    modeling_config = u.load_config(modeling_config_path)
 
-#     # Apply the flattened overrides to each config
-#     for full_key, value in override_params.items():
-#         if full_key.startswith('config.'):
-#             # Validate the key exists before setting the value
-#             validate_key_in_config(config, full_key[len('config.'):])
-#             set_nested_value(config, full_key[len('config.'):], value)
-#         elif full_key.startswith('metrics_config.'):
-#             # Validate the key exists before setting the value
-#             validate_key_in_config(metrics_config, full_key[len('metrics_config.'):])
-#             set_nested_value(metrics_config, full_key[len('metrics_config.'):], value)
-#         elif full_key.startswith('modeling_config.'):
-#             # Validate the key exists before setting the value
-#             validate_key_in_config(modeling_config, full_key[len('modeling_config.'):])
-#             set_nested_value(modeling_config, full_key[len('modeling_config.'):], value)
-#         else:
-#             raise ValueError(f"Unknown config section in key: {full_key}")
+    # Apply the flattened overrides to each config
+    for full_key, value in override_params.items():
+        if full_key.startswith('config.'):
+            # Validate the key exists before setting the value
+            validate_key_in_config(config, full_key[len('config.'):])
+            set_nested_value(config, full_key[len('config.'):], value)
+        elif full_key.startswith('metrics_config.'):
+            # Validate the key exists before setting the value
+            validate_key_in_config(metrics_config, full_key[len('metrics_config.'):])
+            set_nested_value(metrics_config, full_key[len('metrics_config.'):], value)
+        elif full_key.startswith('modeling_config.'):
+            # Validate the key exists before setting the value
+            validate_key_in_config(modeling_config, full_key[len('modeling_config.'):])
+            set_nested_value(modeling_config, full_key[len('modeling_config.'):], value)
+        else:
+            raise ValueError(f"Unknown config section in key: {full_key}")
 
-#     # reapply the period boundary dates based on the current config['training_data'] params
-#     period_dates = u.calculate_period_dates(config)
-#     config['training_data'].update(period_dates)
+    # reapply the period boundary dates based on the current config['training_data'] params
+    period_dates = u.calculate_period_dates(config)
+    config['training_data'].update(period_dates)
 
-#     return config, metrics_config, modeling_config
+    return config, metrics_config, modeling_config
 
-# # helper function for prepare_configs()
-# def set_nested_value(config, key_path, value):
-#     """
-#     Sets a value in a nested dictionary based on a flattened key path.
+# helper function for prepare_configs()
+def set_nested_value(config, key_path, value):
+    """
+    Sets a value in a nested dictionary based on a flattened key path.
 
-#     Args:
-#     - config (dict): The configuration dictionary to update.
-#     - key_path (str): The flattened key path (e.g., 'config.data_cleaning.max_wallet_inflows').
-#     - value: The value to set at the given key path.
-#     """
-#     keys = key_path.split('.')
-#     sub_dict = config
-#     for key in keys[:-1]:  # Traverse down to the second-to-last key
-#         sub_dict = sub_dict.setdefault(key, {})
-#     sub_dict[keys[-1]] = value  # Set the value at the final key
+    Args:
+    - config (dict): The configuration dictionary to update.
+    - key_path (str): The flattened key path (e.g., 'config.data_cleaning.max_wallet_inflows').
+    - value: The value to set at the given key path.
+    """
+    keys = key_path.split('.')
+    sub_dict = config
+    for key in keys[:-1]:  # Traverse down to the second-to-last key
+        sub_dict = sub_dict.setdefault(key, {})
+    sub_dict[keys[-1]] = value  # Set the value at the final key
 
-# # helper function for prepare_configs
-# def validate_key_in_config(config, key_path):
-#     """
-#     Validates that a given key path exists in the nested configuration.
+# helper function for prepare_configs
+def validate_key_in_config(config, key_path):
+    """
+    Validates that a given key path exists in the nested configuration.
 
-#     Args:
-#     - config (dict): The configuration dictionary to validate.
-#     - key_path (str): The flattened key path to check.
-#         (e.g. 'config.data_cleaning.max_wallet_inflows')
+    Args:
+    - config (dict): The configuration dictionary to validate.
+    - key_path (str): The flattened key path to check.
+        (e.g. 'config.data_cleaning.max_wallet_inflows')
 
-#     Raises:
-#     - KeyError: If the key path does not exist in the config.
-#     """
-#     keys = key_path.split('.')
-#     sub_dict = config
-#     for key in keys[:-1]:  # Traverse down to the second-to-last key
-#         if key not in sub_dict:
-#             raise KeyError(
-#                 f"Key '{key}' not found in config at level '{'.'.join(keys[:-1])}'")
-#         sub_dict = sub_dict[key]
-#     if keys[-1] not in sub_dict:
-#         raise KeyError(
-#             f"Key '{keys[-1]}' not found in config at final level '{'.'.join(keys[:-1])}'")
+    Raises:
+    - KeyError: If the key path does not exist in the config.
+    """
+    keys = key_path.split('.')
+    sub_dict = config
+    for key in keys[:-1]:  # Traverse down to the second-to-last key
+        if key not in sub_dict:
+            raise KeyError(
+                f"Key '{key}' not found in config at level '{'.'.join(keys[:-1])}'")
+        sub_dict = sub_dict[key]
+    if keys[-1] not in sub_dict:
+        raise KeyError(
+            f"Key '{keys[-1]}' not found in config at final level '{'.'.join(keys[:-1])}'")
 
 
 

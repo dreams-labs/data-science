@@ -5,8 +5,8 @@ training_data:
   # The modeling period end date and training period start and end dates are automatically
   # imputed using utils.py function calculate_period_dates() when load_config() is run
   modeling_period_start: "2024-11-21"  # Start date for the modeling period
-  modeling_period_duration: 17    # Duration of the modeling period in days
-  training_period_duration: 90    # Duration of the training period in days
+  modeling_period_duration: 10    # Duration of the modeling period in days
+  training_period_duration: 30    # Duration of the training period in days
 
   # The entire training data generation pipeline will be run for this many additional \
   # windows, with the periods moved back the full modeling+training duration time
@@ -14,7 +14,7 @@ training_data:
   time_window_frequency: 20 # how many days apart each time_window should start
 
   # Whether to query 'core' or 'dev_core' dataset tables
-  dataset: 'prod'
+  dataset: 'dev'  # Set to 'prod' or 'dev'; determines whether to query 'core' or 'dev' dataset tables
 
 
 datasets:
@@ -37,32 +37,32 @@ datasets:
   # Keyed on coin_id-date
   wallet_cohorts:
 
-    whales_longterm:
-      lookback_period: 150 # how long the window for wallet thresholds extends backwards before the training_period_start
-      wallet_minimum_inflows: 50000  # Minimum USD inflows for a wallet to be considered a "shark"
-      wallet_maximum_inflows: 50000000  # Maximum USD inflows for a wallet to be considered a "shark"
-      coin_profits_win_threshold: 15000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
-      coin_return_win_threshold: 0.5  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
-      wallet_min_coin_wins: 6  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
-      sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
-
-    # whales:
-    #   lookback_period: 0 # how long the window for wallet thresholds extends backwards before the training_period_start
+    # whales_longterm:
+    #   lookback_period: 150 # how long the window for wallet thresholds extends backwards before the training_period_start
     #   wallet_minimum_inflows: 50000  # Minimum USD inflows for a wallet to be considered a "shark"
     #   wallet_maximum_inflows: 50000000  # Maximum USD inflows for a wallet to be considered a "shark"
-    #   coin_profits_win_threshold: 10000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
-    #   coin_return_win_threshold: 0.3  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
-    #   wallet_min_coin_wins: 4  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
+    #   coin_profits_win_threshold: 15000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
+    #   coin_return_win_threshold: 0.5  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
+    #   wallet_min_coin_wins: 6  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
     #   sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
 
-    # normies:
-    #   lookback_period: 0 # how long the window for wallet thresholds extends backwards before the training_period_start
-    #   wallet_minimum_inflows: 100  # Minimum USD inflows for a wallet to be considered a "shark"
-    #   wallet_maximum_inflows: 10000  # Maximum USD inflows for a wallet to be considered a "shark"
-    #   coin_profits_win_threshold: 0  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
-    #   coin_return_win_threshold: 0  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
-    #   wallet_min_coin_wins: 0  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
-    #   sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
+    whales:
+      lookback_period: 0 # how long the window for wallet thresholds extends backwards before the training_period_start
+      wallet_minimum_inflows: 50000  # Minimum USD inflows for a wallet to be considered a "shark"
+      wallet_maximum_inflows: 50000000  # Maximum USD inflows for a wallet to be considered a "shark"
+      coin_profits_win_threshold: 10000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
+      coin_return_win_threshold: 0.3  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
+      wallet_min_coin_wins: 4  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
+      sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
+
+    normies:
+      lookback_period: 0 # how long the window for wallet thresholds extends backwards before the training_period_start
+      wallet_minimum_inflows: 100  # Minimum USD inflows for a wallet to be considered a "shark"
+      wallet_maximum_inflows: 10000  # Maximum USD inflows for a wallet to be considered a "shark"
+      coin_profits_win_threshold: 0  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
+      coin_return_win_threshold: 0  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
+      wallet_min_coin_wins: 0  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
+      sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
 
     # midtier:
     #   lookback_period: 0 # how long the window for wallet thresholds extends backwards before the training_period_start
@@ -112,7 +112,8 @@ data_cleaning:
   min_daily_volume: 10000 # Minimum average daily volume the coin must have
   exclude_coins_without_transfers: True  # determines whether to create price features for coins without transfers data
 
-  # coverage filters
+  # Warnings about potential data gaps in profits_df or market_data_df
+  coverage_decrease_audit_window: 10  #
   price_coverage_warning_min_coin_increase: 100  # if this many coin prices has recently become imputed...
   price_coverage_warning_min_pct_increase: 0.05  # ...and the % of imputed coin prices has increased by this value, issue a warning
   transfers_coverage_warning_min_coin_increase: 10  # if this many coins have lost transfers data...
