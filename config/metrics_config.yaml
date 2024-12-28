@@ -53,33 +53,7 @@ time_series:
 
 # Keyed on coin_id-date
 wallet_cohorts:
-    whales_longterm:
-        buyers_new:
-            aggregations:
-                sum:
-                    scaling: "none"
-        buyers_repeat:
-            rolling:
-                aggregations:
-                    sum:
-                        scaling: "none"
-                window_duration: 5
-                lookback_periods: 4
-        total_bought:
-            rolling:
-                aggregations:
-                    sum:
-                        scaling: "none"
-                window_duration: 5
-                lookback_periods: 4
-        total_balance:
-            rolling:
-                aggregations:
-                    last:
-                        scaling: "none"
-                window_duration: 5
-                lookback_periods: 4
-    # whales:
+    # whales_longterm:
     #     buyers_new:
     #         aggregations:
     #             sum:
@@ -105,43 +79,69 @@ wallet_cohorts:
     #                     scaling: "none"
     #             window_duration: 5
     #             lookback_periods: 4
+    whales:
+        buyers_new:
+            aggregations:
+                sum:
+                    scaling: "none"
+        buyers_repeat:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 15
+                lookback_periods: 2
+        total_bought:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 15
+                lookback_periods: 2
+        total_balance:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: "none"
+                window_duration: 15
+                lookback_periods: 2
 
-    # normies:
-    #     buyers_new:
-    #         rolling:
-    #             aggregations:
-    #                 sum:
-    #                     scaling: "none"
-    #             window_duration: 5
-    #             lookback_periods: 4
-    #     total_holders:
-    #         rolling:
-    #             aggregations:
-    #                 last:
-    #                     scaling: "none"
-    #             window_duration: 5
-    #             lookback_periods: 4
-    #     total_bought:
-    #         rolling:
-    #             aggregations:
-    #                 sum:
-    #                     scaling: "none"
-    #             window_duration: 5
-    #             lookback_periods: 4
-    #     total_sold:
-    #         rolling:
-    #             aggregations:
-    #                 sum:
-    #                     scaling: "none"
-    #             window_duration: 5
-    #             lookback_periods: 4
-    #     total_balance:
-    #         rolling:
-    #             aggregations:
-    #                 last:
-    #                     scaling: "none"
-    #             window_duration: 5
-    #             lookback_periods: 4
+    normies:
+        buyers_new:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 15
+                lookback_periods: 2
+        total_holders:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: "none"
+                window_duration: 15
+                lookback_periods: 2
+        total_bought:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 15
+                lookback_periods: 2
+        total_sold:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 15
+                lookback_periods: 2
+        total_balance:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: "none"
+                window_duration: 15
+                lookback_periods: 2
 
     # midtier:
     #     buyers_new:

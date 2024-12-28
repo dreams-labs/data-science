@@ -139,19 +139,23 @@ def prepare_all_windows_base_data(config, metrics_config):
     """
     # 1. Data Retrieval, Cleaning, Indicator Calculation
     # --------------------------------------------------
+    # Market data: retrieve and clean full history
+    market_data_df = dr.retrieve_market_data(dataset=config['training_data']['dataset'])
+    market_data_df = dr.clean_market_data(market_data_df, config,
+                                            config['training_data']['earliest_window_start'],
+                                            config['training_data']['training_period_end'])
+
+    # Profits: retrieve and clean profits data spanning the earliest to latest training periods
+    profits_df = dr.retrieve_profits_data(
+        start_date = config['training_data']['earliest_cohort_lookback_start'],
+        end_date = config['training_data']['training_period_end'],
+        min_wallet_inflows = config['data_cleaning']['min_wallet_inflows'],
+        dataset = config['training_data']['dataset'])
+    profits_df, _ = dr.clean_profits_df(profits_df, config['data_cleaning'])
+
     # Macro trends: retrieve and clean full history
     macro_trends_df = dr.retrieve_macro_trends_data()
     macro_trends_df = dr.clean_macro_trends(macro_trends_df, config)
-
-    # Market data: retrieve and clean full history
-    market_data_df = dr.retrieve_market_data()
-    market_data_df = dr.clean_market_data(market_data_df, config)
-
-    # Profits: retrieve and clean profits data spanning the earliest to latest training periods
-    profits_df = dr.retrieve_profits_data(config['training_data']['earliest_cohort_lookback_start'],
-                                          config['training_data']['training_period_end'],
-                                          config['data_cleaning']['maximum_market_cap_share'])
-    profits_df, _ = dr.clean_profits_df(profits_df, config['data_cleaning'])
 
 
     # 2. Filtering based on dataset overlap

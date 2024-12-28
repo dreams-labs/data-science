@@ -119,6 +119,7 @@ class DataCleaningConfig(NoExtrasBaseModel):
     min_wallet_inflows: float = Field(..., gt=0)
     maximum_market_cap_share: float = Field(..., gt=0)
     exclude_coins_without_transfers: bool = Field(False)
+    coverage_decrease_audit_window: int = Field(..., gt=0)  # how far to look back for the below assessments of coverage decreases
     price_coverage_warning_min_coin_increase: int = Field(..., gt=0)  # if this many coin prices has recently become imputed...
     price_coverage_warning_min_pct_increase: float = Field(..., gt=0)  # ...and the % of imputed coin prices has increased by this value, issue a warning
     transfers_coverage_warning_min_coin_increase: int = Field(..., gt=0)  # if this many coins have lost transfers data...
