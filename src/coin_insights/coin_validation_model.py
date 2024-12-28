@@ -29,7 +29,6 @@ def prepare_features_and_targets(
     Prepares modeling dataset using modeling period data instead of validation period.
 
     Params:
-    - coin_validation_df (DataFrame): Contains wallet metrics and market stats
     - modeling_profits_df (DataFrame): Raw profits data from modeling period
     - modeling_market_data_df (DataFrame): Market data from modeling period
     - wallet_scores_df (DataFrame): Wallet scores from model predictions
@@ -60,7 +59,8 @@ def prepare_features_and_targets(
     coin_modeling_df['log_market_cap'] = np.log1p(coin_modeling_df['market_cap_filled'])
     coin_modeling_df['log_total_balance'] = np.log1p(coin_modeling_df['total_balance'])
     coin_modeling_df['log_avg_wallet_balance'] = np.log1p(coin_modeling_df['avg_wallet_balance'])
-    coin_modeling_df['wallet_concentration'] = coin_modeling_df['top_wallet_balance'] / coin_modeling_df['total_balance']
+    coin_modeling_df['wallet_concentration'] = (coin_modeling_df['top_wallet_balance']
+                                                / coin_modeling_df['total_balance'])
     coin_modeling_df['wallet_activity'] = coin_modeling_df['total_wallets'] * coin_modeling_df['score_confidence']
 
     # 5. Calculate ratios and interaction terms

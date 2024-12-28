@@ -15,6 +15,7 @@ import wallet_insights.wallet_model_evaluation as wime
 from wallet_modeling.wallets_config_manager import WalletsConfig
 
 # pylint: disable=unused-variable  # messy stats functions in visualizations
+# pylint: disable=invalid-name  # X_test isn't camelcase
 
 
 # Set up logger at the module level
