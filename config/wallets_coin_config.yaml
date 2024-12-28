@@ -31,7 +31,7 @@ coin_modeling:
 
     # Target variable parameters
     target_variable: "coin_return_winsorized"
-    returns_winsorization: 0.05
+    returns_winsorization: 0.02
     drop_columns: [
         # # 'balance_wtd_mean_score',
         # 'all_cohort_wallets_balance',
