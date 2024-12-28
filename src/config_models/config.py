@@ -114,8 +114,8 @@ class DataCleaningConfig(NoExtrasBaseModel):
     Variables used to clean and filter raw data before training data is built
     """
     max_wallet_inflows: float = Field(..., gt=0)
-    max_gap_days: int = Field(..., gt=0)
-    min_daily_volume: float = Field(..., gt=0)
+    max_gap_days: int = Field(..., ge=0)
+    min_daily_volume: float = Field(..., ge=0)
     min_wallet_inflows: float = Field(..., gt=0)
     maximum_market_cap_share: float = Field(..., gt=0)
     exclude_coins_without_transfers: bool = Field(False)
