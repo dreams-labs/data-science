@@ -639,14 +639,14 @@ def analyze_top_coins_wallet_metrics(df: pd.DataFrame,
 
     # Wallet metrics to analyze
     wallet_metrics = [
-        'weighted_avg_score',
-        'composite_score',
-        'top_wallet_balance_pct',
-        'top_wallet_count_pct',
-        'score_confidence',
-        'total_balance',
-        'avg_wallet_balance',
-        'total_wallets',
+        'balance_wtd_mean_score',
+        'top_wallets_balance_pct',
+        'top_wallets_count_pct',
+        'top_wallets_balance',
+        'top_wallets_count',
+        'all_cohort_wallets_mean_score',
+        'all_cohort_wallets_balance',
+        'all_cohort_wallets_count',
     ]
 
     # Calculate wallet metrics for ntiles

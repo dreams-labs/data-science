@@ -77,7 +77,7 @@ class CoinModel:
         ])
 
     def run_experiment(self, feature_df: pd.DataFrame,
-                      return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
+                    return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
         """
         Params:
         - feature_df (DataFrame): Pre-joined feature and target data
@@ -93,9 +93,16 @@ class CoinModel:
         result = {'pipeline': self.pipeline}
 
         if return_data:
+            # Test predictions
             self.y_pred = pd.Series(
                 self.pipeline.predict(self.X_test),
                 index=self.X_test.index
+            )
+
+            # Full dataset predictions
+            training_cohort_pred = pd.Series(
+                self.pipeline.predict(feature_df.drop(self.wallets_coin_config['coin_modeling']['target_variable'], axis=1)),
+                index=feature_df.index
             )
 
             result.update({
@@ -103,7 +110,9 @@ class CoinModel:
                 'X_test': self.X_test,
                 'y_train': self.y_train,
                 'y_test': self.y_test,
-                'y_pred': self.y_pred
+                'y_pred': self.y_pred,
+                'training_cohort_pred': training_cohort_pred,
+                'training_cohort_actuals': feature_df[self.wallets_coin_config['coin_modeling']['target_variable']]
             })
 
         return result

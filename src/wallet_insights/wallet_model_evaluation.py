@@ -238,7 +238,7 @@ class RegressionEvaluator:
 
         # Custom colormap
         self.custom_cmap = mcolors.LinearSegmentedColormap.from_list(
-            'custom_blues', ['#181818', '#145a8d', '#69c4ff']
+            'custom_blues', ['#1b2530', '#145a8d', '#69c4ff']
         )
 
         if plot_type == 'all':
