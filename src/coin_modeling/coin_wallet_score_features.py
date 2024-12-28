@@ -89,7 +89,7 @@ def calculate_weighted_balance_scores(analysis_df: pd.DataFrame) -> pd.DataFrame
     """
     return analysis_df.groupby('coin_id', observed=True).apply(
         lambda x: pd.Series({
-            'all_cohort_wallets/balance_wtd_mean_score': safe_weighted_average(
+            'top_100pct/balance_wtd_mean_score': safe_weighted_average(
                 x['score'].values,
                 x['usd_balance'].values
             )
@@ -99,7 +99,7 @@ def calculate_weighted_balance_scores(analysis_df: pd.DataFrame) -> pd.DataFrame
 
 
 def calculate_quantile_metrics(analysis_df: pd.DataFrame,
-                            quantile: float = None) -> pd.DataFrame:
+                            quantile: float) -> pd.DataFrame:
     """
     Calculate metrics for a specific score quantile cohort.
 
@@ -116,13 +116,9 @@ def calculate_quantile_metrics(analysis_df: pd.DataFrame,
         Where q_prefix is either 'all_wallets' or 'top_Xpct' based on quantile
     """
     # Determine cohort and prefix
-    if quantile is None:
-        df = analysis_df
-        prefix = 'all_wallets'
-    else:
-        threshold = analysis_df['score'].quantile(1 - quantile)
-        df = analysis_df[analysis_df['score'] >= threshold]
-        prefix = f'top_{int(quantile * 100)}pct'
+    threshold = analysis_df['score'].quantile(1 - quantile)
+    df = analysis_df[analysis_df['score'] >= threshold]
+    prefix = f'top_{int(quantile * 100)}pct'
 
     # Calculate metrics
     metrics_df = df.groupby('coin_id', observed=True).agg(
@@ -194,10 +190,6 @@ def calculate_coin_balance_features(modeling_profits_df: pd.DataFrame,
             metrics_df,
             how='left'
         ).fillna(fill_values)
-
-    # Calculate all-wallet metrics last
-    all_metrics = calculate_quantile_metrics(analysis_df)
-    coin_wallet_features_df = coin_wallet_features_df.join(all_metrics, how='inner')
 
     # Validation
     missing_coins = set(analysis_df['coin_id']) - set(coin_wallet_features_df.index)
