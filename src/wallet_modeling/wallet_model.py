@@ -1,6 +1,3 @@
-"""
-Calculates metrics aggregated at the wallet level
-"""
 # pylint:disable=invalid-name  # X_test isn't camelcase
 import logging
 from typing import Dict, Union
