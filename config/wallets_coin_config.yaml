@@ -1,3 +1,12 @@
+# Variables used to clean and filter raw data before training data is built
+data_cleaning:
+
+    # Market data filters
+    max_initial_market_cap: 999150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
+    max_gap_days: 50  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
+    min_daily_volume: 500 # Minimum average daily volume the coin must have
+
+
 # Variables used for comnverting the wallet scores into coin forecasts
 coin_validation_analysis:
 
