@@ -99,20 +99,12 @@ class CoinModel:
                 index=self.X_test.index
             )
 
-            # Full dataset predictions
-            training_cohort_pred = pd.Series(
-                self.pipeline.predict(feature_df.drop(self.wallets_coin_config['coin_modeling']['target_variable'], axis=1)),
-                index=feature_df.index
-            )
-
             result.update({
                 'X_train': self.X_train,
                 'X_test': self.X_test,
                 'y_train': self.y_train,
                 'y_test': self.y_test,
                 'y_pred': self.y_pred,
-                'training_cohort_pred': training_cohort_pred,
-                'training_cohort_actuals': feature_df[self.wallets_coin_config['coin_modeling']['target_variable']]
             })
 
         return result
