@@ -19,7 +19,7 @@ wallets_config = WalletsConfig()
 wallets_coin_config = yaml.safe_load((config_directory / 'wallets_coin_config.yaml').read_text(encoding='utf-8'))  # pylint:disable=line-too-long
 
 
-def calculate_coin_wallet_score_features(modeling_profits_df: pd.DataFrame, wallet_scores_df: pd.DataFrame
+def calculate_coin_end_balance_features(modeling_profits_df: pd.DataFrame, wallet_scores_df: pd.DataFrame
                                          ) -> pd.DataFrame:
     """
     Calculates coin-level metrics based on wallet behavior and scores at the end of the modeling period.
@@ -125,42 +125,3 @@ def calculate_coin_wallet_score_features(modeling_profits_df: pd.DataFrame, wall
         raise ValueError(f"Found {len(missing_coins)} coin_ids in analysis_df that are missing from features")
 
     return coin_wallet_features_df
-
-
-
-    # # 3. Apply filters based on wallets_config
-    # # ----------------------------------------
-    # # Log initial count
-    # initial_count = len(coin_wallet_metrics_df)
-    # logger.info("Starting coin count: %d", initial_count)
-
-    # # Filter for minimum activity
-    # min_wallets = wallets_config['coin_validation_analysis']['min_wallets']
-    # min_balance = wallets_config['coin_validation_analysis']['min_balance']
-
-    # # Apply wallet threshold and log
-    # wallets_filtered_df = coin_wallet_metrics_df[coin_wallet_metrics_df['total_wallets'] >= min_wallets]
-    # wallets_removed = initial_count - len(wallets_filtered_df)
-    # logger.info(
-    #     "Removed %d coins (%.1f%%) with fewer than %d wallets",
-    #     wallets_removed,
-    #     (wallets_removed/initial_count)*100,
-    #     min_wallets
-    # )
-
-    # # Apply balance threshold and log
-    # coin_wallet_metrics_df = wallets_filtered_df[wallets_filtered_df['total_balance'] >= min_balance]
-    # balance_removed = len(wallets_filtered_df) - len(coin_wallet_metrics_df)
-    # logger.info(
-    #     "Removed %d coins (%.1f%%) with balance below %d",
-    #     balance_removed,
-    #     (balance_removed/initial_count)*100,
-    #     min_balance
-    # )
-
-    # # Log final count
-    # logger.info(
-    #     "Final coin count after all filters: %d (%.1f%% of initial)",
-    #     len(coin_wallet_metrics_df),
-    #     (len(coin_wallet_metrics_df)/initial_count)*100
-    # )
