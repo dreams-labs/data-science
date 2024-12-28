@@ -6,8 +6,8 @@ from xgboost import XGBRegressor
 
 # local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
-import wallet_insights.coin_validation_analysis as wicv
 import wallet_insights.wallet_model_evaluation as wime
+import coin_insights.coin_validation_analysis as civa
 import utils as u
 
 
@@ -37,14 +37,14 @@ def prepare_features_and_targets(
     - modeling_df (DataFrame): Prepared modeling data with features and target
     """
     # 1. Calculate modeling period coin performance
-    coin_performance_df = wicv.calculate_coin_performance(
+    coin_performance_df = civa.calculate_coin_performance(
         modeling_market_data_df,
         wallets_config['training_data']['modeling_period_start'],
         wallets_config['training_data']['modeling_period_end']
     )
 
     # 2. Calculate modeling period wallet metrics
-    modeling_wallet_metrics = wicv.calculate_coin_metrics_from_wallet_scores(
+    modeling_wallet_metrics = civa.calculate_coin_metrics_from_wallet_scores(
         modeling_profits_df,
         wallet_scores_df
     )
