@@ -1,7 +1,3 @@
-"""
-Models coin performance
-"""
-# pylint:disable=invalid-name  # X_test isn't camelcase
 import logging
 from typing import Dict, Union
 import pandas as pd
@@ -15,60 +11,99 @@ from xgboost import XGBRegressor
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
 
+# pylint:disable=invalid-name  # X_test isn't camelcase
 
 
-
-def train_coin_prediction_model(modeling_df: pd.DataFrame):
+class CoinModel:
     """
-    Trains coin prediction model with proper validation and feature selection.
+    Simplified model for coin return predictions. Assumes pre-joined feature dataset.
     """
-    # 1. Define features to use
-    feature_cols = [
-        # Market cap features
-        'log_market_cap', 'is_micro_cap', 'is_small_cap', 'is_mid_cap',
 
-        # Wallet metrics
-        'weighted_avg_score', 'mean_score', 'score_std', 'score_confidence',
-        'top_wallet_score_ratio',
+    def __init__(self, wallets_coin_config: Dict):
+        """
+        Params:
+        - wallets_coin_config (dict): wallets_coin_config.yaml
+        """
+        self.wallets_coin_config = wallets_coin_config
+        self.pipeline = None
+        self.X_train = None
+        self.X_test = None
+        self.y_train = None
+        self.y_test = None
+        self.y_pred = None
+        self.training_data = None
 
-        # Balance metrics
-        'log_total_balance', 'log_avg_wallet_balance',
-        'top_wallet_balance_pct', 'wallet_concentration',
+    def _prepare_data(self, feature_df: pd.DataFrame) -> None:
+        """
+        Params:
+        - feature_df (DataFrame): Pre-joined dataframe with features and target
+        """
+        self.training_data = feature_df.copy()
 
-        # Activity metrics
-        'total_wallets', 'wallet_activity', 'balance_weighted_confidence'
-    ]
+        # Separate features and target
+        target_var = self.wallets_coin_config['coin_modeling']['target_variable']
+        X = feature_df.drop(target_var, axis=1)
+        y = feature_df[target_var]
 
-    # 2. Prepare train/test split
-    X = modeling_df[feature_cols].values
-    y = modeling_df['coin_return'].values
+        # Split train/test
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42
+        )
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=modeling_df['is_mid_cap']
-    )
+    def _build_pipeline(self) -> None:
+        """Build scikit-learn pipeline with scaling and XGBoost model"""
+        # Get columns to drop
+        drop_cols = self.wallets_coin_config['coin_modeling']['drop_columns']
 
-    # 3. Create model with proper parameters
-    model = XGBRegressor(
-        n_estimators=200,
-        max_depth=4,
-        learning_rate=0.05,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        min_child_weight=3,
-        random_state=42
-    )
+        # Define feature columns
+        feature_cols = [col for col in self.X_train.columns
+                       if col not in (drop_cols or [])]
 
-    # 4. Train and evaluate
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
+        # Create preprocessor
+        preprocessor = ColumnTransformer(
+            transformers=[
+                ('features', StandardScaler(), feature_cols)
+            ],
+            remainder='drop'
+        )
 
-    # 5. Create evaluator with feature names
-    evaluator = wime.RegressionEvaluator(
-        y_train=y_train,
-        y_true=y_test,
-        y_pred=y_pred,
-        model=model,
-        feature_names=feature_cols
-    )
+        # Create model
+        model = XGBRegressor(**self.wallets_coin_config['coin_modeling']['model_params'])
 
-    return model, evaluator
+        # Build pipeline
+        self.pipeline = Pipeline([
+            ('preprocessor', preprocessor),
+            ('regressor', model)
+        ])
+
+    def run_experiment(self, feature_df: pd.DataFrame,
+                      return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
+        """
+        Params:
+        - feature_df (DataFrame): Pre-joined feature and target data
+        - return_data (bool): Whether to return data splits and predictions
+
+        Returns:
+        - result (dict): Contains fitted pipeline and optionally train/test data
+        """
+        self._prepare_data(feature_df)
+        self._build_pipeline()
+        self.pipeline.fit(self.X_train, self.y_train)
+
+        result = {'pipeline': self.pipeline}
+
+        if return_data:
+            self.y_pred = pd.Series(
+                self.pipeline.predict(self.X_test),
+                index=self.X_test.index
+            )
+
+            result.update({
+                'X_train': self.X_train,
+                'X_test': self.X_test,
+                'y_train': self.y_train,
+                'y_test': self.y_test,
+                'y_pred': self.y_pred
+            })
+
+        return result
