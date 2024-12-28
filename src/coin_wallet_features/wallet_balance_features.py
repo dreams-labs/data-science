@@ -1,4 +1,5 @@
 import logging
+from typing import List
 from pathlib import Path
 import yaml
 import pandas as pd
@@ -36,20 +37,20 @@ def prepare_balance_data(modeling_profits_df: pd.DataFrame,
     """
     # Convert date and filter to balance date
     balance_date = pd.to_datetime(balance_date)
-    modeling_end_balances_df = modeling_profits_df[
+    modeling_balances_df = modeling_profits_df[
         modeling_profits_df['date'] == balance_date
     ].copy()
 
     # Select required columns and filter to positive balances
-    modeling_end_balances_df = modeling_end_balances_df[
+    modeling_balances_df = modeling_balances_df[
         ['coin_id', 'wallet_address', 'usd_balance']
     ]
-    modeling_end_balances_df = modeling_end_balances_df[
-        modeling_end_balances_df['usd_balance'] > 0
+    modeling_balances_df = modeling_balances_df[
+        modeling_balances_df['usd_balance'] > 0
     ]
 
     # Merge wallet scores with balance data
-    analysis_df = modeling_end_balances_df.merge(
+    analysis_df = modeling_balances_df.merge(
         wallet_scores_df[['score']],
         left_on='wallet_address',
         right_index=True,
@@ -137,17 +138,19 @@ def calculate_quantile_metrics(analysis_df: pd.DataFrame,
     return metrics_df
 
 
-def calculate_coin_balance_features(modeling_profits_df: pd.DataFrame,
-                                    wallet_scores_df: pd.DataFrame,
-                                    balance_date: str
-                                         ) -> pd.DataFrame:
+def calculate_coin_wallet_balance_features(
+                profits_df: pd.DataFrame,
+                wallet_scores_df: pd.DataFrame,
+                balance_date: str,
+                all_coin_ids: List[str]) -> pd.DataFrame:
     """
     Calculates coin-level metrics based on wallet behavior and scores as of a specific date.
 
     Params:
-    - modeling_profits_df (DataFrame): Profits data with coin_id, wallet_address, date, usd_balance columns
+    - profits_df (DataFrame): Profits data with coin_id, wallet_address, date, usd_balance columns
     - wallet_scores_df (DataFrame): Wallet scores data indexed by wallet_address with score column
     - balance_date (str): The date one which balance distributions should be analyzed
+    - all_coin_ids (List[str]): Complete list of coins to include in output
 
     Returns:
     - coin_wallet_balance_features_df (DataFrame): Coin-level features including:
@@ -162,18 +165,21 @@ def calculate_coin_balance_features(modeling_profits_df: pd.DataFrame,
 
     """
     # Combine wallet-coin pair period balances and scores
-    analysis_df = prepare_balance_data(modeling_profits_df, wallet_scores_df, balance_date)
+    analysis_df = prepare_balance_data(profits_df, wallet_scores_df, balance_date)
 
-    # Initialize output dataframe with an index for every coin_id with an end balance
-    coin_wallet_features_df = pd.DataFrame(index=analysis_df['coin_id'].unique())
+    # Initialize with complete coin list
+    coin_wallet_features_df = pd.DataFrame(index=all_coin_ids)
     coin_wallet_features_df.index.name = 'coin_id'
 
     # Calculate balance weighted average scores
     weighted_scores_df = calculate_weighted_balance_scores(analysis_df)
-    coin_wallet_features_df = coin_wallet_features_df.join(weighted_scores_df, how='inner')
+    coin_wallet_features_df = coin_wallet_features_df.join(
+        weighted_scores_df,
+        how='left'
+        ).fillna(-1)  # fill -1 for coins with no wallets on the balance_date
 
     # Calculate metrics for each quantile cohort
-    quantiles = wallets_coin_config['features']['top_wallets_quantiles']  # can easily add more
+    quantiles = wallets_coin_config['features']['top_wallets_quantiles']
     for quantile in quantiles:
         metrics_df = calculate_quantile_metrics(analysis_df, quantile)
         prefix = f'top_{int(quantile * 100)}pct'
@@ -192,8 +198,9 @@ def calculate_coin_balance_features(modeling_profits_df: pd.DataFrame,
         ).fillna(fill_values)
 
     # Validation
-    missing_coins = set(analysis_df['coin_id']) - set(coin_wallet_features_df.index)
+    missing_coins = set(all_coin_ids) - set(coin_wallet_features_df.index)
     if missing_coins:
-        raise ValueError(f"Found {len(missing_coins)} coin_ids in analysis_df that are missing from features")
+        raise ValueError(f"Found {len(missing_coins)} coin_ids in all coins list "
+                         "missing from analysis_df")
 
     return coin_wallet_features_df
