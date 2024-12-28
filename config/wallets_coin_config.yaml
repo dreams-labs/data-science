@@ -1,0 +1,51 @@
+# Variables used to clean and filter raw data before training data is built
+data_cleaning:
+
+    # Market data filters
+    max_initial_market_cap: 999150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
+    max_gap_days: 50  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
+    min_daily_volume: 500 # Minimum average daily volume the coin must have
+
+
+# Variables used for comnverting the wallet scores into coin forecasts
+coin_validation_analysis:
+
+    # Forecasting methods
+    top_n: 5  # how many of the top coins of a given sort method will be included in performance assessments
+    sort_method: "top_wallet_balance_pct"  # which coin wallet metric to use for coin forecast rankings
+
+    # Thresholds for coin inclusion in forecasts
+    min_wallets: 5  # how many wallets must hold a coin for the coin to be elegible for forecasting
+    min_balance: 10000  # how much USD all wallets must hold for the coin to be elegible for forecasting
+    min_market_cap: 00_000  # coins below this market cap will not be included in performance assessments
+    max_market_cap: 999950_000_000  # coins above this market cap will not be included in performance assessments
+
+
+# Features used in the coin model
+features:
+    top_wallets_cutoff: 0.25  # what ntile a wallet's score has to be to counted as a top wallet
+
+
+# Variables used in the generation of the validation period coin model
+coin_modeling:
+
+    # Target variable parameters
+    target_variable: "coin_return_winsorized"
+    returns_winsorization: 0.05
+    drop_columns: [
+        # # 'balance_wtd_mean_score',
+        # 'all_cohort_wallets_balance',
+        # 'all_cohort_wallets_count',
+        # 'all_cohort_wallets_mean_score',
+        # 'top_wallets_balance',
+        # 'top_wallets_count',
+        # 'top_wallets_mean_score',
+        # # 'top_wallets_balance_pct',
+        # 'top_wallets_count_pct',
+    ]
+
+    # Model params
+    model_type: "xgb"
+    model_params:
+        random_state: 42
+        n_jobs: -1

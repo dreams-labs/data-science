@@ -39,14 +39,14 @@ def retrieve_period_datasets(period_start_date, period_end_date, coin_cohort=Non
     # Get raw period data
     profits_df, market_data_df = wtd.retrieve_raw_datasets(period_start_date, period_end_date)
 
-    if coin_cohort is not None:
-        # Filter to existing cohort before processing
-        profits_df = profits_df[profits_df['coin_id'].isin(coin_cohort)]
-        market_data_df = market_data_df[market_data_df['coin_id'].isin(coin_cohort)]
-    else:
-        # Apply full cleaning to establish cohort
-        market_data_df = wtd.clean_market_dataset(market_data_df, profits_df, period_start_date, period_end_date)
-        profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
+    # Apply cleaning process including coin cohort filter if specified
+    market_data_df = wtd.clean_market_dataset(market_data_df, profits_df,
+                                                period_start_date, period_end_date,
+                                                coin_cohort)
+    profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
+
+    # Set the coin_cohort if it hadn't already been passed
+    if not coin_cohort:
         coin_cohort = set(market_data_df['coin_id'].unique())
         logger.info("Defined coin cohort of %s coins after applying data cleaning filters.",
                     len(coin_cohort))

@@ -493,7 +493,6 @@ def check_coin_transfers_staleness(profits_df, data_cleaning_config) -> None:
 
 
 
-@u.timing_decorator
 def clean_profits_df(profits_df, data_cleaning_config):
     """
     Clean the profits DataFrame by excluding all records for any wallet_addresses that
