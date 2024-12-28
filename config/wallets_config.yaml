@@ -84,26 +84,3 @@ modeling:
         min_child_weight: 5
         random_state: 42
         n_jobs: -1
-
-
-# Variables used for comnverting the wallet scores into coin forecasts
-coin_validation_analysis:
-
-    # Params for coin_validation_df
-    top_wallets_cutoff: 0.2  # what ntile a wallet's score has to be to counted as a top wallet
-
-    # Forecasting methods
-    top_n: 5  # how many of the top coins of a given sort method will be included in performance assessments
-    sort_method: "top_wallet_balance_pct"  # which coin wallet metric to use for coin forecast rankings
-
-    # Thresholds for coin inclusion in forecasts
-    min_wallets: 3  # how many wallets must hold a coin for the coin to be elegible for forecasting
-    min_balance: 10000  # how much USD all wallets must hold for the coin to be elegible for forecasting
-    min_market_cap: 600_000  # coins below this market cap will not be included in performance assessments
-    max_market_cap: 50_000_000  # coins above this market cap will not be included in performance assessments
-
-
-# Variables used in the generation of the validation period coin model
-coin_validation_model:
-
-    target_variable: "coin_return"
