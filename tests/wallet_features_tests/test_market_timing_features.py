@@ -226,16 +226,16 @@ def test_relative_changes_calculation(mock_wallets_features_config,mock_wallets_
     # For price_rsi_14_vs_lead_2: ((lead_2 - base) / base) * 100
     expected_rsi_change = (30 - 10) / 10  # 200%
     assert np.isclose(
-        result_df['price_rsi_14_vs_lead_2'].iloc[0],
+        result_df['price_rsi_14/lead_2'].iloc[0],
         expected_rsi_change,
         equal_nan=True
     )
 
     # Verify that the relative_change_columns list is correct
     expected_relative_change_columns = [
-        'price_rsi_14_vs_lead_2',
-        'price_rsi_14_vs_lead_3',
-        'price_sma_7_vs_lead_1'
+        'price_rsi_14/lead_2',
+        'price_rsi_14/lead_3',
+        'price_sma_7/lead_1'
     ]
     assert relative_change_columns == expected_relative_change_columns
 
@@ -288,10 +288,10 @@ def test_calculate_timing_features_basic():
     # Sell mean: Single value = -0.5
     expected = pd.DataFrame(
         {
-            'test_metric_buy_mean': [0.75],
-            'test_metric_buy_weighted': [0.833333],
-            'test_metric_sell_mean': [-0.5],
-            'test_metric_sell_weighted': [-0.5],
+            'test_metric/buy_mean': [0.75],
+            'test_metric/buy_weighted': [0.833333],
+            'test_metric/sell_mean': [-0.5],
+            'test_metric/sell_weighted': [-0.5],
         },
         index=pd.Index(['wallet_a'], name='wallet_address')
     )
@@ -343,10 +343,10 @@ def test_calculate_timing_features_empty_groups():
     # Expected values
     expected = pd.DataFrame(
         {
-            'test_metric_buy_mean': [0.75, np.nan],
-            'test_metric_buy_weighted': [0.833333, np.nan],
-            'test_metric_sell_mean': [np.nan, -0.75],
-            'test_metric_sell_weighted': [np.nan, -0.833333],
+            'test_metric/buy_mean': [0.75, np.nan],
+            'test_metric/buy_weighted': [0.833333, np.nan],
+            'test_metric/sell_mean': [np.nan, -0.75],
+            'test_metric/sell_weighted': [np.nan, -0.833333],
         },
         index=pd.Index(['wallet_a', 'wallet_b'], name='wallet_address')
     )
@@ -398,35 +398,34 @@ def test_calculate_timing_features_extreme_values():
     # Expected values
     expected = pd.DataFrame(
         {
-            'test_metric_buy_mean': [50.00005],    # Simple average of extremes
-            'test_metric_buy_weighted': [0.0001],  # Dominated by large transaction
-            'test_metric_sell_mean': [0.0],         # Single zero-value sell
-            'test_metric_sell_weighted': [0.0],    # Single zero-value sell
+            'test_metric/buy_mean': [50.00005],    # Simple average of extremes
+            'test_metric/buy_weighted': [0.0001],  # Dominated by large transaction
+            'test_metric/sell_mean': [0.0],         # Single zero-value sell
+            'test_metric/sell_weighted': [0.0],    # Single zero-value sell
         },
         index=pd.Index(['wallet_a'], name='wallet_address')
     )
 
     # Verify weighted buy average (requires higher rtol due to extreme value differences)
     assert np.isclose(
-        result['test_metric_buy_weighted'].iloc[0],
-        expected['test_metric_buy_weighted'].iloc[0],
+        result['test_metric/buy_weighted'].iloc[0],
+        expected['test_metric/buy_weighted'].iloc[0],
         rtol=1e-5
     ), "Buy weighted average calculation failed with extreme values"
 
     # Verify buy mean
     assert np.isclose(
-        result['test_metric_buy_mean'].iloc[0],
-        expected['test_metric_buy_mean'].iloc[0]
+        result['test_metric/buy_mean'].iloc[0],
+        expected['test_metric/buy_mean'].iloc[0]
     ), "Buy mean calculation failed with extreme values"
 
     # Verify sell calculations
     assert np.isclose(
-        result['test_metric_sell_weighted'].iloc[0],
-        expected['test_metric_sell_weighted'].iloc[0]
+        result['test_metric/sell_weighted'].iloc[0],
+        expected['test_metric/sell_weighted'].iloc[0]
     ), "Sell weighted average calculation failed with zero value"
 
     assert np.isclose(
-        result['test_metric_sell_mean'].iloc[0],
-        expected['test_metric_sell_mean'].iloc[0]
+        result['test_metric/sell_mean'].iloc[0],
+        expected['test_metric/sell_mean'].iloc[0]
     ), "Sell mean calculation failed with zero value"
-
