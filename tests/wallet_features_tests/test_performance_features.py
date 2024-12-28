@@ -153,7 +153,7 @@ def test_transform_performance_ratios(sample_performance_features_df):
     # 1. Base ratios: Validate that the base ratios remain unchanged after transformation.
     for col in ratio_df.columns:
         assert np.allclose(
-            transformed_df[f"{col}_base"].values,
+            transformed_df[f"{col}/base"].values,
             ratio_df[col].values,
             equal_nan=True
         ), f"Base ratio for {col} does not match expected values."
@@ -162,7 +162,7 @@ def test_transform_performance_ratios(sample_performance_features_df):
     for col in ratio_df.columns:
         expected_rank = ratio_df[col].rank(method="average", pct=True).values
         assert np.allclose(
-            transformed_df[f"{col}_rank"].values,
+            transformed_df[f"{col}/rank"].values,
             expected_rank,
             equal_nan=True
         ), f"Rank for {col} does not match expected values."
@@ -171,7 +171,7 @@ def test_transform_performance_ratios(sample_performance_features_df):
     for col in ratio_df.columns:
         expected_log = np.sign(ratio_df[col]) * np.log1p(ratio_df[col].abs())
         assert np.allclose(
-            transformed_df[f"{col}_log"].values,
+            transformed_df[f"{col}/log"].values,
             expected_log,
             equal_nan=True
         ), f"Log transformation for {col} does not match expected values."
@@ -183,7 +183,7 @@ def test_transform_performance_ratios(sample_performance_features_df):
         series = ratio_df[col]
         expected_winsorized = u.winsorize(series, cutoff=winsorization_threshold)
         assert np.allclose(
-            transformed_df[f"{col}_winsorized"].values,
+            transformed_df[f"{col}/winsorized"].values,
             expected_winsorized.values,
             equal_nan=True
         ), f"Winsorized values for {col} do not match expected values."
@@ -191,7 +191,7 @@ def test_transform_performance_ratios(sample_performance_features_df):
     # 5. Ntile rank: Validate that ntile ranks are calculated correctly.
     ntile_count = 10  # Assume config sets this to 10
     for col in ratio_df.columns:
-        denominator = col.split("_v_")[1]
+        denominator = col.split("/")[1]
         balance_col = f"balance_{denominator}"
         metric_ntiles = pd.qcut(
             balance_features_df[balance_col],
@@ -206,10 +206,11 @@ def test_transform_performance_ratios(sample_performance_features_df):
             .fillna(0)
         )
         assert np.allclose(
-            transformed_df[f"{col}_ntile_rank"].values,
+            transformed_df[f"{col}/ntile_rank"].values,
             expected_ntile_rank.values,
             equal_nan=True
         ), f"Ntile rank for {col} does not match expected values."
+
 
 
 
