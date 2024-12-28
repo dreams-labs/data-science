@@ -19,16 +19,17 @@ wallets_config = WalletsConfig()
 wallets_coin_config = yaml.safe_load((config_directory / 'wallets_coin_config.yaml').read_text(encoding='utf-8'))  # pylint:disable=line-too-long
 
 
-def calculate_coin_end_balance_features(modeling_profits_df: pd.DataFrame, wallet_scores_df: pd.DataFrame
+def calculate_coin_balance_features(modeling_profits_df: pd.DataFrame,
+                                    wallet_scores_df: pd.DataFrame,
+                                    balance_date: str
                                          ) -> pd.DataFrame:
     """
-    Calculates coin-level metrics based on wallet behavior and scores at the end of the modeling period.
+    Calculates coin-level metrics based on wallet behavior and scores as of a specific date.
 
     Params:
     - modeling_profits_df (DataFrame): Profits data with coin_id, wallet_address, date, usd_balance columns
     - wallet_scores_df (DataFrame): Wallet scores data indexed by wallet_address with score column
-    - wallets_config (dict): Config containing modeling_period_end date
-    - wallets_coin_config (dict): Config containing top_wallets_cutoff threshold
+    - balance_date (str): The date one which balance distributions should be analyzed
 
     Returns:
     - coin_wallet_features_df (DataFrame): Coin-level features including:
@@ -42,11 +43,11 @@ def calculate_coin_end_balance_features(modeling_profits_df: pd.DataFrame, walle
     - ValueError: If any coin_ids are missing from final features dataframe
 
     """
-    # 1. Combine wallet-coin pair period end balances and scores
+    # 1. Combine wallet-coin pair period balances and scores
     # ----------------------------------------------------------
-    # identify balances at the end of the modeling period
-    modeling_end_date = pd.to_datetime(wallets_config['training_data']['modeling_period_end'])
-    modeling_end_balances_df = modeling_profits_df[modeling_profits_df['date']==modeling_end_date].copy()
+    # identify balances as of the balance_date
+    balance_date = pd.to_datetime(balance_date)
+    modeling_end_balances_df = modeling_profits_df[modeling_profits_df['date']==balance_date].copy()
     modeling_end_balances_df = modeling_end_balances_df[['coin_id','wallet_address','usd_balance']]
     modeling_end_balances_df = modeling_end_balances_df[modeling_end_balances_df['usd_balance']>0]
 
@@ -75,7 +76,7 @@ def calculate_coin_end_balance_features(modeling_profits_df: pd.DataFrame, walle
     weighted_scores_df = (analysis_df.groupby('coin_id', observed=True)
                         .apply(
                             lambda x: pd.Series({
-                                'balance_wtd_mean_score': safe_weighted_average(
+                                'all_cohort_wallets/balance_wtd_mean_score': safe_weighted_average(
                                 x['score'].values,
                                 x['usd_balance'].values)
                             })
@@ -85,10 +86,14 @@ def calculate_coin_end_balance_features(modeling_profits_df: pd.DataFrame, walle
 
     # Calculate total metrics for all wallets in profits_df
     all_wallets_metrics = analysis_df.groupby('coin_id',observed=True).agg(
-        all_cohort_wallets_balance=('usd_balance', 'sum'),
-        all_cohort_wallets_count=('wallet_address', 'count'),
-        all_cohort_wallets_mean_score=('score', 'mean')
-    )
+        balance=('usd_balance', 'sum'),
+        count=('wallet_address', 'count'),
+        mean_score=('score', 'mean')
+    ).rename(columns={
+        'balance': 'all_cohort_wallets/balance',
+        'count': 'all_cohort_wallets/count',
+        'mean_score': 'all_cohort_wallets/mean_score'
+    })
     coin_wallet_features_df = coin_wallet_features_df.join(all_wallets_metrics,how='inner')
 
 
@@ -96,14 +101,18 @@ def calculate_coin_end_balance_features(modeling_profits_df: pd.DataFrame, walle
     top_wallets_cutoff = wallets_coin_config['features']['top_wallets_cutoff']
     high_score_threshold = wallet_scores_df['score'].quantile(1 - top_wallets_cutoff)
     top_wallet_metrics = analysis_df[analysis_df['score'] >= high_score_threshold].groupby('coin_id',observed=True).agg(
-        top_wallets_balance=('usd_balance', 'sum'),
-        top_wallets_count=('wallet_address', 'count'),
-        top_wallets_mean_score=('score', 'mean')
-    )
+        balance=('usd_balance', 'sum'),
+        count=('wallet_address', 'count'),
+        mean_score=('score', 'mean')
+    ).rename(columns={
+        'balance': 'top_wallets/balance',
+        'count': 'top_wallets/count',
+        'mean_score': 'top_wallets/mean_score'
+    })
     fill_values = {
-        'top_wallets_balance': 0,
-        'top_wallets_count': 0,
-        'top_wallets_mean_score': -1  # indicates there are no scores rather than a low avg
+        'top_wallets/balance': 0,
+        'top_wallets/count': 0,
+        'top_wallets/mean_score': -1  # indicates there are no scores rather than a low avg
     }
     coin_wallet_features_df = coin_wallet_features_df.join(
         top_wallet_metrics,
@@ -112,11 +121,11 @@ def calculate_coin_end_balance_features(modeling_profits_df: pd.DataFrame, walle
 
 
     # Calculate relative percentages
-    coin_wallet_features_df['top_wallets_balance_pct'] = (coin_wallet_features_df['top_wallets_balance']
-                                                        / coin_wallet_features_df['all_cohort_wallets_balance'])
+    coin_wallet_features_df['top_wallets/balance_pct'] = (coin_wallet_features_df['top_wallets/balance']
+                                                        / coin_wallet_features_df['all_cohort_wallets/balance'])
 
-    coin_wallet_features_df['top_wallets_count_pct'] = (coin_wallet_features_df['top_wallets_count']
-                                                        / coin_wallet_features_df['all_cohort_wallets_count'])
+    coin_wallet_features_df['top_wallets/count_pct'] = (coin_wallet_features_df['top_wallets/count']
+                                                        / coin_wallet_features_df['all_cohort_wallets/count'])
 
 
     # Validation: check if any coin_ids missing from final features
