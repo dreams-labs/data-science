@@ -23,7 +23,7 @@ coin_validation_analysis:
 
 # Features used in the coin model
 features:
-    top_wallets_cutoff: 0.1  # what ntile a wallet's score has to be to counted as a top wallet
+    top_wallets_cutoff: 0.25  # what ntile a wallet's score has to be to counted as a top wallet
 
 
 # Variables used in the generation of the validation period coin model
