@@ -10,7 +10,6 @@ from dreams_core import core as dc
 # Local module imports
 import wallet_features.performance_features as wpf
 import wallet_features.trading_features as wtf
-import wallet_features.market_cap_features as wmc
 import wallet_insights.wallet_model_evaluation as wime
 from wallet_modeling.wallets_config_manager import WalletsConfig
 
@@ -289,21 +288,13 @@ def calculate_coin_performance(market_data_df, start_date, end_date):
     end_date = pd.to_datetime(wallets_config['training_data']['validation_period_end'])
 
     # Get all required data for start date in one operation
-    start_data = market_data_df[market_data_df['date'] == start_date].set_index('coin_id')[['price', 'market_cap']]
+    start_data = market_data_df[market_data_df['date'] == start_date].set_index('coin_id')[['price']]
     end_data = market_data_df[market_data_df['date'] == end_date].set_index('coin_id')[['price']]
-
-    # Fill market cap
-    market_data_filled_df = wmc.force_fill_market_cap(market_data_df)
-    start_market_cap_filled = market_data_filled_df[
-        market_data_filled_df['date'] == start_date
-    ].set_index('coin_id')['market_cap_filled']
 
     # Create consolidated dataframe
     coin_performance_df = pd.DataFrame({
         'starting_price': start_data['price'],
-        'ending_price': end_data['price'],
-        'market_cap': start_data['market_cap'],
-        'market_cap_filled': start_market_cap_filled
+        'ending_price': end_data['price']
     })
 
     # Remove coins with zero starting price
