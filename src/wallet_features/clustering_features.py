@@ -35,13 +35,21 @@ def create_basic_cluster_features(training_data_df, include_pca=False, include_c
     - cluster_features_df (df): dataframe with original index plus new cluster features
     """
     n_components = wallets_config['features']['clustering_n_components']
-    cluster_counts = wallets_config['features']['clustering_n_clusters']  # Now a list
+    cluster_counts = wallets_config['features']['clustering_n_clusters']
+    fill_method = wallets_config['features']['clustering_fill_method']
 
     # Store original index
     original_index = training_data_df.index
 
     # Get numeric features
     numeric_df = training_data_df.select_dtypes(include=[np.number])
+
+    # Fill as specified in the config
+    if fill_method == 0:
+        numeric_df = numeric_df.fillna(0)
+    else:
+        raise ValueError(f"Unknown clustering fill value {fill_method} found in "
+                         "wallets_config['features']['clustering_fill_method'].")
 
     # Scale the features
     scaler = StandardScaler()

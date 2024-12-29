@@ -73,13 +73,12 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     wallet_features_df = wallet_features_df.join(trading_features_df, how='left')\
         .fillna({col: 0 for col in trading_features_df.columns})
 
-    # Performance features (left join, fill -1s)
+    # Performance features (left join, do not fill)
     # Inherits trading features imputed rows requirement
     # -----------------------------------------------------------------------
     performance_features_df = wpf.calculate_performance_features(wallet_features_df)
     feature_column_names['performance|'] = performance_features_df.columns
-    wallet_features_df = wallet_features_df.join(performance_features_df, how='left')\
-        .fillna({col: -1 for col in performance_features_df.columns})
+    wallet_features_df = wallet_features_df.join(performance_features_df, how='left')
 
     # Market timing features (left join, fill 0s)
     # Uses only real transfers (~is_imputed)
@@ -89,21 +88,19 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     wallet_features_df = wallet_features_df.join(timing_features_df, how='left')\
         .fillna({col: 0 for col in timing_features_df.columns})
 
-    # Market cap features (left join, fill 0s)
+    # Market cap features (left join, do not full)
     # Volume weighted uses real transfers, balance weighted uses period_end_date
     # -----------------------------------------------------------------------
     market_features_df = wmc.calculate_market_cap_features(profits_df, market_indicators_data_df)
     feature_column_names['mktcap|'] = market_features_df.columns
-    wallet_features_df = wallet_features_df.join(market_features_df, how='left')\
-        .fillna({col: 0 for col in market_features_df.columns})
+    wallet_features_df = wallet_features_df.join(market_features_df, how='left')
 
-    # Transfers features (left join, fill -1s)
+    # Transfers features (left join, do not fill)
     # Uses only real transfers (~is_imputed)
     # -----------------------------------------------------------------------
     transfers_features_df = wts.calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
     feature_column_names['transfers|'] = transfers_features_df.columns
-    wallet_features_df = wallet_features_df.join(transfers_features_df, how='left')\
-        .fillna({col: -1 for col in transfers_features_df.columns})
+    wallet_features_df = wallet_features_df.join(transfers_features_df, how='left')
 
     # Apply feature prefixes
     rename_map = {col: f"{prefix}{col}"

@@ -57,6 +57,7 @@ features:
     # Clustering params
     clustering_n_components: 25
     clustering_n_clusters: [2,4]
+    clustering_fill_method: 0  # all empty values will be filled with this
 
     # Market timing params
     offset_winsorization: 0.02 # comparisons between metrics and their offset values will be winsorized by this amount
@@ -77,6 +78,7 @@ modeling:
     model_type: "xgb"
     model_params:
         n_estimators: 300
+        missing: null  # xgb will handle unfilled null values
         max_depth: 4
         learning_rate: 0.05
         subsample: 0.8

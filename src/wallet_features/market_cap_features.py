@@ -70,8 +70,8 @@ def calculate_volume_weighted_market_cap(profits_market_features_df):
     )
 
     wallet_volume_wtd_mc_df['volume_wtd_market_cap'] =  np.where(
-        # set value to 0 if there is not volume
-        wallet_volume_wtd_mc_df['total_volume'] == 0,0,
+        # set value to nan if there is not volume
+        wallet_volume_wtd_mc_df['total_volume'] == 0, np.nan,
 
         # calculate weighted average if there is volume
         (wallet_volume_wtd_mc_df['total_market_cap_volume']
@@ -114,7 +114,7 @@ def calculate_ending_balance_weighted_market_cap(profits_market_cap_df):
     # Divide to find weighted average market cap
     wallet_end_balance_wtd_mc_df['end_portfolio_wtd_market_cap'] = np.where(
         # indicates to xgboost there is no value
-        wallet_end_balance_wtd_mc_df['total_usd_balance'] == 0,-1,
+        wallet_end_balance_wtd_mc_df['total_usd_balance'] == 0, np.nan,
 
         # finds weighted average
         (wallet_end_balance_wtd_mc_df['total_market_cap_balance']
@@ -168,8 +168,5 @@ def calculate_market_cap_features(profits_df,market_data_df):
 
     # Merge into a wallet-indexed df of features
     market_cap_features_df = wallet_end_balance_wtd_mc_df.join(volume_wtd_df,how='inner')
-
-    # fill 0s for wallets with no volume
-    market_cap_features_df = market_cap_features_df.fillna(0)
 
     return market_cap_features_df
