@@ -102,8 +102,8 @@ def calculate_coin_performance(market_data_df, start_date, end_date):
         market_cap_filled: market cap with 100% coverage
     """
     # Convert dates to datetime
-    start_date = pd.to_datetime(wallets_config['training_data']['validation_period_start'])
-    end_date = pd.to_datetime(wallets_config['training_data']['validation_period_end'])
+    start_date = pd.to_datetime(start_date)
+    end_date = pd.to_datetime(end_date)
 
     # Get all required data for start date in one operation
     start_data = market_data_df[market_data_df['date'] == start_date].set_index('coin_id')[['price']]
@@ -115,12 +115,11 @@ def calculate_coin_performance(market_data_df, start_date, end_date):
         'ending_price': end_data['price']
     })
 
-    # Remove coins with zero starting price
-    coin_performance_df = coin_performance_df[coin_performance_df['starting_price'] > 0]
-
     # Calculate returns
-    coin_performance_df['coin_return'] = (coin_performance_df['ending_price']
-                                        / coin_performance_df['starting_price']) - 1
+    coin_performance_df['coin_return'] = np.where(coin_performance_df['starting_price']==0, np.nan,
+                                                  ((coin_performance_df['ending_price']
+                                                    / coin_performance_df['starting_price']) - 1)
+    )
 
     # Drop price columns
     coin_performance_df = coin_performance_df.drop(['starting_price','ending_price'], axis=1)

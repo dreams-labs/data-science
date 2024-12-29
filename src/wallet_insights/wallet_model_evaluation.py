@@ -438,8 +438,7 @@ def analyze_cluster_metrics(modeling_df: pd.DataFrame,
         })
 
         # Add the aggregated metrics
-        agg_func = np.median if agg_method == 'median' else np.mean
-        metric_aggs = modeling_df.groupby(cluster_col)[comparison_metrics].agg(agg_func)
+        metric_aggs = modeling_df.groupby(cluster_col)[comparison_metrics].agg(agg_method)
         cluster_stats = pd.concat([cluster_stats, metric_aggs], axis=1)
 
         results[k] = cluster_stats
