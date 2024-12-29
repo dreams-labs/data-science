@@ -433,6 +433,33 @@ def split_dataframe_by_coverage(
 
 
 
+def apply_period_boundaries(
+        time_series_df: pd.DataFrame,
+        start_date: str,
+        end_date: str,
+    ) -> pd.DataFrame:
+    """
+    Splits DataFrame into records that fall within the date range.
+
+    Params:
+    - time_series_df (DataFrame): Input DataFrame with 'date' column
+    - start_date, end_date (strings): the earliest and latest dates to retain formatted as YYYY-MM-DD
+
+    Returns:
+    - in_range_df
+    """
+    # Convert params to datetime
+    start_date = pd.to_datetime(start_date)
+    end_date = pd.to_datetime(end_date)
+
+    in_range_df = time_series_df[
+        (time_series_df['date'] >= start_date)
+        & (time_series_df['date'] <= end_date)
+    ]
+
+    return in_range_df
+
+
 
 def generate_coin_metadata_features(metadata_df, config):
     """
