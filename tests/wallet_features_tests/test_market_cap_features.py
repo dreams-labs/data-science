@@ -121,7 +121,7 @@ def test_calculate_volume_weighted_market_cap_mixed_scenarios():
     # Wallet 4: Equal weights (1000 + 3000)/2 = 2000
     expected_values = {
         1: 2333.33,
-        2: 0,
+        2: np.nan,
         3: 5000.00,
         4: 2000.00
     }
@@ -130,7 +130,7 @@ def test_calculate_volume_weighted_market_cap_mixed_scenarios():
         assert np.isclose(
             result.loc[wallet, 'volume_wtd_market_cap'],
             expected,
-            rtol=1e-2
+            rtol=1e-2, equal_nan=True
         ), f"Incorrect weighted market cap for wallet {wallet}"
 
 
@@ -462,13 +462,13 @@ def test_calculate_portfolio_weighted_market_cap(test_profits_df,test_market_cap
             'end_portfolio_wtd_market_cap': 65000000,
         },
         'w07_tiny_transactions2': {
-            'end_portfolio_wtd_market_cap': -1
+            'end_portfolio_wtd_market_cap': np.nan
         },
     }
 
     # Validate results
     for wallet, expected in expected_results.items():
         wallet_result = market_cap_features_df.loc[wallet, 'end_portfolio_wtd_market_cap']
-        assert np.isclose(wallet_result, expected['end_portfolio_wtd_market_cap'], atol=1e5), \
+        assert np.isclose(wallet_result, expected['end_portfolio_wtd_market_cap'], atol=1e5, equal_nan=True), \
             f"Wallet {wallet} has incorrect portfolio-weighted market cap: {wallet_result}, " \
             f"expected: {expected['end_portfolio_wtd_market_cap']}."

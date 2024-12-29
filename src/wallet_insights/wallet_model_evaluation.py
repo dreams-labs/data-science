@@ -449,9 +449,9 @@ def analyze_cluster_metrics(modeling_df: pd.DataFrame,
 
 
 def analyze_cluster_performance(modeling_df: pd.DataFrame,
-                              cluster_counts: List[int],
-                              y_true: pd.Series,
-                              y_pred: pd.Series) -> Dict[int, pd.DataFrame]:
+                                cluster_counts: List[int],
+                                y_true: pd.Series,
+                                y_pred: pd.Series) -> Dict[int, pd.DataFrame]:
     """
     Calculate model performance metrics for each cluster in test set.
 
@@ -465,7 +465,7 @@ def analyze_cluster_performance(modeling_df: pd.DataFrame,
     - Dict[int, DataFrame]: Performance metrics for each k value's clusters
     """
     # Clusters with fewer than this amount of wallets will have NaNs instead of metrics.
-    cluster_required_sample_size = 100
+    cluster_required_sample_size = 50
 
     # Filter modeling_df to only include test set wallets
     test_wallets = y_true.index
@@ -486,32 +486,36 @@ def analyze_cluster_performance(modeling_df: pd.DataFrame,
             cluster_mask = test_df[cluster_col] == cluster
             n_samples = cluster_mask.sum()
 
-            # If a cluster has fewer than the required samples, log a warning and return NaN metrics
+            # Initialize base metrics dictionary
+            cluster_metrics = {
+                'n_samples': n_samples
+            }
+
+            # If cluster is too small, log warning and use NaN metrics
             if n_samples < cluster_required_sample_size:
                 logger.warning(
                     f"Cluster {cluster} (k={k}) has only {n_samples} test set samples. "
                     f"Test set performance metrics will be reported as NaN."
                 )
-                cluster_metrics = {
-                    'pct_total': 0.0,
+                cluster_metrics.update({
                     'r2': np.nan,
                     'rmse': np.nan,
                     'mae': np.nan,
                     'mape': np.nan,
-                    'explained_variance': np.nan,
-                    'n_samples': n_samples
-                }
+                    'explained_variance': np.nan
+                })
 
             # Otherwise calculate metrics for the cluster
             else:
-                cluster_metrics = {
+                cluster_metrics.update({
                     'r2': r2_score(y_true_arr[cluster_mask], y_pred_arr[cluster_mask]),
                     'rmse': np.sqrt(mean_squared_error(y_true_arr[cluster_mask], y_pred_arr[cluster_mask])),
                     'mae': mean_absolute_error(y_true_arr[cluster_mask], y_pred_arr[cluster_mask]),
                     'mape': mean_absolute_percentage_error(y_true_arr[cluster_mask], y_pred_arr[cluster_mask]),
                     'explained_variance': explained_variance_score(y_true_arr[cluster_mask], y_pred_arr[cluster_mask])
-                }
-                metrics_by_cluster.append(cluster_metrics)
+                })
+
+            metrics_by_cluster.append(cluster_metrics)
 
         results[k] = pd.DataFrame(metrics_by_cluster)
 
