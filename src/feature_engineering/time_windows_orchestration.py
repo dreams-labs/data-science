@@ -356,10 +356,11 @@ def join_dataset_all_windows_dfs(concatenated_dfs):
     for dataset, (df, fill_method) in concatenated_dfs.items():
         rows_start = len(training_data_df)
 
-        if df.isna().sum().sum() > 0:
-            raise ValueError(f"All windows DataFrame for '{dataset}' unexpectedly contains null values.")
+        if fill_method == 'retain_nulls':
+            df = df.set_index(['time_window', 'coin_id'])
+            training_data_df = training_data_df.join(df, on=['time_window', 'coin_id'], how='inner')
 
-        if fill_method == 'drop_records':
+        elif fill_method == 'drop_records':
             df = df.set_index(['time_window', 'coin_id'])
             training_data_df = training_data_df.join(df, on=['time_window', 'coin_id'], how='inner')
 
