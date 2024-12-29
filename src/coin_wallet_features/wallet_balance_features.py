@@ -178,23 +178,47 @@ def calculate_coin_wallet_balance_features(
         how='left'
     )
 
-    # Calculate metrics for each quantile cohort
+    # Retrieve quantiles and perform data quality checks
     quantiles = wallets_coin_config['features']['top_wallets_quantiles']
+
+    if len(quantiles) != len(set(quantiles)):
+        raise ValueError("Quantiles must be unique")
+    if not all(0 < q <= 1 for q in quantiles):
+        raise ValueError("Quantiles must be in range (0, 1]")
+
+    # Add 1.0 and sort in descending order
+    quantiles = sorted(quantiles + [1.0], reverse=True)
+
+    # Calculate metrics for each quantile cohort
     for quantile in quantiles:
+
+        # Calculate balances and counts
         metrics_df = calculate_quantile_metrics(analysis_df, quantile)
         prefix = f'top_{int(quantile * 100)}pct'
 
-        # Define fill values for this quantile's metrics
-        fill_values = {
-            f'{prefix}/balance': 0,
-            f'{prefix}/count': 0,
-        }
-
-        # Join and fill
+        # Join to df with all features
         coin_wallet_features_df = coin_wallet_features_df.join(
             metrics_df,
             how='left'
-        ).fillna(fill_values)
+        )
+
+        # Add relative metrics for quantiles < 1.0
+        if quantile < 1.0:
+            coin_wallet_features_df[f'{prefix}/balance_pct'] = (
+                coin_wallet_features_df[f'{prefix}/balance'] / coin_wallet_features_df['top_100pct/balance']
+            ).fillna(0)
+            coin_wallet_features_df[f'{prefix}/count_pct'] = (
+                coin_wallet_features_df[f'{prefix}/count'] / coin_wallet_features_df['top_100pct/count']
+            ).fillna(0)
+
+            # Define and apply fill values for this quantile's metrics
+            fill_values = {
+                f'{prefix}/balance': 0,
+                f'{prefix}/count': 0,
+                f'{prefix}/balance_pct': 0,
+                f'{prefix}/count_pct': 0,
+            }
+            coin_wallet_features_df = coin_wallet_features_df.fillna(fill_values)
 
     # Validation
     missing_coins = set(all_coin_ids) - set(coin_wallet_features_df.index)
