@@ -361,7 +361,7 @@ def join_dataset_all_windows_dfs(concatenated_dfs):
 
         if fill_method == 'retain_nulls':
             df = df.set_index(['time_window', 'coin_id'])
-            training_data_df = training_data_df.join(df, on=['time_window', 'coin_id'], how='inner')
+            training_data_df = training_data_df.join(df, on=['time_window', 'coin_id'], how='left')
 
         elif fill_method == 'drop_records':
             df = df.set_index(['time_window', 'coin_id'])
@@ -393,10 +393,6 @@ def join_dataset_all_windows_dfs(concatenated_dfs):
             'rows_end': rows_end,
             'rows_removed': rows_start - rows_end
         })
-
-    if training_data_df.isna().sum().sum() > 0:
-        raise ValueError("Merged training_data_df unexpectedly contains null values. "
-                            f"See {training_data_df.isna().sum()}")
 
     join_log_df = pd.DataFrame(log_data)
 
