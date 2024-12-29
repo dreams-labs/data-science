@@ -356,18 +356,23 @@ def join_dataset_all_windows_dfs(concatenated_dfs):
     for dataset, (df, fill_method) in concatenated_dfs.items():
         rows_start = len(training_data_df)
 
+        # Get columns to track from current df so we can fill them appropriately
+        merge_cols = df.columns.difference(['time_window', 'coin_id'])
+
         if fill_method == 'retain_nulls':
             df = df.set_index(['time_window', 'coin_id'])
             training_data_df = training_data_df.join(df, on=['time_window', 'coin_id'], how='inner')
 
         elif fill_method == 'drop_records':
             df = df.set_index(['time_window', 'coin_id'])
+            df = df.dropna()
             training_data_df = training_data_df.join(df, on=['time_window', 'coin_id'], how='inner')
 
         elif fill_method == 'fill_zeros':
             df = df.set_index(['time_window', 'coin_id'])
             training_data_df = training_data_df.join(df, on=['time_window', 'coin_id'], how='left')
-            training_data_df = training_data_df.fillna(0)
+            # Only fill the columns from current df
+            training_data_df[merge_cols] = training_data_df[merge_cols].fillna(0)
 
         elif fill_method == 'extend_coin_ids':
             df = df.set_index('time_window')
