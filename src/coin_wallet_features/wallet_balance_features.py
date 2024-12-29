@@ -176,7 +176,7 @@ def calculate_coin_wallet_balance_features(
     coin_wallet_features_df = coin_wallet_features_df.join(
         weighted_scores_df,
         how='left'
-        ).fillna(-1)  # fill -1 for coins with no wallets on the balance_date
+    )
 
     # Calculate metrics for each quantile cohort
     quantiles = wallets_coin_config['features']['top_wallets_quantiles']
@@ -188,7 +188,6 @@ def calculate_coin_wallet_balance_features(
         fill_values = {
             f'{prefix}/balance': 0,
             f'{prefix}/count': 0,
-            f'{prefix}/mean_score': -1
         }
 
         # Join and fill
