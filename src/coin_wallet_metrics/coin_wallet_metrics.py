@@ -168,6 +168,9 @@ def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets):
     profits_df = profits_df[profits_df['date']<=training_period_end]
     cohort_profits_df = profits_df[profits_df['wallet_address'].isin(cohort_wallets)]
 
+    logger.info("No wallet cohort activity found for %s coins during the window.",
+                len(profits_df['coin_id'].unique()) - len(cohort_profits_df['coin_id'].unique()))
+
     cohort_profits_df = cohort_profits_df[['coin_id','wallet_address','date','usd_balance','usd_net_transfers']]
 
     # Raise an error if the filtered df is empty

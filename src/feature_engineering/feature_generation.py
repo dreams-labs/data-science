@@ -216,7 +216,7 @@ def generate_window_wallet_cohort_features(
             continue
 
         # Generate cohort buysell_metrics
-        cohort_metrics_df = cwm.generate_buysell_metrics_df(window_profits_df,
+        cohort_metrics_df = cwm.generate_buysell_metrics_df(cohort_profits_df,
                                                             config['training_data']['training_period_end'],
                                                             cohort_wallets)
 
