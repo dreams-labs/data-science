@@ -10,7 +10,6 @@ from sklearn.metrics import (
     mean_absolute_error,
     r2_score,
     explained_variance_score,
-    mean_absolute_percentage_error
 )
 from dreams_core import core as dc
 
@@ -87,7 +86,6 @@ class RegressionEvaluator:
         self.metrics['mse'] = mean_squared_error(self.y_true, self.y_pred)
         self.metrics['rmse'] = np.sqrt(self.metrics['mse'])
         self.metrics['mae'] = mean_absolute_error(self.y_true, self.y_pred)
-        self.metrics['mape'] = mean_absolute_percentage_error(self.y_true, self.y_pred)
         self.metrics['r2'] = r2_score(self.y_true, self.y_pred)
         self.metrics['explained_variance'] = explained_variance_score(self.y_true, self.y_pred)
 
@@ -96,7 +94,6 @@ class RegressionEvaluator:
             'mse': mean_squared_error(self.training_cohort_actuals, self.training_cohort_pred),
             'rmse': np.sqrt(mean_squared_error(self.training_cohort_actuals, self.training_cohort_pred)),
             'mae': mean_absolute_error(self.training_cohort_actuals, self.training_cohort_pred),
-            'mape': mean_absolute_percentage_error(self.training_cohort_actuals, self.training_cohort_pred),
             'r2': r2_score(self.training_cohort_actuals, self.training_cohort_pred),
         }
 
@@ -158,14 +155,12 @@ class RegressionEvaluator:
             f"R² Score:                 {self.metrics['r2']:.3f}",
             f"RMSE:                     {self.metrics['rmse']:.3f}",
             f"MAE:                      {self.metrics['mae']:.3f}",
-            f"MAPE:                     {self.metrics['mape']:.1f}%",
             "",
             "Training Cohort Metrics",
             "-" * 35,
             f"R² Score:                 {self.metrics['training_cohort']['r2']:.3f}",
             f"RMSE:                     {self.metrics['training_cohort']['rmse']:.3f}",
             f"MAE:                      {self.metrics['training_cohort']['mae']:.3f}",
-            f"MAPE:                     {self.metrics['training_cohort']['mape']:.1f}%",
             "",
             "Residuals Analysis",
             "-" * 35,
@@ -238,7 +233,7 @@ class RegressionEvaluator:
 
         # Custom colormap
         self.custom_cmap = mcolors.LinearSegmentedColormap.from_list(
-            'custom_blues', ['#1b2530', '#145a8d', '#69c4ff']
+            'custom_blues', ['#1b2530', '#145a8d', '#b3e5ff']
         )
 
         if plot_type == 'all':
@@ -290,7 +285,7 @@ class RegressionEvaluator:
                 gridsize=50,
                 cmap=self.custom_cmap,
                 mincnt=1,
-                bins='log',
+                bins=10**np.linspace(-1, 2, 20),
                 extent=extent)
 
         # Add diagonal reference line
@@ -413,37 +408,41 @@ def assign_clusters_from_distances(modeling_df: pd.DataFrame, cluster_counts: Li
 
 def analyze_cluster_metrics(modeling_df: pd.DataFrame,
                          cluster_counts: List[int],
-                         comparison_metrics: List[str]) -> Dict[int, pd.DataFrame]:
+                         comparison_metrics: List[str],
+                         agg_method: str = 'median') -> Dict[int, pd.DataFrame]:
     """
-    Calculate median metrics for each cluster grouping.
+    Calculate aggregate metrics for each cluster grouping.
 
     Params:
     - modeling_df (DataFrame): DataFrame with cluster assignments and metrics
     - cluster_counts (List[int]): List of k values [e.g. 2, 4]
     - comparison_metrics (List[str]): Metrics to analyze
+    - agg_method (str): Aggregation method - either 'median' or 'mean'
 
     Returns:
-    - Dict[int, DataFrame]: Median metrics for each k value's clusters
+    - Dict[int, DataFrame]: Aggregated metrics for each k value's clusters
     """
+    if agg_method not in ['median', 'mean']:
+        raise ValueError("agg_method must be either 'median' or 'mean'")
+
     results = {}
 
     for k in cluster_counts:
         cluster_col = f'k{k}_cluster'
-
-        # Calculate cluster size info first
         cluster_sizes = modeling_df[cluster_col].value_counts()
 
         # Create initial DataFrame with size metrics
-        medians = pd.DataFrame({
+        cluster_stats = pd.DataFrame({
             'cluster_size': cluster_sizes,
             'cluster_pct': (cluster_sizes / len(modeling_df) * 100).round(2)
         })
 
-        # Add the median metrics
-        metric_medians = modeling_df.groupby(cluster_col)[comparison_metrics].median()
-        medians = pd.concat([medians, metric_medians], axis=1)
+        # Add the aggregated metrics
+        agg_func = np.median if agg_method == 'median' else np.mean
+        metric_aggs = modeling_df.groupby(cluster_col)[comparison_metrics].agg(agg_func)
+        cluster_stats = pd.concat([cluster_stats, metric_aggs], axis=1)
 
-        results[k] = medians
+        results[k] = cluster_stats
 
     return results
 
@@ -488,7 +487,7 @@ def analyze_cluster_performance(modeling_df: pd.DataFrame,
 
             # Initialize base metrics dictionary
             cluster_metrics = {
-                'n_samples': n_samples
+                'test_set_samples': n_samples
             }
 
             # If cluster is too small, log warning and use NaN metrics
@@ -501,7 +500,6 @@ def analyze_cluster_performance(modeling_df: pd.DataFrame,
                     'r2': np.nan,
                     'rmse': np.nan,
                     'mae': np.nan,
-                    'mape': np.nan,
                     'explained_variance': np.nan
                 })
 
@@ -511,7 +509,6 @@ def analyze_cluster_performance(modeling_df: pd.DataFrame,
                     'r2': r2_score(y_true_arr[cluster_mask], y_pred_arr[cluster_mask]),
                     'rmse': np.sqrt(mean_squared_error(y_true_arr[cluster_mask], y_pred_arr[cluster_mask])),
                     'mae': mean_absolute_error(y_true_arr[cluster_mask], y_pred_arr[cluster_mask]),
-                    'mape': mean_absolute_percentage_error(y_true_arr[cluster_mask], y_pred_arr[cluster_mask]),
                     'explained_variance': explained_variance_score(y_true_arr[cluster_mask], y_pred_arr[cluster_mask])
                 })
 
@@ -588,18 +585,21 @@ def style_rows(df: pd.DataFrame) -> pd.DataFrame.style:
     return styled.format(format_dict)
 
 
-def create_cluster_report(modeling_df, model_results, n, comparison_metrics):
+def create_cluster_report(modeling_df: pd.DataFrame,
+                          model_results: Dict,
+                          n: int,
+                          comparison_metrics: List[str],
+                          agg_method: str = 'median') -> pd.DataFrame.style:
     """
-    Generates a formatted dataframe report on the clusters' sizes, performance, and median
+    Generates a formatted dataframe report on the clusters' sizes, performance, and aggregated
     values for the comparison_metrics columns.
 
     Params:
-    - modeling_df (df): the df with all the features input to the model
+    - modeling_df (DataFrame): the df with all the features input to the model
     - model_results (dict): output dict with results generated by wm.WalletModel.run_experiment()
-    - n (int): a value from wallets_config['features']['clustering_n_clusters'] that indicates
-        which cluster set to analyze
-    - comparison_metrics (list of strings): the metrics from modeling_df to provide median
-        values for
+    - n (int): cluster set to analyze
+    - comparison_metrics (list): the metrics from modeling_df to provide aggregated values for
+    - agg_method (str): Aggregation method - either 'median' or 'mean'
 
     Returns:
     - styled_df (pandas.io.formats.style.Styler): a pretty df with metrics
@@ -624,7 +624,8 @@ def create_cluster_report(modeling_df, model_results, n, comparison_metrics):
     cluster_profiles = analyze_cluster_metrics(
         cluster_analysis_df,
         wallets_config['features']['clustering_n_clusters'],
-        list(set(base_metrics + comparison_metrics))
+        list(set(base_metrics + comparison_metrics)),
+        agg_method=agg_method
     )
 
     # Assess model performance in the test set of each cluster
@@ -636,18 +637,29 @@ def create_cluster_report(modeling_df, model_results, n, comparison_metrics):
     )
 
     # Join metrics with performance and reorder rows
-    cluster_results_df = cluster_profiles[n].join(cluster_performance[n]).T
+    cluster_results_df = cluster_profiles[n].join(cluster_performance[n])
+
+    # Convert capital F Float columns to normal float columns to fix styling failures
+    float_cols = cluster_results_df.select_dtypes(['Float64','Float32']).columns
+    type_map = {col: 'float64' for col in float_cols}
+
+    # Pivot the df
+    cluster_results_pivot = (
+        cluster_results_df.copy()
+        .astype(type_map)
+        .T
+    )
 
     # Define the desired row order
-    size_metrics = ['cluster_size', 'cluster_pct']
-    perf_metrics = ['r2', 'rmse', 'mae', 'mape', 'explained_variance']
-    remaining_metrics = [col for col in cluster_results_df.index
+    size_metrics = ['cluster_size', 'cluster_pct', 'test_set_samples']
+    perf_metrics = ['r2', 'rmse', 'mae', 'explained_variance']
+    remaining_metrics = [col for col in cluster_results_pivot.index
                         if col not in size_metrics + perf_metrics + base_metrics]
 
     # Reorder the rows
     ordered_rows = (size_metrics + base_metrics + perf_metrics + remaining_metrics)
-    cluster_results_df = cluster_results_df.reindex(ordered_rows)
+    cluster_results_pivot = cluster_results_pivot.reindex(ordered_rows)
 
-    styled_df = style_rows(cluster_results_df)
+    styled_df = style_rows(cluster_results_pivot)
 
-    return styled_df
+    return styled_df,cluster_results_df
