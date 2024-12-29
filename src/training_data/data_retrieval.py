@@ -164,7 +164,7 @@ def clean_market_data(market_data_df, config, earliest_date, latest_date):
 
     # Identify coin_ids with insufficient volume within date range
     mean_volume = filtered_df.groupby('coin_id', observed=True)['volume'].mean()
-    low_volume_coins = mean_volume[mean_volume <= min_daily_volume].index.tolist()
+    low_volume_coins = mean_volume[mean_volume < min_daily_volume].index.tolist()
 
     # Combine problematic coin lists
     coins_to_remove = list(set(gap_coin_ids + low_volume_coins))

@@ -168,6 +168,9 @@ def generate_buysell_metrics_df(profits_df,training_period_end,cohort_wallets):
     profits_df = profits_df[profits_df['date']<=training_period_end]
     cohort_profits_df = profits_df[profits_df['wallet_address'].isin(cohort_wallets)]
 
+    logger.info("No wallet cohort activity found for %s coins during the window.",
+                len(profits_df['coin_id'].unique()) - len(cohort_profits_df['coin_id'].unique()))
+
     cohort_profits_df = cohort_profits_df[['coin_id','wallet_address','date','usd_balance','usd_net_transfers']]
 
     # Raise an error if the filtered df is empty
@@ -386,9 +389,6 @@ def split_dataframe_by_coverage(
     # Create copy of df
     time_series_df = time_series_df.copy()
 
-    # Drop all rows with any NaN values
-    time_series_df = time_series_df.dropna()
-
     # Define a function to check if a date range has full coverage
     def has_full_coverage(min_date, max_date):
         return (min_date <= start_date) and (max_date >= end_date)
@@ -434,6 +434,33 @@ def split_dataframe_by_coverage(
 
     return full_coverage_df, partial_coverage_df
 
+
+
+def apply_period_boundaries(
+        time_series_df: pd.DataFrame,
+        start_date: str,
+        end_date: str,
+    ) -> pd.DataFrame:
+    """
+    Splits DataFrame into records that fall within the date range.
+
+    Params:
+    - time_series_df (DataFrame): Input DataFrame with 'date' column
+    - start_date, end_date (strings): the earliest and latest dates to retain formatted as YYYY-MM-DD
+
+    Returns:
+    - in_range_df
+    """
+    # Convert params to datetime
+    start_date = pd.to_datetime(start_date)
+    end_date = pd.to_datetime(end_date)
+
+    in_range_df = time_series_df[
+        (time_series_df['date'] >= start_date)
+        & (time_series_df['date'] <= end_date)
+    ]
+
+    return in_range_df
 
 
 

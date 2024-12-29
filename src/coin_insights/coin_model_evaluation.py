@@ -63,6 +63,7 @@ class CoinRegressionEvaluator:
         summary = [
             "Model Performance Summary",
             "=" * 50,
+            f"Test Samples:             {len(self.y_test):,}",
             f"R² Score:                 {self.metrics['r2']:.3f}",
             f"RMSE:                     {self.metrics['rmse']:.3f}",
             f"MAE:                      {self.metrics['mae']:.3f}",

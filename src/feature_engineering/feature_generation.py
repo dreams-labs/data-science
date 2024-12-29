@@ -45,12 +45,10 @@ def generate_window_time_series_features(
     - flattened_metrics_filepath (string): the filepath to where the flattened_metrics_df is saved
     """
     # Filter input data to time window
-    window_time_series_df, _ = cwm.split_dataframe_by_coverage(
+    window_time_series_df = cwm.apply_period_boundaries(
         all_windows_time_series_df,
         config['training_data']['training_period_start'],
         config['training_data']['training_period_end'],
-        id_column='coin_id',
-        drop_outside_date_range=True
     )
 
     # Flatten the metrics DataFrame to be keyed only on coin_id
@@ -66,7 +64,7 @@ def generate_window_time_series_features(
     # Add dataset_name as a prefix to all columns so their lineage is fully documented
     flattened_metrics_df = flattened_metrics_df.rename(
         columns=lambda x:
-        f"{dataset_name.replace('-', '_')}_{x}"
+        f"{dataset_name.replace('-', '|')}|{x}"
         if x not in ['coin_id', 'time_window']
         else x)
 
@@ -218,7 +216,7 @@ def generate_window_wallet_cohort_features(
             continue
 
         # Generate cohort buysell_metrics
-        cohort_metrics_df = cwm.generate_buysell_metrics_df(window_profits_df,
+        cohort_metrics_df = cwm.generate_buysell_metrics_df(cohort_profits_df,
                                                             config['training_data']['training_period_end'],
                                                             cohort_wallets)
 

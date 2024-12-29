@@ -24,15 +24,15 @@ datasets:
 
         market_data:
             price:
-                sameness_threshold: .95  # columns with more than this % of one value will be dropped
+                sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
             volume:
-                sameness_threshold: .95  # columns with more than this % of one value will be dropped
+                sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
             market_cap:
-                sameness_threshold: .95  # columns with more than this % of one value will be dropped
+                sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
             mfi:
-                sameness_threshold: .95  # columns with more than this % of one value will be dropped
+                sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
             obv:
-                sameness_threshold: .95  # columns with more than this % of one value will be dropped
+                sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
 
     # Keyed on coin_id-date
     wallet_cohorts:
@@ -53,16 +53,16 @@ datasets:
           coin_profits_win_threshold: 10000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
           coin_return_win_threshold: 0.3  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
           wallet_min_coin_wins: 4  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
-          sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
+          sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
 
-      normies:
-          lookback_period: 0 # how long the window for wallet thresholds extends backwards before the training_period_start
-          wallet_minimum_inflows: 100  # Minimum USD inflows for a wallet to be considered a "shark"
-          wallet_maximum_inflows: 10000  # Maximum USD inflows for a wallet to be considered a "shark"
-          coin_profits_win_threshold: 0  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
-          coin_return_win_threshold: 0  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
-          wallet_min_coin_wins: 0  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
-          sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
+    #   normies:
+    #       lookback_period: 0 # how long the window for wallet thresholds extends backwards before the training_period_start
+    #       wallet_minimum_inflows: 100  # Minimum USD inflows for a wallet to be considered a "shark"
+    #       wallet_maximum_inflows: 10000  # Maximum USD inflows for a wallet to be considered a "shark"
+    #       coin_profits_win_threshold: 0  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
+    #       coin_return_win_threshold: 0  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
+    #       wallet_min_coin_wins: 0  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
+    #       sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
 
     # midtier:
     #   lookback_period: 0 # how long the window for wallet thresholds extends backwards before the training_period_start
@@ -103,13 +103,13 @@ data_cleaning:
     # Variables used to clean and filter raw data before training data is built
 
     # Wallet filters
-    max_wallet_inflows: 25_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
+    max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
     min_wallet_inflows: 10 # The amount of lifetime USD inflows a wallet-coin pair must have to be included in the training data
     maximum_market_cap_share: 0.3 # if a wallet ever owns more than this % of a coin's market cap, remove it
 
     # market_data_df filters: Define how to handle missing price data
-    max_gap_days: 50  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
-    min_daily_volume: 2000 # Minimum average daily volume the coin must have
+    max_gap_days: 5000  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
+    min_daily_volume: 0 # Minimum average daily volume the coin must have
     exclude_coins_without_transfers: True  # determines whether to create price features for coins without transfers data
 
     # Warnings about potential data gaps in profits_df or market_data_df

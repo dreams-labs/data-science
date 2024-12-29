@@ -15,7 +15,7 @@ preprocessing:
         - "time_series_market_data_volume_sum_7d_period_4"
     fill_methods:
         wallet_cohorts: "fill_zeros"
-        time_series: "drop_records"
+        time_series: "retain_nulls"
         macro_trends: "extend_coin_ids"
     data_partitioning:
         test_set_share: 0.25  # Size of the test set as a proportion of the data

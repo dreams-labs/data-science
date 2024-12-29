@@ -66,11 +66,6 @@ def flatten_coin_date_df(df, df_metrics_config, training_period_end):
             f"Missing dates: {missing_dates}"
         )
 
-    # Check for NaN values
-    if df.isnull().values.any():
-        raise ValueError(
-            "Timeseries contains NaN values. Ensure imputation is done upstream before flattening."
-        )
     # Check if df columns have configurations in df_metrics_config
     configured_metrics = []
     for m in df_metrics_config.keys():
