@@ -119,7 +119,7 @@ def calculate_quantile_metrics(analysis_df: pd.DataFrame,
     # Determine cohort and prefix
     threshold = analysis_df['score'].quantile(1 - quantile)
     df = analysis_df[analysis_df['score'] >= threshold]
-    prefix = f'top_{int(quantile * 100)}pct'
+    prefix = f'top_{int(quantile * 100):02d}pct'
 
     # Calculate metrics
     metrics_df = df.groupby('coin_id', observed=True).agg(
@@ -194,7 +194,7 @@ def calculate_coin_wallet_balance_features(
 
         # Calculate balances and counts
         metrics_df = calculate_quantile_metrics(analysis_df, quantile)
-        prefix = f'top_{int(quantile * 100)}pct'
+        prefix = f'top_{int(quantile * 100):02d}pct'
 
         # Join to df with all features
         coin_wallet_features_df = coin_wallet_features_df.join(

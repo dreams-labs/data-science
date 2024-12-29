@@ -15,8 +15,6 @@ coin_validation_analysis:
     sort_method: "top_wallet_balance_pct"  # which coin wallet metric to use for coin forecast rankings
 
     # Thresholds for coin inclusion in forecasts
-    min_wallets: 5  # how many wallets must hold a coin for the coin to be elegible for forecasting
-    min_balance: 10000  # how much USD all wallets must hold for the coin to be elegible for forecasting
     min_market_cap: 00_000  # coins below this market cap will not be included in performance assessments
     max_market_cap: 999950_000_000  # coins above this market cap will not be included in performance assessments
 
@@ -24,11 +22,15 @@ coin_validation_analysis:
 # Features used in the coin model
 features:
     # top_wallets_quantiles: [1.0, 0.5, 0.25, 0.10, 0.05, 0.02]  # what ntile a wallet's score has to be to counted as a top wallet
-    top_wallets_quantiles: [0.5, 0.25, 0.1]  # what ntile a wallet's score has to be to counted as a top wallet
+    top_wallets_quantiles: [0.5, 0.25, 0.1, 0.05]  # what ntile a wallet's score has to be to counted as a top wallet
 
 
 # Variables used in the generation of the validation period coin model
 coin_modeling:
+
+    # Thresholds for coin inclusion in training data
+    min_cohort_wallets: 5  # how many wallets must hold a coin for the coin to be elegible for forecasting
+    min_cohort_balance: 10000  # how much USD all wallets must hold for the coin to be elegible for forecasting
 
     # Target variable parameters
     target_variable: "coin_return_winsorized"

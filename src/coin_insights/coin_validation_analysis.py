@@ -591,6 +591,7 @@ def create_visualizations(df):
 
 def analyze_top_coins_wallet_metrics(df: pd.DataFrame,
                                    percentile: int,
+                                   wallet_metrics: List,
                                    method: str = 'median') -> pd.DataFrame:
     """
     Creates a formatted df comparing wallet metrics between top performing coins.
@@ -598,6 +599,7 @@ def analyze_top_coins_wallet_metrics(df: pd.DataFrame,
     Params:
     - df (DataFrame): DataFrame with coin metrics and returns
     - percentile (int): Percentile threshold for top performers (must be >50)
+    - wallet_metrics (list): List of the metrics to generate analysis for
     - method (str): Aggregation method - 'mean' or 'median'
 
     Returns:
@@ -629,21 +631,12 @@ def analyze_top_coins_wallet_metrics(df: pd.DataFrame,
             'all_coins': len(df)
         },
         'pct_of_coins': {
-            ntile_column: len(top_coins) / len(df) * 100,
-            middle_column: len(middle_coins) / len(df) * 100,
-            bottom_column: len(bottom_coins) / len(df) * 100,
+            ntile_column: len(top_coins) / len(df),
+            middle_column: len(middle_coins) / len(df),
+            bottom_column: len(bottom_coins) / len(df),
             'all_coins': 100.0
         }
     }
-
-    # Wallet metrics to analyze
-    wallet_metrics = [
-        'top_100pct/balance_wtd_mean_score',
-        'top_10pct/count',
-        'top_25pct/count',
-        'top_50pct/count',
-        'top_100pct/count',
-    ]
 
     # Calculate wallet metrics for ntiles
     for metric in wallet_metrics:
@@ -662,9 +655,9 @@ def analyze_top_coins_wallet_metrics(df: pd.DataFrame,
             metric_name = f'{metric}_{stat}'
             return_metric_names.append(metric_name)
             results[metric_name] = {
-                ntile_column: (np.mean if stat == 'mean' else np.median)(top_coins[metric]) * 100,
-                middle_column: (np.mean if stat == 'mean' else np.median)(middle_coins[metric]) * 100,
-                bottom_column: (np.mean if stat == 'mean' else np.median)(bottom_coins[metric]) * 100,
+                ntile_column: (np.mean if stat == 'mean' else np.median)(top_coins[metric]),
+                middle_column: (np.mean if stat == 'mean' else np.median)(middle_coins[metric]),
+                bottom_column: (np.mean if stat == 'mean' else np.median)(bottom_coins[metric]),
                 'all_coins': (np.mean if stat == 'mean' else np.median)(df[metric])
             }
 
@@ -676,8 +669,9 @@ def analyze_top_coins_wallet_metrics(df: pd.DataFrame,
 
 
 def create_top_coins_wallet_metrics_report(df: pd.DataFrame,
-                            percentile: int = 75,
-                            method: str = 'median') -> pd.DataFrame.style:
+                                           percentile,
+                                           wallet_metrics: List,
+                                           method: str = 'median') -> pd.DataFrame.style:
     """
     Creates a styled performance analysis report showing summary metrics of the
     coin-level wallet metrics.
@@ -685,15 +679,188 @@ def create_top_coins_wallet_metrics_report(df: pd.DataFrame,
     Params:
     - df (DataFrame): DataFrame with coin metrics and returns
     - percentile (int): Percentile threshold for top performers
+    - wallet_metrics (list): List of the metrics to generate analysis for
     - how the metrics should be summarized (string): e.g. 'median','mean'
 
     Returns:
     - styled_df (DataFrame.style): Styled analysis results
     """
     # Generate results DataFrame
-    results_df = analyze_top_coins_wallet_metrics(df, percentile, method)
+    results_df = analyze_top_coins_wallet_metrics(df, percentile, wallet_metrics, method)
 
     # Apply consistent styling
     styled_df = wime.style_rows(results_df)
 
     return styled_df
+
+
+def analyze_metric_segments(
+    df: pd.DataFrame,
+    wallet_metrics: List[str],
+    n_quantiles: int
+) -> pd.DataFrame:
+    """
+    Analyzes both mean returns and metric values for different quantile buckets.
+
+    Params:
+    - df (DataFrame): Input data with metrics and returns
+    - wallet_metrics (List[str]): Metrics to analyze (higher values = higher scores)
+    - n_quantiles (int): Number of quantile buckets (e.g. 4 for quartiles, 10 for deciles)
+
+    Returns:
+    - DataFrame: Multi-level columns with metrics and returns for each segment
+    """
+    # Generate quantile breakpoints
+    quantiles = np.linspace(0, 1, n_quantiles+1)
+
+    # Generate segment names
+    segments = [
+        f"q{int(q1*100):02d}_q{int(q2*100):02d}"
+        for q1, q2 in zip(quantiles[:-1], quantiles[1:])
+    ]
+
+    results = {}
+    for metric in wallet_metrics:
+        # Calculate threshold values for this metric
+        thresholds = np.quantile(df[metric], quantiles)
+
+        # Initialize metric results
+        metric_stats = {'metric_mean': [], 'return_mean': [], 'n_coins': []}
+
+        # Calculate stats for each bucket
+        for i in range(len(quantiles)-1):
+            if i == len(quantiles)-2:  # Last segment includes highest value
+                mask = (df[metric] >= thresholds[i])
+            else:
+                mask = (df[metric] >= thresholds[i]) & (df[metric] < thresholds[i+1])
+
+            segment_data = df[mask]
+
+            metric_stats['metric_mean'].append(segment_data[metric].mean())
+            metric_stats['return_mean'].append(segment_data['coin_return'].mean())
+            metric_stats['n_coins'].append(len(segment_data))
+
+        # Create multi-level columns for this metric
+        for stat_name, values in metric_stats.items():
+            for segment, value in zip(segments, values):
+                results[(metric, segment, stat_name)] = value
+
+    # Convert to DataFrame with multi-level columns
+    results_df = pd.DataFrame(results, index=[0]).T
+    results_df = results_df.unstack(level=[1, 2])
+    results_df.columns = results_df.columns.droplevel(0)
+
+    return results_df
+
+
+def style_metric_segments(df: pd.DataFrame) -> pd.DataFrame.style:
+    """
+    Apply conditional formatting with different color scales for metrics and returns.
+
+    Params:
+    - df (DataFrame): Multi-level column DataFrame from analyze_metric_segments
+
+    Returns:
+    - styled_df (DataFrame.style): DataFrame with separate metric/return formatting
+    """
+    def color_by_type(row, metric_type, color):
+        # Filter to columns of given metric type
+        type_cols = [col for col in row.index if metric_type in col[1]]
+
+        # Get values for just this metric type
+        type_values = row[type_cols].astype(float)
+
+        # Skip if no valid values
+        valid_vals = type_values.dropna()
+        if len(valid_vals) == 0:
+            return pd.Series([''] * len(row), index=row.index)
+
+        # Normalize within this metric type
+        min_val = valid_vals.min()
+        max_val = valid_vals.max()
+        if min_val == max_val:
+            return pd.Series([''] * len(row), index=row.index)
+
+        norm = type_values.apply(lambda x: (x - min_val) / (max_val - min_val) if pd.notna(x) else np.nan)
+
+        # Create color series for all columns (defaulting to empty string)
+        colors = pd.Series([''] * len(row), index=row.index)
+
+        # Set colors only for this metric type's columns
+        for col in type_cols:
+            val = norm[col]
+            if pd.notna(val):
+                colors[col] = f'background-color: rgba{color}, {val:.2f})'
+
+        return colors
+
+    def row_style(row):
+        # Combine colors from different metrics
+        metric_colors = color_by_type(row, 'metric_mean', '(0, 100, 255')  # Blue
+        return_colors = color_by_type(row, 'return_mean', '(60, 179, 113')  # Green
+        count_colors = color_by_type(row, 'n_coins', '(128, 128, 128')  # Gray
+
+        # Combine all colors (non-empty strings will overwrite empty ones)
+        final_colors = pd.Series([''] * len(row), index=row.index)
+        for colors in [metric_colors, return_colors, count_colors]:
+            final_colors[colors != ''] = colors[colors != '']
+
+        return final_colors
+
+    # Create style object
+    styled = df.style.apply(row_style, axis=1)
+
+    # Format numbers
+    format_dict = {}
+    for col in df.columns:
+        if df[col].dtype in [np.float64, np.float32]:
+            format_dict[col] = '{:.3f}'.format
+        elif df[col].dtype in [np.int64, np.int32]:
+            format_dict[col] = '{:,.0f}'.format
+
+    # Add just before return styled.format(format_dict):
+    metric_cols = [col for col in df.columns if 'metric_mean' in col[1]]
+    styled = df.sort_values(by=metric_cols[-1], ascending=True).style.apply(row_style, axis=1)
+
+
+    return styled.format(format_dict)
+
+
+def calculate_metric_return_correlations(df: pd.DataFrame, n_quantiles: List[float]) -> pd.DataFrame:
+    """
+    Calculate correlations between metric values and their corresponding returns.
+
+    Params:
+    - df (DataFrame): Multi-level column DataFrame from analyze_metric_segments
+    - wallet_metrics (List[str]): List of metrics analyzed
+    - quantiles (List[float]): Quantile thresholds used
+
+    Returns:
+    - DataFrame: Correlation metrics for each wallet metric
+    """
+    # Generate quantile breakpoints
+    quantiles = np.linspace(0, 1, n_quantiles+1)
+
+    segments = [f"q{int(q1*100):02d}_q{int(q2*100):02d}"
+               for q1, q2 in zip(quantiles, quantiles[1:])]
+
+    correlations = {}
+    for metric in df.index:
+        metric_vals = [df.loc[metric, (seg, 'metric_mean')] for seg in segments]
+        return_vals = [df.loc[metric, (seg, 'return_mean')] for seg in segments]
+
+        # Drop any NaN pairs
+        valid_pairs = [(m, r) for m, r in zip(metric_vals, return_vals)
+                      if pd.notna(m) and pd.notna(r)]
+        if valid_pairs:
+            metric_vals, return_vals = zip(*valid_pairs)
+            corr = np.corrcoef(metric_vals, return_vals)[0, 1]
+        else:
+            corr = np.nan
+
+        correlations[metric] = {
+            'correlation': corr,
+            'n_valid_buckets': len(valid_pairs)
+        }
+
+    return pd.DataFrame(correlations).T.sort_values('correlation', ascending=False)

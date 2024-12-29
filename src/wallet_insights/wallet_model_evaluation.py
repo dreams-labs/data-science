@@ -518,29 +518,6 @@ def analyze_cluster_performance(modeling_df: pd.DataFrame,
     return results
 
 
-def format_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Apply human_format to all numeric columns in dataframe.
-
-    Params:
-    - df (DataFrame): Input dataframe with numeric columns
-
-    Returns:
-    - DataFrame: Copy of input with formatted numeric columns
-    """
-    # Create copy to avoid modifying original
-    formatted_df = df.copy()
-
-    # Only apply to numeric columns that aren't just 0/1 categories
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-
-    for col in numeric_cols:
-        if df[col].nunique() > 2:  # Skip binary columns
-            formatted_df[col] = df[col].apply(dc.human_format)
-
-    return formatted_df
-
-
 def style_rows(df: pd.DataFrame) -> pd.DataFrame.style:
     """
     Apply row-wise conditional formatting with blue gradient and human-readable numbers.
