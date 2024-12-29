@@ -386,9 +386,6 @@ def split_dataframe_by_coverage(
     # Create copy of df
     time_series_df = time_series_df.copy()
 
-    # Drop all rows with any NaN values
-    time_series_df = time_series_df.dropna()
-
     # Define a function to check if a date range has full coverage
     def has_full_coverage(min_date, max_date):
         return (min_date <= start_date) and (max_date >= end_date)
