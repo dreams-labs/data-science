@@ -91,8 +91,7 @@ def calculate_ending_balance_weighted_market_cap(profits_market_cap_df):
 
     Returns:
     - wallet_end_balance_wtd_mc_df (df): DataFrame with index wallet_address and column
-        'end_portfolio_wtd_market_cap' showing avg mc weighted by ending balance, or -1
-        if the ending balance is 0
+        'end_portfolio_wtd_market_cap' showing avg mc weighted by ending balance
     """
     # Create a copy to avoid modifying original
     profits_df_end = profits_market_cap_df.copy()

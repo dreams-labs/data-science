@@ -78,7 +78,6 @@ modeling:
     model_type: "xgb"
     model_params:
         n_estimators: 300
-        missing: null  # xgb will handle unfilled null values
         max_depth: 4
         learning_rate: 0.05
         subsample: 0.8
