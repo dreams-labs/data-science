@@ -90,12 +90,15 @@ def calculate_score_metrics(
 
     for score_col in score_columns:
         score_name = score_col.split('|')[1]  # Extract score name from 'score|name' format
-        weighted_scores = (
+        weighted_scores = pd.concat([
             segment_data.groupby('coin_id', observed=True)
-            .apply(lambda x: safe_weighted_average(x[score_col].values, x['usd_balance'].values))
-            .rename(f'{segment_name}/{segment_value}|balance/{balance_date_str}/score_wtd_balance/{score_name}')
-        )
+            .apply(lambda x, col=score_col: safe_weighted_average(x[col].values, x['usd_balance'].values))
+            .rename(f'{segment_name}/{segment_value}/balance/{balance_date_str}/score_wtd_balance/{score_name}')
+            for score_col in score_columns
+        ], axis=1)
+
         score_metrics = score_metrics.join(weighted_scores, how='left')
+
 
     return score_metrics
 

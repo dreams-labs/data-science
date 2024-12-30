@@ -56,7 +56,7 @@ def assign_wallet_quantiles(score_series: pd.Series, quantiles: list[float]) -> 
 
     # Create result DataFrame with quantile assignments
     result_df = pd.DataFrame(index=score_series.index)
-    column_name = f'score_quantile/{score_series.name}'
+    column_name = f'score_quantile|{score_series.name}'
     result_df[column_name] = pd.cut(
         score_series,
         bins=bin_edges,
