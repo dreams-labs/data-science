@@ -5,24 +5,15 @@ time_series:
     market_data:
         price:
             indicators:
-                ema:
+                sma:
                     parameters:
-                        window: [7]
+                        window: [5]
                     rolling:
                         comparisons:
                             pct_change:
                                 scaling: "none"
-                        window_duration: 5
+                        window_duration: 15
                         lookback_periods: 4
-                # sma:
-                #     parameters:
-                #         window: [30]
-                #     rolling:
-                #         comparisons:
-                #             pct_change:
-                #                 scaling: "none"
-                #         window_duration: 5
-                #         lookback_periods: 4
                 rsi:
                     parameters:
                         window: [14]
@@ -36,7 +27,10 @@ time_series:
                 aggregations:
                     sum:
                         scaling: "none"
-                window_duration: 5
+                comparisons:
+                    pct_change:
+                        scaling: "none"
+                window_duration: 15
                 lookback_periods: 4
         market_cap:
             aggregations:
@@ -44,6 +38,8 @@ time_series:
                     scaling: "none"
         mfi:
             aggregations:
+                first:
+                    scaling: "none"
                 last:
                     scaling: "none"
         obv:
@@ -106,42 +102,42 @@ wallet_cohorts:
                 window_duration: 15
                 lookback_periods: 2
 
-    # normies:
-    #     buyers_new:
-    #         rolling:
-    #             aggregations:
-    #                 sum:
-    #                     scaling: "none"
-    #             window_duration: 15
-    #             lookback_periods: 2
-    #     total_holders:
-    #         rolling:
-    #             aggregations:
-    #                 last:
-    #                     scaling: "none"
-    #             window_duration: 15
-    #             lookback_periods: 2
-    #     total_bought:
-    #         rolling:
-    #             aggregations:
-    #                 sum:
-    #                     scaling: "none"
-    #             window_duration: 15
-    #             lookback_periods: 2
-    #     total_sold:
-    #         rolling:
-    #             aggregations:
-    #                 sum:
-    #                     scaling: "none"
-    #             window_duration: 15
-    #             lookback_periods: 2
-    #     total_balance:
-    #         rolling:
-    #             aggregations:
-    #                 last:
-    #                     scaling: "none"
-    #             window_duration: 15
-    #             lookback_periods: 2
+    normies:
+        buyers_new:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 15
+                lookback_periods: 2
+        total_holders:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: "none"
+                window_duration: 15
+                lookback_periods: 2
+        total_bought:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 15
+                lookback_periods: 2
+        total_sold:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: "none"
+                window_duration: 15
+                lookback_periods: 2
+        total_balance:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: "none"
+                window_duration: 15
+                lookback_periods: 2
 
     # midtier:
     #     buyers_new:
