@@ -125,14 +125,18 @@ def calculate_quantile_metrics(analysis_df: pd.DataFrame,
     metrics_df = df.groupby('coin_id', observed=True).agg(
         balance=('usd_balance', 'sum'),
         count=('wallet_address', 'count'),
-        mean_score=('score', 'mean')
+        score_mean=('score', 'mean'),
+        score_median=('score', 'median'),
+        score_stdev=('score', 'std')
     )
 
     # Rename columns with prefix
     metrics_df = metrics_df.rename(columns={
         'balance': f'{prefix}/balance',
         'count': f'{prefix}/count',
-        'mean_score': f'{prefix}/mean_score'
+        'score_mean': f'{prefix}/score_mean',
+        'score_median': f'{prefix}/score_median',
+        'score_stdev': f'{prefix}/score_stdev'
     })
 
     return metrics_df

@@ -29,7 +29,7 @@ features:
 coin_modeling:
 
     # Thresholds for coin inclusion in training data
-    min_cohort_wallets: 5  # how many wallets must hold a coin for the coin to be elegible for forecasting
+    min_cohort_wallets: 20  # how many wallets must hold a coin for the coin to be elegible for forecasting
     min_cohort_balance: 10000  # how much USD all wallets must hold for the coin to be elegible for forecasting
 
     # Target variable parameters
