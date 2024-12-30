@@ -570,8 +570,9 @@ def create_cluster_report(modeling_df: pd.DataFrame,
     cluster_analysis_df = modeling_df[list(set(cluster_cols + base_metrics + comparison_metrics))].copy()
 
     # Assign wallets to categorical clusters based on the distance values
-    cluster_analysis_df = clf.assign_clusters_from_distances(cluster_analysis_df,
+    cluster_assignments_df = clf.assign_clusters_from_distances(cluster_analysis_df,
                                                          wallets_config['features']['clustering_n_clusters'])
+    cluster_analysis_df = cluster_analysis_df.join(cluster_assignments_df,how='inner')
 
     # Generate metrics for clusters
     cluster_profiles = analyze_cluster_metrics(

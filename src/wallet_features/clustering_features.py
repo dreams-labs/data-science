@@ -97,19 +97,24 @@ def assign_clusters_from_distances(modeling_df: pd.DataFrame, cluster_counts: Li
     Returns:
     - modeling_df (DataFrame): Original df with new cluster assignment columns
     """
+    cluster_assignments_df = modeling_df.copy()
+
+    cluster_cols = []
     for k in cluster_counts:
         # Get distance columns for this k value
         distance_cols = [f'cluster|k{k}/distance_to_cluster_{i}' for i in range(k)]
 
         # Assign cluster based on minimum distance
-        modeling_df[f'k{k}_cluster'] = (
+        cluster_assignments_df[f'k{k}_cluster'] = (
             modeling_df[distance_cols]
             .idxmin(axis=1)
             .str[-1]
             .astype(int)
         )
 
-    return modeling_df
+        cluster_cols = cluster_cols + [f'k{k}_cluster']
+
+    return cluster_assignments_df[cluster_cols]
 
 
 
