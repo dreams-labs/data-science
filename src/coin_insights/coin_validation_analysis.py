@@ -719,7 +719,43 @@ def analyze_metric_segments(
         for q1, q2 in zip(quantiles[:-1], quantiles[1:])
     ]
 
+
     results = {}
+
+    # Baseline row (aggregate of all coins)
+    metrics = ['metric_mean', 'return_mean', 'n_coins']
+    segment_size = len(df) // n_quantiles
+
+    for metric in metrics:
+        for segment in segments:
+            if metric == 'metric_mean':
+                value = 0
+            elif metric == 'return_mean':
+                value = df['coin_return'].mean()
+            else: # n_coins
+                value = segment_size
+
+            results[('BASELINE', segment, metric)] = value
+
+    # Perfect ordering row
+    sorted_returns = np.sort(df['coin_return'].values)
+    metrics = ['metric_mean', 'return_mean', 'n_coins']  # Define order for third key
+
+    for metric in metrics:  # Outer loop on metric to group them together
+        for i, segment in enumerate(segments):
+            start_idx = i * len(df) // n_quantiles
+            end_idx = (i + 1) * len(df) // n_quantiles if i < n_quantiles-1 else len(df)
+
+            if metric == 'metric_mean':
+                value = np.nan
+            elif metric == 'return_mean':
+                value = sorted_returns[start_idx:end_idx].mean()
+            else:  # n_coins
+                value = end_idx - start_idx
+
+            results[('PERFECT', segment, metric)] = value
+
+
     for metric in wallet_metrics:
         # Calculate threshold values for this metric
         thresholds = np.quantile(df[metric], quantiles)
@@ -820,47 +856,18 @@ def style_metric_segments(df: pd.DataFrame) -> pd.DataFrame.style:
 
     # Add just before return styled.format(format_dict):
     metric_cols = [col for col in df.columns if 'metric_mean' in col[1]]
-    styled = df.sort_values(by=metric_cols[-1], ascending=True).style.apply(row_style, axis=1)
+
+
+    # Get BASELINE and PERFECT rows
+    special_rows = df.loc[['BASELINE', 'PERFECT']]
+    # Get and sort remaining rows
+    other_rows = df.drop(['BASELINE', 'PERFECT']).sort_values(by=metric_cols[-1], ascending=True)
+    # Concatenate in desired order
+    df_sorted = pd.concat([special_rows, other_rows])
+
+    styled = df_sorted.style.apply(row_style, axis=1)
+
 
 
     return styled.format(format_dict)
 
-
-def calculate_metric_return_correlations(df: pd.DataFrame, n_quantiles: List[float]) -> pd.DataFrame:
-    """
-    Calculate correlations between metric values and their corresponding returns.
-
-    Params:
-    - df (DataFrame): Multi-level column DataFrame from analyze_metric_segments
-    - wallet_metrics (List[str]): List of metrics analyzed
-    - quantiles (List[float]): Quantile thresholds used
-
-    Returns:
-    - DataFrame: Correlation metrics for each wallet metric
-    """
-    # Generate quantile breakpoints
-    quantiles = np.linspace(0, 1, n_quantiles+1)
-
-    segments = [f"q{int(q1*100):02d}_q{int(q2*100):02d}"
-               for q1, q2 in zip(quantiles, quantiles[1:])]
-
-    correlations = {}
-    for metric in df.index:
-        metric_vals = [df.loc[metric, (seg, 'metric_mean')] for seg in segments]
-        return_vals = [df.loc[metric, (seg, 'return_mean')] for seg in segments]
-
-        # Drop any NaN pairs
-        valid_pairs = [(m, r) for m, r in zip(metric_vals, return_vals)
-                      if pd.notna(m) and pd.notna(r)]
-        if valid_pairs:
-            metric_vals, return_vals = zip(*valid_pairs)
-            corr = np.corrcoef(metric_vals, return_vals)[0, 1]
-        else:
-            corr = np.nan
-
-        correlations[metric] = {
-            'correlation': corr,
-            'n_valid_buckets': len(valid_pairs)
-        }
-
-    return pd.DataFrame(correlations).T.sort_values('correlation', ascending=False)

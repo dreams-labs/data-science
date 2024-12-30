@@ -20,7 +20,7 @@ training_data:
 data_cleaning:
 
     # Modeling period filters
-    modeling_min_investment: 0
+    modeling_min_investment: 1000
     modeling_min_coins_traded: 0
 
     # Wallet cohort thresholds
@@ -64,8 +64,8 @@ features:
     timing_metrics_min_transaction_size: 20  # trades below this USD threshold will not be evaluated for market timing peformance or transfers buyer sequencing
 
     # Performance params
-    ranking_ntiles: 5
-    returns_winsorization: 0.01
+    ranking_ntiles: 2
+    returns_winsorization: 0.02
 
 # Variables used for model generation
 modeling:
