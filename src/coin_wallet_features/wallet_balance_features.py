@@ -20,255 +20,83 @@ wallets_config = WalletsConfig()
 wallets_coin_config = yaml.safe_load((config_directory / 'wallets_coin_config.yaml').read_text(encoding='utf-8'))  # pylint:disable=line-too-long
 
 
-def prepare_balance_data(modeling_profits_df: pd.DataFrame,
-                        wallet_scores_df: pd.DataFrame,
-                        balance_date: str) -> pd.DataFrame:
+
+def calculate_segment_wallet_balance_features(
+    profits_df: pd.DataFrame,
+    wallet_segments: pd.Series,
+    balance_date: str,
+    all_coin_ids: List[str]) -> pd.DataFrame:
     """
-    Prepares wallet balance and score data for feature calculation.
+    Calculates coin-level metrics for each wallet segment.
 
     Params:
-    - modeling_profits_df (DataFrame): Profits data with coin_id, wallet_address, date, usd_balance
-    - wallet_scores_df (DataFrame): Wallet scores data indexed by wallet_address with score column
+    - profits_df (DataFrame): Profits data with coin_id, wallet_address, date, usd_balance
+    - wallet_segments (Series): Segment labels indexed by wallet_address
     - balance_date (str): Date for balance analysis
+    - all_coin_ids (List[str]): Complete list of coins to include in output
 
     Returns:
-    - analysis_df (DataFrame): Combined wallet balances and scores for the specified date,
-                             filtered to positive balances
+    - DataFrame: Coin-level features for each segment, including:
+        {segments_name}/{segment_label}|balance/{YYMMDD}/balance: Total USD balance
+        {segments_name}/{segment_label}|balance/{YYMMDD}/count: Number of wallets
+        {segments_name}/{segment_label}|balance/{YYMMDD}/balance_pct: Segment balance / total balance
+        {segments_name}/{segment_label}|balance/{YYMMDD}/count_pct: Segment wallet count / total wallet count
+        Indexed by coin_id
     """
-    # Convert date and filter to balance date
     balance_date = pd.to_datetime(balance_date)
-    modeling_balances_df = modeling_profits_df[
-        modeling_profits_df['date'] == balance_date
-    ].copy()
+    balance_date_str = balance_date.strftime('%y%m%d')
+    balances_df = profits_df[profits_df['date'] == balance_date].copy()
 
-    # Select required columns and filter to positive balances
-    modeling_balances_df = modeling_balances_df[
-        ['coin_id', 'wallet_address', 'usd_balance']
-    ]
-    modeling_balances_df = modeling_balances_df[
-        modeling_balances_df['usd_balance'] > 0
-    ]
+    # Get segments name for prefix, defaulting to 'segment' if unnamed
+    segments_name = getattr(wallet_segments, 'name', 'segment')
 
-    # Merge wallet scores with balance data
-    analysis_df = modeling_balances_df.merge(
-        wallet_scores_df[['score']],
+    analysis_df = balances_df[['coin_id', 'wallet_address', 'usd_balance']].merge(
+        wallet_segments.rename(f'{segments_name}'),
         left_on='wallet_address',
         right_index=True,
         how='left'
     )
 
-    return analysis_df
+    result_df = pd.DataFrame(index=all_coin_ids)
+    result_df.index.name = 'coin_id'
 
-
-
-def safe_weighted_average(scores: np.ndarray, weights: np.ndarray) -> float:
-    """
-    Calculate weighted average, handling zero weights safely.
-
-    Params:
-    - scores (ndarray): Array of score values
-    - weights (ndarray): Array of weights (e.g. balances)
-
-    Returns:
-    - float: Weighted average score, or simple mean if weights sum to 0
-    """
-    if np.sum(weights) == 0:
-        return np.mean(scores) if len(scores) > 0 else 0
-    return np.sum(scores * weights) / np.sum(weights)
-
-
-
-def calculate_weighted_balance_scores(analysis_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Calculate balance-weighted average scores for each coin.
-
-    Params:
-    - analysis_df (DataFrame): Combined balance and score data
-
-    Returns:
-    - weighted_scores_df (DataFrame): Balance-weighted mean scores by coin_id
-    """
-    return analysis_df.groupby('coin_id', observed=True).apply(
-        lambda x: pd.Series({
-            'top_100pct/balance_wtd_mean_score': safe_weighted_average(
-                x['score'].values,
-                x['usd_balance'].values
-            )
-        })
-    )
-
-
-
-def calculate_quantile_metrics(analysis_df: pd.DataFrame,
-                            quantile: float) -> pd.DataFrame:
-    """
-    Calculate metrics for a specific score quantile cohort.
-
-    Params:
-    - analysis_df (DataFrame): Combined balance and score data
-    - quantile (float, optional): Score quantile threshold (0.0-1.0)
-                                If None, calculates for all wallets
-
-    Returns:
-    - metrics_df (DataFrame): Standard metrics with automatically generated prefixes:
-        - {q_prefix}/balance: Total USD balance
-        - {q_prefix}/count: Number of wallets
-        - {q_prefix}/mean_score: Mean wallet score
-        Where q_prefix is either 'all_wallets' or 'top_Xpct' based on quantile
-    """
-    # Determine cohort and prefix
-    threshold = analysis_df['score'].quantile(1 - quantile)
-    df = analysis_df[analysis_df['score'] >= threshold]
-    prefix = f'top_{int(quantile * 100):02d}pct'
-
-    # Calculate metrics
-    metrics_df = df.groupby('coin_id', observed=True).agg(
-        balance=('usd_balance', 'sum'),
-        count=('wallet_address', 'count'),
-        score_mean=('score', 'mean'),
-        score_median=('score', 'median'),
-        score_stdev=('score', 'std')
-    )
-
-    # Rename columns with prefix
-    metrics_df = metrics_df.rename(columns={
-        'balance': f'{prefix}/balance',
-        'count': f'{prefix}/count',
-        'score_mean': f'{prefix}/score_mean',
-        'score_median': f'{prefix}/score_median',
-        'score_stdev': f'{prefix}/score_stdev'
+    totals = analysis_df.groupby('coin_id', observed=True).agg({
+        'usd_balance': 'sum',
+        'wallet_address': 'count'
+    }).rename(columns={
+        'usd_balance': f'{segments_name}/total/balance',
+        'wallet_address': f'{segments_name}/total/count'
     })
 
-    return metrics_df
+    for segment in wallet_segments.unique():
+        segment_metrics = analysis_df[analysis_df[segments_name] == segment].groupby(
+            'coin_id',
+            observed=True
+        ).agg({
+            'usd_balance': 'sum',
+            'wallet_address': 'count'
+        }).rename(columns={
+            'usd_balance': f'{segments_name}/{segment}|balance/{balance_date_str}/balance',
+            'wallet_address': f'{segments_name}/{segment}|balance/{balance_date_str}/count'
+        })
 
+        segment_metrics[f'{segments_name}/{segment}|balance/{balance_date_str}/balance_pct'] = (
+            segment_metrics[f'{segments_name}/{segment}|balance/{balance_date_str}/balance'] /
+            totals[f'{segments_name}/total/balance']
+        ).fillna(0)
 
-def calculate_coin_wallet_balance_features(
-                profits_df: pd.DataFrame,
-                wallet_scores_df: pd.DataFrame,
-                balance_date: str,
-                all_coin_ids: List[str]) -> pd.DataFrame:
-    """
-    Calculates coin-level metrics based on wallet behavior and scores as of a specific date.
+        segment_metrics[f'{segments_name}/{segment}|balance/{balance_date_str}/count_pct'] = (
+            segment_metrics[f'{segments_name}/{segment}|balance/{balance_date_str}/count'] /
+            totals[f'{segments_name}/total/count']
+        ).fillna(0)
 
-    Params:
-    - profits_df (DataFrame): Profits data with coin_id, wallet_address, date, usd_balance columns
-    - wallet_scores_df (DataFrame): Wallet scores data indexed by wallet_address with score column
-    - balance_date (str): The date one which balance distributions should be analyzed
-    - all_coin_ids (List[str]): Complete list of coins to include in output
+        result_df = result_df.join(segment_metrics, how='left')
 
-    Returns:
-    - coin_wallet_balance_features_df (DataFrame): Coin-level features including:
-        - balance_wtd_mean_score: Wallet scores weighted by USD balance
-        - all_cohort_wallets_*: Metrics across all wallets (balance, count, mean score)
-        - top_wallets_*: Metrics for high-scoring wallets only
-        - *_pct: Relative metrics comparing top wallets to all wallets
-        Indexed by coin_id.
+    result_df = result_df.fillna(0)
 
-    Raises:
-    - ValueError: If any coin_ids are missing from final features dataframe
-
-    """
-    # Combine wallet-coin pair period balances and scores
-    analysis_df = prepare_balance_data(profits_df, wallet_scores_df, balance_date)
-
-    # Initialize with complete coin list
-    coin_wallet_features_df = pd.DataFrame(index=all_coin_ids)
-    coin_wallet_features_df.index.name = 'coin_id'
-
-    # Calculate balance weighted average scores
-    weighted_scores_df = calculate_weighted_balance_scores(analysis_df)
-    coin_wallet_features_df = coin_wallet_features_df.join(
-        weighted_scores_df,
-        how='left'
-    )
-
-    # Retrieve quantiles and perform data quality checks
-    quantiles = wallets_coin_config['features']['top_wallets_quantiles']
-
-    if len(quantiles) != len(set(quantiles)):
-        raise ValueError("Quantiles must be unique")
-    if not all(0 < q <= 1 for q in quantiles):
-        raise ValueError("Quantiles must be in range (0, 1]")
-
-    # Add 1.0 and sort in descending order
-    quantiles = sorted(quantiles + [1.0], reverse=True)
-
-    # Calculate metrics for each quantile cohort
-    for quantile in quantiles:
-
-        # Calculate balances and counts
-        metrics_df = calculate_quantile_metrics(analysis_df, quantile)
-        prefix = f'top_{int(quantile * 100):02d}pct'
-
-        # Join to df with all features
-        coin_wallet_features_df = coin_wallet_features_df.join(
-            metrics_df,
-            how='left'
-        )
-
-        # Add relative metrics for quantiles < 1.0
-        if quantile < 1.0:
-            coin_wallet_features_df[f'{prefix}/balance_pct'] = (
-                coin_wallet_features_df[f'{prefix}/balance'] / coin_wallet_features_df['top_100pct/balance']
-            ).fillna(0)
-            coin_wallet_features_df[f'{prefix}/count_pct'] = (
-                coin_wallet_features_df[f'{prefix}/count'] / coin_wallet_features_df['top_100pct/count']
-            ).fillna(0)
-
-            # Define and apply fill values for this quantile's metrics
-            fill_values = {
-                f'{prefix}/balance': 0,
-                f'{prefix}/count': 0,
-                f'{prefix}/balance_pct': 0,
-                f'{prefix}/count_pct': 0,
-            }
-            coin_wallet_features_df = coin_wallet_features_df.fillna(fill_values)
-
-    # Validation
-    missing_coins = set(all_coin_ids) - set(coin_wallet_features_df.index)
+    missing_coins = set(all_coin_ids) - set(result_df.index)
     if missing_coins:
-        raise ValueError(f"Found {len(missing_coins)} coin_ids in all coins list "
-                         "missing from analysis_df")
+        raise ValueError(f"Found {len(missing_coins)} coin_ids missing from analysis")
 
-    return coin_wallet_features_df
-
-
-
-def add_quantile_columns(validation_coin_wallet_features_df: pd.DataFrame, n_quantiles: int) -> pd.DataFrame:
-    """
-    Adds quantile columns for each base metric in the dataframe.
-
-    Params:
-    - validation_coin_wallet_features_df (DataFrame): Input features dataframe
-    - n_quantiles (int): Number of quantiles to split into (e.g. 4 for quartiles)
-
-    Returns:
-    - DataFrame: Original dataframe with added quantile columns
-    """
-    result_df = validation_coin_wallet_features_df.copy()
-    base_cols = [col for col in result_df.columns if col != 'coin_return']
-
-    for col in base_cols:
-        quantile_col = f"{col}/quantile_{n_quantiles}"
-        try:
-            # Convert categorical output to int
-            result_df[quantile_col] = pd.qcut(
-                result_df[col],
-                q=n_quantiles,
-                labels=False,  # Returns 0-based indices
-                duplicates='drop'
-            ) + 1  # Shift to 1-based indices
-        except ValueError:
-            bins = np.linspace(
-                result_df[col].min(),
-                result_df[col].max(),
-                n_quantiles + 1
-            )
-            result_df[quantile_col] = pd.cut(
-                result_df[col],
-                bins=bins,
-                labels=False,
-                include_lowest=True
-            ) + 1
 
     return result_df

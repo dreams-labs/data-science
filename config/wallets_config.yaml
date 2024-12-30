@@ -64,7 +64,7 @@ features:
     timing_metrics_min_transaction_size: 20  # trades below this USD threshold will not be evaluated for market timing peformance or transfers buyer sequencing
 
     # Performance params
-    ranking_ntiles: 2
+    ranking_ntiles: 3
     returns_winsorization: 0.02
 
 # Variables used for model generation
