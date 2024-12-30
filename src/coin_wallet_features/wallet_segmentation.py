@@ -31,28 +31,28 @@ def assign_wallet_quantiles(score_series: pd.Series, quantiles: list[float]) -> 
     Params:
     - score_series (Series): Score values indexed by wallet_address
     - quantiles (list[float]): List of quantile thresholds in ascending order (e.g. [0.4, 0.6, 0.8])
-        Higher values represent better scores
+        Represents percentile breakpoints for binning
 
     Returns:
     - DataFrame: DataFrame with new score quantile column named 'score_{score_name}_quantile'
         indicating which quantile bucket the wallet belongs to (e.g. '0_40pct')
-
-    Raises:
-    - ValueError: If any wallets are missing segments or segment count is incorrect
     """
     # Validate and sort quantiles
     quantiles = sorted(quantiles)
     if not all(0 < q < 1 for q in quantiles):
         raise ValueError("Quantiles must be between 0 and 1")
 
-    # Create bin edges including -inf and 1
-    bin_edges = [-float('inf')] + quantiles + [1]
+    # Calculate score thresholds based on data distribution
+    score_thresholds = score_series.quantile(quantiles)
+
+    # Create bin edges using actual score distribution
+    bin_edges = [-float('inf')] + list(score_thresholds) + [float('inf')]
 
     # Create labels for each bin (e.g. '0_40pct', '40_60pct', etc)
     bin_labels = []
     for i in range(len(bin_edges) - 1):
-        start_pct = int(max(0, bin_edges[i]) * 100)
-        end_pct = int(bin_edges[i + 1] * 100)
+        start_pct = int(quantiles[i-1] * 100) if i > 0 else 0
+        end_pct = int(quantiles[i] * 100) if i < len(quantiles) else 100
         bin_labels.append(f'{start_pct}_{end_pct}pct')
 
     # Create result DataFrame with quantile assignments
@@ -70,7 +70,7 @@ def assign_wallet_quantiles(score_series: pd.Series, quantiles: list[float]) -> 
     if result_df[column_name].isna().any():
         raise ValueError("Some wallets are missing segment assignments")
     if len(unique_segments) != len(quantiles) + 1:
-        raise ValueError(f"Expected {len(quantiles) + 1} segments but found {len(unique_segments)}")
+        raise ValueError(f"Expected {len(quantiles) + 1} segments but found {len(unique_segments)}: {unique_segments}")
 
     return result_df
 

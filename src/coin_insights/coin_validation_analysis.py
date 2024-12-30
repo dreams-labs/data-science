@@ -759,6 +759,10 @@ def analyze_metric_segments(
 
 
     for metric in wallet_metrics:
+        # Don't make metrics for the return column
+        if metric == return_column:
+            continue
+
         # Calculate threshold values for this metric
         thresholds = np.quantile(df[metric], quantiles)
 
