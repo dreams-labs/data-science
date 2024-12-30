@@ -23,18 +23,17 @@ wallets_coin_config = yaml.safe_load((config_directory / 'wallets_coin_config.ya
 
 
 
-def assign_wallet_quantiles(wallet_scores_df: pd.DataFrame, quantiles: list[float]) -> pd.DataFrame:
+def assign_wallet_quantiles(score_series: pd.Series, quantiles: list[float]) -> pd.DataFrame:
     """
     Assigns each wallet to a single quantile bucket based on score.
 
     Params:
-    - wallet_scores_df (DataFrame): Wallet scores data indexed by wallet_address
-        Must contain 'score' column
+    - score_series (Series): Score values indexed by wallet_address
     - quantiles (list[float]): List of quantile thresholds in ascending order (e.g. [0.4, 0.6, 0.8])
         Higher values represent better scores
 
     Returns:
-    - DataFrame: Original wallet_scores_df with new 'score_quantile' column as strings
+    - DataFrame: DataFrame with new score quantile column named 'score_{score_name}_quantile'
         indicating which quantile bucket the wallet belongs to (e.g. '0_40pct')
 
     Raises:
@@ -55,20 +54,21 @@ def assign_wallet_quantiles(wallet_scores_df: pd.DataFrame, quantiles: list[floa
         end_pct = int(bin_edges[i + 1] * 100)
         bin_labels.append(f'{start_pct}_{end_pct}pct')
 
-    # Assign quantile labels using pd.cut with ascending order and convert to string
-    result_df = wallet_scores_df.copy()
-    result_df['score_quantile'] = pd.cut(
-        result_df['score'],
+    # Create result DataFrame with quantile assignments
+    result_df = pd.DataFrame(index=score_series.index)
+    column_name = f'score_{score_series.name}_quantile'
+    result_df[column_name] = pd.cut(
+        score_series,
         bins=bin_edges,
         labels=bin_labels,
         include_lowest=True
     ).astype(str)
 
     # Validate all wallets have segments and segment count is correct
-    unique_segments = result_df['score_quantile'].unique()
-    if result_df['score_quantile'].isna().any():
+    unique_segments = result_df[column_name].unique()
+    if result_df[column_name].isna().any():
         raise ValueError("Some wallets are missing segment assignments")
     if len(unique_segments) != len(quantiles) + 1:
         raise ValueError(f"Expected {len(quantiles) + 1} segments but found {len(unique_segments)}")
 
-    return result_df[['score_quantile']]
+    return result_df
