@@ -3,7 +3,6 @@ from typing import List
 from pathlib import Path
 import yaml
 import pandas as pd
-import numpy as np
 
 # local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
@@ -23,7 +22,8 @@ wallets_coin_config = yaml.safe_load((config_directory / 'wallets_coin_config.ya
 
 def calculate_segment_wallet_balance_features(
     profits_df: pd.DataFrame,
-    wallet_segments: pd.Series,
+    wallet_segmentation_df: pd.DataFrame,
+    segment_column: str,
     balance_date: str,
     all_coin_ids: List[str]) -> pd.DataFrame:
     """
@@ -48,10 +48,11 @@ def calculate_segment_wallet_balance_features(
     balances_df = profits_df[profits_df['date'] == balance_date].copy()
 
     # Get segments name for prefix, defaulting to 'segment' if unnamed
-    segments_name = getattr(wallet_segments, 'name', 'segment')
+    segments_series = wallet_segmentation_df[segment_column]
+    segments_name = segment_column
 
     analysis_df = balances_df[['coin_id', 'wallet_address', 'usd_balance']].merge(
-        wallet_segments.rename(f'{segments_name}'),
+        segments_series.rename(f'{segments_name}'),
         left_on='wallet_address',
         right_index=True,
         how='left'
@@ -68,7 +69,7 @@ def calculate_segment_wallet_balance_features(
         'wallet_address': f'{segments_name}/total/count'
     })
 
-    for segment in wallet_segments.unique():
+    for segment in segments_series.unique():
         segment_metrics = analysis_df[analysis_df[segments_name] == segment].groupby(
             'coin_id',
             observed=True

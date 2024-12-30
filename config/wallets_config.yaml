@@ -20,7 +20,7 @@ training_data:
 data_cleaning:
 
     # Modeling period filters
-    modeling_min_investment: 1000
+    modeling_min_investment: 100
     modeling_min_coins_traded: 0
 
     # Wallet cohort thresholds
