@@ -14,6 +14,7 @@ from sklearn.metrics import (
 from dreams_core import core as dc
 
 # local module imports
+import wallet_features.clustering_features as clf
 from wallet_modeling.wallets_config_manager import WalletsConfig
 
 # Set up logger at the module level
@@ -39,7 +40,9 @@ class RegressionEvaluator:
         _plot_residuals_distribution(ax): Plots histogram of residuals
         _plot_feature_importance(ax): Plots feature importance if available from model
     """
-    def __init__(self, y_train, y_true, y_pred, training_cohort_pred, training_cohort_actuals, model=None, feature_names=None):
+    def __init__(self, y_train, y_true, y_pred,
+                 training_cohort_pred, training_cohort_actuals,
+                 model=None, feature_names=None):
         """
         Initialize the evaluator with actual and predicted values.
 
@@ -380,32 +383,6 @@ class RegressionEvaluator:
 #             Cluster Analysis Tools
 # ---------------------------------------------
 
-def assign_clusters_from_distances(modeling_df: pd.DataFrame, cluster_counts: List[int]) -> pd.DataFrame:
-    """
-    Assign clusters based on minimum distances for each k in cluster_counts.
-
-    Params:
-    - modeling_df (DataFrame): DataFrame with distance features, indexed by wallet_address
-    - cluster_counts (List[int]): List of k values to process [e.g. 2, 4]
-
-    Returns:
-    - modeling_df (DataFrame): Original df with new cluster assignment columns
-    """
-    for k in cluster_counts:
-        # Get distance columns for this k value
-        distance_cols = [f'cluster|k{k}/distance_to_cluster_{i}' for i in range(k)]
-
-        # Assign cluster based on minimum distance
-        modeling_df[f'k{k}_cluster'] = (
-            modeling_df[distance_cols]
-            .idxmin(axis=1)
-            .str[-1]
-            .astype(int)
-        )
-
-    return modeling_df
-
-
 def analyze_cluster_metrics(modeling_df: pd.DataFrame,
                          cluster_counts: List[int],
                          comparison_metrics: List[str],
@@ -593,7 +570,7 @@ def create_cluster_report(modeling_df: pd.DataFrame,
     cluster_analysis_df = modeling_df[list(set(cluster_cols + base_metrics + comparison_metrics))].copy()
 
     # Assign wallets to categorical clusters based on the distance values
-    cluster_analysis_df = assign_clusters_from_distances(cluster_analysis_df,
+    cluster_analysis_df = clf.assign_clusters_from_distances(cluster_analysis_df,
                                                          wallets_config['features']['clustering_n_clusters'])
 
     # Generate metrics for clusters

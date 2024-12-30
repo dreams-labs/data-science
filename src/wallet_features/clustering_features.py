@@ -2,7 +2,7 @@
 Conducts PCA anlysis of wallet facts and outputs wallet-keyed clustering features
 """
 import logging
-from typing import Dict
+from typing import Dict,List
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
@@ -83,6 +83,33 @@ def create_basic_cluster_features(training_data_df, include_pca=False, include_c
             cluster_features_df[f'k{n_clusters}/distance_to_cluster_{i}'] = distances[:, i]
 
     return cluster_features_df
+
+
+
+def assign_clusters_from_distances(modeling_df: pd.DataFrame, cluster_counts: List[int]) -> pd.DataFrame:
+    """
+    Assign categorical cluster labels based on minimum distances for each k in cluster_counts.
+
+    Params:
+    - modeling_df (DataFrame): DataFrame with distance features, indexed by wallet_address
+    - cluster_counts (List[int]): List of k values to process [e.g. 2, 4]
+
+    Returns:
+    - modeling_df (DataFrame): Original df with new cluster assignment columns
+    """
+    for k in cluster_counts:
+        # Get distance columns for this k value
+        distance_cols = [f'cluster|k{k}/distance_to_cluster_{i}' for i in range(k)]
+
+        # Assign cluster based on minimum distance
+        modeling_df[f'k{k}_cluster'] = (
+            modeling_df[distance_cols]
+            .idxmin(axis=1)
+            .str[-1]
+            .astype(int)
+        )
+
+    return modeling_df
 
 
 
