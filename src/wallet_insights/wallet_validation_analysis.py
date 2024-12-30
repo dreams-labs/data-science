@@ -171,6 +171,7 @@ def create_prediction_quantiles(
 
     return quantile_groups
 
+
 def create_quantile_report(
     wallet_metrics: pd.DataFrame,
     model_scores: pd.Series,

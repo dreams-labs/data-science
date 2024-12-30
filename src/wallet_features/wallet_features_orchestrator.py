@@ -156,4 +156,4 @@ def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
     if not set(profits_df['wallet_address']).issubset(transfers_sequencing_df['wallet_address']):
         raise ValueError("profits_df has wallets not in transfers_sequencing_df.")
 
-    logger.info("All input dataframes passed validation checks.")
+    logger.debug("All input dataframes passed validation checks.")
