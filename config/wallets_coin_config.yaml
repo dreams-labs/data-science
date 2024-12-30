@@ -32,7 +32,7 @@ coin_modeling:
     max_market_cap: 50_000_000  # coins above this market cap will not be included in performance assessments
 
     # Target variable parameters
-    target_variable: "coin_return_winsorized"
+    target_variable: "coin_return_pctile"
     returns_winsorization: 0.02
     drop_columns: [
         # # 'balance_wtd_mean_score',

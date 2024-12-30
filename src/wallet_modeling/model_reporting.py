@@ -187,6 +187,7 @@ def generate_and_save_model_artifacts(model_results, base_path):
     # Create wallet scores DataFrame with both cohorts
     wallet_scores_df = pd.DataFrame({
         'score': model_results['training_cohort_pred'],
+        'actual': model_results['training_cohort_actuals'],
         'in_modeling_cohort': model_results['training_cohort_pred'].index.isin(model_results['y_test'].index)
     })
 

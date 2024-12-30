@@ -71,8 +71,8 @@ features:
 modeling:
     # Which wallet performance metric to use as the target variable. Options are:
     # invested, crypto_net_gain, return, risk_adj_return, performance_score, log_weighted_return, hybrid_score, size_adjusted_rank
-    target_variable: "crypto_net_gain/max_investment/ntile_rank"
-    score_name: "net_gain_ntile"  # only used for column names in coin features
+    target_variable: "crypto_net_gain"
+    score_name: "net_gain_raw"  # only used for column names in coin features
     drop_columns: []
 
     # Model specifics
