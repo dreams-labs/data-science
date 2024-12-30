@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 import yaml
 import pandas as pd
+import numpy as np
 
 # local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
@@ -70,5 +71,46 @@ def assign_wallet_quantiles(score_series: pd.Series, quantiles: list[float]) -> 
         raise ValueError("Some wallets are missing segment assignments")
     if len(unique_segments) != len(quantiles) + 1:
         raise ValueError(f"Expected {len(quantiles) + 1} segments but found {len(unique_segments)}")
+
+    return result_df
+
+
+
+def add_quantile_columns(validation_coin_wallet_features_df: pd.DataFrame, n_quantiles: int) -> pd.DataFrame:
+    """
+    Adds quantile columns for each base metric in the dataframe.
+
+    Params:
+    - validation_coin_wallet_features_df (DataFrame): Input features dataframe
+    - n_quantiles (int): Number of quantiles to split into (e.g. 4 for quartiles)
+
+    Returns:
+    - DataFrame: Original dataframe with added quantile columns
+    """
+    result_df = validation_coin_wallet_features_df.copy()
+    base_cols = [col for col in result_df.columns if col != 'coin_return']
+
+    for col in base_cols:
+        quantile_col = f"{col}/quantile_{n_quantiles}"
+        try:
+            # Convert categorical output to int
+            result_df[quantile_col] = pd.qcut(
+                result_df[col],
+                q=n_quantiles,
+                labels=False,  # Returns 0-based indices
+                duplicates='drop'
+            ) + 1  # Shift to 1-based indices
+        except ValueError:
+            bins = np.linspace(
+                result_df[col].min(),
+                result_df[col].max(),
+                n_quantiles + 1
+            )
+            result_df[quantile_col] = pd.cut(
+                result_df[col],
+                bins=bins,
+                labels=False,
+                include_lowest=True
+            ) + 1
 
     return result_df

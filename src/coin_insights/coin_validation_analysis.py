@@ -697,7 +697,8 @@ def create_top_coins_wallet_metrics_report(df: pd.DataFrame,
 def analyze_metric_segments(
     df: pd.DataFrame,
     wallet_metrics: List[str],
-    n_quantiles: int
+    n_quantiles: int,
+    return_column: str
 ) -> pd.DataFrame:
     """
     Analyzes both mean returns and metric values for different quantile buckets.
@@ -706,6 +707,7 @@ def analyze_metric_segments(
     - df (DataFrame): Input data with metrics and returns
     - wallet_metrics (List[str]): Metrics to analyze (higher values = higher scores)
     - n_quantiles (int): Number of quantile buckets (e.g. 4 for quartiles, 10 for deciles)
+    - return_column (str): The name of the column with coin return values
 
     Returns:
     - DataFrame: Multi-level columns with metrics and returns for each segment
@@ -731,14 +733,14 @@ def analyze_metric_segments(
             if metric == 'metric_mean':
                 value = 0
             elif metric == 'return_mean':
-                value = df['coin_return'].mean()
+                value = df[return_column].mean()
             else: # n_coins
                 value = segment_size
 
             results[('BASELINE', segment, metric)] = value
 
     # Perfect ordering row
-    sorted_returns = np.sort(df['coin_return'].values)
+    sorted_returns = np.sort(df[return_column].values)
     metrics = ['metric_mean', 'return_mean', 'n_coins']  # Define order for third key
 
     for metric in metrics:  # Outer loop on metric to group them together
@@ -773,7 +775,7 @@ def analyze_metric_segments(
             segment_data = df[mask]
 
             metric_stats['metric_mean'].append(segment_data[metric].mean())
-            metric_stats['return_mean'].append(segment_data['coin_return'].mean())
+            metric_stats['return_mean'].append(segment_data[return_column].mean())
             metric_stats['n_coins'].append(len(segment_data))
 
         # Create multi-level columns for this metric
