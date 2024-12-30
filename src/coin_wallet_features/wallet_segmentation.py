@@ -34,31 +34,41 @@ def assign_wallet_quantiles(wallet_scores_df: pd.DataFrame, quantiles: list[floa
         Higher values represent better scores
 
     Returns:
-    - DataFrame: Original wallet_scores_df with new 'score_quantile' column
+    - DataFrame: Original wallet_scores_df with new 'score_quantile' column as strings
         indicating which quantile bucket the wallet belongs to (e.g. '0_40pct')
+
+    Raises:
+    - ValueError: If any wallets are missing segments or segment count is incorrect
     """
     # Validate and sort quantiles
     quantiles = sorted(quantiles)
     if not all(0 < q < 1 for q in quantiles):
         raise ValueError("Quantiles must be between 0 and 1")
 
-    # Create bin edges including 0 and 1
-    bin_edges = [0] + quantiles + [1]
+    # Create bin edges including -inf and 1
+    bin_edges = [-float('inf')] + quantiles + [1]
 
     # Create labels for each bin (e.g. '0_40pct', '40_60pct', etc)
     bin_labels = []
     for i in range(len(bin_edges) - 1):
-        start_pct = int(bin_edges[i] * 100)
+        start_pct = int(max(0, bin_edges[i]) * 100)
         end_pct = int(bin_edges[i + 1] * 100)
         bin_labels.append(f'{start_pct}_{end_pct}pct')
 
-    # Assign quantile labels using pd.qcut with ascending order
+    # Assign quantile labels using pd.cut with ascending order and convert to string
     result_df = wallet_scores_df.copy()
     result_df['score_quantile'] = pd.cut(
         result_df['score'],
         bins=bin_edges,
         labels=bin_labels,
         include_lowest=True
-    )
+    ).astype(str)
+
+    # Validate all wallets have segments and segment count is correct
+    unique_segments = result_df['score_quantile'].unique()
+    if result_df['score_quantile'].isna().any():
+        raise ValueError("Some wallets are missing segment assignments")
+    if len(unique_segments) != len(quantiles) + 1:
+        raise ValueError(f"Expected {len(quantiles) + 1} segments but found {len(unique_segments)}")
 
     return result_df[['score_quantile']]
