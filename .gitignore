@@ -4,6 +4,9 @@
 # Config archive
 /config_archive/
 
+# Notebooks archive
+/notebooks/archived/
+
 # temp files
 temp/
 
