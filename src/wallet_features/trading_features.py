@@ -57,7 +57,9 @@ def calculate_wallet_trading_features(
         - activity_density: Transaction days / period duration
         - volume_vs_twb_ratio: Volume relative to time-weighted balance
     """
+    # Copy df and assert period
     profits_df = base_profits_df.copy()
+    u.assert_period(profits_df, period_start_date, period_end_date)
 
     # Calculate additional columns
     profits_df = calculate_crypto_balance_columns(profits_df, period_start_date)
