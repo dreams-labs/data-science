@@ -142,7 +142,7 @@ def load_model_artifacts(model_id, base_path):
 
 
 
-def generate_and_save_model_artifacts(model_results, base_path):
+def generate_and_save_wallet_model_artifacts(model_results, base_path):
     """
     Wrapper function to generate evaluations, metrics, and save all model artifacts.
     Uses RegressionEvaluator for model evaluation.
