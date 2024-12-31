@@ -28,7 +28,8 @@ wallet_features:
 
 # How to segment wallet features
 wallet_segmentation:
-    score_segment_quantiles: [0.05, 0.15, 0.5, 0.85, 0.95]  # higher is better; how to assign wallet a score segment
+    score_segment_quantiles: [0.1, 0.3, 0.5, 0.7, 0.9]  # higher is better; how to assign wallet a score segment
+    # score_segment_quantiles: [0.05, 0.15, 0.5, 0.85, 0.95]  # higher is better; how to assign wallet a score segment
     training_period_n_clusters: 4  # which n clusters assignment from the training period to segment by
 
 # Variables used in the generation of the validation period coin model
@@ -39,8 +40,8 @@ coin_modeling:
     min_cohort_balance: 25000  # how much USD all wallets must hold for the coin to be elegible for forecasting
 
     # Thresholds for coin inclusion in training data
-    min_market_cap: 600_000  # coins below this market cap will not be included in performance assessments
-    max_market_cap: 50_000_000  # coins above this market cap will not be included in performance assessments
+    min_market_cap: 00_000  # coins below this market cap will not be included in performance assessments
+    max_market_cap: 999350_000_000  # coins above this market cap will not be included in performance assessments
 
     # Target variable parameters
     # target_variable: "coin_return_winsorized"
