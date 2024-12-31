@@ -35,7 +35,7 @@ wallet_segmentation:
 coin_modeling:
 
     # Thresholds for coin inclusion in training data
-    min_cohort_wallets: 15  # how many wallets must hold a coin for the coin to be elegible for forecasting
+    min_cohort_wallets: 25  # how many wallets must hold a coin for the coin to be elegible for forecasting
     min_cohort_balance: 25000  # how much USD all wallets must hold for the coin to be elegible for forecasting
 
     # Thresholds for coin inclusion in training data
@@ -43,6 +43,7 @@ coin_modeling:
     max_market_cap: 50_000_000  # coins above this market cap will not be included in performance assessments
 
     # Target variable parameters
+    # target_variable: "coin_return_winsorized"
     target_variable: "coin_return_pctile"
     returns_winsorization: 0.02
     drop_columns: [

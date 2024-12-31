@@ -57,7 +57,7 @@ def assign_wallet_quantiles(score_series: pd.Series, quantiles: list[float]) -> 
 
     # Create result DataFrame with quantile assignments
     result_df = pd.DataFrame(index=score_series.index)
-    column_name = f'score_quantile|{score_series.name.split("|")[1]}/{score_series.name.split("|")[0]}'
+    column_name = f'score_quantile|{score_series.name.split("|")[1]}'
     result_df[column_name] = pd.cut(
         score_series,
         bins=bin_edges,
@@ -93,12 +93,12 @@ def quantize_all_wallet_scores(wallet_segmentation_df, wallet_scores, score_segm
     for score_name in wallet_scores:
 
         # Append score quantiles
-        wallet_quantiles = assign_wallet_quantiles(wallet_segmentation_df[f'score|{score_name}'],
+        wallet_quantiles = assign_wallet_quantiles(wallet_segmentation_df[f'scores|{score_name}/score'],
                                                    score_segment_quantiles)
         wallet_segmentation_df = wallet_segmentation_df.join(wallet_quantiles,how='inner')
 
         # Append residual quantiles
-        wallet_quantiles = assign_wallet_quantiles(wallet_segmentation_df[f'residual|{score_name}'],
+        wallet_quantiles = assign_wallet_quantiles(wallet_segmentation_df[f'scores|{score_name}/residual'],
                                                    score_segment_quantiles)
         wallet_segmentation_df = wallet_segmentation_df.join(wallet_quantiles,how='inner')
 
