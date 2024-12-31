@@ -183,7 +183,7 @@ class RegressionEvaluator:
         plt.rcParams['axes.titlecolor'] = '#afc6ba'
 
         self.custom_cmap = mcolors.LinearSegmentedColormap.from_list(
-            'custom_blues', ['#1b2530', '#145a8d', '#69c4ff']
+            'custom_blues', ['#1b2530', '#145a8d', '#ddeeff']
         )
 
 
@@ -299,40 +299,169 @@ class RegressionEvaluator:
         return importance_summary_df
 
 
+    def _plot_actual_vs_predicted(self, ax):
+        """Plot actual vs predicted values using hexbin."""
+        extent = [
+            min(self.y_test.min(), self.y_pred.min()),
+            max(self.y_test.max(), self.y_pred.max()),
+            min(self.y_test.min(), self.y_pred.min()),
+            max(self.y_test.max(), self.y_pred.max())
+        ]
 
+        ax.hexbin(self.y_test, self.y_pred,
+                gridsize=50,
+                cmap=self.custom_cmap,
+                mincnt=1,
+                bins=10**np.linspace(-1, 2, 20),
+                extent=extent)
 
-    def plot_evaluation(self, plot_type='all', display=True):
-        """Generate evaluation plots with updated layout."""
-        # Dark mode styling
-        plt.rcParams['figure.facecolor'] = '#181818'
-        plt.rcParams['axes.facecolor'] = '#181818'
-        plt.rcParams['text.color'] = '#afc6ba'
-        plt.rcParams['axes.labelcolor'] = '#afc6ba'
-        plt.rcParams['xtick.color'] = '#afc6ba'
-        plt.rcParams['ytick.color'] = '#afc6ba'
-        plt.rcParams['axes.titlecolor'] = '#afc6ba'
+        ax.plot([self.y_test.min(), self.y_test.max()],
+                [self.y_test.min(), self.y_test.max()],
+                'r--', lw=2)
 
-        # Custom colormap
-        self.custom_cmap = mcolors.LinearSegmentedColormap.from_list(
-            'custom_blues', ['#1b2530', '#145a8d', '#b3e5ff']
-        )
+        ax.set_xlabel('Actual Values')
+        ax.set_ylabel('Predicted Values')
+        ax.set_title('Actual vs Predicted Values')
+
+    def _plot_residuals(self, ax):
+        """Plot residuals vs predicted values using hexbin."""
+        ax.hexbin(self.y_pred, self.residuals,
+                gridsize=50,
+                cmap=self.custom_cmap,
+                mincnt=1,
+                bins=10**np.linspace(.5, 6, 50))
+
+        ax.axhline(y=0, color='r', linestyle='--')
+        ax.set_xlabel('Predicted Values')
+        ax.set_ylabel('Residuals')
+        ax.set_title('Residuals vs Predicted Values')
+
+    def _plot_feature_importance(self, ax):
+        """Plot feature importance with inset legend."""
+        if 'importances' in self.metrics:
+            df = pd.DataFrame(self.metrics['importances']).head(20)
+            df['prefix'] = df['feature'].str.split('|').str[0]
+
+            unique_prefixes = df['prefix'].unique()
+            palette = dict(zip(unique_prefixes,
+                             sns.color_palette("husl", len(unique_prefixes))))
+
+            sns.barplot(
+                data=df,
+                x='importance',
+                y='feature',
+                ax=ax,
+                hue='prefix',
+                palette=palette
+            )
+
+            ax.legend(title='Feature Type', loc='lower right',
+                    bbox_to_anchor=(0.98, 0.02))
+
+            ax.set_xlabel('Importance')
+            ax.set_ylabel('Feature')
+            ax.set_title('Top 20 Feature Importances')
+        else:
+            ax.text(0.5, 0.5, 'Feature Importance Not Available',
+                    ha='center', va='center')
+
+    def _plot_score_distribution(self, ax):
+        """Basic distribution plot of actual vs predicted values."""
+        sns.kdeplot(data=self.y_test, ax=ax, label='Actual', color='#69c4ff')
+        sns.kdeplot(data=self.y_pred, ax=ax, label='Predicted', color='#ff6969')
+
+        ax.axvline(np.mean(self.y_test), color='#69c4ff', linestyle='--', alpha=0.5)
+        ax.axvline(np.mean(self.y_pred), color='#ff6969', linestyle='--', alpha=0.5)
+
+        ax.set_title('Score Distribution')
+        ax.set_xlabel('Values')
+        ax.set_ylabel('Density')
+        ax.legend()
+
+    def _plot_cohort_comparison(self, ax):
+        """Enhanced distribution plot comparing training and modeling cohorts."""
+        if not hasattr(self, 'training_cohort_pred'):
+            raise ValueError("Cohort comparison requires training cohort data")
+
+        sns.kdeplot(data=self.y_pred, ax=ax,
+                   label='Modeling Cohort (pred)', color='#69c4ff')
+        sns.kdeplot(data=self.training_cohort_pred, ax=ax,
+                   label='Training Cohort (pred)', color='#ff6969')
+        sns.kdeplot(data=self.training_cohort_actuals, ax=ax,
+                   label='Actual Values', color='#69ff69')
+
+        # Add mean lines
+        ax.axvline(np.mean(self.y_pred), color='#69c4ff', linestyle='--', alpha=0.5)
+        ax.axvline(np.mean(self.training_cohort_pred),
+                  color='#ff6969', linestyle='--', alpha=0.5)
+        ax.axvline(np.mean(self.training_cohort_actuals),
+                  color='#69ff69', linestyle='--', alpha=0.5)
+
+        # Add quartile markers
+        for q in [25, 75]:
+            ax.axvline(np.percentile(self.y_pred, q),
+                      color='#69c4ff', linestyle=':', alpha=0.3)
+            ax.axvline(np.percentile(self.training_cohort_pred, q),
+                      color='#ff6969', linestyle=':', alpha=0.3)
+            ax.axvline(np.percentile(self.training_cohort_actuals, q),
+                      color='#69ff69', linestyle=':', alpha=0.3)
+
+        ax.set_title('Score Distribution by Cohort')
+        ax.set_xlabel('Values')
+        ax.set_ylabel('Density')
+        ax.legend()
+
+    def plot_coin_evaluation(self, plot_type='all', display=True):
+        """Generate evaluation plots for coin models."""
+        if plot_type == 'all':
+            fig = plt.figure(figsize=(15, 12))
+            gs = plt.GridSpec(2, 2, height_ratios=[1, 1], width_ratios=[1, 1])
+
+            ax1 = fig.add_subplot(gs[0, 0])  # Actual vs Predicted
+            ax2 = fig.add_subplot(gs[0, 1])  # Residuals
+            ax3 = fig.add_subplot(gs[1, 0])  # Score Distribution
+            ax4 = fig.add_subplot(gs[1, 1])  # Feature Importance
+
+            self._plot_actual_vs_predicted(ax1)
+            self._plot_residuals(ax2)
+            self._plot_score_distribution(ax3)
+            self._plot_feature_importance(ax4)
+        else:
+            fig, ax = plt.subplots(figsize=(8, 6))
+            if plot_type == 'actual_vs_predicted':
+                self._plot_actual_vs_predicted(ax)
+            elif plot_type == 'residuals':
+                self._plot_residuals(ax)
+            elif plot_type == 'score_distribution':
+                self._plot_score_distribution(ax)
+            elif plot_type == 'feature_importance':
+                self._plot_feature_importance(ax)
+
+        plt.tight_layout()
+        if display:
+            plt.show()
+            return None
+        return fig
+
+    def plot_wallet_evaluation(self, plot_type='all', display=True):
+        """Generate evaluation plots for wallet models with cohort analysis."""
+        if not hasattr(self, 'training_cohort_pred'):
+            raise ValueError("Wallet evaluation requires training cohort data")
 
         if plot_type == 'all':
             fig = plt.figure(figsize=(15, 12))
             gs = plt.GridSpec(2, 2, height_ratios=[1, 1], width_ratios=[1, 1])
 
-            # Create subplots
             ax1 = fig.add_subplot(gs[0, 0])  # Actual vs Predicted
-            ax2 = fig.add_subplot(gs[0, 1])  # Residuals vs Predicted
+            ax2 = fig.add_subplot(gs[0, 1])  # Residuals
             ax3 = fig.add_subplot(gs[1, 0])  # Cohort Comparison
             ax4 = fig.add_subplot(gs[1, 1])  # Feature Importance
 
             self._plot_actual_vs_predicted(ax1)
             self._plot_residuals(ax2)
-            self._plot_cohort_comparison(ax3)  # New cohort comparison plot
+            self._plot_cohort_comparison(ax3)
             self._plot_feature_importance(ax4)
         else:
-            # Individual plot handling remains the same
             fig, ax = plt.subplots(figsize=(8, 6))
             if plot_type == 'actual_vs_predicted':
                 self._plot_actual_vs_predicted(ax)
@@ -344,112 +473,7 @@ class RegressionEvaluator:
                 self._plot_feature_importance(ax)
 
         plt.tight_layout()
-
         if display:
             plt.show()
             return None
         return fig
-
-
-    def _plot_actual_vs_predicted(self, ax):
-        """Plot actual vs predicted values using hexbin without colorbar."""
-        # Set the same range for both axes to ensure hexagons are not stretched
-        extent = [
-            min(self.y_test.min(), self.y_pred.min()),
-            max(self.y_test.max(), self.y_pred.max()),
-            min(self.y_test.min(), self.y_pred.min()),
-            max(self.y_test.max(), self.y_pred.max())
-        ]
-
-        # Create hexbin plot with defined extent
-        ax.hexbin(self.y_test, self.y_pred,
-                gridsize=50,
-                cmap=self.custom_cmap,
-                mincnt=1,
-                bins=10**np.linspace(-1, 2, 20),
-                extent=extent)
-
-        # Add diagonal reference line
-        ax.plot([self.y_test.min(), self.y_test.max()],
-                [self.y_test.min(), self.y_test.max()],
-                'r--', lw=2)
-
-        ax.set_xlim(extent[:2])  # Set x-axis limits
-        ax.set_ylim(extent[2:])  # Set y-axis limits
-
-        ax.set_xlabel('Actual Values')
-        ax.set_ylabel('Predicted Values')
-        ax.set_title('Actual vs Predicted Values')
-
-
-    def _plot_residuals(self, ax):
-        """Plot residuals vs predicted values using hexbin without colorbar."""
-        # Create hexbin plot
-        ax.hexbin(self.y_pred, self.residuals,
-                gridsize=50,
-                cmap=self.custom_cmap,
-                mincnt=1,
-                bins='log')
-
-        # Add horizontal reference line at y=0
-        ax.axhline(y=0, color='r', linestyle='--')
-
-        ax.set_xlabel('Predicted Values')
-        ax.set_ylabel('Residuals')
-        ax.set_title('Residuals vs Predicted Values')
-
-
-    def _plot_cohort_comparison(self, ax):
-        """Plot density comparison of both cohorts' predictions and training cohort actuals."""
-        # Create KDE plots for distributions
-        sns.kdeplot(data=self.y_pred, ax=ax, label='Modeling Cohort (pred)', color='#69c4ff')
-        sns.kdeplot(data=self.training_cohort_pred, ax=ax, label='Training Cohort (pred)', color='#ff6969')
-        sns.kdeplot(data=self.training_cohort_actuals, ax=ax, label='Actual Values', color='#69ff69')
-
-        # Add mean lines
-        ax.axvline(np.mean(self.y_pred), color='#69c4ff', linestyle='--', alpha=0.5)
-        ax.axvline(np.mean(self.training_cohort_pred), color='#ff6969', linestyle='--', alpha=0.5)
-        ax.axvline(np.mean(self.training_cohort_actuals), color='#69ff69', linestyle='--', alpha=0.5)
-
-        # Add quartile markers
-        for q in [25, 75]:
-            ax.axvline(np.percentile(self.y_pred, q), color='#69c4ff', linestyle=':', alpha=0.3)
-            ax.axvline(np.percentile(self.training_cohort_pred, q), color='#ff6969', linestyle=':', alpha=0.3)
-            ax.axvline(np.percentile(self.training_cohort_actuals, q), color='#69ff69', linestyle=':', alpha=0.3)
-
-        ax.set_title('Score Distribution by Cohort')
-        ax.set_xlabel('Values')
-        ax.set_ylabel('Density')
-        ax.legend()
-
-
-
-    def _plot_feature_importance(self, ax):
-        """Plot feature importance with inset legend."""
-        if 'importances' in self.metrics:
-            # Create DataFrame with feature prefixes
-            df = pd.DataFrame(self.metrics['importances']).head(20)
-            df['prefix'] = df['feature'].str.split('|').str[0]
-
-            # Create color palette for prefixes
-            unique_prefixes = df['prefix'].unique()
-            palette = dict(zip(unique_prefixes, sns.color_palette("husl", len(unique_prefixes))))
-
-            # Plot using hue
-            sns.barplot(
-                data=df,
-                x='importance',
-                y='feature',
-                ax=ax,
-                hue='prefix',
-                palette=palette
-            )
-
-            # Move legend inside plot
-            ax.legend(title='Feature Type', loc='lower right', bbox_to_anchor=(0.98, 0.02))
-
-            ax.set_xlabel('Importance')
-            ax.set_ylabel('Feature')
-            ax.set_title('Top 20 Feature Importances')
-        else:
-            ax.text(0.5, 0.5, 'Feature Importance Not Available', ha='center', va='center')
