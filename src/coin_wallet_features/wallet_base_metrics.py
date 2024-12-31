@@ -1,14 +1,12 @@
 import logging
 from typing import Tuple,List
-from pathlib import Path
 import pandas as pd
+import wallet_features.trading_features as wtf
+import utils as u
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
 
-# Locate the config directory
-current_dir = Path(__file__).parent
-config_directory = current_dir / '..' / '..' / 'config'
 
 
 def calculate_coin_wallet_balances(
@@ -41,3 +39,40 @@ def calculate_coin_wallet_balances(
     )
 
     return balances_df
+
+
+
+def calculate_coin_wallet_trading_metrics(profits_df, start_date, end_date):
+    """
+    Creates a coin-wallet multiindexed df with trading metrics for each pair.
+
+    Params:
+    - profits_df (df): df with period boundaries set to start and end dates
+    - start_date, end_date (str): YYYY-MM-DD dates
+
+    Returns:
+    - cw_trading_metrics_df (df): df multiindexed on coin_id,wallet_address with trading metrics
+    """
+    # Assert period and copy
+    u.assert_period(profits_df, start_date, end_date)
+    rekeyed_profits_df = profits_df.copy()
+
+    # Create profits_df keyed on hybrid coin_id|wallet_address
+    rekeyed_profits_df['wallet_address'] = (rekeyed_profits_df['coin_id'].astype(str) + '|'
+                                            + rekeyed_profits_df['wallet_address'].astype(str))
+
+
+    # Calculate trading features on the hybrid index level
+    cw_trading_metrics_df = wtf.calculate_wallet_trading_features(rekeyed_profits_df,start_date,end_date)
+
+    # Split the hybrid index back into wallet_address and coin_id
+    wallet_coin = cw_trading_metrics_df.index.str.split('|', expand=True)
+    cw_trading_metrics_df.index = pd.MultiIndex.from_tuples(wallet_coin, names=['coin_id', 'wallet_address'])
+
+    # Reconvert the wallet_address back to int
+    cw_trading_metrics_df.index = pd.MultiIndex.from_tuples(
+        [(c, int(w)) for c, w in cw_trading_metrics_df.index],
+        names=['coin_id', 'wallet_address']
+    )
+
+    return cw_trading_metrics_df
