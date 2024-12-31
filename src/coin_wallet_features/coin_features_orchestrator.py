@@ -20,27 +20,39 @@ wallets_metrics_config = u.load_config('../config/wallets_metrics_config.yaml')
 wallets_features_config = yaml.safe_load(Path('../config/wallets_features_config.yaml').read_text(encoding='utf-8'))
 
 
-def load_merge_feature_scores(feature_scores: list, base_path: str) -> pd.DataFrame:
+
+def load_wallet_scores(wallet_scores: list, wallet_scores_path: str) -> pd.DataFrame:
     """
     Params:
-    - feature_scores (list): List of feature score types to load
-    - base_path (str): Base path to parquet files directory
+    - wallet_scores (list): List of score names to merge
+    - wallet_scores_path (str): Base path for score parquet files
 
     Returns:
-    - merged_df (DataFrame): Combined features dataframe with de-duplicated columns
+    - wallet_scores_df (DataFrame):
+        wallet_address (index): contains all wallet addresses included in any score
+        score|{score_name} (float): the predicted score
+        residual|{score_name} (float): the residual of the score
     """
-    # Load first df to get index structure
-    merged_df = pd.read_parquet(f"{base_path}/{feature_scores[0]}.parquet")
-    base_cols = set(merged_df.columns)
+    wallet_scores_df = pd.DataFrame()
 
-    # Merge remaining dfs with suffix handling for overlaps
-    for score in feature_scores[1:]:
-        curr_df = pd.read_parquet(f"{base_path}/{score}.parquet")
-        overlap_cols = list(set(curr_df.columns) & base_cols)
+    for score_name in wallet_scores:
+        score_df = pd.read_parquet(f"{wallet_scores_path}/{score_name}.parquet")
 
-        # Only add suffix if there are overlapping columns
-        suffix = (None, f'_{score}') if overlap_cols else (None, None)
-        merged_df = merged_df.merge(curr_df, left_index=True, right_index=True,
-                                  suffixes=suffix)
+        # Add residuals column
+        score_df[f'residual|{score_name}'] = (
+            score_df[f'score|{score_name}'] - score_df[f'actual|{score_name}']
+        )
 
-    return merged_df
+        # Select only needed columns
+        score_subset = score_df[[
+            f'score|{score_name}',
+            f'residual|{score_name}'
+        ]]
+
+        # Full outer join with existing results
+        wallet_scores_df = (
+            score_subset if wallet_scores_df.empty
+            else wallet_scores_df.join(score_subset, how='outer')
+        )
+
+    return wallet_scores_df
