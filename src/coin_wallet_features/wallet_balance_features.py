@@ -45,19 +45,19 @@ def calculate_segment_metrics(
         metric_column: 'sum',
         'wallet_address': 'count'
     }).rename(columns={
-        metric_column: f'{segment_family}/{segment_value}|{metric_column}|sum',
-        'wallet_address': f'{segment_family}/{segment_value}|{metric_column}|count'
+        metric_column: f'{segment_family}/{segment_value}|{metric_column}|aggregations/sum',
+        'wallet_address': f'{segment_family}/{segment_value}|{metric_column}|aggregations/count'
     })
 
     # Calculate percentages using the passed metric column name
-    metrics[f'{segment_family}/{segment_value}|{metric_column}|sum_pct'] = (
-        metrics[f'{segment_family}/{segment_value}|{metric_column}|sum'] /
-        totals_df[f'{segment_family}/total|{metric_column}|sum']
+    metrics[f'{segment_family}/{segment_value}|{metric_column}|aggregations/sum_pct'] = (
+        metrics[f'{segment_family}/{segment_value}|{metric_column}|aggregations/sum'] /
+        totals_df[f'{segment_family}/total|{metric_column}|aggregations/sum']
     ).fillna(0)
 
-    metrics[f'{segment_family}/{segment_value}|count_pct'] = (
-        metrics[f'{segment_family}/{segment_value}|{metric_column}|count'] /
-        totals_df[f'{segment_family}/total|{metric_column}|count']
+    metrics[f'{segment_family}/{segment_value}|{metric_column}|aggregations/count_pct'] = (
+        metrics[f'{segment_family}/{segment_value}|{metric_column}|aggregations/count'] /
+        totals_df[f'{segment_family}/total|{metric_column}|aggregations/count']
     ).fillna(0)
 
     return metrics
@@ -104,7 +104,7 @@ def calculate_score_weighted_metrics(
     return weighted_scores
 
 
-def generate_segmented_features(
+def generate_segment_features(
     wallet_metric_df: pd.DataFrame,
     metric_column: str,
     wallet_segmentation_df: pd.DataFrame,
@@ -146,8 +146,8 @@ def generate_segmented_features(
         f'{metric_column}': 'sum',
         'wallet_address': 'count'
     }).rename(columns={
-        f'{metric_column}': f'{segment_family}/total|{metric_column}|sum',
-        'wallet_address': f'{segment_family}/total|{metric_column}|count'
+        f'{metric_column}': f'{segment_family}/total|{metric_column}|aggregations/sum',
+        'wallet_address': f'{segment_family}/total|{metric_column}|aggregations/count'
     })
 
     # Process each segment value

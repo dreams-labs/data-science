@@ -22,7 +22,8 @@ def calculate_coin_wallet_balances(
     - balance_date (str): Date for metric calculation
 
     Returns:
-    - DataFrame: Wallet-coin level data with metric value for specified date
+    - balances_df (DataFrame): Wallet-coin level data with metric value for specified date
+    - col_name (str): the name of the balance column
     """
     balance_date = pd.to_datetime(balance_date)
     balance_date_str = balance_date.strftime('%y%m%d')
@@ -33,8 +34,9 @@ def calculate_coin_wallet_balances(
     ].copy()
 
     # Rename the metric column to include the date
+    col_name = f'usd_balance/{balance_date_str}'
     balances_df = balances_df.rename(
-        columns={'usd_balance': f'usd_balance/{balance_date_str}'}
+        columns={'usd_balance': col_name}
     )
 
-    return balances_df
+    return balances_df,col_name
