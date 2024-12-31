@@ -33,7 +33,7 @@ def calculate_coin_wallet_balances(
     ].copy().set_index(['coin_id','wallet_address'])
 
     # Rename the metric column to include the date
-    col_name = f'usd_balance/{balance_date_str}'
+    col_name = f'usd_balance_{balance_date_str}'
     balances_df = balances_df.rename(
         columns={'usd_balance': col_name}
     )
