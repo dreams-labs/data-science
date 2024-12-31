@@ -11,7 +11,7 @@ import numpy as np
 import yaml
 import utils as u
 from dreams_core.googlecloud import GoogleCloud as dgc
-import wallet_insights.wallet_model_evaluation as wime
+import wallet_insights.model_evaluation as wime
 from wallet_modeling.wallets_config_manager import WalletsConfig
 
 

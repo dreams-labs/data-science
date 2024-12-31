@@ -10,7 +10,7 @@ from dreams_core import core as dc
 # Local module imports
 import wallet_features.performance_features as wpf
 import wallet_features.trading_features as wtf
-import wallet_insights.wallet_model_evaluation as wime
+import wallet_insights.model_evaluation as wime
 from wallet_modeling.wallets_config_manager import WalletsConfig
 
 # pylint: disable=unused-variable  # messy stats functions in visualizations

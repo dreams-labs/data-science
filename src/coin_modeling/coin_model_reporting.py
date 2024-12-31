@@ -7,7 +7,7 @@ from pathlib import Path
 import logging
 import pandas as pd
 from dreams_core.googlecloud import GoogleCloud as dgc
-import wallet_insights.wallet_model_evaluation as wime
+import wallet_insights.model_evaluation as wime
 from wallet_modeling.wallet_model_reporting import wmr
 
 

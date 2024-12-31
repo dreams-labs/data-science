@@ -152,7 +152,6 @@ def calculate_score_weighted_metrics(
     return weighted_scores
 
 
-@u.timing_decorator
 def flatten_cw_to_coin_features(
     wallet_metric_df: pd.DataFrame,
     metric_column: str,
