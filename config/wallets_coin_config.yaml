@@ -39,6 +39,11 @@ coin_modeling:
     min_cohort_wallets: 25  # how many wallets must hold a coin for the coin to be elegible for forecasting
     min_cohort_balance: 25000  # how much USD all wallets must hold for the coin to be elegible for forecasting
 
+    # Params used to remove unnecessary features
+    feature_selection:
+        variance_threshold: 0.01
+        correlation_threshold: 0.95
+
     # Thresholds for coin inclusion in training data
     min_market_cap: 00_000  # coins below this market cap will not be included in performance assessments
     max_market_cap: 999350_000_000  # coins above this market cap will not be included in performance assessments
