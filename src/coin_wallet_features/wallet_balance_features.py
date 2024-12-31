@@ -65,7 +65,7 @@ def calculate_segment_metrics(
 
 
 
-def calculate_score_metrics(
+def calculate_score_weighted_metrics(
     analysis_df: pd.DataFrame,
     segment_name: str,
     segment_value: str,
@@ -102,7 +102,7 @@ def calculate_score_metrics(
     renamed_cols = {}
     for col in score_columns:
         score_name = col.split('|')[1]
-        renamed_cols[col] = f'{segment_name}/{segment_value}/balance/{balance_date_str}|score_wtd_balance/{score_name}'
+        renamed_cols[col] = f'{segment_name}/{segment_value}|balance/{balance_date_str}|score_wtd_balance/{score_name}'
     weighted_scores.rename(columns=renamed_cols, inplace=True)
 
     return weighted_scores
@@ -167,7 +167,7 @@ def calculate_segment_wallet_balance_features(
         )
 
         # Get score metrics
-        score_metrics = calculate_score_metrics(
+        score_metrics = calculate_score_weighted_metrics(
             analysis_df, segment_column, segment,
             balance_date_str, score_columns
         )
