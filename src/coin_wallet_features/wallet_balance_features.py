@@ -146,7 +146,7 @@ def calculate_segment_wallet_balance_features(
     balances_df = profits_df[profits_df['date'] == balance_date].copy()
 
     # Get score columns
-    score_columns = [col for col in wallet_segmentation_df.columns if col.startswith('score|')]
+    score_columns = [col for col in wallet_segmentation_df.columns if col.startswith('scores|')]
 
     # Prepare analysis DataFrame
     analysis_df = balances_df[['coin_id', 'wallet_address', 'usd_balance']].merge(
