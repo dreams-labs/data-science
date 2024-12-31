@@ -38,15 +38,16 @@ def load_wallet_scores(wallet_scores: list, wallet_scores_path: str) -> pd.DataF
     for score_name in wallet_scores:
         score_df = pd.read_parquet(f"{wallet_scores_path}/{score_name}.parquet")
 
-        # Add residuals column
-        score_df[f'residual|{score_name}'] = (
+        # Add residuals column and renamed scores column
+        score_df[f'scores|{score_name}/residual'] = (
             score_df[f'score|{score_name}'] - score_df[f'actual|{score_name}']
         )
+        score_df[f'scores|{score_name}/score'] = score_df[f'score|{score_name}']
 
         # Select only needed columns
         score_subset = score_df[[
-            f'score|{score_name}',
-            f'residual|{score_name}'
+            f'scores|{score_name}/score',
+            f'scores|{score_name}/residual'
         ]]
 
         # Full outer join with existing results
