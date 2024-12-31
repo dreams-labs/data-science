@@ -14,25 +14,38 @@ coin_validation_analysis:
     top_n: 5  # how many of the top coins of a given sort method will be included in performance assessments
     sort_method: "top_wallet_balance_pct"  # which coin wallet metric to use for coin forecast rankings
 
+# Which wallet features to load
+wallet_features:
 
-# Features used in the coin model
+    # Metadata for which scores to load
+    wallet_scores_path: "temp/wallet_modeling_score_dfs"
+    wallet_scores: [
+        'net_gain_ntile',
+        'net_gain_winsor',
+        'net_gain_raw'
+    ]
+
+
+# How to segment wallet features
 wallet_segmentation:
-    score_segment_quantiles: [0.05, 0.15, 0.5, 0.85, 0.95]  # higher is better; how to assign wallet a score segment
+    score_segment_quantiles: [0.1, 0.3, 0.5, 0.7, 0.9]  # higher is better; how to assign wallet a score segment
+    # score_segment_quantiles: [0.05, 0.15, 0.5, 0.85, 0.95]  # higher is better; how to assign wallet a score segment
     training_period_n_clusters: 4  # which n clusters assignment from the training period to segment by
 
 # Variables used in the generation of the validation period coin model
 coin_modeling:
 
     # Thresholds for coin inclusion in training data
-    min_cohort_wallets: 15  # how many wallets must hold a coin for the coin to be elegible for forecasting
+    min_cohort_wallets: 25  # how many wallets must hold a coin for the coin to be elegible for forecasting
     min_cohort_balance: 25000  # how much USD all wallets must hold for the coin to be elegible for forecasting
 
     # Thresholds for coin inclusion in training data
-    min_market_cap: 600_000  # coins below this market cap will not be included in performance assessments
-    max_market_cap: 50_000_000  # coins above this market cap will not be included in performance assessments
+    min_market_cap: 00_000  # coins below this market cap will not be included in performance assessments
+    max_market_cap: 999350_000_000  # coins above this market cap will not be included in performance assessments
 
     # Target variable parameters
-    target_variable: "coin_return_winsorized"
+    # target_variable: "coin_return_winsorized"
+    target_variable: "coin_return_pctile"
     returns_winsorization: 0.02
     drop_columns: [
         # # 'balance_wtd_mean_score',

@@ -188,3 +188,68 @@ class CoinRegressionEvaluator:
         else:
             ax.text(0.5, 0.5, 'Feature Importance Not Available',
                     ha='center', va='center')
+
+
+    def importance_summary(self, levels=0):
+        """
+        Generate and return a df showing total importance by feature category and the best performing
+        feature in each category.
+
+        Returns:
+        - importance_summary_df (df): formatted df showing importance metrics for each feature category
+        """
+
+        feature_importance_df = pd.DataFrame(self.metrics['importances'])
+
+        # 1. Define feature types based on level param
+        # --------------------------------------------
+        # Split feature names
+        level_0_split = feature_importance_df['feature'].str.split('|', expand=True)
+        level_1_split = level_0_split[1].str.split('/', expand=True)
+
+        # Level 0: High level category only, e.g. score_quantile
+        if levels == 0:
+            feature_importance_df['prefix'] = level_0_split[0]
+
+        # Level 1: Category subset, e.g. score_quantile|score_name
+        elif levels == 1:
+            feature_importance_df['prefix'] = level_0_split[0] + '|' + level_1_split[0]
+
+        # Level 2: Subset component, e.g. score_quantile|score_name/residual
+        elif levels == 2:
+            feature_importance_df['prefix'] = level_0_split[0] + '|' + level_1_split[0] + '/' + level_1_split[1]
+
+
+
+        # 2. Compute total importance for each feature type
+        # -------------------------------------------------
+        # Calculate total_importance by summing importance for each prefix
+        importance_summary_df = feature_importance_df.groupby('prefix').agg(
+            total_importance=('importance', 'sum'),
+        )
+
+        # Take the highest importance feature from each prefix
+        highest_importances_df = (feature_importance_df
+                                .sort_values(by='importance', ascending=False)
+                                .groupby('prefix')
+                                .first())
+        highest_importances_df.columns = ['best_feature','best_importance']
+
+        # Join the total importances with the highest importances
+        importance_summary_df = (importance_summary_df
+                            .join(highest_importances_df)
+                            .sort_values(by='total_importance', ascending=False))
+
+        # Format output
+        importance_summary_df = (importance_summary_df
+                                .rename(columns={
+                                    'total_importance': 'Total Importance',
+                                    'best_feature': 'Best Feature',
+                                    'best_importance': 'Best Importance'
+                                })
+                                .style.format({
+                                    'Total Importance': '{:.3f}',
+                                    'Best Importance': '{:.3f}'
+                                }))
+
+        return importance_summary_df

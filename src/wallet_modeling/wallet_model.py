@@ -4,8 +4,8 @@ from typing import Dict, Union
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from sklearn.compose import ColumnTransformer
+# from sklearn.preprocessing import StandardScaler
+# from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from xgboost import XGBRegressor
 
@@ -77,22 +77,24 @@ class WalletModel:
         """
         Build the pipeline with column dropping, numeric scaling, and model.
         """
-        # Configure column dropping
-        drop_cols = self.wallets_config['modeling']['drop_columns']
+        # TODO: will be implemented through ticket DDA-505
+        # # Configure column dropping
+        # drop_cols = self.wallets_config['modeling']['drop_columns']
+        # preprocessing_scaler = self.wallets_config['modeling']['preprocessing_scaler']
 
-        # Get feature columns (all columns except those to be dropped)
-        feature_cols = [col for col in self.X_train.columns
-                    if col not in (drop_cols or [])]
+        # # Get feature columns (all columns except those to be dropped)
+        # feature_cols = [col for col in self.X_train.columns
+        #             if col not in (drop_cols or [])]
 
-        # Create preprocessor with two steps:
-        # 1. Drop unwanted columns
-        # 2. Scale remaining features
-        preprocessor = ColumnTransformer(
-            transformers=[
-                ('features', StandardScaler(), feature_cols)
-            ],
-            remainder='drop'  # This will drop any columns not explicitly included
-        )
+        # # Create preprocessor with two steps:
+        # # 1. Drop unwanted columns
+        # # 2. Scale remaining features
+        # preprocessor = ColumnTransformer(
+        #     transformers=[
+        #         ('features', StandardScaler(), feature_cols)
+        #     ],
+        #     remainder='drop'  # This will drop any columns not explicitly included
+        # )
 
         # Define the model
         if self.wallets_config['modeling']['model_type'] == 'xgb':
@@ -102,7 +104,7 @@ class WalletModel:
 
         # Create pipeline
         self.pipeline = Pipeline([
-            ('preprocessor', preprocessor),
+            # ('preprocessor', preprocessor),
             ('regressor', model)
         ])
 
