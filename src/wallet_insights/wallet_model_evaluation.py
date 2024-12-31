@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 
 
-class RegressionEvaluator:
+class WalletRegressionEvaluator:
     """
     A utility class for evaluating and visualizing regression model performance.
 

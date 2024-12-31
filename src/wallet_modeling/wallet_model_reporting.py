@@ -145,7 +145,7 @@ def load_model_artifacts(model_id, base_path):
 def generate_and_save_wallet_model_artifacts(model_results, base_path):
     """
     Wrapper function to generate evaluations, metrics, and save all model artifacts.
-    Uses RegressionEvaluator for model evaluation.
+    Uses WalletRegressionEvaluator for model evaluation.
 
     Parameters:
     - model_results (dict): Output from WalletModel.run_experiment containing:
@@ -162,9 +162,9 @@ def generate_and_save_wallet_model_artifacts(model_results, base_path):
         - evaluation: Model evaluation metrics
         - wallet_scores: DataFrame of wallet-level predictions
     """
-    # 1. Generate model evaluation metrics using RegressionEvaluator
+    # 1. Generate model evaluation metrics using WalletRegressionEvaluator
     model = model_results['pipeline'].named_steps['regressor']
-    evaluator = wime.RegressionEvaluator(
+    evaluator = wime.WalletRegressionEvaluator(
         y_train=model_results['y_train'],
         y_true=model_results['y_test'],
         y_pred=model_results['y_pred'],
