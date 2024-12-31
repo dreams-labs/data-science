@@ -223,8 +223,8 @@ def identify_modeling_cohort(modeling_period_profits_df: pd.DataFrame) -> pd.Dat
                                             calculate_full_metrics=True)
 
     # Extract thresholds
-    modeling_min_investment = wallets_config['data_cleaning']['modeling_min_investment']
-    modeling_min_coins_traded = wallets_config['data_cleaning']['modeling_min_coins_traded']
+    modeling_min_investment = wallets_config['modeling']['modeling_min_investment']
+    modeling_min_coins_traded = wallets_config['modeling']['modeling_min_coins_traded']
 
     # Create boolean mask for qualifying wallets
     meets_criteria = (
