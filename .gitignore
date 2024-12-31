@@ -1,6 +1,5 @@
-# Modeling folders
-/modeling/
-/wallet_modeling/
+# Modeling artifacts
+/artifacts/
 
 # Config archive
 /config_archive/

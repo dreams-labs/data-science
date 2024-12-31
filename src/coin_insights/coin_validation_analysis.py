@@ -792,7 +792,15 @@ def analyze_metric_segments(
     results_df = results_df.unstack(level=[1, 2])
     results_df.columns = results_df.columns.droplevel(0)
 
-    return results_df
+    # Reorder columns to group returns, metrics, counts
+    segments = [col[0] for col in results_df.columns if col[1] == 'return_mean']
+    col_order = (
+        [(seg, 'return_mean') for seg in segments] +
+        [(seg, 'metric_mean') for seg in segments] +
+        [(seg, 'n_coins') for seg in segments]
+    )
+
+    return results_df[col_order]
 
 
 def style_metric_segments(df: pd.DataFrame) -> pd.DataFrame.style:
@@ -876,4 +884,3 @@ def style_metric_segments(df: pd.DataFrame) -> pd.DataFrame.style:
 
 
     return styled.format(format_dict)
-

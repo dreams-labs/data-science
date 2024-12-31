@@ -3,7 +3,6 @@ from typing import List
 from pathlib import Path
 import yaml
 import pandas as pd
-import numpy as np
 
 # local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
@@ -47,22 +46,24 @@ def calculate_segment_metrics(
         'usd_balance': 'sum',
         'wallet_address': 'count'
     }).rename(columns={
-        'usd_balance': f'{segment_name}/{segment_value}|balance/{balance_date_str}/balance',
-        'wallet_address': f'{segment_name}/{segment_value}|balance/{balance_date_str}/count'
+        'usd_balance': f'{segment_name}/{segment_value}|balance/{balance_date_str}|balance',
+        'wallet_address': f'{segment_name}/{segment_value}|balance/{balance_date_str}|count'
     })
 
     # Calculate percentages
-    metrics[f'{segment_name}/{segment_value}|balance/{balance_date_str}/balance_pct'] = (
-        metrics[f'{segment_name}/{segment_value}|balance/{balance_date_str}/balance'] /
+    metrics[f'{segment_name}/{segment_value}|balance/{balance_date_str}|balance_pct'] = (
+        metrics[f'{segment_name}/{segment_value}|balance/{balance_date_str}|balance'] /
         totals_df[f'{segment_name}/total/balance']
     ).fillna(0)
 
-    metrics[f'{segment_name}/{segment_value}|balance/{balance_date_str}/count_pct'] = (
-        metrics[f'{segment_name}/{segment_value}|balance/{balance_date_str}/count'] /
+    metrics[f'{segment_name}/{segment_value}|balance/{balance_date_str}|count_pct'] = (
+        metrics[f'{segment_name}/{segment_value}|balance/{balance_date_str}|count'] /
         totals_df[f'{segment_name}/total/count']
     ).fillna(0)
 
     return metrics
+
+
 
 def calculate_score_metrics(
     analysis_df: pd.DataFrame,
@@ -84,39 +85,27 @@ def calculate_score_metrics(
     Returns:
     - DataFrame: Weighted score metrics for segment
     """
-    segment_data = analysis_df[analysis_df[segment_name] == segment_value]
+    # filter data for current segment
+    segment_data = analysis_df[analysis_df[segment_name] == segment_value].copy()
 
-    score_metrics = pd.DataFrame(index=segment_data['coin_id'].unique())
+    # multiply each score column by usd_balance in a single pass
+    score_sums = segment_data[score_columns].mul(segment_data['usd_balance'], axis=0)
+    score_sums = score_sums.groupby(segment_data['coin_id'],observed=True).sum()  # sum by coin_id
 
-    for score_col in score_columns:
-        score_name = score_col.split('|')[1]  # Extract score name from 'score|name' format
-        weighted_scores = pd.concat([
-            segment_data.groupby('coin_id', observed=True)
-            .apply(lambda x, col=score_col: safe_weighted_average(x[col].values, x['usd_balance'].values))
-            .rename(f'{segment_name}/{segment_value}/balance/{balance_date_str}/score_wtd_balance/{score_name}')
-            for score_col in score_columns
-        ], axis=1)
+    # get total balances per coin_id
+    weight_sums = segment_data.groupby('coin_id',observed=True)['usd_balance'].sum()
 
-        score_metrics = score_metrics.join(weighted_scores, how='left')
+    # compute weighted averages for all columns in one step
+    weighted_scores = score_sums.div(weight_sums, axis=0)
 
+    # rename columns to match your desired naming convention
+    renamed_cols = {}
+    for col in score_columns:
+        score_name = col.split('|')[1]
+        renamed_cols[col] = f'{segment_name}/{segment_value}/balance/{balance_date_str}|score_wtd_balance/{score_name}'
+    weighted_scores.rename(columns=renamed_cols, inplace=True)
 
-    return score_metrics
-
-
-def safe_weighted_average(scores: np.ndarray, weights: np.ndarray) -> float:
-    """
-    Calculate weighted average, handling zero weights safely.
-
-    Params:
-    - scores (ndarray): Array of score values
-    - weights (ndarray): Array of weights (e.g. balances)
-
-    Returns:
-    - float: Weighted average score, or simple mean if weights sum to 0
-    """
-    if np.sum(weights) == 0:
-        return np.mean(scores) if len(scores) > 0 else 0
-    return np.sum(scores * weights) / np.sum(weights)
+    return weighted_scores
 
 
 
