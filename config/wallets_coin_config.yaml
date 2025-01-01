@@ -20,9 +20,9 @@ wallet_features:
     # Metadata for which scores to load
     wallet_scores_path: "temp/wallet_modeling_score_dfs"
     wallet_scores: [
-        'net_gain_ntile',
-        'net_gain_winsor',
-        'net_gain_raw'
+        'net_gain_ntile_250101',
+        'net_gain_winsorized_250101',
+        'net_gain_raw_250101'
     ]
 
     # Wallets with volume/balances below this won't be counted in medians/distributions/etc
@@ -45,7 +45,7 @@ coin_modeling:
 
     # Thresholds for coin inclusion in training data
     min_cohort_wallets: 25  # how many wallets must hold a coin for the coin to be elegible for forecasting
-    min_cohort_balance: 25000  # how much USD all wallets must hold for the coin to be elegible for forecasting
+    min_cohort_balance: 20000  # how much USD all wallets must hold for the coin to be elegible for forecasting
 
     # Params used to remove unnecessary features
     feature_selection:

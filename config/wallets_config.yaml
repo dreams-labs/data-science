@@ -61,7 +61,7 @@ features:
 
     # Performance params
     ranking_ntiles: 4
-    returns_winsorization: 0.02
+    returns_winsorization: 0.01
 
 # Variables used for model generation
 modeling:
@@ -71,8 +71,9 @@ modeling:
     modeling_min_coins_traded: 0
 
     # Which wallet performance metric to use as the target variable.
+    target_variable: "crypto_net_gain"
     # target_variable: "crypto_net_gain/max_investment/ntile_rank"
-    target_variable: "crypto_net_gain/max_investment/winsorized"
+    # target_variable: "crypto_net_gain/max_investment/winsorized"
     drop_columns: []
     train_test_split: 0.2  # test size
 
@@ -80,15 +81,15 @@ modeling:
     model_type: "xgb"
     model_params:
         n_estimators: 500
-        max_depth: 4
-        learning_rate: 0.1
+        max_depth: 7
+        learning_rate: 0.05
         subsample: 0.8
         colsample_bytree: 1.0
         min_child_weight: 5
         early_stopping_rounds: 20
         eval_metric: 'rmse'
 
-        # calculation params
+        # non modeling metaparams
         verbose: 50
         random_state: 42
         n_jobs: -1
@@ -96,18 +97,19 @@ modeling:
     # Parameter tuning
     grid_search_params:
 
-        enabled: true # whether to grid search
+        # Search methodology
+        enabled: false # whether to grid search
+        n_iter: 10  # random search limit
+        scoring: 'neg_root_mean_squared_error'
+        n_splits: 3  # cv splits
+        n_jobs: -1
+        verbose_level: 3  # scikit-learn verbosity
+
+        # Params
         param_grid:
             regressor__n_estimators: [500]
             regressor__max_depth: [3, 5, 7]
             regressor__learning_rate: [0.05, 0.1, 0.15]
-
-        # Search methodology
-        n_iter: 10  # random search limit
-        scoring: 'neg_root_mean_squared_error'
-        n_splits: 2  # cv splits
-        n_jobs: -1
-        verbose_level: 2  # scikit-learn verbosity
 
 
     # Coin model workflow params
