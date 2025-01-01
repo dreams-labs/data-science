@@ -63,26 +63,76 @@ features:
     ranking_ntiles: 4
     returns_winsorization: 0.02
 
+
+
 # Variables used for model generation
 modeling:
+
+    # Feature selection params
+    feature_selection:
+        variance_threshold: 0.02
+        correlation_threshold: 0.95
+        protected_features: [
+            'cluster|'
+        ]
+
     # Modeling period filters
-    modeling_min_investment: 100
+    modeling_min_investment: 1000
     modeling_min_coins_traded: 0
 
     # Which wallet performance metric to use as the target variable.
+    # target_variable: "crypto_net_gain"
     target_variable: "crypto_net_gain/max_investment/ntile_rank"
-    score_name: "net_gain_raw"  # reference name for feature columns etc
+    # target_variable: "crypto_net_gain/max_investment/winsorized"
     drop_columns: []
-    preprocessing_scaler: "none"
+    train_test_split: 0.2  # test size
 
     # Model specifics
     model_type: "xgb"
     model_params:
-        n_estimators: 300
-        max_depth: 4
-        learning_rate: 0.05
-        subsample: 0.8
-        colsample_bytree: 1.0
-        min_child_weight: 5
+
+    # -----------------------
+    # Wallet Model Params
+    # -----------------------
+
+        # Model params
+        max_depth: 15
+        min_child_weight_pct: 0.0001
+        n_estimators: 1000
+        learning_rate: 0.02
+        colsample_bytree: 0.6
+        gamma: 0.1
+
+        # Early stopping
+        early_stopping_rounds: 20
+        eval_metric: 'rmse'
+
+        # Metaparams
         random_state: 42
         n_jobs: -1
+
+    # Parameter tuning
+    grid_search_params:
+
+        enabled: true # whether to grid search
+
+        # Search methodology
+        n_iter: 35  # random search limit
+        scoring: 'neg_root_mean_squared_error'
+        n_splits: 2  # cv splits
+        n_jobs: -1
+        verbose_level: 3  # scikit-learn verbosity
+
+        # Params
+        param_grid:
+            # params to test
+            regressor__max_depth: [11, 13, 15, 17, 19]
+            regressor__min_child_weight_pct: [0.00002, 0.00005, 0.0001, 0.0002, 0.005]
+            regressor__subsample: [0.7, 0.85, 1.0]
+
+            # params that keep the model speedy
+            regressor__n_estimators: [150]
+            regressor__learning_rate: [0.1]
+
+    # Coin model workflow params
+    score_name: "iterating"  # reference name for feature columns etc
