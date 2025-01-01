@@ -72,6 +72,9 @@ modeling:
     feature_selection:
         variance_threshold: 0.02
         correlation_threshold: 0.95
+        protected_features: [
+            'cluster|'
+        ]
 
     # Modeling period filters
     modeling_min_investment: 1000
@@ -109,7 +112,7 @@ modeling:
 
         # Search methodology
         enabled: true # whether to grid search
-        n_iter: 16  # random search limit
+        n_iter: 20  # random search limit
         scoring: 'neg_root_mean_squared_error'
         n_splits: 3  # cv splits
         n_jobs: -1
@@ -117,9 +120,9 @@ modeling:
 
         # Params
         param_grid:
-            regressor__n_estimators: [200]
-            regressor__max_depth: [7, 9, 11, 12]
-            regressor__min_child_weight_pct: [0.005, 0.01]
+            regressor__n_estimators: [150]
+            regressor__max_depth: [7, 9, 11, 13, 15]
+            regressor__min_child_weight_pct: [0.00005, 0.0001, 0.0002, 0.005, 0.01, 0.02]
 
     # Coin model workflow params
     score_name: "iterating"  # reference name for feature columns etc
