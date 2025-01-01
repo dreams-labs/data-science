@@ -12,7 +12,7 @@ training_data:
     validation_period_end: "2024-11-30"
 
     # Local pipeline configs
-    dataset: 'prod'  # Set to 'prod' or 'dev'; determines whether to query 'core' or 'dev' dataset tables
+    dataset: 'dev'  # Set to 'prod' or 'dev'; determines whether to query 'core' or 'dev' dataset tables
     parquet_folder: 'temp/wallet_modeling_dfs'  # where to store parquet files
 
 
@@ -77,7 +77,7 @@ modeling:
         ]
 
     # Modeling period filters
-    modeling_min_investment: 1000
+    modeling_min_investment: 100
     modeling_min_coins_traded: 0
 
     # Which wallet performance metric to use as the target variable.
@@ -114,7 +114,7 @@ modeling:
     # Parameter tuning
     grid_search_params:
 
-        enabled: true # whether to grid search
+        enabled: false # whether to grid search
 
         # Search methodology
         n_iter: 35  # random search limit
