@@ -66,14 +66,14 @@ features:
 # Variables used for model generation
 modeling:
     # Modeling period filters
-    modeling_min_investment: 100
+    modeling_min_investment: 1000
     modeling_min_coins_traded: 0
 
     # Which wallet performance metric to use as the target variable.
-    target_variable: "crypto_net_gain/max_investment/ntile_rank"
-    score_name: "net_gain_raw"  # reference name for feature columns etc
+    # target_variable: "crypto_net_gain/max_investment/ntile_rank"
+    target_variable: "crypto_net_gain/max_investment/winsorized"
+    score_name: "iterating"  # reference name for feature columns etc
     drop_columns: []
-    preprocessing_scaler: "none"
 
     # Model specifics
     model_type: "xgb"
@@ -84,5 +84,17 @@ modeling:
         subsample: 0.8
         colsample_bytree: 1.0
         min_child_weight: 5
+        early_stopping_rounds: 20
+        eval_metric: 'rmse'
+
+        # calculation params
+        verbose: 50
         random_state: 42
         n_jobs: -1
+
+    # Cross validation
+    cv_params:
+        enabled: false  # Toggle CV on/off
+        n_splits: 5
+        shuffle: true
+

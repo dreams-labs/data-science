@@ -3,9 +3,7 @@ import logging
 from typing import Dict, Union
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
-# from sklearn.preprocessing import StandardScaler
-# from sklearn.compose import ColumnTransformer
+from sklearn.model_selection import train_test_split,cross_val_score
 from sklearn.pipeline import Pipeline
 from xgboost import XGBRegressor
 
@@ -77,24 +75,6 @@ class WalletModel:
         """
         Build the pipeline with column dropping, numeric scaling, and model.
         """
-        # TO DO: will be implemented through ticket DDA-505
-        # # Configure column dropping
-        # drop_cols = self.wallets_config['modeling']['drop_columns']
-        # preprocessing_scaler = self.wallets_config['modeling']['preprocessing_scaler']
-
-        # # Get feature columns (all columns except those to be dropped)
-        # feature_cols = [col for col in self.X_train.columns
-        #             if col not in (drop_cols or [])]
-
-        # # Create preprocessor with two steps:
-        # # 1. Drop unwanted columns
-        # # 2. Scale remaining features
-        # preprocessor = ColumnTransformer(
-        #     transformers=[
-        #         ('features', StandardScaler(), feature_cols)
-        #     ],
-        #     remainder='drop'  # This will drop any columns not explicitly included
-        # )
 
         # Define the model
         if self.wallets_config['modeling']['model_type'] == 'xgb':
@@ -104,16 +84,59 @@ class WalletModel:
 
         # Create pipeline
         self.pipeline = Pipeline([
-            # ('preprocessor', preprocessor),
             ('regressor', model)
         ])
 
+    def _cross_validate(self) -> Dict[str, float]:
+        """
+        Perform cross-validation using configured parameters.
+
+        Returns:
+        - cv_results (dict): Mean and std of CV scores
+        """
+        if not self.wallets_config['modeling'].get('cv_params', {}).get('enabled'):
+            return {}
+
+        # Get CV parameters from config
+        cv_params = self.wallets_config['modeling']['cv_params']
+        n_splits = cv_params.get('n_splits', 5)
+
+        # Get features and target for full modeling cohort
+        modeling_mask = self.training_data_df['in_modeling_cohort'] == 1
+        X = self.training_data_df[modeling_mask].drop(['in_modeling_cohort'], axis=1)
+        y = X.pop(self.wallets_config['modeling']['target_variable'])
+
+        # Perform CV using same model params
+        model = XGBRegressor(**self.wallets_config['modeling']['model_params'])
+        scores = cross_val_score(
+            model,
+            X,
+            y,
+            cv=n_splits,
+            scoring='neg_root_mean_squared_error',
+            n_jobs=self.wallets_config['modeling']['model_params'].get('n_jobs', -1)
+        )
+
+        return {
+            'cv_rmse_mean': -scores.mean(),
+            'cv_rmse_std': scores.std()
+        }
+
     def _fit(self) -> None:
         """
-        Fit the pipeline on training data.
+        Fit the pipeline on training data with early stopping using test set.
         """
-        # Train pipeline
-        self.pipeline.fit(self.X_train, self.y_train)
+        # Create eval set for monitoring validation performance
+        eval_set = [(self.X_test, self.y_test)]
+
+        # Pass eval_set to XGBoost through the pipeline
+        # The regressor__ prefix routes the parameter to the XGBoost step
+        self.pipeline.fit(
+            self.X_train,
+            self.y_train,
+            regressor__eval_set=eval_set
+        )
+
 
     def _predict(self) -> pd.Series:
         """
@@ -128,6 +151,7 @@ class WalletModel:
         # Convert to Series with same index as test data
         self.y_pred = pd.Series(raw_predictions, index=self.X_test.index)
         return self.y_pred
+
 
     def _predict_training_cohort(self) -> pd.Series:
         """
@@ -154,6 +178,7 @@ class WalletModel:
             raise ValueError("Prediction dropped some wallet addresses")
 
         return predictions
+
 
     def run_experiment(self, training_data_df: pd.DataFrame, modeling_cohort_target_var_df: pd.DataFrame,
                     return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
