@@ -1,4 +1,3 @@
-# pylint:disable=invalid-name  # X_test isn't camelcase
 import logging
 from typing import Dict, Union, Tuple
 import pandas as pd
@@ -9,11 +8,13 @@ from sklearn.pipeline import Pipeline
 # Local modules
 from base_modeling.base_model import BaseModel
 
+# pylint:disable=invalid-name  # X_test isn't camelcase
+# pylint: disable=W0201  # Attribute defined outside __init__, false positive due to inheritance
+
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
 
 
-# pylint: disable=W0201  # Attribute defined outside __init__, false positive due to inheritance
 class WalletModel(BaseModel):
     """
     Wallet-specific model implementation.

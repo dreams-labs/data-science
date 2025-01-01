@@ -60,6 +60,7 @@ coin_modeling:
     target_variable: "coin_return_winsorized"
     # target_variable: "coin_return_pctile_full"
     # target_variable: "coin_return_pctile"
+    train_test_split: 0.2  # test size
 
     returns_winsorization: 0.02
     drop_columns: []
@@ -99,6 +100,11 @@ coin_modeling:
 
         # Params
         param_grid:
-            regressor__n_estimators: [500]
-            regressor__max_depth: [3, 5, 7]
-            regressor__learning_rate: [0.05, 0.1, 0.15]
+            # params to test
+            regressor__max_depth: [11, 13, 15, 17, 19]
+            regressor__min_child_weight_pct: [0.00002, 0.00005, 0.0001, 0.0002, 0.005]
+            regressor__subsample: [0.7, 0.85, 1.0]
+
+            # params that keep the model speedy
+            regressor__n_estimators: [150]
+            regressor__learning_rate: [0.1]

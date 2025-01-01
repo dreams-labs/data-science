@@ -1,4 +1,3 @@
-# pylint:disable=invalid-name  # X_test isn't camelcase
 import logging
 from typing import Dict, Union
 import pandas as pd
@@ -6,6 +5,8 @@ import numpy as np
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.pipeline import Pipeline
 from xgboost import XGBRegressor
+
+# pylint:disable=invalid-name  # X_test isn't camelcase
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
