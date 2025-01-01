@@ -36,8 +36,8 @@ wallet_features:
 
 # How to segment wallet features
 wallet_segmentation:
-    score_segment_quantiles: [0.1, 0.3, 0.5, 0.7, 0.9]  # higher is better; how to assign wallet a score segment
-    # score_segment_quantiles: [0.05, 0.15, 0.5, 0.85, 0.95]  # higher is better; how to assign wallet a score segment
+    # score_segment_quantiles: [0.1, 0.3, 0.5, 0.7, 0.9]  # higher is better; how to assign wallet a score segment
+    score_segment_quantiles: [0.05, 0.15, 0.5, 0.85, 0.95]  # higher is better; how to assign wallet a score segment
     training_period_cluster_groups: [2, 4]  # which n clusters assignment from the training period to segment by
 
 # Variables used in the generation of the validation period coin model
