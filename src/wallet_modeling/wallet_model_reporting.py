@@ -1,6 +1,7 @@
 """
 Functions for generating and storing model training reports and associated data
 """
+from typing import Dict,Tuple
 import json
 import uuid
 from datetime import datetime
@@ -8,11 +9,8 @@ from pathlib import Path
 import logging
 import pandas as pd
 import numpy as np
-import yaml
-import utils as u
 from dreams_core.googlecloud import GoogleCloud as dgc
 import wallet_insights.model_evaluation as wime
-from wallet_modeling.wallets_config_manager import WalletsConfig
 
 
 logger = logging.getLogger(__name__)
@@ -43,10 +41,7 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path):
     Parameters:
     - model_results (dict): Output from train_xgb_model containing pipeline and training data
     - evaluation_dict (dict): Model evaluation metrics and analysis
-    - configs (dict): Dictionary containing configuration objects:
-        - wallets_config: Main wallet modeling configuration
-        - wallets_metrics_config: Metrics calculation configuration
-        - wallets_features_config: Feature engineering configuration
+    - configs (dict): Dictionary containing configuration objects
     - base_path (str): Base path for saving all model artifacts
 
     Returns:
@@ -72,6 +67,9 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path):
     model_report_filename = f"model_report_{filename_timestamp}_{model_r2:.3f}_{model_id}.json"
     base_dir = Path(base_path)
 
+    if not base_dir.exists():
+        raise FileNotFoundError(f"Base directory {base_dir} does not exist")
+
     # Create necessary directories
     for dir_name in ['model_reports', 'wallet_scores']:
         (base_dir / dir_name).mkdir(parents=True, exist_ok=True)
@@ -80,6 +78,7 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path):
     # 1. Save model report
     report = {
         'model_id': model_id,
+        'model_type': 'wallet',
         'timestamp': model_time.isoformat(),
         'training_data': model_results['training_data'],
         'configurations': configs,
@@ -142,7 +141,11 @@ def load_model_artifacts(model_id, base_path):
 
 
 
-def generate_and_save_wallet_model_artifacts(model_results, base_path):
+def generate_and_save_wallet_model_artifacts(
+    model_results: Dict,
+    base_path: str,
+    configs: Dict[str, Dict]
+) -> Tuple[str, object, pd.DataFrame]:
     """
     Wrapper function to generate evaluations, metrics, and save all model artifacts.
     Uses WalletRegressionEvaluator for model evaluation.
@@ -155,6 +158,7 @@ def generate_and_save_wallet_model_artifacts(model_results, base_path):
         - y_pred: Model predictions on modeling cohort test set
         - training_cohort_pred: Predictions for full training cohort
     - base_path (str): Base path for saving artifacts
+    - configs (dict of dicts): configs to store
 
     Returns:
     - dict: Dictionary containing:
@@ -164,9 +168,9 @@ def generate_and_save_wallet_model_artifacts(model_results, base_path):
     """
     # 1. Generate model evaluation metrics using WalletRegressionEvaluator
     model = model_results['pipeline'].named_steps['regressor']
-    evaluator = wime.WalletRegressionEvaluator(
+    evaluator = wime.RegressionEvaluator(
         y_train=model_results['y_train'],
-        y_true=model_results['y_test'],
+        y_test=model_results['y_test'],
         y_pred=model_results['y_pred'],
         training_cohort_pred=model_results['training_cohort_pred'],
         training_cohort_actuals=model_results['training_cohort_actuals'],
@@ -190,19 +194,6 @@ def generate_and_save_wallet_model_artifacts(model_results, base_path):
         'actual': model_results['training_cohort_actuals'],
         'in_modeling_cohort': model_results['training_cohort_pred'].index.isin(model_results['y_test'].index)
     })
-
-    # Load configurations
-    wallets_config = WalletsConfig()
-    wallets_metrics_config = u.load_config('../config/wallets_metrics_config.yaml')
-    wallets_features_config = yaml.safe_load(
-        Path('../config/wallets_features_config.yaml').read_text(encoding='utf-8')
-    )
-
-    configs = {
-        'wallets_config': wallets_config.config,
-        'wallets_metrics_config': wallets_metrics_config,
-        'wallets_features_config': wallets_features_config
-    }
 
     # 5. Save all artifacts
     model_id = save_model_artifacts(
