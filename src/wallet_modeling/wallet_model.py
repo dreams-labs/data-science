@@ -3,7 +3,7 @@ import logging
 from typing import Dict, Union, Tuple
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split,GridSearchCV
+from sklearn.model_selection import train_test_split,RandomizedSearchCV
 from sklearn.pipeline import Pipeline
 from xgboost import XGBRegressor
 
@@ -42,6 +42,54 @@ class BaseModel:
         ])
 
 
+    def _run_grid_search(self, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
+        """
+        Perform grid search with cross validation using configured parameters.
+
+        Params:
+        - X (DataFrame): feature data for modeling cohort
+        - y (Series): target variable for modeling cohort
+
+        Returns:
+        - cv_results (dict): Mean and std of CV scores
+        """
+        if not self.modeling_config.get('grid_search_params', {}).get('enabled'):
+            return {}
+
+        # Get CV parameters from config
+        grid_search_params = self.modeling_config['grid_search_params']
+
+        # Copy model params but remove the ones that don't apply to skl cross validation
+        cv_model_params = self.modeling_config['model_params'].copy()
+        for param in ['early_stopping_rounds', 'eval_metric', 'verbose']:
+            cv_model_params.pop(param, None)
+
+        # Create pipeline for grid search
+        cv_pipeline = Pipeline([
+            ('regressor', XGBRegressor(**cv_model_params))
+        ])
+
+        # Perform randomized search
+        random_search = RandomizedSearchCV(
+            cv_pipeline,
+            grid_search_params['param_grid'],
+            n_iter = grid_search_params['n_iter'],
+            cv = grid_search_params['n_splits'],
+            scoring = grid_search_params['scoring'],
+            verbose = grid_search_params.get('verbose_level', 0),
+            n_jobs = cv_model_params.get('n_jobs', -1),
+            random_state = cv_model_params.get('random_state', 42),
+        )
+
+        random_search.fit(X, y)
+
+        return {
+            'best_params': random_search.best_params_,
+            'best_score': -random_search.best_score_,
+            'cv_results': random_search.cv_results_
+        }
+
+
     def _fit(self) -> None:
         """
         Fit the pipeline on training data with early stopping using test set.
@@ -78,7 +126,8 @@ class WalletModel(BaseModel):
     Extends BaseModel with wallet-specific data preparation and grid search.
     """
 
-    def _prepare_data(self, training_data_df: pd.DataFrame, modeling_cohort_target_var_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
+    def _prepare_data(self, training_data_df: pd.DataFrame,
+                      modeling_cohort_target_var_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
         """
         Params:
         - training_data_df (DataFrame): full training cohort feature data
@@ -114,61 +163,12 @@ class WalletModel(BaseModel):
 
         # Create train/test split for final model
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
+            X, y,
+            test_size=self.modeling_config['train_test_split'],
+            random_state=self.modeling_config['model_params']['random_state']
         )
 
         return X, y
-
-
-    def _run_grid_search(self, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
-        """
-        Perform grid search with cross validation using configured parameters.
-
-        Params:
-        - X (DataFrame): feature data for modeling cohort
-        - y (Series): target variable for modeling cohort
-
-        Returns:
-        - cv_results (dict): Mean and std of CV scores
-        """
-        if not self.modeling_config.get('grid_search_params', {}).get('enabled'):
-            return {}
-
-        # Get CV parameters from config
-        grid_search_params = self.modeling_config['grid_search_params']
-        n_splits = grid_search_params.get('n_splits', 5)
-
-        param_grid = grid_search_params['param_grid']
-
-        # Create base model without early stopping params
-        cv_model_params = self.modeling_config['model_params'].copy()
-        cv_model_params.pop('early_stopping_rounds', None)
-        cv_model_params.pop('eval_metric', None)
-        cv_model_params.pop('verbose', None)
-
-        # Create pipeline for grid search
-        cv_pipeline = Pipeline([
-            ('regressor', XGBRegressor(**cv_model_params))
-        ])
-
-        # Perform grid search
-        grid_search = GridSearchCV(
-            cv_pipeline,
-            param_grid,
-            cv=n_splits,
-            scoring='neg_root_mean_squared_error',
-            n_jobs=cv_model_params.get('n_jobs', -1),
-            verbose=grid_search_params.get('verbose_level', 0)
-        )
-
-        grid_search.fit(X, y)
-
-        return {
-            'best_params': grid_search.best_params_,
-            'best_score': -grid_search.best_score_,  # Convert back to positive RMSE
-            'cv_results': grid_search.cv_results_
-        }
-
 
 
     def _predict_training_cohort(self) -> pd.Series:
