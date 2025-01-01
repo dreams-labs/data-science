@@ -14,10 +14,10 @@ coin_validation_analysis:
     top_n: 5  # how many of the top coins of a given sort method will be included in performance assessments
     sort_method: "top_wallet_balance_pct"  # which coin wallet metric to use for coin forecast rankings
 
-# Which wallet features to load
-wallet_features:
+# How wallet segments are defined
+wallet_segments:
 
-    # Metadata for which scores to load
+    # Scores to include as segments + metrics
     wallet_scores_path: "temp/wallet_modeling_score_dfs"
     wallet_scores: [
         'net_gain_ntile_250101',
@@ -25,10 +25,16 @@ wallet_features:
         'net_gain_raw_250101'
     ]
 
-    # Wallets with volume/balances below this won't be counted in medians/distributions/etc
-    usd_materiality: 20
 
-    # Metrics to drop based on low obsserved importance
+wallet_features:
+
+    # Balance metrics params
+    wallet_balance_dates:
+
+    # Score features params
+    usd_materiality: 20 # Wallets with volume/balances below this won't be counted in medians/distributions/etc
+
+    # Metrics to drop based on low observed importance
     drop_trading_metrics: [
         'average_transaction'
     ]
@@ -62,7 +68,7 @@ coin_modeling:
     # target_variable: "coin_return_pctile"
     train_test_split: 0.2  # test size
 
-    returns_winsorization: 0.02
+    returns_winsorization: 0.01
     drop_columns: []
 
 
@@ -74,14 +80,14 @@ coin_modeling:
     # Coin Model Params
     # -----------------------
 
-        n_estimators: 200
-        max_depth: 5
-        learning_rate: 0.05
+        n_estimators: 300
+        max_depth: 6
+        learning_rate: 0.02
         subsample: 0.8
         colsample_bytree: 1.0
         min_child_weight: 5
-        # early_stopping_rounds: 20
-        # eval_metric: 'rmse'
+        early_stopping_rounds: 20
+        eval_metric: 'rmse'
 
         # non modeling metaparams
         random_state: 42
@@ -90,20 +96,21 @@ coin_modeling:
     # Parameter tuning
     grid_search_params:
 
-        # Search methodology
         enabled: false # whether to grid search
-        n_iter: 10  # random search limit
+
+        # Search methodology
+        n_iter: 20  # random search limit
         scoring: 'neg_root_mean_squared_error'
-        n_splits: 3  # cv splits
+        n_splits: 5  # cv splits
         n_jobs: -1
         verbose_level: 3  # scikit-learn verbosity
 
         # Params
         param_grid:
             # params to test
-            regressor__max_depth: [11, 13, 15, 17, 19]
-            regressor__min_child_weight_pct: [0.00002, 0.00005, 0.0001, 0.0002, 0.005]
-            regressor__subsample: [0.7, 0.85, 1.0]
+            regressor__max_depth: [4, 6, 8]
+            regressor__min_child_weight_pct: [0.005, 0.01, 0.025]
+            # regressor__subsample: [0.7, 0.85, 1.0]
 
             # params that keep the model speedy
             regressor__n_estimators: [150]
