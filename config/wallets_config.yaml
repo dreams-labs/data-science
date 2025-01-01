@@ -93,8 +93,12 @@ modeling:
         n_jobs: -1
 
     # Cross validation
-    cv_params:
-        enabled: false  # Toggle CV on/off
-        n_splits: 5
+    grid_search_params:
+        enabled: true
+        n_splits: 2
         shuffle: true
-
+        verbose_level: 2  # scikit-learn verbosity
+        param_grid:
+            regressor__n_estimators: [200, 400]
+            # regressor__max_depth: [3, 5, 7]
+            regressor__learning_rate: [0.01, 0.5]

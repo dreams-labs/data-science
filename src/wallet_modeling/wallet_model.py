@@ -1,9 +1,9 @@
 # pylint:disable=invalid-name  # X_test isn't camelcase
 import logging
-from typing import Dict, Union
+from typing import Dict, Union, Tuple
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split,cross_val_score
+from sklearn.model_selection import train_test_split,GridSearchCV
 from sklearn.pipeline import Pipeline
 from xgboost import XGBRegressor
 
@@ -32,7 +32,7 @@ class WalletModel:
         self.training_data_df = None  # Store full training cohort dataset for later scoring
 
 
-    def _prepare_data(self, training_data_df: pd.DataFrame, modeling_cohort_target_var_df: pd.DataFrame) -> None:
+    def _prepare_data(self, training_data_df: pd.DataFrame, modeling_cohort_target_var_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
         """
         Params:
         - training_data_df (DataFrame): full training cohort feature data
@@ -40,7 +40,8 @@ class WalletModel:
                                                 for full training cohort
 
         Returns:
-        - None
+        - X (DataFrame): feature data for modeling cohort
+        - y (Series): target variable for modeling cohort
         """
         # Store full training cohort for later scoring
         self.training_data_df = training_data_df.copy()
@@ -65,10 +66,12 @@ class WalletModel:
         X = modeling_df.drop([target_var, 'in_modeling_cohort'], axis=1)
         y = modeling_df[target_var]
 
-        # Split into train/test
+        # Create train/test split for final model
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
             X, y, test_size=0.2, random_state=42
         )
+
+        return X, y
 
 
     def _build_pipeline(self) -> None:
@@ -87,39 +90,54 @@ class WalletModel:
             ('regressor', model)
         ])
 
-    def _cross_validate(self) -> Dict[str, float]:
+
+    def _run_grid_search(self, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
         """
-        Perform cross-validation using configured parameters.
+        Perform grid search with cross validation using configured parameters.
+
+        Params:
+        - X (DataFrame): feature data for modeling cohort
+        - y (Series): target variable for modeling cohort
 
         Returns:
         - cv_results (dict): Mean and std of CV scores
         """
-        if not self.wallets_config['modeling'].get('cv_params', {}).get('enabled'):
+        if not self.wallets_config['modeling'].get('grid_search_params', {}).get('enabled'):
             return {}
 
         # Get CV parameters from config
-        cv_params = self.wallets_config['modeling']['cv_params']
-        n_splits = cv_params.get('n_splits', 5)
+        grid_search_params = self.wallets_config['modeling']['grid_search_params']
+        n_splits = grid_search_params.get('n_splits', 5)
 
-        # Get features and target for full modeling cohort
-        modeling_mask = self.training_data_df['in_modeling_cohort'] == 1
-        X = self.training_data_df[modeling_mask].drop(['in_modeling_cohort'], axis=1)
-        y = X.pop(self.wallets_config['modeling']['target_variable'])
+        param_grid = grid_search_params['param_grid']
 
-        # Perform CV using same model params
-        model = XGBRegressor(**self.wallets_config['modeling']['model_params'])
-        scores = cross_val_score(
-            model,
-            X,
-            y,
+        # Create base model without early stopping params
+        cv_model_params = self.wallets_config['modeling']['model_params'].copy()
+        cv_model_params.pop('early_stopping_rounds', None)
+        cv_model_params.pop('eval_metric', None)
+        cv_model_params.pop('verbose', None)
+
+        # Create pipeline for grid search
+        cv_pipeline = Pipeline([
+            ('regressor', XGBRegressor(**cv_model_params))
+        ])
+
+        # Perform grid search
+        grid_search = GridSearchCV(
+            cv_pipeline,
+            param_grid,
             cv=n_splits,
             scoring='neg_root_mean_squared_error',
-            n_jobs=self.wallets_config['modeling']['model_params'].get('n_jobs', -1)
+            n_jobs=cv_model_params.get('n_jobs', -1),
+            verbose=grid_search_params.get('verbose_level', 0)
         )
 
+        grid_search.fit(X, y)
+
         return {
-            'cv_rmse_mean': -scores.mean(),
-            'cv_rmse_std': scores.std()
+            'best_params': grid_search.best_params_,
+            'best_score': -grid_search.best_score_,  # Convert back to positive RMSE
+            'cv_results': grid_search.cv_results_
         }
 
     def _fit(self) -> None:
@@ -186,26 +204,46 @@ class WalletModel:
         Params:
         - training_data_df (DataFrame): full training cohort feature data
         - modeling_cohort_target_var_df (DataFrame): Contains in_modeling_cohort flag and target variable
-                                                for full training cohort
         - return_data (bool): whether to return train/test splits and predictions
 
         Returns:
-        - result (dict): contains pipeline and optionally data splits, predictions, and full cohort actuals
+        - result (dict): contains pipeline, cv results if enabled, and optionally data splits and predictions
         """
         # Validate matching indexes and lengths
-        if not (training_data_df.index.equals(modeling_cohort_target_var_df.index)):
+        if not training_data_df.index.equals(modeling_cohort_target_var_df.index):
             raise ValueError(
                 "training_data_df and modeling_cohort_target_var_df must have identical indexes. "
                 f"Found lengths {len(training_data_df)} and {len(modeling_cohort_target_var_df)}"
             )
 
-        # Run full experiment: prep data, build pipeline, fit model
-        self._prepare_data(training_data_df, modeling_cohort_target_var_df)
+        # Store data for CV and final training
+        self.training_data_df = training_data_df.copy()
+
+        # Prepare data
+        X, y = self._prepare_data(training_data_df, modeling_cohort_target_var_df)
+
+        # Run cross-validation if enabled and get best params
+        cv_results = self._run_grid_search(X, y)
+
+        # Update model params with best params from CV if available
+        if cv_results.get('best_params'):
+            # Remove 'regressor__' prefix from param names
+            best_params = {
+                k.replace('regressor__', ''): v
+                for k, v in cv_results['best_params'].items()
+            }
+            self.wallets_config['modeling']['model_params'].update(best_params)
+            logger.info(f"Updated model params with CV best params: {best_params}")
+
+        # Build and fit final model
         self._build_pipeline()
         self._fit()
 
-        # Always return the pipeline
-        result = {'pipeline': self.pipeline}
+        # Build results dict
+        result = {
+            'pipeline': self.pipeline,
+            'cv_results': cv_results
+        }
 
         # Optionally return detailed data
         if return_data:
