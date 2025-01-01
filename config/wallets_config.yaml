@@ -98,8 +98,8 @@ modeling:
     grid_search_params:
 
         # Search methodology
-        enabled: false # whether to grid search
-        n_iter: 10  # random search limit
+        enabled: true # whether to grid search
+        n_iter: 15  # random search limit
         scoring: 'neg_root_mean_squared_error'
         n_splits: 3  # cv splits
         n_jobs: -1
@@ -108,8 +108,10 @@ modeling:
         # Params
         param_grid:
             regressor__n_estimators: [500]
-            regressor__max_depth: [3, 5, 7]
-            regressor__learning_rate: [0.05, 0.1, 0.15]
+            regressor__max_depth: [6, 7, 8]
+            regressor__learning_rate: [0.01, 0.03, 0.05]
+            regressor__colsample_bytree: [0.8, 1.0]  # Add feature sampling
+            regressor__gamma: [0, 0.1, 0.2]  # Add split threshold
 
 
     # Coin model workflow params

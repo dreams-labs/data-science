@@ -74,8 +74,8 @@ coin_modeling:
         subsample: 0.8
         colsample_bytree: 1.0
         min_child_weight: 5
-        early_stopping_rounds: 20
-        eval_metric: 'rmse'
+        # early_stopping_rounds: 20
+        # eval_metric: 'rmse'
 
         # non modeling metaparams
         verbose: 50

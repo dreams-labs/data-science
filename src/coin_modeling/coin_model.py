@@ -17,129 +17,129 @@ logger = logging.getLogger(__name__)
 # pylint:disable=invalid-name  # X_test isn't camelcase
 
 
-class CoinModel(BaseModel):
+# class CoinModel(BaseModel):
 
 
-    # def __init__(self, modeling_config):
-    #     """loads model with all params from BaseModel"""
-    #     super().__init__(modeling_config)
+#     # def __init__(self, modeling_config):
+#     #     """loads model with all params from BaseModel"""
+#     #     super().__init__(modeling_config)
 
 
-    def _prepare_data(self, feature_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
+#     def _prepare_data(self, feature_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
+#         """
+#         Params:
+#         - feature_df (DataFrame): Pre-joined dataframe with features and target
+
+#         Returns:
+#         - X (DataFrame): feature data
+#         - y (Series): target variable
+#         """
+#         self.training_data_df = feature_df.copy()
+
+#         target_var = self.modeling_config['target_variable']
+#         X = feature_df.drop(target_var, axis=1)
+#         y = feature_df[target_var]
+
+#         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
+#             X, y,
+#             test_size=self.modeling_config['train_test_split'],
+#             random_state=self.modeling_config['model_params']['random_state']
+#         )
+
+#         return X, y
+
+
+class CoinModel:
+    """
+    Simplified model for coin return predictions. Assumes pre-joined feature dataset.
+    """
+
+    def __init__(self, wallets_coin_config: Dict):
+        """
+        Params:
+        - wallets_coin_config (dict): wallets_coin_config.yaml
+        """
+        self.wallets_coin_config = wallets_coin_config
+        self.pipeline = None
+        self.X_train = None
+        self.X_test = None
+        self.y_train = None
+        self.y_test = None
+        self.y_pred = None
+        self.training_data = None
+
+    def _prepare_data(self, feature_df: pd.DataFrame) -> None:
         """
         Params:
         - feature_df (DataFrame): Pre-joined dataframe with features and target
-
-        Returns:
-        - X (DataFrame): feature data
-        - y (Series): target variable
         """
-        self.training_data_df = feature_df.copy()
+        self.training_data = feature_df.copy()
 
-        target_var = self.modeling_config['target_variable']
+        # Separate features and target
+        target_var = self.wallets_coin_config['coin_modeling']['target_variable']
         X = feature_df.drop(target_var, axis=1)
         y = feature_df[target_var]
 
+        # Split train/test
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            X, y,
-            test_size=self.modeling_config['train_test_split'],
-            random_state=self.modeling_config['model_params']['random_state']
+            X, y, test_size=0.2, random_state=42
         )
 
-        return X, y
+    def _build_pipeline(self) -> None:
+        """Build scikit-learn pipeline with scaling and XGBoost model"""
+        # Get columns to drop
+        drop_cols = self.wallets_coin_config['coin_modeling']['drop_columns']
 
+        # Define feature columns
+        feature_cols = [col for col in self.X_train.columns
+                       if col not in (drop_cols or [])]
 
-# class CoinModel:
-#     """
-#     Simplified model for coin return predictions. Assumes pre-joined feature dataset.
-#     """
+        # Create preprocessor
+        preprocessor = ColumnTransformer(
+            transformers=[
+                ('features', StandardScaler(), feature_cols)
+            ],
+            remainder='drop'
+        )
 
-#     def __init__(self, wallets_coin_config: Dict):
-#         """
-#         Params:
-#         - wallets_coin_config (dict): wallets_coin_config.yaml
-#         """
-#         self.wallets_coin_config = wallets_coin_config
-#         self.pipeline = None
-#         self.X_train = None
-#         self.X_test = None
-#         self.y_train = None
-#         self.y_test = None
-#         self.y_pred = None
-#         self.training_data = None
+        # Create model
+        model = XGBRegressor(**self.wallets_coin_config['coin_modeling']['model_params'])
 
-    # def _prepare_data(self, feature_df: pd.DataFrame) -> None:
-    #     """
-    #     Params:
-    #     - feature_df (DataFrame): Pre-joined dataframe with features and target
-    #     """
-    #     self.training_data = feature_df.copy()
+        # Build pipeline
+        self.pipeline = Pipeline([
+            ('preprocessor', preprocessor),
+            ('regressor', model)
+        ])
 
-    #     # Separate features and target
-    #     target_var = self.wallets_coin_config['coin_modeling']['target_variable']
-    #     X = feature_df.drop(target_var, axis=1)
-    #     y = feature_df[target_var]
+    def run_experiment(self, feature_df: pd.DataFrame,
+                    return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
+        """
+        Params:
+        - feature_df (DataFrame): Pre-joined feature and target data
+        - return_data (bool): Whether to return data splits and predictions
 
-    #     # Split train/test
-    #     self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-    #         X, y, test_size=0.2, random_state=42
-    #     )
+        Returns:
+        - result (dict): Contains fitted pipeline and optionally train/test data
+        """
+        self._prepare_data(feature_df)
+        self._build_pipeline()
+        self.pipeline.fit(self.X_train, self.y_train)
 
-    # def _build_pipeline(self) -> None:
-    #     """Build scikit-learn pipeline with scaling and XGBoost model"""
-    #     # Get columns to drop
-    #     drop_cols = self.wallets_coin_config['coin_modeling']['drop_columns']
+        result = {'pipeline': self.pipeline}
 
-    #     # Define feature columns
-    #     feature_cols = [col for col in self.X_train.columns
-    #                    if col not in (drop_cols or [])]
+        if return_data:
+            # Test predictions
+            self.y_pred = pd.Series(
+                self.pipeline.predict(self.X_test),
+                index=self.X_test.index
+            )
 
-    #     # Create preprocessor
-    #     preprocessor = ColumnTransformer(
-    #         transformers=[
-    #             ('features', StandardScaler(), feature_cols)
-    #         ],
-    #         remainder='drop'
-    #     )
+            result.update({
+                'X_train': self.X_train,
+                'X_test': self.X_test,
+                'y_train': self.y_train,
+                'y_test': self.y_test,
+                'y_pred': self.y_pred,
+            })
 
-#         # Create model
-#         model = XGBRegressor(**self.wallets_coin_config['coin_modeling']['model_params'])
-
-#         # Build pipeline
-#         self.pipeline = Pipeline([
-#             ('preprocessor', preprocessor),
-#             ('regressor', model)
-#         ])
-
-#     def run_experiment(self, feature_df: pd.DataFrame,
-#                     return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
-#         """
-#         Params:
-#         - feature_df (DataFrame): Pre-joined feature and target data
-#         - return_data (bool): Whether to return data splits and predictions
-
-#         Returns:
-#         - result (dict): Contains fitted pipeline and optionally train/test data
-#         """
-#         self._prepare_data(feature_df)
-#         self._build_pipeline()
-#         self.pipeline.fit(self.X_train, self.y_train)
-
-#         result = {'pipeline': self.pipeline}
-
-#         if return_data:
-#             # Test predictions
-#             self.y_pred = pd.Series(
-#                 self.pipeline.predict(self.X_test),
-#                 index=self.X_test.index
-#             )
-
-#             result.update({
-#                 'X_train': self.X_train,
-#                 'X_test': self.X_test,
-#                 'y_train': self.y_train,
-#                 'y_test': self.y_test,
-#                 'y_pred': self.y_pred,
-#             })
-
-#         return result
+        return result
