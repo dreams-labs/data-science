@@ -25,12 +25,20 @@ wallet_features:
         'net_gain_raw'
     ]
 
+    # Wallets with volume/balances below this won't be counted in medians/distributions/etc
+    usd_materiality: 20
+
+    # Metrics to drop based on low obsserved importance
+    drop_trading_metrics: [
+        'average_transaction'
+    ]
+
 
 # How to segment wallet features
 wallet_segmentation:
-    score_segment_quantiles: [0.1, 0.3, 0.5, 0.7, 0.9]  # higher is better; how to assign wallet a score segment
-    # score_segment_quantiles: [0.05, 0.15, 0.5, 0.85, 0.95]  # higher is better; how to assign wallet a score segment
-    training_period_n_clusters: 4  # which n clusters assignment from the training period to segment by
+    # score_segment_quantiles: [0.1, 0.3, 0.5, 0.7, 0.9]  # higher is better; how to assign wallet a score segment
+    score_segment_quantiles: [0.05, 0.15, 0.5, 0.85, 0.95]  # higher is better; how to assign wallet a score segment
+    training_period_cluster_groups: [2, 4]  # which n clusters assignment from the training period to segment by
 
 # Variables used in the generation of the validation period coin model
 coin_modeling:
@@ -39,13 +47,21 @@ coin_modeling:
     min_cohort_wallets: 25  # how many wallets must hold a coin for the coin to be elegible for forecasting
     min_cohort_balance: 25000  # how much USD all wallets must hold for the coin to be elegible for forecasting
 
+    # Params used to remove unnecessary features
+    feature_selection:
+        variance_threshold: 0.02
+        correlation_threshold: 0.95
+
     # Thresholds for coin inclusion in training data
     min_market_cap: 00_000  # coins below this market cap will not be included in performance assessments
     max_market_cap: 999350_000_000  # coins above this market cap will not be included in performance assessments
 
     # Target variable parameters
-    # target_variable: "coin_return_winsorized"
-    target_variable: "coin_return_pctile"
+    target_variable: "coin_return_winsorized"
+    # target_variable: "coin_return_pctile_full"
+    # target_variable: "coin_return_pctile"
+
+
     returns_winsorization: 0.02
     drop_columns: [
         # # 'balance_wtd_mean_score',
@@ -62,5 +78,11 @@ coin_modeling:
     # Model params
     model_type: "xgb"
     model_params:
+        n_estimators: 100
+        max_depth: 2
+        learning_rate: 0.01
+        subsample: 0.6
+        colsample_bytree: 0.1
+        min_child_weight: 10
         random_state: 42
         n_jobs: -1

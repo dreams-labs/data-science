@@ -1,12 +1,17 @@
-# Modeling folders
-/modeling/
-/wallet_modeling/
+# Modeling artifacts
+/artifacts/
 
 # Config archive
 /config_archive/
 
+# Notebooks archive
+/notebooks/archived/
+
 # temp files
 temp/
+
+# Logs
+/logs/
 
 # DS_Store
 .DS_Store

@@ -3,28 +3,18 @@ Functions for assigning wallets to different segments or cohorts, which can then
 used to compare metrics between the features.
 """
 import logging
-from pathlib import Path
-import yaml
 import pandas as pd
 import numpy as np
 
 # local module imports
-from wallet_modeling.wallets_config_manager import WalletsConfig
+import wallet_features.clustering_features as wcl
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
 
-# Locate the config directory
-current_dir = Path(__file__).parent
-config_directory = current_dir / '..' / '..' / 'config'
-
-# Load wallets_config at the module level
-wallets_config = WalletsConfig()
-wallets_coin_config = yaml.safe_load((config_directory / 'wallets_coin_config.yaml').read_text(encoding='utf-8'))  # pylint:disable=line-too-long
 
 
-
-def assign_wallet_quantiles(score_series: pd.Series, quantiles: list[float]) -> pd.DataFrame:
+def calculate_wallet_quantiles(score_series: pd.Series, quantiles: list[float]) -> pd.DataFrame:
     """
     Assigns each wallet to a single quantile bucket based on score.
 
@@ -63,7 +53,7 @@ def assign_wallet_quantiles(score_series: pd.Series, quantiles: list[float]) -> 
         bins=bin_edges,
         labels=bin_labels,
         include_lowest=True
-    ).astype(str)
+    ).astype('category')
 
     # Validate all wallets have segments and segment count is correct
     unique_segments = result_df[column_name].unique()
@@ -76,7 +66,7 @@ def assign_wallet_quantiles(score_series: pd.Series, quantiles: list[float]) -> 
 
 
 
-def quantize_all_wallet_scores(wallet_segmentation_df, wallet_scores, score_segment_quantiles):
+def assign_wallet_score_quantiles(wallet_segmentation_df, wallet_scores, score_segment_quantiles):
     """
     Generates categorical quantiles for each wallet across each score and residual.
 
@@ -93,12 +83,12 @@ def quantize_all_wallet_scores(wallet_segmentation_df, wallet_scores, score_segm
     for score_name in wallet_scores:
 
         # Append score quantiles
-        wallet_quantiles = assign_wallet_quantiles(wallet_segmentation_df[f'scores|{score_name}/score'],
+        wallet_quantiles = calculate_wallet_quantiles(wallet_segmentation_df[f'scores|{score_name}_score'],
                                                    score_segment_quantiles)
         wallet_segmentation_df = wallet_segmentation_df.join(wallet_quantiles,how='inner')
 
         # Append residual quantiles
-        wallet_quantiles = assign_wallet_quantiles(wallet_segmentation_df[f'scores|{score_name}/residual'],
+        wallet_quantiles = calculate_wallet_quantiles(wallet_segmentation_df[f'scores|{score_name}_residual'],
                                                    score_segment_quantiles)
         wallet_segmentation_df = wallet_segmentation_df.join(wallet_quantiles,how='inner')
 
@@ -106,7 +96,34 @@ def quantize_all_wallet_scores(wallet_segmentation_df, wallet_scores, score_segm
 
 
 
-def add_quantile_columns(validation_coin_wallet_features_df: pd.DataFrame, n_quantiles: int) -> pd.DataFrame:
+def assign_cluster_labels(training_data_df: pd.DataFrame, cluster_groups: list) -> pd.DataFrame:
+    """
+    Params:
+    - training_data_df (DataFrame): Training data for clustering
+    - n_clusters (list): List of cluster counts to generate
+
+    Returns:
+    - combined_clusters_df (DataFrame): Single DataFrame with all cluster labels
+    """
+    # Create list of cluster dataframes
+    cluster_dfs = []
+
+    for n in cluster_groups:
+        wallet_clusters_df = wcl.assign_clusters_from_distances(training_data_df, [n])
+        wallet_clusters_df[f'k{n}_cluster'] = 'cluster_' + wallet_clusters_df[f'k{n}_cluster'].astype(str)
+        wallet_clusters_df[f'k{n}_cluster'] = wallet_clusters_df[f'k{n}_cluster'].astype('category')
+        wallet_clusters_df = wallet_clusters_df.add_prefix('training_clusters|')
+        cluster_dfs.append(wallet_clusters_df)
+
+    # Single join operation
+    combined_clusters_df = pd.concat(cluster_dfs, axis=1)
+
+    return combined_clusters_df
+
+
+
+
+def add_feature_quantile_columns(validation_coin_wallet_features_df: pd.DataFrame, n_quantiles: int) -> pd.DataFrame:
     """
     Adds quantile columns for each base metric in the dataframe.
 

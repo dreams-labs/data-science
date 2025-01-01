@@ -13,7 +13,7 @@ from sklearn.metrics import (
 
 # Local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
-import wallet_insights.wallet_model_evaluation as wime
+import wallet_insights.model_evaluation as wime
 
 # plint:disable=invalid-name  # X isn't snake case
 

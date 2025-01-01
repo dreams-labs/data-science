@@ -19,18 +19,14 @@ training_data:
 # Variables used to clean and filter raw data before training data is built
 data_cleaning:
 
-    # Modeling period filters
-    modeling_min_investment: 100
-    modeling_min_coins_traded: 0
-
     # Wallet cohort thresholds
     min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
     max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
-    min_wallet_investment: 5000 # time weighted average balance filter
+    min_wallet_investment: 1000 # time weighted average balance filter
     max_wallet_investment: 10_000_000 # time weighted average balance filter
-    min_wallet_volume: 20000  # Exclude wallets with fewer than this amount of training period USD volume
+    min_wallet_volume: 5000  # Exclude wallets with fewer than this amount of training period USD volume
     max_wallet_volume: 25_000_000  # Exclude wallets with fewer than this amount of training period USD volume
-    min_wallet_inflows: 5000  # Exclude wallets with inflows below this amount (USD)
+    min_wallet_inflows: 1000  # Exclude wallets with inflows below this amount (USD)
     max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
     max_wallet_profits: 100_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
 
@@ -69,10 +65,13 @@ features:
 
 # Variables used for model generation
 modeling:
-    # Which wallet performance metric to use as the target variable. Options are:
-    # invested, crypto_net_gain, return, risk_adj_return, performance_score, log_weighted_return, hybrid_score, size_adjusted_rank
+    # Modeling period filters
+    modeling_min_investment: 100
+    modeling_min_coins_traded: 0
+
+    # Which wallet performance metric to use as the target variable.
     target_variable: "crypto_net_gain/max_investment/ntile_rank"
-    score_name: "net_gain_raw"  # only used for column names in coin features
+    score_name: "net_gain_raw"  # reference name for feature columns etc
     drop_columns: []
     preprocessing_scaler: "none"
 
