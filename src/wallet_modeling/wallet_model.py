@@ -31,6 +31,12 @@ class BaseModel:
         self.y_pred = None
         self.training_data_df = None
 
+        # Grid Search Objects
+        self.random_search = None
+        self.cv_results_ = None
+        self.best_params_ = None
+        self.best_score_ = None
+
 
     def _build_pipeline(self) -> None:
         """
@@ -69,8 +75,8 @@ class BaseModel:
             ('regressor', XGBRegressor(**cv_model_params))
         ])
 
-        # Perform randomized search
-        random_search = RandomizedSearchCV(
+        # Store the search object in the instance
+        self.random_search = RandomizedSearchCV(
             cv_pipeline,
             grid_search_params['param_grid'],
             n_iter = grid_search_params['n_iter'],
@@ -81,14 +87,32 @@ class BaseModel:
             random_state = cv_model_params.get('random_state', 42),
         )
 
-        random_search.fit(X, y)
+        # Store intermediate results in the instance
+        self.cv_results_ = []
+        self.best_params_ = None
+        self.best_score_ = float('inf')
+
+        try:
+            self.random_search.fit(X, y)
+            # Store final results
+            self.cv_results_ = self.random_search.cv_results_
+            self.best_params_ = self.random_search.best_params_
+            self.best_score_ = -self.random_search.best_score_
+        except KeyboardInterrupt:
+            logger.info("Grid search interrupted. Saving partial results...")
+            if hasattr(self.random_search, 'cv_results_'):
+                self.cv_results_ = self.random_search.cv_results_
+                self.best_params_ = self.random_search.best_params_
+                self.best_score_ = -self.random_search.best_score_
+
+
+        self.random_search.fit(X, y)
 
         return {
-            'best_params': random_search.best_params_,
-            'best_score': -random_search.best_score_,
-            'cv_results': random_search.cv_results_
+            'best_params': self.random_search.best_params_,
+            'best_score': -self.random_search.best_score_,
+            'cv_results': self.random_search.cv_results_
         }
-
 
     def _fit(self) -> None:
         """

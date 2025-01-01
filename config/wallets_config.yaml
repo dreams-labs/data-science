@@ -71,9 +71,9 @@ modeling:
     modeling_min_coins_traded: 0
 
     # Which wallet performance metric to use as the target variable.
-    target_variable: "crypto_net_gain"
+    # target_variable: "crypto_net_gain"
     # target_variable: "crypto_net_gain/max_investment/ntile_rank"
-    # target_variable: "crypto_net_gain/max_investment/winsorized"
+    target_variable: "crypto_net_gain/max_investment/winsorized"
     drop_columns: []
     train_test_split: 0.2  # test size
 
@@ -99,20 +99,19 @@ modeling:
 
         # Search methodology
         enabled: true # whether to grid search
-        n_iter: 15  # random search limit
+        n_iter: 80  # random search limit
         scoring: 'neg_root_mean_squared_error'
         n_splits: 3  # cv splits
         n_jobs: -1
-        verbose_level: 3  # scikit-learn verbosity
+        verbose_level: 1  # scikit-learn verbosity
 
         # Params
         param_grid:
-            regressor__n_estimators: [500]
-            regressor__max_depth: [6, 7, 8]
-            regressor__learning_rate: [0.01, 0.03, 0.05]
-            regressor__colsample_bytree: [0.8, 1.0]  # Add feature sampling
-            regressor__gamma: [0, 0.1, 0.2]  # Add split threshold
-
+            regressor__n_estimators: [400, 500, 600]
+            regressor__max_depth: [5, 6, 7, 8]
+            regressor__learning_rate: [0.01, 0.03, 0.05, 0.07]
+            regressor__colsample_bytree: [0.6, 0.8, 1.0]
+            regressor__gamma: [0, 0.1, 0.2]
 
     # Coin model workflow params
     score_name: "iterating"  # reference name for feature columns etc
