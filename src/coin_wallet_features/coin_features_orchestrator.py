@@ -65,7 +65,7 @@ def load_wallet_scores(wallet_scores: list, wallet_scores_path: str) -> pd.DataF
 # ------------------------------------------------------- #
 
 
-def calculate_segment_metrics(
+def calculate_aggregation_metrics(
     analysis_df: pd.DataFrame,
     segment_family: str,
     segment_value: str,
@@ -108,6 +108,7 @@ def calculate_segment_metrics(
     ).fillna(0)
 
     return metrics
+
 
 def calculate_score_weighted_metrics(
     analysis_df: pd.DataFrame,
@@ -160,7 +161,9 @@ def calculate_score_distribution_metrics(
     score_columns: List[str],
     usd_materiality: float = 20.0
 ) -> pd.DataFrame:
-    """Calculate distribution metrics for scores within a segment.
+    """
+    Calculate distribution metrics (median, p10, p90, std) for multiple score columns
+    without inline lambdas, potentially improving performance for large data.
 
     Params:
     - analysis_df (DataFrame): MultiIndexed (coin_id, wallet_address) data
@@ -171,42 +174,46 @@ def calculate_score_distribution_metrics(
     - usd_materiality (float): USD threshold for including wallets
 
     Returns:
-    - DataFrame: Score distribution metrics for segment
+    - DataFrame: Distribution metrics for each score column
     """
-    # Filter for segment and materiality threshold
-    segment_data = analysis_df[
+    # filter for segment & minimum USD
+    seg_data = analysis_df[
         (analysis_df[segment_family] == segment_value) &
         (analysis_df[metric_column] >= usd_materiality)
-    ]
+    ].copy()
 
-    # Calculate metrics for each score using vectorized operations
-    dist_metrics = {}
+    # 1) median
+    median_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].median()
 
-    for score_col in score_columns:
-        # Group by coin_id and calculate metrics
-        metrics = segment_data.groupby(level='coin_id', observed=True)[score_col].agg([
-            ('median', 'median'),
-            ('p10', lambda x: x.quantile(0.1)),
-            ('p90', lambda x: x.quantile(0.9)),
-            ('std', 'std')
-        ])
+    # 2) p10
+    p10_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.1)
 
-        # Rename columns with proper prefixes
-        score_name = score_col.split('|')[1]  # Extract score name
-        renamed_cols = {
-            stat: f'{segment_family}/{segment_value}|{metric_column}|score_dist/{score_name}_{stat}'
-            for stat in metrics.columns
-        }
-        metrics = metrics.rename(columns=renamed_cols)
+    # 3) p90
+    p90_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.9)
 
-        # Add to results
-        if dist_metrics:
-            dist_metrics = dist_metrics.join(metrics, how='outer')
-        else:
-            dist_metrics = metrics
+    # 4) std
+    std_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].std()
 
-    return dist_metrics.fillna(0)
+    # rename columns and combine
+    def rename_cols(df: pd.DataFrame, suffix: str) -> pd.DataFrame:
+        """
+        Add naming convention for each metric type.
+        """
+        new_cols = {}
+        for c in df.columns:
+            score_name = c.split('|')[1]  # e.g. "score|xxx" -> "xxx"
+            new_cols[c] = f'{segment_family}/{segment_value}|{metric_column}|score_dist/{score_name}_{suffix}'
+        return df.rename(columns=new_cols)
 
+    median_df = rename_cols(median_df, 'median')
+    p10_df = rename_cols(p10_df, 'p10')
+    p90_df = rename_cols(p90_df, 'p90')
+    std_df = rename_cols(std_df, 'std')
+
+    # merge all results horizontally
+    metrics_df = median_df.join([p10_df, p90_df, std_df], how='outer').fillna(0)
+
+    return metrics_df
 
 
 def flatten_cw_to_coin_features(
@@ -253,28 +260,32 @@ def flatten_cw_to_coin_features(
     result_df = pd.DataFrame(index=pd.Index(all_coin_ids, name='coin_id'))
 
     for segment_value in wallet_segmentation_df[segment_family].unique():
-        # Get existing metrics
-        segment_metrics = calculate_segment_metrics(
+        # Computes basic aggregations
+        aggregation_metrics_df = calculate_aggregation_metrics(
             analysis_df, segment_family, segment_value,
             metric_column, totals_df
         )
+        result_df = result_df.join(aggregation_metrics_df,how='left')\
+            .fillna({col: 0 for col in aggregation_metrics_df.columns})
 
-        score_metrics = calculate_score_weighted_metrics(
+
+        # Computes weighted balance scores
+        score_metrics_df = calculate_score_weighted_metrics(
             analysis_df, segment_family, segment_value,
             metric_column, score_columns
         )
+        result_df = result_df.join(score_metrics_df,how='left') # leave nulls as null
 
-        # Add new distribution metrics
-        score_dist_metrics = calculate_score_distribution_metrics(
-            analysis_df, segment_family, segment_value,
-            metric_column, score_columns, usd_materiality
-        )
 
-        # Combine all metrics
-        combined_metrics = segment_metrics.join([score_metrics, score_dist_metrics], how='outer')
-        result_df = result_df.join(combined_metrics, how='left')
+        # Checks if the column is includes material usd values
+        if wallet_metric_df[metric_column].abs().mean() > (10 * usd_materiality):
 
-    result_df = result_df.fillna(0)
+            # Add new distribution metrics
+            score_dist_metrics_df = calculate_score_distribution_metrics(
+                analysis_df, segment_family, segment_value,
+                metric_column, score_columns, usd_materiality
+            )
+            result_df = result_df.join(score_dist_metrics_df,how='left') # leave nulls as null
 
     # Validation
     missing_coins = set(all_coin_ids) - set(result_df.index)

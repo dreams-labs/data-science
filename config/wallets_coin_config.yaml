@@ -28,6 +28,7 @@ wallet_features:
     # Wallets with volume/balances below this won't be counted in medians/distributions/etc
     usd_materiality: 20
 
+    # Metrics to drop based on low obsserved importance
     drop_trading_metrics: [
         'average_transaction'
     ]
@@ -56,9 +57,9 @@ coin_modeling:
     max_market_cap: 999350_000_000  # coins above this market cap will not be included in performance assessments
 
     # Target variable parameters
-    # target_variable: "coin_return_winsorized"
+    target_variable: "coin_return_winsorized"
     # target_variable: "coin_return_pctile_full"
-    target_variable: "coin_return_pctile"
+    # target_variable: "coin_return_pctile"
 
 
     returns_winsorization: 0.02
