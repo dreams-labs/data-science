@@ -30,19 +30,53 @@ class BaseModel:
         self.y_test = None
         self.y_pred = None
         self.training_data_df = None
-
-        # Grid Search Objects
         self.random_search = None
-        self.cv_results_ = None
-        self.best_params_ = None
-        self.best_score_ = None
+
+
+    def _convert_min_child_pct_to_weight(self, X: pd.DataFrame, base_pct: float = 0.01) -> int:
+        """
+        Calculate min_child_weight based on dataset size.
+
+        Params:
+        - X (DataFrame): feature data to determine size from
+        - base_pct (float): baseline percentage for min_child_weight calculation
+
+        Returns:
+        - min_child_weight (int): calculated minimum child weight
+        """
+        n_samples = X.shape[0]
+        return max(1, int(n_samples * base_pct))
+
+    def _convert_min_child_weight_to_pct(self, X: pd.DataFrame, min_child_weight: int) -> float:
+        """
+        Convert min_child_weight back to percentage based on dataset size.
+
+        Params:
+        - X (DataFrame): feature data used for size calculation
+        - min_child_weight (int): minimum child weight value
+
+        Returns:
+        - pct (float): corresponding percentage of dataset size
+        """
+        n_samples = X.shape[0]
+        return min_child_weight / n_samples
+
 
 
     def _build_pipeline(self) -> None:
         """
         Build basic XGBoost pipeline. Override for custom preprocessing.
         """
-        model = XGBRegressor(**self.modeling_config['model_params'])
+        model_params = self.modeling_config['model_params'].copy()
+
+        # Update min_child_weight if percentage is specified
+        if model_params.get('min_child_weight_pct'):
+            model_params['min_child_weight'] = self._convert_min_child_pct_to_weight(
+                self.X_train,
+                model_params.pop('min_child_weight_pct')
+            )
+
+        model = XGBRegressor(**model_params)
         self.pipeline = Pipeline([
             ('regressor', model)
         ])
@@ -62,11 +96,23 @@ class BaseModel:
         if not self.modeling_config.get('grid_search_params', {}).get('enabled'):
             return {}
 
-        # Get CV parameters from config
-        grid_search_params = self.modeling_config['grid_search_params']
-
-        # Copy model params but remove the ones that don't apply to skl cross validation
+        # Get base model params and handle child weight percentages
         cv_model_params = self.modeling_config['model_params'].copy()
+        if cv_model_params.get('min_child_weight_pct'):
+            cv_model_params['min_child_weight'] = self._convert_min_child_pct_to_weight(
+                self.X_train,
+                cv_model_params.pop('min_child_weight_pct')
+            )
+
+        # Get grid search params and handle child weight percentages
+        grid_search_params = self.modeling_config['grid_search_params']
+        if 'regressor__min_child_weight_pct' in grid_search_params['param_grid']:
+            pct_grid = grid_search_params['param_grid'].pop('regressor__min_child_weight_pct')
+            grid_search_params['param_grid']['regressor__min_child_weight'] = [
+                self._convert_min_child_pct_to_weight(X, pct) for pct in pct_grid
+            ]
+
+        # Remove params that don't apply to the model
         for param in ['early_stopping_rounds', 'eval_metric', 'verbose']:
             cv_model_params.pop(param, None)
 
@@ -87,29 +133,13 @@ class BaseModel:
             random_state = cv_model_params.get('random_state', 42),
         )
 
-        # Store intermediate results in the instance
-        self.cv_results_ = []
-        self.best_params_ = None
-        self.best_score_ = float('inf')
-
-        try:
-            self.random_search.fit(X, y)
-            # Store final results
-            self.cv_results_ = self.random_search.cv_results_
-            self.best_params_ = self.random_search.best_params_
-            self.best_score_ = -self.random_search.best_score_
-        except KeyboardInterrupt:
-            logger.info("Grid search interrupted. Saving partial results...")
-            if hasattr(self.random_search, 'cv_results_'):
-                self.cv_results_ = self.random_search.cv_results_
-                self.best_params_ = self.random_search.best_params_
-                self.best_score_ = -self.random_search.best_score_
-
-
         self.random_search.fit(X, y)
 
         return {
-            'best_params': self.random_search.best_params_,
+            'best_params': {
+                k: (self._convert_min_child_weight_to_pct(X, v) if k == 'regressor__min_child_weight' else v)
+                for k, v in self.random_search.best_params_.items()
+            },
             'best_score': -self.random_search.best_score_,
             'cv_results': self.random_search.cv_results_
         }
