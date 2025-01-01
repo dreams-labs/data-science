@@ -25,6 +25,15 @@ wallet_features:
         'net_gain_raw'
     ]
 
+    # Wallets with volume/balances below this won't be counted in medians/distributions/etc
+    score_metrics_usd_threshold: 20
+
+    drop_trading_metrics: [
+        'active_time_weighted_balance',
+        'average_transaction',
+        'time_weighted_balance',
+    ]
+
 
 # How to segment wallet features
 wallet_segmentation:

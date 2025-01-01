@@ -77,7 +77,7 @@ class WalletModel:
         """
         Build the pipeline with column dropping, numeric scaling, and model.
         """
-        # TODO: will be implemented through ticket DDA-505
+        # TO DO: will be implemented through ticket DDA-505
         # # Configure column dropping
         # drop_cols = self.wallets_config['modeling']['drop_columns']
         # preprocessing_scaler = self.wallets_config['modeling']['preprocessing_scaler']
