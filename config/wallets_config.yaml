@@ -82,8 +82,8 @@ modeling:
 
     # Which wallet performance metric to use as the target variable.
     # target_variable: "crypto_net_gain"
-    # target_variable: "crypto_net_gain/max_investment/ntile_rank"
-    target_variable: "crypto_net_gain/max_investment/winsorized"
+    target_variable: "crypto_net_gain/max_investment/ntile_rank"
+    # target_variable: "crypto_net_gain/max_investment/winsorized"
     drop_columns: []
     train_test_split: 0.2  # test size
 
@@ -91,11 +91,15 @@ modeling:
     model_type: "xgb"
     model_params:
 
+    # -----------------------
+    # Wallet Model Params
+    # -----------------------
+
         # Model params
-        max_depth: 9
-        min_child_weight_pct: 0.01
-        n_estimators: 200
-        learning_rate: 0.07
+        max_depth: 15
+        min_child_weight_pct: 0.0001
+        n_estimators: 1000
+        learning_rate: 0.02
         colsample_bytree: 0.6
         gamma: 0.1
 
@@ -110,19 +114,25 @@ modeling:
     # Parameter tuning
     grid_search_params:
 
-        # Search methodology
         enabled: true # whether to grid search
-        n_iter: 20  # random search limit
+
+        # Search methodology
+        n_iter: 35  # random search limit
         scoring: 'neg_root_mean_squared_error'
-        n_splits: 3  # cv splits
+        n_splits: 2  # cv splits
         n_jobs: -1
         verbose_level: 3  # scikit-learn verbosity
 
         # Params
         param_grid:
+            # params to test
+            regressor__max_depth: [11, 13, 15, 17, 19]
+            regressor__min_child_weight_pct: [0.00002, 0.00005, 0.0001, 0.0002, 0.005]
+            regressor__subsample: [0.7, 0.85, 1.0]
+
+            # params that keep the model speedy
             regressor__n_estimators: [150]
-            regressor__max_depth: [7, 9, 11, 13, 15]
-            regressor__min_child_weight_pct: [0.00005, 0.0001, 0.0002, 0.005, 0.01, 0.02]
+            regressor__learning_rate: [0.1]
 
     # Coin model workflow params
     score_name: "iterating"  # reference name for feature columns etc

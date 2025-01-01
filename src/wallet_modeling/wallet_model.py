@@ -3,9 +3,8 @@ import logging
 from typing import Dict, Union, Tuple
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split,RandomizedSearchCV
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
-from xgboost import XGBRegressor
 
 # Local modules
 from base_modeling.base_model import BaseModel
@@ -14,6 +13,7 @@ from base_modeling.base_model import BaseModel
 logger = logging.getLogger(__name__)
 
 
+# pylint: disable=W0201  # Attribute defined outside __init__, false positive due to inheritance
 class WalletModel(BaseModel):
     """
     Wallet-specific model implementation.

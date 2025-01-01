@@ -192,7 +192,7 @@ class RegressionEvaluator:
         """Generate formatted summary of model performance."""
         summary = [
             "Model Performance Summary",
-            "=" * 50,
+            "=" * 35,
         ]
 
         # Add sample sizes
