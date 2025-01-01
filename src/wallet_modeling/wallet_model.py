@@ -11,26 +11,72 @@ from xgboost import XGBRegressor
 logger = logging.getLogger(__name__)
 
 
-class WalletModel:
+class BaseModel:
     """
-    A class for running wallet model experiments with a single model.
-    Encapsulates data preparation, training, prediction, and result management.
+    Base class for XGBoost-based prediction models.
+    Handles core pipeline functionality, data preparation, and model training.
     """
 
-    def __init__(self, wallets_config):
+    def __init__(self, modeling_config):
         """
         Params:
         - wallets_config (dict): configuration dictionary for modeling parameters.
         """
-        self.wallets_config = wallets_config
+        self.modeling_config = modeling_config
         self.pipeline = None
         self.X_train = None
         self.X_test = None
         self.y_train = None
         self.y_test = None
         self.y_pred = None
-        self.training_data_df = None  # Store full training cohort dataset for later scoring
+        self.training_data_df = None
 
+
+    def _build_pipeline(self) -> None:
+        """
+        Build basic XGBoost pipeline. Override for custom preprocessing.
+        """
+        model = XGBRegressor(**self.modeling_config['model_params'])
+        self.pipeline = Pipeline([
+            ('regressor', model)
+        ])
+
+
+    def _fit(self) -> None:
+        """
+        Fit the pipeline on training data with early stopping using test set.
+        """
+        # Create eval set for monitoring validation performance
+        eval_set = [(self.X_test, self.y_test)]
+
+        # Pass eval_set to XGBoost through the pipeline
+        # The regressor__ prefix routes the parameter to the XGBoost step
+        self.pipeline.fit(
+            self.X_train,
+            self.y_train,
+            regressor__eval_set=eval_set
+        )
+
+    def _predict(self) -> pd.Series:
+        """
+        Make predictions on the test set.
+
+        Returns:
+        - predictions (Series): predicted values for the test set, indexed like y_test
+        """
+        # Get raw predictions from pipeline
+        raw_predictions = self.pipeline.predict(self.X_test)
+
+        # Convert to Series with same index as test data
+        self.y_pred = pd.Series(raw_predictions, index=self.X_test.index)
+        return self.y_pred
+
+
+class WalletModel(BaseModel):
+    """
+    Wallet-specific model implementation.
+    Extends BaseModel with wallet-specific data preparation and grid search.
+    """
 
     def _prepare_data(self, training_data_df: pd.DataFrame, modeling_cohort_target_var_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
         """
@@ -62,7 +108,7 @@ class WalletModel:
         modeling_df = modeling_df[modeling_cohort_mask]
 
         # Separate target variable
-        target_var = self.wallets_config['modeling']['target_variable']
+        target_var = self.modeling_config['target_variable']
         X = modeling_df.drop([target_var, 'in_modeling_cohort'], axis=1)
         y = modeling_df[target_var]
 
@@ -72,23 +118,6 @@ class WalletModel:
         )
 
         return X, y
-
-
-    def _build_pipeline(self) -> None:
-        """
-        Build the pipeline with column dropping, numeric scaling, and model.
-        """
-
-        # Define the model
-        if self.wallets_config['modeling']['model_type'] == 'xgb':
-            model = XGBRegressor(**self.wallets_config['modeling']['model_params'])
-        else:
-            raise ValueError("Invalid model type found in wallets_config['modeling']['model_type'].")
-
-        # Create pipeline
-        self.pipeline = Pipeline([
-            ('regressor', model)
-        ])
 
 
     def _run_grid_search(self, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
@@ -102,17 +131,17 @@ class WalletModel:
         Returns:
         - cv_results (dict): Mean and std of CV scores
         """
-        if not self.wallets_config['modeling'].get('grid_search_params', {}).get('enabled'):
+        if not self.modeling_config.get('grid_search_params', {}).get('enabled'):
             return {}
 
         # Get CV parameters from config
-        grid_search_params = self.wallets_config['modeling']['grid_search_params']
+        grid_search_params = self.modeling_config['grid_search_params']
         n_splits = grid_search_params.get('n_splits', 5)
 
         param_grid = grid_search_params['param_grid']
 
         # Create base model without early stopping params
-        cv_model_params = self.wallets_config['modeling']['model_params'].copy()
+        cv_model_params = self.modeling_config['model_params'].copy()
         cv_model_params.pop('early_stopping_rounds', None)
         cv_model_params.pop('eval_metric', None)
         cv_model_params.pop('verbose', None)
@@ -140,35 +169,6 @@ class WalletModel:
             'cv_results': grid_search.cv_results_
         }
 
-    def _fit(self) -> None:
-        """
-        Fit the pipeline on training data with early stopping using test set.
-        """
-        # Create eval set for monitoring validation performance
-        eval_set = [(self.X_test, self.y_test)]
-
-        # Pass eval_set to XGBoost through the pipeline
-        # The regressor__ prefix routes the parameter to the XGBoost step
-        self.pipeline.fit(
-            self.X_train,
-            self.y_train,
-            regressor__eval_set=eval_set
-        )
-
-
-    def _predict(self) -> pd.Series:
-        """
-        Make predictions on the test set.
-
-        Returns:
-        - predictions (Series): predicted values for the test set, indexed like y_test
-        """
-        # Get raw predictions from pipeline
-        raw_predictions = self.pipeline.predict(self.X_test)
-
-        # Convert to Series with same index as test data
-        self.y_pred = pd.Series(raw_predictions, index=self.X_test.index)
-        return self.y_pred
 
 
     def _predict_training_cohort(self) -> pd.Series:
@@ -232,7 +232,7 @@ class WalletModel:
                 k.replace('regressor__', ''): v
                 for k, v in cv_results['best_params'].items()
             }
-            self.wallets_config['modeling']['model_params'].update(best_params)
+            self.modeling_config['model_params'].update(best_params)
             logger.info(f"Updated model params with CV best params: {best_params}")
 
         # Build and fit final model
@@ -249,7 +249,7 @@ class WalletModel:
         if return_data:
             y_pred = self._predict()
             training_cohort_pred = self._predict_training_cohort()
-            target_var = self.wallets_config['modeling']['target_variable']
+            target_var = self.modeling_config['target_variable']
             full_cohort_actuals = modeling_cohort_target_var_df[target_var]
 
             result.update({
