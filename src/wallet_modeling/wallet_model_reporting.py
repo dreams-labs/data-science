@@ -103,7 +103,7 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path):
         how='left'
     )
     wallet_scores_path = base_dir / 'wallet_scores' / f"wallet_scores_{model_id}.csv"
-    wallet_scores_df.to_csv(wallet_scores_path, index=False)
+    wallet_scores_df.to_csv(wallet_scores_path, index=True)
     logger.info(f"Saved wallet scores and addresses to {wallet_scores_path}")
 
     return model_id

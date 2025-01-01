@@ -73,7 +73,7 @@ def save_coin_model_artifacts(model_results, evaluation_dict, configs, base_path
     coin_scores_df = pd.DataFrame(model_results['y_pred'])
     coin_scores_df.columns = ['y_pred']
     coin_scores_path = base_dir / 'coin_scores' / f"coin_scores_{model_id}.csv"
-    coin_scores_df.to_csv(coin_scores_path, index=False)
+    coin_scores_df.to_csv(coin_scores_path, index=True)
     logger.info(f"Saved coin scores and addresses to {coin_scores_path}")
 
     return model_id
