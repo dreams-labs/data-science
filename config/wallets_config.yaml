@@ -61,7 +61,7 @@ features:
 
     # Performance params
     ranking_ntiles: 4
-    returns_winsorization: 0.01
+    returns_winsorization: 0.02
 
 # Variables used for model generation
 modeling:

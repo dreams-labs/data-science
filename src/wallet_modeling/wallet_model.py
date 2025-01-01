@@ -105,6 +105,51 @@ class BaseModel:
             regressor__eval_set=eval_set
         )
 
+
+    def run_base_experiment(self, return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
+        """
+        Core experiment runner with parameter tuning and model fitting.
+
+        Params:
+        - return_data (bool): Whether to return train/test splits and predictions
+
+        Returns:
+        - result (dict): Contains fitted pipeline and optionally train/test data
+        """
+        if self.X_train is None or self.y_train is None:
+            raise ValueError("Data must be prepared before running experiment")
+
+        cv_results = self._run_grid_search(self.X_train, self.y_train)
+
+        if cv_results.get('best_params'):
+            best_params = {
+                k.replace('regressor__', ''): v
+                for k, v in cv_results['best_params'].items()
+            }
+            self.modeling_config['model_params'].update(best_params)
+            logger.info(f"Updated model params with CV best params: {best_params}")
+
+        self._build_pipeline()
+        self._fit()
+
+        result = {
+            'pipeline': self.pipeline,
+            'cv_results': cv_results
+        }
+
+        if return_data:
+            self.y_pred = self._predict()  # Store prediction in instance
+            result.update({
+                'X_train': self.X_train,
+                'X_test': self.X_test,
+                'y_train': self.y_train,
+                'y_test': self.y_test,
+                'y_pred': self.y_pred,
+            })
+
+        return result
+
+
     def _predict(self) -> pd.Series:
         """
         Make predictions on the test set.
@@ -198,66 +243,38 @@ class WalletModel(BaseModel):
         return predictions
 
 
-    def run_experiment(self, training_data_df: pd.DataFrame, modeling_cohort_target_var_df: pd.DataFrame,
-                    return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
+    def run_wallet_experiment(self, training_data_df: pd.DataFrame,
+                            modeling_cohort_target_var_df: pd.DataFrame,
+                            return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
         """
+        Run wallet-specific modeling experiment.
+
         Params:
         - training_data_df (DataFrame): full training cohort feature data
-        - modeling_cohort_target_var_df (DataFrame): Contains in_modeling_cohort flag and target variable
-        - return_data (bool): whether to return train/test splits and predictions
+        - modeling_cohort_target_var_df (DataFrame): Contains modeling cohort flag and target
+        - return_data (bool): Whether to return train/test splits and predictions
 
         Returns:
-        - result (dict): contains pipeline, cv results if enabled, and optionally data splits and predictions
+        - result (dict): Contains fitted pipeline, predictions, and optional train/test data
         """
-        # Validate matching indexes and lengths
+        # Validate indexes match
         if not training_data_df.index.equals(modeling_cohort_target_var_df.index):
             raise ValueError(
                 "training_data_df and modeling_cohort_target_var_df must have identical indexes. "
                 f"Found lengths {len(training_data_df)} and {len(modeling_cohort_target_var_df)}"
             )
 
-        # Store data for CV and final training
-        self.training_data_df = training_data_df.copy()
+        # Run base experiment
+        self._prepare_data(training_data_df, modeling_cohort_target_var_df)
+        result = super().run_base_experiment(return_data)
 
-        # Prepare data
-        X, y = self._prepare_data(training_data_df, modeling_cohort_target_var_df)
-
-        # Run cross-validation if enabled and get best params
-        cv_results = self._run_grid_search(X, y)
-
-        # Update model params with best params from CV if available
-        if cv_results.get('best_params'):
-            # Remove 'regressor__' prefix from param names
-            best_params = {
-                k.replace('regressor__', ''): v
-                for k, v in cv_results['best_params'].items()
-            }
-            self.modeling_config['model_params'].update(best_params)
-            logger.info(f"Updated model params with CV best params: {best_params}")
-
-        # Build and fit final model
-        self._build_pipeline()
-        self._fit()
-
-        # Build results dict
-        result = {
-            'pipeline': self.pipeline,
-            'cv_results': cv_results
-        }
-
-        # Optionally return detailed data
+        # Add wallet-specific predictions if requested
         if return_data:
-            y_pred = self._predict()
             training_cohort_pred = self._predict_training_cohort()
             target_var = self.modeling_config['target_variable']
             full_cohort_actuals = modeling_cohort_target_var_df[target_var]
 
             result.update({
-                'X_train': self.X_train,
-                'X_test': self.X_test,
-                'y_train': self.y_train,
-                'y_test': self.y_test,
-                'y_pred': y_pred,
                 'training_cohort_pred': training_cohort_pred,
                 'training_cohort_actuals': full_cohort_actuals
             })
