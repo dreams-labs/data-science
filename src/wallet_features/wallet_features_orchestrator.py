@@ -74,7 +74,7 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
         .fillna({col: 0 for col in trading_features_df.columns})
 
     # Performance features (left join, do not fill)
-    # Inherits trading features imputed rows requirement
+    # Requires both starting_balance_date and period_end_date imputed rows (same as trading)
     # -----------------------------------------------------------------------
     performance_features_df = wpf.calculate_performance_features(wallet_features_df)
     feature_column_names['performance|'] = performance_features_df.columns
