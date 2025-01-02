@@ -24,6 +24,10 @@ wallets_config = WalletsConfig()
 wallets_metrics_config = u.load_config(config_directory / 'wallets_metrics_config.yaml')
 wallets_features_config = yaml.safe_load((config_directory / 'wallets_features_config.yaml').read_text(encoding='utf-8'))  # pylint:disable=line-too-long
 
+
+# -----------------------------
+# Main Interface
+# -----------------------------
 @u.timing_decorator
 def calculate_market_timing_features(profits_df, market_indicators_data_df):
     """
@@ -78,39 +82,43 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
 
 
 
+# -----------------------------
+# Component Functions
+# -----------------------------
+
 class FeatureConfigError(Exception):
     """Custom exception for feature configuration errors."""
     pass
 
 def calculate_offsets(
-    market_timing_df: pd.DataFrame
+    market_indicators_data_df: pd.DataFrame
 ) -> pd.DataFrame:
     """
     Calculate offset values for specified columns in market timing dataframe.
 
     Args:
-        market_timing_df: DataFrame containing market timing data
+        market_indicators_data_df: DataFrame containing market timing data
 
     Returns:
-        DataFrame with added offset columns
+        market_timing_df: DataFrame with added offset columns
 
     Raises:
         FeatureConfigError: If configuration is invalid or required columns are missing
     """
     # Create a copy of the input DataFrame to avoid modifying the original
-    result_df = market_timing_df.copy()
+    market_timing_df = market_indicators_data_df.copy()
 
     # Get the offsets configuration
     try:
         offset_config = wallets_features_config['market_timing']['offsets']
     except KeyError as e:
         raise FeatureConfigError("Config key ['market_timing']['offsets'] was not found in " \
-                               "wallets_features_config.") from e
+                                "wallets_features_config.") from e
 
     # Process each column and its offsets
     for column, column_config in offset_config.items():
         # Check if the column exists in the DataFrame
-        if column not in result_df.columns:
+        if column not in market_timing_df.columns:
             raise FeatureConfigError(f"Column '{column}' not found in DataFrame")
 
         # Extract offsets from the new config structure
@@ -127,15 +135,24 @@ def calculate_offsets(
             raise FeatureConfigError(f"Invalid configuration format for column '{column}': {str(e)}") from e
 
         # Calculate offset for each specified lead value
-        for lead in offsets:
-            new_column = f"{column}_lead_{lead}"
+        for offset in offsets:
+            if offset > 0:
+                new_column = f"{column}_lead_{offset}"
+            elif offset < 0:
+                new_column = f"{column}_lag_{-offset}"
+            else:
+                raise ValueError(f"Invalid wallet_features_config offset param {offset} found. "
+                                "Offsets must be non-zero integers.")
+
+
             try:
-                result_df[new_column] = result_df.groupby('coin_id',observed=True)[column].shift(-lead)
+                market_timing_df[new_column] = market_timing_df.groupby('coin_id',observed=True)[column].shift(-offset)
             except Exception as e:
                 raise FeatureConfigError(f"Error calculating offset for column '{column}' " \
-                                      f"with lead {lead}: {str(e)}") from e
+                                        f"with lead {offset}: {str(e)}") from e
 
-    return result_df
+    return market_timing_df
+
 
 
 def calculate_relative_changes(
@@ -182,28 +199,27 @@ def calculate_relative_changes(
             raise FeatureConfigError(f"Base column '{base_column}' not found in DataFrame")
 
         try:
-            # Extract configuration
-            if isinstance(column_config, dict):
-                offsets = column_config['offsets']
-                retain_base_columns = column_config.get('retain_base_columns', True)
-            else:
-                # Backward compatibility
-                offsets = column_config
-                retain_base_columns = True
+            offsets = column_config['offsets']
+            retain_base_columns = column_config.get('retain_base_columns', True)
         except KeyError as e:
             raise FeatureConfigError(f"Invalid configuration for column '{base_column}': {str(e)}") from e
 
         # Calculate relative change for each offset
-        for lead in offsets:
-            offset_column = f"{base_column}_lead_{lead}"
+        for offset in offsets:
 
-            # Check if offset column exists
+            # Identify column and confirm it exists
+            if offset > 0:
+                offset_str = f'lead_{offset}'
+            elif offset < 0:
+                offset_str = f'lag_{-offset}'
+
+            offset_column = f'{base_column}_{offset_str}'
             if offset_column not in result_df.columns:
                 raise FeatureConfigError(f"Offset column '{offset_column}' not found in DataFrame. " \
-                                      "Run calculate_offsets() first.")
+                                        "Run calculate_offsets() first.")
 
             # Create new column name for relative change
-            change_column = f"{base_column}/lead_{lead}"
+            change_column = f"{base_column}/{offset_str}"
 
             try:
                 # Calculate percentage change
@@ -212,6 +228,10 @@ def calculate_relative_changes(
                     (result_df[offset_column] - result_df[base_column]) /
                     result_df[base_column]
                 )
+
+                # Flip the sign if the offset is negative (compares present v past instead of future vs present)
+                if offset < 0:
+                    result_df[change_column] = result_df[change_column] * -1
 
                 # Handle division by zero cases
                 result_df[change_column] = result_df[change_column].replace([np.inf, -np.inf], np.nan)
@@ -226,7 +246,7 @@ def calculate_relative_changes(
 
             except Exception as e:
                 raise FeatureConfigError(f"Error calculating relative change between '{base_column}' " \
-                                      f"and '{offset_column}': {str(e)}") from e
+                                        f"and '{offset_column}': {str(e)}") from e
 
     # Winsorize all change columns
     for column in relative_change_columns:
@@ -237,7 +257,6 @@ def calculate_relative_changes(
         result_df = result_df.drop(columns=list(columns_to_drop))
 
     return result_df,relative_change_columns
-
 
 
 
