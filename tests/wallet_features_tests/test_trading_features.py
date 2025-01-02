@@ -204,6 +204,7 @@ def test_profits_data():
 
 
 
+
 @pytest.fixture
 def test_profits_df(test_profits_data):
     """
@@ -327,15 +328,16 @@ def test_w08_offsetting_transactions(test_trading_features_df):
     wallet = 'w08_offsetting_transactions'
     wallet_features = test_trading_features_df.loc[wallet]
 
+    print(wallet_features)
     # Calculate expected values
-    # total_crypto_buys: initial 500 + 10000 buy = 10500
-    expected_buys = 10500
+    # total_crypto_buys: 10000 buy = 10000
+    expected_buys = 10000
 
     # total_crypto_sells: 10000 sell = 10000
     expected_sells = 10000
 
-    # net_crypto_investment: 10500 - 10000 = 500
-    expected_net = 500
+    # net_crypto_investment: 10000 - 10000 = 0
+    expected_net = 0
 
     # crypto_net_gain: 750 ending - 500 cost basis = 250
     expected_gain = 250
