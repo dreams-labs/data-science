@@ -118,24 +118,24 @@ def assign_clusters_from_distances(modeling_df: pd.DataFrame, cluster_counts: Li
 
 
 
-def optimize_parameters(df: pd.DataFrame, max_clusters: int = 10) -> Dict[str, Dict]:
+def optimize_cluster_parameters(training_data_df: pd.DataFrame, max_clusters: int = 10) -> Dict[str, Dict]:
     """
     Analyze optimal number of components and clusters using multiple methods.
 
     Parameters:
-    df: DataFrame with features
-    max_components: maximum number of PCA components to consider
-    max_clusters: maximum number of clusters to consider
+    - training_data_df: DataFrame with features
+    - max_components: maximum number of PCA components to consider
+    - max_clusters: maximum number of clusters to consider
 
     Returns:
-    Dictionary with analysis results and plots
+    - Dictionary with analysis results and plots
 
     Example Use:
-    results = wcl.optimize_parameters(training_data_df)
+    results = wcl.optimize_cluster_parameters(wallets_training_data_df)
 
     """
     # Prepare data
-    numeric_df = df.select_dtypes(include=[np.number])
+    numeric_df = training_data_df.select_dtypes(include=[np.number])
     scaler = StandardScaler()
     scaled_data = scaler.fit_transform(numeric_df)
 

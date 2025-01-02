@@ -191,7 +191,16 @@ def test_profits_data():
         {'coin_id': 'sol', 'wallet_address': 'w12_buys_late', 'date': '2024-10-01', 'usd_balance': 550, 'usd_net_transfers': 0, 'is_imputed': True},
     ]
 
-    return pd.DataFrame(profits_data), training_period_start, training_period_end
+    test_profits_df = pd.DataFrame(profits_data)
+
+    # Create usd_inflows column
+    test_profits_df['usd_inflows'] = test_profits_df['usd_net_transfers'].where(
+        (test_profits_df['usd_net_transfers'] > 0) &
+        (~test_profits_df['is_imputed']),
+        0
+    )
+
+    return test_profits_df, training_period_start, training_period_end
 
 
 
