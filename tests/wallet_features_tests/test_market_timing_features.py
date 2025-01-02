@@ -289,8 +289,8 @@ def test_calculate_timing_features_basic():
     expected = pd.DataFrame(
         {
             'test_metric/buy_mean': [0.75],
-            'test_metric/buy_weighted': [0.833333],
             'test_metric/sell_mean': [-0.5],
+            'test_metric/buy_weighted': [0.833333],
             'test_metric/sell_weighted': [-0.5],
         },
         index=pd.Index(['wallet_a'], name='wallet_address')
@@ -344,8 +344,8 @@ def test_calculate_timing_features_empty_groups():
     expected = pd.DataFrame(
         {
             'test_metric/buy_mean': [0.75, np.nan],
-            'test_metric/buy_weighted': [0.833333, np.nan],
             'test_metric/sell_mean': [np.nan, -0.75],
+            'test_metric/buy_weighted': [0.833333, np.nan],
             'test_metric/sell_weighted': [np.nan, -0.833333],
         },
         index=pd.Index(['wallet_a', 'wallet_b'], name='wallet_address')
@@ -399,8 +399,8 @@ def test_calculate_timing_features_extreme_values():
     expected = pd.DataFrame(
         {
             'test_metric/buy_mean': [50.00005],    # Simple average of extremes
-            'test_metric/buy_weighted': [0.0001],  # Dominated by large transaction
             'test_metric/sell_mean': [0.0],         # Single zero-value sell
+            'test_metric/buy_weighted': [0.0001],  # Dominated by large transaction
             'test_metric/sell_weighted': [0.0],    # Single zero-value sell
         },
         index=pd.Index(['wallet_a'], name='wallet_address')

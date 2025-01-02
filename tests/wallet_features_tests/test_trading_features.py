@@ -191,7 +191,17 @@ def test_profits_data():
         {'coin_id': 'sol', 'wallet_address': 'w12_buys_late', 'date': '2024-10-01', 'usd_balance': 550, 'usd_net_transfers': 0, 'is_imputed': True},
     ]
 
-    return pd.DataFrame(profits_data), training_period_start, training_period_end
+    test_profits_df = pd.DataFrame(profits_data)
+
+    # Create usd_inflows column
+    test_profits_df['usd_inflows'] = test_profits_df['usd_net_transfers'].where(
+        (test_profits_df['usd_net_transfers'] > 0) &
+        (~test_profits_df['is_imputed']),
+        0
+    )
+
+    return test_profits_df, training_period_start, training_period_end
+
 
 
 
@@ -318,15 +328,16 @@ def test_w08_offsetting_transactions(test_trading_features_df):
     wallet = 'w08_offsetting_transactions'
     wallet_features = test_trading_features_df.loc[wallet]
 
+    print(wallet_features)
     # Calculate expected values
-    # total_crypto_buys: initial 500 + 10000 buy = 10500
-    expected_buys = 10500
+    # total_crypto_buys: 10000 buy = 10000
+    expected_buys = 10000
 
     # total_crypto_sells: 10000 sell = 10000
     expected_sells = 10000
 
-    # net_crypto_investment: 10500 - 10000 = 500
-    expected_net = 500
+    # net_crypto_investment: 10000 - 10000 = 0
+    expected_net = 0
 
     # crypto_net_gain: 750 ending - 500 cost basis = 250
     expected_gain = 250

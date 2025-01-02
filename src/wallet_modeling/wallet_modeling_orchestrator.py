@@ -181,6 +181,19 @@ def generate_training_indicators_df(training_market_data_df_full,wallets_metrics
     market_indicators_data_df = market_indicators_data_df[market_indicators_data_df['date']
                                                     >=wallets_config['training_data']['training_starting_balance_date']]
 
+    # Reset OBV to 0 at training start if it exists
+    training_start = pd.to_datetime(wallets_config['training_data']['training_starting_balance_date'])
+    if 'obv' in market_indicators_data_df.columns:
+        # Group by coin_id since OBV is coin-specific
+        for coin_id in market_indicators_data_df['coin_id'].unique():
+            mask = (market_indicators_data_df['coin_id'] == coin_id) & \
+                  (market_indicators_data_df['date'] >= training_start)
+            coin_idx = market_indicators_data_df[mask].index
+            if len(coin_idx) > 0:
+                # Reset OBV to start from 0 for each coin's training period
+                market_indicators_data_df.loc[coin_idx, 'obv'] -= \
+                    market_indicators_data_df.loc[coin_idx[0], 'obv']
+
     # If a parquet file location is specified, store the files there and return nothing
     if parquet_filename:
         parquet_filepath = f"{parquet_folder}/{parquet_filename}.parquet"

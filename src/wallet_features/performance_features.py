@@ -240,7 +240,7 @@ def transform_performance_ratios(performance_ratios_df: pd.DataFrame,
     return performance_features_df
 
 
-
+@u.timing_decorator
 def calculate_performance_features(trading_features_df):
     """
     Calculates a set of profit numerators, investment denominators, ratio combinations,
