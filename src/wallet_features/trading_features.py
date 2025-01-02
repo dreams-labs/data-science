@@ -145,6 +145,7 @@ def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
     return profits_df
 
 
+
 def buy_crypto_start_balance(df: pd.DataFrame, period_start_date: str) -> pd.DataFrame:
     """
     Sets start date crypto balance change as the initial balance value.
@@ -421,5 +422,3 @@ def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
         raise ValueError('Record count mismatch')
 
     return result_df
-
-
