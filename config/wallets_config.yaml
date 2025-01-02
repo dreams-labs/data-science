@@ -1,14 +1,18 @@
-# Variables used to define the training data
+# WalletModel Config
+
+
+# WalletModel Period Boundaries
 training_data:
     training_window_starts: [
         "2023-06-01",
         "2024-01-01",
         "2024-04-01",
+        "2024-07-01",
         "2024-09-01",
         "2024-10-01"
     ]
-    modeling_period_start: "2024-11-01"
-    modeling_period_end: "2024-11-20"
+    modeling_period_start: "2024-10-20"
+    modeling_period_end: "2024-11-10"
     validation_period_end: "2024-11-30"
 
     # Local pipeline configs
@@ -16,24 +20,26 @@ training_data:
     parquet_folder: 'temp/wallet_modeling_dfs'  # where to store parquet files
 
 
-# Variables used to clean and filter raw data before training data is built
+# WalletModel Cleaning
 data_cleaning:
 
     # Wallet cohort thresholds
-    min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
-    max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
-    min_wallet_investment: 1000 # time weighted average balance filter
-    max_wallet_investment: 10_000_000 # time weighted average balance filter
-    min_wallet_volume: 5000  # Exclude wallets with fewer than this amount of training period USD volume
-    max_wallet_volume: 25_000_000  # Exclude wallets with fewer than this amount of training period USD volume
-    min_wallet_inflows: 1000  # Exclude wallets with inflows below this amount (USD)
+    min_coins_traded: 2  # Exclude wallets that have traded fewer coins than this during the training period
+    max_coins_traded: 200  # Exclude wallets that have traded more coins than this during the training period
+
+    min_wallet_investment: 2000 # Filters based on max_investment from trading features
+    min_wallet_inflows: 2000  # Exclude wallets with inflows below this amount (USD)
+    min_wallet_volume: 2500  # Exclude wallets with fewer than this amount of training period USD volume
+
+    max_wallet_investment: 20_000_000 # Filters based on max_investment from trading features
     max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
+    max_wallet_volume: 75_000_000  # Exclude wallets with fewer than this amount of training period USD volume
     max_wallet_profits: 100_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
 
     # Market data filters
     max_initial_market_cap: 999150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
-    max_gap_days: 14  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
-    min_daily_volume: 500 # Minimum average daily volume the coin must have
+    max_gap_days: 50  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
+    min_daily_volume: 100 # Minimum average daily volume the coin must have
 
     # Warnings about potential data gaps in profits_df or market_data_df
     coverage_decrease_audit_window: 10  # how far to look back to assess decreases in coverage
@@ -43,12 +49,12 @@ data_cleaning:
     transfers_coverage_warning_min_pct_increase: 0.05  # ...and the % of coin without transfers data has increased by this value, issue a warning
 
     # Market cap imputation filters
-    min_mc_imputation_coverage: 0.3  # coins with market cap coverage below this level will have hardcoded market cap values filled
+    min_mc_imputation_coverage: 0.3  # coins with market cap coverage below this level won't be filled with mc_imputed, only mc_filled
     max_mc_imputation_multiple: 3.0  # don't impute dates where the imputed market cap exceeds the max known market cap * this ratio
     market_cap_default_fill:  500000  # coins below the imputation coverage level will have empty values filled with this
 
 
-# Variables used to define features
+# WalletModel Features
 features:
     # Clustering params
     clustering_n_components: 25
@@ -65,41 +71,38 @@ features:
 
 
 
-# Variables used for model generation
+# WalletModel Modeling Config
 modeling:
 
     # Feature selection params
     feature_selection:
-        variance_threshold: 0.02
-        correlation_threshold: 0.95
+        variance_threshold: 0.00
+        correlation_threshold: 1
         protected_features: [
             'cluster|'
         ]
 
     # Modeling period filters
-    modeling_min_investment: 1000
+    modeling_min_investment: 100
     modeling_min_coins_traded: 0
 
     # Which wallet performance metric to use as the target variable.
     # target_variable: "crypto_net_gain"
-    target_variable: "crypto_net_gain/max_investment/ntile_rank"
-    # target_variable: "crypto_net_gain/max_investment/winsorized"
+    # target_variable: "crypto_net_gain/max_investment/ntile_rank"
+    target_variable: "crypto_net_gain/max_investment/winsorized"
     drop_columns: []
     train_test_split: 0.2  # test size
 
+    # WalletModel Params
     # Model specifics
     model_type: "xgb"
     model_params:
 
-    # -----------------------
-    # Wallet Model Params
-    # -----------------------
-
         # Model params
+        n_estimators: 250
+        learning_rate: 0.05
         max_depth: 15
         min_child_weight_pct: 0.0001
-        n_estimators: 1000
-        learning_rate: 0.02
         colsample_bytree: 0.6
         gamma: 0.1
 
@@ -111,10 +114,10 @@ modeling:
         random_state: 42
         n_jobs: -1
 
-    # Parameter tuning
+    # WalletModel Grid Search
     grid_search_params:
 
-        enabled: true # whether to grid search
+        enabled: false # whether to grid search
 
         # Search methodology
         n_iter: 35  # random search limit
