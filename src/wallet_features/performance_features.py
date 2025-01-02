@@ -248,15 +248,15 @@ def calculate_performance_features(trading_features_df):
     """
     trading_features_df = trading_features_df.copy()
 
-    # Features reflecting the profit/return rate/cash inflows/inflow
+    # Numerator features reflecting the profit/return rate/cash inflows/inflow
     profits_features_df = calculate_profits_features(trading_features_df)
     profits_features_df = profits_features_df.add_prefix('profits_')
 
-    # Features reflecting the balance/investment/outlays
+    # Demoniminator features reflecting the balance/investment/outlays
     balance_features_df = calculate_balance_features(trading_features_df)
     balance_features_df = balance_features_df.add_prefix('balance_')
 
-    # Compute ratios
+    # Combine to make ratios
     ratios_features_df = profits_features_df.join(balance_features_df)
     ratios_features_df = calculate_performance_ratios(ratios_features_df)
 
