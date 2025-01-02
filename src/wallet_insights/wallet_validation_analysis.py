@@ -234,3 +234,37 @@ def create_quantile_report(
     styled_df = wime.style_rows(results_df)
 
     return styled_df
+
+
+def analyze_wallet_model_importance(feature_importances):
+    """
+    Splits the wallet model feature importance df into component columns.
+
+    Params:
+    - feature_importance (dict of lists of floats): Output of wallet_evaluator.metrics['importances'].
+        Includes lists ['feature'] and ['importance']
+
+    Returns:
+    - feature_details_df (df): df with columns for all column components along with importance
+    """
+    # Convert lists to df
+    feature_importance_df = pd.DataFrame(feature_importances)
+
+    # Split on pipe delimiters
+    split_df = feature_importance_df['feature'].str.split('|', expand=True)
+    split_df.columns = ['feature_category','feature_details','training_segment']
+
+    # Split nested components
+    features_df = split_df['feature_details'].str.split('/', expand=True)
+    features_df.columns = ['feature_name', 'feature_comparison', 'feature_aggregation']
+
+    # Combine all components
+    feature_details_df = pd.concat([
+        split_df['feature_category'],
+        features_df,
+        split_df['training_segment'],
+        feature_importance_df['importance']
+    ], axis=1)
+
+    return feature_details_df
+

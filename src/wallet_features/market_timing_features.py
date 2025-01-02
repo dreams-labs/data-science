@@ -210,7 +210,7 @@ def calculate_relative_changes(
             # Identify column and confirm it exists
             if offset > 0:
                 offset_str = f'lead_{offset}'
-            elif offset < 0:
+            else:
                 offset_str = f'lag_{-offset}'
 
             offset_column = f'{base_column}_{offset_str}'

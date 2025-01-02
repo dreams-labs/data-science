@@ -16,6 +16,11 @@ time_series:
                 sma:
                     parameters:
                         window: [5]
+        market_cap_filled:
+            indicators:
+                sma:
+                    parameters:
+                        window: [5]
         mfi:
             indicators:
                 sma:
