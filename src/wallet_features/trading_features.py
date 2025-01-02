@@ -106,6 +106,73 @@ def calculate_wallet_trading_features(
 # Support Functions
 # -----------------------------------
 
+
+
+def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
+                                   period_start_date: str
+                                   ) -> pd.DataFrame:
+    """
+    Adds crypto_balance_change column tracking changes in crypto holdings.
+    A positive value indicates an increase in crypto holdings, negative indicates decrease.
+
+    Params:
+    - profits_df (DataFrame): Daily profits data to compute balance changes for
+    - period_start_date (str): Period start in 'YYYY-MM-DD' format
+
+    Returns:
+    - adj_profits_df (DataFrame): Input df with crypto_balance_change column added
+    """
+    profits_df = profits_df.copy()
+
+    # Sort by wallet, coin, and date for accurate cumulative calculations
+    profits_df = profits_df.sort_values(['wallet_address', 'coin_id', 'date'])
+
+    # Crypto balance change equals usd_net_transfers except on the starting_balance_date
+    profits_df['crypto_balance_change'] = profits_df['usd_net_transfers']
+    profits_df = buy_crypto_start_balance(profits_df, period_start_date)
+
+    # Calculate crypto cost based on lifetime usd transfers
+    profits_df['crypto_cumulative_transfers'] = (profits_df
+                                       .groupby(['wallet_address', 'coin_id'],
+                                               observed=True,
+                                               sort=False)  # sort=False since we pre-sorted
+                                       ['crypto_balance_change']
+                                       .cumsum())
+
+    # Net gain is the current balance less the cost basis
+    profits_df['crypto_cumulative_net_gain'] = profits_df['usd_balance'] - profits_df['crypto_cumulative_transfers']
+
+    return profits_df
+
+
+def buy_crypto_start_balance(df: pd.DataFrame, period_start_date: str) -> pd.DataFrame:
+    """
+    Sets start date crypto balance change as the initial balance value.
+
+    Params:
+    - df (DataFrame): Input dataframe with usd_balance and crypto_balance_change
+    - period_start_date (str): The start date of the period
+
+    Returns:
+    - df (DataFrame): DataFrame with adjusted crypto_balance_change
+
+    Example Case
+    ------------
+    Opening balance of $75 with $0 transfer results in:
+    crypto_balance_change = +$75 (increase in crypto holdings)
+    """
+    period_start_date = datetime.strptime(period_start_date,'%Y-%m-%d')
+    starting_balance_date = period_start_date - timedelta(days=1)
+
+    mask = df['date'] == starting_balance_date
+    target_balances = df.loc[mask, 'usd_balance']
+    df.loc[mask, 'crypto_balance_change'] = target_balances
+
+    return df
+
+
+
+
 def calculate_gain_and_investment_columns(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
     Calculates net gain and max investment for each wallet.
@@ -205,139 +272,6 @@ def calculate_observed_activity_columns(profits_df: pd.DataFrame, period_start_d
 
 
 
-def buy_crypto_start_balance(df: pd.DataFrame, period_start_date: str) -> pd.DataFrame:
-    """
-    Sets start date crypto balance change as the initial balance value.
-
-    Params:
-    - df (DataFrame): Input dataframe with usd_balance and crypto_balance_change
-    - period_start_date (str): The start date of the period
-
-    Returns:
-    - df (DataFrame): DataFrame with adjusted crypto_balance_change
-
-    Example Case
-    ------------
-    Opening balance of $75 with $0 transfer results in:
-    crypto_balance_change = +$75 (increase in crypto holdings)
-    """
-    period_start_date = datetime.strptime(period_start_date,'%Y-%m-%d')
-    starting_balance_date = period_start_date - timedelta(days=1)
-
-    mask = df['date'] == starting_balance_date
-    target_balances = df.loc[mask, 'usd_balance']
-    df.loc[mask, 'crypto_balance_change'] = target_balances
-
-    return df
-
-
-
-@u.timing_decorator
-def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Optimized cost basis calculation focusing on maintaining original loop efficiency.
-
-    Params:
-    - profits_df (DataFrame): profits data with required columns
-
-    Returns:
-    - DataFrame with cost basis for each wallet-coin-date
-    """
-    df = profits_df.copy()
-
-    # Calculate opening balance before transfers
-    df['opening_balance'] = df['usd_balance'] - df['usd_net_transfers']
-
-    # Calculate % sold when transfers are negative
-    df['pct_sold'] = np.where(
-        df['usd_net_transfers'] < 0,
-        -df['usd_net_transfers'] / df['opening_balance'],
-        0
-    ).astype('float64')
-
-    # Track new cost basis from buys
-    df['cost_basis_bought'] = np.where(
-        df['crypto_balance_change'] > 0,
-        df['crypto_balance_change'],
-        0
-    ).astype('float64')
-
-    # Pre-sort the DataFrame to simplify iteration
-    df = df.sort_values(['wallet_address', 'coin_id', 'date']).reset_index(drop=True)
-
-    # Initialize an array for the cost basis
-    crypto_cost_basis = np.zeros(len(df))
-
-    # Efficient iteration: Avoid grouping by working directly on pre-sorted indices
-    current_wallet_coin = None
-    cumulative_cost_basis = 0
-
-    for i in range(len(df)):
-        wallet_coin = (df.at[i, 'wallet_address'], df.at[i, 'coin_id'])
-
-        if wallet_coin != current_wallet_coin:
-            # New wallet-coin group
-            cumulative_cost_basis = 0
-            current_wallet_coin = wallet_coin
-
-        # Update cumulative cost basis
-        cumulative_cost_basis = (
-            cumulative_cost_basis * (1 - df.at[i, 'pct_sold']) +
-            df.at[i, 'cost_basis_bought']
-        )
-        crypto_cost_basis[i] = cumulative_cost_basis
-
-    # Assign the calculated values back to the DataFrame
-    df['crypto_cost_basis'] = crypto_cost_basis
-
-    result_df = df[['wallet_address', 'coin_id', 'date', 'crypto_cost_basis']]
-
-    # Validation check to ensure the result DataFrame has the same number of rows as the input
-    if len(profits_df) != len(result_df):
-        raise ValueError('Record count mismatch')
-
-    return result_df
-
-
-
-def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
-                                   period_start_date: str
-                                   ) -> pd.DataFrame:
-    """
-    Adds crypto_balance_change column tracking changes in crypto holdings.
-    A positive value indicates an increase in crypto holdings, negative indicates decrease.
-
-    Params:
-    - profits_df (DataFrame): Daily profits data to compute balance changes for
-    - period_start_date (str): Period start in 'YYYY-MM-DD' format
-
-    Returns:
-    - adj_profits_df (DataFrame): Input df with crypto_balance_change column added
-    """
-    profits_df = profits_df.copy()
-
-    # Sort by wallet, coin, and date for accurate cumulative calculations
-    profits_df = profits_df.sort_values(['wallet_address', 'coin_id', 'date'])
-
-    # Crypto balance change equals usd_net_transfers except on the starting_balance_date
-    profits_df['crypto_balance_change'] = profits_df['usd_net_transfers']
-    profits_df = buy_crypto_start_balance(profits_df, period_start_date)
-
-    # Calculate crypto cost based on lifetime usd transfers
-    profits_df['crypto_cumulative_transfers'] = (profits_df
-                                       .groupby(['wallet_address', 'coin_id'],
-                                               observed=True,
-                                               sort=False)  # sort=False since we pre-sorted
-                                       ['crypto_balance_change']
-                                       .cumsum())
-
-    # Net gain is the current balance less the cost basis
-    profits_df['crypto_cumulative_net_gain'] = profits_df['usd_balance'] - profits_df['crypto_cumulative_transfers']
-
-    return profits_df
-
-
-
 @u.timing_decorator
 def aggregate_time_weighted_balance(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -420,3 +354,72 @@ def aggregate_time_weighted_balance(profits_df: pd.DataFrame) -> pd.DataFrame:
         'time_weighted_balance': wallet_metrics['coin_twb'],
         'active_time_weighted_balance': wallet_metrics['active_coin_twb']
     })
+
+
+
+def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Optimized cost basis calculation focusing on maintaining original loop efficiency.
+
+    Params:
+    - profits_df (DataFrame): profits data with required columns
+
+    Returns:
+    - DataFrame with cost basis for each wallet-coin-date
+    """
+    df = profits_df.copy()
+
+    # Calculate opening balance before transfers
+    df['opening_balance'] = df['usd_balance'] - df['usd_net_transfers']
+
+    # Calculate % sold when transfers are negative
+    df['pct_sold'] = np.where(
+        df['usd_net_transfers'] < 0,
+        -df['usd_net_transfers'] / df['opening_balance'],
+        0
+    ).astype('float64')
+
+    # Track new cost basis from buys
+    df['cost_basis_bought'] = np.where(
+        df['crypto_balance_change'] > 0,
+        df['crypto_balance_change'],
+        0
+    ).astype('float64')
+
+    # Pre-sort the DataFrame to simplify iteration
+    df = df.sort_values(['wallet_address', 'coin_id', 'date']).reset_index(drop=True)
+
+    # Initialize an array for the cost basis
+    crypto_cost_basis = np.zeros(len(df))
+
+    # Efficient iteration: Avoid grouping by working directly on pre-sorted indices
+    current_wallet_coin = None
+    cumulative_cost_basis = 0
+
+    for i in range(len(df)):
+        wallet_coin = (df.at[i, 'wallet_address'], df.at[i, 'coin_id'])
+
+        if wallet_coin != current_wallet_coin:
+            # New wallet-coin group
+            cumulative_cost_basis = 0
+            current_wallet_coin = wallet_coin
+
+        # Update cumulative cost basis
+        cumulative_cost_basis = (
+            cumulative_cost_basis * (1 - df.at[i, 'pct_sold']) +
+            df.at[i, 'cost_basis_bought']
+        )
+        crypto_cost_basis[i] = cumulative_cost_basis
+
+    # Assign the calculated values back to the DataFrame
+    df['crypto_cost_basis'] = crypto_cost_basis
+
+    result_df = df[['wallet_address', 'coin_id', 'date', 'crypto_cost_basis']]
+
+    # Validation check to ensure the result DataFrame has the same number of rows as the input
+    if len(profits_df) != len(result_df):
+        raise ValueError('Record count mismatch')
+
+    return result_df
+
+
