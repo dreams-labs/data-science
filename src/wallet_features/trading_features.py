@@ -244,12 +244,12 @@ def calculate_observed_activity_columns(profits_df: pd.DataFrame, period_start_d
     ).set_index('wallet_address')
 
     # Calculate buy/sell metrics from full dataset
-    profits_df['positive_changes'] = np.where(profits_df['crypto_balance_change'] > 0,
-                                            profits_df['crypto_balance_change'], 0)
-    profits_df['negative_changes'] = np.where(profits_df['crypto_balance_change'] < 0,
-                                            -profits_df['crypto_balance_change'], 0)
+    observed_profits_df['positive_changes'] = np.where(observed_profits_df['crypto_balance_change'] > 0,
+                                            observed_profits_df['crypto_balance_change'], 0)
+    observed_profits_df['negative_changes'] = np.where(observed_profits_df['crypto_balance_change'] < 0,
+                                            -observed_profits_df['crypto_balance_change'], 0)
 
-    changes_metrics_df = profits_df.groupby('wallet_address').agg(
+    changes_metrics_df = observed_profits_df.groupby('wallet_address').agg(
         total_crypto_buys=('positive_changes', 'sum'),
         total_crypto_sells=('negative_changes', 'sum'),
         net_crypto_investment=('crypto_balance_change', 'sum')
