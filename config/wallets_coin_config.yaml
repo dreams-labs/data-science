@@ -1,3 +1,7 @@
+# CoinModel Config
+
+
+# CoinModel Cleaning
 # Variables used to clean and filter raw data before training data is built
 data_cleaning:
 
@@ -14,7 +18,8 @@ coin_validation_analysis:
     top_n: 5  # how many of the top coins of a given sort method will be included in performance assessments
     sort_method: "top_wallet_balance_pct"  # which coin wallet metric to use for coin forecast rankings
 
-# How wallet segments are defined
+
+# CoinModel Segments
 wallet_segments:
 
     # Scores to include as segments + metrics
@@ -25,7 +30,12 @@ wallet_segments:
         'net_gain_raw_250101'
     ]
 
+    # score_segment_quantiles: [0.1, 0.3, 0.5, 0.7, 0.9]  # higher is better; how to assign wallet a score segment
+    score_segment_quantiles: [0.05, 0.15, 0.5, 0.85, 0.95]  # higher is better; how to assign wallet a score segment
+    training_period_cluster_groups: [2, 4]  # which n clusters assignment from the training period to segment by
 
+
+# CoinModel Features
 wallet_features:
 
     # Balance metrics params
@@ -39,13 +49,7 @@ wallet_features:
         'average_transaction'
     ]
 
-
-# How to segment wallet features
-wallet_segmentation:
-    # score_segment_quantiles: [0.1, 0.3, 0.5, 0.7, 0.9]  # higher is better; how to assign wallet a score segment
-    score_segment_quantiles: [0.05, 0.15, 0.5, 0.85, 0.95]  # higher is better; how to assign wallet a score segment
-    training_period_cluster_groups: [2, 4]  # which n clusters assignment from the training period to segment by
-
+# CoinModel Modeling Config
 # Variables used in the generation of the validation period coin model
 coin_modeling:
 
@@ -72,14 +76,9 @@ coin_modeling:
     drop_columns: []
 
 
-    # Model specifics
+    # CoinModel Params
     model_type: "xgb"
     model_params:
-
-    # -----------------------
-    # Coin Model Params
-    # -----------------------
-
         n_estimators: 300
         max_depth: 6
         learning_rate: 0.02
@@ -93,7 +92,7 @@ coin_modeling:
         random_state: 42
         n_jobs: -1
 
-    # Parameter tuning
+    # CoinModel Grid Search
     grid_search_params:
 
         enabled: false # whether to grid search
