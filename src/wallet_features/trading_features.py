@@ -47,7 +47,7 @@ def calculate_wallet_trading_features(
                     usd_net_transfers, is_imputed
 
     Returns:
-    - wallet_metrics_df (DataFrame): Trading metrics keyed on wallet_address with columns:
+    - trading_features_df (DataFrame): Trading metrics keyed on wallet_address with columns:
         - total_crypto_buys: Sum of positive balance changes
         - total_crypto_sells: Sum of negative balance changes
         - net_crypto_investment: Net sum of all balance changes
@@ -75,7 +75,7 @@ def calculate_wallet_trading_features(
     observed_activity_df = calculate_observed_activity_columns(profits_df,period_start_date,period_end_date)
 
     # Merge together
-    wallet_metrics_df = gain_and_investment_df.join(observed_activity_df)
+    trading_features_df = gain_and_investment_df.join(observed_activity_df)
 
     # Add twb if configured to do so
     if calculate_twb_metrics:
@@ -84,20 +84,20 @@ def calculate_wallet_trading_features(
         time_weighted_df = aggregate_time_weighted_balance(profits_df)
 
         # Join all full metric dataframes
-        wallet_metrics_df = wallet_metrics_df.join(time_weighted_df)
+        trading_features_df = trading_features_df.join(time_weighted_df)
 
         # Calculate volume to time-weighted balance ratio
-        wallet_metrics_df['volume_vs_twb_ratio'] = np.where(
-            wallet_metrics_df['time_weighted_balance'] > 0,
-            wallet_metrics_df['total_volume'] / wallet_metrics_df['time_weighted_balance'],
+        trading_features_df['volume_vs_twb_ratio'] = np.where(
+            trading_features_df['time_weighted_balance'] > 0,
+            trading_features_df['total_volume'] / trading_features_df['time_weighted_balance'],
             0
         )
 
     # Fill missing values and handle edge cases
-    wallet_metrics_df = wallet_metrics_df.fillna(0)
-    wallet_metrics_df = wallet_metrics_df.replace(-0, 0)
+    trading_features_df = trading_features_df.fillna(0)
+    trading_features_df = trading_features_df.replace(-0, 0)
 
-    return wallet_metrics_df
+    return trading_features_df
 
 
 
