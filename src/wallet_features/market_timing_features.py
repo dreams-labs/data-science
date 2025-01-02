@@ -260,160 +260,52 @@ def calculate_relative_changes(
     return result_df,relative_change_columns
 
 
-@u.timing_decorator
-def calculate_timing_features_for_columnold(df, metric_column):
-    """
-    Calculate timing features for a single metric column from pre-merged DataFrame.
-
-    Args:
-        df (pd.DataFrame): Pre-merged DataFrame with columns [wallet_address, usd_net_transfers, metric_column]
-        metric_column (str): Name of the column to analyze
-
-    Returns:
-        pd.DataFrame: DataFrame indexed by wallet_address with columns:
-            - {metric_column}/buy_weighted
-            - {metric_column}/buy_mean
-            - {metric_column}/sell_weighted
-            - {metric_column}/sell_mean
-    """
-    # Split into buys and sells
-    buys = df[df['usd_net_transfers'] > 0].copy()
-    sells = df[df['usd_net_transfers'] < 0].copy()
-
-    features = pd.DataFrame(index=df['wallet_address'].unique())
-
-    # Vectorized buy calculations
-    if not buys.empty:
-        # Regular mean
-        features[f"{metric_column}/buy_mean"] = (
-            buys.groupby('wallet_address')[metric_column].mean()
-        )
-
-        # Weighted mean: First compute the products, then group
-        buys['weighted_values'] = buys[metric_column] * abs(buys['usd_net_transfers'])
-        weighted_sums = buys.groupby('wallet_address')['weighted_values'].sum()
-        weight_sums = buys.groupby('wallet_address')['usd_net_transfers'].apply(abs).sum()
-        features[f"{metric_column}/buy_weighted"] = weighted_sums / weight_sums
-
-    # Similar for sells
-    if not sells.empty:
-        features[f"{metric_column}/sell_mean"] = (
-            sells.groupby('wallet_address')[metric_column].mean()
-        )
-
-        sells['weighted_values'] = sells[metric_column] * abs(sells['usd_net_transfers'])
-        weighted_sums = sells.groupby('wallet_address')['weighted_values'].sum()
-        weight_sums = sells.groupby('wallet_address')['usd_net_transfers'].apply(abs).sum()
-        features[f"{metric_column}/sell_weighted"] = weighted_sums / weight_sums
-
-    return features
 
 @u.timing_decorator
 def calculate_timing_features_for_column(df: pd.DataFrame, metric_column: str) -> pd.DataFrame:
     """
-    Calculate timing features (mean, weighted mean) for a single metric column
-    in one groupby pass.
-
-    Params:
-    - df (DataFrame): Must contain [wallet_address, usd_net_transfers, metric_column].
-    - metric_column (str): Column to analyze.
-
-    Returns:
-    - DataFrame: Indexed by wallet_address with columns for buy_mean, buy_weighted,
-                 sell_mean, sell_weighted.
+    Calculate timing features (mean, weighted mean) for a single metric column in a single pass.
+    Result columns: {metric_column}/buy_mean, {metric_column}/buy_weighted,
+                    {metric_column}/sell_mean, {metric_column}/sell_weighted.
     """
-    # Filter out rows with zero net transfers (they don't affect buy/sell calculations)
+    # Filter out rows with zero net transfers
     df = df[df['usd_net_transfers'] != 0].copy()
 
-    # Label rows as 'buy' or 'sell'
+    # Label transaction_side = 'buy' or 'sell'
     df['transaction_side'] = np.where(df['usd_net_transfers'] > 0, 'buy', 'sell')
 
-    # Precompute absolute net transfers & weighted values
+    # Precompute abs transfers & weighted values
     df['abs_net_transfers'] = df['usd_net_transfers'].abs()
     df['weighted_values'] = df[metric_column] * df['abs_net_transfers']
 
-    # Single groupby pass
+    # Group once on [wallet_address, transaction_side]
     grouped = df.groupby(['wallet_address', 'transaction_side'], observed=True).agg(
-        mean_metric=(metric_column, 'mean'),
+        mean_val=(metric_column, 'mean'),
         sum_weighted_values=('weighted_values', 'sum'),
-        sum_weights=('abs_net_transfers', 'sum')
+        sum_weights=('abs_net_transfers', 'sum'),
     ).reset_index()
 
-    # Compute weighted metric
-    grouped['weighted_metric'] = grouped['sum_weighted_values'] / grouped['sum_weights']
+    # Compute weighted average
+    grouped['weighted_val'] = grouped['sum_weighted_values'] / grouped['sum_weights']
 
-    # Pivot 'transaction_side' from rows to columns
+    # Pivot to separate 'buy' and 'sell' columns
     pivoted = grouped.pivot(index='wallet_address', columns='transaction_side')
 
-    # Rename pivoted columns
-    pivoted.columns = [
-        f"{metric_column}/{side}_{agg}"
-        for agg, side in pivoted.columns
-    ]
+    # We only want mean and weighted columns
+    # pivoted["mean_val"] => buy / sell means
+    # pivoted["weighted_val"] => buy / sell weighted
+    pivoted_mean = pivoted['mean_val'].copy()
+    pivoted_weighted = pivoted['weighted_val'].copy()
 
-    # Fill missing columns with 0
-    pivoted = pivoted.fillna(0)
+    # Rename columns
+    pivoted_mean.columns = [f'{metric_column}/{side}_mean' for side in pivoted_mean.columns]
+    pivoted_weighted.columns = [f'{metric_column}/{side}_weighted' for side in pivoted_weighted.columns]
 
-    return pivoted
+    # Combine back
+    final_df = pd.concat([pivoted_mean, pivoted_weighted], axis=1)
 
-# @u.timing_decorator
-# def calculate_timing_features_for_column2(df: pd.DataFrame, metric_column: str) -> pd.DataFrame:
-#     """
-#     Calculate timing features for a single metric column from pre-merged DataFrame.
+    return final_df
 
-#     Params:
-#     - df (DataFrame): Must contain [wallet_address, usd_net_transfers, metric_column]
-#     - metric_column (str): Name of the column to analyze
-
-#     Returns:
-#     - DataFrame: Indexed by wallet_address with columns:
-#         - {metric_column}/buy_weighted
-#         - {metric_column}/buy_mean
-#         - {metric_column}/sell_weighted
-#         - {metric_column}/sell_mean
-#     """
-#     # Separate buys & sells
-#     buys = df[df['usd_net_transfers'] > 0]
-#     sells = df[df['usd_net_transfers'] < 0]
-
-#     # create result DataFrame
-#     features = pd.DataFrame(index=df['wallet_address'].unique())
-
-#     # BUY features
-#     if not buys.empty:
-#         # precompute for single pass
-#         buys = buys.assign(
-#             weighted_values=buys[metric_column] * buys['usd_net_transfers'].abs()
-#         )
-
-#         buy_grouped = buys.groupby('wallet_address').agg(
-#             mean_metric=(metric_column, 'mean'),
-#             sum_weighted_values=('weighted_values', 'sum'),
-#             sum_weights=('usd_net_transfers', lambda x: x.abs().sum())
-#         )
-#         buy_grouped['weighted_metric'] = buy_grouped['sum_weighted_values'] / buy_grouped['sum_weights']
-
-#         # add columns to features
-#         features[f"{metric_column}/buy_mean"] = buy_grouped['mean_metric']
-#         features[f"{metric_column}/buy_weighted"] = buy_grouped['weighted_metric']
-
-#     # SELL features
-#     if not sells.empty:
-#         sells = sells.assign(
-#             weighted_values=sells[metric_column] * sells['usd_net_transfers'].abs()
-#         )
-
-#         sell_grouped = sells.groupby('wallet_address').agg(
-#             mean_metric=(metric_column, 'mean'),
-#             sum_weighted_values=('weighted_values', 'sum'),
-#             sum_weights=('usd_net_transfers', lambda x: x.abs().sum())
-#         )
-#         sell_grouped['weighted_metric'] = sell_grouped['sum_weighted_values'] / sell_grouped['sum_weights']
-
-#         features[f"{metric_column}/sell_mean"] = sell_grouped['mean_metric']
-#         features[f"{metric_column}/sell_weighted"] = sell_grouped['weighted_metric']
-
-#     return features
 
 
 def generate_all_timing_features(
