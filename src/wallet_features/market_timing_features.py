@@ -261,7 +261,6 @@ def calculate_relative_changes(
 
 
 
-@u.timing_decorator
 def calculate_timing_features_for_column(df: pd.DataFrame, metric_column: str) -> pd.DataFrame:
     """
     Calculate timing features (mean, weighted mean) for a single metric column in a single pass.
