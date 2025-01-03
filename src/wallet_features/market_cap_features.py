@@ -49,14 +49,12 @@ def calculate_market_cap_features(profits_df,market_data_df):
     # Force fill market cap gaps
     filled_market_cap_df = force_fill_market_cap(market_data_df)
 
-    logger.info('5')
     # Merge market cap data
     profits_market_cap_df = profits_df.merge(
         filled_market_cap_df[['date', 'coin_id', 'market_cap_imputed', 'market_cap_filled']],
         on=['date', 'coin_id'],
         how='inner'
     )
-    logger.info('5')
 
     # Calculate ending balance weighted metrics
     wallet_end_balance_wtd_mc_df = calculate_ending_balance_weighted_market_cap(profits_market_cap_df)

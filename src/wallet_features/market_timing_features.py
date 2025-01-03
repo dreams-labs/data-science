@@ -243,17 +243,14 @@ def prepare_timing_data(profits_df: pd.DataFrame,
     - timing_profits_df (DataFrame): Merged and preprocessed timing data
     - factorization_info (dict): Pre-computed factorization data
     """
-    logger.info('ptd0')
     # Filter out transactions below materiality threshold
     filtered_profits = profits_df[
         abs(profits_df['usd_net_transfers']) >= wallets_config['data_cleaning']['usd_materiality']
     ]
 
-    logger.info('ptd0.1')
     # Set indices using inplace=True to save memory
     market_timing_df.set_index(['coin_id', 'date'], inplace=True)
     filtered_profits.set_index(['coin_id', 'date'], inplace=True)
-    logger.info('ptd0.11')
 
     # Then merge on index
     timing_profits_df = filtered_profits.merge(
@@ -263,17 +260,13 @@ def prepare_timing_data(profits_df: pd.DataFrame,
         how='inner'
     )
 
-    logger.info('ptd0.3')
     # Label transaction_side = 'buy' or 'sell'
     timing_profits_df['transaction_side'] = np.where(timing_profits_df['usd_net_transfers'] > 0, 'buy', 'sell')
 
     # Pre-compute factorization
     # see the below Optimization Notes for an explantion of this sequence
-    logger.info('ptd1')
     wallet_codes, wallet_uniques = pd.factorize(timing_profits_df['wallet_address'])
-    logger.info('ptd2')
     side_codes, side_uniques = pd.factorize(timing_profits_df['transaction_side'])
-    logger.info('ptd3')
     n_sides = len(side_uniques)
     combined_codes = wallet_codes * n_sides + side_codes
 
