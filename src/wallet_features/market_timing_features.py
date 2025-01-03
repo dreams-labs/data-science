@@ -106,6 +106,10 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
     # Simple concat of wallet features - no aggregation needed
     wallet_timing_features_df = pd.concat(all_wallet_features)
 
+    # Reset indices using inplace=True to save memory
+    market_timing_df = market_timing_df.reset_index(inplace=True)
+    profits_df = profits_df.reset_index(inplace=True)
+
     return wallet_timing_features_df
 
 

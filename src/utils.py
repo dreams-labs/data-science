@@ -470,23 +470,33 @@ def timing_decorator(func):
     """
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        # Get the logger
+        # Create logger with caller's module name
         function_logger = logging.getLogger(func.__module__)
 
-        # Log the initiation of the function
+        # Create custom LogRecord factory to override the wrapper location
+        old_factory = logging.getLogRecordFactory()
+        def record_factory(*args, **kwargs):
+            record = old_factory(*args, **kwargs)
+            record.module = func.__module__
+            record.funcName = func.__name__
+            return record
+
+        logging.setLogRecordFactory(record_factory)
+
         function_logger.debug('Initiating %s...', func.__name__)
 
-        # Time the function execution
         start_time = time.time()
         result = func(*args, **kwargs)
         end_time = time.time()
 
-        # Log the execution time
         function_logger.info(
             'Completed %s after %.2f seconds.',
             func.__name__,
             end_time - start_time
         )
+
+        # Restore original LogRecord factory
+        logging.setLogRecordFactory(old_factory)
         return result
     return wrapper
 
