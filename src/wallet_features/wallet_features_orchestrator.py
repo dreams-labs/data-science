@@ -2,9 +2,7 @@
 Calculates metrics aggregated at the wallet level
 """
 import logging
-from pathlib import Path
 import pandas as pd
-import yaml
 
 # Local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig

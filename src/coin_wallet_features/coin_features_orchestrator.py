@@ -2,10 +2,8 @@
 Calculates metrics aggregated at the coin level
 """
 import logging
-from pathlib import Path
 from typing import List
 import pandas as pd
-import yaml
 
 # Local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
