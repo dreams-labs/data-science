@@ -24,7 +24,7 @@ wallets_config = WalletsConfig()
 
 
 # -----------------------------------
-# Main Interface Function
+#         Core Interface
 # -----------------------------------
 
 @u.timing_decorator
@@ -112,10 +112,8 @@ def calculate_wallet_trading_features(
 
 
 # -----------------------------------
-# Support Functions
+#         Helper Functions
 # -----------------------------------
-
-
 
 def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
                                    period_start_date: str

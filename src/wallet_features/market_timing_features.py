@@ -24,9 +24,10 @@ wallets_config = WalletsConfig()
 wallets_metrics_config = u.load_config(config_directory / 'wallets_metrics_config.yaml')
 
 
-# -----------------------------
-# Main Interface
-# -----------------------------
+# ------------------------------
+#         Core Interface
+# ------------------------------
+
 @u.timing_decorator
 def calculate_market_timing_features(profits_df, market_indicators_data_df):
     """
@@ -86,9 +87,8 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
 
 
 # -----------------------------
-# Component Functions
+#         Helper Functions
 # -----------------------------
-
 
 def identify_indicator_columns(config: dict) -> list:
     """

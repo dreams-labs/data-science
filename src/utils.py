@@ -922,7 +922,7 @@ def winsorize(data: pd.Series, cutoff: float = 0.01) -> pd.Series:
 
 
 # ---------------------------------------- #
-#     Misc Notebook Support Functions
+#     Misc Notebook         Helper Functions
 # ---------------------------------------- #
 
 # silence donation message

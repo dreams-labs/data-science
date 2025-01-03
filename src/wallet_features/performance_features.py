@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 
 
+# ------------------------------
+#         Core Interface
+# ------------------------------
+
+@u.timing_decorator
 def calculate_profits_features(wallet_features_df: pd.DataFrame) -> pd.DataFrame:
     """
     Generates candidate profit profits_features for return calculations.
@@ -61,6 +66,10 @@ def calculate_profits_features(wallet_features_df: pd.DataFrame) -> pd.DataFrame
     return profits_features_df
 
 
+
+# ------------------------------
+#         Helper Functions
+# ------------------------------
 
 def calculate_balance_features(trading_features_df: pd.DataFrame,
                                include_twb_metrics: bool) -> pd.DataFrame:

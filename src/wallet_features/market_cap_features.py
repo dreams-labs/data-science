@@ -16,7 +16,7 @@ wallets_config = WalletsConfig()
 
 
 # ------------------------------
-# Primary Interface Function
+#         Core Interface
 # ------------------------------
 
 @u.timing_decorator
@@ -71,10 +71,9 @@ def calculate_market_cap_features(profits_df,market_data_df):
 
 
 # ------------------------------
-# Component Functions
+#         Helper Functions
 # ------------------------------
 
-@u.timing_decorator
 def force_fill_market_cap(market_data_df):
     """
     Creates a column 'market_cap_filled' with complete coverage by:
@@ -101,7 +100,7 @@ def force_fill_market_cap(market_data_df):
 
     return market_data_df
 
-@u.timing_decorator
+
 def calculate_volume_weighted_market_cap(profits_market_features_df):
     """
     Calculate volume-weighted average market cap for each wallet address.
@@ -140,7 +139,7 @@ def calculate_volume_weighted_market_cap(profits_market_features_df):
 
     return wallet_volume_wtd_mc_df[['volume_wtd_market_cap']]
 
-@u.timing_decorator
+
 def calculate_ending_balance_weighted_market_cap(profits_market_cap_df):
     """
     Calculate USD balance-weighted average market cap for each wallet address

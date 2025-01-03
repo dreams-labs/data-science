@@ -14,6 +14,7 @@ from kneed import KneeLocator
 
 # Local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
+import utils as u
 
 # set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -22,6 +23,12 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 
 
+
+# -----------------------------------
+#         Core Interface
+# -----------------------------------
+
+@u.timing_decorator
 def create_basic_cluster_features(training_data_df, include_pca=False, include_categorical=False):
     """
     Add cluster-related features to the original dataframe.
@@ -85,6 +92,9 @@ def create_basic_cluster_features(training_data_df, include_pca=False, include_c
     return cluster_features_df
 
 
+# -----------------------------------
+#         Utility Functions
+# -----------------------------------
 
 def assign_clusters_from_distances(modeling_df: pd.DataFrame, cluster_counts: List[int]) -> pd.DataFrame:
     """
