@@ -32,7 +32,8 @@ def calculate_wallet_trading_features(
     base_profits_df: pd.DataFrame,
     period_start_date: str,
     period_end_date: str,
-    calculate_twb_metrics: bool = True
+    include_twb_metrics: bool = True,
+    include_btc_metrics: bool = False
 ) -> pd.DataFrame:
     """
     Calculates comprehensive crypto trading metrics for each wallet.
@@ -41,7 +42,7 @@ def calculate_wallet_trading_features(
     - base_profits_df (DataFrame): Daily profits data
     - period_start_date (str): Period start in 'YYYY-MM-DD' format
     - period_end_date (str): Period end in 'YYYY-MM-DD' format
-    - calculate_twb_metrics (bool): whether to calculate time weighted balance metrics
+    - include_twb_metrics (bool): whether to calculate time weighted balance metrics
 
     Required columns: wallet_address, coin_id, date, usd_balance,
                     usd_net_transfers, is_imputed
@@ -59,29 +60,38 @@ def calculate_wallet_trading_features(
         - activity_density: Transaction days / period duration
         - volume_vs_twb_ratio: Volume relative to time-weighted balance
     """
+
+    # 1. Prepare balances_profits_df
+    # ------------------------------
     # Copy df and assert period
     profits_df = base_profits_df.copy()
     u.assert_period(profits_df, period_start_date, period_end_date)
     profits_df['date'] = pd.to_datetime(profits_df['date'])
 
+    # Retrieve inclusion config values
+    include_twb_metrics = wallets_config['features']['include_twb_metrics']
+    include_btc_metrics = wallets_config['features']['include_btc_metrics']
 
+
+    # 2. Calculate configured metrics
+    # ------------------------------
     # Add crypto balance/transfers/gain helper columns
-    profits_df = calculate_crypto_balance_columns(profits_df, period_start_date)
+    balances_profits_df = calculate_crypto_balance_columns(profits_df, period_start_date)
 
     # Calculate net_gain and max_investment columns
-    gain_and_investment_df = calculate_gain_and_investment_columns(profits_df)
+    gain_and_investment_df = calculate_gain_and_investment_columns(balances_profits_df)
 
     # Calculated metrics that ignore imputed transactions
-    observed_activity_df = calculate_observed_activity_columns(profits_df,period_start_date,period_end_date)
+    observed_activity_df = calculate_observed_activity_columns(balances_profits_df,period_start_date,period_end_date)
 
     # Merge together
     trading_features_df = gain_and_investment_df.join(observed_activity_df)
 
     # Add twb if configured to do so
-    if calculate_twb_metrics:
+    if include_twb_metrics:
 
         # Calculate time weighted balance using the cost basis
-        time_weighted_df = aggregate_time_weighted_balance(profits_df)
+        time_weighted_df = aggregate_time_weighted_balance(balances_profits_df)
 
         # Join all full metric dataframes
         trading_features_df = trading_features_df.join(time_weighted_df)
@@ -93,9 +103,13 @@ def calculate_wallet_trading_features(
             0
         )
 
+    # if calculate_btc_metrics:
+    #     btc=True
+
+
+
     # Fill missing values and handle edge cases
-    trading_features_df = trading_features_df.fillna(0)
-    trading_features_df = trading_features_df.replace(-0, 0)
+    trading_features_df = trading_features_df.fillna(0).replace(-0, 0)
 
     return trading_features_df
 
@@ -210,7 +224,10 @@ def calculate_gain_and_investment_columns(profits_df: pd.DataFrame) -> pd.DataFr
 
 
 
-def calculate_observed_activity_columns(profits_df: pd.DataFrame, period_start_date: str, period_end_date: str) -> pd.DataFrame:
+def calculate_observed_activity_columns(profits_df: pd.DataFrame,
+                                        period_start_date: str,
+                                        period_end_date: str
+    ) -> pd.DataFrame:
     """
     Calculates metrics based on actual trading activity, excluding imputed rows.
 
@@ -285,7 +302,7 @@ def aggregate_time_weighted_balance(profits_df: pd.DataFrame) -> pd.DataFrame:
     Returns:
     - wallet_metrics_df (DataFrame): Time weighted metrics by wallet
     """
-    active_period_threshold = wallets_config['features']['timing_metrics_min_transaction_size']
+    active_period_threshold = wallets_config['data_cleaning']['usd_materiality']
 
     # Calculate cost basis for each wallet-coin pair and merge into main dataframe
     cost_basis_df = get_cost_basis_df(profits_df)

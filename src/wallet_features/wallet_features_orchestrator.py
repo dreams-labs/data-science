@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 # Load wallets_config at the module level
 wallets_config = WalletsConfig()
 wallets_metrics_config = u.load_config('../config/wallets_metrics_config.yaml')
-wallets_features_config = yaml.safe_load(Path('../config/wallets_features_config.yaml').read_text(encoding='utf-8'))
 
 
 def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_sequencing_df,

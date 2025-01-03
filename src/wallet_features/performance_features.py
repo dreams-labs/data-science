@@ -94,10 +94,15 @@ def calculate_balance_features(trading_features_df: pd.DataFrame) -> pd.DataFram
     """
     balance_features_df = pd.DataFrame(index=trading_features_df.index)
 
-    # Basic size features
+    # Trading features to use as performance ratio denominators
     balance_features_df['max_investment'] = trading_features_df['max_investment']
-    balance_features_df['twb'] = trading_features_df['time_weighted_balance']
-    balance_features_df['active_twb'] = trading_features_df['active_time_weighted_balance']
+    balance_features_df['total_crypto_buys'] = trading_features_df['total_crypto_buys']
+    balance_features_df['net_crypto_investment'] = trading_features_df['net_crypto_investment']
+
+    # Add time weighted balance features if configured to
+    if wallets_config['features']['include_twb_metrics'] is True:
+        balance_features_df['twb'] = trading_features_df['time_weighted_balance']
+        balance_features_df['active_twb'] = trading_features_df['active_time_weighted_balance']
 
     # DISABLED FEATURES
     # -----------------------------------------------------

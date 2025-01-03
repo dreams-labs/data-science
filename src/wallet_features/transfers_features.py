@@ -35,7 +35,7 @@ def retrieve_transfers_sequencing():
         the associated coin_id.
     """
     # Wallet transactions below this threshold will not be included in the buyer sequencing
-    minimum_transaction_size = wallets_config['features']['timing_metrics_min_transaction_size']
+    minimum_transaction_size = wallets_config['data_cleaning']['usd_materiality']
     minimum_transaction_size = 0
 
     # All data after the training period must be ignored to avoid data leakage

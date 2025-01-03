@@ -18,8 +18,6 @@ logger = logging.getLogger(__name__)
 # Load wallets_config at the module level
 wallets_config = WalletsConfig()
 wallets_metrics_config = u.load_config('../config/wallets_metrics_config.yaml')
-wallets_features_config = yaml.safe_load(Path('../config/wallets_features_config.yaml').read_text(encoding='utf-8'))
-
 
 
 def load_wallet_scores(wallet_scores: list, wallet_scores_path: str) -> pd.DataFrame:

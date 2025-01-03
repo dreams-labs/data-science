@@ -2,10 +2,10 @@
 Calculates metrics aggregated at the wallet level
 """
 import logging
+from typing import List
 from pathlib import Path
 import pandas as pd
 import numpy as np
-import yaml
 
 
 # Local module imports
@@ -22,7 +22,6 @@ config_directory = current_dir / '..' / '..' / 'config'
 # Load wallets_config at the module level
 wallets_config = WalletsConfig()
 wallets_metrics_config = u.load_config(config_directory / 'wallets_metrics_config.yaml')
-wallets_features_config = yaml.safe_load((config_directory / 'wallets_features_config.yaml').read_text(encoding='utf-8'))  # pylint:disable=line-too-long
 
 
 # -----------------------------
@@ -65,17 +64,18 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
 
             All wallet_addresses from the categorical index are included with zeros for missing data.
     """
+    # identify indicator columns based on the config file
+    indicator_columns = identify_indicator_columns(wallets_metrics_config['time_series']['market_data'])
 
     # add timing offset features
-    market_timing_df = calculate_offsets(market_indicators_data_df)
-    market_timing_df,relative_change_columns = calculate_relative_changes(market_timing_df)
+    market_timing_df = calculate_offsets(market_indicators_data_df, indicator_columns)
+    market_timing_df, relative_change_columns = calculate_relative_changes(market_timing_df, indicator_columns)
 
     # flatten the wallet-coin-date transactions into wallet-indexed features
     wallet_timing_features_df = generate_all_timing_features(
         profits_df,
         market_timing_df,
-        relative_change_columns,
-        wallets_config['features']['timing_metrics_min_transaction_size'],
+        relative_change_columns
     )
 
     return wallet_timing_features_df
@@ -86,78 +86,67 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
 # Component Functions
 # -----------------------------
 
-class FeatureConfigError(Exception):
-    """Custom exception for feature configuration errors."""
-    pass
+
+def identify_indicator_columns(config: dict) -> list:
+    """
+    Generates column names from nested indicator config.
+
+    Params:
+    - config (dict): Nested config with metrics, indicators and parameters
+
+    Returns:
+    - cols (list): List of generated column names
+    """
+    cols = []
+    for metric, metric_config in config.items():
+        for indicator, ind_config in metric_config['indicators'].items():
+            for _, values in ind_config['parameters'].items():
+                for value in values:
+                    cols.append(f"{metric}_{indicator}_{value}")
+
+    return cols
+
 
 @u.timing_decorator
 def calculate_offsets(
-    market_indicators_data_df: pd.DataFrame
+    market_indicators_data_df: pd.DataFrame,
+    indicator_columns: List
 ) -> pd.DataFrame:
     """
     Calculate offset values for specified columns in market timing dataframe.
 
     Args:
         market_indicators_data_df: DataFrame containing market timing data
+        indicator_columns: List of the names of the indicator columns
 
     Returns:
         market_timing_df: DataFrame with added offset columns
-
-    Raises:
-        FeatureConfigError: If configuration is invalid or required columns are missing
     """
     # Create a copy of the input DataFrame to avoid modifying the original
     market_timing_df = market_indicators_data_df.copy()
 
     # Get the offsets configuration
-    try:
-        offset_config = wallets_features_config['market_timing']['offsets']
-    except KeyError as e:
-        raise FeatureConfigError("Config key ['market_timing']['offsets'] was not found in " \
-                                "wallets_features_config.") from e
+    offsets = wallets_config['features']['market_timing_offsets']
 
     # Process each column and its offsets
-    for column, column_config in offset_config.items():
-        # Check if the column exists in the DataFrame
-        if column not in market_timing_df.columns:
-            raise FeatureConfigError(f"Column '{column}' not found in DataFrame")
+    for column in indicator_columns:
 
-        # Extract offsets from the new config structure
-        try:
-            # Handle both old and new config formats
-            if isinstance(column_config, dict):
-                offsets = column_config['offsets']
-            else:
-                # Backward compatibility for old format
-                offsets = column_config
-        except KeyError as e:
-            raise FeatureConfigError(f"'offsets' key not found in configuration for column '{column}'") from e
-        except Exception as e:
-            raise FeatureConfigError(f"Invalid configuration format for column '{column}': {str(e)}") from e
-
-        # Calculate offset for each specified lead value
+        # Calculate offset for each specified value
         for offset in offsets:
             if offset > 0:
                 new_column = f"{column}_lead_{offset}"
-            elif offset < 0:
-                new_column = f"{column}_lag_{-offset}"
             else:
-                raise ValueError(f"Invalid wallet_features_config offset param {offset} found. "
-                                "Offsets must be non-zero integers.")
+                new_column = f"{column}_lag_{-offset}"
 
-
-            try:
-                market_timing_df[new_column] = market_timing_df.groupby('coin_id',observed=True)[column].shift(-offset)
-            except Exception as e:
-                raise FeatureConfigError(f"Error calculating offset for column '{column}' " \
-                                        f"with lead {offset}: {str(e)}") from e
+            market_timing_df[new_column] = market_timing_df.groupby('coin_id',observed=True)[column].shift(-offset)
 
     return market_timing_df
 
 
 @u.timing_decorator
 def calculate_relative_changes(
-    market_timing_df: pd.DataFrame
+    market_timing_df: pd.DataFrame,
+    indicator_columns: List
 ) -> pd.DataFrame:
     """
     Calculate relative changes between base columns and their corresponding offset columns.
@@ -170,23 +159,16 @@ def calculate_relative_changes(
 
     Args:
         market_timing_df: DataFrame containing market timing data with offset columns
+        indicator_columns: List of the names of the indicator columns
 
     Returns:
         DataFrame with added relative change columns and optionally dropped base/offset columns
         relative_change_columns: List of the relative change columns created
-
-    Raises:
-        FeatureConfigError: If configuration is invalid or required columns are missing
     """
     # Create a copy of the input DataFrame to avoid modifying the original
     result_df = market_timing_df.copy()
-
-    # Get the offsets configuration
-    try:
-        offset_config = wallets_features_config['market_timing']['offsets']
-        winsor_coef = wallets_config['features']['offset_winsorization']
-    except KeyError as e:
-        raise FeatureConfigError("Required config key not found in wallets_config['features']: " + str(e)) from e
+    offsets = wallets_config['features']['market_timing_offsets']
+    offset_winsorization = wallets_config['features']['market_timing_offset_winsorization']
 
     # Keep track of columns to drop
     columns_to_drop = set()
@@ -194,64 +176,42 @@ def calculate_relative_changes(
     relative_change_columns = []
 
     # Process each column and calculate relative changes
-    for base_column, column_config in offset_config.items():
-        # Check if the base column exists in the DataFrame
-        if base_column not in result_df.columns:
-            raise FeatureConfigError(f"Base column '{base_column}' not found in DataFrame")
-
-        try:
-            offsets = column_config['offsets']
-            retain_base_columns = column_config.get('retain_base_columns', True)
-        except KeyError as e:
-            raise FeatureConfigError(f"Invalid configuration for column '{base_column}': {str(e)}") from e
+    for base_column in indicator_columns:
 
         # Calculate relative change for each offset
         for offset in offsets:
 
-            # Identify column and confirm it exists
+            # Define column names
             if offset > 0:
                 offset_str = f'lead_{offset}'
             else:
                 offset_str = f'lag_{-offset}'
 
             offset_column = f'{base_column}_{offset_str}'
-            if offset_column not in result_df.columns:
-                raise FeatureConfigError(f"Offset column '{offset_column}' not found in DataFrame. " \
-                                        "Run calculate_offsets() first.")
 
             # Create new column name for relative change
             change_column = f"{base_column}/{offset_str}"
 
-            try:
-                # Calculate percentage change
-                # Formula: (offset_value - base_value) / base_value
-                result_df[change_column] = (
-                    (result_df[offset_column] - result_df[base_column]) /
-                    result_df[base_column]
-                )
+            # Calculate percentage change
+            # Formula: (offset_value - base_value) / base_value
+            result_df[change_column] = (
+                (result_df[offset_column] - result_df[base_column]) /
+                result_df[base_column]
+            )
 
-                # Flip the sign if the offset is negative (compares present v past instead of future vs present)
-                if offset < 0:
-                    result_df[change_column] = result_df[change_column] * -1
+            # Flip the sign if the offset is negative (compares present v past instead of future vs present)
+            if offset < 0:
+                result_df[change_column] = result_df[change_column] * -1
 
-                # Handle division by zero cases
-                result_df[change_column] = result_df[change_column].replace([np.inf, -np.inf], np.nan)
+            # Handle division by zero cases
+            result_df[change_column] = result_df[change_column].replace([np.inf, -np.inf], np.nan)
 
-                # Add column to winsorization list
-                relative_change_columns.append(change_column)
-
-                # If retain_base_columns is False, mark columns for dropping
-                if not retain_base_columns:
-                    columns_to_drop.add(base_column)
-                    columns_to_drop.add(offset_column)
-
-            except Exception as e:
-                raise FeatureConfigError(f"Error calculating relative change between '{base_column}' " \
-                                        f"and '{offset_column}': {str(e)}") from e
+            # Add column to winsorization list
+            relative_change_columns.append(change_column)
 
     # Winsorize all change columns
     for column in relative_change_columns:
-        result_df[column] = u.winsorize(result_df[column], winsor_coef)
+        result_df[column] = u.winsorize(result_df[column], offset_winsorization)
 
     # Drop marked columns if any
     if columns_to_drop:
@@ -260,7 +220,7 @@ def calculate_relative_changes(
     return result_df,relative_change_columns
 
 
-
+@u.timing_decorator
 def calculate_timing_features_for_column(df: pd.DataFrame, metric_column: str) -> pd.DataFrame:
     """
     Calculate timing features (mean, weighted mean) for a single metric column in a single pass.
@@ -307,11 +267,11 @@ def calculate_timing_features_for_column(df: pd.DataFrame, metric_column: str) -
 
 
 
+@u.timing_decorator
 def generate_all_timing_features(
     profits_df,
     market_timing_df,
-    relative_change_columns,
-    min_transaction_size=0
+    relative_change_columns
 ):
     """
     Generate timing features for multiple market metric columns.
@@ -320,7 +280,6 @@ def generate_all_timing_features(
         profits_df (pd.DataFrame): DataFrame with columns [coin_id, date, wallet_address, usd_net_transfers]
         market_timing_df (pd.DataFrame): DataFrame with market timing metrics indexed by (coin_id, date)
         relative_change_columns (list): List of column names from market_timing_df to analyze
-        min_transaction_size (float): Minimum absolute USD value of transaction to consider
 
     Returns:
         pd.DataFrame: DataFrame indexed by wallet_address with generated features for each input column
@@ -328,9 +287,9 @@ def generate_all_timing_features(
     # Get list of wallets to include
     wallet_addresses = profits_df['wallet_address'].unique()
 
-    # Filter by minimum transaction size
+    # Filter out transactions below materiality threshold
     filtered_profits = profits_df[
-        abs(profits_df['usd_net_transfers']) >= min_transaction_size
+        abs(profits_df['usd_net_transfers']) >= wallets_config['data_cleaning']['usd_materiality']
     ].copy()
 
     # Perform the merge once

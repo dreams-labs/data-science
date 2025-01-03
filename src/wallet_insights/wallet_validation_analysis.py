@@ -267,4 +267,3 @@ def analyze_wallet_model_importance(feature_importances):
     ], axis=1)
 
     return feature_details_df
-

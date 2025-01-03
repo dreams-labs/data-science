@@ -60,11 +60,6 @@ def basic_market_timing_features_config():
     }
 
 @pytest.fixture
-def mock_wallets_features_config(monkeypatch, basic_market_timing_features_config):
-    """Mock the wallets_features_config at the module level"""
-    monkeypatch.setattr(wmt, 'wallets_features_config', basic_market_timing_features_config)
-
-@pytest.fixture
 def basic_market_timing_metrics_config():
     """
     Fixture providing a basic wallet features configuration with market timing offsets.
@@ -102,7 +97,7 @@ def mock_wallets_metrics_config(monkeypatch, basic_market_timing_metrics_config)
 # Add these to your existing imports
 
 @pytest.mark.unit
-def test_successful_offset_calculation(mock_wallets_features_config,mock_wallets_metrics_config):
+def test_successful_offset_calculation(mock_wallets_metrics_config):
     """
     Test successful calculation of offsets when DataFrame has sufficient records.
 
@@ -146,7 +141,7 @@ def test_successful_offset_calculation(mock_wallets_features_config,mock_wallets
     )
 
 @pytest.mark.unit
-def test_insufficient_records(mock_wallets_features_config,mock_wallets_metrics_config):
+def test_insufficient_records(mock_wallets_metrics_config):
     """
     Test offset calculation when one coin has insufficient records.
 
@@ -169,38 +164,9 @@ def test_insufficient_records(mock_wallets_features_config,mock_wallets_metrics_
     assert pd.isna(eth_data['price_rsi_14_lead_3']).all()  # 3-step offset should be all NaN
     assert pd.isna(eth_data['price_rsi_14_lead_2']).all()  # 2-step offset should be all NaN
 
-@pytest.mark.unit
-def test_missing_column_in_df(monkeypatch):
-    """
-    Test handling of configuration with column that doesn't exist in DataFrame.
-    """
-    df = pd.DataFrame({
-        'coin_id': ['BTC', 'ETH'],
-        'price_rsi_3': [10, 15]  # Only RSI-3 exists, not RSI-4
-    })
-
-    invalid_config = {
-        'market_timing': {
-            'offsets': {
-                'price_rsi_4': {  # This column doesn't exist
-                    'offsets': [1],
-                    'retain_base_columns': True
-                }
-            }
-        }
-    }
-
-    # Mock the wallets_features_config with invalid config
-    monkeypatch.setattr(wmt, 'wallets_features_config', invalid_config)
-
-    with pytest.raises(wmt.FeatureConfigError) as exc_info:
-        wmt.calculate_offsets(df)
-
-    assert "Column 'price_rsi_4' not found in DataFrame" in str(exc_info.value)
-
 
 @pytest.mark.unit
-def test_relative_changes_calculation(mock_wallets_features_config,mock_wallets_metrics_config):
+def test_relative_changes_calculation(mock_wallets_metrics_config):
     """
     Test calculation of relative changes between base and offset columns.
 
