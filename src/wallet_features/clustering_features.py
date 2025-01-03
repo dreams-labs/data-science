@@ -25,7 +25,7 @@ wallets_config = WalletsConfig()
 
 
 # -----------------------------------
-#         Core Interface
+#           Core Interface
 # -----------------------------------
 
 @u.timing_decorator

@@ -83,7 +83,6 @@ def define_training_wallet_cohort(profits_df,market_data_df):
     training_profits_df = (
         imputed_profits_df[imputed_profits_df['date'] <= training_period_end]
         .copy()
-        .drop('total_return', axis=1)
     )
 
     # Confirm valid dates for training period
@@ -126,9 +125,6 @@ def split_training_window_profits_dfs(training_profits_df,training_market_data_d
                                                                         training_market_data_df,
                                                                         training_window_boundary_dates,
                                                                         n_threads=1)
-
-    # drop imputed total_return column
-    training_windows_profits_df = training_windows_profits_df.drop('total_return', axis=1)
 
     # Split profits_df into training windows
     training_windows_profits_dfs = wtd.split_training_window_dfs(training_windows_profits_df)
@@ -233,7 +229,8 @@ def identify_modeling_cohort(modeling_period_profits_df: pd.DataFrame) -> pd.Dat
     modeling_wallets_df = wtf.calculate_wallet_trading_features(modeling_period_profits_df,
                                             wallets_config['training_data']['modeling_period_start'],
                                             wallets_config['training_data']['modeling_period_end'],
-                                            include_twb_metrics=True)
+                                            include_twb_metrics=False,
+                                            include_btc_metrics=False)
 
     # Extract thresholds
     modeling_min_investment = wallets_config['modeling']['modeling_min_investment']

@@ -93,8 +93,8 @@ modeling:
 
     # Feature selection params
     feature_selection:
-        variance_threshold: 0.00
-        correlation_threshold: 1
+        variance_threshold: 0.03
+        correlation_threshold: 0.95
         protected_features: [
             'cluster|'
         ]
