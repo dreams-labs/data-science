@@ -144,10 +144,6 @@ def format_and_save_datasets(profits_df, market_data_df, period_start_date, parq
     # Clean profits_df
     profits_df, _ = dr.clean_profits_df(profits_df, wallets_config['data_cleaning'])
 
-    # Drop unneeded columns
-    columns_to_drop = ['total_return']
-    profits_df = profits_df.drop(columns_to_drop,axis=1)
-
     # Round relevant columns
     columns_to_round = [
         'profits_cumulative'

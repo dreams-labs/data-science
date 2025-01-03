@@ -54,7 +54,7 @@ def retrieve_market_data(dataset='prod'):
     market_data_df['coin_id'] = market_data_df['coin_id'].astype('category')
 
     # Downcast numeric columns to reduce memory usage
-    market_data_df['price'] = market_data_df['price'].astype('float32')
+    market_data_df = u.df_downcast(market_data_df)
 
     # Dates as dates
     market_data_df['date'] = pd.to_datetime(market_data_df['date'])
@@ -434,11 +434,7 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows, dataset='pro
     profits_df['coin_id'] = profits_df['coin_id'].astype('category')
     profits_df['date'] = pd.to_datetime(profits_df['date'])
 
-    # Add total_return column
-    profits_df['total_return'] = (profits_df['profits_cumulative']
-                                   / profits_df['usd_inflows_cumulative'])
-
-    # Convert all numerical columns to 32 bit, using df_downcast to avoid overflow
+    # Convert all numerical columns to 32 bit, using safe_downcast to avoid overflow
     profits_df = u.df_downcast(profits_df)
 
     logger.info('Retrieved profits_df with %s unique coins and %s rows after %.2f seconds',
