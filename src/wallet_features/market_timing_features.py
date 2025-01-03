@@ -74,9 +74,9 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
 
 
     # Get unique coins for chunking
-    unique_coins = profits_df['coin_id'].unique()
+    unique_coins = np.random.permutation(profits_df['coin_id'].unique())
     coins_per_batch = wallets_config['features']['market_timing_coins_per_batch']
-    batch_count = np.ceil(len(unique_coins)/coins_per_batch)  # Adjust based on memory constraints
+    batch_count = np.ceil(len(unique_coins)/coins_per_batch)
     all_wallet_features = []
 
     # Process each chunk
@@ -145,10 +145,8 @@ def calculate_offsets(
         indicator_columns: List of the names of the indicator columns
 
     Returns:
-        market_timing_df: DataFrame with added offset columns
+        market_indicators_data_df: DataFrame with added offset columns
     """
-    # Create a copy of the input DataFrame
-    market_timing_df = market_indicators_data_df.copy()
 
     # Get offsets from config
     offsets = wallets_config['features']['market_timing_offsets']
@@ -156,7 +154,7 @@ def calculate_offsets(
     # Pre-calculate all shifted columns
     new_columns = {}
     for column in indicator_columns:
-        grouped = market_timing_df.groupby('coin_id', observed=True)[column]
+        grouped = market_indicators_data_df.groupby('coin_id', observed=True)[column]
         for offset in offsets:
             if offset > 0:
                 col_name = f"{column}_lead_{offset}"
@@ -166,10 +164,10 @@ def calculate_offsets(
 
     # Add all new columns at once
     if new_columns:
-        new_df = pd.DataFrame(new_columns, index=market_timing_df.index)
-        market_timing_df = pd.concat([market_timing_df, new_df], axis=1)
+        new_df = pd.DataFrame(new_columns, index=market_indicators_data_df.index)
+        market_indicators_data_df = pd.concat([market_indicators_data_df, new_df], axis=1)
 
-    return market_timing_df
+    return market_indicators_data_df
 
 
 @u.timing_decorator
@@ -249,18 +247,12 @@ def prepare_timing_data(profits_df: pd.DataFrame,
     # Filter out transactions below materiality threshold
     filtered_profits = profits_df[
         abs(profits_df['usd_net_transfers']) >= wallets_config['data_cleaning']['usd_materiality']
-    ].copy()
+    ]
 
     logger.info('ptd0.1')
-    # # Perform the merge once
-    # timing_profits_df = filtered_profits.merge(
-    #     market_timing_df[relative_change_columns + ['coin_id', 'date']],
-    #     on=['coin_id', 'date'],
-    #     how='left'
-    # )
-    # Before the merge:
-    market_timing_df = market_timing_df.set_index(['coin_id', 'date'])
-    filtered_profits = filtered_profits.set_index(['coin_id', 'date'])
+    # Set indices using inplace=True to save memory
+    market_timing_df.set_index(['coin_id', 'date'], inplace=True)
+    filtered_profits.set_index(['coin_id', 'date'], inplace=True)
     logger.info('ptd0.11')
 
     # Then merge on index
@@ -270,10 +262,6 @@ def prepare_timing_data(profits_df: pd.DataFrame,
         right_index=True,
         how='inner'
     )
-
-    logger.info('ptd0.2')
-    # Filter out rows with zero net transfers
-    timing_profits_df = timing_profits_df[timing_profits_df['usd_net_transfers'] != 0].copy()
 
     logger.info('ptd0.3')
     # Label transaction_side = 'buy' or 'sell'

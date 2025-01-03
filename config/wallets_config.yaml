@@ -80,7 +80,7 @@ features:
             -200, -150, -100, -75, -50, -35, -20, -10, -5,
         ]
     market_timing_offset_winsorization: 0.02 # comparisons between metrics and their offset values will be winsorized by this amount
-    market_timing_coins_per_batch: 500
+    market_timing_coins_per_batch: 1000
 
     # Clustering features
     clustering_n_components: 25
