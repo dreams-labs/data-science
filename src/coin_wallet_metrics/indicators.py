@@ -371,15 +371,8 @@ def calculate_mfi(price: pd.Series, volume: pd.Series, window: int = 14) -> pd.S
     pos_flow_sum = positive_money_flow.rolling(window=window).sum()
     neg_flow_sum = negative_money_flow.rolling(window=window).sum()
 
-    # Safe division for money flow ratio
-    money_flow_ratio = np.where(
-        neg_flow_sum != 0,
-        pos_flow_sum / neg_flow_sum,
-        np.where(pos_flow_sum != 0, 100, 1)  # If no negative flow but positive flow exists = strong buy
-    )
-
     # Calculate MFI
-    mfi = 100 - (100 / (1 + money_flow_ratio))
+    mfi = 100 * pos_flow_sum / (pos_flow_sum + neg_flow_sum)
 
     return pd.Series(mfi, index=price.index).ffill().fillna(50)  # Use 50 as neutral starting point
 

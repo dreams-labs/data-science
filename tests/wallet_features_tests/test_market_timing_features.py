@@ -93,11 +93,17 @@ def mock_wallets_metrics_config(monkeypatch, basic_market_timing_metrics_config)
     """Mock the wallets_metrics_config at the module level"""
     monkeypatch.setattr(wmt, 'wallets_metrics_config', basic_market_timing_metrics_config)
 
+@pytest.fixture
+def indicator_columns(basic_market_timing_metrics_config):
+    """Indicator column list based on demo config"""
+    indicators_config = basic_market_timing_metrics_config['time_series']['market_data']
+    return wmt.identify_indicator_columns(indicators_config)
+
 
 # Add these to your existing imports
 
 @pytest.mark.unit
-def test_successful_offset_calculation(mock_wallets_metrics_config):
+def test_successful_offset_calculation(mock_wallets_metrics_config,indicator_columns):
     """
     Test successful calculation of offsets when DataFrame has sufficient records.
 
@@ -115,7 +121,7 @@ def test_successful_offset_calculation(mock_wallets_metrics_config):
     })
 
     # Calculate offsets
-    result = wmt.calculate_offsets(df)
+    result = wmt.calculate_offsets(df,indicator_columns)
 
     # Verify all expected columns exist
     expected_columns = [

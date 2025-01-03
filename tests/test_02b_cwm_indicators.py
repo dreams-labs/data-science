@@ -623,17 +623,22 @@ def test_calculate_mfi_scenario1():
     expected_mfi.iloc[2] = 100  # since only positive money flows exist in the first window
 
     # Fill NaN values according to the new function behavior
-    expected_mfi = expected_mfi.ffill().fillna(0.5)
-
+    expected_mfi = expected_mfi.ffill().fillna(50)
+    print('result_mfi')
+    print(result_mfi.values)
+    print('----')
+    print('expected_mfi')
+    print(expected_mfi.values)
+    print('----')
     # Assert all values are close, including the previously NaN values that are now filled
     assert np.allclose(result_mfi, expected_mfi, atol=1e-4), \
-        f"Expected MFI values: {expected_mfi.values}, but got {result_mfi.values}"
+        f"Expected MFI values: {expected_mfi.values} but got {result_mfi.values}"
 
     # Assert there are no NaN values in the result
     assert not result_mfi.isna().any(), "Expected no NaN values in the result due to forward fill and 0.5 filling"
 
     # Assert the first value is 0.5 (since it can't be forward filled)
-    assert result_mfi[0] == 0.5, "Expected first value to be 0.5 since it cannot be forward filled"
+    assert result_mfi[0] == 50, "Expected first value to be 0.5 since it cannot be forward filled"
 
 
 
