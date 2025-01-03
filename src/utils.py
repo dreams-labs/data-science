@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from typing import List,Dict,Any
 import importlib
 import itertools
+import pyttsx3
 import logging
 import warnings
 import functools
@@ -490,9 +491,9 @@ def timing_decorator(func):
         end_time = time.time()
 
         function_logger.info(
-            'Completed %s after %.2f seconds.',
-            func.__name__,
-            end_time - start_time
+            '(%.2fs)Completed %s.',
+            end_time - start_time,
+            func.__name__
         )
 
         # Restore original LogRecord factory
@@ -972,31 +973,41 @@ def winsorize(data: pd.Series, cutoff: float = 0.01) -> pd.Series:
 
 # silence donation message
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-def notify(sound_file_path=None):
+def notify(prompt=None, sound_file_path=None, voice_id=None):
     """
-    Play a notification sound from a local audio file using pygame asynchronously.
-    Falls back to ALERT_SOUND_FILEPATH environment variable if no path provided.
-    Returns early if no valid sound file path is found.
+    Play alert sound followed by optional TTS message after 1s delay.
 
     Args:
-        sound_file_path (str, optional): Path to the sound file (supports .wav format)
+        prompt (str, optional): Text to speak using TTS
+        sound_file_path (str, optional): Path to sound file (.wav format)
+        voice_id (str, optional): Specific voice ID to use for TTS
     """
+    # Always play sound file first
     sound_file_path = sound_file_path or os.getenv('ALERT_SOUND_FILEPATH')
     if not sound_file_path:
         return "No sound file found."
 
     try:
-        if not pygame.mixer.get_init():  # Initialize mixer if not already done
+        if not pygame.mixer.get_init():
             pygame.mixer.init()
 
         sound = pygame.mixer.Sound(sound_file_path)
         sound.play()
 
-        # Don't wait for the sound to finish - return immediately
-        return
+        # If prompt provided, wait 1s then do TTS
+        if prompt:
+            time.sleep(0.7)
+            engine = pyttsx3.init()
+            voice_id = voice_id or os.getenv('ALERT_VOICE_ID')
+            engine.setProperty('voice', voice_id)
+            engine.setProperty('rate', 180)     # Speed of speech (words per minute)
+            engine.say(prompt)
+            engine.runAndWait()
+            engine.stop()
+            del engine
 
-    except Exception as e:  # pylint:disable=broad-exception-caught
-        return f"Error playing sound: {e}"
+    except Exception as e:
+        return f"Error with playback: {e}"
 
 
 # pylint: disable=dangerous-default-value
