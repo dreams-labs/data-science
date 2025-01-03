@@ -3,7 +3,7 @@ Calculates metrics aggregated at the wallet level
 """
 import time
 import logging
-from typing import List
+from typing import List,Tuple
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -74,8 +74,12 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
 
 
     # Flatten the wallet-coin-date transactions into wallet-indexed features
-    timing_profits_df = prepare_timing_data(profits_df, market_timing_df, relative_change_columns)
-    wallet_timing_features_df = calculate_wallet_timing_features(timing_profits_df, relative_change_columns)
+    timing_profits_df, factorization_info = prepare_timing_data(profits_df,
+                                                                market_timing_df,
+                                                                relative_change_columns)
+    wallet_timing_features_df = calculate_wallet_timing_features(timing_profits_df,
+                                                                 relative_change_columns,
+                                                                 factorization_info)
 
 
     return wallet_timing_features_df
@@ -220,12 +224,11 @@ def calculate_relative_changes(
     return result_df,relative_change_columns
 
 
-
 @u.timing_decorator
 def prepare_timing_data(profits_df: pd.DataFrame,
-                        market_timing_df: pd.DataFrame,
-                        relative_change_columns: list
-                    ) -> pd.DataFrame:
+                       market_timing_df: pd.DataFrame,
+                       relative_change_columns: list
+                   ) -> Tuple[pd.DataFrame, dict]:
     """
     Prepare and merge profits data with market timing metrics.
 
@@ -236,6 +239,7 @@ def prepare_timing_data(profits_df: pd.DataFrame,
 
     Returns:
     - timing_profits_df (DataFrame): Merged and preprocessed timing data
+    - factorization_info (dict): Pre-computed factorization data
     """
     # Filter out transactions below materiality threshold
     filtered_profits = profits_df[
@@ -255,35 +259,50 @@ def prepare_timing_data(profits_df: pd.DataFrame,
     # Label transaction_side = 'buy' or 'sell'
     timing_profits_df['transaction_side'] = np.where(timing_profits_df['usd_net_transfers'] > 0, 'buy', 'sell')
 
+    # Pre-compute factorization
+    wallet_codes, wallet_uniques = pd.factorize(timing_profits_df['wallet_address'])
+    side_codes, side_uniques = pd.factorize(timing_profits_df['transaction_side'])
+    n_sides = len(side_uniques)
+    combined_codes = wallet_codes * n_sides + side_codes
+
     # Precompute abs transfers
     timing_profits_df['abs_net_transfers'] = timing_profits_df['usd_net_transfers'].abs()
 
-    return timing_profits_df
+    factorization_info = {
+        'wallet_uniques': wallet_uniques,
+        'side_uniques': side_uniques,
+        'combined_codes': combined_codes,
+        'n_sides': n_sides
+    }
 
+    return timing_profits_df, factorization_info
 
 @u.timing_decorator
-def calculate_wallet_timing_features(timing_profits_df: pd.DataFrame, relative_change_columns: list) -> pd.DataFrame:
+def calculate_wallet_timing_features(timing_profits_df: pd.DataFrame,
+                                   relative_change_columns: list,
+                                   factorization_info: dict) -> pd.DataFrame:
     """
     Generate timing features for each wallet from prepared timing data.
 
     Params:
     - timing_profits_df (DataFrame): Preprocessed timing data
     - relative_change_columns (list): Columns to generate features for
+    - factorization_info (dict): Pre-computed factorization data
 
     Returns:
     - result (DataFrame): Wallet-level timing features
     """
-    # Get list of wallets to include
-    wallet_addresses = timing_profits_df['wallet_address'].unique()
+    # Use pre-computed wallet addresses from factorization
+    wallet_uniques = factorization_info['wallet_uniques']
 
     # Calculate features for each column
     all_features = []
-
     for col in relative_change_columns:
         logger.debug("Generating timing performance features for %s...", col)
         col_features = calculate_timing_features_for_column(
             timing_profits_df,
-            col
+            col,
+            factorization_info
         )
         all_features.append(col_features)
 
@@ -292,35 +311,33 @@ def calculate_wallet_timing_features(timing_profits_df: pd.DataFrame, relative_c
         result = pd.concat(all_features, axis=1)
     else:
         result = pd.DataFrame(
-            index=pd.Index(wallet_addresses, name='wallet_address')
+            index=pd.Index(wallet_uniques, name='wallet_address')
         )
 
     # Ensure all wallet addresses are included and fill NaNs
     result = pd.DataFrame(
         result,
-        index=pd.Index(wallet_addresses, name='wallet_address')
+        index=pd.Index(wallet_uniques, name='wallet_address')
     ).fillna(0)
 
     return result
 
 
-
 @u.timing_decorator
-def calculate_timing_features_for_column(df: pd.DataFrame, metric_column: str) -> pd.DataFrame:
+def calculate_timing_features_for_column(df: pd.DataFrame,
+                                       metric_column: str,
+                                       factorization_info: dict) -> pd.DataFrame:
     """
-    Calculate timing features (mean, weighted mean) for a single metric column using vectorized operations.
+    Calculate timing features using pre-computed factorization.
     Result columns: {metric_column}/buy_mean, {metric_column}/buy_weighted,
                     {metric_column}/sell_mean, {metric_column}/sell_weighted.
     """
-    start_time = time.time()
-    logger.info("ctffc1 %s",time.time()-start_time)
-    # Create combined integer keys
-    wallet_codes, wallet_uniques = pd.factorize(df['wallet_address'])
-    side_codes, side_uniques = pd.factorize(df['transaction_side'])
-    n_sides = len(side_uniques)
-    combined_codes = wallet_codes * n_sides + side_codes
+    # Unpack pre-computed factorization data
+    wallet_uniques = factorization_info['wallet_uniques']
+    side_uniques = factorization_info['side_uniques']
+    combined_codes = factorization_info['combined_codes']
+    n_sides = factorization_info['n_sides']
 
-    logger.info("ctffc2 %s",time.time()-start_time)
     # Calculate aggregations using bincount
     sum_values = np.bincount(combined_codes, weights=df[metric_column].to_numpy(),
                            minlength=len(wallet_uniques) * n_sides)
@@ -331,7 +348,6 @@ def calculate_timing_features_for_column(df: pd.DataFrame, metric_column: str) -
     sum_weights = np.bincount(combined_codes, weights=df['abs_net_transfers'].to_numpy(),
                             minlength=len(wallet_uniques) * n_sides)
 
-    logger.info("ctffc3 %s",time.time()-start_time)
     # Calculate means with proper NaN handling
     mean_matrix = np.divide(sum_values, counts,
                           out=np.full_like(sum_values, np.nan, dtype=float),
@@ -340,7 +356,6 @@ def calculate_timing_features_for_column(df: pd.DataFrame, metric_column: str) -
                               out=np.full_like(sum_weighted, np.nan, dtype=float),
                               where=sum_weights > 0).reshape(len(wallet_uniques), n_sides)
 
-    logger.info("ctffc4 %s",time.time()-start_time)
     # Create final DataFrame
     mean_df = pd.DataFrame(
         mean_matrix,
@@ -353,5 +368,4 @@ def calculate_timing_features_for_column(df: pd.DataFrame, metric_column: str) -
         columns=[f'{metric_column}/{side}_weighted' for side in side_uniques]
     )
 
-    logger.info("ctffc5 %s",time.time()-start_time)
     return pd.concat([mean_df, weighted_df], axis=1)

@@ -281,6 +281,29 @@ def test_relative_changes_calculation(mock_wallets_config, indicator_columns):
 # calculate_timing_features_for_column() unit tests
 # ------------------------------------------------- #
 
+def create_factorization_info(df: pd.DataFrame) -> dict:
+    """
+    Create factorization info dictionary from a DataFrame.
+
+    Params:
+    - df (DataFrame): DataFrame containing 'wallet_address' and 'transaction_side' columns
+
+    Returns:
+    - dict: Factorization info with wallet_uniques, side_uniques, combined_codes, and n_sides
+    """
+    wallet_codes, wallet_uniques = pd.factorize(df['wallet_address'])
+    side_codes, side_uniques = pd.factorize(df['transaction_side'])
+    n_sides = len(side_uniques)
+    combined_codes = wallet_codes * n_sides + side_codes
+
+    return {
+        'wallet_uniques': wallet_uniques,
+        'side_uniques': side_uniques,
+        'combined_codes': combined_codes,
+        'n_sides': n_sides
+    }
+
+
 @pytest.mark.unit
 def test_calculate_timing_features_basic():
     """
@@ -307,15 +330,17 @@ def test_calculate_timing_features_basic():
     test_df['abs_net_transfers'] = test_df['usd_net_transfers'].abs()
     test_df['transaction_side'] = np.where(test_df['usd_net_transfers'] > 0, 'buy', 'sell')
 
+    factorization_info = create_factorization_info(test_df)
+
 
     # Calculate features
-    result = wmt.calculate_timing_features_for_column(test_df, 'test_metric')
+    result = wmt.calculate_timing_features_for_column(
+        test_df,
+        'test_metric',
+        factorization_info
+    )
 
-    # Expected values - calculating each component:
-    # Buy weighted: (100 * 0.5 + 200 * 1.0) / (100 + 200) = 0.833333
-    # Buy mean: (0.5 + 1.0) / 2 = 0.75
-    # Sell weighted: (-0.5 * 150) / 150 = -0.5
-    # Sell mean: Single value = -0.5
+    # Rest of test remains the same
     expected = pd.DataFrame(
         {
             'test_metric/buy_mean': [0.75],
@@ -326,12 +351,7 @@ def test_calculate_timing_features_basic():
         index=pd.Index(['wallet_a'], name='wallet_address')
     )
 
-    # Verify all values match expected
-    assert np.allclose(
-        result,
-        expected,
-        equal_nan=True
-    ), f"Expected {expected}\nGot {result}"
+    assert np.allclose(result, expected, equal_nan=True), f"Expected {expected}\nGot {result}"
 
 
 @pytest.mark.unit
@@ -360,7 +380,6 @@ def test_calculate_timing_features_empty_groups():
         Sell weighted avg = (150 * -0.5 + 300 * -1.0) / (150 + 300) = -0.833333
         Sell mean = (-0.5 + -1.0) / 2 = -0.75
     """
-    # Create sample data
     test_df = pd.DataFrame({
         'wallet_address': ['wallet_a', 'wallet_a', 'wallet_b', 'wallet_b'],
         'usd_net_transfers': [100, 200, -150, -300],
@@ -369,8 +388,14 @@ def test_calculate_timing_features_empty_groups():
     test_df['abs_net_transfers'] = test_df['usd_net_transfers'].abs()
     test_df['transaction_side'] = np.where(test_df['usd_net_transfers'] > 0, 'buy', 'sell')
 
-    # Calculate features
-    result = wmt.calculate_timing_features_for_column(test_df, 'test_metric')
+    # Create factorization info
+    factorization_info = create_factorization_info(test_df)
+
+    result = wmt.calculate_timing_features_for_column(
+        test_df,
+        'test_metric',
+        factorization_info
+    )
 
     # Expected values
     expected = pd.DataFrame(
@@ -426,8 +451,14 @@ def test_calculate_timing_features_extreme_values():
     test_df['abs_net_transfers'] = test_df['usd_net_transfers'].abs()
     test_df['transaction_side'] = np.where(test_df['usd_net_transfers'] > 0, 'buy', 'sell')
 
-    # Calculate features
-    result = wmt.calculate_timing_features_for_column(test_df, 'test_metric')
+    # Create factorization info
+    factorization_info = create_factorization_info(test_df)
+
+    result = wmt.calculate_timing_features_for_column(
+        test_df,
+        'test_metric',
+        factorization_info
+    )
 
     # Expected values
     expected = pd.DataFrame(
