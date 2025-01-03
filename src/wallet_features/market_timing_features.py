@@ -1,7 +1,6 @@
 """
 Calculates metrics aggregated at the wallet level
 """
-import time
 import logging
 from typing import List,Tuple
 from pathlib import Path
@@ -224,6 +223,7 @@ def calculate_relative_changes(
     return result_df,relative_change_columns
 
 
+
 @u.timing_decorator
 def prepare_timing_data(profits_df: pd.DataFrame,
                        market_timing_df: pd.DataFrame,
@@ -260,6 +260,7 @@ def prepare_timing_data(profits_df: pd.DataFrame,
     timing_profits_df['transaction_side'] = np.where(timing_profits_df['usd_net_transfers'] > 0, 'buy', 'sell')
 
     # Pre-compute factorization
+    # see the below Optimization Notes for an explantion of this sequence
     wallet_codes, wallet_uniques = pd.factorize(timing_profits_df['wallet_address'])
     side_codes, side_uniques = pd.factorize(timing_profits_df['transaction_side'])
     n_sides = len(side_uniques)
@@ -321,6 +322,64 @@ def calculate_wallet_timing_features(timing_profits_df: pd.DataFrame,
     ).fillna(0)
 
     return result
+
+
+# pylint:disable=pointless-string-statement
+"""
+Optimization Notes: Integer-Based Aggregation vs GroupBy
+------------------------------------------------------
+The below code uses pd.factorization along with np.bincount to dramatically
+improve performance over a standard groupby.agg() sequence.
+
+Original Approach:
+
+    grouped = df.groupby(['wallet_address', 'transaction_side'], observed=True).agg(
+        mean_val=(metric_column, 'mean'),
+        sum_weighted_values=('weighted_values', 'sum'),
+        sum_weights=('abs_net_transfers', 'sum'),
+    ).reset_index()
+
+
+The initial implementation used pandas groupby() to calculate metrics for each
+wallet's buy/sell transactions. While intuitive, groupby operations have
+significant overhead as they:
+1. Create separate groups in memory
+2. Apply operations to each group independently
+3. Recombine results back into a DataFrame
+
+
+
+New Approach: Integer-Based Aggregation
+-------------------------------------
+The optimized version uses factorization to convert the problem into pure
+numerical operations:
+
+1. Factorization: Convert categorical data to dense integer arrays
+   Example:
+   wallet_addresses = ['wallet_a', 'wallet_a', 'wallet_b']
+   Becomes:
+   codes = [0, 0, 1]  # Dense integers
+   uniques = ['wallet_a', 'wallet_b']  # Lookup table
+
+2. Combined Keys: Create single integer key for wallet-side combinations
+   With 2 sides (buy/sell):
+   wallet 0, side 1 = 0 * 2 + 1 = 1
+   wallet 1, side 0 = 1 * 2 + 0 = 2
+
+3. Fast Aggregation: Use numpy's bincount for efficient integer array operations
+   - Sum values: bincount(combined_codes, weights=values)
+   - Count occurrences: bincount(combined_codes)
+   - Calculate means: divide sums by counts
+
+Performance Benefits:
+- Memory Efficiency: Works with simple integer arrays instead of group objects
+- Vectorized Operations: Uses optimized numpy functions
+- Single Pass: Scans data once for all aggregations
+- Pre-computation: Factorizes once at start, avoiding repeated string comparisons
+
+This approach shows significant performance improvements over groupby when
+dealing with large datasets (~200M rows).
+"""
 
 
 @u.timing_decorator
