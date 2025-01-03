@@ -27,15 +27,15 @@ data_cleaning:
     usd_materiality: 20
 
     # Wallet cohort thresholds
-    min_coins_traded: 2  # Exclude wallets that have traded fewer coins than this during the training period
+    min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
     max_coins_traded: 300  # Exclude wallets that have traded more coins than this during the training period
 
-    # min_wallet_investment: 1500 # Filters based on max_investment from trading features
-    # min_wallet_inflows: 1500  # Exclude wallets with inflows below this amount (USD)
-    # min_wallet_volume: 3000  # Exclude wallets with fewer than this amount of training period USD volume
-    min_wallet_investment: 25000 # Filters based on max_investment from trading features
-    min_wallet_inflows: 25000  # Exclude wallets with inflows below this amount (USD)
-    min_wallet_volume: 50000  # Exclude wallets with fewer than this amount of training period USD volume
+    min_wallet_investment: 1500 # Filters based on max_investment from trading features
+    min_wallet_inflows: 1500  # Exclude wallets with inflows below this amount (USD)
+    min_wallet_volume: 3000  # Exclude wallets with fewer than this amount of training period USD volume
+    # min_wallet_investment: 25000 # Filters based on max_investment from trading features
+    # min_wallet_inflows: 25000  # Exclude wallets with inflows below this amount (USD)
+    # min_wallet_volume: 50000  # Exclude wallets with fewer than this amount of training period USD volume
 
     max_wallet_investment: 30_000_000 # Filters based on max_investment from trading features
     max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
@@ -80,6 +80,7 @@ features:
             -200, -150, -100, -75, -50, -35, -20, -10, -5,
         ]
     market_timing_offset_winsorization: 0.02 # comparisons between metrics and their offset values will be winsorized by this amount
+    market_timing_coins_per_batch: 500
 
     # Clustering features
     clustering_n_components: 25

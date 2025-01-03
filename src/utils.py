@@ -533,46 +533,81 @@ def create_progress_bar(total_items):
 #     DataFrame Manipulation Functions
 # ---------------------------------------- #
 
-def safe_downcast(df, column, dtype):
+def safe_downcast(df: pd.DataFrame, column: str) -> pd.DataFrame:
     """
-    Safe method to downcast a column datatype. If the column has no values that exceed the
-    limits of the new dtype, it will be downcasted. If it has values that will result in
-    overflow errors, it will raise an error.
+    Automatically downcast a numeric column to smallest safe dtype.
+
+    Params:
+    - df (DataFrame): Input dataframe
+    - column (str): Column to downcast
+
+    Returns:
+    - DataFrame: DataFrame with downcasted column if safe
     """
-    # Check if the column is numeric
     if not pd.api.types.is_numeric_dtype(df[column]):
-        logger.warning("Column '%s' is not numeric. Skipping downcast.", column)
+        logger.debug(f"Column '{column}' is not numeric. Skipping downcast.")
         return df
 
-    # Get the original dtype of the column
-    original_dtype = df[column].dtype
-
-    # Get the min and max values of the colum
+    original_dtype = str(df[column].dtype)
     col_min = df[column].min()
     col_max = df[column].max()
 
-    # Get the limits of the target dtype
-    if dtype in ['float32', 'float64']:
-        type_info = np.finfo(dtype)
-    elif dtype in ['int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64']:
-        type_info = np.iinfo(dtype)
-    else:
-        logger.error("Unsupported dtype: %s", dtype)
+    # Define downcast paths
+    downcast_paths = {
+        'int64': ['int32', 'int16'],
+        'Int64': ['Int32', 'Int16'],
+        'float64': ['float32', 'float16'],
+        'Float64': ['Float32', 'Float16']
+    }
+
+    # Get downcast sequence for this dtype
+    dtype_sequence = downcast_paths.get(original_dtype, [])
+    if not dtype_sequence:
         return df
 
-    # Check if the column values are within the limits of the target dtype
-    if col_min < type_info.min or col_max > type_info.max:
-        logger.warning("Cannot safely downcast column '%s' to %s. "
-                       "Values are outside the range of %s. "
-                       "Min: %s, Max: %s",
-                       column, dtype, dtype, col_min, col_max)
-        return df
+    # Try each downcast level
+    for target_dtype in dtype_sequence:
+        try:
+            # Convert pandas dtype to numpy for limit checking
+            np_dtype = target_dtype.lower()
+            if target_dtype[0].isupper():
+                np_dtype = np_dtype[1:]  # Remove 'I' from 'Int32'
 
-    # If we've made it here, it's safe to downcast
-    df[column] = df[column].astype(dtype)
+            # Skip if we can't get type info
+            if not np_dtype.startswith(('int', 'float')):
+                continue
 
-    logger.debug("Successfully downcasted column '%s' from %s to %s",
-                 column, original_dtype, dtype)
+            # Get dtype limits
+            if 'float' in np_dtype:
+                type_info = np.finfo(np_dtype)
+            else:
+                type_info = np.iinfo(np_dtype)
+
+            # Check if safe to downcast
+            if col_min >= type_info.min and col_max <= type_info.max:
+                df[column] = df[column].astype(target_dtype)
+                logger.debug(f"Downcasted '{column}' from {original_dtype} to {target_dtype}")
+                return df
+
+        except (ValueError, TypeError) as e:
+            logger.debug(f"Could not process {target_dtype} for column '{column}': {e}")
+            continue
+
+    return df
+
+
+def df_downcast(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Attempt to downcast all numeric columns to smallest safe dtype.
+
+    Params:
+    - df (DataFrame): Input dataframe to optimize
+
+    Returns:
+    - DataFrame: Optimized dataframe
+    """
+    for col in df.columns:
+        df = safe_downcast(df, col)
     return df
 
 
