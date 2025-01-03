@@ -73,11 +73,11 @@ features:
 
     # Market timing featurs
     market_timing_offsets: [
-            30, 10,
-            -30, -10,
+            # 30, 10,
+            # -30, -10,
 
-            # 200,  150,  100,  75,  50,  35,  20,  10,  5,
-            # -200, -150, -100, -75, -50, -35, -20, -10, -5,
+            200,  150,  100,  75,  50,  35,  20,  10,  5,
+            -200, -150, -100, -75, -50, -35, -20, -10, -5,
         ]
     market_timing_offset_winsorization: 0.02 # comparisons between metrics and their offset values will be winsorized by this amount
 

@@ -110,7 +110,7 @@ def identify_indicator_columns(config: dict) -> list:
     return cols
 
 
-@u.timing_decorator
+
 def calculate_offsets(
     market_indicators_data_df: pd.DataFrame,
     indicator_columns: List
@@ -146,7 +146,7 @@ def calculate_offsets(
     return market_timing_df
 
 
-@u.timing_decorator
+
 def calculate_relative_changes(
     market_timing_df: pd.DataFrame,
     indicator_columns: List
@@ -224,7 +224,7 @@ def calculate_relative_changes(
 
 
 
-@u.timing_decorator
+
 def prepare_timing_data(profits_df: pd.DataFrame,
                        market_timing_df: pd.DataFrame,
                        relative_change_columns: list
@@ -278,7 +278,7 @@ def prepare_timing_data(profits_df: pd.DataFrame,
 
     return timing_profits_df, factorization_info
 
-@u.timing_decorator
+
 def calculate_wallet_timing_features(timing_profits_df: pd.DataFrame,
                                    relative_change_columns: list,
                                    factorization_info: dict) -> pd.DataFrame:
@@ -382,7 +382,6 @@ dealing with large datasets (~200M rows).
 """
 
 
-@u.timing_decorator
 def calculate_timing_features_for_column(df: pd.DataFrame,
                                        metric_column: str,
                                        factorization_info: dict) -> pd.DataFrame:
