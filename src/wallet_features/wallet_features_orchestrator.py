@@ -104,12 +104,17 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     transfers_features_df = wts.calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
     feature_column_names['transfers|'] = transfers_features_df.columns
     wallet_features_df = wallet_features_df.join(transfers_features_df, how='left')
+
     # Apply feature prefixes
     rename_map = {col: f"{prefix}{col}"
                 for prefix, cols in feature_column_names.items()
                 for col in cols}
+    wallet_features_df = wallet_features_df.rename(columns=rename_map)
 
-    return wallet_features_df.rename(columns=rename_map)
+    # Downcast all columns to help with memory
+    wallet_features_df = u.df_downcast(wallet_features_df)
+
+    return wallet_features_df
 
 
 

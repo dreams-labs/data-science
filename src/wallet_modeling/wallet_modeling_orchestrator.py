@@ -190,6 +190,9 @@ def generate_training_indicators_df(training_market_data_df_full,wallets_metrics
                 market_indicators_data_df.loc[coin_idx, 'obv'] -= \
                     market_indicators_data_df.loc[coin_idx[0], 'obv']
 
+    # Downcast all columns where safe to do so
+    market_indicators_data_df = u.df_downcast(market_indicators_data_df)
+
     # If a parquet file location is specified, store the files there and return nothing
     if parquet_filename:
         parquet_filepath = f"{parquet_folder}/{parquet_filename}.parquet"

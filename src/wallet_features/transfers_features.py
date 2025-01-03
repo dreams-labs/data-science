@@ -77,6 +77,9 @@ def retrieve_transfers_sequencing():
     # Convert coin_id column to categorical to reduce memory usage
     transfers_sequencing_df['coin_id'] = transfers_sequencing_df['coin_id'].astype('category')
 
+    # Downcast to save memory
+    transfers_sequencing_df = u.df_downcast(transfers_sequencing_df)
+
     return transfers_sequencing_df
 
 
