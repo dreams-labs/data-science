@@ -73,16 +73,37 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
     market_timing_df, relative_change_columns = calculate_relative_changes(market_timing_df, indicator_columns)
 
 
-    # Flatten the wallet-coin-date transactions into wallet-indexed features
-    timing_profits_df, factorization_info = prepare_timing_data(profits_df,
-                                                                market_timing_df,
-                                                                relative_change_columns)
-    wallet_timing_features_df = calculate_wallet_timing_features(timing_profits_df,
-                                                                 relative_change_columns,
-                                                                 factorization_info)
+    # Get unique coins for chunking
+    unique_coins = profits_df['coin_id'].unique()
+    coins_per_batch = wallets_config['features']['market_timing_coins_per_batch']
+    batch_count = np.ceil(len(unique_coins)/coins_per_batch)  # Adjust based on memory constraints
+    all_wallet_features = []
 
+    # Process each chunk
+    for coin_chunk in np.array_split(unique_coins, batch_count):
+        # Filter both dataframes for current chunk
+        chunk_profits = profits_df[profits_df['coin_id'].isin(coin_chunk)]
+        chunk_market = market_timing_df[market_timing_df['coin_id'].isin(coin_chunk)]
+
+        # Process chunk
+        timing_profits_df, factorization_info = prepare_timing_data(chunk_profits,
+                                                                  chunk_market,
+                                                                  relative_change_columns)
+
+        chunk_features = calculate_wallet_timing_features(timing_profits_df,
+                                                        relative_change_columns,
+                                                        factorization_info)
+
+        all_wallet_features.append(chunk_features)
+
+    # Combine results - this will be efficient as we're at wallet level
+    wallet_timing_features_df = pd.concat(all_wallet_features)
+
+    # Aggregate duplicate wallets if they appear in multiple chunks
+    wallet_timing_features_df = wallet_timing_features_df.groupby(level=0).mean()
 
     return wallet_timing_features_df
+
 
 
 
@@ -90,6 +111,7 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
 #         Helper Functions
 # -----------------------------
 
+@u.timing_decorator
 def identify_indicator_columns(config: dict) -> list:
     """
     Generates column names from nested indicator config.
@@ -110,7 +132,7 @@ def identify_indicator_columns(config: dict) -> list:
     return cols
 
 
-
+@u.timing_decorator
 def calculate_offsets(
     market_indicators_data_df: pd.DataFrame,
     indicator_columns: List
@@ -125,106 +147,88 @@ def calculate_offsets(
     Returns:
         market_timing_df: DataFrame with added offset columns
     """
-    # Create a copy of the input DataFrame to avoid modifying the original
+    # Create a copy of the input DataFrame
     market_timing_df = market_indicators_data_df.copy()
 
-    # Get the offsets configuration
+    # Get offsets from config
     offsets = wallets_config['features']['market_timing_offsets']
 
-    # Process each column and its offsets
+    # Pre-calculate all shifted columns
+    new_columns = {}
     for column in indicator_columns:
-
-        # Calculate offset for each specified value
+        grouped = market_timing_df.groupby('coin_id', observed=True)[column]
         for offset in offsets:
             if offset > 0:
-                new_column = f"{column}_lead_{offset}"
+                col_name = f"{column}_lead_{offset}"
             else:
-                new_column = f"{column}_lag_{-offset}"
+                col_name = f"{column}_lag_{-offset}"
+            new_columns[col_name] = grouped.shift(-offset)
 
-            market_timing_df[new_column] = market_timing_df.groupby('coin_id',observed=True)[column].shift(-offset)
+    # Add all new columns at once
+    if new_columns:
+        new_df = pd.DataFrame(new_columns, index=market_timing_df.index)
+        market_timing_df = pd.concat([market_timing_df, new_df], axis=1)
 
     return market_timing_df
 
 
-
+@u.timing_decorator
 def calculate_relative_changes(
     market_timing_df: pd.DataFrame,
     indicator_columns: List
-) -> pd.DataFrame:
+) -> Tuple[pd.DataFrame, List[str]]:
     """
     Calculate relative changes between base columns and their corresponding offset columns.
 
-    For each base column with offset columns (e.g., price_rsi_14 and price_rsi_14_lead_30),
-    calculates the percentage change between them and stores it in a new column
-    (e.g., price_rsi_14/lead_30). If retain_base_columns is False, drops the original
-    base and offset columns after calculating the changes. All changes are winsorized
-    using the configured coefficient.
-
     Args:
         market_timing_df: DataFrame containing market timing data with offset columns
-        indicator_columns: List of the names of the indicator columns
+        indicator_columns: List of indicator column names
 
     Returns:
-        DataFrame with added relative change columns and optionally dropped base/offset columns
-        relative_change_columns: List of the relative change columns created
+        result_df: DataFrame with added relative change columns
+        relative_change_columns: List of created relative change column names
     """
-    # Create a copy of the input DataFrame to avoid modifying the original
+    # Create a copy of input DataFrame
     result_df = market_timing_df.copy()
     offsets = wallets_config['features']['market_timing_offsets']
     offset_winsorization = wallets_config['features']['market_timing_offset_winsorization']
 
-    # Keep track of columns to drop
-    columns_to_drop = set()
-    # Keep track of columns to winsorize
+    # Pre-calculate all changes
+    new_columns = {}
     relative_change_columns = []
 
-    # Process each column and calculate relative changes
     for base_column in indicator_columns:
-
-        # Calculate relative change for each offset
         for offset in offsets:
-
             # Define column names
-            if offset > 0:
-                offset_str = f'lead_{offset}'
-            else:
-                offset_str = f'lag_{-offset}'
-
+            offset_str = f'lead_{offset}' if offset > 0 else f'lag_{-offset}'
             offset_column = f'{base_column}_{offset_str}'
-
-            # Create new column name for relative change
             change_column = f"{base_column}/{offset_str}"
 
             # Calculate percentage change
-            # Formula: (offset_value - base_value) / base_value
-            result_df[change_column] = (
-                (result_df[offset_column] - result_df[base_column]) /
-                result_df[base_column]
-            )
+            changes = (result_df[offset_column] - result_df[base_column]) / result_df[base_column]
 
-            # Flip the sign if the offset is negative (compares present v past instead of future vs present)
+            # Flip sign for lag comparisons
             if offset < 0:
-                result_df[change_column] = result_df[change_column] * -1
+                changes *= -1
 
-            # Handle division by zero cases
-            result_df[change_column] = result_df[change_column].replace([np.inf, -np.inf], np.nan)
+            # Handle inf cases
+            changes = changes.replace([np.inf, -np.inf], np.nan)
 
-            # Add column to winsorization list
+            # Winsorize
+            changes = u.winsorize(changes, offset_winsorization)
+
+            new_columns[change_column] = changes
             relative_change_columns.append(change_column)
 
-    # Winsorize all change columns
-    for column in relative_change_columns:
-        result_df[column] = u.winsorize(result_df[column], offset_winsorization)
+    # Add all new columns at once
+    if new_columns:
+        new_df = pd.DataFrame(new_columns, index=result_df.index)
+        result_df = pd.concat([result_df, new_df], axis=1)
 
-    # Drop marked columns if any
-    if columns_to_drop:
-        result_df = result_df.drop(columns=list(columns_to_drop))
-
-    return result_df,relative_change_columns
+    return result_df, relative_change_columns
 
 
-
-
+@u.timing_decorator
 def prepare_timing_data(profits_df: pd.DataFrame,
                        market_timing_df: pd.DataFrame,
                        relative_change_columns: list
@@ -241,28 +245,47 @@ def prepare_timing_data(profits_df: pd.DataFrame,
     - timing_profits_df (DataFrame): Merged and preprocessed timing data
     - factorization_info (dict): Pre-computed factorization data
     """
+    logger.info('ptd0')
     # Filter out transactions below materiality threshold
     filtered_profits = profits_df[
         abs(profits_df['usd_net_transfers']) >= wallets_config['data_cleaning']['usd_materiality']
     ].copy()
 
-    # Perform the merge once
+    logger.info('ptd0.1')
+    # # Perform the merge once
+    # timing_profits_df = filtered_profits.merge(
+    #     market_timing_df[relative_change_columns + ['coin_id', 'date']],
+    #     on=['coin_id', 'date'],
+    #     how='left'
+    # )
+    # Before the merge:
+    market_timing_df = market_timing_df.set_index(['coin_id', 'date'])
+    filtered_profits = filtered_profits.set_index(['coin_id', 'date'])
+    logger.info('ptd0.11')
+
+    # Then merge on index
     timing_profits_df = filtered_profits.merge(
-        market_timing_df[relative_change_columns + ['coin_id', 'date']],
-        on=['coin_id', 'date'],
-        how='left'
+        market_timing_df[relative_change_columns],
+        left_index=True,
+        right_index=True,
+        how='inner'
     )
 
+    logger.info('ptd0.2')
     # Filter out rows with zero net transfers
     timing_profits_df = timing_profits_df[timing_profits_df['usd_net_transfers'] != 0].copy()
 
+    logger.info('ptd0.3')
     # Label transaction_side = 'buy' or 'sell'
     timing_profits_df['transaction_side'] = np.where(timing_profits_df['usd_net_transfers'] > 0, 'buy', 'sell')
 
     # Pre-compute factorization
     # see the below Optimization Notes for an explantion of this sequence
+    logger.info('ptd1')
     wallet_codes, wallet_uniques = pd.factorize(timing_profits_df['wallet_address'])
+    logger.info('ptd2')
     side_codes, side_uniques = pd.factorize(timing_profits_df['transaction_side'])
+    logger.info('ptd3')
     n_sides = len(side_uniques)
     combined_codes = wallet_codes * n_sides + side_codes
 
@@ -279,6 +302,7 @@ def prepare_timing_data(profits_df: pd.DataFrame,
     return timing_profits_df, factorization_info
 
 
+@u.timing_decorator
 def calculate_wallet_timing_features(timing_profits_df: pd.DataFrame,
                                    relative_change_columns: list,
                                    factorization_info: dict) -> pd.DataFrame:
