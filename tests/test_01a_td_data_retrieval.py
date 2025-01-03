@@ -449,7 +449,7 @@ def profits_at_threshold_df():
 # set up config and module-level variables
 # ---------------------------------- #
 
-config = load_config('test_config/test_config.yaml')
+config = load_config(os.path.join(os.path.dirname(__file__), 'test_config/test_config.yaml'))
 
 # Module-level variables
 TRAINING_PERIOD_START = config['training_data']['training_period_start']
