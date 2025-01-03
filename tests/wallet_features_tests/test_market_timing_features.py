@@ -304,6 +304,9 @@ def test_calculate_timing_features_basic():
         'usd_net_transfers': [100, 200, -150],
         'test_metric': [0.5, 1.0, -0.5]
     })
+    test_df['abs_net_transfers'] = test_df['usd_net_transfers'].abs()
+    test_df['transaction_side'] = np.where(test_df['usd_net_transfers'] > 0, 'buy', 'sell')
+
 
     # Calculate features
     result = wmt.calculate_timing_features_for_column(test_df, 'test_metric')
@@ -363,6 +366,8 @@ def test_calculate_timing_features_empty_groups():
         'usd_net_transfers': [100, 200, -150, -300],
         'test_metric': [0.5, 1.0, -0.5, -1.0]
     })
+    test_df['abs_net_transfers'] = test_df['usd_net_transfers'].abs()
+    test_df['transaction_side'] = np.where(test_df['usd_net_transfers'] > 0, 'buy', 'sell')
 
     # Calculate features
     result = wmt.calculate_timing_features_for_column(test_df, 'test_metric')
@@ -418,6 +423,8 @@ def test_calculate_timing_features_extreme_values():
         'usd_net_transfers': [1e9, 0.01, -1e9],
         'test_metric': [0.0001, 100.0, 0.0]
     })
+    test_df['abs_net_transfers'] = test_df['usd_net_transfers'].abs()
+    test_df['transaction_side'] = np.where(test_df['usd_net_transfers'] > 0, 'buy', 'sell')
 
     # Calculate features
     result = wmt.calculate_timing_features_for_column(test_df, 'test_metric')

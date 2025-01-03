@@ -1,6 +1,7 @@
 """
 Calculates metrics aggregated at the wallet level
 """
+import time
 import logging
 from typing import List
 from pathlib import Path
@@ -71,12 +72,11 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
     market_timing_df = calculate_offsets(market_indicators_data_df, indicator_columns)
     market_timing_df, relative_change_columns = calculate_relative_changes(market_timing_df, indicator_columns)
 
-    # flatten the wallet-coin-date transactions into wallet-indexed features
-    wallet_timing_features_df = generate_all_timing_features(
-        profits_df,
-        market_timing_df,
-        relative_change_columns
-    )
+
+    # Flatten the wallet-coin-date transactions into wallet-indexed features
+    timing_profits_df = prepare_timing_data(profits_df, market_timing_df, relative_change_columns)
+    wallet_timing_features_df = calculate_wallet_timing_features(timing_profits_df, relative_change_columns)
+
 
     return wallet_timing_features_df
 
@@ -220,73 +220,23 @@ def calculate_relative_changes(
     return result_df,relative_change_columns
 
 
-@u.timing_decorator
-def calculate_timing_features_for_column(df: pd.DataFrame, metric_column: str) -> pd.DataFrame:
-    """
-    Calculate timing features (mean, weighted mean) for a single metric column in a single pass.
-    Result columns: {metric_column}/buy_mean, {metric_column}/buy_weighted,
-                    {metric_column}/sell_mean, {metric_column}/sell_weighted.
-    """
-    # Filter out rows with zero net transfers
-    df = df[df['usd_net_transfers'] != 0].copy()
-
-    # Label transaction_side = 'buy' or 'sell'
-    df['transaction_side'] = np.where(df['usd_net_transfers'] > 0, 'buy', 'sell')
-
-    # Precompute abs transfers & weighted values
-    df['abs_net_transfers'] = df['usd_net_transfers'].abs()
-    df['weighted_values'] = df[metric_column] * df['abs_net_transfers']
-
-    # Group once on [wallet_address, transaction_side]
-    grouped = df.groupby(['wallet_address', 'transaction_side'], observed=True).agg(
-        mean_val=(metric_column, 'mean'),
-        sum_weighted_values=('weighted_values', 'sum'),
-        sum_weights=('abs_net_transfers', 'sum'),
-    ).reset_index()
-
-    # Compute weighted average
-    grouped['weighted_val'] = grouped['sum_weighted_values'] / grouped['sum_weights']
-
-    # Pivot to separate 'buy' and 'sell' columns
-    pivoted = grouped.pivot(index='wallet_address', columns='transaction_side')
-
-    # We only want mean and weighted columns
-    # pivoted["mean_val"] => buy / sell means
-    # pivoted["weighted_val"] => buy / sell weighted
-    pivoted_mean = pivoted['mean_val'].copy()
-    pivoted_weighted = pivoted['weighted_val'].copy()
-
-    # Rename columns
-    pivoted_mean.columns = [f'{metric_column}/{side}_mean' for side in pivoted_mean.columns]
-    pivoted_weighted.columns = [f'{metric_column}/{side}_weighted' for side in pivoted_weighted.columns]
-
-    # Combine back
-    final_df = pd.concat([pivoted_mean, pivoted_weighted], axis=1)
-
-    return final_df
-
-
 
 @u.timing_decorator
-def generate_all_timing_features(
-    profits_df,
-    market_timing_df,
-    relative_change_columns
-):
+def prepare_timing_data(profits_df: pd.DataFrame,
+                        market_timing_df: pd.DataFrame,
+                        relative_change_columns: list
+                    ) -> pd.DataFrame:
     """
-    Generate timing features for multiple market metric columns.
+    Prepare and merge profits data with market timing metrics.
 
-    Args:
-        profits_df (pd.DataFrame): DataFrame with columns [coin_id, date, wallet_address, usd_net_transfers]
-        market_timing_df (pd.DataFrame): DataFrame with market timing metrics indexed by (coin_id, date)
-        relative_change_columns (list): List of column names from market_timing_df to analyze
+    Params:
+    - profits_df (DataFrame): Raw profits data
+    - market_timing_df (DataFrame): Market timing metrics data
+    - relative_change_columns (list): Columns to include from market timing data
 
     Returns:
-        pd.DataFrame: DataFrame indexed by wallet_address with generated features for each input column
+    - timing_profits_df (DataFrame): Merged and preprocessed timing data
     """
-    # Get list of wallets to include
-    wallet_addresses = profits_df['wallet_address'].unique()
-
     # Filter out transactions below materiality threshold
     filtered_profits = profits_df[
         abs(profits_df['usd_net_transfers']) >= wallets_config['data_cleaning']['usd_materiality']
@@ -299,8 +249,36 @@ def generate_all_timing_features(
         how='left'
     )
 
+    # Filter out rows with zero net transfers
+    timing_profits_df = timing_profits_df[timing_profits_df['usd_net_transfers'] != 0].copy()
+
+    # Label transaction_side = 'buy' or 'sell'
+    timing_profits_df['transaction_side'] = np.where(timing_profits_df['usd_net_transfers'] > 0, 'buy', 'sell')
+
+    # Precompute abs transfers
+    timing_profits_df['abs_net_transfers'] = timing_profits_df['usd_net_transfers'].abs()
+
+    return timing_profits_df
+
+
+@u.timing_decorator
+def calculate_wallet_timing_features(timing_profits_df: pd.DataFrame, relative_change_columns: list) -> pd.DataFrame:
+    """
+    Generate timing features for each wallet from prepared timing data.
+
+    Params:
+    - timing_profits_df (DataFrame): Preprocessed timing data
+    - relative_change_columns (list): Columns to generate features for
+
+    Returns:
+    - result (DataFrame): Wallet-level timing features
+    """
+    # Get list of wallets to include
+    wallet_addresses = timing_profits_df['wallet_address'].unique()
+
     # Calculate features for each column
     all_features = []
+
     for col in relative_change_columns:
         logger.debug("Generating timing performance features for %s...", col)
         col_features = calculate_timing_features_for_column(
@@ -324,3 +302,56 @@ def generate_all_timing_features(
     ).fillna(0)
 
     return result
+
+
+
+@u.timing_decorator
+def calculate_timing_features_for_column(df: pd.DataFrame, metric_column: str) -> pd.DataFrame:
+    """
+    Calculate timing features (mean, weighted mean) for a single metric column using vectorized operations.
+    Result columns: {metric_column}/buy_mean, {metric_column}/buy_weighted,
+                    {metric_column}/sell_mean, {metric_column}/sell_weighted.
+    """
+    start_time = time.time()
+    logger.info("ctffc1 %s",time.time()-start_time)
+    # Create combined integer keys
+    wallet_codes, wallet_uniques = pd.factorize(df['wallet_address'])
+    side_codes, side_uniques = pd.factorize(df['transaction_side'])
+    n_sides = len(side_uniques)
+    combined_codes = wallet_codes * n_sides + side_codes
+
+    logger.info("ctffc2 %s",time.time()-start_time)
+    # Calculate aggregations using bincount
+    sum_values = np.bincount(combined_codes, weights=df[metric_column].to_numpy(),
+                           minlength=len(wallet_uniques) * n_sides)
+    counts = np.bincount(combined_codes, minlength=len(wallet_uniques) * n_sides)
+    weighted_values = df[metric_column] * df['abs_net_transfers']
+    sum_weighted = np.bincount(combined_codes, weights=weighted_values.to_numpy(),
+                             minlength=len(wallet_uniques) * n_sides)
+    sum_weights = np.bincount(combined_codes, weights=df['abs_net_transfers'].to_numpy(),
+                            minlength=len(wallet_uniques) * n_sides)
+
+    logger.info("ctffc3 %s",time.time()-start_time)
+    # Calculate means with proper NaN handling
+    mean_matrix = np.divide(sum_values, counts,
+                          out=np.full_like(sum_values, np.nan, dtype=float),
+                          where=counts > 0).reshape(len(wallet_uniques), n_sides)
+    weighted_matrix = np.divide(sum_weighted, sum_weights,
+                              out=np.full_like(sum_weighted, np.nan, dtype=float),
+                              where=sum_weights > 0).reshape(len(wallet_uniques), n_sides)
+
+    logger.info("ctffc4 %s",time.time()-start_time)
+    # Create final DataFrame
+    mean_df = pd.DataFrame(
+        mean_matrix,
+        index=wallet_uniques,
+        columns=[f'{metric_column}/{side}_mean' for side in side_uniques]
+    )
+    weighted_df = pd.DataFrame(
+        weighted_matrix,
+        index=wallet_uniques,
+        columns=[f'{metric_column}/{side}_weighted' for side in side_uniques]
+    )
+
+    logger.info("ctffc5 %s",time.time()-start_time)
+    return pd.concat([mean_df, weighted_df], axis=1)
