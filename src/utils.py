@@ -652,7 +652,7 @@ def assert_period(df, period_start, period_end) -> None:
                                 f"date of {period_starting_balance_date.strftime('%Y-%m-%d')}.")
 
         # Confirm all rows have is_imputed set to True
-        if not (starting_balance_profits_df['is_imputed'] == True).all():
+        if not starting_balance_profits_df['is_imputed'].all():
             raise ValueError("Found non-imputed records in starting balance")
 
 
