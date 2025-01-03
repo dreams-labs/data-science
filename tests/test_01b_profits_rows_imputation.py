@@ -84,7 +84,7 @@ def test_calculate_new_profits_values_normal_data(sample_profits_df, target_date
     assert result.index.names == ['coin_id', 'wallet_address', 'date']
     assert set(result.columns) == {
         'profits_cumulative', 'usd_balance',
-        'usd_net_transfers', 'usd_inflows', 'usd_inflows_cumulative', 'total_return'
+        'usd_net_transfers', 'usd_inflows', 'usd_inflows_cumulative'
     }
 
     # Check if calculations are correct for the first row (btc, addr1)
@@ -94,7 +94,6 @@ def test_calculate_new_profits_values_normal_data(sample_profits_df, target_date
     assert first_row['usd_net_transfers'] == 0
     assert first_row['usd_inflows'] == 0
     assert first_row['usd_inflows_cumulative'] == 900
-    assert first_row['total_return'] == pytest.approx(0.1728, abs=1e-4)  # 155.55555556 / 900
 
     # Check if all rows have the correct target_date
     assert (result.index.get_level_values('date') == target_date).all()
@@ -150,8 +149,6 @@ def test_calculate_new_profits_values_zero_price_change(zero_price_change_df, ta
         assert result_row['usd_net_transfers'] == 0
         assert result_row['usd_inflows'] == 0
         assert result_row['usd_inflows_cumulative'] == original_row['usd_inflows_cumulative']
-        assert result_row['total_return'] == pytest.approx(
-            original_row['profits_cumulative'] / original_row['usd_inflows_cumulative'], abs=1e-4)
 
     # Check if all rows have the correct target_date
     assert (result.index.get_level_values('date') == target_date).all()
@@ -213,8 +210,6 @@ def test_calculate_new_profits_values_negative_price_change(negative_price_chang
         assert result_row['usd_net_transfers'] == 0
         assert result_row['usd_inflows'] == 0
         assert result_row['usd_inflows_cumulative'] == original_row['usd_inflows_cumulative']
-        assert result_row['total_return'] == pytest.approx(
-            expected_profits_cumulative / original_row['usd_inflows_cumulative'], abs=1e-4)
 
         # Additional checks specific to negative price change
         assert result_row['profits_cumulative'] < original_row['profits_cumulative']
@@ -271,8 +266,6 @@ def test_calculate_new_profits_values_zero_usd_balance(zero_usd_balance_df, targ
         assert result_row['usd_net_transfers'] == 0
         assert result_row['usd_inflows'] == 0
         assert result_row['usd_inflows_cumulative'] == original_row['usd_inflows_cumulative']
-        assert result_row['total_return'] == pytest.approx(
-            original_row['profits_cumulative'] / original_row['usd_inflows_cumulative'], abs=1e-4)
 
     # Check if all rows have the correct target_date
     assert (result.index.get_level_values('date') == target_date).all()
@@ -334,8 +327,6 @@ def test_calculate_new_profits_values_multiple_coins_wallets(
         assert result_row['usd_net_transfers'] == 0
         assert result_row['usd_inflows'] == 0
         assert result_row['usd_inflows_cumulative'] == original_row['usd_inflows_cumulative']
-        assert result_row['total_return'] == pytest.approx(
-            expected_profits_cumulative / original_row['usd_inflows_cumulative'], abs=1e-4)
 
     # Check if all rows have the correct target_date
     assert (result.index.get_level_values('date') == target_date).all()
@@ -389,8 +380,6 @@ def sample_profits_df_missing_dates():
                          df['profits_cumulative'] +
                          df.groupby(['coin_id', 'wallet_address'])['usd_net_transfers'].cumsum())
 
-    # Calculate total_return
-    df['total_return'] = df['profits_cumulative'] / df['usd_inflows_cumulative']
     df = df.reset_index()
 
     return df
@@ -442,7 +431,7 @@ def test_impute_profits_df_rows_base_case(sample_profits_df_missing_dates,
     assert isinstance(result, pd.DataFrame)
     expected_columns = ['coin_id', 'wallet_address', 'date', 'profits_cumulative',
                         'usd_balance', 'usd_net_transfers', 'usd_inflows',
-                        'usd_inflows_cumulative', 'total_return']
+                        'usd_inflows_cumulative']
     assert set(result.columns) == set(expected_columns)
 
     # Check that only rows for the target date are returned
@@ -484,8 +473,6 @@ def test_impute_profits_df_rows_base_case(sample_profits_df_missing_dates,
         assert row['usd_net_transfers'] == 0
         assert row['usd_inflows'] == 0
         assert row['usd_inflows_cumulative'] == last_known['usd_inflows_cumulative']
-        assert row['total_return'] == pytest.approx(
-            row['profits_cumulative'] / row['usd_inflows_cumulative'], rel=1e-6)
 
     # Check handling of multiple coins and wallets
     assert set(result['coin_id']) == {'BTC', 'ETH'}
