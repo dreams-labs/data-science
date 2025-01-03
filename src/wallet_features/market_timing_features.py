@@ -72,37 +72,42 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
     market_timing_df = calculate_offsets(market_indicators_data_df, indicator_columns)
     market_timing_df, relative_change_columns = calculate_relative_changes(market_timing_df, indicator_columns)
 
-
-    # Get unique coins for chunking
-    unique_coins = np.random.permutation(profits_df['coin_id'].unique())
-    coins_per_batch = wallets_config['features']['market_timing_coins_per_batch']
-    batch_count = np.ceil(len(unique_coins)/coins_per_batch)
+    # Get unique wallets for batching
+    unique_wallets = np.random.permutation(profits_df['wallet_address'].unique())
+    wallets_per_batch = wallets_config['features']['market_timing_wallets_per_batch']  # New config param needed
+    batch_count = np.ceil(len(unique_wallets)/wallets_per_batch)
     all_wallet_features = []
 
-    # Process each chunk
-    for coin_chunk in np.array_split(unique_coins, batch_count):
-        # Filter both dataframes for current chunk
-        chunk_profits = profits_df[profits_df['coin_id'].isin(coin_chunk)]
-        chunk_market = market_timing_df[market_timing_df['coin_id'].isin(coin_chunk)]
+    # Set indices using inplace=True to save memory
+    market_timing_df.set_index(['coin_id', 'date'], inplace=True)
+    profits_df.set_index(['coin_id', 'date'], inplace=True)
 
-        # Process chunk
+    # Filter out transactions below materiality threshold
+    profits_df = profits_df[
+        abs(profits_df['usd_net_transfers']) >= wallets_config['data_cleaning']['usd_materiality']
+    ]
+
+    # Process each wallet batch
+    for wallet_chunk in np.array_split(unique_wallets, batch_count):
+        # Filter profits for current wallet batch
+        chunk_profits = profits_df[profits_df['wallet_address'].isin(wallet_chunk)]
+
+        # Process chunk with complete market data
         timing_profits_df, factorization_info = prepare_timing_data(chunk_profits,
-                                                                  chunk_market,
+                                                                  market_timing_df,
                                                                   relative_change_columns)
 
         chunk_features = calculate_wallet_timing_features(timing_profits_df,
                                                         relative_change_columns,
-                                                        factorization_info)
+                                                                                factorization_info)
 
         all_wallet_features.append(chunk_features)
 
-    # Combine results - this will be efficient as we're at wallet level
+    # Simple concat of wallet features - no aggregation needed
     wallet_timing_features_df = pd.concat(all_wallet_features)
 
-    # Aggregate duplicate wallets if they appear in multiple chunks
-    wallet_timing_features_df = wallet_timing_features_df.groupby(level=0).mean()
-
     return wallet_timing_features_df
+
 
 
 
@@ -228,7 +233,7 @@ def calculate_relative_changes(
 
 @u.timing_decorator
 def prepare_timing_data(profits_df: pd.DataFrame,
-                       market_timing_df: pd.DataFrame,
+                        market_timing_df: pd.DataFrame,
                        relative_change_columns: list
                    ) -> Tuple[pd.DataFrame, dict]:
     """
@@ -243,17 +248,8 @@ def prepare_timing_data(profits_df: pd.DataFrame,
     - timing_profits_df (DataFrame): Merged and preprocessed timing data
     - factorization_info (dict): Pre-computed factorization data
     """
-    # Filter out transactions below materiality threshold
-    filtered_profits = profits_df[
-        abs(profits_df['usd_net_transfers']) >= wallets_config['data_cleaning']['usd_materiality']
-    ]
-
-    # Set indices using inplace=True to save memory
-    market_timing_df.set_index(['coin_id', 'date'], inplace=True)
-    filtered_profits.set_index(['coin_id', 'date'], inplace=True)
-
-    # Then merge on index
-    timing_profits_df = filtered_profits.merge(
+    # Merge on index
+    timing_profits_df = profits_df.merge(
         market_timing_df[relative_change_columns],
         left_index=True,
         right_index=True,
@@ -279,6 +275,9 @@ def prepare_timing_data(profits_df: pd.DataFrame,
         'combined_codes': combined_codes,
         'n_sides': n_sides
     }
+
+    # Downcast to save memory
+    timing_profits_df = u.df_downcast(timing_profits_df)
 
     return timing_profits_df, factorization_info
 
