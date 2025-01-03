@@ -5,7 +5,7 @@ logs/
 
 # Notebooks
 notebooks/archived/
-notesbooks/temp/
+notebooks/temp/
 
 # Python
 __pycache__/
