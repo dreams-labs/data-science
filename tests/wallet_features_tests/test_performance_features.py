@@ -60,7 +60,7 @@ def test_balance_features_core_metrics():
         'time_weighted_balance': [800, 1500],
         'active_time_weighted_balance': [900, 1800]
     })
-    result = wpf.calculate_balance_features(mock_input)
+    result = wpf.calculate_balance_features(mock_input,include_twb_metrics=True)
     assert (result >= 0).all().all()  # All balance metrics should be non-negative
     assert np.allclose(result['max_investment'], mock_input['max_investment'])
 

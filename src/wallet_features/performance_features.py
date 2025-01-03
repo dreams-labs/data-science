@@ -62,7 +62,8 @@ def calculate_profits_features(wallet_features_df: pd.DataFrame) -> pd.DataFrame
 
 
 
-def calculate_balance_features(trading_features_df: pd.DataFrame) -> pd.DataFrame:
+def calculate_balance_features(trading_features_df: pd.DataFrame,
+                               include_twb_metrics: bool) -> pd.DataFrame:
     """
     Generates candidate denominator features capturing different aspects of wallet scale.
 
@@ -74,6 +75,7 @@ def calculate_balance_features(trading_features_df: pd.DataFrame) -> pd.DataFram
         - activity_density: Trading frequency
         - transaction_days: Days with activity
         - average_transaction: Mean transaction size
+    - include_twb_metrics (bool): whether time weighted balance metrics are calculated
 
     Returns:
     - balance_df (DataFrame): Scale features with columns:
@@ -100,7 +102,7 @@ def calculate_balance_features(trading_features_df: pd.DataFrame) -> pd.DataFram
     balance_features_df['net_crypto_investment'] = trading_features_df['net_crypto_investment']
 
     # Add time weighted balance features if configured to
-    if wallets_config['features']['include_twb_metrics'] is True:
+    if include_twb_metrics is True:
         balance_features_df['twb'] = trading_features_df['time_weighted_balance']
         balance_features_df['active_twb'] = trading_features_df['active_time_weighted_balance']
 
@@ -246,7 +248,7 @@ def transform_performance_ratios(performance_ratios_df: pd.DataFrame,
 
 
 @u.timing_decorator
-def calculate_performance_features(trading_features_df):
+def calculate_performance_features(trading_features_df,include_twb_metrics):
     """
     Calculates a set of profit numerators, investment denominators, ratio combinations,
     and transformations of ratios to create a matrix of performance scores.
@@ -258,7 +260,7 @@ def calculate_performance_features(trading_features_df):
     profits_features_df = profits_features_df.add_prefix('profits_')
 
     # Demoniminator features reflecting the balance/investment/outlays
-    balance_features_df = calculate_balance_features(trading_features_df)
+    balance_features_df = calculate_balance_features(trading_features_df,include_twb_metrics)
     balance_features_df = balance_features_df.add_prefix('balance_')
 
     # Combine to make ratios
