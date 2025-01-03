@@ -68,11 +68,6 @@ def calculate_wallet_trading_features(
     u.assert_period(profits_df, period_start_date, period_end_date)
     profits_df['date'] = pd.to_datetime(profits_df['date'])
 
-    # Retrieve inclusion config values
-    include_twb_metrics = wallets_config['features']['include_twb_metrics']
-    include_btc_metrics = wallets_config['features']['include_btc_metrics']
-
-
     # 2. Calculate configured metrics
     # ------------------------------
     # Add crypto balance/transfers/gain helper columns

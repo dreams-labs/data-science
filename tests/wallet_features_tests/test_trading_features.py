@@ -242,7 +242,8 @@ def test_trading_features_df(test_profits_df):
     # Compute trading features
     wallet_trading_features_df = wtf.calculate_wallet_trading_features(test_profits_df,
                                                                        training_period_start,
-                                                                       training_period_end)
+                                                                       training_period_end,
+                                                                       include_twb_metrics=True)
 
     # Return dates for recalculation
     return wallet_trading_features_df
