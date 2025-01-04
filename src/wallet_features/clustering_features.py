@@ -5,7 +5,6 @@ import logging
 from typing import Dict,List
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans, MiniBatchKMeans
 from sklearn.metrics import silhouette_score
@@ -29,7 +28,7 @@ wallets_config = WalletsConfig()
 # -----------------------------------
 
 @u.timing_decorator
-def create_basic_cluster_features(training_data_df, include_pca=False, include_categorical=False):
+def create_kmeans_cluster_features(training_data_df, include_pca=False, include_categorical=False):
     """
     Add cluster-related features to the original dataframe.
 
@@ -47,9 +46,11 @@ def create_basic_cluster_features(training_data_df, include_pca=False, include_c
     cluster_counts = wallets_config['features']['clustering_n_clusters']
 
     # Get preprocessed data using helper
+    logger.info("Preprocessing training data for clustering...")
     scaled_data = preprocess_clustering_data(training_data_df)
 
     # Apply PCA
+    logger.info("Reducing to %s PCA components...", n_components)
     pca = PCA(n_components=n_components)
     pca_result = pca.fit_transform(scaled_data)
 
@@ -63,6 +64,7 @@ def create_basic_cluster_features(training_data_df, include_pca=False, include_c
 
     # Generate features for each cluster count
     for n_clusters in cluster_counts:
+        logger.info("Generating clusters for cluster count %s...", n_clusters)
         kmeans = KMeans(n_clusters=n_clusters, random_state=42)
         cluster_labels = kmeans.fit_predict(pca_result)
 

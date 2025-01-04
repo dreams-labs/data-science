@@ -21,6 +21,7 @@ wallets_config = WalletsConfig()
 wallets_metrics_config = u.load_config('../config/wallets_metrics_config.yaml')
 
 
+@u.timing_decorator
 def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_sequencing_df,
                               wallet_cohort, period_start_date, period_end_date):
     """
