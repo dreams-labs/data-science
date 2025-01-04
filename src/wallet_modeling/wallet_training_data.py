@@ -156,8 +156,9 @@ def format_and_save_datasets(profits_df, market_data_df, period_start_date, parq
         ,'usd_inflows'
         ,'usd_inflows_cumulative'
     ]
-    profits_df[columns_to_round] = profits_df[columns_to_round].round(2)
-    profits_df[columns_to_round] = profits_df[columns_to_round].replace(-0, 0)
+    profits_df.loc[:, columns_to_round] = (profits_df[columns_to_round]
+                                        .round(2)
+                                        .replace(-0, 0))
 
     # Remove rows with a rounded 0 balance and 0 transfers
     profits_df = profits_df[
