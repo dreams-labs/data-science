@@ -22,7 +22,6 @@ import pandas as pd
 import numpy as np
 from pydantic import ValidationError
 import pygame
-import dreams_core.core as dc
 
 
 # pylint: disable=E0401
@@ -40,7 +39,7 @@ importlib.reload(py_mo)
 importlib.reload(py_e)
 
 # set up logger at the module level
-logger = dc.setup_logger()
+logger = logging.getLogger(__name__)
 
 
 
@@ -471,35 +470,32 @@ def timing_decorator(func):
     """
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        # Create logger with caller's module name
-        function_logger = logging.getLogger(func.__module__)
+        logger = logging.getLogger(func.__module__) # pylint: disable=redefined-outer-name
 
-        # Create custom LogRecord factory to override the wrapper location
-        old_factory = logging.getLogRecordFactory()
-        def record_factory(*args, **kwargs):
-            record = old_factory(*args, **kwargs)
-            record.module = func.__module__
-            record.funcName = func.__name__
-            return record
-
-        logging.setLogRecordFactory(record_factory)
-
-        function_logger.debug('Initiating %s...', func.__name__)
+        # Only log start with normal location
+        logger.debug('Initiating %s...', func.__name__)
 
         start_time = time.time()
         result = func(*args, **kwargs)
-        end_time = time.time()
+        duration = time.time() - start_time
 
-        function_logger.info(
-            '<%.2fs> Completed %s.',
-            end_time - start_time,
-            func.__name__
+        # Create single custom record for timing log
+        record = logging.LogRecord(
+            name=logger.name,
+            level=logging.INFO,
+            pathname=func.__code__.co_filename,
+            lineno=func.__code__.co_firstlineno,
+            msg='<%.2fs> Completed %s.',
+            args=(duration, func.__name__),
+            exc_info=None
         )
 
-        # Restore original LogRecord factory
-        logging.setLogRecordFactory(old_factory)
+        # Handle this record directly
+        logger.handle(record)
+
         return result
     return wrapper
+
 
 
 
@@ -971,7 +967,7 @@ def winsorize(data: pd.Series, cutoff: float = 0.01) -> pd.Series:
 
 
 # ---------------------------------------- #
-#     Misc Notebook         Helper Functions
+#     Misc Notebook Helper Functions
 # ---------------------------------------- #
 
 # silence donation message
@@ -1003,7 +999,8 @@ def notify(prompt=None, sound_file_path=None, voice_id=None):
             engine = pyttsx3.init()
             voice_id = voice_id or os.getenv('ALERT_VOICE_ID')
             engine.setProperty('voice', voice_id)
-            engine.setProperty('rate', 180)     # Speed of speech (words per minute)
+            engine.setProperty('rate', 125)     # Speed of speech (words per minute)
+            engine.setProperty('volume', 0.7)    # Volume: 0.0 to 1.0
             engine.say(prompt)
             engine.runAndWait()
             engine.stop()
