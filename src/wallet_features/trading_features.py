@@ -33,7 +33,7 @@ def calculate_wallet_trading_features(
     period_start_date: str,
     period_end_date: str,
     include_twb_metrics: bool = True,
-    # include_btc_metrics: bool = False
+    include_btc_metrics: bool = False
 ) -> pd.DataFrame:
     """
     Calculates comprehensive crypto trading metrics for each wallet.
@@ -93,8 +93,8 @@ def calculate_wallet_trading_features(
             0
         )
 
-    # # if calculate_btc_metrics:
-    # #     btc=True
+    if include_btc_metrics:
+        _=True
 
     # Fill missing values and handle edge cases
     trading_features_df = trading_features_df.fillna(0).replace(-0, 0)

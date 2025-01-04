@@ -491,7 +491,7 @@ def timing_decorator(func):
         end_time = time.time()
 
         function_logger.info(
-            '(%.2fs) Completed %s.',
+            '<%.2fs> Completed %s.',
             end_time - start_time,
             func.__name__
         )
