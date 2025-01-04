@@ -2,6 +2,7 @@
 Calculates metrics aggregated at the wallet level
 """
 import logging
+import gc
 from typing import List,Tuple
 from pathlib import Path
 import pandas as pd
@@ -106,9 +107,10 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
     # Simple concat of wallet features - no aggregation needed
     wallet_timing_features_df = pd.concat(all_wallet_features)
 
-    # Reset indices using inplace=True to save memory
-    market_timing_df = market_timing_df.reset_index(inplace=True)
-    profits_df = profits_df.reset_index(inplace=True)
+    # Reset indices and gc.collect() to ensure removal from memory
+    market_timing_df.reset_index(inplace=True)
+    profits_df.reset_index(inplace=True)
+    gc.collect()
 
     return wallet_timing_features_df
 
