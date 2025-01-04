@@ -229,11 +229,13 @@ def identify_modeling_cohort(modeling_period_profits_df: pd.DataFrame) -> pd.Dat
                     wallets_config['training_data']['modeling_period_end'])
 
     # Calculate modeling period wallet metrics
-    modeling_wallets_df = wtf.calculate_wallet_trading_features(modeling_period_profits_df,
-                                            wallets_config['training_data']['modeling_period_start'],
-                                            wallets_config['training_data']['modeling_period_end'],
-                                            include_twb_metrics=False,
-                                            include_btc_metrics=False)
+    modeling_wallets_df = wtf.calculate_wallet_trading_features(
+        modeling_period_profits_df.set_index(['coin_id', 'wallet_address', 'date']).sort_index(level=['coin_id', 'wallet_address', 'date']),
+        wallets_config['training_data']['modeling_period_start'],
+        wallets_config['training_data']['modeling_period_end'],
+        include_twb_metrics=False,
+        include_btc_metrics=False
+    )
 
     # Extract thresholds
     modeling_min_investment = wallets_config['modeling']['modeling_min_investment']

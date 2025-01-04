@@ -7,8 +7,9 @@ import os
 import json
 import gc
 import inspect
+from pathlib import Path
 from datetime import datetime, timedelta
-from typing import List,Dict,Any
+from typing import List,Dict,Any,Union
 import importlib
 import itertools
 import logging
@@ -970,37 +971,56 @@ def winsorize(data: pd.Series, cutoff: float = 0.01) -> pd.Series:
 #     Misc Notebook Helper Functions
 # ---------------------------------------- #
 
-# silence donation message
-os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-def notify(prompt=None, sound_file_path=None, voice_id=None):
+def notify(sound_name: Union[str, int] = None, prompt: str = None, voice_id: str = None):
     """
-    Play alert sound followed by optional TTS message after 1s delay.
+    Play alert sound followed by optional TTS message.
 
-    Args:
-        prompt (str, optional): Text to speak using TTS
-        sound_file_path (str, optional): Path to sound file (.wav format)
-        voice_id (str, optional): Specific voice ID to use for TTS
+    Params:
+    - sound_name (str|int): Name/index of sound from config (e.g. 'alert_bells' or 0)
+    - prompt (str, optional): Text to speak using TTS
+    - voice_id (str, optional): Specific voice ID for TTS
     """
-    # Always play sound file first
-    sound_file_path = sound_file_path or os.getenv('ALERT_SOUND_FILEPATH')
-    if not sound_file_path:
-        return "No sound file found."
+    # Load sound config
+    config_path = Path("../../../Local/notification_sounds.yaml")
+    try:
+        with open(config_path, encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        return f"Error loading sound config: {e}"
+
+    sounds = config.get('notification_sounds', {})
+
+    # Handle integer index
+    if isinstance(sound_name, int):
+        sound_keys = list(sounds.keys())
+        if 0 <= sound_name < len(sound_keys):
+            sound_name = sound_keys[sound_name]
+        else:
+            return f"Invalid sound index. Choose 0-{len(sound_keys)-1}"
+
+    # Default to 'notify' if no sound specified
+    if not sound_name:
+        sound_name = 'notify'
+    elif sound_name not in sounds:
+        return f"Invalid sound name. Choose from: {', '.join(sounds.keys())}"
+
+    sound_config = sounds[sound_name]
 
     try:
         if not pygame.mixer.get_init():
             pygame.mixer.init()
 
-        sound = pygame.mixer.Sound(sound_file_path)
+        sound = pygame.mixer.Sound(sound_config['path'])
+        sound.set_volume(sound_config.get('volume', 1.0))
         sound.play()
 
-        # If prompt provided, wait 1s then do TTS
         if prompt:
-            time.sleep(0.7)
+            time.sleep(1.2)
             engine = pyttsx3.init()
             voice_id = voice_id or os.getenv('ALERT_VOICE_ID')
             engine.setProperty('voice', voice_id)
-            engine.setProperty('rate', 125)     # Speed of speech (words per minute)
-            engine.setProperty('volume', 0.7)    # Volume: 0.0 to 1.0
+            engine.setProperty('rate', 125)
+            engine.setProperty('volume', 0.4)
             engine.say(prompt)
             engine.runAndWait()
             engine.stop()
