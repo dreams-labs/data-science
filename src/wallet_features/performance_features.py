@@ -21,6 +21,55 @@ wallets_config = WalletsConfig()
 # ------------------------------
 
 @u.timing_decorator
+def calculate_performance_features(trading_features_df,include_twb_metrics):
+    """
+    Calculates a set of profit numerators, investment denominators, ratio combinations,
+    and transformations of ratios to create a matrix of performance scores.
+    """
+    trading_features_df = trading_features_df.copy()
+
+    # Numerator features reflecting the profit/return rate/cash inflows/inflow
+    profits_features_df = calculate_profits_features(trading_features_df)
+    profits_features_df = profits_features_df.add_prefix('profits_')
+
+    # Demoniminator features reflecting the balance/investment/outlays
+    balance_features_df = calculate_balance_features(trading_features_df,include_twb_metrics)
+    balance_features_df = balance_features_df.add_prefix('balance_')
+
+    # Combine to make ratios
+    ratios_features_df = profits_features_df.join(balance_features_df)
+    ratios_features_df = calculate_performance_ratios(ratios_features_df)
+
+    # Generate features using transformations of ratios
+    performance_features_df = transform_performance_ratios(ratios_features_df,
+                                                           balance_features_df)
+
+    # Check null values
+    null_check = performance_features_df.isnull().sum()
+    if null_check.any():
+        raise ValueError(f"Null values found in columns: {null_check[null_check > 0].index.tolist()}")
+
+    # Check for infinite values
+    inf_columns = (
+        performance_features_df.columns[
+            performance_features_df.isin([np.inf, -np.inf]).any()
+        ].tolist())
+    if inf_columns:
+        raise ValueError(f"Infinite values found in columns: {inf_columns}")
+
+    # Check wallet_address index consistency
+    if not performance_features_df.index.equals(trading_features_df.index):
+        raise ValueError("Wallet address mismatch between trading_features_df and performance_features_df")
+
+    return performance_features_df
+
+
+
+
+# ------------------------------
+#         Helper Functions
+# ------------------------------
+
 def calculate_profits_features(wallet_features_df: pd.DataFrame) -> pd.DataFrame:
     """
     Generates candidate profit profits_features for return calculations.
@@ -66,10 +115,6 @@ def calculate_profits_features(wallet_features_df: pd.DataFrame) -> pd.DataFrame
     return profits_features_df
 
 
-
-# ------------------------------
-#         Helper Functions
-# ------------------------------
 
 def calculate_balance_features(trading_features_df: pd.DataFrame,
                                include_twb_metrics: bool) -> pd.DataFrame:
@@ -254,51 +299,6 @@ def transform_performance_ratios(performance_ratios_df: pd.DataFrame,
         )
 
     return performance_features_df
-
-
-@u.timing_decorator
-def calculate_performance_features(trading_features_df,include_twb_metrics):
-    """
-    Calculates a set of profit numerators, investment denominators, ratio combinations,
-    and transformations of ratios to create a matrix of performance scores.
-    """
-    trading_features_df = trading_features_df.copy()
-
-    # Numerator features reflecting the profit/return rate/cash inflows/inflow
-    profits_features_df = calculate_profits_features(trading_features_df)
-    profits_features_df = profits_features_df.add_prefix('profits_')
-
-    # Demoniminator features reflecting the balance/investment/outlays
-    balance_features_df = calculate_balance_features(trading_features_df,include_twb_metrics)
-    balance_features_df = balance_features_df.add_prefix('balance_')
-
-    # Combine to make ratios
-    ratios_features_df = profits_features_df.join(balance_features_df)
-    ratios_features_df = calculate_performance_ratios(ratios_features_df)
-
-    # Generate features using transformations of ratios
-    performance_features_df = transform_performance_ratios(ratios_features_df,
-                                                           balance_features_df)
-
-    # Check null values
-    null_check = performance_features_df.isnull().sum()
-    if null_check.any():
-        raise ValueError(f"Null values found in columns: {null_check[null_check > 0].index.tolist()}")
-
-    # Check for infinite values
-    inf_columns = (
-        performance_features_df.columns[
-            performance_features_df.isin([np.inf, -np.inf]).any()
-        ].tolist())
-    if inf_columns:
-        raise ValueError(f"Infinite values found in columns: {inf_columns}")
-
-    # Check wallet_address index consistency
-    if not performance_features_df.index.equals(trading_features_df.index):
-        raise ValueError("Wallet address mismatch between trading_features_df and performance_features_df")
-
-    return performance_features_df
-
 
 
 
