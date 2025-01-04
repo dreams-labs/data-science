@@ -93,12 +93,12 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
 
         # Process batch with complete market data
         timing_profits_df, factorization_info = prepare_timing_data(batch_profits,
-                                                                  market_timing_df,
-                                                                  relative_change_columns)
+                                                                    market_timing_df,
+                                                                    relative_change_columns)
 
         batch_features = calculate_wallet_timing_features(timing_profits_df,
-                                                        relative_change_columns,
-                                                                                factorization_info)
+                                                          relative_change_columns,
+                                                          factorization_info)
 
         all_wallet_features.append(batch_features)
 
@@ -120,7 +120,6 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
 #         Helper Functions
 # -----------------------------
 
-@u.timing_decorator
 def identify_indicator_columns(config: dict) -> list:
     """
     Generates column names from nested indicator config.
