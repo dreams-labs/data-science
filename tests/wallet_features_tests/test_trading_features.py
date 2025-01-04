@@ -239,6 +239,10 @@ def test_trading_features_df(test_profits_df):
     # Unpack tuple
     test_profits_df, training_period_start, training_period_end = test_profits_df
 
+    # Set index
+    test_profits_df.set_index(['coin_id', 'wallet_address', 'date'], inplace=True, verify_integrity=True)
+    test_profits_df.sort_index(level=['coin_id', 'wallet_address', 'date'], inplace=True)
+
     # Compute trading features
     wallet_trading_features_df = wtf.calculate_wallet_trading_features(test_profits_df,
                                                                        training_period_start,
@@ -577,8 +581,12 @@ def test_remapped_trading_features_df(test_remapped_profits_df):
     # Unpack tuple
     remapped_profits_df, training_period_start, training_period_end = test_remapped_profits_df
 
+    # Set index
+    remapped_profits_df_ix = remapped_profits_df.copy().set_index(['coin_id', 'wallet_address', 'date'], verify_integrity=True)
+    remapped_profits_df_ix = remapped_profits_df_ix.sort_index(level=['coin_id', 'wallet_address', 'date'])
+
     # Compute trading features
-    remapped_wallet_trading_features_df = wtf.calculate_wallet_trading_features(remapped_profits_df,
+    remapped_wallet_trading_features_df = wtf.calculate_wallet_trading_features(remapped_profits_df_ix,
                                                                        training_period_start,
                                                                        training_period_end)
 

@@ -11,10 +11,10 @@ from datetime import datetime, timedelta
 from typing import List,Dict,Any
 import importlib
 import itertools
-import pyttsx3
 import logging
 import warnings
 import functools
+import pyttsx3
 import yaml
 import psutil
 import progressbar
@@ -491,7 +491,7 @@ def timing_decorator(func):
         end_time = time.time()
 
         function_logger.info(
-            '(%.2fs)Completed %s.',
+            '(%.2fs) Completed %s.',
             end_time - start_time,
             func.__name__
         )
@@ -638,6 +638,9 @@ def assert_period(df, period_start, period_end) -> None:
     period_start = pd.to_datetime(period_start)
     period_end = pd.to_datetime(period_end)
     period_starting_balance_date = period_start - timedelta(days=1)
+
+    # Reset index so we can assess date as a column
+    df = df.reset_index()
 
     # Confirm the earliest record is the period starting balance date
     earliest_date = df['date'].min()
@@ -1006,7 +1009,7 @@ def notify(prompt=None, sound_file_path=None, voice_id=None):
             engine.stop()
             del engine
 
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         return f"Error with playback: {e}"
 
 
