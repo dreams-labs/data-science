@@ -472,7 +472,6 @@ def timing_decorator(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         logger = logging.getLogger(func.__module__) # pylint: disable=redefined-outer-name
-        wrapper_line = inspect.currentframe().f_lineno  # Get decorator's line number
 
         # Only log start with normal location
         logger.debug('Initiating %s...', func.__name__)
@@ -486,7 +485,7 @@ def timing_decorator(func):
             name=logger.name,
             level=logging.INFO,
             pathname=func.__code__.co_filename,
-            lineno=wrapper_line,
+            lineno=func.__code__.co_firstlineno,
             msg='(%.1fs) Completed %s.',
             args=(duration, func.__name__),
             exc_info=None

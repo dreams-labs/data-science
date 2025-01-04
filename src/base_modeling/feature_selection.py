@@ -27,6 +27,11 @@ def remove_low_variance_features(
     Returns:
     - reduced_df (DataFrame): DataFrame with low variance features removed
     """
+    # If the threshold is 0 then don't compute anything
+    if variance_threshold == 0:
+        logger.info("Didn't apply variance-based feature selection.")
+        return training_df
+
     # Calculate variances with optional scaling
     if scale_before_selection:
         scaled_df = (training_df - training_df.mean()) / training_df.std()
@@ -78,6 +83,11 @@ def remove_correlated_features(
     Returns:
     - reduced_df (DataFrame): DataFrame with correlated features removed
     """
+    # If the threshold is 1.0 then don't compute anything
+    if correlation_threshold == 1.0:
+        logger.info("Didn't apply correlation-based feature selection.")
+        return training_df
+
     # Calculate correlation matrix
     logger.info("Calculating feature correlation...")
     corr_matrix = training_df.corr().abs()

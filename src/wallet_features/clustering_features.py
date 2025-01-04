@@ -117,7 +117,7 @@ def preprocess_clustering_data(training_data_df: pd.DataFrame) -> np.ndarray:
     # Remove low variance features to speed up PCA
     scaled_data = fs.remove_low_variance_features(
         scaled_data,
-        wallets_config['modeling']['feature_selection']['variance_threshold']
+        wallets_config['features']['feature_selection']['variance_threshold']
         ,scale_before_selection=False  # the data is already scaled
     )
 

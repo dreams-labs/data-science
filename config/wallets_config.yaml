@@ -11,8 +11,8 @@ training_data:
         "2024-09-01",
         "2024-10-01"
     ]
-    modeling_period_start: "2024-10-20"
-    modeling_period_end: "2024-11-10"
+    modeling_period_start: "2024-11-01"
+    modeling_period_end: "2024-11-20"
     validation_period_end: "2024-11-30"
 
     # Local pipeline configs
@@ -33,10 +33,6 @@ data_cleaning:
     min_wallet_investment: 1000 # Filters based on max_investment from trading features
     min_wallet_inflows: 1000  # Exclude wallets with inflows below this amount (USD)
     min_wallet_volume: 5000  # Exclude wallets with fewer than this amount of training period USD volume
-    # min_wallet_investment: 25000 # Filters based on max_investment from trading features
-    # min_wallet_inflows: 25000  # Exclude wallets with inflows below this amount (USD)
-    # min_wallet_volume: 50000  # Exclude wallets with fewer than this amount of training period USD volume
-
     max_wallet_investment: 10_000_000 # Filters based on max_investment from trading features
     max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
     max_wallet_volume: 25_000_000  # Exclude wallets with fewer than this amount of training period USD volume
@@ -73,8 +69,8 @@ features:
 
     # Market timing featurs
     market_timing_offsets: [
-             80,  50,  20,  10,  5,
-            -80, -50, -20, -10, -5,
+             80,  50,  20,  7,
+            -80, -50, -20, -7,
         ]
     market_timing_offset_winsorization: 0.02 # comparisons between metrics and their offset values will be winsorized by this amount
     market_timing_wallets_per_batch: 300_000
@@ -85,6 +81,15 @@ features:
     clustering_fill_method: 'fill_0'  # 'fill_0' or 'fill_mean'
     clustering_include_pca: False
 
+    # Feature selection params
+    feature_selection:
+        variance_threshold: 0.00
+        scale_before_selection: True
+        correlation_threshold: 0.95
+        protected_features: [
+            'cluster|'
+        ]
+
 
 # WalletModel Modeling Config
 modeling:
@@ -92,15 +97,6 @@ modeling:
     # Modeling period filters
     modeling_min_investment: 1000
     modeling_min_coins_traded: 0
-
-    # Feature selection params
-    feature_selection:
-        variance_threshold: 0.03
-        scale_before_selection: True
-        correlation_threshold: 0.95
-        protected_features: [
-            'cluster|'
-        ]
 
     # Which wallet performance metric to use as the target variable.
     # target_variable: "crypto_net_gain"
