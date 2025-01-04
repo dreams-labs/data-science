@@ -13,6 +13,7 @@ from kneed import KneeLocator
 
 # Local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
+import base_modeling.feature_selection as fs
 import utils as u
 
 # set up logger at the module level
@@ -96,17 +97,32 @@ def preprocess_clustering_data(training_data_df: pd.DataFrame) -> np.ndarray:
     Returns:
     - scaled_data (ndarray): Preprocessed and scaled numeric data
     """
+    # Validate fill method
     fill_method = wallets_config['features']['clustering_fill_method']
     if fill_method not in ['fill_0', 'fill_mean']:
         raise ValueError(f"Unknown clustering fill value {fill_method}")
 
+    # Select numeric columns
     numeric_df = training_data_df.select_dtypes(include=[np.number])
+
+    # Fill 0s if configured to
     if fill_method == 'fill_0':
         numeric_df = numeric_df.fillna(0)
 
+    # Scale data
     scaled_data = (numeric_df - numeric_df.mean()) / numeric_df.std()
     if fill_method == 'fill_mean':
         scaled_data = scaled_data.fillna(0)
+
+    # Remove low variance features to speed up PCA
+    scaled_data = fs.remove_low_variance_features(
+        scaled_data,
+        wallets_config['modeling']['feature_selection']['variance_threshold']
+        ,scale_before_selection=False  # the data is already scaled
+    )
+
+    if scaled_data.isna().sum().sum() > 0:
+        raise ValueError("Unexpected null values found in pre-PCA scaled data.")
 
     return scaled_data
 

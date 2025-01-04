@@ -11,21 +11,30 @@ logger = logging.getLogger(__name__)
 def remove_low_variance_features(
     training_df: pd.DataFrame,
     variance_threshold: float = 0.01,
-    protected_features: list = None
+    protected_features: list = None,
+    scale_before_selection: bool = True
 ) -> pd.DataFrame:
     """
     Remove features with variance below threshold, preserving protected features.
+    If scale_before_selection is True, applies variance threshold to standardized data.
 
     Params:
     - training_df (DataFrame): Input feature matrix
     - variance_threshold (float): Minimum variance to keep feature
     - protected_features (list): Prefixes of features to preserve regardless of variance
+    - scale_before_selection (bool): Whether to standardize before variance calculation
 
     Returns:
     - reduced_df (DataFrame): DataFrame with low variance features removed
     """
-    # Calculate variances without recomputing multiple times
-    feature_variances = training_df.var()
+    # Calculate variances with optional scaling
+    if scale_before_selection:
+        scaled_df = (training_df - training_df.mean()) / training_df.std()
+        feature_variances = scaled_df.var()
+        scale_log = "after standard scaling"
+    else:
+        feature_variances = training_df.var()
+        scale_log = ""
 
     # Get features exceeding threshold
     high_variance_features = feature_variances[
@@ -40,15 +49,17 @@ def remove_low_variance_features(
         ]
         high_variance_features = list(set(high_variance_features + protected_cols))
 
-    # Select columns efficiently
+    # Select columns from original unscaled data
     reduced_df = training_df[high_variance_features]
 
     logger.info(
-        f"Removed {training_df.shape[1] - reduced_df.shape[1]} low variance features"
+        f"Removed {training_df.shape[1] - reduced_df.shape[1]} features {scale_log}"
+        f" with variance below {variance_threshold}"
         f" while protecting {len(protected_cols) if protected_features else 0} features"
     )
 
     return reduced_df
+
 
 
 def remove_correlated_features(
