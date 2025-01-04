@@ -36,6 +36,8 @@ def retrieve_period_datasets(period_start_date, period_end_date, coin_cohort=Non
     Returns:
     - tuple: (profits_df, market_data_df, coin_cohort) for the period
     """
+    logger.info("Retrieving datasets for period %s-%s...",period_start_date, period_end_date)
+
     # Get raw period data
     profits_df, market_data_df = wtd.retrieve_raw_datasets(period_start_date, period_end_date)
 
@@ -77,23 +79,21 @@ def define_training_wallet_cohort(profits_df,market_data_df):
 
     # Impute the training period end (training period start is pre-imputed into profits_df generation)
     imputed_profits_df = pri.impute_profits_for_multiple_dates(profits_df, market_data_df,
-                                                               [training_period_end], n_threads=24)
+                                                                [training_period_end], n_threads=24)
 
     # Create a training period only profits_df
-    training_profits_df = (
-        imputed_profits_df[imputed_profits_df['date'] <= training_period_end]
-        .copy()
-    )
+    training_profits_df = (imputed_profits_df[imputed_profits_df['date'] <= training_period_end])
 
     # Confirm valid dates for training period
     u.assert_period(profits_df, training_period_start, training_period_end)
     u.assert_period(market_data_df, training_period_start, training_period_end)
 
     # Compute wallet level metrics over duration of training period
-    training_wallet_metrics_df = wtf.calculate_wallet_trading_features(training_profits_df,
-                                                                       training_period_start,
-                                                                       training_period_end,
-                                                                       include_twb_metrics=False)
+    training_wallet_metrics_df = wtf.calculate_wallet_trading_features(
+        training_profits_df.set_index(['coin_id', 'wallet_address', 'date']).sort_index(level=['coin_id', 'wallet_address', 'date']),
+        training_period_start,
+        training_period_end,
+        include_twb_metrics=False)
 
     # Apply filters based on wallet behavior during the training period
     filtered_training_wallet_metrics_df = wtd.apply_wallet_thresholds(training_wallet_metrics_df)
