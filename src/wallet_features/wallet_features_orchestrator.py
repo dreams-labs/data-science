@@ -135,6 +135,9 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     # Downcast all columns to help with memory
     wallet_features_df = u.df_downcast(wallet_features_df)
 
+    # Reset indices
+    profits_df.reset_index(inplace=True)
+    market_indicators_data_df.reset_index(inplace=True)
 
     return wallet_features_df
 
