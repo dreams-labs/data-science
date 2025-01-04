@@ -45,27 +45,9 @@ def create_basic_cluster_features(training_data_df, include_pca=False, include_c
     original_index = training_data_df.index
     n_components = wallets_config['features']['clustering_n_components']
     cluster_counts = wallets_config['features']['clustering_n_clusters']
-    fill_method = wallets_config['features']['clustering_fill_method']
-    if fill_method not in ['fill_0','fill_mean']:
-        raise ValueError(f"Unknown clustering fill value {fill_method} found in "
-                    "wallets_config['features']['clustering_fill_method'].")
 
-    # Select numeric columns only
-    numeric_df = training_data_df.select_dtypes(include=[np.number])
-
-    # Fill 0s if configured to
-    if fill_method == 'fill_0':
-        logger.info("Filling data using method '%s'...", fill_method)
-        numeric_df = numeric_df.fillna(0)
-
-    # Scale data
-    logger.info("Scaling data...")
-    scaled_data = (numeric_df - numeric_df.mean()) / numeric_df.std()
-
-    # Fill mean if configured to (fill 0 on scaled data is filling the mean)
-    if fill_method == 'fill_mean':
-        logger.info("Filling data using method '%s'...", fill_method)
-        scaled_data = scaled_data.fillna(0)
+    # Get preprocessed data using helper
+    scaled_data = preprocess_clustering_data(training_data_df)
 
     # Apply PCA
     pca = PCA(n_components=n_components)
@@ -95,6 +77,37 @@ def create_basic_cluster_features(training_data_df, include_pca=False, include_c
             cluster_features_df[f'k{n_clusters}/distance_to_cluster_{i}'] = distances[:, i]
 
     return cluster_features_df
+
+
+
+# -----------------------------------
+#          Helper Functions
+# -----------------------------------
+
+def preprocess_clustering_data(training_data_df: pd.DataFrame) -> np.ndarray:
+    """
+    Preprocesses data for clustering analysis with consistent scaling.
+
+    Params:
+    - training_data_df (DataFrame): Input features DataFrame
+
+    Returns:
+    - scaled_data (ndarray): Preprocessed and scaled numeric data
+    """
+    fill_method = wallets_config['features']['clustering_fill_method']
+    if fill_method not in ['fill_0', 'fill_mean']:
+        raise ValueError(f"Unknown clustering fill value {fill_method}")
+
+    numeric_df = training_data_df.select_dtypes(include=[np.number])
+    if fill_method == 'fill_0':
+        numeric_df = numeric_df.fillna(0)
+
+    scaled_data = (numeric_df - numeric_df.mean()) / numeric_df.std()
+    if fill_method == 'fill_mean':
+        scaled_data = scaled_data.fillna(0)
+
+    return scaled_data
+
 
 
 # -----------------------------------
@@ -155,27 +168,9 @@ def optimize_cluster_parameters(
     results = wcl.optimize_cluster_parameters(wallets_training_data_df)
 
     """
-    fill_method = wallets_config['features']['clustering_fill_method']
-    if fill_method not in ['fill_0','fill_mean']:
-        raise ValueError(f"Unknown clustering fill value {fill_method} found in "
-                    "wallets_config['features']['clustering_fill_method'].")
-
-    # Select numeric columns only
-    numeric_df = training_data_df.select_dtypes(include=[np.number])
-
-    # Fill 0s if configured to
-    if fill_method == 'fill_0':
-        logger.info("Filling data using method '%s'...", fill_method)
-        numeric_df = numeric_df.fillna(0)
-
-    # Scale data
-    logger.info("Scaling data...")
-    scaled_data = (numeric_df - numeric_df.mean()) / numeric_df.std()
-
-    # Fill mean if configured to (fill 0 on scaled data is filling the mean)
-    if fill_method == 'fill_mean':
-        logger.info("Filling data using method '%s'...", fill_method)
-        scaled_data = scaled_data.fillna(0)
+    # Filter to numeric, scale, and fill data
+    logger.info("Preprocessing training data for PCA analysis...")
+    scaled_data = preprocess_clustering_data(training_data_df)
 
     # Analyze PCA components
     logger.info("Computing PCA with %s components...", max_components)
@@ -220,8 +215,8 @@ def optimize_cluster_parameters(
 
     # Sample data for silhouette scores if dataset is large
     sample_size = 10000
+    logger.info("Using %s sample size for MiniBatchKMeans...", sample_size)
     if reduced_data.shape[0] > sample_size:
-        logger.info("Using %s sample size for silhouette scores...", sample_size)
         indices = np.random.choice(reduced_data.shape[0], sample_size, replace=False)
         sample_data = reduced_data[indices]
 
@@ -232,7 +227,7 @@ def optimize_cluster_parameters(
     if not minik_batch_size:
         minik_batch_size = int(np.sqrt(reduced_data.shape[0]))
     for k in range(2, max_clusters + 1):
-        logger.info("Computing scores for %s clusters...", k)
+        logger.debug("Computing scores for %s clusters...", k)
         kmeans = MiniBatchKMeans(n_clusters=k, random_state=42,
                                 batch_size=minik_batch_size)
         kmeans.fit(reduced_data)
