@@ -109,8 +109,8 @@ def calculate_wallet_trading_features(
 
 
 def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
-                                   period_start_date: str
-                                   ) -> pd.DataFrame:
+                                     period_start_date: str
+                                     ) -> pd.DataFrame:
     """
     Adds crypto_balance_change column tracking changes in crypto holdings.
     A positive value indicates an increase in crypto holdings, negative indicates decrease.
