@@ -1,26 +1,17 @@
 market_timing:
-    offsets:
-        price_sma_3:
-            offsets: [
-                -200, -150, -100, -75, -50, -35, -20, -10, -5,
-                 200,  150,  100,  75,  50,  35,  20,  10,  5,
-              ]
-            retain_base_columns: False
-        price_rsi_3:
-            offsets: [-100, -50, -20, -10, 10, 20, 50, 100]
-            retain_base_columns: True
-        volume_sma_3:
-            offsets: [-100, -50, -20, -10, 10, 20, 50, 100]
-            retain_base_columns: True
-        volume_rsi_3:
-            offsets: [-100, -50, -20, -10, 10, 20, 50, 100]
-            retain_base_columns: True
-        market_cap_filled_sma_3:
-            offsets: [-100, -50, -20, -10, 10, 20, 50, 100]
-            retain_base_columns: True
-        mfi_sma_3:
-            offsets: [-100, -50, -20, -10, 10, 20, 50, 100]
-            retain_base_columns: True
-        obv_sma_3:
-            offsets: [-100, -50, -20, -10, 10, 20, 50, 100]
-            retain_base_columns: True
+  offsets:
+    price_sma_5:
+      offsets: [7,21,50]
+      retain_base_columns: False
+    price_rsi_5:
+      offsets: [25,50]
+      retain_base_columns: True
+    volume_sma_5:
+      offsets: [7,21,50]
+      retain_base_columns: True
+    mfi_sma_5:
+      offsets: [21,50]
+      retain_base_columns: True
+    obv_sma_5:
+      offsets: [21,50]
+      retain_base_columns: True

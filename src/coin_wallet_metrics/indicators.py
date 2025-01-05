@@ -349,39 +349,73 @@ def add_mfi_column(time_series_df, price_col='price', volume_col='volume', windo
 
 def calculate_mfi(price: pd.Series, volume: pd.Series, window: int = 14) -> pd.Series:
     """
+    Money Flow Index (MFI): MFI combines price and volume data to assess buying and selling
+    pressure, signaling potential overbought (above 80) or oversold (below 20) conditions.
+
     Params:
-    - price (pd.Series): close prices
-    - volume (pd.Series): trading volume
-    - window (int): lookback window (default 14)
+    - price (pd.Series): the close prices for each time step
+    - volume (pd.Series): the trading volume for each time step
+    - window (int): the lookback window for calculating the MFI (default is 14)
 
     Returns:
-    - pd.Series: MFI values
+    - pd.Series: a series representing the MFI for each time step
     """
+
+    # Step 1: Use the close price directly as the proxy for the typical price
     typical_price = price
+
+    # Step 2: Calculate the Raw Money Flow (MF = TP * Volume)
     money_flow = typical_price * volume
 
-    # Get price changes
-    price_diff = typical_price.diff()
+    # Step 3: Calculate Positive and Negative Money Flow
+    positive_money_flow = money_flow.where(typical_price > typical_price.shift(1), 0)
+    negative_money_flow = money_flow.where(typical_price < typical_price.shift(1), 0)
 
-    # Handle equal prices by assigning to positive flow (maintains continuity)
-    positive_money_flow = money_flow.where(price_diff >= 0, 0)
-    negative_money_flow = money_flow.where(price_diff < 0, 0)
+    # Step 4: Calculate the Money Flow Ratio (MFR) over the window
+    money_flow_ratio = positive_money_flow.rolling(window=window).sum() / negative_money_flow.rolling(window=window).sum()
 
-    # Calculate rolling sums with handling for zero negative flow
-    pos_flow_sum = positive_money_flow.rolling(window=window).sum()
-    neg_flow_sum = negative_money_flow.rolling(window=window).sum()
-
-    # Safe division for money flow ratio
-    money_flow_ratio = np.where(
-        neg_flow_sum != 0,
-        pos_flow_sum / neg_flow_sum,
-        np.where(pos_flow_sum != 0, 100, 1)  # If no negative flow but positive flow exists = strong buy
-    )
-
-    # Calculate MFI
+    # Step 5: Calculate the Money Flow Index (MFI)
     mfi = 100 - (100 / (1 + money_flow_ratio))
 
-    return pd.Series(mfi, index=price.index).ffill().fillna(50)  # Use 50 as neutral starting point
+    # Step 6: Forward fill NaN values, then fill remaining NaNs with 0.5
+    mfi = mfi.ffill().fillna(0.5)
+
+    return mfi
+# def calculate_mfi(price: pd.Series, volume: pd.Series, window: int = 14) -> pd.Series:
+#     """
+#     Params:
+#     - price (pd.Series): close prices
+#     - volume (pd.Series): trading volume
+#     - window (int): lookback window (default 14)
+
+#     Returns:
+#     - pd.Series: MFI values
+#     """
+#     typical_price = price
+#     money_flow = typical_price * volume
+
+#     # Get price changes
+#     price_diff = typical_price.diff()
+
+#     # Handle equal prices by assigning to positive flow (maintains continuity)
+#     positive_money_flow = money_flow.where(price_diff >= 0, 0)
+#     negative_money_flow = money_flow.where(price_diff < 0, 0)
+
+#     # Calculate rolling sums with handling for zero negative flow
+#     pos_flow_sum = positive_money_flow.rolling(window=window).sum()
+#     neg_flow_sum = negative_money_flow.rolling(window=window).sum()
+
+#     # Safe division for money flow ratio
+#     money_flow_ratio = np.where(
+#         neg_flow_sum != 0,
+#         pos_flow_sum / neg_flow_sum,
+#         np.where(pos_flow_sum != 0, 100, 1)  # If no negative flow but positive flow exists = strong buy
+#     )
+
+#     # Calculate MFI
+#     mfi = 100 - (100 / (1 + money_flow_ratio))
+
+#     return pd.Series(mfi, index=price.index).ffill().fillna(50)  # Use 50 as neutral starting point
 
 
 @u.timing_decorator

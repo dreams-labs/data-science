@@ -187,17 +187,24 @@ def calculate_gain_and_investment_columns(profits_df: pd.DataFrame) -> pd.DataFr
         - max_investment: Maximum cumulative transfers (floored at 0)
         - crypto_net_gain: Final unrealized gain per wallet
     """
-    # Extract the last row per wallet-coin from pre-sorted DataFrame
+    # Retrieve the cumulative net gain at the end of the period
     last_rows = profits_df.drop_duplicates(subset=['wallet_address', 'coin_id'], keep='last')
-
-    # Group by wallet to calculate total current gain
     gains_df = last_rows.groupby('wallet_address', as_index=False).agg(
         crypto_net_gain=('crypto_cumulative_net_gain', 'sum')
     ).set_index('wallet_address')
 
+    # Calculate buy/sell metrics from full dataset, including opening balances
+    profits_df['positive_changes'] = np.where(profits_df['crypto_balance_change'] > 0,
+                                            profits_df['crypto_balance_change'], 0)
+    profits_df['negative_changes'] = np.where(profits_df['crypto_balance_change'] < 0,
+                                            -profits_df['crypto_balance_change'], 0)
+
     # Group and aggregate for max investment
     investments_df = profits_df.groupby('wallet_address').agg(
-        max_investment=('crypto_cumulative_transfers', 'max')
+        max_investment=('crypto_cumulative_transfers', 'max'),
+        total_crypto_buys=('positive_changes', 'sum'),
+        total_crypto_sells=('negative_changes', 'sum'),
+        net_crypto_investment=('crypto_balance_change', 'sum'),
     )
 
     # Set floor of 0 on max_investment to match business constraint
@@ -237,37 +244,18 @@ def calculate_observed_activity_columns(profits_df: pd.DataFrame, period_start_d
     # Precompute absolute balance changes
     observed_profits_df['abs_balance_change'] = observed_profits_df['crypto_balance_change'].abs()
 
-    # Calculate base activity metrics
-    volume_metrics_df = observed_profits_df.groupby('wallet_address', as_index=False).agg(
+    # Calculate observed activity metrics
+    observed_activity_df = observed_profits_df.groupby('wallet_address', as_index=False).agg(
         unique_coins_traded=('coin_id', 'nunique'),
-        total_volume=('abs_balance_change', 'sum')
-    ).set_index('wallet_address')
-
-    # Calculate buy/sell metrics from full dataset
-    observed_profits_df['positive_changes'] = np.where(observed_profits_df['crypto_balance_change'] > 0,
-                                            observed_profits_df['crypto_balance_change'], 0)
-    observed_profits_df['negative_changes'] = np.where(observed_profits_df['crypto_balance_change'] < 0,
-                                            -observed_profits_df['crypto_balance_change'], 0)
-
-    changes_metrics_df = observed_profits_df.groupby('wallet_address').agg(
-        total_crypto_buys=('positive_changes', 'sum'),
-        total_crypto_sells=('negative_changes', 'sum'),
-        net_crypto_investment=('crypto_balance_change', 'sum')
-    )
-
-    # Calculate transaction frequency metrics
-    activity_metrics_df = observed_profits_df.groupby('wallet_address', as_index=False).agg(
+        total_volume=('abs_balance_change', 'sum'),
         transaction_days=('date', 'nunique'),
-        average_transaction=('abs_balance_change', 'mean')
+        average_transaction=('abs_balance_change', 'mean'),
     ).set_index('wallet_address')
 
     # Add activity density based on period duration
     period_duration = (datetime.strptime(period_end_date, '%Y-%m-%d') -
                         datetime.strptime(period_start_date, '%Y-%m-%d')).days + 1
-    activity_metrics_df['activity_density'] = activity_metrics_df['transaction_days'] / period_duration
-
-    # Combine all metrics
-    observed_activity_df = volume_metrics_df.join([changes_metrics_df, activity_metrics_df])
+    observed_activity_df['activity_density'] = observed_activity_df['transaction_days'] / period_duration
 
     return observed_activity_df
 
@@ -283,7 +271,7 @@ def aggregate_time_weighted_balance(profits_df: pd.DataFrame) -> pd.DataFrame:
     - profits_df (DataFrame): Daily profits data with balances and dates
 
     Returns:
-    - wallet_metrics_df (DataFrame): Time weighted metrics by wallet
+    - trading_features_df (DataFrame): Time weighted metrics by wallet
     """
     active_period_threshold = wallets_config['features']['timing_metrics_min_transaction_size']
 

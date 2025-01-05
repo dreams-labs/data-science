@@ -7,12 +7,11 @@ training_data:
         "2023-06-01",
         "2024-01-01",
         "2024-04-01",
-        "2024-07-01",
         "2024-09-01",
         "2024-10-01"
     ]
-    modeling_period_start: "2024-10-20"
-    modeling_period_end: "2024-11-10"
+    modeling_period_start: "2024-11-01"
+    modeling_period_end: "2024-11-20"
     validation_period_end: "2024-11-30"
 
     # Local pipeline configs
@@ -24,22 +23,22 @@ training_data:
 data_cleaning:
 
     # Wallet cohort thresholds
-    min_coins_traded: 2  # Exclude wallets that have traded fewer coins than this during the training period
-    max_coins_traded: 300  # Exclude wallets that have traded more coins than this during the training period
+    min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
+    max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
 
-    min_wallet_investment: 1500 # Filters based on max_investment from trading features
-    min_wallet_inflows: 1500  # Exclude wallets with inflows below this amount (USD)
-    min_wallet_volume: 3000  # Exclude wallets with fewer than this amount of training period USD volume
+    min_wallet_investment: 1000 # time weighted average balance filter
+    min_wallet_inflows: 1000  # Exclude wallets with inflows below this amount (USD)
+    min_wallet_volume: 5000  # Exclude wallets with fewer than this amount of training period USD volume
 
-    max_wallet_investment: 30_000_000 # Filters based on max_investment from trading features
+    max_wallet_investment: 10_000_000 # time weighted average balance filter
     max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
-    max_wallet_volume: 120_000_000  # Exclude wallets with fewer than this amount of training period USD volume
-    max_wallet_profits: 30_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
+    max_wallet_volume: 25_000_000  # Exclude wallets with fewer than this amount of training period USD volume
+    max_wallet_profits: 100_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
 
     # Market data filters
     max_initial_market_cap: 999150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
-    max_gap_days: 50  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
-    min_daily_volume: 100 # Minimum average daily volume the coin must have
+    max_gap_days: 14  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
+    min_daily_volume: 500 # Minimum average daily volume the coin must have
 
     # Warnings about potential data gaps in profits_df or market_data_df
     coverage_decrease_audit_window: 10  # how far to look back to assess decreases in coverage
@@ -49,7 +48,7 @@ data_cleaning:
     transfers_coverage_warning_min_pct_increase: 0.05  # ...and the % of coin without transfers data has increased by this value, issue a warning
 
     # Market cap imputation filters
-    min_mc_imputation_coverage: 0.3  # coins with market cap coverage below this level won't be filled with mc_imputed, only mc_filled
+    min_mc_imputation_coverage: 0.3  # coins with market cap coverage below this level will have hardcoded market cap values filled
     max_mc_imputation_multiple: 3.0  # don't impute dates where the imputed market cap exceeds the max known market cap * this ratio
     market_cap_default_fill:  500000  # coins below the imputation coverage level will have empty values filled with this
 
@@ -76,8 +75,8 @@ modeling:
 
     # Feature selection params
     feature_selection:
-        variance_threshold: 0.00
-        correlation_threshold: 1
+        variance_threshold: -1
+        correlation_threshold: 2.0
         protected_features: [
             'cluster|'
         ]
@@ -89,7 +88,7 @@ modeling:
     # Which wallet performance metric to use as the target variable.
     # target_variable: "crypto_net_gain"
     # target_variable: "crypto_net_gain/max_investment/ntile_rank"
-    target_variable: "crypto_net_gain/max_investment/winsorized"
+    target_variable: "crypto_net_gain/max_investment/ntile_rank"
     drop_columns: []
     train_test_split: 0.2  # test size
 
@@ -99,15 +98,15 @@ modeling:
     model_params:
 
         # Model params
-        n_estimators: 250
+        n_estimators: 300
+        max_depth: 4
         learning_rate: 0.05
-        max_depth: 15
-        min_child_weight_pct: 0.0001
-        colsample_bytree: 0.6
-        gamma: 0.1
+        subsample: 0.8
+        colsample_bytree: 1.0
+        min_child_weight: 5
 
         # Early stopping
-        early_stopping_rounds: 20
+        early_stopping_rounds: 999
         eval_metric: 'rmse'
 
         # Metaparams

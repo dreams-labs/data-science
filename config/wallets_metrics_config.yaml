@@ -7,33 +7,25 @@ time_series:
             indicators:
                 sma:
                     parameters:
-                        window: [3]
+                        window: [5]
                 rsi:
                     parameters:
-                        window: [3]
+                        window: [5]
         volume:
             indicators:
                 sma:
                     parameters:
-                        window: [3]
-                rsi:
-                    parameters:
-                        window: [3]
-        market_cap_filled:
-            indicators:
-                sma:
-                    parameters:
-                        window: [3]
+                        window: [5]
         mfi:
             indicators:
                 sma:
                     parameters:
-                        window: [3]
+                        window: [5]
         obv:
             indicators:
                 sma:
                     parameters:
-                        window: [3]
+                        window: [5]
 
 # # Time series keyed on only date
 # macro_trends:
