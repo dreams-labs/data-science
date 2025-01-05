@@ -83,7 +83,6 @@ def define_training_wallet_cohort(profits_df,market_data_df):
     training_profits_df = (
         imputed_profits_df[imputed_profits_df['date'] <= training_period_end]
         .copy()
-        .drop('total_return', axis=1)
     )
 
     # Confirm valid dates for training period
@@ -126,9 +125,6 @@ def split_training_window_profits_dfs(training_profits_df,training_market_data_d
                                                                         training_market_data_df,
                                                                         training_window_boundary_dates,
                                                                         n_threads=1)
-
-    # drop imputed total_return column
-    training_windows_profits_df = training_windows_profits_df.drop('total_return', axis=1)
 
     # Split profits_df into training windows
     training_windows_profits_dfs = wtd.split_training_window_dfs(training_windows_profits_df)
