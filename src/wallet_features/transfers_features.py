@@ -152,7 +152,7 @@ def retrieve_transfers():
     logger.info("Retrieved transfers data for %s wallet-coin-date records.",
                 len(transfers_df))
 
-    transfers_df = u.safe_downcast(transfers_df, 'wallet_address', 'int32')
+    transfers_df = u.df_downcast(transfers_df)
 
     return transfers_df
 
