@@ -5,15 +5,16 @@ import logging
 from typing import Dict,List
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, MiniBatchKMeans
 from sklearn.metrics import silhouette_score
 import matplotlib.pyplot as plt
 from kneed import KneeLocator
 
 # Local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
+import base_modeling.feature_selection as fs
+import utils as u
 
 # set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -22,7 +23,13 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 
 
-def create_basic_cluster_features(training_data_df, include_pca=False, include_categorical=False):
+
+# -----------------------------------
+#           Core Interface
+# -----------------------------------
+
+@u.timing_decorator
+def create_kmeans_cluster_features(training_data_df, include_pca=False, include_categorical=False):
     """
     Add cluster-related features to the original dataframe.
 
@@ -34,28 +41,17 @@ def create_basic_cluster_features(training_data_df, include_pca=False, include_c
     Returns:
     - cluster_features_df (df): dataframe with original index plus new cluster features
     """
+    # Store original index and extract params
+    original_index = training_data_df.index
     n_components = wallets_config['features']['clustering_n_components']
     cluster_counts = wallets_config['features']['clustering_n_clusters']
-    fill_method = wallets_config['features']['clustering_fill_method']
 
-    # Store original index
-    original_index = training_data_df.index
-
-    # Get numeric features
-    numeric_df = training_data_df.select_dtypes(include=[np.number])
-
-    # Fill as specified in the config
-    if fill_method == 0:
-        numeric_df = numeric_df.fillna(0)
-    else:
-        raise ValueError(f"Unknown clustering fill value {fill_method} found in "
-                         "wallets_config['features']['clustering_fill_method'].")
-
-    # Scale the features
-    scaler = StandardScaler()
-    scaled_data = scaler.fit_transform(numeric_df)
+    # Get preprocessed data using helper
+    logger.info("Preprocessing training data for clustering...")
+    scaled_data = preprocess_clustering_data(training_data_df)
 
     # Apply PCA
+    logger.info("Reducing to %s PCA components...", n_components)
     pca = PCA(n_components=n_components)
     pca_result = pca.fit_transform(scaled_data)
 
@@ -69,6 +65,7 @@ def create_basic_cluster_features(training_data_df, include_pca=False, include_c
 
     # Generate features for each cluster count
     for n_clusters in cluster_counts:
+        logger.info("Generating clusters for cluster count %s...", n_clusters)
         kmeans = KMeans(n_clusters=n_clusters, random_state=42)
         cluster_labels = kmeans.fit_predict(pca_result)
 
@@ -85,6 +82,59 @@ def create_basic_cluster_features(training_data_df, include_pca=False, include_c
     return cluster_features_df
 
 
+
+# -----------------------------------
+#          Helper Functions
+# -----------------------------------
+
+def preprocess_clustering_data(training_data_df: pd.DataFrame) -> np.ndarray:
+    """
+    Preprocesses data for clustering analysis with consistent scaling.
+
+    Params:
+    - training_data_df (DataFrame): Input features DataFrame
+
+    Returns:
+    - scaled_data (ndarray): Preprocessed and scaled numeric data
+    """
+    # Validate fill method
+    fill_method = wallets_config['features']['clustering_fill_method']
+    if fill_method not in ['fill_0', 'fill_mean']:
+        raise ValueError(f"Unknown clustering fill value {fill_method}")
+
+    # Select numeric columns
+    numeric_df = training_data_df.select_dtypes(include=[np.number])
+
+    # Fill 0s if configured to
+    if fill_method == 'fill_0':
+        numeric_df = numeric_df.fillna(0)
+
+    # Scale data
+    scaled_data = (numeric_df - numeric_df.mean()) / numeric_df.std()
+
+    # Zero out columns that have no variance to avoid NaNs that break PCA)
+    scaled_data.loc[:, numeric_df.std() == 0] = 0
+
+    if fill_method == 'fill_mean':
+        scaled_data = scaled_data.fillna(0)
+
+    # # Remove low variance features to speed up PCA
+    # scaled_data = fs.remove_low_variance_features(
+    #     scaled_data,
+    #     wallets_config['features']['feature_selection']['variance_threshold']
+    #     ,scale_before_selection=False  # the data is already scaled
+    # )
+
+    if scaled_data.isna().sum().sum() > 0:
+        raise ValueError("Unexpected null values found in pre-PCA scaled data.")
+
+    return scaled_data
+
+
+
+# -----------------------------------
+#         Utility Functions
+# -----------------------------------
 
 def assign_clusters_from_distances(modeling_df: pd.DataFrame, cluster_counts: List[int]) -> pd.DataFrame:
     """
@@ -118,7 +168,12 @@ def assign_clusters_from_distances(modeling_df: pd.DataFrame, cluster_counts: Li
 
 
 
-def optimize_cluster_parameters(training_data_df: pd.DataFrame, max_clusters: int = 10) -> Dict[str, Dict]:
+def optimize_cluster_parameters(
+        training_data_df: pd.DataFrame,
+        max_components: int = 120,
+        max_clusters: int = 20,
+        minik_batch_size: int = None,
+    ) -> Dict[str, Dict]:
     """
     Analyze optimal number of components and clusters using multiple methods.
 
@@ -126,6 +181,7 @@ def optimize_cluster_parameters(training_data_df: pd.DataFrame, max_clusters: in
     - training_data_df: DataFrame with features
     - max_components: maximum number of PCA components to consider
     - max_clusters: maximum number of clusters to consider
+    - minik_batch: how many records to use in the MiniBatchKMeans batches
 
     Returns:
     - Dictionary with analysis results and plots
@@ -134,14 +190,15 @@ def optimize_cluster_parameters(training_data_df: pd.DataFrame, max_clusters: in
     results = wcl.optimize_cluster_parameters(wallets_training_data_df)
 
     """
-    # Prepare data
-    numeric_df = training_data_df.select_dtypes(include=[np.number])
-    scaler = StandardScaler()
-    scaled_data = scaler.fit_transform(numeric_df)
+    # Filter to numeric, scale, and fill data
+    logger.info("Preprocessing training data for PCA analysis...")
+    scaled_data = preprocess_clustering_data(training_data_df)
 
     # Analyze PCA components
-    pca = PCA()
+    logger.info("Computing PCA with %s components...", max_components)
+    pca = PCA(n_components=max_components)
     pca.fit(scaled_data)
+    logger.info("PCA calculations complete.")
 
     # Calculate explained variance ratio
     explained_variance = pca.explained_variance_ratio_
@@ -168,22 +225,42 @@ def optimize_cluster_parameters(training_data_df: pd.DataFrame, max_clusters: in
     plt.show()
 
     # Find optimal components using explained variance threshold
-    n_components_80 = np.argmax(cumulative_variance >= 0.8) + 1
+    n_components_80 = min(
+        np.argmax(cumulative_variance >= 0.8) + 1,
+        max_components
+    )
 
     # Analyze optimal number of clusters
     # Use optimal number of components found above
-    pca_optimal = PCA(n_components=n_components_80)
-    reduced_data = pca_optimal.fit_transform(scaled_data)
+    logger.info("Assessing optimal cluster counts based on PCA results...")
+    reduced_data = pca.transform(scaled_data)[:, :n_components_80]
 
-    # Calculate metrics for different numbers of clusters
+    # Sample data for silhouette scores if dataset is large
+    sample_size = 10000
+    logger.info("Using %s sample size for MiniBatchKMeans...", sample_size)
+    if reduced_data.shape[0] > sample_size:
+        indices = np.random.choice(reduced_data.shape[0], sample_size, replace=False)
+        sample_data = reduced_data[indices]
+
     inertias = []
     silhouette_scores = []
 
+    # Define batch size for mini k
+    if not minik_batch_size:
+        minik_batch_size = int(np.sqrt(reduced_data.shape[0]))
     for k in range(2, max_clusters + 1):
-        kmeans = KMeans(n_clusters=k, random_state=42)
+        logger.debug("Computing scores for %s clusters...", k)
+        kmeans = MiniBatchKMeans(n_clusters=k, random_state=42,
+                                batch_size=minik_batch_size)
         kmeans.fit(reduced_data)
         inertias.append(kmeans.inertia_)
-        silhouette_scores.append(silhouette_score(reduced_data, kmeans.labels_))
+
+        # Use sampled data for silhouette score
+        if reduced_data.shape[0] > sample_size:
+            labels = kmeans.predict(sample_data)
+            silhouette_scores.append(silhouette_score(sample_data, labels))
+        else:
+            silhouette_scores.append(silhouette_score(reduced_data, kmeans.labels_))
 
     # Plot clustering metrics
     plt.figure(figsize=(12, 4))
@@ -195,9 +272,10 @@ def optimize_cluster_parameters(training_data_df: pd.DataFrame, max_clusters: in
     plt.title('Elbow Method')
 
     # Find elbow point
+    logger.info("Computing knee locations...")
     kl = KneeLocator(range(2, max_clusters + 1), inertias, curve='convex', direction='decreasing')
     if kl.elbow:
-        plt.axvline(x=kl.elbow, color='r', linestyle='--', label=f'Elbow at k={kl.elbow}')
+        plt.axvline(x=kl.elbow, color='g', linestyle='--', label=f'Elbow at k={kl.elbow}')
         plt.legend()
 
     plt.subplot(122)
@@ -233,5 +311,4 @@ def optimize_cluster_parameters(training_data_df: pd.DataFrame, max_clusters: in
                 {results['optimal_components']['n_components_80_variance']}")
     logger.info(f"Optimal k from elbow method: {results['optimal_clusters']['elbow_k']}")
     logger.info(f"Optimal k from silhouette score: {results['optimal_clusters']['silhouette_k']}")
-
     return results
