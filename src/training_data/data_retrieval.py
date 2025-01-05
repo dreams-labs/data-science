@@ -434,6 +434,10 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows, dataset='pro
     profits_df['coin_id'] = profits_df['coin_id'].astype('category')
     profits_df['date'] = pd.to_datetime(profits_df['date'])
 
+    # Add total_return column
+    profits_df['total_return'] = (profits_df['profits_cumulative']
+                                   / profits_df['usd_inflows_cumulative'])
+
     # Convert all numerical columns to 32 bit, using safe_downcast to avoid overflow
     profits_df = u.safe_downcast(profits_df, 'wallet_address', 'int32')
     profits_df = u.safe_downcast(profits_df, 'profits_cumulative', 'float32')

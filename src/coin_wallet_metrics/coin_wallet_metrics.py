@@ -52,10 +52,6 @@ def classify_wallet_cohort(profits_df, wallet_cohort_config, cohort_name):
     eligible_wallets_profits_df = profits_df[profits_df['wallet_address'].isin(eligible_wallets_df['wallet_address'])].copy()
     eligible_wallets_profits_df = eligible_wallets_profits_df.sort_values(by=['wallet_address', 'coin_id', 'date'])
 
-    # Add total return column
-    eligible_wallets_profits_df['total_return'] = (eligible_wallets_profits_df['profits_cumulative']
-                                                   / eligible_wallets_profits_df['usd_inflows'])
-
     # compute wallet-coin level metrics
     eligible_wallets_coins_df = eligible_wallets_profits_df.groupby(['wallet_address', 'coin_id'], observed=True).agg({
         'profits_cumulative': 'last',  # Use the last record for cumulative profits

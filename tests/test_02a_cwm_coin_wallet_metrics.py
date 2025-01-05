@@ -56,7 +56,10 @@ def sample_wallet_cohort_profits_df():
         'usd_inflows': [5000, 7500, 7500, 8000, 20000, 1000],
         'profits_cumulative': [3000, 2000, 8000, 6000, 9000, 500]
     }
+
+    # Recompute total return: total_return = profits_cumulative / usd_inflows
     df = pd.DataFrame(data)
+    df['total_return'] = df['profits_cumulative'] / df['usd_inflows']
     return df
 
 # Sample config for wallet cohort

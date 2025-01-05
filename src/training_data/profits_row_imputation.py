@@ -371,6 +371,10 @@ def calculate_new_profits_values(profits_df, target_date):
     # no new usd_inflows so cumulative remains the same
     new_rows_df['usd_inflows_cumulative'] = profits_df['usd_inflows_cumulative']
 
+    # recalculate total_return since profits have changed with price
+    new_rows_df['total_return'] = (new_rows_df['profits_cumulative']
+                                   / new_rows_df['usd_inflows_cumulative'])
+
     # Set the date index to be the target_date
     new_rows_df = new_rows_df.reset_index()
     new_rows_df['date'] = target_date  # pylint: disable=E1137 # df does not support item assignment
