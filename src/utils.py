@@ -7,13 +7,15 @@ import os
 import json
 import gc
 import inspect
+from pathlib import Path
 from datetime import datetime, timedelta
-from typing import List,Dict,Any
+from typing import List,Dict,Any,Union
 import importlib
 import itertools
 import logging
 import warnings
 import functools
+import pyttsx3
 import yaml
 import psutil
 import progressbar
@@ -21,7 +23,6 @@ import pandas as pd
 import numpy as np
 from pydantic import ValidationError
 import pygame
-import dreams_core.core as dc
 
 
 # pylint: disable=E0401
@@ -39,7 +40,7 @@ importlib.reload(py_mo)
 importlib.reload(py_e)
 
 # set up logger at the module level
-logger = dc.setup_logger()
+logger = logging.getLogger(__name__)
 
 
 
@@ -470,26 +471,31 @@ def timing_decorator(func):
     """
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        # Get the logger
-        function_logger = logging.getLogger(func.__module__)
+        logger = logging.getLogger(func.__module__) # pylint: disable=redefined-outer-name
 
-        # Log the initiation of the function
-        function_logger.debug('Initiating %s...', func.__name__)
+        # Only log start with normal location
+        logger.debug('Initiating %s...', func.__name__)
 
-        # Time the function execution
         start_time = time.time()
         result = func(*args, **kwargs)
-        end_time = time.time()
+        duration = time.time() - start_time
 
-        # Log the execution time
-        function_logger.info(
-            'Completed %s after %.2f seconds.',
-            func.__name__,
-            end_time - start_time
+        # Create single custom record for timing log
+        record = logging.LogRecord(
+            name=logger.name,
+            level=logging.INFO,
+            pathname=func.__code__.co_filename,
+            lineno=func.__code__.co_firstlineno,
+            msg='(%.1fs) Completed %s.',
+            args=(duration, func.__name__),
+            exc_info=None
         )
+
+        # Handle this record directly
+        logger.handle(record)
+
         return result
     return wrapper
-
 
 
 def create_progress_bar(total_items):
@@ -533,46 +539,81 @@ def create_progress_bar(total_items):
 #     DataFrame Manipulation Functions
 # ---------------------------------------- #
 
-def safe_downcast(df, column, dtype):
+def safe_downcast(df: pd.DataFrame, column: str) -> pd.DataFrame:
     """
-    Safe method to downcast a column datatype. If the column has no values that exceed the
-    limits of the new dtype, it will be downcasted. If it has values that will result in
-    overflow errors, it will raise an error.
+    Automatically downcast a numeric column to smallest safe dtype.
+
+    Params:
+    - df (DataFrame): Input dataframe
+    - column (str): Column to downcast
+
+    Returns:
+    - DataFrame: DataFrame with downcasted column if safe
     """
-    # Check if the column is numeric
     if not pd.api.types.is_numeric_dtype(df[column]):
-        logger.warning("Column '%s' is not numeric. Skipping downcast.", column)
+        logger.debug(f"Column '{column}' is not numeric. Skipping downcast.")
         return df
 
-    # Get the original dtype of the column
-    original_dtype = df[column].dtype
-
-    # Get the min and max values of the colum
+    original_dtype = str(df[column].dtype)
     col_min = df[column].min()
     col_max = df[column].max()
 
-    # Get the limits of the target dtype
-    if dtype in ['float32', 'float64']:
-        type_info = np.finfo(dtype)
-    elif dtype in ['int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64']:
-        type_info = np.iinfo(dtype)
-    else:
-        logger.error("Unsupported dtype: %s", dtype)
+    # Define downcast paths
+    downcast_paths = {
+        'int64': ['int32', 'int16'],
+        'Int64': ['Int32', 'Int16'],
+        'float64': ['float32', 'float16'],
+        'Float64': ['Float32', 'Float16']
+    }
+
+    # Get downcast sequence for this dtype
+    dtype_sequence = downcast_paths.get(original_dtype, [])
+    if not dtype_sequence:
         return df
 
-    # Check if the column values are within the limits of the target dtype
-    if col_min < type_info.min or col_max > type_info.max:
-        logger.warning("Cannot safely downcast column '%s' to %s. "
-                       "Values are outside the range of %s. "
-                       "Min: %s, Max: %s",
-                       column, dtype, dtype, col_min, col_max)
-        return df
+    # Try each downcast level
+    for target_dtype in dtype_sequence:
+        try:
+            # Convert pandas dtype to numpy for limit checking
+            np_dtype = target_dtype.lower()
+            if target_dtype[0].isupper():
+                np_dtype = np_dtype[1:]  # Remove 'I' from 'Int32'
 
-    # If we've made it here, it's safe to downcast
-    df[column] = df[column].astype(dtype)
+            # Skip if we can't get type info
+            if not np_dtype.startswith(('int', 'float')):
+                continue
 
-    logger.debug("Successfully downcasted column '%s' from %s to %s",
-                 column, original_dtype, dtype)
+            # Get dtype limits
+            if 'float' in np_dtype:
+                type_info = np.finfo(np_dtype)
+            else:
+                type_info = np.iinfo(np_dtype)
+
+            # Check if safe to downcast
+            if col_min >= type_info.min and col_max <= type_info.max:
+                df[column] = df[column].astype(target_dtype)
+                logger.debug(f"Downcasted '{column}' from {original_dtype} to {target_dtype}")
+                return df
+
+        except (ValueError, TypeError) as e:
+            logger.debug(f"Could not process {target_dtype} for column '{column}': {e}")
+            continue
+
+    return df
+
+
+def df_downcast(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Attempt to downcast all numeric columns to smallest safe dtype.
+
+    Params:
+    - df (DataFrame): Input dataframe to optimize
+
+    Returns:
+    - DataFrame: Optimized dataframe
+    """
+    for col in df.columns:
+        df = safe_downcast(df, col)
     return df
 
 
@@ -592,6 +633,9 @@ def assert_period(df, period_start, period_end) -> None:
     period_start = pd.to_datetime(period_start)
     period_end = pd.to_datetime(period_end)
     period_starting_balance_date = period_start - timedelta(days=1)
+
+    # Reset index so we can assess date as a column
+    df = df.reset_index()
 
     # Confirm the earliest record is the period starting balance date
     earliest_date = df['date'].min()
@@ -922,36 +966,66 @@ def winsorize(data: pd.Series, cutoff: float = 0.01) -> pd.Series:
 
 
 # ---------------------------------------- #
-#     Misc Notebook Support Functions
+#     Misc Notebook Helper Functions
 # ---------------------------------------- #
 
-# silence donation message
-os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-def notify(sound_file_path=None):
+def notify(sound_name: Union[str, int] = None, prompt: str = None, voice_id: str = None):
     """
-    Play a notification sound from a local audio file using pygame asynchronously.
-    Falls back to ALERT_SOUND_FILEPATH environment variable if no path provided.
-    Returns early if no valid sound file path is found.
+    Play alert sound followed by optional TTS message.
 
-    Args:
-        sound_file_path (str, optional): Path to the sound file (supports .wav format)
+    Params:
+    - sound_name (str|int): Name/index of sound from config (e.g. 'alert_bells' or 0)
+    - prompt (str, optional): Text to speak using TTS
+    - voice_id (str, optional): Specific voice ID for TTS
     """
-    sound_file_path = sound_file_path or os.getenv('ALERT_SOUND_FILEPATH')
-    if not sound_file_path:
-        return "No sound file found."
+    # Load sound config
+    config_path = Path("../../../Local/notification_sounds.yaml")
+    try:
+        with open(config_path, encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        return f"Error loading sound config: {e}"
+
+    sounds = config.get('notification_sounds', {})
+
+    # Handle integer index
+    if isinstance(sound_name, int):
+        sound_keys = list(sounds.keys())
+        if 0 <= sound_name < len(sound_keys):
+            sound_name = sound_keys[sound_name]
+        else:
+            return f"Invalid sound index. Choose 0-{len(sound_keys)-1}"
+
+    # Default to 'notify' if no sound specified
+    if not sound_name:
+        sound_name = 'notify'
+    elif sound_name not in sounds:
+        return f"Invalid sound name. Choose from: {', '.join(sounds.keys())}"
+
+    sound_config = sounds[sound_name]
 
     try:
-        if not pygame.mixer.get_init():  # Initialize mixer if not already done
+        if not pygame.mixer.get_init():
             pygame.mixer.init()
 
-        sound = pygame.mixer.Sound(sound_file_path)
+        sound = pygame.mixer.Sound(sound_config['path'])
+        sound.set_volume(sound_config.get('volume', 1.0))
         sound.play()
 
-        # Don't wait for the sound to finish - return immediately
-        return
+        if prompt:
+            time.sleep(1.2)
+            engine = pyttsx3.init()
+            voice_id = voice_id or os.getenv('ALERT_VOICE_ID')
+            engine.setProperty('voice', voice_id)
+            engine.setProperty('rate', 125)
+            engine.setProperty('volume', 0.4)
+            engine.say(prompt)
+            engine.runAndWait()
+            engine.stop()
+            del engine
 
-    except Exception as e:  # pylint:disable=broad-exception-caught
-        return f"Error playing sound: {e}"
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        return f"Error with playback: {e}"
 
 
 # pylint: disable=dangerous-default-value
