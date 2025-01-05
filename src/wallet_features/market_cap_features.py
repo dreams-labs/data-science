@@ -15,6 +15,64 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 
 
+
+# ------------------------------
+#         Core Interface
+# ------------------------------
+
+@u.timing_decorator
+def calculate_market_cap_features(profits_df,market_data_df):
+    """
+    Calculates metrics about each wallet's interaction with coins of different market caps:
+    1. Volume-weighted average market cap (uses only real transfers)
+    2. Ending balance-weighted market cap (uses final period balances)
+
+    Params:
+    - profits_df (DataFrame): Daily profits with both real transfers and imputed period boundary rows
+    - market_data_df (DataFrame): Price and market cap data
+
+    Returns:
+    - market_cap_features_df (DataFrame): Market cap features indexed on wallet_address
+
+    """
+    # Copy dfs
+    profits_df = profits_df.copy()
+    market_data_df = market_data_df.copy()
+
+    # Data quality check: all profits_df coin-date records have market data
+    missing_pairs = ~profits_df.set_index(['coin_id', 'date']).index.isin(
+        market_data_df.set_index(['coin_id', 'date']).index
+    )
+    if missing_pairs.any():
+        problematic_pairs = profits_df[missing_pairs][['coin_id', 'date']]
+        raise ValueError(f"Missing coin_id-date pairs in market_cap_df:\n{problematic_pairs}")
+
+    # Force fill market cap gaps
+    filled_market_cap_df = force_fill_market_cap(market_data_df)
+
+    # Merge market cap data
+    profits_market_cap_df = profits_df.merge(
+        filled_market_cap_df[['date', 'coin_id', 'market_cap_imputed', 'market_cap_filled']],
+        on=['date', 'coin_id'],
+        how='inner'
+    )
+
+    # Calculate ending balance weighted metrics
+    wallet_end_balance_wtd_mc_df = calculate_ending_balance_weighted_market_cap(profits_market_cap_df)
+
+    # Calculate volume-weighted metrics using only real transfers
+    volume_wtd_df = calculate_volume_weighted_market_cap(profits_market_cap_df)
+
+    # Merge into a wallet-indexed df of features
+    market_cap_features_df = wallet_end_balance_wtd_mc_df.join(volume_wtd_df,how='inner')
+
+    return market_cap_features_df
+
+
+# ------------------------------
+#         Helper Functions
+# ------------------------------
+
 def force_fill_market_cap(market_data_df):
     """
     Creates a column 'market_cap_filled' with complete coverage by:
@@ -121,51 +179,3 @@ def calculate_ending_balance_weighted_market_cap(profits_market_cap_df):
     )
 
     return wallet_end_balance_wtd_mc_df[['end_portfolio_wtd_market_cap']]
-
-
-@u.timing_decorator
-def calculate_market_cap_features(profits_df,market_data_df):
-    """
-    Calculates metrics about each wallet's interaction with coins of different market caps:
-    1. Volume-weighted average market cap (uses only real transfers)
-    2. Ending balance-weighted market cap (uses final period balances)
-
-    Params:
-    - profits_df (DataFrame): Daily profits with both real transfers and imputed period boundary rows
-    - market_data_df (DataFrame): Price and market cap data
-
-    Returns:
-    - market_cap_features_df (DataFrame): Market cap features indexed on wallet_address
-
-    """
-    # Copy dfs
-    profits_df = profits_df.copy()
-    market_data_df = market_data_df.copy()
-
-    # Data quality check: all profits_df coin-date records have market data
-    profits_pairs = set(profits_df[['coin_id', 'date']].apply(tuple, axis=1))
-    market_cap_pairs = set(market_data_df[['coin_id', 'date']].apply(tuple, axis=1))
-    missing_in_market_cap = profits_pairs - market_cap_pairs
-    if missing_in_market_cap:
-        raise ValueError(f"Missing coin_id-date pairs in market_cap_df: {missing_in_market_cap}")
-
-    # Force fill market cap gaps
-    filled_market_cap_df = force_fill_market_cap(market_data_df)
-
-    # Merge market cap data
-    profits_market_cap_df = profits_df.merge(
-        filled_market_cap_df[['date', 'coin_id', 'market_cap_imputed', 'market_cap_filled']],
-        on=['date', 'coin_id'],
-        how='inner'
-    )
-
-    # Calculate ending balance weighted metrics
-    wallet_end_balance_wtd_mc_df = calculate_ending_balance_weighted_market_cap(profits_market_cap_df)
-
-    # Calculate volume-weighted metrics using only real transfers
-    volume_wtd_df = calculate_volume_weighted_market_cap(profits_market_cap_df)
-
-    # Merge into a wallet-indexed df of features
-    market_cap_features_df = wallet_end_balance_wtd_mc_df.join(volume_wtd_df,how='inner')
-
-    return market_cap_features_df
