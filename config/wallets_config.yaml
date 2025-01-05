@@ -121,25 +121,26 @@ modeling:
     # WalletModel Grid Search
     grid_search_params:
 
-        enabled: false # whether to grid search
+        enabled: true # whether to grid search
 
         # Search methodology
-        n_iter: 35  # random search limit
+        n_iter: 3  # random search limit
         scoring: 'neg_root_mean_squared_error'
-        n_splits: 2  # cv splits
+        n_splits: 3  # cv splits
         n_jobs: -1
         verbose_level: 3  # scikit-learn verbosity
 
         # Params
         param_grid:
             # params to test
-            regressor__max_depth: [11, 13, 15, 17, 19]
+            regressor__max_depth: [7, 9, 11, 13, 15, 17]
             regressor__min_child_weight_pct: [0.00002, 0.00005, 0.0001, 0.0002, 0.005]
             regressor__subsample: [0.7, 0.85, 1.0]
+            regressor__colsample_bynode': [0.7, 0.85, 1.0]
 
             # params that keep the model speedy
             regressor__n_estimators: [150]
-            regressor__learning_rate: [0.1]
+            regressor__learning_rate: [0.05]
 
     # Coin model workflow params
     score_name: "iterating"  # reference name for feature columns etc

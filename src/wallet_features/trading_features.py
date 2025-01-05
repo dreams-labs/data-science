@@ -72,7 +72,8 @@ def calculate_wallet_trading_features(
     gain_and_investment_df = calculate_gain_and_investment_columns(profits_df)
 
     # Calculated metrics that ignore imputed transactions
-    observed_activity_df = calculate_observed_activity_columns(profits_df,period_start_date,period_end_date)
+    observed_activity_df = calculate_observed_activity_columns(profits_df,
+                                                               period_start_date,period_end_date)
 
     # Merge together
     trading_features_df = gain_and_investment_df.join(observed_activity_df)
@@ -217,7 +218,9 @@ def calculate_gain_and_investment_columns(profits_df: pd.DataFrame) -> pd.DataFr
 
 
 
-def calculate_observed_activity_columns(profits_df: pd.DataFrame, period_start_date: str, period_end_date: str) -> pd.DataFrame:
+def calculate_observed_activity_columns(profits_df: pd.DataFrame,
+                                        period_start_date: str,
+                                        period_end_date: str) -> pd.DataFrame:
     """
     Calculates metrics based on actual trading activity, excluding imputed rows.
 

@@ -6,6 +6,8 @@ from sklearn.model_selection import RandomizedSearchCV
 from sklearn.pipeline import Pipeline
 from xgboost import XGBRegressor
 
+import utils as u
+
 # pylint:disable=invalid-name  # X_test isn't camelcase
 
 # Set up logger at the module level
@@ -135,6 +137,11 @@ class BaseModel:
         )
 
         self.random_search.fit(X, y)
+
+        # Log best results
+        logger.info("Grid search complate. Best score: %f",
+                    -self.random_search.best_score_)
+        u.notify('synth_magic')
 
         return {
             'best_params': {
