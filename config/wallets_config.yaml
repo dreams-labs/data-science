@@ -111,7 +111,7 @@ modeling:
         min_child_weight: 5
 
         # Early stopping
-        early_stopping_rounds: 999
+        early_stopping_rounds: 25
         eval_metric: 'rmse'
 
         # Metaparams
