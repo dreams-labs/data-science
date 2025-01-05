@@ -1,3 +1,4 @@
+import time
 import logging
 from typing import Dict, Union
 import pandas as pd
@@ -6,6 +7,7 @@ from sklearn.model_selection import RandomizedSearchCV
 from sklearn.pipeline import Pipeline
 from xgboost import XGBRegressor
 
+# Local modules
 import utils as u
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
@@ -25,6 +27,8 @@ class BaseModel:
         Params:
         - wallets_config (dict): configuration dictionary for modeling parameters.
         """
+        self.start_time = time.time()
+        self.training_time = None
         self.modeling_config = modeling_config
         self.pipeline = None
         self.X_train = None
@@ -96,10 +100,13 @@ class BaseModel:
         Returns:
         - cv_results (dict): Mean and std of CV scores
         """
+        # If grid search is disabled, return nothing
         if not self.modeling_config.get('grid_search_params', {}).get('enabled'):
+            logger.info("Constructing production model with base params...")
             return {}
 
         # Get base model params and handle child weight percentages
+        logger.info("Initiating grid search...")
         cv_model_params = self.modeling_config['model_params'].copy()
         if cv_model_params.get('min_child_weight_pct'):
             cv_model_params['min_child_weight'] = self._convert_min_child_pct_to_weight(
@@ -139,7 +146,7 @@ class BaseModel:
         self.random_search.fit(X, y)
 
         # Log best results
-        logger.info("Grid search complate. Best score: %f",
+        logger.info("Grid search complete. Best score: %f",
                     -self.random_search.best_score_)
         u.notify('synth_magic')
 
@@ -151,6 +158,47 @@ class BaseModel:
             'best_score': -self.random_search.best_score_,
             'cv_results': self.random_search.cv_results_
         }
+
+    def generate_search_report(self) -> pd.DataFrame:
+        """
+        Generate a report of the random search results.
+
+        Returns:
+        - report_df (DataFrame): A DataFrame with columns for 'param', 'param_value',
+                                'avg_score', and 'total_builds'.
+        """
+        if not self.random_search:
+            logger.error("Random search has not been run.")
+        elif not hasattr(self.random_search, 'cv_results_'):
+            logger.error("cv_results_ is unavailable.")
+
+        # Extract cv_results from the random search
+        cv_results = self.random_search.cv_results_
+
+        # Convert cv_results to a DataFrame
+        results_df = pd.DataFrame(cv_results)
+
+        # Prepare a list to hold rows for the report
+        report_data = []
+
+        # Loop through each parameter in the param grid
+        for param in [col for col in results_df.columns if col.startswith("param_")]:
+            param_name = param.replace("param_", "")
+            for _, row in results_df.iterrows():
+                report_data.append({
+                    'param': param_name,
+                    'param_value': row[param],
+                    'avg_score': row['mean_test_score'],
+                    'total_builds': len(results_df)
+                })
+
+        # Create a DataFrame for the report
+        report_df = pd.DataFrame(report_data)
+
+        # Sort the report for better readability
+        report_df.sort_values(by='avg_score', ascending=False, inplace=True)
+
+        return report_df
 
     def _fit(self) -> None:
         """
@@ -166,6 +214,9 @@ class BaseModel:
             self.y_train,
             regressor__eval_set=eval_set
         )
+
+        self.training_time = time.time() - self.start_time
+        logger.info("Training completed after %.2f seconds.", self.training_time)
 
 
     def run_base_experiment(self, return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:

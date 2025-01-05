@@ -108,6 +108,8 @@ class WalletModel(BaseModel):
         Returns:
         - result (dict): Contains fitted pipeline, predictions, and optional train/test data
         """
+        logger.info("Beginning model construction...")
+
         # Validate indexes match
         if not training_data_df.index.equals(modeling_cohort_target_var_df.index):
             raise ValueError(

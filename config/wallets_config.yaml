@@ -102,47 +102,65 @@ modeling:
     model_type: "xgb"
     model_params:
 
-        # Estimators and Learning Rate
-        n_estimators: 800  # how many trees to build
-        learning_rate: 0.02  # how fast tree iterations learn
-
-        # Depth and Child Weight
+        # Core Tree Params (Always Active)
+        # -------------------------------
         max_depth: 17  # how deep the trees can go
         min_child_weight_pct: 0.0002  # what % of rows each tree must have
-
-        # Sampling
         subsample: 1.0  # samples rows, e.g. trees use x% of all wallet rows
         colsample_bytree: 0.9  # samples columns, e.g. trees use x% of all column features
 
-        # Early Stopping
+        # Early Stopping Controls
         early_stopping_rounds: 25
         eval_metric: 'rmse'
 
-        # Metaparams
-        n_jobs: 4  # how many models to build at once
-        nthread: -1  # how many threads each model can use
-        tree_method: 'approx'  # Uses histogram-based approximation; should be faster and less memory
-        max_bin: 128  # Reduces memory usage of histogram
-        sampling_method: 'uniform'  # only method without gpu, assigns equal probability to all data points during sampling
+        # Threading Controls
+        n_jobs: 4
+        nthread: -1
+
         random_state: 42
+
+        # Performance Profile (Choose One Section)
+        # --------------------------------------
+        # Current: Balance Speed vs Predictiveness
+        n_estimators: 800
+        learning_rate: 0.02
+        tree_method: 'approx'
+        max_bin: 256
+
+        # # Alternative: Maximize Speed
+        # n_estimators: 500
+        # learning_rate: 0.02
+        # tree_method: 'hist'
+        # max_bin: 128
+
+        # # Alternative: Maximize Predictiveness
+        # n_estimators: 9999
+        # learning_rate: 0.005
+        # tree_method: 'approx'
+        # max_bin: 256
+
 
     # WalletModel Grid Search
     grid_search_params:
 
+        # Turn On or Off
         enabled: true # whether to grid search
 
-        # Search methodology
-        n_iter: 12  # random search limit
+        # Search Methodology
+        n_iter: 10  # random search limit
         scoring: 'neg_root_mean_squared_error'
-        n_splits: 5  # cv splits
+        n_splits: 3  # cv splits
         verbose_level: 3  # scikit-learn verbosity
 
         # Params
         param_grid:
 
             # Depth and Child Weight
-            # regressor__max_depth: [17, 19, 21]
-            # regressor__min_child_weight_pct: [0.00005, 0.0001, 0.0002, 0.005, 0.01]
+            regressor__min_child_weight_pct: [0.0001, 0.0005, 0.002]
+            regressor__max_depth: [17, 19, 21]  # basic depth param
+            # regressor__max_leaves: [2000, 4000, 8000]  # test leaves for more complexity than just depth
+            # regressor__grow_policy: ['lossguide']  # enables leaf-wise growth
+            # regressor__refresh_leaf: [true,false]  # controls whether XGBoost recalculates leaf values after each tree is built
 
             # Col/Row Sampling
             # regressor__subsample: [0.8, 0.9, 1.0]
@@ -151,14 +169,18 @@ modeling:
             # # Model Speed
             # regressor__tree_method: ['hist', 'approx', 'auto']
             # regressor__max_bin: [64, 128, 256]
+            regressor__gamma: [0.0, 0.1, 1.0, 3.0]  # controls the minimum loss reduction needed to split a node
 
-            # # Tree Training Speed Overrides
-            # regressor__n_estimators: [200]
-            # regressor__learning_rate: [0.05]
-            # regressor__tree_method: ['auto']
-            regressor__max_bin: [128,256]
-            # regressor__n_jobs: [4]  # how many models to build at once
-            # regressor__nthread: [6]  # how many threads each model can use
+
+            # Tree Training Speed Overrides
+            regressor__n_estimators: [500]
+            regressor__learning_rate: [0.02]
+
+            # Optimize for Speed
+            regressor__n_jobs: [4]  # how many models to build at once
+            regressor__nthread: [6]  # how many threads each model can use
+            regressor__max_bin: [128]
+            regressor__tree_method: ['hist']
 
 
     # Coin model workflow params
