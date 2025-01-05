@@ -7,6 +7,7 @@ from sklearn.pipeline import Pipeline
 
 # Local modules
 from base_modeling.base_model import BaseModel
+import utils as u
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
 # pylint: disable=W0201  # Attribute defined outside __init__, false positive due to inheritance
@@ -128,5 +129,7 @@ class WalletModel(BaseModel):
                 'training_cohort_pred': training_cohort_pred,
                 'training_cohort_actuals': full_cohort_actuals
             })
+
+        u.notify('notify')
 
         return result
