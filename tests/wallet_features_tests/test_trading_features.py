@@ -330,14 +330,14 @@ def test_w08_offsetting_transactions(test_trading_features_df):
 
     print(wallet_features)
     # Calculate expected values
-    # total_crypto_buys: 10000 buy = 10000
-    expected_buys = 10000
+    # total_crypto_buys: 10000 + 500 balance = 10500
+    expected_buys = 10000 + 500
 
     # total_crypto_sells: 10000 sell = 10000
     expected_sells = 10000
 
     # net_crypto_investment: 10000 - 10000 = 0
-    expected_net = 0
+    expected_net = 500
 
     # crypto_net_gain: 750 ending - 500 cost basis = 250
     expected_gain = 250
