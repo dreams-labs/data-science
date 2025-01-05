@@ -60,6 +60,11 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     u.assert_period(profits_df, period_start_date, period_end_date)
     validate_inputs(profits_df, market_indicators_data_df, transfers_sequencing_df)
 
+    # Downcast to ensure optimal memory usage
+    profits_df = u.df_downcast(profits_df)
+    market_indicators_data_df = u.df_downcast(market_indicators_data_df)
+    transfers_sequencing_df = u.df_downcast(transfers_sequencing_df)
+
     # Initialize output dataframe
     wallet_features_df = pd.DataFrame(index=wallet_cohort)
     wallet_features_df.index.name = 'wallet_address'
