@@ -92,8 +92,8 @@ modeling:
 
     # Which wallet performance metric to use as the target variable.
     # target_variable: "crypto_net_gain"
-    # target_variable: "crypto_net_gain/max_investment/ntile_rank"
-    target_variable: "crypto_net_gain/max_investment/winsorized"
+    target_variable: "crypto_net_gain/max_investment/ntile_rank"
+    # target_variable: "crypto_net_gain/max_investment/winsorized"
     drop_columns: []
     train_test_split: 0.2  # test size
 
@@ -114,13 +114,21 @@ modeling:
         # Performance Profiles (Choose One Section)
         # --------------------------------------
 
-        # Balanced Speed vs Predictiveness
-        n_estimators: 800  # number of trees to train in the model
-        learning_rate: 0.025  # step size for updates to weights during training
+        # Speed Demon
+        n_estimators: 200  # number of trees to train in the model
+        learning_rate: 0.1  # step size for updates to weights during training
         early_stopping_rounds: 25  # stop training if no improvement after x rounds
         gamma: 0.01  # minimum gain required to split further on a leaf node
         tree_method: 'hist'  # method for building trees, e.g., histogram-based
-        max_bin: 256  # how many bins to categorize features into
+        max_bin: 128  # how many bins to categorize features into
+
+        # # Balanced Speed vs Predictiveness
+        # n_estimators: 800  # number of trees to train in the model
+        # learning_rate: 0.025  # step size for updates to weights during training
+        # early_stopping_rounds: 25  # stop training if no improvement after x rounds
+        # gamma: 0.01  # minimum gain required to split further on a leaf node
+        # tree_method: 'hist'  # method for building trees, e.g., histogram-based
+        # max_bin: 256  # how many bins to categorize features into
 
         # # Maximized Predictiveness
         # n_estimators: 5000
@@ -149,6 +157,13 @@ modeling:
         n_splits: 2  # cv splits
         verbose_level: 3  # scikit-learn verbosity
 
+        # Target variables
+        target_variables: [
+            "crypto_net_gain/max_investment/winsorized",
+            "crypto_net_gain/max_investment/ntile_rank",
+        ]
+
+
         # Params
         param_grid:
 
@@ -167,15 +182,16 @@ modeling:
             # regressor__gamma: [0.0, 0.1, 1.0]  # controls the minimum loss reduction needed to split a node
 
 
-            # # Tree Training Speed Overrides
-            # regressor__n_estimators: [200]
-            # regressor__learning_rate: [0.05]
+            # Tree Training Speed Overrides
+            regressor__n_estimators: [200]
+            regressor__learning_rate: [0.05]
+            regressor__gamma: 0.01
 
             # Optimize for Speed
             regressor__n_jobs: [4]  # how many models to build at once
             regressor__nthread: [4]  # how many threads each model can use
-            # regressor__max_bin: [128]
-            # regressor__tree_method: ['hist']
+            regressor__max_bin: [128]
+            regressor__tree_method: ['hist']
 
 
     # Coin model workflow params

@@ -23,12 +23,13 @@ class WalletModel(BaseModel):
     """
 
     def _prepare_data(self, training_data_df: pd.DataFrame,
-                      modeling_cohort_target_var_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
+                    modeling_cohort_target_var_df: pd.DataFrame,
+                    target_var: str = None) -> Tuple[pd.DataFrame, pd.Series]:
         """
         Params:
         - training_data_df (DataFrame): full training cohort feature data
         - modeling_cohort_target_var_df (DataFrame): Contains in_modeling_cohort flag and target variable
-                                                for full training cohort
+        - target_var (str, optional): Override target variable from config
 
         Returns:
         - X (DataFrame): feature data for modeling cohort
@@ -42,6 +43,9 @@ class WalletModel(BaseModel):
                 modeling_cohort_target_var_df.index.name == 'wallet_address'):
             raise ValueError("Both dataframes must have wallet_address as index")
 
+        # Get target variable name
+        target_var = target_var or self.modeling_config['target_variable']
+
         # Join target data to features
         modeling_df = training_data_df.join(
             modeling_cohort_target_var_df,
@@ -53,7 +57,6 @@ class WalletModel(BaseModel):
         modeling_df = modeling_df[modeling_cohort_mask]
 
         # Separate target variable
-        target_var = self.modeling_config['target_variable']
         X = modeling_df.drop([target_var, 'in_modeling_cohort'], axis=1)
         y = modeling_df[target_var]
 
@@ -94,9 +97,37 @@ class WalletModel(BaseModel):
         return predictions
 
 
+    def _compile_wallet_experiment_results(self, base_results: Dict,
+                                modeling_cohort_target_var_df: pd.DataFrame,
+                                return_data: bool) -> Dict:
+        """
+        Compile experiment results including optional predictions.
+
+        Params:
+        - base_results (Dict): Results from base experiment
+        - modeling_cohort_target_var_df (DataFrame): Contains modeling cohort flag and target
+        - return_data (bool): Whether to return train/test splits and predictions
+
+        Returns:
+        - results (Dict): Complete results dictionary
+        """
+        if not return_data:
+            return base_results
+
+        training_cohort_pred = self._predict_training_cohort()
+        target_var = self.modeling_config['target_variable']
+        full_cohort_actuals = modeling_cohort_target_var_df[target_var]
+
+        base_results.update({
+            'training_cohort_pred': training_cohort_pred,
+            'training_cohort_actuals': full_cohort_actuals
+        })
+
+        return base_results
+
     def run_wallet_experiment(self, training_data_df: pd.DataFrame,
                             modeling_cohort_target_var_df: pd.DataFrame,
-                            return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
+                            return_data: bool = True) -> Dict:
         """
         Run wallet-specific modeling experiment.
 
@@ -117,21 +148,16 @@ class WalletModel(BaseModel):
                 f"Found lengths {len(training_data_df)} and {len(modeling_cohort_target_var_df)}"
             )
 
-        # Run base experiment
+        # Run standard experiment with config target variable
         self._prepare_data(training_data_df, modeling_cohort_target_var_df)
-        result = super().run_base_experiment(return_data)
+        base_results = super().run_base_experiment(return_data)
 
-        # Add wallet-specific predictions if requested
-        if return_data:
-            training_cohort_pred = self._predict_training_cohort()
-            target_var = self.modeling_config['target_variable']
-            full_cohort_actuals = modeling_cohort_target_var_df[target_var]
-
-            result.update({
-                'training_cohort_pred': training_cohort_pred,
-                'training_cohort_actuals': full_cohort_actuals
-            })
+        # Compile final results
+        results = self._compile_wallet_experiment_results(
+            base_results,
+            modeling_cohort_target_var_df,
+            return_data
+        )
 
         u.notify('notify')
-
-        return result
+        return results
