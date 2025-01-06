@@ -257,40 +257,47 @@ def identify_modeling_cohort(modeling_period_profits_df: pd.DataFrame) -> pd.Dat
     return modeling_wallets_df
 
 
-
-def hybridize_wallet_address(df, coin_id_map=None):
+def hybridize_wallet_address(df, hybrid_cw_id_map=None):
     """
-    Creates a hybrid wallet_address.coin_id index, where coin_id is an assigned integer and the
-    hybrid key is represented as a float.
+    Maps wallet_address-coin_id pairs to unique integers for efficient indexing.
 
     Params:
     - df (DataFrame): dataframe with columns ['coin_id','wallet_address']
-    - coin_id_map (dict, optional): mapping of coin_id uuids to the mapped ints
+    - hybrid_cw_id_map (dict): mapping of (wallet,coin) tuples to integers
 
     Returns:
-    - df (DataFrame): input df with wallet_address replaced by hybrid key
-    - coin_id_map (dict): mapping of coin_id uuids to the mapped ints
+    - df (DataFrame): input df with hybrid integer keys
+    - hybrid_cw_id_map (dict): mapping of (wallet,coin) tuples to integers
     """
-    # Create a new mapping if one wasn't provided
-    if coin_id_map is None:  # better practice than 'if not coin_id_map'
-        # mapping of coin_ids to small integers
-        coin_id_map = {coin: idx + 1 for idx, coin in enumerate(df['coin_id'].unique())}
+    # Create unique mapping for wallet-coin pairs
+    unique_pairs = list(zip(df['wallet_address'], df['coin_id']))
 
-    if len(coin_id_map) > 10000:
-        raise ValueError("There are over 10k coins, hybrid index is capped at 10k.")
+    # Generate new mapping if none was provided
+    if hybrid_cw_id_map is None:
+        hybrid_cw_id_map = {pair: idx for idx, pair in enumerate(set(unique_pairs), 1)}
 
-    # Create and set hybrid index
-    df['wallet_address'] = (df['wallet_address'] +
-                          df['coin_id'].map(coin_id_map).astype('float64') / 10000)
+    # Vectorized mapping of pairs to integers
+    df['wallet_address'] = pd.Series(unique_pairs).map(hybrid_cw_id_map)
 
-    # Confirm no decimal portions are 0 (round 5)
-    decimal_parts = round(df['wallet_address'] % 1, 5)
+    return df, hybrid_cw_id_map
 
-    # Convert asserts to raises
-    if any(decimal_parts == 0):
-        raise ValueError("Found addresses with missing coin_id")
 
-    if not (all(decimal_parts >= 0.0001) and all(decimal_parts <= 0.9999)):
-        raise ValueError("Found addresses with incorrect coin_id format")
 
-    return df, coin_id_map
+def dehybridize_wallet_address(df, hybrid_cw_id_map):
+    """
+    Restores original wallet_address-coin_id pairs from hybrid integer keys.
+
+    Params:
+    - df (DataFrame): dataframe with hybrid integer keys in wallet_address
+    - hybrid_cw_id_map (dict): mapping of (wallet,coin) tuples to integers
+
+    Returns:
+    - df (DataFrame): input df with original wallet_address restored
+    """
+    # Create reverse mapping
+    reverse_map = {v: k for k, v in hybrid_cw_id_map.items()}
+
+    # Vectorized mapping back to original tuples
+    df['wallet_address'] = df['wallet_address'].map(reverse_map).map(lambda x: x[0])
+
+    return df
