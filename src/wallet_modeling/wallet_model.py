@@ -1,9 +1,7 @@
 import logging
-from typing import Dict, Union, Tuple
+from typing import Dict, Tuple
 import pandas as pd
-import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
 
 # Local modules
 from base_modeling.base_model import BaseModel
