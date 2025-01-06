@@ -23,9 +23,9 @@ class WalletModel(BaseModel):
     Extends BaseModel with wallet-specific data preparation and grid search.
     """
 
-# -----------------------------------
-#           Helper Methods
-# -----------------------------------
+    # -----------------------------------
+    #           Helper Methods
+    # -----------------------------------
 
     def _prepare_data(self, training_data_df: pd.DataFrame,
                       modeling_cohort_target_var_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
@@ -99,9 +99,9 @@ class WalletModel(BaseModel):
         return predictions
 
 
-# -----------------------------------
-#         Primary Interface
-# -----------------------------------
+    # -----------------------------------
+    #         Primary Interface
+    # -----------------------------------
 
     def construct_wallet_model(self, training_data_df: pd.DataFrame,
                             modeling_cohort_target_var_df: pd.DataFrame,
