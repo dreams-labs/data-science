@@ -15,7 +15,7 @@ training_data:
     validation_period_end: "2024-11-30"
 
     # Local pipeline configs
-    dataset: 'prod'  # Set to 'prod' or 'dev'; determines whether to query 'core' or 'dev' dataset tables
+    dataset: 'dev'  # Set to 'prod' or 'dev'; determines whether to query 'core' or 'dev' dataset tables
     parquet_folder: 'temp/wallet_modeling_dfs'  # where to store parquet files
 
 
@@ -59,7 +59,7 @@ features:
     include_twb_metrics: False
 
     # Performance Params
-    ranking_ntiles: 3
+    ranking_ntiles: 4
     returns_winsorization: 0.02
 
     # Clustering Params
@@ -92,8 +92,9 @@ modeling:
 
     # Which wallet performance metric to use as the target variable.
     # target_variable: "crypto_net_gain"
-    # target_variable: "crypto_net_gain/max_investment/ntile_rank"
-    target_variable: "crypto_net_gain/max_investment/winsorized"
+    target_variable: "crypto_net_gain/max_investment/ntile_rank"
+    # target_variable: "crypto_net_gain/max_investment/winsorized"
+    # target_variable: "crypto_net_gain/max_ienvstment/base"
     drop_columns: []
     train_test_split: 0.2  # test size
 
@@ -114,7 +115,22 @@ modeling:
         # Performance Profiles (Choose One Section)
         # --------------------------------------
 
-        # Balanced Speed vs Predictiveness
+        # # DEV
+        # n_estimators: 20  # number of trees to train in the model
+        # learning_rate: 0.2  # step size for updates to weights during training
+        # gamma: 0.01  # minimum gain required to split further on a leaf node
+        # tree_method: 'hist'  # method for building trees, e.g., histogram-based
+        # max_bin: 128  # how many bins to categorize features into
+
+        # # AGILE
+        # n_estimators: 200  # number of trees to train in the model
+        # learning_rate: 0.05  # step size for updates to weights during training
+        # early_stopping_rounds: 20  # stop training if no improvement after x rounds
+        # gamma: 0.01  # minimum gain required to split further on a leaf node
+        # tree_method: 'hist'  # method for building trees, e.g., histogram-based
+        # max_bin: 128  # how many bins to categorize features into
+
+        # BALANCED
         n_estimators: 800  # number of trees to train in the model
         learning_rate: 0.025  # step size for updates to weights during training
         early_stopping_rounds: 25  # stop training if no improvement after x rounds
@@ -122,7 +138,7 @@ modeling:
         tree_method: 'hist'  # method for building trees, e.g., histogram-based
         max_bin: 256  # how many bins to categorize features into
 
-        # # Maximized Predictiveness
+        # # WISE
         # n_estimators: 5000
         # learning_rate: 0.01
         # early_stopping_rounds: 50
@@ -149,6 +165,13 @@ modeling:
         n_splits: 2  # cv splits
         verbose_level: 3  # scikit-learn verbosity
 
+        # Target variables
+        target_variables: [
+            "crypto_net_gain/max_investment/winsorized",
+            "crypto_net_gain/max_investment/ntile_rank",
+        ]
+
+
         # Params
         param_grid:
 
@@ -167,15 +190,16 @@ modeling:
             # regressor__gamma: [0.0, 0.1, 1.0]  # controls the minimum loss reduction needed to split a node
 
 
-            # # Tree Training Speed Overrides
-            # regressor__n_estimators: [200]
-            # regressor__learning_rate: [0.05]
+            # Tree Training Speed Overrides
+            regressor__n_estimators: [200]
+            regressor__learning_rate: [0.05]
+            regressor__gamma: 0.01
 
             # Optimize for Speed
             regressor__n_jobs: [4]  # how many models to build at once
             regressor__nthread: [4]  # how many threads each model can use
-            # regressor__max_bin: [128]
-            # regressor__tree_method: ['hist']
+            regressor__max_bin: [128]
+            regressor__tree_method: ['hist']
 
 
     # Coin model workflow params

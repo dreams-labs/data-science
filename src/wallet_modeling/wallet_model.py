@@ -16,11 +16,16 @@ import utils as u
 logger = logging.getLogger(__name__)
 
 
+# WalletModel Constructor
 class WalletModel(BaseModel):
     """
     Wallet-specific model implementation.
     Extends BaseModel with wallet-specific data preparation and grid search.
     """
+
+# -----------------------------------
+#           Helper Methods
+# -----------------------------------
 
     def _prepare_data(self, training_data_df: pd.DataFrame,
                       modeling_cohort_target_var_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
@@ -94,7 +99,11 @@ class WalletModel(BaseModel):
         return predictions
 
 
-    def run_wallet_experiment(self, training_data_df: pd.DataFrame,
+# -----------------------------------
+#         Primary Interface
+# -----------------------------------
+
+    def construct_wallet_model(self, training_data_df: pd.DataFrame,
                             modeling_cohort_target_var_df: pd.DataFrame,
                             return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
         """
@@ -119,7 +128,7 @@ class WalletModel(BaseModel):
 
         # Run base experiment
         self._prepare_data(training_data_df, modeling_cohort_target_var_df)
-        result = super().run_base_experiment(return_data)
+        result = super().construct_base_model(return_data)
 
         # Add wallet-specific predictions if requested
         if return_data:

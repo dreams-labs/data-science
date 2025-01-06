@@ -219,7 +219,7 @@ class BaseModel:
         logger.info("Training completed after %.2f seconds.", self.training_time)
 
 
-    def run_base_experiment(self, return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
+    def construct_base_model(self, return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
         """
         Core experiment runner with parameter tuning and model fitting.
 

@@ -50,7 +50,7 @@ class CoinModel(BaseModel):
 
         return X, y
 
-    def run_coin_experiment(self, feature_df: pd.DataFrame,
+    def construct_coin_model(self, feature_df: pd.DataFrame,
                           return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
         """
         Run coin-specific modeling experiment.
@@ -63,4 +63,4 @@ class CoinModel(BaseModel):
         - result (dict): Contains fitted pipeline and optionally train/test data
         """
         self._prepare_data(feature_df)
-        return super().run_base_experiment(return_data)
+        return super().construct_base_model(return_data)

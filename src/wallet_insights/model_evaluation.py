@@ -222,7 +222,7 @@ class RegressionEvaluator:
         # Add training cohort metrics if available
         if 'training_cohort' in self.metrics:
             summary.extend([
-                "Training Cohort Metrics",
+                "Inactive Wallets Cohort Metrics",
                 "-" * 35,
                 f"R² Score:                 {self.metrics['training_cohort']['r2']:.3f}",
                 f"RMSE:                     {self.metrics['training_cohort']['rmse']:.3f}",
