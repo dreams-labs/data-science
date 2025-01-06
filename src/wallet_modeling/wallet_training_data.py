@@ -395,7 +395,7 @@ def upload_wallet_cohort(wallet_cohort):
     project_id = 'western-verve-411004'
     client = bigquery.Client(project=project_id)
 
-    wallet_ids_table = f"{project_id}.temp.wallet_modeling_training_cohort_ids"
+    wallet_ids_table = f"{project_id}.temp.wallet_modeling_training_cohort"
     schema = [
         {'name':'wallet_id', 'type': 'int64'},
         {'name':'updated_at', 'type': 'datetime'}
@@ -414,7 +414,7 @@ def upload_wallet_cohort(wallet_cohort):
     # -------------------------------------------------------
     # Single query to create final table with all fields
     create_query = f"""
-    CREATE OR REPLACE TABLE `{project_id}.temp.wallet_modeling_training_cohort` AS
+    CREATE OR REPLACE TABLE `{wallet_ids_table}` AS
     SELECT
         t.wallet_id,
         w.wallet_address,
@@ -425,5 +425,5 @@ def upload_wallet_cohort(wallet_cohort):
     """
 
     client.query(create_query).result()
-    logger.info('Uploaded cohort of %s wallets with addresses to temp.wallet_modeling_training_cohort.',
-                len(wallet_cohort))
+    logger.info('Uploaded cohort of %s wallets with addresses to %s.',
+                len(wallet_cohort), wallet_ids_table)
