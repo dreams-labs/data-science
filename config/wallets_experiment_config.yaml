@@ -1,8 +1,0 @@
-# # WalletModel Config
-
-
-# WalletModel Modeling Config
-modeling:
-
-    # Which wallet performance metric to use as the target variable.
-    target_variable: "crypto_net_gain/max_investment/winsorized"
