@@ -7,6 +7,7 @@ from sklearn.pipeline import Pipeline
 
 # Local modules
 from base_modeling.base_model import BaseModel
+import utils as u
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
 # pylint: disable=W0201  # Attribute defined outside __init__, false positive due to inheritance
@@ -107,6 +108,8 @@ class WalletModel(BaseModel):
         Returns:
         - result (dict): Contains fitted pipeline, predictions, and optional train/test data
         """
+        logger.info("Beginning model construction...")
+
         # Validate indexes match
         if not training_data_df.index.equals(modeling_cohort_target_var_df.index):
             raise ValueError(
@@ -128,5 +131,7 @@ class WalletModel(BaseModel):
                 'training_cohort_pred': training_cohort_pred,
                 'training_cohort_actuals': full_cohort_actuals
             })
+
+        u.notify('notify')
 
         return result
