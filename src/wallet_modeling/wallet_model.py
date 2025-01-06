@@ -14,6 +14,7 @@ import utils as u
 logger = logging.getLogger(__name__)
 
 
+# WalletModel Constructor
 class WalletModel(BaseModel):
     """
     Wallet-specific model implementation.
@@ -123,7 +124,7 @@ class WalletModel(BaseModel):
 
         return base_results
 
-    def run_wallet_experiment(self, training_data_df: pd.DataFrame,
+    def construct_wallet_model(self, training_data_df: pd.DataFrame,
                             modeling_cohort_target_var_df: pd.DataFrame,
                             return_data: bool = True) -> Dict:
         """
@@ -148,7 +149,7 @@ class WalletModel(BaseModel):
 
         # Run standard experiment with config target variable
         self._prepare_data(training_data_df, modeling_cohort_target_var_df)
-        base_results = super().run_base_experiment(return_data)
+        base_results = super().construct_base_model(return_data)
 
         # Compile final results
         results = self._compile_wallet_experiment_results(
