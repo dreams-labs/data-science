@@ -1,10 +1,9 @@
-"""
-Orchestrates groups of functions to generate wallet model pipeline
-"""
-
+"""Orchestrates groups of functions to generate wallet model pipeline"""
 import time
 import logging
+from typing import Tuple,Optional,Dict
 import pandas as pd
+import numpy as np
 
 # Local module imports
 import training_data.profits_row_imputation as pri
@@ -66,10 +65,25 @@ def retrieve_period_datasets(period_start_date, period_end_date, coin_cohort=Non
     return profits_df_formatted, market_data_df_formatted, coin_cohort
 
 
+
 @u.timing_decorator
-def define_training_wallet_cohort(profits_df,market_data_df):
+def define_training_wallet_cohort(profits_df: pd.DataFrame,
+                                  market_data_df: pd.DataFrame,
+                                ) -> Tuple[pd.DataFrame, np.ndarray]:
     """
-    Applies transformations and filters to identify wallets that pass data cleaning filters
+    Orchestrates the definition of a wallet cohort for model training by:
+    1. Imputing profits at period boundaries
+    2. Calculating wallet-level trading metrics
+    3. Filtering wallets based on behavior thresholds
+    4. Uploading filtered cohort to BigQuery
+
+    Params:
+        profits_df (DataFrame): Historical profit and balance data for all wallets
+        market_data_df (DataFrame): Market prices and metadata for relevant period
+
+    Returns:
+        training_cohort_profits_df (DataFrame): Profits data filtered to selected wallets
+        training_wallet_cohort (ndarray): Array of wallet addresses that pass filters
     """
     start_time = time.time()
     training_period_start = wallets_config['training_data']['training_period_start']
@@ -257,7 +271,15 @@ def identify_modeling_cohort(modeling_period_profits_df: pd.DataFrame) -> pd.Dat
     return modeling_wallets_df
 
 
-def hybridize_wallet_address(df, hybrid_cw_id_map=None):
+
+# -----------------------------------
+#   Hybrid Index Utility Functions
+# -----------------------------------
+
+def hybridize_wallet_address(
+    df: pd.DataFrame,
+    hybrid_cw_id_map: Optional[Dict[Tuple[int, str], int]] = None
+) -> Tuple[pd.DataFrame, Dict[Tuple[int, str], int]]:
     """
     Maps wallet_address-coin_id pairs to unique integers for efficient indexing.
 
@@ -283,7 +305,10 @@ def hybridize_wallet_address(df, hybrid_cw_id_map=None):
 
 
 
-def dehybridize_wallet_address(df, hybrid_cw_id_map):
+def dehybridize_wallet_address(
+    df: pd.DataFrame,
+    hybrid_cw_id_map: Dict[Tuple[int, str], int]
+) -> pd.DataFrame:
     """
     Restores original wallet_address-coin_id pairs from hybrid integer keys.
 
