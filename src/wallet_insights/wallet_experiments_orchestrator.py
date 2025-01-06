@@ -1,4 +1,5 @@
 import logging
+import copy
 from typing import Dict
 import pandas as pd
 from sklearn.metrics import r2_score
@@ -27,7 +28,7 @@ class WalletExperimentsOrchestrator:
         self.config_experiment = config_experiment
         self.model_outcomes = []
 
-        # alidate that the config structures match
+        # validate that the config structures match
         self._validate_configs()
 
 
@@ -39,7 +40,7 @@ class WalletExperimentsOrchestrator:
     def orchestrate_wallet_experiment(
         self,
         training_data_df: pd.DataFrame,
-        modeling_cohort_target_var_df: pd.DataFrame
+        modeling_wallet_features_df: pd.DataFrame
     ) -> Dict:
         """
         Orchestrates modeling workflow across multiple experiment configurations.
@@ -54,12 +55,15 @@ class WalletExperimentsOrchestrator:
         # Generate experiment configurations
         experiment_configs = self._generate_experiment_configs()
 
+        logger.info(experiment_configs[0]['modeling']['target_variable'])
+        logger.info(experiment_configs[1]['modeling']['target_variable'])
+
         # Run experiments
         for config in experiment_configs:
             model_outcome = self._construct_experiment_model(
                 config,
                 training_data_df,
-                modeling_cohort_target_var_df
+                modeling_wallet_features_df
             )
             self.model_outcomes.append(model_outcome)
 
@@ -85,15 +89,16 @@ class WalletExperimentsOrchestrator:
 
         # Extract target variables from experiment config
         target_vars = self.config_experiment['modeling']['target_variable']
-
+        logger.info(target_vars)
         for target_var in target_vars:
+            logger.info(target_var)
             # Create deep copy to avoid modifying base config
-            experiment_config = self.config_base.copy()
+            experiment_config = copy.deepcopy(self.config_base)
 
             # Override target variable
             experiment_config['modeling']['target_variable'] = target_var
 
-            experiment_configs.append(experiment_config)
+            experiment_configs.append(copy.deepcopy(experiment_config))
 
         logger.info(f"Generated {len(experiment_configs)} experiment configurations")
         return experiment_configs
@@ -104,7 +109,7 @@ class WalletExperimentsOrchestrator:
         self,
         experiment_config: Dict,
         training_data_df: pd.DataFrame,
-        modeling_cohort_target_var_df: pd.DataFrame
+        modeling_wallet_features_df: pd.DataFrame
     ) -> Dict:
         """
         Constructs single wallet model with experiment configuration.
@@ -118,8 +123,14 @@ class WalletExperimentsOrchestrator:
             Dict: Model outputs including metrics and parameters
         """
         try:
-            # Initialize model with experiment config
-            wallet_model = WalletModel(experiment_config)
+            # Filter training data to only the modeling cohort through inner join to target variable
+            modeling_cohort_target_var_df = modeling_wallet_features_df[['in_modeling_cohort',
+                                                                         experiment_config['modeling']['target_variable']
+                                                                         ]].copy()
+
+
+            # Initialize model with experiment config modeling section
+            wallet_model = WalletModel(experiment_config['modeling'])
 
             # Construct and get results
             model_output = wallet_model.construct_wallet_model(
