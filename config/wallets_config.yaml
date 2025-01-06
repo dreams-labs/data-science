@@ -23,7 +23,7 @@ training_data:
 data_cleaning:
 
     # Wallet cohort thresholds
-    min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
+    min_coins_traded: 0  # Exclude wallets that have traded fewer coins than this during the training period
     max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
 
     min_wallet_investment: 1000 # time weighted average balance filter

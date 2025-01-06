@@ -255,3 +255,42 @@ def identify_modeling_cohort(modeling_period_profits_df: pd.DataFrame) -> pd.Dat
 
 
     return modeling_wallets_df
+
+
+
+def hybridize_wallet_address(df, coin_id_map=None):
+    """
+    Creates a hybrid wallet_address.coin_id index, where coin_id is an assigned integer and the
+    hybrid key is represented as a float.
+
+    Params:
+    - df (DataFrame): dataframe with columns ['coin_id','wallet_address']
+    - coin_id_map (dict, optional): mapping of coin_id uuids to the mapped ints
+
+    Returns:
+    - df (DataFrame): input df with wallet_address replaced by hybrid key
+    - coin_id_map (dict): mapping of coin_id uuids to the mapped ints
+    """
+    # Create a new mapping if one wasn't provided
+    if coin_id_map is None:  # better practice than 'if not coin_id_map'
+        # mapping of coin_ids to small integers
+        coin_id_map = {coin: idx + 1 for idx, coin in enumerate(df['coin_id'].unique())}
+
+    if len(coin_id_map) > 10000:
+        raise ValueError("There are over 10k coins, hybrid index is capped at 10k.")
+
+    # Create and set hybrid index
+    df['wallet_address'] = (df['wallet_address'] +
+                          df['coin_id'].map(coin_id_map).astype('float64') / 10000)
+
+    # Confirm no decimal portions are 0 (round 5)
+    decimal_parts = round(df['wallet_address'] % 1, 5)
+
+    # Convert asserts to raises
+    if any(decimal_parts == 0):
+        raise ValueError("Found addresses with missing coin_id")
+
+    if not (all(decimal_parts >= 0.0001) and all(decimal_parts <= 0.9999)):
+        raise ValueError("Found addresses with incorrect coin_id format")
+
+    return df, coin_id_map
