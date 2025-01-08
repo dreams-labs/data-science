@@ -1028,6 +1028,23 @@ def notify(sound_name: Union[str, int] = None, prompt: str = None, voice_id: str
         return f"Error with playback: {e}"
 
 
+
+def notify_on_failure(shell, etype, value, tb, tb_offset=None):
+    """
+    Custom error handler that plays a notification sound
+    and displays the traceback normally.
+    """
+    try:
+        # Play error notification
+        notify(19)
+    except Exception:
+        pass  # Safely ignore any errors with notify()
+
+    # Call the original traceback display method
+    shell.showtraceback((etype, value, tb), tb_offset=tb_offset)
+
+
+
 # pylint: disable=dangerous-default-value
 def export_code(
     code_directories=[],
