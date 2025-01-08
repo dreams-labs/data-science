@@ -23,7 +23,7 @@ training_data:
 data_cleaning:
 
     # Wallet cohort thresholds
-    min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
+    min_coins_traded: 0  # Exclude wallets that have traded fewer coins than this during the training period
     max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
 
     min_wallet_investment: 1000 # time weighted average balance filter
@@ -123,13 +123,13 @@ modeling:
         tree_method: 'hist'  # method for building trees, e.g., histogram-based
         max_bin: 128  # how many bins to categorize features into
 
-        # BALANCED
-        n_estimators: 800  # number of trees to train in the model
-        learning_rate: 0.025  # step size for updates to weights during training
-        early_stopping_rounds: 25  # stop training if no improvement after x rounds
-        gamma: 0.01  # minimum gain required to split further on a leaf node
-        tree_method: 'hist'  # method for building trees, e.g., histogram-based
-        max_bin: 256  # how many bins to categorize features into
+        # # BALANCED
+        # n_estimators: 800  # number of trees to train in the model
+        # learning_rate: 0.025  # step size for updates to weights during training
+        # early_stopping_rounds: 25  # stop training if no improvement after x rounds
+        # gamma: 0.01  # minimum gain required to split further on a leaf node
+        # tree_method: 'hist'  # method for building trees, e.g., histogram-based
+        # max_bin: 256  # how many bins to categorize features into
 
         # # WISE
         # n_estimators: 5000
