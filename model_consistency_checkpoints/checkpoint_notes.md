@@ -2,13 +2,23 @@
 
 ## checkpoint 1
 
-Dev Speedy
+### Dev Speedy
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.286
+RMSE:                     0.244
+MAE:                      0.196
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.652
+RMSE:                     0.131
+MAE:                      0.075
 
 
 
-
-
-Prod Balanced
+### Prod Balanced
 
 Core Metrics
 -----------------------------------
