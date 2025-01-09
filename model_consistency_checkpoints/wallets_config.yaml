@@ -1,6 +1,8 @@
+# CheckpointValidation
 # WalletModel Config
 
 
+# CheckpointValidation
 # WalletModel Period Boundaries
 training_data:
     training_window_starts: [
@@ -19,6 +21,7 @@ training_data:
     parquet_folder: 'temp/wallet_modeling_dfs'  # where to store parquet files
 
 
+# CheckpointValidation
 # WalletModel Cleaning
 data_cleaning:
 
@@ -53,6 +56,7 @@ data_cleaning:
     market_cap_default_fill:  500000  # coins below the imputation coverage level will have empty values filled with this
 
 
+# CheckpointValidation
 # WalletModel Features
 features:
     # Trading Params
@@ -83,6 +87,7 @@ features:
 
 
 
+# CheckpointValidation
 # WalletModel Modeling Config
 modeling:
 
@@ -98,6 +103,7 @@ modeling:
     drop_columns: []
     train_test_split: 0.2  # test size
 
+# CheckpointValidation
     # WalletModel Params
     # Model specifics
     model_type: "xgb"
@@ -146,6 +152,7 @@ modeling:
         random_state: 42
 
 
+# CheckpointValidation
     # WalletModel Grid Search
     grid_search_params:
 
