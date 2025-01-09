@@ -96,14 +96,11 @@ modeling:
     modeling_min_coins_traded: 0
 
     # Which wallet performance metric to use as the target variable.
-    # target_variable: "crypto_net_gain"
-    target_variable: "crypto_net_gain/max_investment/ntile_rank"
-    # target_variable: "crypto_net_gain/max_investment/winsorized"
-    # target_variable: "crypto_net_gain/max_ienvstment/base"
+    target_variable: "crypto_net_gain/max_investment/winsorized"
     drop_columns: []
     train_test_split: 0.2  # test size
 
-# CheckpointValidation
+    # CheckpointValidation
     # WalletModel Params
     # Model specifics
     model_type: "xgb"
@@ -129,13 +126,13 @@ modeling:
         tree_method: 'hist'  # method for building trees, e.g., histogram-based
         max_bin: 128  # how many bins to categorize features into
 
-        # BALANCED
-        n_estimators: 800  # number of trees to train in the model
-        learning_rate: 0.025  # step size for updates to weights during training
-        early_stopping_rounds: 25  # stop training if no improvement after x rounds
-        gamma: 0.01  # minimum gain required to split further on a leaf node
-        tree_method: 'hist'  # method for building trees, e.g., histogram-based
-        max_bin: 256  # how many bins to categorize features into
+        # # BALANCED
+        # n_estimators: 800  # number of trees to train in the model
+        # learning_rate: 0.025  # step size for updates to weights during training
+        # early_stopping_rounds: 25  # stop training if no improvement after x rounds
+        # gamma: 0.01  # minimum gain required to split further on a leaf node
+        # tree_method: 'hist'  # method for building trees, e.g., histogram-based
+        # max_bin: 256  # how many bins to categorize features into
 
         # # WISE
         # n_estimators: 5000
@@ -152,7 +149,7 @@ modeling:
         random_state: 42
 
 
-# CheckpointValidation
+    # CheckpointValidation
     # WalletModel Grid Search
     grid_search_params:
 

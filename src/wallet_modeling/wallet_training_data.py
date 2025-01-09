@@ -439,3 +439,4 @@ def upload_wallet_cohort(wallet_cohort):
     client.query(create_query).result()
     logger.info('Uploaded cohort of %s wallets with addresses to %s.',
                 len(wallet_cohort), wallet_ids_table)
+
