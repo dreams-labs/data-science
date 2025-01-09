@@ -1,9 +1,12 @@
 """Orchestrates groups of functions to generate wallet model pipeline"""
 import time
 import logging
+from datetime import datetime
 from typing import Tuple,Optional,Dict
 import pandas as pd
 import numpy as np
+import pandas_gbq
+from google.cloud import bigquery
 
 # Local module imports
 import training_data.profits_row_imputation as pri
@@ -326,3 +329,73 @@ def dehybridize_wallet_address(
     df['wallet_address'] = df['wallet_address'].map(reverse_map).map(lambda x: x[0])
 
     return df
+
+
+
+def upload_hybrid_wallet_mapping(hybrid_cw_id_map: Dict[Tuple[int, str], int]) -> None:
+    """
+    Uploads the mapping of hybrid indices to all wallet-coin pairs to BigQuery.
+
+    Params:
+        hybrid_cw_id_map (Dict[Tuple[int, str], int]): Mapping of (wallet,coin) tuples to hybrid indices
+    """
+    # 1. Generate upload_df from hybrid map
+    # -------------------------------------
+    upload_df = pd.DataFrame(
+        [(v, k[0], k[1]) for k, v in hybrid_cw_id_map.items()],
+        columns=['hybrid_id', 'wallet_id', 'coin_id']
+    )
+    upload_df['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    # Set df datatypes
+    dtype_mapping = {
+        'hybrid_id': int,
+        'wallet_id': int,
+        'coin_id': str,
+        'updated_at': 'datetime64[ns, UTC]'
+    }
+    upload_df = upload_df.astype(dtype_mapping)
+
+    # 2. Upload to BigQuery
+    # ---------------------
+    project_id = 'western-verve-411004'
+    client = bigquery.Client(project=project_id)
+
+    hybrid_table = f"{project_id}.temp.wallet_modeling_hybrid_cohort"
+    schema = [
+        {'name': 'hybrid_id', 'type': 'int64'},
+        {'name': 'wallet_id', 'type': 'int64'},
+        {'name': 'coin_id', 'type': 'string'},
+        {'name': 'updated_at', 'type': 'datetime'}
+    ]
+
+    pandas_gbq.to_gbq(
+        upload_df,
+        hybrid_table,
+        project_id=project_id,
+        if_exists='replace',
+        table_schema=schema,
+        progress_bar=False
+    )
+
+    # 3. Create final table with resolved wallet addresses
+    # ----------------------------------------------------
+    create_query = f"""
+    CREATE OR REPLACE TABLE `{hybrid_table}` AS
+    SELECT
+        h.hybrid_id,
+        h.coin_id,
+        h.wallet_id,
+        w.wallet_address,
+        CURRENT_TIMESTAMP() as updated_at
+    FROM `{hybrid_table}` h
+    LEFT JOIN `reference.wallet_ids` w
+        ON h.wallet_id = w.wallet_id
+    """
+
+    client.query(create_query).result()
+    logger.info(
+        'Uploaded complete hybrid ID mapping of %s wallet-coin pairs to %s.',
+        len(hybrid_cw_id_map),
+        hybrid_table
+    )
