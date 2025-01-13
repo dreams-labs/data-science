@@ -72,6 +72,7 @@ def retrieve_period_datasets(period_start_date, period_end_date, coin_cohort=Non
 @u.timing_decorator
 def define_training_wallet_cohort(profits_df: pd.DataFrame,
                                   market_data_df: pd.DataFrame,
+                                  hybridize_wallet_ids: bool
                                 ) -> Tuple[pd.DataFrame, np.ndarray]:
     """
     Orchestrates the definition of a wallet cohort for model training by:
@@ -81,12 +82,14 @@ def define_training_wallet_cohort(profits_df: pd.DataFrame,
     4. Uploading filtered cohort to BigQuery
 
     Params:
-        profits_df (DataFrame): Historical profit and balance data for all wallets
-        market_data_df (DataFrame): Market prices and metadata for relevant period
+    - profits_df (DataFrame): Historical profit and balance data for all wallets
+    - market_data_df (DataFrame): Market prices and metadata for relevant period
+    - hybridize_wallet_ids (bool): whether the IDs are regular wallet_ids or hybrid wallet-coin IDs
+
 
     Returns:
-        training_cohort_profits_df (DataFrame): Profits data filtered to selected wallets
-        training_wallet_cohort (ndarray): Array of wallet addresses that pass filters
+    - training_cohort_profits_df (DataFrame): Profits data filtered to selected wallets
+    - training_wallet_cohort (ndarray): Array of wallet addresses that pass filters
     """
     start_time = time.time()
     training_period_start = wallets_config['training_data']['training_period_start']
@@ -117,7 +120,7 @@ def define_training_wallet_cohort(profits_df: pd.DataFrame,
     training_wallet_cohort = filtered_training_wallet_metrics_df.index.values
 
     # Upload the cohort to BigQuery for additional complex feature generation
-    wtd.upload_wallet_cohort(training_wallet_cohort)
+    wtd.upload_training_cohort(training_wallet_cohort, hybridize_wallet_ids)
     logger.info("Training wallet cohort defined as %s wallets after %.2f seconds.",
                 len(training_wallet_cohort), time.time()-start_time)
 
@@ -361,7 +364,7 @@ def upload_hybrid_wallet_mapping(hybrid_cw_id_map: Dict[Tuple[int, str], int]) -
     project_id = 'western-verve-411004'
     client = bigquery.Client(project=project_id)
 
-    hybrid_table = f"{project_id}.temp.wallet_modeling_hybrid_cohort"
+    hybrid_table = f"{project_id}.temp.wallet_modeling_hybrid_id_mapping"
     schema = [
         {'name': 'hybrid_id', 'type': 'int64'},
         {'name': 'wallet_id', 'type': 'int64'},
