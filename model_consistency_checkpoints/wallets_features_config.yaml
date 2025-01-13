@@ -1,4 +1,3 @@
-# CheckpointValidation
 market_timing:
   offsets:
     price_sma_5:

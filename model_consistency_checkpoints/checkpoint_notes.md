@@ -1,5 +1,33 @@
 # 01/08/25 DDA-434 hybrid wallet address key
 
+## checkpoint 3: after adding hybrid key functionality through transfers_df
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.210
+RMSE:                     0.301
+MAE:                      0.215
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.670
+RMSE:                     0.149
+MAE:                      0.079
+
+### Dev Speedy: crypto_net_gain/max_investment/winsorized
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.267
+RMSE:                     0.291
+MAE:                      0.210
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.670
+RMSE:                     0.149
+MAE:                      0.081
+
 ## checkpoint 2: after removing 0x0000 addresses from coin_wallet_transfers
 
 
