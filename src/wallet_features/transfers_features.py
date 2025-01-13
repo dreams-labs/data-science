@@ -122,39 +122,39 @@ def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
 # -------------------------------------------------
 # these identify which how long a wallet held their tokens
 
-def retrieve_transfers():
-    """
-    Returns the buyer number for each wallet-coin pairing, where the first buyer
-    receives rank 1 and the count increases for each subsequence wallet.
+# def retrieve_transfers():
+#     """
+#     Returns the buyer number for each wallet-coin pairing, where the first buyer
+#     receives rank 1 and the count increases for each subsequence wallet.
 
-    Buyer numbers are calculated for all wallets but the returned df only includes
-    wallets that were uploaded to the temp.wallet_modeling_training_cohort table.
+#     Buyer numbers are calculated for all wallets but the returned df only includes
+#     wallets that were uploaded to the temp.wallet_modeling_training_cohort table.
 
-    Returns:
-    - buyer_numbers_df (df): dataframe showing that buyer number a wallet was for
-        the associated coin_id.
-    """
-    # All data after the training period must be ignored to avoid data leakage
-    training_period_end = wallets_config['training_data']['training_period_end']
+#     Returns:
+#     - buyer_numbers_df (df): dataframe showing that buyer number a wallet was for
+#         the associated coin_id.
+#     """
+#     # All data after the training period must be ignored to avoid data leakage
+#     training_period_end = wallets_config['training_data']['training_period_end']
 
-    transfers_sql = f"""select cwt.coin_id
-    ,cwt.wallet_address
-    ,cwt.date
-    ,cwt.net_transfers
-    ,cwt.balance
-    from core.coin_wallet_transfers cwt
-    join temp.wallet_modeling_training_cohort wmc on wmc.wallet_address = cwt.wallet_address
-    and cwt.date <= '{training_period_end}'
-    order by 1,2,3"""
+#     transfers_sql = f"""select cwt.coin_id
+#     ,cwt.wallet_address
+#     ,cwt.date
+#     ,cwt.net_transfers
+#     ,cwt.balance
+#     from core.coin_wallet_transfers cwt
+#     join temp.wallet_modeling_training_cohort wmc on wmc.wallet_address = cwt.wallet_address
+#     and cwt.date <= '{training_period_end}'
+#     order by 1,2,3"""
 
-    transfers_df = dgc().run_sql(transfers_sql)
+#     transfers_df = dgc().run_sql(transfers_sql)
 
-    logger.info("Retrieved transfers data for %s wallet-coin-date records.",
-                len(transfers_df))
+#     logger.info("Retrieved transfers data for %s wallet-coin-date records.",
+#                 len(transfers_df))
 
-    transfers_df = u.df_downcast(transfers_df)
+#     transfers_df = u.df_downcast(transfers_df)
 
-    return transfers_df
+#     return transfers_df
 
 
 
