@@ -22,13 +22,16 @@ wallets_config = WalletsConfig()
 # -------------------------------------------------
 # these identify which buyer number a wallet was to a given coin
 
-def retrieve_transfers_sequencing():
+def retrieve_transfers_sequencing(hybridize_wallet_ids: bool) -> pd.DataFrame:
     """
     Returns the buyer number for each wallet-coin pairing, where the first buyer
     receives rank 1 and the count increases for each subsequence wallet.
 
     Buyer numbers are calculated for all wallets but the returned df only includes
     wallets that were uploaded to the temp.wallet_modeling_training_cohort table.
+
+    Params:
+    - hybridize_wallet_ids (bool): whether the IDs are regular wallet_ids or hybrid wallet-coin IDs
 
     Returns:
     - buyer_numbers_df (df): dataframe showing that buyer number a wallet was for
@@ -41,7 +44,7 @@ def retrieve_transfers_sequencing():
     # All data after the training period must be ignored to avoid data leakage
     training_period_end = wallets_config['training_data']['training_period_end']
 
-    sequencing_sql = f"""
+    sequencing_sql_ctes = f"""
         with transaction_rank as (
             select coin_id
             ,wallet_address
@@ -59,6 +62,11 @@ def retrieve_transfers_sequencing():
             ,rank() over (partition by coin_id order by first_transaction asc) as buyer_number
             from transaction_rank tr
         )
+        """
+
+    if hybridize_wallet_ids is False:
+        sequencing_sql = f"""
+        {sequencing_sql_ctes}
 
         select wc.wallet_id as wallet_address -- rename to match the rest of the pipeline
         ,o.coin_id
@@ -67,6 +75,18 @@ def retrieve_transfers_sequencing():
         from buy_ordering o
         join reference.wallet_ids xw on xw.wallet_address = o.wallet_address
         join temp.wallet_modeling_training_cohort wc on wc.wallet_id = xw.wallet_id
+        """
+    else:
+        sequencing_sql = f"""
+        {sequencing_sql_ctes}
+
+        select wc.hybrid_id as wallet_address -- rename to match the rest of the pipeline
+        ,o.coin_id
+        ,o.first_transaction
+        ,o.buyer_number
+        from buy_ordering o
+        join temp.wallet_modeling_training_cohort wc on wc.wallet_address = o.wallet_address
+            and wc.coin_id = o.coin_id
         """
 
     transfers_sequencing_df = dgc().run_sql(sequencing_sql)
