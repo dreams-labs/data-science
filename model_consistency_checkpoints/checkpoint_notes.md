@@ -2,31 +2,34 @@
 
 ## checkpoint 3: after adding hybrid key functionality through transfers_df
 
+Prod winsorized yes 0x00000 coin wallet profits
 Core Metrics
 -----------------------------------
-R² Score:                 0.210
-RMSE:                     0.301
-MAE:                      0.215
+R² Score:                 0.347
+RMSE:                     0.426
+MAE:                      0.295
 
 Inactive Wallets Cohort Metrics
 -----------------------------------
-R² Score:                 0.670
-RMSE:                     0.149
-MAE:                      0.079
+R² Score:                 0.743
+RMSE:                     0.230
+MAE:                      0.131
 
-### Dev Speedy: crypto_net_gain/max_investment/winsorized
 
+
+Prod winsorized no 0x00000 coin wallet profits
 Core Metrics
 -----------------------------------
-R² Score:                 0.267
-RMSE:                     0.291
-MAE:                      0.210
+R² Score:                 0.346
+RMSE:                     0.423
+MAE:                      0.294
 
 Inactive Wallets Cohort Metrics
 -----------------------------------
-R² Score:                 0.670
-RMSE:                     0.149
-MAE:                      0.081
+R² Score:                 0.744
+RMSE:                     0.229
+MAE:                      0.132
+
 
 ## checkpoint 2: after removing 0x0000 addresses from coin_wallet_transfers
 
@@ -59,6 +62,23 @@ Inactive Wallets Cohort Metrics
 R² Score:                 0.744
 RMSE:                     0.229
 MAE:                      0.132
+
+
+with updated coin_wallet_profits data
+### Prod Balanced: crypto_net_gain/max_investment/winsorized
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.354
+RMSE:                     0.425
+MAE:                      0.295
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.744
+RMSE:                     0.229
+MAE:                      0.132
+
 
 
 
