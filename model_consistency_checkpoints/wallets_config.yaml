@@ -1,6 +1,8 @@
+# CheckpointValidation
 # WalletModel Config
 
 
+# CheckpointValidation
 # WalletModel Period Boundaries
 training_data:
     training_window_starts: [
@@ -15,23 +17,24 @@ training_data:
     validation_period_end: "2024-11-30"
 
     # Whether to use hybrid coin-wallet ids
-    hybridize_wallet_ids: True  # if true, training data will be keyed on wallet-coin pairs
+    hybridize_wallet_ids: False  # if true, training data will be keyed on wallet-coin pairs
 
     # Local pipeline configs
     dataset: 'prod'  # Set to 'prod' or 'dev'; determines whether to query 'core' or 'dev' dataset tables
     parquet_folder: 'temp/wallet_modeling_dfs'  # where to store parquet files
 
 
+# CheckpointValidation
 # WalletModel Cleaning
 data_cleaning:
 
     # Wallet cohort thresholds
-    min_coins_traded: 0  # Exclude wallets that have traded fewer coins than this during the training period
+    min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
     max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
 
-    min_wallet_investment: 20000 # time weighted average balance filter
-    min_wallet_inflows: 20000  # Exclude wallets with inflows below this amount (USD)
-    min_wallet_volume: 25000  # Exclude wallets with fewer than this amount of training period USD volume
+    min_wallet_investment: 1000 # time weighted average balance filter
+    min_wallet_inflows: 1000  # Exclude wallets with inflows below this amount (USD)
+    min_wallet_volume: 5000  # Exclude wallets with fewer than this amount of training period USD volume
 
     max_wallet_investment: 10_000_000 # time weighted average balance filter
     max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
@@ -56,6 +59,7 @@ data_cleaning:
     market_cap_default_fill:  500000  # coins below the imputation coverage level will have empty values filled with this
 
 
+# CheckpointValidation
 # WalletModel Features
 features:
     # Trading Params
@@ -86,6 +90,7 @@ features:
 
 
 
+# CheckpointValidation
 # WalletModel Modeling Config
 modeling:
 
@@ -94,13 +99,11 @@ modeling:
     modeling_min_coins_traded: 0
 
     # Which wallet performance metric to use as the target variable.
-    # target_variable: "crypto_net_gain"
-    # target_variable: "crypto_net_gain/max_investment/ntile_rank"
     target_variable: "crypto_net_gain/max_investment/winsorized"
-    # target_variable: "crypto_net_gain/max_ienvstment/base"
     drop_columns: []
     train_test_split: 0.2  # test size
 
+    # CheckpointValidation
     # WalletModel Params
     # Model specifics
     model_type: "xgb"
@@ -118,21 +121,21 @@ modeling:
         # Performance Profiles (Choose One Section)
         # --------------------------------------
 
-        # SPEEDY
-        n_estimators: 200  # number of trees to train in the model
-        learning_rate: 0.05  # step size for updates to weights during training
-        early_stopping_rounds: 20  # stop training if no improvement after x rounds
-        gamma: 0.01  # minimum gain required to split further on a leaf node
-        tree_method: 'hist'  # method for building trees, e.g., histogram-based
-        max_bin: 128  # how many bins to categorize features into
-
-        # # BALANCED
-        # n_estimators: 800  # number of trees to train in the model
-        # learning_rate: 0.025  # step size for updates to weights during training
-        # early_stopping_rounds: 25  # stop training if no improvement after x rounds
+        # # SPEEDY
+        # n_estimators: 200  # number of trees to train in the model
+        # learning_rate: 0.05  # step size for updates to weights during training
+        # early_stopping_rounds: 20  # stop training if no improvement after x rounds
         # gamma: 0.01  # minimum gain required to split further on a leaf node
         # tree_method: 'hist'  # method for building trees, e.g., histogram-based
-        # max_bin: 256  # how many bins to categorize features into
+        # max_bin: 128  # how many bins to categorize features into
+
+        # BALANCED
+        n_estimators: 800  # number of trees to train in the model
+        learning_rate: 0.025  # step size for updates to weights during training
+        early_stopping_rounds: 25  # stop training if no improvement after x rounds
+        gamma: 0.01  # minimum gain required to split further on a leaf node
+        tree_method: 'hist'  # method for building trees, e.g., histogram-based
+        max_bin: 256  # how many bins to categorize features into
 
         # # WISE
         # n_estimators: 5000
@@ -149,6 +152,7 @@ modeling:
         random_state: 42
 
 
+    # CheckpointValidation
     # WalletModel Grid Search
     grid_search_params:
 
