@@ -2,7 +2,8 @@
 
 ## checkpoint 3: after adding hybrid key functionality through transfers_df
 
-Prod winsorized yes 0x00000 coin wallet profits
+### Prod winsorized yes 0x00000 coin wallet profits
+matches checkpoint 1 rerun
 Core Metrics
 -----------------------------------
 R² Score:                 0.347
@@ -100,6 +101,22 @@ MAE:                      0.118
 
 
 ## checkpoint 1
+
+### Prod Balanced winsorized rerun with checkpoint 3 data
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.347
+RMSE:                     0.426
+MAE:                      0.295
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.743
+RMSE:                     0.230
+MAE:                      0.131
+
+
 
 ### Dev Speedy
 
