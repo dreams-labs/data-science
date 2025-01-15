@@ -66,9 +66,8 @@ def calculate_wallet_trading_features(
     # Calculate configured metrics
     # ----------------------------
     # Add crypto balance/transfers/gain helper columns
-
-    profits_df = profits_df.reset_index()
     profits_df = calculate_crypto_balance_columns(profits_df, period_start_date)
+    profits_df = profits_df.reset_index()
 
     # Calculate net_gain and max_investment columns
     gain_and_investment_df = calculate_gain_and_investment_columns(profits_df)
@@ -106,40 +105,29 @@ def calculate_wallet_trading_features(
 # -----------------------------------
 
 
-
 def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
-                                     period_start_date: str
-                                     ) -> pd.DataFrame:
+                                   period_start_date: str
+                                   ) -> pd.DataFrame:
     """
-    Adds crypto_balance_change column tracking changes in crypto holdings.
-    A positive value indicates an increase in crypto holdings, negative indicates decrease.
+    Adds crypto balance change columns using multiindex operations.
 
     Params:
-    - profits_df (DataFrame): Daily profits data to compute balance changes for
+    - profits_df (DataFrame): Daily profits data with multiindex (coin_id, wallet_address, date)
     - period_start_date (str): Period start in 'YYYY-MM-DD' format
 
     Returns:
-    - adj_profits_df (DataFrame): Input df with crypto_balance_change column added
+    - adj_profits_df (DataFrame): Input df with crypto balance columns added
     """
-    profits_df = profits_df.copy()
-
-    # Sort by wallet, coin, and date for accurate cumulative calculations
-    profits_df = profits_df.sort_values(['wallet_address', 'coin_id', 'date'])
-
-    # Crypto balance change equals usd_net_transfers except on the starting_balance_date
     profits_df['crypto_balance_change'] = profits_df['usd_net_transfers']
     profits_df = buy_crypto_start_balance(profits_df, period_start_date)
 
-    # Calculate crypto cost based on lifetime usd transfers
+    # Use index-aware cumsum() since data is already sorted by (coin_id, wallet_address, date)
     profits_df['crypto_cumulative_transfers'] = (profits_df
-                                       .groupby(['wallet_address', 'coin_id'],
-                                               observed=True,
-                                               sort=False)  # sort=False since we pre-sorted
-                                       ['crypto_balance_change']
-                                       .cumsum())
+                                                 .groupby(level=['coin_id', 'wallet_address'],observed=True)
+                                                 ['crypto_balance_change'].cumsum())
 
-    # Net gain is the current balance less the cost basis
-    profits_df['crypto_cumulative_net_gain'] = profits_df['usd_balance'] - profits_df['crypto_cumulative_transfers']
+    profits_df['crypto_cumulative_net_gain'] = (profits_df['usd_balance']
+                                                - profits_df['crypto_cumulative_transfers'])
 
     return profits_df
 
@@ -147,29 +135,24 @@ def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
 
 def buy_crypto_start_balance(df: pd.DataFrame, period_start_date: str) -> pd.DataFrame:
     """
-    Sets start date crypto balance change as the initial balance value.
+    Sets start date crypto balance change using multiindex operations.
 
     Params:
-    - df (DataFrame): Input dataframe with usd_balance and crypto_balance_change
-    - period_start_date (str): The start date of the period
+    - df (DataFrame): Input df with multiindex (coin_id, wallet_address, date)
+    - period_start_date (str): Period start in 'YYYY-MM-DD'
 
     Returns:
     - df (DataFrame): DataFrame with adjusted crypto_balance_change
-
-    Example Case
-    ------------
-    Opening balance of $75 with $0 transfer results in:
-    crypto_balance_change = +$75 (increase in crypto holdings)
     """
-    period_start_date = datetime.strptime(period_start_date,'%Y-%m-%d')
+    period_start_date = datetime.strptime(period_start_date, '%Y-%m-%d')
     starting_balance_date = period_start_date - timedelta(days=1)
 
-    mask = df['date'] == starting_balance_date
-    target_balances = df.loc[mask, 'usd_balance']
-    df.loc[mask, 'crypto_balance_change'] = target_balances
+    # Use IndexSlice to efficiently select the starting balance date
+    idx = pd.IndexSlice
+    start_slice = idx[:, :, starting_balance_date]
+    df.loc[start_slice, 'crypto_balance_change'] = df.loc[start_slice, 'usd_balance']
 
     return df
-
 
 
 
