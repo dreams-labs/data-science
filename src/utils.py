@@ -1179,13 +1179,21 @@ def export_code(
 def logger_to_file(filepath: str) -> None:
     """
     Adds file output to existing logger while preserving settings.
+    Prevents duplicate handlers for the same filepath.
 
     Params:
     - filepath (str): Path where log file should be created
     """
+    logger = logging.getLogger()
+
+    # Check if handler for this file already exists
+    for handler in logger.handlers:
+        if isinstance(handler, logging.FileHandler) and handler.baseFilename == filepath:
+            return
+
     file_handler = logging.FileHandler(filepath)
     file_handler.setFormatter(logging.Formatter(
         '[%(asctime)s] %(levelname)s [%(module)s.%(funcName)s:%(lineno)d] %(message)s',
         datefmt='%d/%b/%Y %H:%M:%S'
     ))
-    logging.getLogger().addHandler(file_handler)
+    logger.addHandler(file_handler)
