@@ -62,17 +62,10 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     - wallet_features_df (df): Wallet-indexed features dataframe with a row for every wallet_cohort
     """
     logger.info('starting data validation...')
-    # Validate inputs
-    u.assert_period(profits_df, period_start_date, period_end_date)
-    logger.info('data validation1')
-    validate_inputs(profits_df, market_indicators_data_df, transfers_sequencing_df)
-    logger.info('data validation2')
 
-    # Downcast to ensure optimal memory usage
-    profits_df = u.df_downcast(profits_df)
-    market_indicators_data_df = u.df_downcast(market_indicators_data_df)
-    transfers_sequencing_df = u.df_downcast(transfers_sequencing_df)
-    logger.info('data validation complete.')
+    # Add indices and validate inputs
+    prepare_dataframes(profits_df,market_indicators_data_df,transfers_sequencing_df,
+                       period_start_date,period_end_date)
 
     # Initialize output dataframe
     wallet_features_df = pd.DataFrame(index=wallet_cohort)
@@ -82,6 +75,10 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     # Trading features (left join, fill 0s)
     # Requires both starting_balance_date and period_end_date imputed rows
     # -----------------------------------------------------------------------
+    profits_df = profits_df.reset_index()
+    market_indicators_data_df = market_indicators_data_df.reset_index()
+
+
     trading_features_df = wtf.calculate_wallet_trading_features(profits_df,
         period_start_date,period_end_date,
         wallets_config['features']['include_twb_metrics']
@@ -167,3 +164,55 @@ def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
         raise ValueError("profits_df has wallets not in transfers_sequencing_df.")
 
     logger.debug("All input dataframes passed validation checks.")
+
+
+def prepare_dataframes(profits_df: pd.DataFrame,
+                       market_indicators_df: pd.DataFrame,
+                       transfers_sequencing_df: pd.DataFrame,
+                       period_start_date: str,
+                       period_end_date: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+    Orchestrates dataframe preparation: validates inputs, optimizes indices, and downcasts dtypes.
+
+    Params:
+    - profits_df (DataFrame): profits data with coin_id, wallet_address, date
+    - market_indicators_df (DataFrame): market indicators with coin_id, date
+    - transfers_sequencing_df (DataFrame): transfers sequencing data
+    - period_start_date (str): start of analysis period
+    - period_end_date (str): end of analysis period
+
+    Returns:
+    - tuple of prepared DataFrames: (profits_df, market_indicators_df, transfers_df)
+    """
+    required_profits_cols = ['coin_id', 'wallet_address', 'date']
+    required_market_cols = ['coin_id', 'date']
+
+    # Validate profits_df structure
+    if not all(col in profits_df.columns or col in profits_df.index.names
+              for col in required_profits_cols):
+        raise ValueError(f"profits_df missing required columns: {required_profits_cols}")
+
+    # Set indices if needed
+    if not isinstance(profits_df.index, pd.MultiIndex):
+        profits_df.set_index(required_profits_cols, inplace=True, verify_integrity=True)
+
+    if not isinstance(market_indicators_df.index, pd.MultiIndex):
+        market_indicators_df.set_index(required_market_cols, inplace=True, verify_integrity=True)
+
+    # Sort indices if needed
+    if not profits_df.index.is_monotonic_increasing:
+        profits_df.sort_index(inplace=True)
+
+    if not market_indicators_df.index.is_monotonic_increasing:
+        market_indicators_df.sort_index(inplace=True)
+
+    # Run required validations
+    u.assert_period(profits_df, period_start_date, period_end_date)
+    validate_inputs(profits_df, market_indicators_df, transfers_sequencing_df)
+
+    # Downcast all dataframes
+    profits_df = u.df_downcast(profits_df)
+    market_indicators_df = u.df_downcast(market_indicators_df)
+    transfers_sequencing_df = u.df_downcast(transfers_sequencing_df)
+
+    return profits_df, market_indicators_df, transfers_sequencing_df
