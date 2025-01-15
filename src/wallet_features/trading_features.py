@@ -29,19 +29,20 @@ wallets_config = WalletsConfig()
 
 @u.timing_decorator
 def calculate_wallet_trading_features(
-    base_profits_df: pd.DataFrame,
+    profits_df: pd.DataFrame,
     period_start_date: str,
     period_end_date: str,
-    calculate_twb_metrics: bool = True
+    include_twb_metrics: bool = True,
+    include_btc_metrics: bool = False
 ) -> pd.DataFrame:
     """
     Calculates comprehensive crypto trading metrics for each wallet.
 
     Params:
-    - base_profits_df (DataFrame): Daily profits data
+    - profits_df (DataFrame): Daily profits data
     - period_start_date (str): Period start in 'YYYY-MM-DD' format
     - period_end_date (str): Period end in 'YYYY-MM-DD' format
-    - calculate_twb_metrics (bool): whether to calculate time weighted balance metrics
+    - include_twb_metrics (bool): whether to calculate time weighted balance metrics
 
     Required columns: wallet_address, coin_id, date, usd_balance,
                     usd_net_transfers, is_imputed
@@ -59,27 +60,27 @@ def calculate_wallet_trading_features(
         - activity_density: Transaction days / period duration
         - volume_vs_twb_ratio: Volume relative to time-weighted balance
     """
-    # Copy df and assert period
-    profits_df = base_profits_df.copy()
-    u.assert_period(profits_df, period_start_date, period_end_date)
-    profits_df['date'] = pd.to_datetime(profits_df['date'])
+    # Validate profits_df
+    profits_df = ensure_index(profits_df, period_start_date, period_end_date)
 
-
+    # Calculate configured metrics
+    # ----------------------------
     # Add crypto balance/transfers/gain helper columns
+
+    profits_df = profits_df.reset_index()
     profits_df = calculate_crypto_balance_columns(profits_df, period_start_date)
 
     # Calculate net_gain and max_investment columns
     gain_and_investment_df = calculate_gain_and_investment_columns(profits_df)
 
     # Calculated metrics that ignore imputed transactions
-    observed_activity_df = calculate_observed_activity_columns(profits_df,
-                                                               period_start_date,period_end_date)
+    observed_activity_df = calculate_observed_activity_columns(profits_df,period_start_date,period_end_date)
 
     # Merge together
     trading_features_df = gain_and_investment_df.join(observed_activity_df)
 
     # Add twb if configured to do so
-    if calculate_twb_metrics:
+    if include_twb_metrics:
 
         # Calculate time weighted balance using the cost basis
         time_weighted_df = aggregate_time_weighted_balance(profits_df)
@@ -95,12 +96,9 @@ def calculate_wallet_trading_features(
         )
 
     # Fill missing values and handle edge cases
-    trading_features_df = trading_features_df.fillna(0)
-    trading_features_df = trading_features_df.replace(-0, 0)
+    trading_features_df = trading_features_df.fillna(0).replace(-0, 0)
 
     return trading_features_df
-
-
 
 
 # -----------------------------------
@@ -413,3 +411,49 @@ def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
         raise ValueError('Record count mismatch')
 
     return result_df
+
+
+
+# -----------------------------------
+#          Utility Functions
+# -----------------------------------
+
+def ensure_index(profits_df: pd.DataFrame,
+                       period_start_date: str,
+                       period_end_date: str
+) -> pd.DataFrame:
+    """
+    Params:
+    - profits_df (DataFrame): Input profits data
+    - period_start_date (str): Period start date
+    - period_end_date (str): Period end date
+
+    Returns:
+    - DataFrame: Validated and properly indexed/sorted profits_df
+    """
+    required_cols = ['coin_id', 'wallet_address', 'date']
+
+    # Check existence of required columns
+    missing_cols = [col for col in required_cols
+                   if col not in profits_df.columns
+                   and col not in profits_df.index.names]
+    if missing_cols:
+        raise ValueError(f"Missing required columns: {missing_cols}")
+
+    # Convert to MultiIndex if needed
+    if not isinstance(profits_df.index, pd.MultiIndex):
+        index_cols = [col for col in required_cols if col in profits_df.columns]
+        profits_df = profits_df.set_index(index_cols)
+
+    # Ensure correct index names
+    if profits_df.index.names != required_cols:
+        profits_df = profits_df.reorder_levels(required_cols)
+
+    # Sort if needed
+    if not profits_df.index.is_monotonic_increasing:
+        profits_df = profits_df.sort_index()
+
+    # Assert period
+    u.assert_period(profits_df, period_start_date, period_end_date)
+
+    return profits_df
