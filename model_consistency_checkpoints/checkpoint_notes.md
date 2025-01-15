@@ -1,3 +1,21 @@
+# DDA 518 orchestrator functions
+
+## checkpoint 1
+Core Metrics
+-----------------------------------
+R² Score:                 0.349
+RMSE:                     0.421
+MAE:                      0.292
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.746
+RMSE:                     0.228
+MAE:                      0.131
+
+
+
+
 # 01/08/25 DDA-434 hybrid wallet address key
 
 ## checkpoint 4: full hybrid key functionality in walletmodel
