@@ -1,8 +1,9 @@
 """Orchestrates groups of functions to generate wallet model pipeline"""
 import time
 import logging
-from datetime import datetime
-from typing import Tuple,Optional,Dict
+import gc
+from datetime import datetime,timedelta
+from typing import Tuple,Optional,Dict,List
 import pandas as pd
 import numpy as np
 import pandas_gbq
@@ -13,6 +14,9 @@ import training_data.profits_row_imputation as pri
 import coin_wallet_metrics.indicators as ind
 import wallet_modeling.wallet_training_data as wtd
 import wallet_features.trading_features as wtf
+import wallet_features.transfers_features as wts
+import wallet_features.wallet_features_orchestrator as wfo
+import wallet_features.clustering_features as wcl
 from wallet_modeling.wallets_config_manager import WalletsConfig
 import utils as u
 
@@ -23,6 +27,10 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 
 
+
+# -----------------------------------
+#   Primary Orchestration Functions
+# -----------------------------------
 
 @u.timing_decorator
 def retrieve_period_datasets(period_start_date, period_end_date, coin_cohort=None, parquet_prefix=None):
@@ -68,6 +76,168 @@ def retrieve_period_datasets(period_start_date, period_end_date, coin_cohort=Non
     return profits_df_formatted, market_data_df_formatted, coin_cohort
 
 
+
+def prepare_training_data(
+    profits_df_full: pd.DataFrame,
+    market_data_df_full: pd.DataFrame,
+    wallets_metrics_config: dict,
+    parquet_folder: str
+) -> List[str]:
+    """
+    Consolidated training data preparation pipeline that handles hybridization,
+    indicator generation, cohort definition and transfers retrieval.
+
+    Params:
+    - profits_df_full: Full historical profits DataFrame
+    - market_data_df_full: Full historical market data DataFrame
+    - wallets_metrics_config: Configuration for market indicators
+    - parquet_folder: Required folder for parquet storage
+
+    Returns:
+    - List of generated parquet file paths
+    """
+    generated_files = []
+
+    # Hybridize wallet IDs if configured
+    if wallets_config['training_data']['hybridize_wallet_ids']:
+        logger.info("Hybridizing wallet IDs...")
+        profits_df_full, hybrid_cw_id_map = hybridize_wallet_address(profits_df_full)
+        hybrid_map_path = f"{parquet_folder}/hybrid_cw_id_map.pkl"
+        pd.to_pickle(hybrid_cw_id_map, hybrid_map_path)
+        generated_files.append(hybrid_map_path)
+        upload_hybrid_wallet_mapping(hybrid_cw_id_map)
+        del hybrid_cw_id_map
+
+    # Remove market data before starting balance date and validate periods
+    market_data_df = market_data_df_full[
+        market_data_df_full['date'] >= wallets_config['training_data']['training_starting_balance_date']
+    ]
+    u.assert_period(market_data_df,
+                    wallets_config['training_data']['training_period_start'],
+                    wallets_config['training_data']['training_period_end'])
+
+    # Generate market indicators
+    logger.info("Generating market indicators...")
+    market_indicators_df = generate_training_indicators_df(
+        market_data_df_full,
+        wallets_metrics_config,
+        parquet_filename=None
+    )
+    market_indicators_path = f"{parquet_folder}/training_market_indicators_data_df.parquet"
+    market_indicators_df.to_parquet(market_indicators_path, index=False)
+    generated_files.append(market_indicators_path)
+    del market_data_df_full, market_data_df
+
+    # Define training wallet cohort
+    logger.info("Defining wallet cohort...")
+    profits_df, _ = define_training_wallet_cohort(
+        profits_df_full,
+        market_indicators_df,
+        wallets_config['training_data']['hybridize_wallet_ids']
+    )
+    profits_path = f"{parquet_folder}/training_profits_df.parquet"
+    profits_df.to_parquet(profits_path, index=True)
+    generated_files.append(profits_path)
+
+    # Retrieve transfers after cohort is in BigQuery
+    logger.info("Retrieving transfers sequencing data...")
+    transfers_df = wts.retrieve_transfers_sequencing(
+        wallets_config['training_data']['hybridize_wallet_ids']
+    )
+    transfers_path = f"{parquet_folder}/training_transfers_sequencing_df.parquet"
+    transfers_df.to_parquet(transfers_path, index=True)
+    generated_files.append(transfers_path)
+
+    # Clean up memory
+    del profits_df_full, profits_df, market_indicators_df, transfers_df
+    gc.collect()
+
+    return generated_files
+
+
+def generate_training_features(
+    profits_df: pd.DataFrame,
+    market_indicators_df: pd.DataFrame,
+    transfers_df: pd.DataFrame,
+    wallet_cohort: List[int],
+    parquet_folder: str
+) -> None:
+    """
+    Orchestrates end-to-end feature generation maintaining existing logic.
+
+    Params:
+    - profits_df: Training period profits data
+    - market_indicators_df: Market data with indicators
+    - transfers_df: Transfers sequencing data
+    - wallet_cohort: List of wallet addresses
+    - parquet_folder: Location for parquet storage
+    """
+    # Generate full period features
+    logger.info("Generating features for full training period...")
+    training_wallet_features_df = wfo.calculate_wallet_features(
+        profits_df,
+        market_indicators_df,
+        transfers_df,
+        wallet_cohort,
+        wallets_config['training_data']['training_period_start'],
+        wallets_config['training_data']['training_period_end']
+    )
+
+    # Initialize full features df with suffixed columns
+    wallet_training_data_df_full = training_wallet_features_df.add_suffix("|all_windows").copy()
+    wallet_training_data_df_full.to_parquet(f"{parquet_folder}/wallet_training_data_df_full.parquet", index=True)
+    del training_wallet_features_df
+    gc.collect()
+
+    # Generate window features
+    training_windows_profits_dfs = split_training_window_profits_dfs(
+        profits_df,
+        market_indicators_df,
+        wallet_cohort
+    )
+
+    # Process each window
+    for i, window_profits_df in enumerate(training_windows_profits_dfs, 1):
+        logger.info("Generating features for window %s...", i)
+
+        window_opening_balance_date = window_profits_df['date'].min()
+        window_start_date = window_opening_balance_date + timedelta(days=1)
+        window_end_date = window_profits_df['date'].max()
+
+        window_wallet_features_df = wfo.calculate_wallet_features(
+            window_profits_df,
+            market_indicators_df,
+            transfers_df,
+            wallet_cohort,
+            window_start_date.strftime('%Y-%m-%d'),
+            window_end_date.strftime('%Y-%m-%d')
+        )
+
+        window_wallet_features_df = window_wallet_features_df.add_suffix(f'|w{i}')
+        wallet_training_data_df_full = wallet_training_data_df_full.join(window_wallet_features_df, how='left')
+
+    # Save unclustered version
+    wallet_training_data_df_full.to_parquet(f"{parquet_folder}/wallet_training_data_df_full_unclustered.parquet", index=True)  # pylint:disable=line-too-long
+
+    # Generate clusters
+    training_cluster_features_df = wcl.create_kmeans_cluster_features(wallet_training_data_df_full)
+    training_cluster_features_df = training_cluster_features_df.add_prefix('cluster|')
+    wallet_training_data_df_full = wallet_training_data_df_full.join(training_cluster_features_df, how='inner')
+
+    # Verify cohort integrity
+    missing_wallets = set(wallet_cohort) - set(wallet_training_data_df_full.index)
+    if missing_wallets:
+        raise ValueError(f"Lost {len(missing_wallets)} wallets from original cohort during feature "
+                         "generation. First few missing: {list(missing_wallets)[:5]}")
+
+    # Save final version
+    wallet_training_data_df_full.to_parquet(f"{parquet_folder}/wallet_training_data_df_full.parquet", index=True)
+
+
+
+# -----------------------------------
+#           Helper Functions
+# -----------------------------------
 
 @u.timing_decorator
 def define_training_wallet_cohort(profits_df: pd.DataFrame,
