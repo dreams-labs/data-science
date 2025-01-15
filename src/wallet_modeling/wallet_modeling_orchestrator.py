@@ -313,7 +313,8 @@ def hybridize_wallet_address(
 
 def dehybridize_wallet_address(
     df: pd.DataFrame,
-    hybrid_cw_id_map: Dict[Tuple[int, str], int]
+    hybrid_cw_id_map: Dict[Tuple[int, str], int],
+    hybrid_col_name: str = 'wallet_address'
 ) -> pd.DataFrame:
     """
     Restores original wallet_address-coin_id pairs from hybrid integer keys.
@@ -321,6 +322,7 @@ def dehybridize_wallet_address(
     Params:
     - df (DataFrame): dataframe with hybrid integer keys in wallet_address
     - hybrid_cw_id_map (dict): mapping of (wallet,coin) tuples to integers
+    - hybrid_col_name (str): name of the column containing the hybrid key
 
     Returns:
     - df (DataFrame): input df with original wallet_address restored
@@ -329,7 +331,7 @@ def dehybridize_wallet_address(
     reverse_map = {v: k for k, v in hybrid_cw_id_map.items()}
 
     # Vectorized mapping back to original tuples
-    df['wallet_address'] = df['wallet_address'].map(reverse_map).map(lambda x: x[0])
+    df[hybrid_col_name] = df[hybrid_col_name].map(reverse_map).map(lambda x: x[0])
 
     return df
 
