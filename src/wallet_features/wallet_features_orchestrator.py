@@ -61,8 +61,6 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     Returns:
     - wallet_features_df (df): Wallet-indexed features dataframe with a row for every wallet_cohort
     """
-    logger.info('starting data validation...')
-
     # Add indices and validate inputs
     prepare_dataframes(profits_df,market_indicators_data_df,transfers_sequencing_df,
                        period_start_date,period_end_date)
@@ -166,6 +164,7 @@ def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
     logger.debug("All input dataframes passed validation checks.")
 
 
+@u.timing_decorator
 def prepare_dataframes(profits_df: pd.DataFrame,
                        market_indicators_df: pd.DataFrame,
                        transfers_sequencing_df: pd.DataFrame,
