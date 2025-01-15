@@ -1,6 +1,32 @@
 # DDA 557 feature efficiency
 
 ## checkpoint 1
+
+### faster version
+Model Performance Summary
+===================================
+Test Samples:             7,640
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.234
+RMSE:                     0.446
+MAE:                      0.317
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.791
+RMSE:                     0.202
+MAE:                      0.101
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.006
+Standard Dev of Residuals:0.446
+95% Prediction Interval:  ±0.874
+
+
+### old version
 Model Performance Summary
 ===================================
 Test Samples:             51,661
