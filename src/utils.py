@@ -1176,24 +1176,32 @@ def export_code(
     logger.info(f"Consolidation complete. All files are saved in {output_file}")
 
 
-def logger_to_file(filepath: str) -> None:
+def setup_notebook_logger(log_filepath: str = None) -> logging.Logger:
     """
-    Adds file output to existing logger while preserving settings.
-    Prevents duplicate handlers for the same filepath.
+    Sets up logging for notebook development with optional file output.
+    Configures root logger to allow propagation to module-level loggers.
 
     Params:
-    - filepath (str): Path where log file should be created
+    - log_filepath (str, optional): Path for log file output
     """
-    logger = logging.getLogger()
+    root_logger = logging.getLogger()  # Get root logger
+    root_logger.setLevel(logging.INFO)  # Set level at root to allow propagation
 
-    # Check if handler for this file already exists
-    for handler in logger.handlers:
-        if isinstance(handler, logging.FileHandler) and handler.baseFilename == filepath:
-            return
+    # Clear any existing handlers to avoid duplicates
+    root_logger.handlers = []
 
-    file_handler = logging.FileHandler(filepath)
-    file_handler.setFormatter(logging.Formatter(
-        '[%(asctime)s] %(levelname)s [%(module)s.%(funcName)s:%(lineno)d] %(message)s',
+    logging.basicConfig(
+        level=logging.INFO,
+        format='[%(asctime)s] %(levelname)s [%(module)s.%(funcName)s:%(lineno)d] %(message)s',
         datefmt='%d/%b/%Y %H:%M:%S'
-    ))
-    logger.addHandler(file_handler)
+    )
+
+    if log_filepath:
+        file_handler = logging.FileHandler(log_filepath)
+        file_handler.setFormatter(logging.Formatter(
+            '[%(asctime)s] %(levelname)s [%(module)s.%(funcName)s:%(lineno)d] %(message)s',
+            datefmt='%d/%b/%Y %H:%M:%S'
+        ))
+        root_logger.addHandler(file_handler)
+
+    return root_logger
