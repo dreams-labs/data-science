@@ -73,9 +73,6 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     # Trading features (left join, fill 0s)
     # Requires both starting_balance_date and period_end_date imputed rows
     # -----------------------------------------------------------------------
-    profits_df = profits_df.reset_index()
-    market_indicators_data_df = market_indicators_data_df.reset_index()
-
 
     trading_features_df = wtf.calculate_wallet_trading_features(profits_df,
         period_start_date,period_end_date,
@@ -84,6 +81,9 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     feature_column_names['trading|'] = trading_features_df.columns
     wallet_features_df = wallet_features_df.join(trading_features_df, how='left')\
         .fillna({col: 0 for col in trading_features_df.columns})
+
+    profits_df.reset_index(inplace=True)
+    market_indicators_data_df.reset_index(inplace=True)
 
     # Performance features (left join, do not fill)
     # Requires both starting_balance_date and period_end_date imputed rows (same as trading)

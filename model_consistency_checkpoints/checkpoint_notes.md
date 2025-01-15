@@ -1,5 +1,24 @@
 # DDA 557 feature efficiency
 
+## checkpoint 2 partial refactor of trading
+Model Performance Summary
+===================================
+Test Samples:             7,640
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.243
+RMSE:                     0.443
+MAE:                      0.315
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.778
+RMSE:                     0.208
+MAE:                      0.113
+
+
+
 ## checkpoint 1
 
 ### faster version

@@ -33,7 +33,6 @@ def calculate_wallet_trading_features(
     period_start_date: str,
     period_end_date: str,
     include_twb_metrics: bool = True,
-    include_btc_metrics: bool = False
 ) -> pd.DataFrame:
     """
     Calculates comprehensive crypto trading metrics for each wallet.
@@ -61,13 +60,14 @@ def calculate_wallet_trading_features(
         - volume_vs_twb_ratio: Volume relative to time-weighted balance
     """
     # Validate profits_df
+    profits_df = profits_df.copy()
     profits_df = ensure_index(profits_df, period_start_date, period_end_date)
 
     # Calculate configured metrics
     # ----------------------------
     # Add crypto balance/transfers/gain helper columns
     profits_df = calculate_crypto_balance_columns(profits_df, period_start_date)
-    profits_df = profits_df.reset_index()
+    profits_df.reset_index(inplace=True)
 
     # Calculate net_gain and max_investment columns
     gain_and_investment_df = calculate_gain_and_investment_columns(profits_df)

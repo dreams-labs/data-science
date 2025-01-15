@@ -1,14 +1,15 @@
+# CheckpointValidation
 # WalletModel Config
 
 
+# CheckpointValidation
 # WalletModel Period Boundaries
 training_data:
     training_window_starts: [
         # "2023-06-01",
-        # "2024-01-01",
+        "2024-01-01",
         "2024-04-01",
         "2024-09-01",
-        "2024-10-01"
     ]
     modeling_period_start: "2024-11-01"
     modeling_period_end: "2024-11-20"
@@ -22,16 +23,17 @@ training_data:
     parquet_folder: 'temp/wallet_modeling_dfs'  # where to store parquet files
 
 
+# CheckpointValidation
 # WalletModel Cleaning
 data_cleaning:
 
     # Wallet cohort thresholds
-    min_coins_traded: 0  # Exclude wallets that have traded fewer coins than this during the training period
+    min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
     max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
 
-    min_wallet_investment: 5000 # time weighted average balance filter
-    min_wallet_inflows: 5000  # Exclude wallets with inflows below this amount (USD)
-    min_wallet_volume: 5000  # Exclude wallets with fewer than this amount of training period USD volume
+    min_wallet_investment: 10000 # time weighted average balance filter
+    min_wallet_inflows: 10000  # Exclude wallets with inflows below this amount (USD)
+    min_wallet_volume: 10000  # Exclude wallets with fewer than this amount of training period USD volume
 
     max_wallet_investment: 10_000_000 # time weighted average balance filter
     max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
@@ -56,6 +58,7 @@ data_cleaning:
     market_cap_default_fill:  500000  # coins below the imputation coverage level will have empty values filled with this
 
 
+# CheckpointValidation
 # WalletModel Features
 features:
     # Trading Params
@@ -85,7 +88,7 @@ features:
 
 
 
-
+# CheckpointValidation
 # WalletModel Modeling Config
 modeling:
 
@@ -98,6 +101,7 @@ modeling:
     drop_columns: []
     train_test_split: 0.2  # test size
 
+    # CheckpointValidation
     # WalletModel Params
     # Model specifics
     model_type: "xgb"
@@ -114,86 +118,16 @@ modeling:
 
         # Performance Profiles (Choose One Section)
         # --------------------------------------
-
-        # # SPEEDY
-        # n_estimators: 200  # number of trees to train in the model
-        # learning_rate: 0.05  # step size for updates to weights during training
-        # early_stopping_rounds: 20  # stop training if no improvement after x rounds
-        # gamma: 0.01  # minimum gain required to split further on a leaf node
-        # tree_method: 'hist'  # method for building trees, e.g., histogram-based
-        # max_bin: 128  # how many bins to categorize features into
-
-        # BALANCED
-        n_estimators: 800  # number of trees to train in the model
+        # CHECKPOINTER
+        n_estimators: 300  # number of trees to train in the model
         learning_rate: 0.025  # step size for updates to weights during training
         early_stopping_rounds: 25  # stop training if no improvement after x rounds
         gamma: 0.01  # minimum gain required to split further on a leaf node
         tree_method: 'hist'  # method for building trees, e.g., histogram-based
         max_bin: 256  # how many bins to categorize features into
 
-        # # WISE
-        # n_estimators: 5000
-        # learning_rate: 0.01
-        # early_stopping_rounds: 50
-        # gamma: 0.005
-        # tree_method: 'approx'
-        # max_bin: 256
-
         # Threading Controls
         n_jobs: -1
         nthread: -1
 
         random_state: 42
-
-
-    # WalletModel Grid Search
-    grid_search_params:
-
-        # Turn On or Off
-        enabled: false # whether to grid search
-
-        # Search Methodology
-        n_iter: 10  # random search limit
-        scoring: 'neg_root_mean_squared_error'
-        n_splits: 2  # cv splits
-        verbose_level: 3  # scikit-learn verbosity
-
-        # Target variables
-        target_variables: [
-            "crypto_net_gain/max_investment/winsorized",
-            "crypto_net_gain/max_investment/ntile_rank",
-        ]
-
-
-        # Params
-        param_grid:
-
-            # Depth and Child Weight
-            # regressor__min_child_weight_pct: [0.0001, 0.0002, 0.0005, 0.001]
-            # regressor__max_depth: [15, 17, 19, 21]  # basic depth param
-
-
-            # Col/Row Sampling
-            # regressor__subsample: [0.8, 0.9, 1.0]
-            # regressor__colsample_bytree: [0.9, 1.0]
-
-            # # Model Speed
-            # regressor__tree_method: ['hist', 'approx', 'auto']
-            # regressor__max_bin: [64, 128, 256]
-            # regressor__gamma: [0.0, 0.1, 1.0]  # controls the minimum loss reduction needed to split a node
-
-
-            # Tree Training Speed Overrides
-            regressor__n_estimators: [200]
-            regressor__learning_rate: [0.05]
-            regressor__gamma: 0.01
-
-            # Optimize for Speed
-            regressor__n_jobs: [4]  # how many models to build at once
-            regressor__nthread: [4]  # how many threads each model can use
-            regressor__max_bin: [128]
-            regressor__tree_method: ['hist']
-
-
-    # Coin model workflow params
-    score_name: "iterating"  # reference name for feature columns etc
