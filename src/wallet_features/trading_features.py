@@ -67,10 +67,10 @@ def calculate_wallet_trading_features(
     # ----------------------------
     # Add crypto balance/transfers/gain helper columns
     profits_df = calculate_crypto_balance_columns(profits_df, period_start_date)
-    profits_df.reset_index(inplace=True)
 
     # Calculate net_gain and max_investment columns
     gain_and_investment_df = calculate_gain_and_investment_columns(profits_df)
+    profits_df.reset_index(inplace=True)
 
     # Calculated metrics that ignore imputed transactions
     observed_activity_df = calculate_observed_activity_columns(profits_df,period_start_date,period_end_date)
@@ -158,42 +158,44 @@ def buy_crypto_start_balance(df: pd.DataFrame, period_start_date: str) -> pd.Dat
 
 def calculate_gain_and_investment_columns(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calculates net gain and max investment for each wallet.
+    Calculates net gain and max investment using multiindex operations.
 
     Params:
-    - profits_df (DataFrame): Profits data with crypto_cumulative_net_gain
-                            and crypto_cumulative_transfers columns
+    - profits_df (DataFrame): Profits data with multiindex (coin_id, wallet_address, date)
+                            and required columns
 
     Returns:
-    - gain_and_investment_df (DataFrame): Metrics keyed on wallet_address with columns:
+    - gain_and_investment_df (DataFrame): Wallet metrics with columns:
         - max_investment: Maximum cumulative transfers (floored at 0)
         - crypto_net_gain: Final unrealized gain per wallet
+        - total_crypto_buys: Sum of positive balance changes
+        - total_crypto_sells: Sum of negative balance changes
+        - net_crypto_investment: Net balance changes
     """
-    # Retrieve the cumulative net gain at the end of the period
-    last_rows = profits_df.drop_duplicates(subset=['wallet_address', 'coin_id'], keep='last')
-    gains_df = last_rows.groupby('wallet_address', as_index=False).agg(
+    # Get last entry per wallet-coin using index levels
+    last_rows = profits_df.groupby(level=['coin_id', 'wallet_address'], observed=True).last()
+
+    # Sum gains across coins for each wallet
+    gains_df = last_rows.groupby(level='wallet_address', observed=True).agg(
         crypto_net_gain=('crypto_cumulative_net_gain', 'sum')
-    ).set_index('wallet_address')
+    )
 
-    # Calculate buy/sell metrics from full dataset, including opening balances
-    profits_df['positive_changes'] = np.where(profits_df['crypto_balance_change'] > 0,
-                                            profits_df['crypto_balance_change'], 0)
-    profits_df['negative_changes'] = np.where(profits_df['crypto_balance_change'] < 0,
-                                            -profits_df['crypto_balance_change'], 0)
+    # Add buy/sell columns
+    balance_changes = profits_df['crypto_balance_change']
+    profits_df['positive_changes'] = balance_changes.clip(lower=0)
+    profits_df['negative_changes'] = (-balance_changes).clip(lower=0)
 
-    # Group and aggregate for max investment
-    investments_df = profits_df.groupby('wallet_address').agg(
+    # Calculate all investment metrics in one groupby
+    investments_df = profits_df.groupby(level='wallet_address', observed=True).agg(
         max_investment=('crypto_cumulative_transfers', 'max'),
         total_crypto_buys=('positive_changes', 'sum'),
         total_crypto_sells=('negative_changes', 'sum'),
-        net_crypto_investment=('crypto_balance_change', 'sum'),
+        net_crypto_investment=('crypto_balance_change', 'sum')
     )
-
-    # Set floor of 0 on max_investment to match business constraint
     investments_df['max_investment'] = investments_df['max_investment'].clip(lower=0)
 
-    # Combine metrics
-    gain_and_investment_df = investments_df.join([gains_df])
+    # Combine metrics - both DataFrames are indexed on wallet_address
+    gain_and_investment_df = investments_df.join(gains_df)
 
     return gain_and_investment_df
 
