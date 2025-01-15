@@ -70,7 +70,6 @@ def calculate_wallet_trading_features(
 
     # Calculate net_gain and max_investment columns
     gain_and_investment_df = calculate_gain_and_investment_columns(profits_df)
-    profits_df.reset_index(inplace=True)
 
     # Calculated metrics that ignore imputed transactions
     observed_activity_df = calculate_observed_activity_columns(profits_df,period_start_date,period_end_date)
@@ -80,6 +79,8 @@ def calculate_wallet_trading_features(
 
     # Add twb if configured to do so
     if include_twb_metrics:
+
+        profits_df.reset_index(inplace=True)
 
         # Calculate time weighted balance using the cost basis
         time_weighted_df = aggregate_time_weighted_balance(profits_df)
@@ -93,6 +94,8 @@ def calculate_wallet_trading_features(
             trading_features_df['total_volume'] / trading_features_df['time_weighted_balance'],
             0
         )
+
+        profits_df = ensure_index(profits_df, period_start_date, period_end_date)
 
     # Fill missing values and handle edge cases
     trading_features_df = trading_features_df.fillna(0).replace(-0, 0)
@@ -200,7 +203,6 @@ def calculate_gain_and_investment_columns(profits_df: pd.DataFrame) -> pd.DataFr
     return gain_and_investment_df
 
 
-
 def calculate_observed_activity_columns(profits_df: pd.DataFrame,
                                         period_start_date: str,
                                         period_end_date: str) -> pd.DataFrame:
@@ -216,31 +218,50 @@ def calculate_observed_activity_columns(profits_df: pd.DataFrame,
     - activity_df (DataFrame): Activity metrics keyed on wallet_address with columns:
         - unique_coins_traded: Number of unique coins traded
         - total_volume: Sum of absolute balance changes
-        - total_crypto_buys: Sum of positive balance changes
-        - total_crypto_sells: Sum of negative balance changes
-        - net_crypto_investment: Net sum of all balance changes
         - transaction_days: Number of days with activity
         - average_transaction: Mean absolute balance change
         - activity_density: Transaction days / period duration
     """
     # Filter to actual transaction activity (excluding imputed rows)
-    observed_profits_df = profits_df.loc[~profits_df['is_imputed'],
-                                ['wallet_address', 'date', 'coin_id', 'crypto_balance_change']]
+    observed_profits_df = profits_df.loc[~profits_df['is_imputed']].copy()
 
     # Precompute absolute balance changes
     observed_profits_df['abs_balance_change'] = observed_profits_df['crypto_balance_change'].abs()
 
-    # Calculate observed activity metrics
-    observed_activity_df = observed_profits_df.groupby('wallet_address', as_index=False).agg(
-        unique_coins_traded=('coin_id', 'nunique'),
+    # Extract index levels for unique counts
+    index_frame = observed_profits_df.index.to_frame(index=False)
+
+    # Calculate unique coins
+    unique_coins = (
+        index_frame[['wallet_address', 'coin_id']]
+        .drop_duplicates()
+        .groupby('wallet_address')
+        .size()
+    )
+
+    # Calculate unique dates
+    transaction_days = (
+        index_frame[['wallet_address', 'date']]
+        .drop_duplicates()
+        .groupby('wallet_address')
+        .size()
+    )
+
+    # Calculate volume metrics
+    volume_metrics = observed_profits_df.groupby(level='wallet_address', observed=True).agg(
         total_volume=('abs_balance_change', 'sum'),
-        transaction_days=('date', 'nunique'),
-        average_transaction=('abs_balance_change', 'mean'),
-    ).set_index('wallet_address')
+        average_transaction=('abs_balance_change', 'mean')
+    )
+
+    # Combine metrics
+    observed_activity_df = volume_metrics.assign(
+        unique_coins_traded=unique_coins,
+        transaction_days=transaction_days
+    )
 
     # Add activity density based on period duration
     period_duration = (datetime.strptime(period_end_date, '%Y-%m-%d') -
-                        datetime.strptime(period_start_date, '%Y-%m-%d')).days + 1
+                      datetime.strptime(period_start_date, '%Y-%m-%d')).days + 1
     observed_activity_df['activity_density'] = observed_activity_df['transaction_days'] / period_duration
 
     return observed_activity_df
