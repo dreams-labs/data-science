@@ -1,11 +1,13 @@
+# CheckpointValidation
 # WalletModel Config
 
 
+# CheckpointValidation
 # WalletModel Period Boundaries
 training_data:
     training_window_starts: [
-        # "2023-06-01",
-        # "2024-01-01",
+        "2023-06-01",
+        "2024-01-01",
         "2024-04-01",
         "2024-09-01",
         "2024-10-01"
@@ -22,15 +24,16 @@ training_data:
     parquet_folder: 'temp/wallet_modeling_dfs'  # where to store parquet files
 
 
+# CheckpointValidation
 # WalletModel Cleaning
 data_cleaning:
 
     # Wallet cohort thresholds
-    min_coins_traded: 0  # Exclude wallets that have traded fewer coins than this during the training period
+    min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period
     max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
 
-    min_wallet_investment: 5000 # time weighted average balance filter
-    min_wallet_inflows: 5000  # Exclude wallets with inflows below this amount (USD)
+    min_wallet_investment: 1000 # time weighted average balance filter
+    min_wallet_inflows: 1000  # Exclude wallets with inflows below this amount (USD)
     min_wallet_volume: 5000  # Exclude wallets with fewer than this amount of training period USD volume
 
     max_wallet_investment: 10_000_000 # time weighted average balance filter
@@ -56,6 +59,7 @@ data_cleaning:
     market_cap_default_fill:  500000  # coins below the imputation coverage level will have empty values filled with this
 
 
+# CheckpointValidation
 # WalletModel Features
 features:
     # Trading Params
@@ -86,6 +90,7 @@ features:
 
 
 
+# CheckpointValidation
 # WalletModel Modeling Config
 modeling:
 
@@ -98,6 +103,7 @@ modeling:
     drop_columns: []
     train_test_split: 0.2  # test size
 
+    # CheckpointValidation
     # WalletModel Params
     # Model specifics
     model_type: "xgb"
@@ -146,6 +152,7 @@ modeling:
         random_state: 42
 
 
+    # CheckpointValidation
     # WalletModel Grid Search
     grid_search_params:
 

@@ -1,0 +1,27 @@
+# CheckpointValidation
+# Time series keyed on coin_id-date
+time_series:
+    market_data:
+        price:
+            indicators:
+                sma:
+                    parameters:
+                        window: [5]
+                rsi:
+                    parameters:
+                        window: [5]
+        volume:
+            indicators:
+                sma:
+                    parameters:
+                        window: [5]
+        mfi:
+            indicators:
+                sma:
+                    parameters:
+                        window: [5]
+        obv:
+            indicators:
+                sma:
+                    parameters:
+                        window: [5]
