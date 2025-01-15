@@ -29,9 +29,9 @@ wallets_config = WalletsConfig()
 
 
 
-# -----------------------------------------
-#   Training Data Orchestration Function
-# -----------------------------------------
+# ------------------------------------------
+#      Primary Orchestration Functions
+# ------------------------------------------
 
 @u.timing_decorator
 def retrieve_period_datasets(period_start_date, period_end_date, coin_cohort=None, parquet_prefix=None):
