@@ -108,6 +108,7 @@ def calculate_wallet_trading_features(
 # -----------------------------------
 
 
+@u.timing_decorator
 def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
                                    period_start_date: str
                                    ) -> pd.DataFrame:
@@ -136,6 +137,7 @@ def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
 
 
 
+@u.timing_decorator
 def buy_crypto_start_balance(df: pd.DataFrame, period_start_date: str) -> pd.DataFrame:
     """
     Sets start date crypto balance change using multiindex operations.
@@ -159,6 +161,7 @@ def buy_crypto_start_balance(df: pd.DataFrame, period_start_date: str) -> pd.Dat
 
 
 
+@u.timing_decorator
 def calculate_gain_and_investment_columns(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
     Calculates net gain and max investment using multiindex operations.
@@ -203,6 +206,7 @@ def calculate_gain_and_investment_columns(profits_df: pd.DataFrame) -> pd.DataFr
     return gain_and_investment_df
 
 
+@u.timing_decorator
 def calculate_observed_activity_columns(profits_df: pd.DataFrame,
                                         period_start_date: str,
                                         period_end_date: str) -> pd.DataFrame:
@@ -353,6 +357,7 @@ def aggregate_time_weighted_balance(profits_df: pd.DataFrame) -> pd.DataFrame:
 
 
 
+@u.timing_decorator
 def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
     Optimized cost basis calculation focusing on maintaining original loop efficiency.
@@ -424,6 +429,7 @@ def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
 #          Utility Functions
 # -----------------------------------
 
+@u.timing_decorator
 def ensure_index(profits_df: pd.DataFrame,
                        period_start_date: str,
                        period_end_date: str
