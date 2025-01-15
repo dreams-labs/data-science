@@ -56,14 +56,18 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     Returns:
     - wallet_features_df (df): Wallet-indexed features dataframe with a row for every wallet_cohort
     """
+    logger.info('starting data validation...')
     # Validate inputs
     u.assert_period(profits_df, period_start_date, period_end_date)
+    logger.info('data validation1')
     validate_inputs(profits_df, market_indicators_data_df, transfers_sequencing_df)
+    logger.info('data validation2')
 
     # Downcast to ensure optimal memory usage
     profits_df = u.df_downcast(profits_df)
     market_indicators_data_df = u.df_downcast(market_indicators_data_df)
     transfers_sequencing_df = u.df_downcast(transfers_sequencing_df)
+    logger.info('data validation complete.')
 
     # Initialize output dataframe
     wallet_features_df = pd.DataFrame(index=wallet_cohort)

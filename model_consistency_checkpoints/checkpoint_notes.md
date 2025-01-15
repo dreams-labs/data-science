@@ -1,3 +1,25 @@
+# DDA 557 feature efficiency
+
+## checkpoint 1
+Model Performance Summary
+===================================
+Test Samples:             51,661
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.349
+RMSE:                     0.421
+MAE:                      0.292
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.746
+RMSE:                     0.228
+MAE:                      0.131
+
+
+
+
 # DDA 518 orchestrator functions
 
 ## checkpoint 1
