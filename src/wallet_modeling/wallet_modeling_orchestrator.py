@@ -14,6 +14,7 @@ import training_data.profits_row_imputation as pri
 import coin_wallet_metrics.indicators as ind
 import wallet_modeling.wallet_training_data as wtd
 import wallet_features.trading_features as wtf
+import wallet_features.performance_features as wpf
 import wallet_features.transfers_features as wts
 import wallet_features.wallet_features_orchestrator as wfo
 import wallet_features.clustering_features as wcl
@@ -28,9 +29,9 @@ wallets_config = WalletsConfig()
 
 
 
-# -----------------------------------
-#   Primary Orchestration Functions
-# -----------------------------------
+# -----------------------------------------
+#   Training Data Orchestration Function
+# -----------------------------------------
 
 @u.timing_decorator
 def retrieve_period_datasets(period_start_date, period_end_date, coin_cohort=None, parquet_prefix=None):
@@ -233,6 +234,84 @@ def generate_training_features(
     # Save final version
     wallet_training_data_df_full.to_parquet(f"{parquet_folder}/wallet_training_data_df_full.parquet", index=True)
 
+
+
+# -----------------------------------------
+#   Modeling Data Orchestration Function
+# -----------------------------------------
+
+@u.timing_decorator
+def prepare_modeling_features(
+    modeling_profits_df_full: pd.DataFrame,
+    hybrid_cw_id_map: Optional[Dict] = None
+) -> pd.DataFrame:
+    """
+    Orchestrates data preparation and feature generation for modeling.
+
+    Params:
+    - modeling_market_data_df_full: Full market data DataFrame
+    - modeling_profits_df_full: Full profits DataFrame
+    - config: Configuration dictionary
+    - hybrid_cw_id_map: Optional mapping for hybrid wallet IDs
+
+    Returns:
+    - modeling_wallet_features_df: Generated wallet features
+    """
+    logger.info("Beginning modeling data preparation...")
+
+    # Handle hybridization if configured
+    if wallets_config['training_data']['hybridize_wallet_ids'] is True:
+        logger.info("Applying wallet-coin hybridization...")
+        modeling_profits_df_full, _ = hybridize_wallet_address(
+            modeling_profits_df_full,
+            hybrid_cw_id_map
+        )
+
+    # Get training wallet cohort
+    logger.info("Loading training wallet cohort...")
+    training_wallet_cohort = pd.read_parquet(
+        f"{wallets_config['training_data']['parquet_folder']}/wallet_training_data_df_full.parquet",
+        columns=[]
+    ).index.values
+
+    # Filter profits to training cohort
+    modeling_profits_df = modeling_profits_df_full[
+        modeling_profits_df_full['wallet_address'].isin(training_wallet_cohort)
+    ]
+    del modeling_profits_df_full
+
+    # Initialize features DataFrame
+    logger.info("Generating modeling features...")
+    modeling_wallet_features_df = pd.DataFrame(index=training_wallet_cohort)
+    modeling_wallet_features_df.index.name = 'wallet_address'
+
+    # Generate trading features and identify modeling cohort
+    modeling_trading_features_df = identify_modeling_cohort(modeling_profits_df)
+    modeling_wallet_features_df = modeling_wallet_features_df.join(
+        modeling_trading_features_df,
+        how='left'
+    ).fillna({col: 0 for col in modeling_trading_features_df.columns})
+
+    # Generate performance features
+    modeling_performance_features_df = wpf.calculate_performance_features(
+        modeling_wallet_features_df,
+        include_twb_metrics=False
+    )
+    modeling_wallet_features_df = modeling_wallet_features_df.join(
+        modeling_performance_features_df,
+        how='left'
+    ).fillna({col: 0 for col in modeling_performance_features_df.columns})
+
+    # Save features
+    output_path = f"{wallets_config['training_data']['parquet_folder']}/modeling_wallet_features_df.parquet"
+    modeling_wallet_features_df.to_parquet(output_path, index=True)
+    logger.info("Saved modeling features to %s", output_path)
+
+    # Clean up memory
+    del modeling_trading_features_df, modeling_performance_features_df, modeling_profits_df
+    gc.collect()
+
+    return modeling_wallet_features_df
 
 
 # -----------------------------------
@@ -574,3 +653,51 @@ def upload_hybrid_wallet_mapping(hybrid_cw_id_map: Dict[Tuple[int, str], int]) -
         len(hybrid_cw_id_map),
         hybrid_table
     )
+
+
+def merge_wallet_hybrid_data(
+    hybrid_parquet_path: str,
+    base_parquet_path: str,
+    output_parquet_path: str,
+    hybrid_suffix: str = "/walletcoin",
+    base_suffix: str = "/wallet"
+) -> str:
+    """
+    Merges hybrid and non-hybrid wallet data frames and saves to parquet.
+
+    Params:
+    - hybrid_parquet_path (str): Path to hybrid wallet-coin data parquet
+    - base_parquet_path (str): Path to base wallet data parquet
+    - output_parquet_path (str): Where to save merged result
+    - hybrid_suffix (str): Suffix for hybrid columns
+    - base_suffix (str): Suffix for base columns
+
+    Returns:
+    - str: Path to saved merged parquet file
+    """
+    # Read input files
+    hybrid_df = pd.read_parquet(hybrid_parquet_path)
+    base_df = pd.read_parquet(base_parquet_path)
+
+    # Create temporary base address column for merging
+    hybrid_df['wallet_address_base'] = hybrid_df.index.values
+
+    # Merge the dataframes
+    merged_df = hybrid_df.merge(
+        base_df,
+        left_on='wallet_address_base',
+        right_index=True,
+        suffixes=(hybrid_suffix, base_suffix)
+    )
+
+    # Clean up temporary column
+    merged_df = merged_df.drop('wallet_address_base', axis=1)
+
+    # Save merged result
+    merged_df.to_parquet(output_parquet_path, index=True)
+
+    # Clean up memory
+    del hybrid_df, base_df, merged_df
+    gc.collect()
+
+    return output_parquet_path
