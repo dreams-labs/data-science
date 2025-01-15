@@ -131,71 +131,58 @@ def test_ratio_calculation(sample_performance_features_df):
 
 
 @pytest.mark.unit
-def test_transform_performance_ratios(sample_performance_features_df):
+def test_transform_performance_ratios(sample_performance_features_df, monkeypatch):
     """
-    Test to validate the correctness of transformations applied to performance ratios by
-    wpf.transform_performance_ratios.
-    Steps:
-    1. Generate raw ratios using wpf.calculate_performance_ratios.
-    2. Apply transformations, including rank, log, winsorization, and ntile rank.
-    3. Validate the correctness of each transformation step.
+    Test to validate performance ratio transformations with ntile=2 override.
     """
-    # Step 1: Generate raw ratios
+    # Override config setting
+    monkeypatch.setitem(wallets_config['features'], 'ranking_ntiles', 2)
+
+    # Steps 1-3 remain unchanged
     ratio_df = wpf.calculate_performance_ratios(sample_performance_features_df)
-
-    # Step 2: Define balance metrics for ntile calculation
     balance_features_df = sample_performance_features_df.filter(like='balance_')
-
-    # Step 3: Transform the performance ratios
     transformed_df = wpf.transform_performance_ratios(ratio_df, balance_features_df)
 
-    # Explanation of assertions:
-    # 1. Base ratios: Validate that the base ratios remain unchanged after transformation.
+    # Assertions 1-4 remain unchanged
     for col in ratio_df.columns:
+        # Base ratio validation
         assert np.allclose(
             transformed_df[f"{col}/base"].values,
             ratio_df[col].values,
             equal_nan=True
-        ), f"Base ratio for {col} does not match expected values."
+        )
 
-    # 2. Rank: Validate that the ranks are correctly calculated as percentiles.
-    for col in ratio_df.columns:
+        # Rank validation
         expected_rank = ratio_df[col].rank(method="average", pct=True).values
         assert np.allclose(
             transformed_df[f"{col}/rank"].values,
             expected_rank,
             equal_nan=True
-        ), f"Rank for {col} does not match expected values."
+        )
 
-    # 3. Log transformation: Validate signed log calculations.
-    for col in ratio_df.columns:
+        # Log validation
         expected_log = np.sign(ratio_df[col]) * np.log1p(ratio_df[col].abs())
         assert np.allclose(
             transformed_df[f"{col}/log"].values,
             expected_log,
             equal_nan=True
-        ), f"Log transformation for {col} does not match expected values."
+        )
 
-    # 4. Winsorization: Validate winsorized ratios based on config.
-    # Assume wallets_config['features']['returns_winsorization'] = 0.05
-    winsorization_threshold = wallets_config['features']['returns_winsorization']
-    for col in ratio_df.columns:
-        series = ratio_df[col]
-        expected_winsorized = u.winsorize(series, cutoff=winsorization_threshold)
+        # Winsorization validation
+        winsorization_threshold = wallets_config['features']['returns_winsorization']
+        expected_winsorized = u.winsorize(ratio_df[col], cutoff=winsorization_threshold)
         assert np.allclose(
             transformed_df[f"{col}/winsorized"].values,
             expected_winsorized.values,
             equal_nan=True
-        ), f"Winsorized values for {col} do not match expected values."
+        )
 
-    # 5. Ntile rank: Validate that ntile ranks are calculated correctly.
-    ntile_count = 10  # Assume config sets this to 10
-    for col in ratio_df.columns:
+        # Modified ntile validation using overridden value
         denominator = col.split("/")[1]
         balance_col = f"balance_{denominator}"
         metric_ntiles = pd.qcut(
             balance_features_df[balance_col],
-            q=ntile_count,
+            q=2,  # Explicitly use 2 to match override
             labels=False,
             duplicates="drop"
         )
@@ -209,7 +196,7 @@ def test_transform_performance_ratios(sample_performance_features_df):
             transformed_df[f"{col}/ntile_rank"].values,
             expected_ntile_rank.values,
             equal_nan=True
-        ), f"Ntile rank for {col} does not match expected values."
+        )
 
 
 

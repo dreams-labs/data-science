@@ -1,10 +1,12 @@
-"""
-Orchestrates groups of functions to generate wallet model pipeline
-"""
-
+"""Orchestrates groups of functions to generate wallet model pipeline"""
 import time
 import logging
+from datetime import datetime
+from typing import Tuple,Optional,Dict
 import pandas as pd
+import numpy as np
+import pandas_gbq
+from google.cloud import bigquery
 
 # Local module imports
 import training_data.profits_row_imputation as pri
@@ -66,10 +68,28 @@ def retrieve_period_datasets(period_start_date, period_end_date, coin_cohort=Non
     return profits_df_formatted, market_data_df_formatted, coin_cohort
 
 
+
 @u.timing_decorator
-def define_training_wallet_cohort(profits_df,market_data_df):
+def define_training_wallet_cohort(profits_df: pd.DataFrame,
+                                  market_data_df: pd.DataFrame,
+                                  hybridize_wallet_ids: bool
+                                ) -> Tuple[pd.DataFrame, np.ndarray]:
     """
-    Applies transformations and filters to identify wallets that pass data cleaning filters
+    Orchestrates the definition of a wallet cohort for model training by:
+    1. Imputing profits at period boundaries
+    2. Calculating wallet-level trading metrics
+    3. Filtering wallets based on behavior thresholds
+    4. Uploading filtered cohort to BigQuery
+
+    Params:
+    - profits_df (DataFrame): Historical profit and balance data for all wallets
+    - market_data_df (DataFrame): Market prices and metadata for relevant period
+    - hybridize_wallet_ids (bool): whether the IDs are regular wallet_ids or hybrid wallet-coin IDs
+
+
+    Returns:
+    - training_cohort_profits_df (DataFrame): Profits data filtered to selected wallets
+    - training_wallet_cohort (ndarray): Array of wallet addresses that pass filters
     """
     start_time = time.time()
     training_period_start = wallets_config['training_data']['training_period_start']
@@ -100,7 +120,7 @@ def define_training_wallet_cohort(profits_df,market_data_df):
     training_wallet_cohort = filtered_training_wallet_metrics_df.index.values
 
     # Upload the cohort to BigQuery for additional complex feature generation
-    wtd.upload_wallet_cohort(training_wallet_cohort)
+    wtd.upload_training_cohort(training_wallet_cohort, hybridize_wallet_ids)
     logger.info("Training wallet cohort defined as %s wallets after %.2f seconds.",
                 len(training_wallet_cohort), time.time()-start_time)
 
@@ -255,3 +275,132 @@ def identify_modeling_cohort(modeling_period_profits_df: pd.DataFrame) -> pd.Dat
 
 
     return modeling_wallets_df
+
+
+
+# -----------------------------------
+#   Hybrid Index Utility Functions
+# -----------------------------------
+
+def hybridize_wallet_address(
+    df: pd.DataFrame,
+    hybrid_cw_id_map: Optional[Dict[Tuple[int, str], int]] = None
+) -> Tuple[pd.DataFrame, Dict[Tuple[int, str], int]]:
+    """
+    Maps wallet_address-coin_id pairs to unique integers for efficient indexing.
+
+    Params:
+    - df (DataFrame): dataframe with columns ['coin_id','wallet_address']
+    - hybrid_cw_id_map (dict): mapping of (wallet,coin) tuples to integers
+
+    Returns:
+    - df (DataFrame): input df with hybrid integer keys
+    - hybrid_cw_id_map (dict): mapping of (wallet,coin) tuples to integers
+    """
+    # Create unique mapping for wallet-coin pairs
+    unique_pairs = list(zip(df['wallet_address'], df['coin_id']))
+
+    # Generate new mapping if none was provided
+    if hybrid_cw_id_map is None:
+        hybrid_cw_id_map = {pair: idx for idx, pair in enumerate(set(unique_pairs), 1)}
+
+    # Vectorized mapping of pairs to integers
+    df['wallet_address'] = pd.Series(unique_pairs).map(hybrid_cw_id_map)
+
+    return df, hybrid_cw_id_map
+
+
+
+def dehybridize_wallet_address(
+    df: pd.DataFrame,
+    hybrid_cw_id_map: Dict[Tuple[int, str], int],
+    hybrid_col_name: str = 'wallet_address'
+) -> pd.DataFrame:
+    """
+    Restores original wallet_address-coin_id pairs from hybrid integer keys.
+
+    Params:
+    - df (DataFrame): dataframe with hybrid integer keys in wallet_address
+    - hybrid_cw_id_map (dict): mapping of (wallet,coin) tuples to integers
+    - hybrid_col_name (str): name of the column containing the hybrid key
+
+    Returns:
+    - df (DataFrame): input df with original wallet_address restored
+    """
+    # Create reverse mapping
+    reverse_map = {v: k for k, v in hybrid_cw_id_map.items()}
+
+    # Vectorized mapping back to original tuples
+    df[hybrid_col_name] = df[hybrid_col_name].map(reverse_map).map(lambda x: x[0])
+
+    return df
+
+
+
+def upload_hybrid_wallet_mapping(hybrid_cw_id_map: Dict[Tuple[int, str], int]) -> None:
+    """
+    Uploads the mapping of hybrid indices to all wallet-coin pairs to BigQuery.
+
+    Params:
+        hybrid_cw_id_map (Dict[Tuple[int, str], int]): Mapping of (wallet,coin) tuples to hybrid indices
+    """
+    # 1. Generate upload_df from hybrid map
+    # -------------------------------------
+    upload_df = pd.DataFrame(
+        [(v, k[0], k[1]) for k, v in hybrid_cw_id_map.items()],
+        columns=['hybrid_id', 'wallet_id', 'coin_id']
+    )
+    upload_df['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    # Set df datatypes
+    dtype_mapping = {
+        'hybrid_id': int,
+        'wallet_id': int,
+        'coin_id': str,
+        'updated_at': 'datetime64[ns, UTC]'
+    }
+    upload_df = upload_df.astype(dtype_mapping)
+
+    # 2. Upload to BigQuery
+    # ---------------------
+    project_id = 'western-verve-411004'
+    client = bigquery.Client(project=project_id)
+
+    hybrid_table = f"{project_id}.temp.wallet_modeling_hybrid_id_mapping"
+    schema = [
+        {'name': 'hybrid_id', 'type': 'int64'},
+        {'name': 'wallet_id', 'type': 'int64'},
+        {'name': 'coin_id', 'type': 'string'},
+        {'name': 'updated_at', 'type': 'datetime'}
+    ]
+
+    pandas_gbq.to_gbq(
+        upload_df,
+        hybrid_table,
+        project_id=project_id,
+        if_exists='replace',
+        table_schema=schema,
+        progress_bar=False
+    )
+
+    # 3. Create final table with resolved wallet addresses
+    # ----------------------------------------------------
+    create_query = f"""
+    CREATE OR REPLACE TABLE `{hybrid_table}` AS
+    SELECT
+        h.hybrid_id,
+        h.coin_id,
+        h.wallet_id,
+        w.wallet_address,
+        CURRENT_TIMESTAMP() as updated_at
+    FROM `{hybrid_table}` h
+    LEFT JOIN `reference.wallet_ids` w
+        ON h.wallet_id = w.wallet_id
+    """
+
+    client.query(create_query).result()
+    logger.info(
+        'Uploaded complete hybrid ID mapping of %s wallet-coin pairs to %s.',
+        len(hybrid_cw_id_map),
+        hybrid_table
+    )

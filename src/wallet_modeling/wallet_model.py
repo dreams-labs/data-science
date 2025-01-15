@@ -23,9 +23,9 @@ class WalletModel(BaseModel):
     Extends BaseModel with wallet-specific data preparation and grid search.
     """
 
-# -----------------------------------
-#           Helper Methods
-# -----------------------------------
+    # -----------------------------------
+    #           Helper Methods
+    # -----------------------------------
 
     def _prepare_data(self, training_data_df: pd.DataFrame,
                       modeling_cohort_target_var_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
@@ -99,9 +99,9 @@ class WalletModel(BaseModel):
         return predictions
 
 
-# -----------------------------------
-#         Primary Interface
-# -----------------------------------
+    # -----------------------------------
+    #         Primary Interface
+    # -----------------------------------
 
     def construct_wallet_model(self, training_data_df: pd.DataFrame,
                             modeling_cohort_target_var_df: pd.DataFrame,
@@ -119,12 +119,18 @@ class WalletModel(BaseModel):
         """
         logger.info("Beginning model construction...")
 
-        # Validate indexes match
-        if not training_data_df.index.equals(modeling_cohort_target_var_df.index):
+        # Validate all training data has targets and remove excess target rows
+        if not training_data_df.index.isin(modeling_cohort_target_var_df.index).all():
             raise ValueError(
-                "training_data_df and modeling_cohort_target_var_df must have identical indexes. "
-                f"Found lengths {len(training_data_df)} and {len(modeling_cohort_target_var_df)}"
+                "Some training data points are missing target values. "
+                f"Found {(~training_data_df.index.isin(modeling_cohort_target_var_df.index)).sum()} "
+                "training rows without targets."
             )
+
+        # Filter target df to only include rows with training data
+        modeling_cohort_target_var_df = modeling_cohort_target_var_df[
+            modeling_cohort_target_var_df.index.isin(training_data_df.index)
+        ]
 
         # Run base experiment
         self._prepare_data(training_data_df, modeling_cohort_target_var_df)

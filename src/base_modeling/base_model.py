@@ -209,6 +209,7 @@ class BaseModel:
 
         # Pass eval_set to XGBoost through the pipeline
         # The regressor__ prefix routes the parameter to the XGBoost step
+        u.notify('correct')
         self.pipeline.fit(
             self.X_train,
             self.y_train,

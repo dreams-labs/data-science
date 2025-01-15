@@ -258,13 +258,15 @@ def analyze_wallet_model_importance(feature_importances):
     features_df = split_df['feature_details'].str.split('/', expand=True)
     features_df.columns = ['feature_name', 'feature_comparison', 'feature_aggregation']
 
+    segments_df = split_df['training_segment'].str.split('/', expand=True)
+    segments_df.columns = ['training_segment','record_type']
+
     # Combine all components
     feature_details_df = pd.concat([
         split_df['feature_category'],
         features_df,
-        split_df['training_segment'],
+        segments_df,
         feature_importance_df['importance']
     ], axis=1)
 
     return feature_details_df
-

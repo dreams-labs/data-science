@@ -1028,6 +1028,23 @@ def notify(sound_name: Union[str, int] = None, prompt: str = None, voice_id: str
         return f"Error with playback: {e}"
 
 
+
+def notify_on_failure(shell, etype, value, tb, tb_offset=None):
+    """
+    Custom error handler that plays a notification sound
+    and displays the traceback normally.
+    """
+    try:
+        # Play error notification
+        notify(19)
+    except Exception:
+        pass  # Safely ignore any errors with notify()
+
+    # Call the original traceback display method
+    shell.showtraceback((etype, value, tb), tb_offset=tb_offset)
+
+
+
 # pylint: disable=dangerous-default-value
 def export_code(
     code_directories=[],
@@ -1058,23 +1075,23 @@ def export_code(
         logger.error(f"Parent directory '{parent_directory}' does not exist.")
         raise FileNotFoundError(f"Parent directory '{parent_directory}' does not exist.")
 
-    # If no specific code directories are provided, default to all subdirectories
-    if not code_directories:
-        logger.warning("No code directories specified. Defaulting to all directories under the parent directory.")
-        code_directories = [d for d in os.listdir(parent_directory) if os.path.isdir(os.path.join(parent_directory, d))]
-
-    # Validate each code directory
+    # If no specific code directories are provided, skip directory processing
     valid_directories = []
-    for directory in code_directories:
-        full_path = os.path.join(parent_directory, directory)
-        if not os.path.exists(full_path):
-            logger.warning(f"Code directory '{full_path}' does not exist. Skipping.")
-        else:
-            valid_directories.append(full_path)
+    if code_directories:
+        # Validate each code directory
+        for directory in code_directories:
+            full_path = os.path.join(parent_directory, directory)
+            if not os.path.exists(full_path):
+                logger.warning(f"Code directory '{full_path}' does not exist. Skipping.")
+            else:
+                valid_directories.append(full_path)
 
-    if not valid_directories:
-        logger.error("No valid code directories found.")
-        raise ValueError("None of the specified code directories exist under the parent directory.")
+        # Process the valid directories
+        for directory in valid_directories:
+            for root, _, files in os.walk(directory):
+                for file in files:
+                    if file.endswith('.py'):
+                        file_path = os.path.join(root, file)
 
     # Check the config directory
     if not os.path.exists(config_directory):

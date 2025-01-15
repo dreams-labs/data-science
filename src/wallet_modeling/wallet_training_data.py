@@ -3,7 +3,7 @@ Primary sequence functions used as part of the wallet modeling pipeline
 """
 
 import logging
-from datetime import datetime,timedelta
+from datetime import datetime, timedelta
 from typing import List
 from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
@@ -25,6 +25,11 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 
 
+
+
+# -----------------------------------
+#      Training Data Preparation
+# -----------------------------------
 
 @u.timing_decorator
 def retrieve_raw_datasets(period_start_date, period_end_date):
@@ -211,6 +216,86 @@ def generate_training_window_imputation_dates() -> List[datetime]:
 
 
 
+def split_training_window_dfs(training_profits_df):
+    """
+    Splits the full profits_df into separate dfs for each training window
+
+    Params:
+    - windows_profits_df (df): dataframe containing profits data for the full training period, with imputed rows
+        for each period window start and end
+
+    Returns:
+    - training_windows_dfs (list of dfs): list of profits_dfs for each training window
+
+    """
+    logger.debug("Generating window-specific profits_dfs...")
+
+    # Convert training window starts to sorted datetime
+    training_windows_starts = sorted([
+        datetime.strptime(date, "%Y-%m-%d")
+        for date in wallets_config['training_data']['training_window_starts']
+    ])
+
+    # Generate end dates for each period
+    training_windows_ends = (
+        [date - timedelta(days=1) for date in training_windows_starts[1:]]
+        + [datetime.strptime(wallets_config['training_data']['training_period_end'], "%Y-%m-%d")]
+    )
+
+    # Generate starting balance dates for each period
+    training_windows_starting_balance_dates = (
+        [training_windows_starts[0] - timedelta(days=1)] # The day before the first window start
+        + training_windows_ends[:-1] # the end date of one window is the starting balance date of the next
+    )
+
+    # Create array of DataFrames for each training period
+    training_windows_profits_dfs = []
+    for start_bal_date, end_date in zip(training_windows_starting_balance_dates, training_windows_ends):
+
+        # Filter to between the starting balance date and end date
+        window_df = training_profits_df[
+            (training_profits_df['date'] >= start_bal_date) & (training_profits_df['date'] <= end_date)
+        ]
+
+        # Override records on the starting balance date to remove transfers
+        mask = window_df['date'] == start_bal_date
+        columns_to_update = ['usd_net_transfers', 'usd_inflows', 'is_imputed']
+        values_to_set = [0, 0, True]
+        window_df.loc[mask, columns_to_update] = values_to_set
+
+        # Confirm the period boundaries are handled correctly
+        start_date = start_bal_date + timedelta(days=1)
+        u.assert_period(window_df, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
+        training_windows_profits_dfs.append(window_df)
+
+    # Confirm that all window dfs' USD transfers add up to the USD transfers in the full training period
+    full_sum = training_profits_df['usd_net_transfers'].sum()
+    window_sum = sum(df['usd_net_transfers'].sum() for df in training_windows_profits_dfs)
+    if not np.isclose(full_sum, window_sum, rtol=1e-5):
+        raise ValueError(f"Net transfers in full training period ({full_sum}) do not match combined "
+                        f"sum of transfers in windows dfs ({window_sum})")
+
+    # Result: array of DataFrames
+    for i, df in enumerate(training_windows_profits_dfs):
+        logger.debug("Training Window %s (%s to %s): %s",
+                    i + 1,
+                    df['date'].min().strftime('%Y-%m-%d'),
+                    df['date'].max().strftime('%Y-%m-%d'),
+                    df.shape)
+    logger.debug("Training Period (%s to %s): %s",
+                training_profits_df['date'].min().strftime('%Y-%m-%d'),
+                training_profits_df['date'].max().strftime('%Y-%m-%d'),
+                training_profits_df.shape)
+
+    return training_windows_profits_dfs
+
+
+
+
+# -----------------------------------
+#     Wallet Cohort Management
+# -----------------------------------
+
 def apply_wallet_thresholds(wallet_metrics_df):
     """
     Applies data cleaning filters to the a df keyed on wallet_address
@@ -294,110 +379,39 @@ def apply_wallet_thresholds(wallet_metrics_df):
 
 
 
-def split_training_window_dfs(training_profits_df):
-    """
-    Splits the full profits_df into separate dfs for each training window
-
-    Params:
-    - windows_profits_df (df): dataframe containing profits data for the full training period, with imputed rows
-        for each period window start and end
-
-    Returns:
-    - training_windows_dfs (list of dfs): list of profits_dfs for each training window
-
-    """
-    logger.debug("Generating window-specific profits_dfs...")
-
-    # Convert training window starts to sorted datetime
-    training_windows_starts = sorted([
-        datetime.strptime(date, "%Y-%m-%d")
-        for date in wallets_config['training_data']['training_window_starts']
-    ])
-
-    # Generate end dates for each period
-    training_windows_ends = (
-        [date - timedelta(days=1) for date in training_windows_starts[1:]]
-        + [datetime.strptime(wallets_config['training_data']['training_period_end'], "%Y-%m-%d")]
-    )
-
-    # Generate starting balance dates for each period
-    training_windows_starting_balance_dates = (
-        [training_windows_starts[0] - timedelta(days=1)] # The day before the first window start
-        + training_windows_ends[:-1] # the end date of one window is the starting balance date of the next
-    )
-
-    # Create array of DataFrames for each training period
-    training_windows_profits_dfs = []
-    for start_bal_date, end_date in zip(training_windows_starting_balance_dates, training_windows_ends):
-
-        # Filter to between the starting balance date and end date
-        window_df = training_profits_df[
-            (training_profits_df['date'] >= start_bal_date) & (training_profits_df['date'] <= end_date)
-        ]
-
-        # Override records on the starting balance date to remove transfers
-        window_df.loc[window_df['date'] == start_bal_date, ['usd_net_transfers', 'usd_inflows', 'is_imputed']] = [0, 0, True]
-
-        # Confirm the period boundaries are handled correctly
-        start_date = start_bal_date + timedelta(days=1)
-        u.assert_period(window_df, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
-
-        training_windows_profits_dfs.append(window_df)
-
-    # Confirm that the USD transfers of each window adds up to the total transfers in the full training period
-    full_sum = training_profits_df['usd_net_transfers'].sum()
-    window_sum = sum(df['usd_net_transfers'].sum() for df in training_windows_profits_dfs)
-    if not np.isclose(full_sum, window_sum, rtol=1e-5):
-        raise ValueError(f"Net transfers in full training period ({full_sum}) do not match combined "
-                        f"sum of transfers in windows dfs ({window_sum})")
-
-    # Result: array of DataFrames
-    for i, df in enumerate(training_windows_profits_dfs):
-        logger.debug("Training Window %s (%s to %s): %s",
-                    i + 1,
-                    df['date'].min().strftime('%Y-%m-%d'),
-                    df['date'].max().strftime('%Y-%m-%d'),
-                    df.shape)
-    logger.debug("Training Period (%s to %s): %s",
-                training_profits_df['date'].min().strftime('%Y-%m-%d'),
-                training_profits_df['date'].max().strftime('%Y-%m-%d'),
-                training_profits_df.shape)
-
-    return training_windows_profits_dfs
-
-
-
-def upload_wallet_cohort(wallet_cohort):
+def upload_training_cohort(cohort_ids: np.array, hybridize_wallet_ids: bool) -> None:
     """
     Uploads the list of wallet_ids that are used in the model to BigQuery. This
     is used to pull additional metrics while limiting results to only relevant wallets.
 
     Params:
-    - wallet_cohort (np.array): the wallet_ids included in the cohort
+    - cohort_ids (np.array): the wallet_ids included in the cohort
+    - hybridize_wallet_ids (bool): whether the IDs are regular wallet_ids or hybrid wallet-coin IDs
 
     """
     # 1. Generate upload_df from input df
     # -----------------------------------
     upload_df = pd.DataFrame()
-    upload_df['wallet_id'] = wallet_cohort
+    id_col = 'hybrid_id' if hybridize_wallet_ids else 'wallet_id'
+    upload_df[id_col] = cohort_ids
     upload_df['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     # set df datatypes of upload df
     dtype_mapping = {
-        'wallet_id': int,
+        id_col: int,
         'updated_at': 'datetime64[ns, UTC]'
     }
     upload_df = upload_df.astype(dtype_mapping)
 
 
-    # 2. Upload list of wallet IDs to bigquery
-    # ----------------------------------------
+    # 2. Upload list of IDs to bigquery
+    # ---------------------------------
     project_id = 'western-verve-411004'
     client = bigquery.Client(project=project_id)
 
-    wallet_ids_table = f"{project_id}.temp.wallet_modeling_training_cohort_ids"
+    wallet_ids_table = f"{project_id}.temp.wallet_modeling_training_cohort"
     schema = [
-        {'name':'wallet_id', 'type': 'int64'},
+        {'name':id_col, 'type': 'int64'},
         {'name':'updated_at', 'type': 'datetime'}
     ]
     pandas_gbq.to_gbq(
@@ -412,18 +426,35 @@ def upload_wallet_cohort(wallet_cohort):
 
     # 3. Create updated table with full wallet_address values
     # -------------------------------------------------------
-    # Single query to create final table with all fields
-    create_query = f"""
-    CREATE OR REPLACE TABLE `{project_id}.temp.wallet_modeling_training_cohort` AS
-    SELECT
-        t.wallet_id,
-        w.wallet_address,
-        CURRENT_TIMESTAMP() as updated_at
-    FROM `{wallet_ids_table}` t
-    LEFT JOIN `reference.wallet_ids` w
-        ON t.wallet_id = w.wallet_id
-    """
 
-    client.query(create_query).result()
-    logger.info('Uploaded cohort of %s wallets with addresses to temp.wallet_modeling_training_cohort.',
-                len(wallet_cohort))
+    if hybridize_wallet_ids is False:
+        create_query = f"""
+        CREATE OR REPLACE TABLE `{wallet_ids_table}` AS
+        SELECT
+            t.wallet_id,
+            w.wallet_address,
+            t.updated_at
+        FROM `{wallet_ids_table}` t
+        LEFT JOIN `reference.wallet_ids` w
+            ON t.wallet_id = w.wallet_id
+        """
+        client.query(create_query).result()
+        logger.info('Uploaded cohort of %s wallets with addresses to %s.',
+                    len(cohort_ids), wallet_ids_table)
+
+    else:
+        create_query = f"""
+        CREATE OR REPLACE TABLE `{wallet_ids_table}` AS
+        SELECT
+            c.hybrid_id,
+            hm.wallet_id,
+            hm.wallet_address,
+            hm.coin_id,
+            c.updated_at
+        FROM `{wallet_ids_table}` c
+        JOIN `temp.wallet_modeling_hybrid_id_mapping` hm
+            ON hm.hybrid_id = c.hybrid_id
+        """
+        client.query(create_query).result()
+        logger.info('Uploaded cohort of %s hybrid_ids %s.',
+                    len(cohort_ids), wallet_ids_table)
