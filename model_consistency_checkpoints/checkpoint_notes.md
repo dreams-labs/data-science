@@ -1,5 +1,26 @@
 # 01/08/25 DDA-434 hybrid wallet address key
 
+## checkpoint 4: full hybrid key functionality in walletmodel
+
+### prod winsorized balanced
+Model Performance Summary
+===================================
+Test Samples:             51,661
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.349
+RMSE:                     0.421
+MAE:                      0.292
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.746
+RMSE:                     0.228
+MAE:                      0.131
+
+
+
 ## checkpoint 3: after adding hybrid key functionality through transfers_df
 
 ### Prod winsorized yes 0x00000 coin wallet profits
