@@ -368,6 +368,9 @@ def define_training_wallet_cohort(profits_df: pd.DataFrame,
     filtered_training_wallet_metrics_df = wtd.apply_wallet_thresholds(training_wallet_metrics_df)
     training_wallet_cohort = filtered_training_wallet_metrics_df.index.values
 
+    if len(training_wallet_cohort) == 0:
+        raise ValueError("Cohort does not include any wallets. Cohort must include wallets.")
+
     # Upload the cohort to BigQuery for additional complex feature generation
     wtd.upload_training_cohort(training_wallet_cohort, hybridize_wallet_ids)
     logger.info("Training wallet cohort defined as %s wallets after %.2f seconds.",
