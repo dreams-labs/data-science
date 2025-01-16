@@ -661,7 +661,6 @@ def assert_period(df, period_start, period_end) -> None:
     # Checks for profits_df specific values
     if 'usd_balance' in df.columns:
 
-
         # Confirm the profits_df columns are in df
         profits_df_columns = ['usd_balance', 'usd_net_transfers', 'usd_inflows', 'is_imputed']
         if not set(profits_df_columns).issubset(df.columns):
@@ -669,11 +668,13 @@ def assert_period(df, period_start, period_end) -> None:
                             f"expected profits_df columns of {profits_df_columns}.")
 
         # Confirm imputed dates are only at the starting balance and period end dates
-        imputed_dates = set(df[df['is_imputed']]['date'])
-        unexpected_imputed_dates = imputed_dates - set([period_starting_balance_date, period_end])
-        if len(unexpected_imputed_dates) > 0:
-            formatted_dates = {d.strftime("%Y-%m-%d") for d in unexpected_imputed_dates}
-            raise ValueError(f"Unexpected imputed dates found on {formatted_dates}.")
+        unexpected_imputed_dates = df[
+            df['is_imputed'] &
+            ~df['date'].isin([period_starting_balance_date, period_end])
+        ]['date'].unique()
+        if len(unexpected_imputed_dates):
+            formatted_dates = pd.to_datetime(unexpected_imputed_dates).strftime("%Y-%m-%d")
+            raise ValueError(f"Unexpected imputed dates found on {set(formatted_dates)}.")
 
 
         # Starting Balance Values Checks
