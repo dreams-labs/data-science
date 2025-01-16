@@ -7,6 +7,7 @@ Intended function sequence:
 profits_df = wtf.add_cash_flow_transfers_logic(profits_df)
 trading_features = wtf.calculate_wallet_trading_features(profits_df)
 """
+import time
 import logging
 from datetime import datetime,timedelta
 import pandas as pd
@@ -208,8 +209,8 @@ def calculate_gain_and_investment_columns(profits_df: pd.DataFrame) -> pd.DataFr
 
 @u.timing_decorator
 def calculate_observed_activity_columns(profits_df: pd.DataFrame,
-                                        period_start_date: str,
-                                        period_end_date: str) -> pd.DataFrame:
+                                    period_start_date: str,
+                                    period_end_date: str) -> pd.DataFrame:
     """
     Calculates metrics based on actual trading activity, excluding imputed rows.
 
@@ -219,51 +220,31 @@ def calculate_observed_activity_columns(profits_df: pd.DataFrame,
     - period_end_date (str): Period end in 'YYYY-MM-DD' format
 
     Returns:
-    - activity_df (DataFrame): Activity metrics keyed on wallet_address with columns:
-        - unique_coins_traded: Number of unique coins traded
-        - total_volume: Sum of absolute balance changes
-        - transaction_days: Number of days with activity
-        - average_transaction: Mean absolute balance change
-        - activity_density: Transaction days / period duration
+    - activity_df (DataFrame): Activity metrics keyed on wallet_address
     """
-    # Filter to actual transaction activity (excluding imputed rows)
+    # Filter and add absolute changes
     observed_profits_df = profits_df.loc[~profits_df['is_imputed']].copy()
-
-    # Precompute absolute balance changes
     observed_profits_df['abs_balance_change'] = observed_profits_df['crypto_balance_change'].abs()
 
-    # Extract index levels for unique counts
+    # Extract index levels once
     index_frame = observed_profits_df.index.to_frame(index=False)
 
-    # Calculate unique coins
-    unique_coins = (
-        index_frame[['wallet_address', 'coin_id']]
-        .drop_duplicates()
-        .groupby('wallet_address')
-        .size()
-    )
-
-    # Calculate unique dates
-    transaction_days = (
-        index_frame[['wallet_address', 'date']]
-        .drop_duplicates()
-        .groupby('wallet_address')
-        .size()
-    )
-
-    # Calculate volume metrics
-    volume_metrics = observed_profits_df.groupby(level='wallet_address', observed=True).agg(
+    # Combine metrics in a single groupby where possible
+    metrics_df = observed_profits_df.groupby(level='wallet_address', observed=True).agg(
         total_volume=('abs_balance_change', 'sum'),
         average_transaction=('abs_balance_change', 'mean')
     )
 
-    # Combine metrics
-    observed_activity_df = volume_metrics.assign(
-        unique_coins_traded=unique_coins,
-        transaction_days=transaction_days
+    # Calculate unique counts from index_frame in single operation
+    unique_counts = index_frame.groupby('wallet_address').agg(
+        unique_coins_traded=('coin_id', 'nunique'),
+        transaction_days=('date', 'nunique')
     )
 
-    # Add activity density based on period duration
+    # Combine metrics
+    observed_activity_df = metrics_df.join(unique_counts)
+
+    # Add activity density
     period_duration = (datetime.strptime(period_end_date, '%Y-%m-%d') -
                       datetime.strptime(period_start_date, '%Y-%m-%d')).days + 1
     observed_activity_df['activity_density'] = observed_activity_df['transaction_days'] / period_duration
