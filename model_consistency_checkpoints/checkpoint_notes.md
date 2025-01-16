@@ -1,3 +1,29 @@
+# dda 574 hybrid run
+checkpoint 1 wallet
+Model Performance Summary
+===================================
+Test Samples:             66,365
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.743
+RMSE:                     0.177
+MAE:                      0.103
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.745
+RMSE:                     0.115
+MAE:                      0.064
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.000
+Standard Dev of Residuals:0.177
+95% Prediction Interval:  ±0.347
+
+
+
 
 # dda 572 rerun
 checkpoint 1
