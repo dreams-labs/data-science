@@ -29,9 +29,9 @@ wallets_config = WalletsConfig()
 
 
 
-# -----------------------------------------
-#   Training Data Orchestration Function
-# -----------------------------------------
+# ------------------------------------------
+#      Primary Orchestration Functions
+# ------------------------------------------
 
 @u.timing_decorator
 def retrieve_period_datasets(period_start_date, period_end_date, coin_cohort=None, parquet_prefix=None):
@@ -362,7 +362,7 @@ def define_training_wallet_cohort(profits_df: pd.DataFrame,
     training_wallet_metrics_df = wtf.calculate_wallet_trading_features(training_profits_df,
                                                                        training_period_start,
                                                                        training_period_end,
-                                                                       calculate_twb_metrics=False)
+                                                                       include_twb_metrics=False)
 
     # Apply filters based on wallet behavior during the training period
     filtered_training_wallet_metrics_df = wtd.apply_wallet_thresholds(training_wallet_metrics_df)
@@ -498,7 +498,7 @@ def identify_modeling_cohort(modeling_period_profits_df: pd.DataFrame) -> pd.Dat
     modeling_wallets_df = wtf.calculate_wallet_trading_features(modeling_period_profits_df,
                                             wallets_config['training_data']['modeling_period_start'],
                                             wallets_config['training_data']['modeling_period_end'],
-                                            calculate_twb_metrics=True)
+                                            include_twb_metrics=True)
 
     # Extract thresholds
     modeling_min_investment = wallets_config['modeling']['modeling_min_investment']

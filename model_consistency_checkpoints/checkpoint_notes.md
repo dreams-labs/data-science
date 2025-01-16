@@ -1,3 +1,153 @@
+# DDA 557 feature efficiency
+
+## checkpoint 4 trading features refactored further
+
+### faster learning rate
+Model Performance Summary
+===================================
+Test Samples:             15,485
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.350
+RMSE:                     0.367
+MAE:                      0.259
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.752
+RMSE:                     0.182
+MAE:                      0.107
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.004
+Standard Dev of Residuals:0.367
+95% Prediction Interval:  ±0.720
+
+
+
+### same model as previous
+Model Performance Summary
+===================================
+Test Samples:             15,485
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.356
+RMSE:                     0.366
+MAE:                      0.257
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.766
+RMSE:                     0.177
+MAE:                      0.101
+
+
+## checkpoint 3 trading features refactored
+new config
+Model Performance Summary
+===================================
+Test Samples:             15,485
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.356
+RMSE:                     0.366
+MAE:                      0.257
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.766
+RMSE:                     0.177
+MAE:                      0.101
+
+
+
+old config
+Model Performance Summary
+===================================
+Test Samples:             7,640
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.242
+RMSE:                     0.444
+MAE:                      0.316
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.775
+RMSE:                     0.209
+MAE:                      0.114
+
+
+## checkpoint 2 partial refactor of trading
+Model Performance Summary
+===================================
+Test Samples:             7,640
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.243
+RMSE:                     0.443
+MAE:                      0.315
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.778
+RMSE:                     0.208
+MAE:                      0.113
+
+
+
+## checkpoint 1
+
+### faster version
+Model Performance Summary
+===================================
+Test Samples:             7,640
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.234
+RMSE:                     0.446
+MAE:                      0.317
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.791
+RMSE:                     0.202
+MAE:                      0.101
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.006
+Standard Dev of Residuals:0.446
+95% Prediction Interval:  ±0.874
+
+
+### old version
+Model Performance Summary
+===================================
+Test Samples:             51,661
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.349
+RMSE:                     0.421
+MAE:                      0.292
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.746
+RMSE:                     0.228
+MAE:                      0.131
+
+
+
+
 # DDA 518 orchestrator functions
 
 ## checkpoint 1

@@ -661,7 +661,6 @@ def assert_period(df, period_start, period_end) -> None:
     # Checks for profits_df specific values
     if 'usd_balance' in df.columns:
 
-
         # Confirm the profits_df columns are in df
         profits_df_columns = ['usd_balance', 'usd_net_transfers', 'usd_inflows', 'is_imputed']
         if not set(profits_df_columns).issubset(df.columns):
@@ -669,11 +668,13 @@ def assert_period(df, period_start, period_end) -> None:
                             f"expected profits_df columns of {profits_df_columns}.")
 
         # Confirm imputed dates are only at the starting balance and period end dates
-        imputed_dates = set(df[df['is_imputed']]['date'])
-        unexpected_imputed_dates = imputed_dates - set([period_starting_balance_date, period_end])
-        if len(unexpected_imputed_dates) > 0:
-            formatted_dates = {d.strftime("%Y-%m-%d") for d in unexpected_imputed_dates}
-            raise ValueError(f"Unexpected imputed dates found on {formatted_dates}.")
+        unexpected_imputed_dates = df[
+            df['is_imputed'] &
+            ~df['date'].isin([period_starting_balance_date, period_end])
+        ]['date'].unique()
+        if len(unexpected_imputed_dates):
+            formatted_dates = pd.to_datetime(unexpected_imputed_dates).strftime("%Y-%m-%d")
+            raise ValueError(f"Unexpected imputed dates found on {set(formatted_dates)}.")
 
 
         # Starting Balance Values Checks
@@ -1176,16 +1177,32 @@ def export_code(
     logger.info(f"Consolidation complete. All files are saved in {output_file}")
 
 
-def logger_to_file(filepath: str) -> None:
+def setup_notebook_logger(log_filepath: str = None) -> logging.Logger:
     """
-    Adds file output to existing logger while preserving settings.
+    Sets up logging for notebook development with optional file output.
+    Configures root logger to allow propagation to module-level loggers.
 
     Params:
-    - filepath (str): Path where log file should be created
+    - log_filepath (str, optional): Path for log file output
     """
-    file_handler = logging.FileHandler(filepath)
-    file_handler.setFormatter(logging.Formatter(
-        '[%(asctime)s] %(levelname)s [%(module)s.%(funcName)s:%(lineno)d] %(message)s',
+    root_logger = logging.getLogger()  # Get root logger
+    root_logger.setLevel(logging.INFO)  # Set level at root to allow propagation
+
+    # Clear any existing handlers to avoid duplicates
+    root_logger.handlers = []
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='[%(asctime)s] %(levelname)s [%(module)s.%(funcName)s:%(lineno)d] %(message)s',
         datefmt='%d/%b/%Y %H:%M:%S'
-    ))
-    logging.getLogger().addHandler(file_handler)
+    )
+
+    if log_filepath:
+        file_handler = logging.FileHandler(log_filepath)
+        file_handler.setFormatter(logging.Formatter(
+            '[%(asctime)s] %(levelname)s [%(module)s.%(funcName)s:%(lineno)d] %(message)s',
+            datefmt='%d/%b/%Y %H:%M:%S'
+        ))
+        root_logger.addHandler(file_handler)
+
+    return root_logger
