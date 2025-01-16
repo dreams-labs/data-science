@@ -99,16 +99,6 @@ def prepare_training_data(
     """
     generated_files = []
 
-    # Hybridize wallet IDs if configured
-    if wallets_config['training_data']['hybridize_wallet_ids']:
-        profits_df_full, hybrid_cw_id_map = hybridize_wallet_address(profits_df_full)
-        hybrid_map_path = f"{parquet_folder}/hybrid_cw_id_map.pkl"
-        pd.to_pickle(hybrid_cw_id_map, hybrid_map_path)
-        generated_files.append(hybrid_map_path)
-
-        upload_hybrid_wallet_mapping(hybrid_cw_id_map)
-        del hybrid_cw_id_map
-
     # Remove market data before starting balance date and validate periods
     market_data_df = market_data_df_full[
         market_data_df_full['date'] >= wallets_config['training_data']['training_starting_balance_date']
@@ -128,6 +118,16 @@ def prepare_training_data(
     market_indicators_df.to_parquet(market_indicators_path, index=False)
     generated_files.append(market_indicators_path)
     del market_data_df_full, market_data_df
+
+    # Hybridize wallet IDs if configured
+    if wallets_config['training_data']['hybridize_wallet_ids']:
+        profits_df_full, hybrid_cw_id_map = hybridize_wallet_address(profits_df_full)
+        hybrid_map_path = f"{parquet_folder}/hybrid_cw_id_map.pkl"
+        pd.to_pickle(hybrid_cw_id_map, hybrid_map_path)
+        generated_files.append(hybrid_map_path)
+
+        upload_hybrid_wallet_mapping(hybrid_cw_id_map)
+        del hybrid_cw_id_map
 
     # Define training wallet cohort
     logger.info("Defining wallet cohort...")
