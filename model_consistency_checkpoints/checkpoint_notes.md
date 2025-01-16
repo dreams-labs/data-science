@@ -1,3 +1,96 @@
+
+# dda 572 rerun
+checkpoint 1
+Coin Model Performance Summary
+===================================
+Test Samples:             226
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.110
+RMSE:                     0.414
+MAE:                      0.284
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.004
+Standard Dev of Residuals:0.414
+95% Prediction Interval:  ±0.811
+
+Wallet Model Performance Summary
+===================================
+Test Samples:             15,470
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.353
+RMSE:                     0.361
+MAE:                      0.253
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.769
+RMSE:                     0.175
+MAE:                      0.099
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.001
+Standard Dev of Residuals:0.361
+95% Prediction Interval:  ±0.708
+
+
+# dda 557 rerun
+
+checkpoint 4
+Model Performance Summary
+===================================
+Test Samples:             15,470
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.353
+RMSE:                     0.361
+MAE:                      0.253
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.769
+RMSE:                     0.175
+MAE:                      0.099
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.001
+Standard Dev of Residuals:0.361
+95% Prediction Interval:  ±0.708
+
+
+
+checkpoint 3
+Model Performance Summary
+===================================
+Test Samples:             15,470
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.353
+RMSE:                     0.361
+MAE:                      0.253
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.769
+RMSE:                     0.175
+MAE:                      0.099
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.001
+Standard Dev of Residuals:0.361
+95% Prediction Interval:  ±0.708
+
+
 # DDA 572 coin model checkpoints
 
 ## checkpoint 1 coin model

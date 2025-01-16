@@ -1,5 +1,7 @@
+# CheckpointValidation
 # CoinModel Config
 
+# CheckpointValidation
 # CoinModel Cleaning
 # Variables used to clean and filter raw data before training data is built
 data_cleaning:
@@ -18,25 +20,25 @@ coin_validation_analysis:
     sort_method: "top_wallet_balance_pct"  # which coin wallet metric to use for coin forecast rankings
 
 
+# CheckpointValidation
 # CoinModel Segments
 wallet_segments:
 
     # Scores to include as segments + metrics
     wallet_scores_path: "temp/wallet_modeling_score_dfs"
     wallet_scores: [
-        'net_gain_ntile_250101',
-        'net_gain_winsorized_250101',
-        'net_gain_raw_250101'
+        'net_gain_winsorized_checkpoint',
     ]
 
     # score_segment_quantiles: [0.1, 0.3, 0.5, 0.7, 0.9]  # higher is better; how to assign wallet a score segment
     score_segment_quantiles: [0.05, 0.15, 0.5, 0.85, 0.95]  # higher is better; how to assign wallet a score segment
-    training_period_cluster_groups: [2, 4]  # which n clusters assignment from the training period to segment by
+    training_period_cluster_groups: [2]  # which n clusters assignment from the training period to segment by
 
     # where to save local files
     parquet_folder: 'temp/coin_modeling_dfs'
 
 
+# CheckpointValidation
 # CoinModel Features
 wallet_features:
 
@@ -51,6 +53,7 @@ wallet_features:
         'average_transaction'
     ]
 
+# CheckpointValidation
 # CoinModel Modeling Config
 # Variables used in the generation of the validation period coin model
 coin_modeling:
@@ -61,8 +64,8 @@ coin_modeling:
 
     # Params used to remove unnecessary features
     feature_selection:
-        variance_threshold: 0.02
-        correlation_threshold: 0.95
+        variance_threshold: 0.0
+        correlation_threshold: 1.0
 
     # Thresholds for coin inclusion in training data
     min_market_cap: 00_000  # coins below this market cap will not be included in performance assessments
@@ -78,6 +81,7 @@ coin_modeling:
     drop_columns: []
 
 
+    # CheckpointValidation
     # CoinModel Params
     model_type: "xgb"
     model_params:
@@ -94,6 +98,7 @@ coin_modeling:
         random_state: 42
         n_jobs: -1
 
+    # CheckpointValidation
     # CoinModel Grid Search
     grid_search_params:
 
