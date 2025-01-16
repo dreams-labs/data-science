@@ -109,7 +109,7 @@ def assign_cluster_labels(training_data_df: pd.DataFrame, cluster_groups: list) 
     cluster_dfs = []
 
     for n in cluster_groups:
-        wallet_clusters_df = wcl.assign_clusters_from_distances(training_data_df, [n])
+        wallet_clusters_df = wcl.assign_clusters_from_distances(training_data_df.copy(), [n])
         wallet_clusters_df[f'k{n}_cluster'] = 'cluster_' + wallet_clusters_df[f'k{n}_cluster'].astype(str)
         wallet_clusters_df[f'k{n}_cluster'] = wallet_clusters_df[f'k{n}_cluster'].astype('category')
         wallet_clusters_df = wallet_clusters_df.add_prefix('training_clusters|')

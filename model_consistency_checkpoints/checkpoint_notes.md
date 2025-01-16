@@ -1,3 +1,40 @@
+# DDA 572 coin model checkpoints
+
+## checkpoint 1 coin model
+Model Performance Summary
+===================================
+Test Samples:             238
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.146
+RMSE:                     0.436
+MAE:                      0.299
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.046
+Standard Dev of Residuals:0.433
+95% Prediction Interval:  ±0.849
+## checkpoint 1 wallet model
+Model Performance Summary
+===================================
+Test Samples:             15,485
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.350
+RMSE:                     0.367
+MAE:                      0.259
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.752
+RMSE:                     0.182
+MAE:                      0.107
+
+
+
 # DDA 557 feature efficiency
 
 ## checkpoint 4 trading features refactored further
