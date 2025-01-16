@@ -1,13 +1,6 @@
 """
-Calculates metrics related to trading performance
-
-Intended function sequence:
-
-# Base feature calculation
-profits_df = wtf.add_cash_flow_transfers_logic(profits_df)
-trading_features = wtf.calculate_wallet_trading_features(profits_df)
+Calculates metrics related to trading activity
 """
-import time
 import logging
 from datetime import datetime,timedelta
 import pandas as pd
