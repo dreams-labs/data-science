@@ -1,5 +1,50 @@
 # DDA 557 feature efficiency
 
+## checkpoint 4 trading features refactored further
+
+### faster learning rate
+Model Performance Summary
+===================================
+Test Samples:             15,485
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.350
+RMSE:                     0.367
+MAE:                      0.259
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.752
+RMSE:                     0.182
+MAE:                      0.107
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.004
+Standard Dev of Residuals:0.367
+95% Prediction Interval:  ±0.720
+
+
+
+### same model as previous
+Model Performance Summary
+===================================
+Test Samples:             15,485
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.356
+RMSE:                     0.366
+MAE:                      0.257
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.766
+RMSE:                     0.177
+MAE:                      0.101
+
+
 ## checkpoint 3 trading features refactored
 new config
 Model Performance Summary
