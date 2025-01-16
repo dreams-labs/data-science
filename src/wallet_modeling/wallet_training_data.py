@@ -431,7 +431,7 @@ def upload_training_cohort(cohort_ids: np.array, hybridize_wallet_ids: bool) -> 
         create_query = f"""
         CREATE OR REPLACE TABLE `{wallet_ids_table}` AS
         SELECT
-            t.wallet_id,
+            t.{id_col},
             w.wallet_address,
             t.updated_at
         FROM `{wallet_ids_table}` t
