@@ -101,11 +101,11 @@ def prepare_training_data(
 
     # Hybridize wallet IDs if configured
     if wallets_config['training_data']['hybridize_wallet_ids']:
-        logger.info("Hybridizing wallet IDs...")
         profits_df_full, hybrid_cw_id_map = hybridize_wallet_address(profits_df_full)
         hybrid_map_path = f"{parquet_folder}/hybrid_cw_id_map.pkl"
         pd.to_pickle(hybrid_cw_id_map, hybrid_map_path)
         generated_files.append(hybrid_map_path)
+
         upload_hybrid_wallet_mapping(hybrid_cw_id_map)
         del hybrid_cw_id_map
 
@@ -531,6 +531,7 @@ def identify_modeling_cohort(modeling_period_profits_df: pd.DataFrame) -> pd.Dat
 #   Hybrid Index Utility Functions
 # -----------------------------------
 
+@u.timing_decorator
 def hybridize_wallet_address(
     df: pd.DataFrame,
     hybrid_cw_id_map: Optional[Dict[Tuple[int, str], int]] = None
@@ -585,7 +586,7 @@ def dehybridize_wallet_address(
     return df
 
 
-
+@u.timing_decorator
 def upload_hybrid_wallet_mapping(hybrid_cw_id_map: Dict[Tuple[int, str], int]) -> None:
     """
     Uploads the mapping of hybrid indices to all wallet-coin pairs to BigQuery.
