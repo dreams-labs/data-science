@@ -259,7 +259,12 @@ def analyze_wallet_model_importance(feature_importances):
     features_df.columns = ['feature_name', 'feature_comparison', 'feature_aggregation']
 
     segments_df = split_df['training_segment'].str.split('/', expand=True)
-    segments_df.columns = ['training_segment','record_type']
+    if len(segments_df.columns) == 1:
+        segments_df.columns = ['training_segment']
+    elif len(segments_df.columns) == 2:
+        segments_df.columns = ['training_segment','record_type']
+    else:
+        raise ValueError("Unknown segments data components found")
 
     # Combine all components
     feature_details_df = pd.concat([
