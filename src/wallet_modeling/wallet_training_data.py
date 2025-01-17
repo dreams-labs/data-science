@@ -314,6 +314,10 @@ def apply_wallet_thresholds(wallet_metrics_df):
     max_wallet_volume = wallets_config['data_cleaning']['max_wallet_volume']
     max_wallet_profits = wallets_config['data_cleaning']['max_wallet_profits']
 
+    if wallets_config['training_data']['hybridize_wallet_ids'] is True:
+        if min_coins > 1:
+            raise ValueError('Hybrid IDs can only trade up to 1 coin.')
+
     # filter based on number of coins traded
     low_coins_traded_wallets = wallet_metrics_df[
         wallet_metrics_df['unique_coins_traded'] < min_coins
