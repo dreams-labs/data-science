@@ -13,7 +13,6 @@ from kneed import KneeLocator
 
 # Local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
-import base_modeling.feature_selection as fs
 import utils as u
 
 # set up logger at the module level
