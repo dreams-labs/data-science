@@ -1,5 +1,23 @@
 # dda 574 hybrid run
-checkpoint 3 I don't know why it changed
+checkpoint 4 coin with hybridized
+Model Performance Summary
+===================================
+Test Samples:             364
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.062
+RMSE:                     0.429
+MAE:                      0.283
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.007
+Standard Dev of Residuals:0.429
+95% Prediction Interval:  ±0.841
+
+
+checkpoint 3 wallet I don't know why it changed
 Model Performance Summary
 ===================================
 Test Samples:             66,365
