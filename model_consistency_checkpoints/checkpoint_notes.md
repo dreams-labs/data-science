@@ -1,5 +1,5 @@
 # dda 574 hybrid run
-checkpoint 1 wallet
+checkpoint 1 wallet hybridized
 Model Performance Summary
 ===================================
 Test Samples:             66,365
@@ -22,7 +22,28 @@ Mean of Residuals:        -0.000
 Standard Dev of Residuals:0.177
 95% Prediction Interval:  ±0.347
 
+checkpoint 1 wallet after timing min transaction fix
+Model Performance Summary
+===================================
+Test Samples:             15,470
 
+Core Metrics
+-----------------------------------
+R² Score:                 0.352
+RMSE:                     0.362
+MAE:                      0.254
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.768
+RMSE:                     0.176
+MAE:                      0.100
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.001
+Standard Dev of Residuals:0.362
+95% Prediction Interval:  ±0.709
 
 
 # dda 572 rerun

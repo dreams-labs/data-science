@@ -16,7 +16,7 @@ training_data:
     validation_period_end: "2024-11-30"
 
     # Whether to use hybrid coin-wallet ids
-    hybridize_wallet_ids: True  # if true, training data will be keyed on wallet-coin pairs
+    hybridize_wallet_ids: False  # if true, training data will be keyed on wallet-coin pairs
 
     # Local pipeline configs
     dataset: 'prod'  # Set to 'prod' or 'dev'; determines whether to query 'core' or 'dev' dataset tables
@@ -28,7 +28,7 @@ training_data:
 data_cleaning:
 
     # Wallet cohort thresholds
-    min_coins_traded: 0  # Exclude wallets that have traded fewer coins than this during the training period
+    min_coins_traded: 2  # Exclude wallets that have traded fewer coins than this during the training period
     max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
 
     min_wallet_investment: 10000 # time weighted average balance filter
