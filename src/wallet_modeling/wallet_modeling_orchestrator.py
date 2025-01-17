@@ -280,6 +280,13 @@ def prepare_modeling_features(
     ]
     del modeling_profits_df_full
 
+    # Assert period and save filtered/hybridized profits_df
+    u.assert_period(modeling_profits_df,
+                    wallets_config['training_data']['modeling_period_start'],
+                    wallets_config['training_data']['modeling_period_end'])
+    output_path = f"{wallets_config['training_data']['parquet_folder']}/modeling_profits_df.parquet"
+    modeling_profits_df.to_parquet(output_path, index=False)
+
     # Initialize features DataFrame
     logger.info("Generating modeling features...")
     modeling_wallet_features_df = pd.DataFrame(index=training_wallet_cohort)
