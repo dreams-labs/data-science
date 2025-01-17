@@ -1,4 +1,28 @@
 # dda 574 hybrid run
+checkpoint 3 I don't know why it changed
+Model Performance Summary
+===================================
+Test Samples:             66,365
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.745
+RMSE:                     0.176
+MAE:                      0.102
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.748
+RMSE:                     0.114
+MAE:                      0.063
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.001
+Standard Dev of Residuals:0.176
+95% Prediction Interval:  ±0.344
+
+
 checkpoint 2 wallet hybridized after timing min transaction fix
 Model Performance Summary
 ===================================
