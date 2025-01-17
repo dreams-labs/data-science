@@ -147,7 +147,7 @@ def assign_clusters_from_distances(modeling_df: pd.DataFrame, cluster_counts: Li
     Returns:
     - modeling_df (DataFrame): Original df with new cluster assignment columns
     """
-    cluster_assignments_df = modeling_df
+    cluster_assignments_df = modeling_df.copy()
 
     cluster_cols = []
     for k in cluster_counts:

@@ -11,7 +11,7 @@ from sklearn.metrics import (
 from dreams_core import core as dc
 
 # local module imports
-import wallet_features.clustering_features as clf
+import wallet_features.clustering_features as wcl
 from wallet_modeling.wallets_config_manager import WalletsConfig
 
 # Set up logger at the module level
@@ -206,13 +206,12 @@ def create_cluster_report(modeling_df: pd.DataFrame,
         'trading|crypto_net_gain|all_windows',
         'mktcap|end_portfolio_wtd_market_cap|all_windows',
         'performance|crypto_net_gain/max_investment/base|all_windows',
-        'performance|crypto_net_gain/active_twb/base|all_windows',
     ]
     cluster_cols = [col for col in modeling_df.columns if col.startswith('cluster|')]
     cluster_analysis_df = modeling_df[list(set(cluster_cols + base_metrics + comparison_metrics))].copy()
 
     # Assign wallets to categorical clusters based on the distance values
-    cluster_assignments_df = clf.assign_clusters_from_distances(cluster_analysis_df,
+    cluster_assignments_df = wcl.assign_clusters_from_distances(cluster_analysis_df,
                                                          wallets_config['features']['clustering_n_clusters'])
     cluster_analysis_df = cluster_analysis_df.join(cluster_assignments_df,how='inner')
 
