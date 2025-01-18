@@ -169,8 +169,10 @@ class BaseModel:
         """
         if not self.random_search:
             logger.error("Random search has not been run.")
+            return None
         elif not hasattr(self.random_search, 'cv_results_'):
             logger.error("cv_results_ is unavailable.")
+            return None
 
         # Extract cv_results from the random search
         cv_results = self.random_search.cv_results_
@@ -198,7 +200,11 @@ class BaseModel:
         # Create a DataFrame for the report
         report_df = pd.DataFrame(report_data)
 
-        return report_df.groupby(['param','param_value'])[['avg_score']].mean().sort_values(by='avg_score', ascending=False)
+        return (report_df
+                    .groupby(['param','param_value'])[['avg_score']]
+                    .mean()
+                    .sort_values(by='avg_score', ascending=False)
+                )
 
     def _fit(self) -> None:
         """

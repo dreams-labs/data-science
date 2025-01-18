@@ -1,3 +1,41 @@
+# dda 520 coin model multiple dates
+checkpoint 1 with 2 dates
+Model Performance Summary
+===================================
+Test Samples:             442
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.229
+RMSE:                     0.254
+MAE:                      0.210
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.002
+Standard Dev of Residuals:0.254
+95% Prediction Interval:  ±0.497
+
+
+checkpoint 1 with 1 date
+Model Performance Summary
+===================================
+Test Samples:             442
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.239
+RMSE:                     0.252
+MAE:                      0.208
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.001
+Standard Dev of Residuals:0.252
+95% Prediction Interval:  ±0.493
+
+
+
 # dda 575 coin model optimizations
 checkpoint 1 possibly overtuned
 Model Performance Summary
