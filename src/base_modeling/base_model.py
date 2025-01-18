@@ -200,7 +200,11 @@ class BaseModel:
         # Create a DataFrame for the report
         report_df = pd.DataFrame(report_data)
 
-        return report_df.groupby(['param','param_value'])[['avg_score']].mean().sort_values(by='avg_score', ascending=False)
+        return (report_df
+                    .groupby(['param','param_value'])[['avg_score']]
+                    .mean()
+                    .sort_values(by='avg_score', ascending=False)
+                )
 
     def _fit(self) -> None:
         """
