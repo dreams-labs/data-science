@@ -169,8 +169,10 @@ class BaseModel:
         """
         if not self.random_search:
             logger.error("Random search has not been run.")
+            return None
         elif not hasattr(self.random_search, 'cv_results_'):
             logger.error("cv_results_ is unavailable.")
+            return None
 
         # Extract cv_results from the random search
         cv_results = self.random_search.cv_results_
