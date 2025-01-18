@@ -60,7 +60,7 @@ wallet_features:
 coin_modeling:
 
     # Thresholds for coin inclusion in training data
-    min_cohort_wallets: 25  # how many wallets must hold a coin for the coin to be elegible for forecasting
+    min_cohort_wallets: 20  # how many wallets must hold a coin for the coin to be elegible for forecasting
     min_cohort_balance: 20000  # how much USD all wallets must hold for the coin to be elegible for forecasting
 
     # Params used to remove unnecessary features
@@ -73,9 +73,9 @@ coin_modeling:
     max_market_cap: 999350_000_000  # coins above this market cap will not be included in performance assessments
 
     # Target variable parameters
-    target_variable: "coin_return_winsorized"
+    # target_variable: "coin_return_winsorized"
     # target_variable: "coin_return_pctile_full"
-    # target_variable: "coin_return_pctile"
+    target_variable: "coin_return_pctile"
     train_test_split: 0.2  # test size
 
     returns_winsorization: 0.01
@@ -87,10 +87,10 @@ coin_modeling:
     model_type: "xgb"
     model_params:
         n_estimators: 300
-        max_depth: 6
+        max_depth: 7
         learning_rate: 0.02
-        subsample: 0.8
-        colsample_bytree: 1.0
+        subsample: 0.9
+        gamma: 0.01
         min_child_weight: 5
         early_stopping_rounds: 20
         eval_metric: 'rmse'
@@ -103,22 +103,43 @@ coin_modeling:
     # CoinModel Grid Search
     grid_search_params:
 
-        enabled: false # whether to grid search
+        # enabled: True # whether to grid search
+        enabled: False # whether to grid search
 
         # Search methodology
-        n_iter: 20  # random search limit
+        n_iter: 60  # random search limit
         scoring: 'neg_root_mean_squared_error'
-        n_splits: 5  # cv splits
+        n_splits: 2  # cv splits
         n_jobs: -1
         verbose_level: 3  # scikit-learn verbosity
 
         # Params
         param_grid:
-            # params to test
-            regressor__max_depth: [4, 6, 8]
-            regressor__min_child_weight_pct: [0.005, 0.01, 0.025]
-            # regressor__subsample: [0.7, 0.85, 1.0]
 
-            # params that keep the model speedy
-            regressor__n_estimators: [150]
-            regressor__learning_rate: [0.1]
+            # # Depth and Child Weight
+            # regressor__max_depth: [6, 8]
+            # regressor__min_child_weight: [2,3,5,10]
+
+            # Col/Row Sampling
+            # regressor__subsample: [0.5, .6, .7, .8, .9, 1.0]
+            regressor__colsample_bytree: [0.9, 1.0]
+
+            # # Model Speed
+            # regressor__tree_method: ['hist', 'approx', 'auto']
+            # regressor__max_bin: [64, 128, 256]
+            # regressor__gamma: [0.0, 0.1, 1.0]  # controls the minimum loss reduction needed to split a node
+
+
+            # # Tree Training Speed Overrides
+            # regressor__n_estimators: [150]
+            # regressor__learning_rate: [0.05]
+
+            # # Optimize for Speed
+            # regressor__n_jobs: [4]  # how many models to build at once
+            # regressor__nthread: [4]  # how many threads each model can use
+            # # regressor__max_bin: [128]
+            # # regressor__tree_method: ['hist']
+
+
+    # Coin model workflow params
+    score_name: "iterating"  # reference name for feature columns etc
