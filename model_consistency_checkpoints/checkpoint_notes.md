@@ -1,3 +1,29 @@
+# dda 551 confidence metrics for scores
+checkpoint 1 wallet base
+Model Performance Summary
+===================================
+Test Samples:             53,868
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.612
+RMSE:                     0.238
+MAE:                      0.147
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.702
+RMSE:                     0.151
+MAE:                      0.086
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.000
+Standard Dev of Residuals:0.238
+95% Prediction Interval:  ±0.466
+
+
+
 # dda 520 coin model multiple dates
 checkpoint 1 with 2 dates
 Model Performance Summary
