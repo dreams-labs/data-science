@@ -60,8 +60,7 @@ def calculate_coin_wallet_trading_metrics(profits_df, start_date, end_date, drop
 
     # Create profits_df keyed on hybrid coin_id|wallet_address
     rekeyed_profits_df['wallet_address'] = (rekeyed_profits_df['coin_id'].astype(str) + '|'
-                                            + rekeyed_profits_df['wallet_address'].astype(str))
-
+                                            + rekeyed_profits_df['wallet_address'].astype(int).astype(str))
 
     # Calculate trading features on the hybrid index level
     cw_trading_metrics_df = wtf.calculate_wallet_trading_features(rekeyed_profits_df,

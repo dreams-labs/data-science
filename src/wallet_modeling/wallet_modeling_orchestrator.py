@@ -99,16 +99,6 @@ def prepare_training_data(
     """
     generated_files = []
 
-    # Hybridize wallet IDs if configured
-    if wallets_config['training_data']['hybridize_wallet_ids']:
-        logger.info("Hybridizing wallet IDs...")
-        profits_df_full, hybrid_cw_id_map = hybridize_wallet_address(profits_df_full)
-        hybrid_map_path = f"{parquet_folder}/hybrid_cw_id_map.pkl"
-        pd.to_pickle(hybrid_cw_id_map, hybrid_map_path)
-        generated_files.append(hybrid_map_path)
-        upload_hybrid_wallet_mapping(hybrid_cw_id_map)
-        del hybrid_cw_id_map
-
     # Remove market data before starting balance date and validate periods
     market_data_df = market_data_df_full[
         market_data_df_full['date'] >= wallets_config['training_data']['training_starting_balance_date']
@@ -128,6 +118,16 @@ def prepare_training_data(
     market_indicators_df.to_parquet(market_indicators_path, index=False)
     generated_files.append(market_indicators_path)
     del market_data_df_full, market_data_df
+
+    # Hybridize wallet IDs if configured
+    if wallets_config['training_data']['hybridize_wallet_ids']:
+        profits_df_full, hybrid_cw_id_map = hybridize_wallet_address(profits_df_full)
+        hybrid_map_path = f"{parquet_folder}/hybrid_cw_id_map.pkl"
+        pd.to_pickle(hybrid_cw_id_map, hybrid_map_path)
+        generated_files.append(hybrid_map_path)
+
+        upload_hybrid_wallet_mapping(hybrid_cw_id_map)
+        del hybrid_cw_id_map
 
     # Define training wallet cohort
     logger.info("Defining wallet cohort...")
@@ -280,6 +280,13 @@ def prepare_modeling_features(
     ]
     del modeling_profits_df_full
 
+    # Assert period and save filtered/hybridized profits_df
+    u.assert_period(modeling_profits_df,
+                    wallets_config['training_data']['modeling_period_start'],
+                    wallets_config['training_data']['modeling_period_end'])
+    output_path = f"{wallets_config['training_data']['parquet_folder']}/modeling_profits_df.parquet"
+    modeling_profits_df.to_parquet(output_path, index=False)
+
     # Initialize features DataFrame
     logger.info("Generating modeling features...")
     modeling_wallet_features_df = pd.DataFrame(index=training_wallet_cohort)
@@ -367,6 +374,9 @@ def define_training_wallet_cohort(profits_df: pd.DataFrame,
     # Apply filters based on wallet behavior during the training period
     filtered_training_wallet_metrics_df = wtd.apply_wallet_thresholds(training_wallet_metrics_df)
     training_wallet_cohort = filtered_training_wallet_metrics_df.index.values
+
+    if len(training_wallet_cohort) == 0:
+        raise ValueError("Cohort does not include any wallets. Cohort must include wallets.")
 
     # Upload the cohort to BigQuery for additional complex feature generation
     wtd.upload_training_cohort(training_wallet_cohort, hybridize_wallet_ids)
@@ -531,6 +541,7 @@ def identify_modeling_cohort(modeling_period_profits_df: pd.DataFrame) -> pd.Dat
 #   Hybrid Index Utility Functions
 # -----------------------------------
 
+@u.timing_decorator
 def hybridize_wallet_address(
     df: pd.DataFrame,
     hybrid_cw_id_map: Optional[Dict[Tuple[int, str], int]] = None
@@ -585,7 +596,7 @@ def dehybridize_wallet_address(
     return df
 
 
-
+@u.timing_decorator
 def upload_hybrid_wallet_mapping(hybrid_cw_id_map: Dict[Tuple[int, str], int]) -> None:
     """
     Uploads the mapping of hybrid indices to all wallet-coin pairs to BigQuery.

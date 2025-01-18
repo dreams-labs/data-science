@@ -637,6 +637,10 @@ def assert_period(df, period_start, period_end) -> None:
     # Reset index so we can assess date as a column
     df = df.reset_index()
 
+    # Confirm no null coin_id columns
+    if df['coin_id'].isnull().any():
+        raise ValueError("Found null values in coin_id column")
+
     # Confirm the earliest record is the period starting balance date
     earliest_date = df['date'].min()
     if earliest_date > period_starting_balance_date:
@@ -660,6 +664,10 @@ def assert_period(df, period_start, period_end) -> None:
 
     # Checks for profits_df specific values
     if 'usd_balance' in df.columns:
+
+        # Confirm no null wallet_address columns
+        if df['wallet_address'].isnull().any():
+            raise ValueError("Found null values in wallet_address column")
 
         # Confirm the profits_df columns are in df
         profits_df_columns = ['usd_balance', 'usd_net_transfers', 'usd_inflows', 'is_imputed']

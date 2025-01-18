@@ -13,7 +13,6 @@ from kneed import KneeLocator
 
 # Local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
-import base_modeling.feature_selection as fs
 import utils as u
 
 # set up logger at the module level
@@ -147,7 +146,7 @@ def assign_clusters_from_distances(modeling_df: pd.DataFrame, cluster_counts: Li
     Returns:
     - modeling_df (DataFrame): Original df with new cluster assignment columns
     """
-    cluster_assignments_df = modeling_df
+    cluster_assignments_df = modeling_df.copy()
 
     cluster_cols = []
     for k in cluster_counts:

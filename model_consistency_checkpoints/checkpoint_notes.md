@@ -1,3 +1,145 @@
+# dda 574 hybrid run
+checkpoint 5 wallet min coins 0
+Model Performance Summary
+===================================
+Test Samples:             53,868
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.612
+RMSE:                     0.238
+MAE:                      0.147
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.702
+RMSE:                     0.151
+MAE:                      0.086
+
+checkpoint 5 coin model min coins 0
+Model Performance Summary
+===================================
+Test Samples:             402
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.075
+RMSE:                     0.406
+MAE:                      0.271
+
+
+checkpoint 4 coin with hybridized
+Model Performance Summary
+===================================
+Test Samples:             364
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.062
+RMSE:                     0.429
+MAE:                      0.283
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.007
+Standard Dev of Residuals:0.429
+95% Prediction Interval:  ±0.841
+
+
+checkpoint 3 wallet I don't know why it changed
+Model Performance Summary
+===================================
+Test Samples:             66,365
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.745
+RMSE:                     0.176
+MAE:                      0.102
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.748
+RMSE:                     0.114
+MAE:                      0.063
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.001
+Standard Dev of Residuals:0.176
+95% Prediction Interval:  ±0.344
+
+
+checkpoint 2 wallet hybridized after timing min transaction fix
+Model Performance Summary
+===================================
+Test Samples:             66,365
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.741
+RMSE:                     0.177
+MAE:                      0.103
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.745
+RMSE:                     0.115
+MAE:                      0.064
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.001
+Standard Dev of Residuals:0.177
+95% Prediction Interval:  ±0.347
+
+
+checkpoint 1 wallet hybridized
+Model Performance Summary
+===================================
+Test Samples:             66,365
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.743
+RMSE:                     0.177
+MAE:                      0.103
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.745
+RMSE:                     0.115
+MAE:                      0.064
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.000
+Standard Dev of Residuals:0.177
+95% Prediction Interval:  ±0.347
+
+checkpoint 1 wallet after timing min transaction fix
+Model Performance Summary
+===================================
+Test Samples:             15,470
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.352
+RMSE:                     0.362
+MAE:                      0.254
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.768
+RMSE:                     0.176
+MAE:                      0.100
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.001
+Standard Dev of Residuals:0.362
+95% Prediction Interval:  ±0.709
+
 
 # dda 572 rerun
 checkpoint 1
