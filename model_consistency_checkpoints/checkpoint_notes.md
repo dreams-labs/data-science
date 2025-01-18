@@ -1,4 +1,33 @@
 # dda 574 hybrid run
+checkpoint 5 wallet min coins 0
+Model Performance Summary
+===================================
+Test Samples:             53,868
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.612
+RMSE:                     0.238
+MAE:                      0.147
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.702
+RMSE:                     0.151
+MAE:                      0.086
+
+checkpoint 5 coin model min coins 0
+Model Performance Summary
+===================================
+Test Samples:             402
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.075
+RMSE:                     0.406
+MAE:                      0.271
+
+
 checkpoint 4 coin with hybridized
 Model Performance Summary
 ===================================

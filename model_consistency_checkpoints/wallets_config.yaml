@@ -28,7 +28,7 @@ training_data:
 data_cleaning:
 
     # Wallet cohort thresholds
-    min_coins_traded: 2  # Exclude wallets that have traded fewer coins than this during the training period
+    min_coins_traded: 0  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
     max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
 
     min_wallet_investment: 10000 # time weighted average balance filter
@@ -109,7 +109,7 @@ modeling:
 
         # Core Tree Params (Always Active)
         # -------------------------------
-        eval_metric: ['rmse', 'mae', 'mape', 'mphe']
+        eval_metric: ['rmse', 'mae', 'mphe']
 
         max_depth: 17  # how deep the trees can go
         min_child_weight_pct: 0.0002  # what % of rows each tree must have
@@ -119,12 +119,12 @@ modeling:
         # Performance Profiles (Choose One Section)
         # --------------------------------------
         # CHECKPOINTER
-        n_estimators: 150  # number of trees to train in the model
-        learning_rate: 0.04  # step size for updates to weights during training
+        n_estimators: 300  # number of trees to train in the model
+        learning_rate: 0.025  # step size for updates to weights during training
         early_stopping_rounds: 25  # stop training if no improvement after x rounds
-        gamma: 0.015  # minimum gain required to split further on a leaf node
+        gamma: 0.01  # minimum gain required to split further on a leaf node
         tree_method: 'hist'  # method for building trees, e.g., histogram-based
-        max_bin: 128  # how many bins to categorize features into
+        max_bin: 256  # how many bins to categorize features into
 
         # Threading Controls
         n_jobs: -1
