@@ -44,7 +44,11 @@ wallet_segments:
 wallet_features:
 
     # Balance metrics params
-    wallet_balance_dates:
+    wallet_balance_dates: [
+        # TODO: needs profits imputation logic to use dates other than modeling start/end
+        '2024-11-20',
+        '2024-10-31',
+    ]
 
     # Score features params
     usd_materiality: 20 # Wallets with volume/balances below this won't be counted in medians/distributions/etc

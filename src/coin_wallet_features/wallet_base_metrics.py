@@ -11,32 +11,38 @@ logger = logging.getLogger(__name__)
 
 def calculate_coin_wallet_balances(
     profits_df: pd.DataFrame,
-    balance_date: str
-) -> Tuple[pd.DataFrame, List[str]]:
-    """Calculate metric value for each wallet-coin pair on specified date.
+    balance_dates: List[str]
+) -> pd.DataFrame:
+    """
+    Calculate metric value for each wallet-coin pair on specified dates.
 
     Params:
     - profits_df (DataFrame): Input profits data
-    - metric_column (str): Column name to aggregate (e.g. 'usd_balance', 'volume')
-    - balance_date (str): Date for metric calculation
+    - balance_dates (List[str]): List of dates for metric calculation
 
     Returns:
-    - balances_df (DataFrame): Wallet-coin level data with metric value for specified date
-        with indices (coin_id','wallet_address)
+    - balances_df (DataFrame): Wallet-coin level data with metric values for each specified date
+        with indices ('coin_id', 'wallet_address').
     """
-    balance_date = pd.to_datetime(balance_date)
-    balance_date_str = balance_date.strftime('%y%m%d')
+    # Convert balance_dates to datetime for consistency
+    balance_dates = pd.to_datetime(balance_dates)
 
-    # Filter to date and select only needed columns
-    balances_df = profits_df[profits_df['date'] == balance_date][
-        ['coin_id', 'wallet_address', 'usd_balance']
-    ].copy().set_index(['coin_id','wallet_address'])
+    # Create a DataFrame with coin_id and wallet_address as indices
+    balances_df = profits_df[['coin_id', 'wallet_address']].drop_duplicates().set_index(['coin_id', 'wallet_address'])
 
-    # Rename the metric column to include the date
-    col_name = f'usd_balance_{balance_date_str}'
-    balances_df = balances_df.rename(
-        columns={'usd_balance': col_name}
-    )
+    # Loop through balance_dates and add a column for each date
+    for balance_date in balance_dates:
+        balance_date_str = balance_date.strftime('%y%m%d')
+        col_name = f'usd_balance_{balance_date_str}'
+
+        # Filter for the specific date and map the balances
+        date_balances = profits_df.loc[
+            profits_df['date'] == balance_date,
+            ['coin_id', 'wallet_address', 'usd_balance']
+        ].set_index(['coin_id', 'wallet_address'])
+
+        # Add the balance column to balances_df
+        balances_df[col_name] = date_balances['usd_balance']
 
     return balances_df
 
