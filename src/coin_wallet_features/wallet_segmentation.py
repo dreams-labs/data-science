@@ -92,6 +92,12 @@ def assign_wallet_score_quantiles(wallet_segmentation_df, wallet_scores, score_s
                                                    score_segment_quantiles)
         wallet_segmentation_df = wallet_segmentation_df.join(wallet_quantiles,how='inner')
 
+        # Append confidence quantiles
+        if f'scores|{score_name}_confidence' in wallet_segmentation_df.columns:
+            wallet_quantiles = calculate_wallet_quantiles(wallet_segmentation_df[f'scores|{score_name}_confidence'],
+                                                    score_segment_quantiles)
+            wallet_segmentation_df = wallet_segmentation_df.join(wallet_quantiles,how='inner')
+
     return wallet_segmentation_df
 
 
