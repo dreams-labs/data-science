@@ -87,10 +87,9 @@ coin_modeling:
     model_type: "xgb"
     model_params:
         n_estimators: 300
-        max_depth: 6
+        max_depth: 7
         learning_rate: 0.02
-        # subsample: 0.8
-        # colsample_bytree: 1.0
+        subsample: 0.9
         gamma: 0.01
         min_child_weight: 5
         early_stopping_rounds: 20
@@ -104,10 +103,11 @@ coin_modeling:
     # CoinModel Grid Search
     grid_search_params:
 
-        enabled: True # whether to grid search
+        # enabled: True # whether to grid search
+        enabled: False # whether to grid search
 
         # Search methodology
-        n_iter: 40  # random search limit
+        n_iter: 60  # random search limit
         scoring: 'neg_root_mean_squared_error'
         n_splits: 2  # cv splits
         n_jobs: -1
@@ -115,12 +115,31 @@ coin_modeling:
 
         # Params
         param_grid:
-            # params to test
-            regressor__max_depth: [4, 6, 8, 10, 12]
-            regressor__min_child_weight: [3,5,10,15]
-            # regressor__min_child_weight_pct: [0.005, 0.01, 0.025]
-            regressor__subsample: [0.7, 0.85, 1.0]
 
-            # params that keep the model speedy
-            regressor__n_estimators: [200]
-            regressor__learning_rate: [0.03]
+            # # Depth and Child Weight
+            # regressor__max_depth: [6, 8]
+            # regressor__min_child_weight: [2,3,5,10]
+
+            # Col/Row Sampling
+            # regressor__subsample: [0.5, .6, .7, .8, .9, 1.0]
+            regressor__colsample_bytree: [0.9, 1.0]
+
+            # # Model Speed
+            # regressor__tree_method: ['hist', 'approx', 'auto']
+            # regressor__max_bin: [64, 128, 256]
+            # regressor__gamma: [0.0, 0.1, 1.0]  # controls the minimum loss reduction needed to split a node
+
+
+            # # Tree Training Speed Overrides
+            # regressor__n_estimators: [150]
+            # regressor__learning_rate: [0.05]
+
+            # # Optimize for Speed
+            # regressor__n_jobs: [4]  # how many models to build at once
+            # regressor__nthread: [4]  # how many threads each model can use
+            # # regressor__max_bin: [128]
+            # # regressor__tree_method: ['hist']
+
+
+    # Coin model workflow params
+    score_name: "iterating"  # reference name for feature columns etc

@@ -159,7 +159,7 @@ class BaseModel:
             'cv_results': self.random_search.cv_results_
         }
 
-    def generate_search_report(self) -> pd.DataFrame:
+    def generate_search_report(self, output_raw_data=False) -> pd.DataFrame:
         """
         Generate a report of the random search results.
 
@@ -178,6 +178,9 @@ class BaseModel:
         # Convert cv_results to a DataFrame
         results_df = pd.DataFrame(cv_results)
 
+        if output_raw_data is True:
+            return results_df
+
         # Prepare a list to hold rows for the report
         report_data = []
 
@@ -195,10 +198,7 @@ class BaseModel:
         # Create a DataFrame for the report
         report_df = pd.DataFrame(report_data)
 
-        # Sort the report for better readability
-        report_df.sort_values(by='avg_score', ascending=False, inplace=True)
-
-        return report_df
+        return report_df.groupby(['param','param_value'])[['avg_score']].mean().sort_values(by='avg_score', ascending=False)
 
     def _fit(self) -> None:
         """
