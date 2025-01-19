@@ -288,6 +288,9 @@ def calculate_tree_confidence(model, wallet_training_data_df: pd.DataFrame) -> p
 
     Returns:
     - confidence_scores (Series): Confidence score per prediction
+
+    Adding to scores DataFrame:
+        modeling_wallet_scores_df[f'confidence|{score_name}'] = confidence_scores
     """
     # Get per-tree predictions
     tree_preds = np.array([
