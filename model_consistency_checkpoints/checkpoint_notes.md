@@ -1,4 +1,22 @@
 # dda 551 confidence metrics for scores
+checkpoint 3 try with confidence
+Model Performance Summary
+===================================
+Test Samples:             442
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.213
+RMSE:                     0.256
+MAE:                      0.211
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.002
+Standard Dev of Residuals:0.256
+95% Prediction Interval:  ±0.502
+
+
 checkpoint 2 coins 1 date
 Model Performance Summary
 ===================================

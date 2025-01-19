@@ -275,3 +275,30 @@ def analyze_wallet_model_importance(feature_importances):
     ], axis=1)
 
     return feature_details_df
+
+
+
+def calculate_tree_confidence(model, wallet_training_data_df: pd.DataFrame) -> pd.Series:
+    """
+    Calculate confidence scores using tree prediction variance.
+
+    Params:
+    - model (XGBRegressor): Trained XGBoost model
+    - wallet_training_data_df (DataFrame): Training data for the full wallet cohort
+
+    Returns:
+    - confidence_scores (Series): Confidence score per prediction
+    """
+    # Get per-tree predictions
+    tree_preds = np.array([
+        model.predict(wallet_training_data_df, iteration_range=(i, i+1), output_margin=True)
+        for i in range(model.best_iteration)
+    ]).T
+
+    # Calculate confidence using prediction variance
+    confidence_scores = pd.Series(
+        1 - np.std(tree_preds, axis=1) / np.mean(tree_preds, axis=1),
+        index=wallet_training_data_df.index
+    )
+
+    return confidence_scores
