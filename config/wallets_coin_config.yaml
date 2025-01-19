@@ -27,8 +27,8 @@ wallet_segments:
     # Scores to include as segments + metrics
     wallet_scores_path: "temp/wallet_modeling_score_dfs"
     wallet_scores: [
-        'net_gain_winsorized_checkpoint_hybridized',
-        # 'net_gain_winsorized_checkpoint',
+        # 'net_gain_winsorized_checkpoint_hybridized',
+        'net_gain_winsorized_checkpoint',
     ]
 
     # score_segment_quantiles: [0.1, 0.3, 0.5, 0.7, 0.9]  # higher is better; how to assign wallet a score segment
@@ -47,7 +47,7 @@ wallet_features:
     wallet_balance_dates: [
         # TODO: needs profits imputation logic to use dates other than modeling start/end
         '2024-11-20',
-        '2024-10-31',
+        # '2024-10-31',
     ]
 
     # Score features params

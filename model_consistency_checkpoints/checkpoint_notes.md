@@ -1,3 +1,101 @@
+# dda 551 confidence metrics for scores
+checkpoint 4 prepare to merge
+wallet
+Model Performance Summary
+===================================
+Test Samples:             53,868
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.612
+RMSE:                     0.238
+MAE:                      0.147
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.702
+RMSE:                     0.151
+MAE:                      0.086
+
+coin
+Model Performance Summary
+===================================
+Test Samples:             442
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.239
+RMSE:                     0.252
+MAE:                      0.208
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.001
+Standard Dev of Residuals:0.252
+95% Prediction Interval:  ±0.493
+
+
+checkpoint 3 try with confidence
+Model Performance Summary
+===================================
+Test Samples:             442
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.213
+RMSE:                     0.256
+MAE:                      0.211
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.002
+Standard Dev of Residuals:0.256
+95% Prediction Interval:  ±0.502
+
+
+checkpoint 2 coins 1 date
+Model Performance Summary
+===================================
+Test Samples:             442
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.239
+RMSE:                     0.252
+MAE:                      0.208
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.001
+Standard Dev of Residuals:0.252
+95% Prediction Interval:  ±0.493
+
+
+checkpoint 1 wallet base
+Model Performance Summary
+===================================
+Test Samples:             53,868
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.612
+RMSE:                     0.238
+MAE:                      0.147
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.702
+RMSE:                     0.151
+MAE:                      0.086
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.000
+Standard Dev of Residuals:0.238
+95% Prediction Interval:  ±0.466
+
+
+
 # dda 520 coin model multiple dates
 checkpoint 1 with 2 dates
 Model Performance Summary

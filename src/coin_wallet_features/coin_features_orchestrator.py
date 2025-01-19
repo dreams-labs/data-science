@@ -38,23 +38,27 @@ def load_wallet_scores(wallet_scores: list, wallet_scores_path: str) -> pd.DataF
 
     for score_name in wallet_scores:
         score_df = pd.read_parquet(f"{wallet_scores_path}/{score_name}.parquet")
+        feature_cols = []
 
-        # Add residuals column and renamed scores column
+        # Add scores column
+        score_df[f'scores|{score_name}_score'] = score_df[f'score|{score_name}']
+        feature_cols.append(f'scores|{score_name}_score')
+
+        # Add residuals column
         score_df[f'scores|{score_name}_residual'] = (
             score_df[f'score|{score_name}'] - score_df[f'actual|{score_name}']
         )
-        score_df[f'scores|{score_name}_score'] = score_df[f'score|{score_name}']
+        feature_cols.append(f'scores|{score_name}_residual')
 
-        # Select only needed columns
-        score_subset = score_df[[
-            f'scores|{score_name}_score',
-            f'scores|{score_name}_residual'
-        ]]
+        # Add confidence if provided
+        if f'confidence|{score_name}' in score_df.columns:
+            score_df[f'scores|{score_name}_confidence'] = score_df[f'confidence|{score_name}']
+            feature_cols.append(f'scores|{score_name}_confidence')
 
         # Full outer join with existing results
         wallet_scores_df = (
-            score_subset if wallet_scores_df.empty
-            else wallet_scores_df.join(score_subset, how='outer')
+            score_df[feature_cols] if wallet_scores_df.empty
+            else wallet_scores_df.join(score_df[feature_cols], how='outer')
         )
 
     return wallet_scores_df
