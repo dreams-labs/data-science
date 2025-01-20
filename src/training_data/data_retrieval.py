@@ -18,9 +18,9 @@ logger = logging.getLogger(__name__)
 
 
 
-# -----------------------------------
-#        Market Data Functions
-# -----------------------------------
+# ------------------------------------
+#     Primary Interface Functions
+# ------------------------------------
 
 def retrieve_market_data(dataset='prod'):
     """
@@ -79,6 +79,248 @@ def retrieve_market_data(dataset='prod'):
                 round(time.time()-start_time,1))
 
     return market_data_df
+
+
+def retrieve_profits_data(start_date, end_date, min_wallet_inflows, dataset='prod'):
+    """
+    Retrieves data from the core.coin_wallet_profits table and converts columns to
+    memory-efficient formats. Records prior to the start_date are excluded but a new
+    row is imputed for the coin_id-wallet_address pair that summarizes their historical
+    performance (see Step 2 CTEs).
+
+    Params:
+    - start_date (String): The earliest date to retrieve records for with format 'YYYY-MM-DD'
+    - start_date (String): The latest date to retrieve records for with format 'YYYY-MM-DD'
+    - min_wallet_inflows (Float): Wallets with fewer than this amount of total USD inflows
+        across all coins will be removed from the profits_df dataset
+    - dataset (String): determines bigquery dataset. 'prod' targets 'core._'; 'dev' targets 'dev_core._'
+
+
+    Returns:
+    - profits_df (DataFrame): contains coin-wallet-date keyed profits data denominated in USD
+    - wallet_address_mapping (pandas Index): mapping that will allow us to convert wallet_address
+        back to the original strings, rather than the integer values they get mapped to for
+        memory optimization
+    """
+    start_time = time.time()
+
+    if dataset == 'prod':
+        core_dataset = 'core'
+    elif dataset == 'dev':
+        core_dataset = 'dev_core'
+    else:
+        raise ValueError("Invalid dataset parameter '%s', dataset must be 'dev' or 'prod'.")
+
+
+    # SQL query to retrieve profits data
+    logger.info(f"Retrieving profits data from {dataset} dataset '{core_dataset}'...")
+
+    query_sql = f"""
+        -- STEP 1: retrieve profits data and apply USD inflows filter
+        -------------------------------------------------------------
+        with profits_full as (
+            select coin_id
+            ,date
+            ,wallet_address
+            ,profits_cumulative
+            ,usd_balance
+            ,usd_net_transfers
+            ,usd_inflows
+            ,usd_inflows_cumulative
+            from {core_dataset}.coin_wallet_profits
+            where date <= '{end_date}'
+        ),
+
+        usd_inflows_filter as (
+            select coin_id
+            ,wallet_address
+            ,max(usd_inflows_cumulative) as total_usd_inflows
+            from profits_full
+            group by 1,2
+        ),
+
+        profits_base as (
+            select pf.*
+            from profits_full pf
+
+            -- filter to remove wallet-coin pairs below the min_wallet_inflows
+            join usd_inflows_filter f on f.coin_id = pf.coin_id
+                and f.wallet_address = pf.wallet_address
+            where f.total_usd_inflows >= {min_wallet_inflows}
+        ),
+
+
+        -- STEP 2: create new records for all coin-wallet pairs as of the training_period_start
+        ---------------------------------------------------------------------------------------
+        -- compute the starting profits and balances as of the training_period_start
+        training_start_existing_rows as (
+            -- identify coin-wallet pairs that already have a balance as of the period end
+            select *
+            from profits_base
+            where date = '{start_date}'
+        ),
+        training_start_needs_rows as (
+            -- for coin-wallet pairs that don't have existing records, identify the row closest to the period end date
+            select t.*
+            ,cmd_previous.price as price_previous
+            ,cmd_training.price as price_current
+            ,row_number() over (partition by t.coin_id,t.wallet_address order by t.date desc) as rn
+            from profits_base t
+            left join training_start_existing_rows e on e.coin_id = t.coin_id
+                and e.wallet_address = t.wallet_address
+
+            -- obtain the last price used to compute the balance and profits data
+            join {core_dataset}.coin_market_data cmd_previous on cmd_previous.coin_id = t.coin_id and cmd_previous.date = t.date
+
+            -- obtain the training_period_start price so we can update the calculations
+            join {core_dataset}.coin_market_data cmd_training on cmd_training.coin_id = t.coin_id and cmd_training.date = '{start_date}'
+            where t.date < '{start_date}'
+            and e.coin_id is null
+        ),
+        training_start_new_rows as (
+            -- create a new row for the period end date by carrying the balance from the closest existing record
+            select t.coin_id
+            ,cast('{start_date}' as datetime) as date
+            ,t.wallet_address
+            -- profits_cumulative is the previous profits_cumulative + the change in profits up to the start_date
+            ,((t.price_current / t.price_previous) - 1) * t.usd_balance + t.profits_cumulative as profits_cumulative
+            -- usd_balance is previous balance * (1 + % change in price)
+            ,(t.price_current / t.price_previous) * t.usd_balance as usd_balance
+            -- there were no transfers
+            ,0 as usd_net_transfers
+            -- there were no inflows
+            ,0 as usd_inflows
+            -- no change since there were no inflows
+            ,usd_inflows_cumulative as usd_inflows_cumulative
+
+            from training_start_needs_rows t
+            where rn=1
+
+        ),
+
+        -- STEP 3: merge all records together
+        -------------------------------------
+        profits_merged as (
+            select *,
+            False as is_imputed
+            from profits_base
+            -- transfers prior to the training period are summarized in training_start_new_rows
+            where date >= '{start_date}'
+
+            union all
+
+            select *,
+            True as is_imputed
+            from training_start_new_rows
+        )
+
+        select coin_id
+        ,date
+
+        -- replace the memory-intensive address strings with integers
+        ,id.wallet_id as wallet_address
+
+        ,profits_cumulative
+        ,usd_balance
+        ,usd_net_transfers
+        ,usd_inflows
+        -- set a floor of $0.01 to avoid divide by 0 errors caused by rounding
+        ,greatest(0.01,usd_inflows_cumulative) as usd_inflows_cumulative
+        ,is_imputed
+        from profits_merged pm
+        join reference.wallet_ids id on id.wallet_address = pm.wallet_address
+    """
+
+    # Run the SQL query using dgc's run_sql method
+    profits_df = dgc().run_sql(query_sql)
+
+    logger.debug('Converting columns to memory-optimized formats...')
+
+    # Convert coin_id to categorical and date to date
+    profits_df['coin_id'] = profits_df['coin_id'].astype('category')
+    profits_df['date'] = pd.to_datetime(profits_df['date'])
+
+    # Convert all numerical columns to 32 bit, using safe_downcast to avoid overflow
+    profits_df = u.df_downcast(profits_df)
+
+    logger.info('Retrieved profits_df with %s unique coins and %s rows after %.2f seconds',
+                len(set(profits_df['coin_id'])),
+                len(profits_df),
+                time.time()-start_time)
+
+    return profits_df
+
+
+def retrieve_macro_trends_data():
+    """
+    Retrieves Google Trends data from the macro_trends dataset. Because the data is weekly, it also
+    resamples to daily records using linear interpolation.
+
+    Returns:
+    - google_trends_df: DataFrame keyed on date containing Google Trends values for multiple terms
+    """
+    # query to retrieve all macro trends data at once
+    query_sql = """
+        with all_dates as (
+            select date from `macro_trends.bitcoin_indicators`
+            union distinct
+            select date from `macro_trends.crypto_global_market`
+            union distinct
+            select date from `macro_trends.google_trends`
+        )
+        select d.date
+        ,bi.btc_price
+        ,bi.cdd_terminal_adjusted_90dma as btc_cdd_terminal_adjusted_90dma
+        ,bi.fear_and_greed as btc_fear_and_greed
+        ,bi.mvrv_z_score as btc_mvrv_z_score
+        ,bi.vdd_multiple as btc_vdd_multiple
+        ,gm.market_cap as global_market_cap
+        ,gm.total_volume as global_volume
+        ,gt.altcoin_worldwide as gtrends_altcoin_worldwide
+        ,gt.cryptocurrency_worldwide as gtrends_cryptocurrency_worldwide
+        ,gt.solana_us as gtrends_solana_us
+        ,gt.cryptocurrency_us as gtrends_cryptocurrency_us
+        ,gt.bitcoin_us as gtrends_bitcoin_us
+        ,gt.solana_worldwide as gtrends_solana_worldwide
+        ,gt.coinbase_us as gtrends_coinbase_us
+        ,gt.bitcoin_worldwide as gtrends_bitcoin_worldwide
+        ,gt.ethereum_worldwide as gtrends_ethereum_worldwide
+        ,gt.ethereum_us as gtrends_ethereum_us
+        ,gt.altcoin_us as gtrends_altcoin_us
+        ,gt.coinbase_worldwide as gtrends_coinbase_worldwide
+        ,gt.memecoin_worldwide as gtrends_memecoin_worldwide
+        ,gt.memecoin_us as gtrends_memecoin_us
+        from all_dates d
+        left join `macro_trends.bitcoin_indicators` bi on bi.date = d.date
+        left join `macro_trends.crypto_global_market` gm on gm.date = d.date
+        left join `macro_trends.google_trends` gt on gt.date = d.date
+        order by date desc
+        """
+
+    # Run the SQL query using dgc's run_sql method
+    macro_trends_df = dgc().run_sql(query_sql)
+    logger.debug('Retrieved macro trends data with shape %s',macro_trends_df.shape)
+
+    # Convert the date column to datetime format
+    macro_trends_df['date'] = pd.to_datetime(macro_trends_df['date'])
+
+    # Resample the df to fill in missing days by using date as the index
+    macro_trends_df = macro_trends_df.set_index('date')
+    macro_trends_df = macro_trends_df.resample('D').interpolate(method='time', limit_area='inside')
+
+    # Reset index
+    macro_trends_df = macro_trends_df.reset_index()
+
+    return macro_trends_df
+
+
+
+
+
+
+# -----------------------------------
+#        Market Data Helpers
+# -----------------------------------
 
 
 def detect_price_data_staleness(market_data_df, config):
@@ -284,178 +526,8 @@ def impute_market_cap(market_data_df, min_coverage=0.7, max_multiple=1.0):
 
 
 # ------------------------------------
-#        Profits Data Functions
+#        Profits Data Helpers
 # ------------------------------------
-
-def retrieve_profits_data(start_date, end_date, min_wallet_inflows, dataset='prod'):
-    """
-    Retrieves data from the core.coin_wallet_profits table and converts columns to
-    memory-efficient formats. Records prior to the start_date are excluded but a new
-    row is imputed for the coin_id-wallet_address pair that summarizes their historical
-    performance (see Step 2 CTEs).
-
-    Params:
-    - start_date (String): The earliest date to retrieve records for with format 'YYYY-MM-DD'
-    - start_date (String): The latest date to retrieve records for with format 'YYYY-MM-DD'
-    - min_wallet_inflows (Float): Wallets with fewer than this amount of total USD inflows
-        across all coins will be removed from the profits_df dataset
-    - dataset (String): determines bigquery dataset. 'prod' targets 'core._'; 'dev' targets 'dev_core._'
-
-
-    Returns:
-    - profits_df (DataFrame): contains coin-wallet-date keyed profits data denominated in USD
-    - wallet_address_mapping (pandas Index): mapping that will allow us to convert wallet_address
-        back to the original strings, rather than the integer values they get mapped to for
-        memory optimization
-    """
-    start_time = time.time()
-
-    if dataset == 'prod':
-        core_dataset = 'core'
-    elif dataset == 'dev':
-        core_dataset = 'dev_core'
-    else:
-        raise ValueError("Invalid dataset parameter '%s', dataset must be 'dev' or 'prod'.")
-
-
-    # SQL query to retrieve profits data
-    logger.info(f"Retrieving profits data from {dataset} dataset '{core_dataset}'...")
-
-    query_sql = f"""
-        -- STEP 1: retrieve profits data and apply USD inflows filter
-        -------------------------------------------------------------
-        with profits_full as (
-            select coin_id
-            ,date
-            ,wallet_address
-            ,profits_cumulative
-            ,usd_balance
-            ,usd_net_transfers
-            ,usd_inflows
-            ,usd_inflows_cumulative
-            from {core_dataset}.coin_wallet_profits
-            where date <= '{end_date}'
-        ),
-
-        usd_inflows_filter as (
-            select coin_id
-            ,wallet_address
-            ,max(usd_inflows_cumulative) as total_usd_inflows
-            from profits_full
-            group by 1,2
-        ),
-
-        profits_base as (
-            select pf.*
-            from profits_full pf
-
-            -- filter to remove wallet-coin pairs below the min_wallet_inflows
-            join usd_inflows_filter f on f.coin_id = pf.coin_id
-                and f.wallet_address = pf.wallet_address
-            where f.total_usd_inflows >= {min_wallet_inflows}
-        ),
-
-
-        -- STEP 2: create new records for all coin-wallet pairs as of the training_period_start
-        ---------------------------------------------------------------------------------------
-        -- compute the starting profits and balances as of the training_period_start
-        training_start_existing_rows as (
-            -- identify coin-wallet pairs that already have a balance as of the period end
-            select *
-            from profits_base
-            where date = '{start_date}'
-        ),
-        training_start_needs_rows as (
-            -- for coin-wallet pairs that don't have existing records, identify the row closest to the period end date
-            select t.*
-            ,cmd_previous.price as price_previous
-            ,cmd_training.price as price_current
-            ,row_number() over (partition by t.coin_id,t.wallet_address order by t.date desc) as rn
-            from profits_base t
-            left join training_start_existing_rows e on e.coin_id = t.coin_id
-                and e.wallet_address = t.wallet_address
-
-            -- obtain the last price used to compute the balance and profits data
-            join {core_dataset}.coin_market_data cmd_previous on cmd_previous.coin_id = t.coin_id and cmd_previous.date = t.date
-
-            -- obtain the training_period_start price so we can update the calculations
-            join {core_dataset}.coin_market_data cmd_training on cmd_training.coin_id = t.coin_id and cmd_training.date = '{start_date}'
-            where t.date < '{start_date}'
-            and e.coin_id is null
-        ),
-        training_start_new_rows as (
-            -- create a new row for the period end date by carrying the balance from the closest existing record
-            select t.coin_id
-            ,cast('{start_date}' as datetime) as date
-            ,t.wallet_address
-            -- profits_cumulative is the previous profits_cumulative + the change in profits up to the start_date
-            ,((t.price_current / t.price_previous) - 1) * t.usd_balance + t.profits_cumulative as profits_cumulative
-            -- usd_balance is previous balance * (1 + % change in price)
-            ,(t.price_current / t.price_previous) * t.usd_balance as usd_balance
-            -- there were no transfers
-            ,0 as usd_net_transfers
-            -- there were no inflows
-            ,0 as usd_inflows
-            -- no change since there were no inflows
-            ,usd_inflows_cumulative as usd_inflows_cumulative
-
-            from training_start_needs_rows t
-            where rn=1
-
-        ),
-
-        -- STEP 3: merge all records together
-        -------------------------------------
-        profits_merged as (
-            select *,
-            False as is_imputed
-            from profits_base
-            -- transfers prior to the training period are summarized in training_start_new_rows
-            where date >= '{start_date}'
-
-            union all
-
-            select *,
-            True as is_imputed
-            from training_start_new_rows
-        )
-
-        select coin_id
-        ,date
-
-        -- replace the memory-intensive address strings with integers
-        ,id.wallet_id as wallet_address
-
-        ,profits_cumulative
-        ,usd_balance
-        ,usd_net_transfers
-        ,usd_inflows
-        -- set a floor of $0.01 to avoid divide by 0 errors caused by rounding
-        ,greatest(0.01,usd_inflows_cumulative) as usd_inflows_cumulative
-        ,is_imputed
-        from profits_merged pm
-        join reference.wallet_ids id on id.wallet_address = pm.wallet_address
-    """
-
-    # Run the SQL query using dgc's run_sql method
-    profits_df = dgc().run_sql(query_sql)
-
-    logger.debug('Converting columns to memory-optimized formats...')
-
-    # Convert coin_id to categorical and date to date
-    profits_df['coin_id'] = profits_df['coin_id'].astype('category')
-    profits_df['date'] = pd.to_datetime(profits_df['date'])
-
-    # Convert all numerical columns to 32 bit, using safe_downcast to avoid overflow
-    profits_df = u.df_downcast(profits_df)
-
-    logger.info('Retrieved profits_df with %s unique coins and %s rows after %.2f seconds',
-                len(set(profits_df['coin_id'])),
-                len(profits_df),
-                time.time()-start_time)
-
-    return profits_df
-
 
 def check_coin_transfers_staleness(profits_df, data_cleaning_config) -> None:
     """
@@ -587,71 +659,8 @@ def retrieve_metadata_data():
 
 
 # ----------------------------------
-#       Macro Trends Functions
+#       Macro Trends Helpers
 # ----------------------------------
-
-def retrieve_macro_trends_data():
-    """
-    Retrieves Google Trends data from the macro_trends dataset. Because the data is weekly, it also
-    resamples to daily records using linear interpolation.
-
-    Returns:
-    - google_trends_df: DataFrame keyed on date containing Google Trends values for multiple terms
-    """
-    # query to retrieve all macro trends data at once
-    query_sql = """
-        with all_dates as (
-            select date from `macro_trends.bitcoin_indicators`
-            union distinct
-            select date from `macro_trends.crypto_global_market`
-            union distinct
-            select date from `macro_trends.google_trends`
-        )
-        select d.date
-        ,bi.btc_price
-        ,bi.cdd_terminal_adjusted_90dma as btc_cdd_terminal_adjusted_90dma
-        ,bi.fear_and_greed as btc_fear_and_greed
-        ,bi.mvrv_z_score as btc_mvrv_z_score
-        ,bi.vdd_multiple as btc_vdd_multiple
-        ,gm.market_cap as global_market_cap
-        ,gm.total_volume as global_volume
-        ,gt.altcoin_worldwide as gtrends_altcoin_worldwide
-        ,gt.cryptocurrency_worldwide as gtrends_cryptocurrency_worldwide
-        ,gt.solana_us as gtrends_solana_us
-        ,gt.cryptocurrency_us as gtrends_cryptocurrency_us
-        ,gt.bitcoin_us as gtrends_bitcoin_us
-        ,gt.solana_worldwide as gtrends_solana_worldwide
-        ,gt.coinbase_us as gtrends_coinbase_us
-        ,gt.bitcoin_worldwide as gtrends_bitcoin_worldwide
-        ,gt.ethereum_worldwide as gtrends_ethereum_worldwide
-        ,gt.ethereum_us as gtrends_ethereum_us
-        ,gt.altcoin_us as gtrends_altcoin_us
-        ,gt.coinbase_worldwide as gtrends_coinbase_worldwide
-        ,gt.memecoin_worldwide as gtrends_memecoin_worldwide
-        ,gt.memecoin_us as gtrends_memecoin_us
-        from all_dates d
-        left join `macro_trends.bitcoin_indicators` bi on bi.date = d.date
-        left join `macro_trends.crypto_global_market` gm on gm.date = d.date
-        left join `macro_trends.google_trends` gt on gt.date = d.date
-        order by date desc
-        """
-
-    # Run the SQL query using dgc's run_sql method
-    macro_trends_df = dgc().run_sql(query_sql)
-    logger.debug('Retrieved macro trends data with shape %s',macro_trends_df.shape)
-
-    # Convert the date column to datetime format
-    macro_trends_df['date'] = pd.to_datetime(macro_trends_df['date'])
-
-    # Resample the df to fill in missing days by using date as the index
-    macro_trends_df = macro_trends_df.set_index('date')
-    macro_trends_df = macro_trends_df.resample('D').interpolate(method='time', limit_area='inside')
-
-    # Reset index
-    macro_trends_df = macro_trends_df.reset_index()
-
-    return macro_trends_df
-
 
 def clean_macro_trends(macro_trends_df, config):
     """
