@@ -1,4 +1,28 @@
 # dda 579 ablation experiment
+checkpoint 2 ablated
+Model Performance Summary
+===================================
+Test Samples:             53,868
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.656
+RMSE:                     0.224
+MAE:                      0.128
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.758
+RMSE:                     0.136
+MAE:                      0.077
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.000
+Standard Dev of Residuals:0.224
+95% Prediction Interval:  ±0.438
+
+
 checkpoint 1 cuttin em out
 Model Performance Summary
 ===================================
