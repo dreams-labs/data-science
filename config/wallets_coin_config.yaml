@@ -58,6 +58,7 @@ wallet_features:
         'average_transaction'
     ]
 
+
 # CheckpointValidation
 # CoinModel Modeling Config
 # Variables used in the generation of the validation period coin model
@@ -66,11 +67,6 @@ coin_modeling:
     # Thresholds for coin inclusion in training data
     min_cohort_wallets: 20  # how many wallets must hold a coin for the coin to be elegible for forecasting
     min_cohort_balance: 20000  # how much USD all wallets must hold for the coin to be elegible for forecasting
-
-    # Params used to remove unnecessary features
-    feature_selection:
-        variance_threshold: 0.0
-        correlation_threshold: 1.0
 
     # Thresholds for coin inclusion in training data
     min_market_cap: 00_000  # coins below this market cap will not be included in performance assessments
@@ -81,9 +77,29 @@ coin_modeling:
     # target_variable: "coin_return_pctile_full"
     target_variable: "coin_return_pctile"
     train_test_split: 0.2  # test size
-
     returns_winsorization: 0.01
-    drop_columns: []
+
+
+    # CheckpointValidation
+    # CoinModel Feature Selection
+    # Params used to remove unnecessary features
+    feature_selection:
+
+        # Column patterns to remove
+        drop_patterns: [
+            # 'training_clusters|k2_cluster/*|trading/*',
+            # 'score_quantile|net_gain_winsorized_checkpoint_residual/*',
+            # 'score_quantile|net_gain_winsorized_checkpoint_residual/*|trading/*',
+            # 'score_quantile|net_gain_winsorized_checkpoint_residual/*|balances/*',
+            # 'scor*',
+            # 'all*',
+            # 'training_cluster*'
+        ]
+
+        # Correlation/variance-based removal
+        scale_before_selection: False # whether to apply variance thresholds before or after scaling data
+        variance_threshold: 0.00 # features with this level of variance or less will be removed
+        correlation_threshold: 1.999 # features above this correlation coefficient will be removed
 
 
     # CheckpointValidation
@@ -113,7 +129,7 @@ coin_modeling:
         # Search methodology
         n_iter: 60  # random search limit
         scoring: 'neg_root_mean_squared_error'
-        n_splits: 2  # cv splits
+        n_splits: 3  # cv splits
         n_jobs: -1
         verbose_level: 3  # scikit-learn verbosity
 
@@ -126,23 +142,31 @@ coin_modeling:
 
             # Col/Row Sampling
             # regressor__subsample: [0.5, .6, .7, .8, .9, 1.0]
-            regressor__colsample_bytree: [0.9, 1.0]
+            # regressor__colsample_bytree: [0.9, 1.0]
 
             # # Model Speed
             # regressor__tree_method: ['hist', 'approx', 'auto']
             # regressor__max_bin: [64, 128, 256]
             # regressor__gamma: [0.0, 0.1, 1.0]  # controls the minimum loss reduction needed to split a node
 
-
             # # Tree Training Speed Overrides
-            # regressor__n_estimators: [150]
-            # regressor__learning_rate: [0.05]
+            regressor__n_estimators: [150]
+            regressor__learning_rate: [0.05]
 
-            # # Optimize for Speed
-            # regressor__n_jobs: [4]  # how many models to build at once
-            # regressor__nthread: [4]  # how many threads each model can use
-            # # regressor__max_bin: [128]
-            # # regressor__tree_method: ['hist']
+            # Optimize for Speed
+            regressor__n_jobs: [4]  # how many models to build at once
+            regressor__nthread: [4]  # how many threads each model can use
+            regressor__max_bin: [128]
+            regressor__tree_method: ['hist']
+
+            drop_columns__drop_patterns: [
+                [],
+                ['scor*'],
+                ['all*'],
+                ['training_cluster*']
+            ]
+
+
 
 
     # Coin model workflow params

@@ -1,5 +1,5 @@
 import logging
-from typing import Tuple,List
+from typing import List
 import pandas as pd
 import wallet_features.trading_features as wtf
 import utils as u

@@ -1,3 +1,179 @@
+# dda 570 ablation analysis
+checkpoint 6 ready to merge
+Model Performance Summary
+===================================
+Test Samples:             53,868
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.612
+RMSE:                     0.238
+MAE:                      0.147
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.702
+RMSE:                     0.151
+MAE:                      0.086
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.000
+Standard Dev of Residuals:0.238
+95% Prediction Interval:  ±0.466
+
+
+checkpoint 5 working with grid search
+Model Performance Summary
+===================================
+Test Samples:             442
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.239
+RMSE:                     0.252
+MAE:                      0.208
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.001
+Standard Dev of Residuals:0.252
+95% Prediction Interval:  ±0.493
+
+
+checkpoint 4 drop cols in pipeline
+Model Performance Summary
+===================================
+Test Samples:             442
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.239
+RMSE:                     0.252
+MAE:                      0.208
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.001
+Standard Dev of Residuals:0.252
+95% Prediction Interval:  ±0.493
+
+
+checkpoint 3 restyle base model
+Model Performance Summary
+===================================
+Test Samples:             442
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.239
+RMSE:                     0.252
+MAE:                      0.208
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.001
+Standard Dev of Residuals:0.252
+95% Prediction Interval:  ±0.493
+
+
+checkpoint 2
+Model Performance Summary
+===================================
+Test Samples:             442
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.239
+RMSE:                     0.252
+MAE:                      0.208
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.001
+Standard Dev of Residuals:0.252
+95% Prediction Interval:  ±0.493
+
+
+
+checkpoint 1 inflows threhsold $10k
+Model Performance Summary
+===================================
+Test Samples:             53,868
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.612
+RMSE:                     0.238
+MAE:                      0.147
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.702
+RMSE:                     0.151
+MAE:                      0.086
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.000
+Standard Dev of Residuals:0.238
+95% Prediction Interval:  ±0.466
+
+coin
+Model Performance Summary
+===================================
+Test Samples:             442
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.239
+RMSE:                     0.252
+MAE:                      0.208
+
+
+
+
+checkpoint 1 inflows threhsold $5k
+Model Performance Summary
+===================================
+Test Samples:             58,573
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.612
+RMSE:                     0.235
+MAE:                      0.146
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.705
+RMSE:                     0.147
+MAE:                      0.085
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.000
+Standard Dev of Residuals:0.235
+95% Prediction Interval:  ±0.461
+
+coin model
+Model Performance Summary
+===================================
+Test Samples:             457
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.136
+RMSE:                     0.274
+MAE:                      0.232
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.010
+Standard Dev of Residuals:0.274
+95% Prediction Interval:  ±0.537
+
+
 # dda 551 confidence metrics for scores
 checkpoint 4 prepare to merge
 wallet

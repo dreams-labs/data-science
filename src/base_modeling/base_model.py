@@ -5,10 +5,13 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.pipeline import Pipeline
+from sklearn.base import BaseEstimator, TransformerMixin
 from xgboost import XGBRegressor
 
 # Local modules
+import base_modeling.feature_selection as fs
 import utils as u
+
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
 
@@ -27,48 +30,80 @@ class BaseModel:
         Params:
         - wallets_config (dict): configuration dictionary for modeling parameters.
         """
-        self.start_time = time.time()
-        self.training_time = None
+        # Key Params
         self.modeling_config = modeling_config
+        self.training_data_df = None
+
+        # Pipeline Steps
         self.pipeline = None
+        self.columns_to_drop = None
+        self.random_search = None
+
+        # Model Datasets
         self.X_train = None
         self.X_test = None
         self.y_train = None
         self.y_test = None
         self.y_pred = None
-        self.training_data_df = None
-        self.random_search = None
+
+        # Utils
+        self.start_time = time.time()
+        self.training_time = None
 
 
-    def _convert_min_child_pct_to_weight(self, X: pd.DataFrame, base_pct: float = 0.01) -> int:
+
+    # -----------------------------------
+    #     Primary Modeling Interface
+    # -----------------------------------
+
+    def construct_base_model(self, return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
         """
-        Calculate min_child_weight based on dataset size.
+        Core experiment runner with parameter tuning and model fitting.
 
         Params:
-        - X (DataFrame): feature data to determine size from
-        - base_pct (float): baseline percentage for min_child_weight calculation
+        - return_data (bool): Whether to return train/test splits and predictions
 
         Returns:
-        - min_child_weight (int): calculated minimum child weight
+        - result (dict): Contains fitted pipeline and optionally train/test data
         """
-        n_samples = X.shape[0]
-        return max(1, int(n_samples * base_pct))
+        if self.X_train is None or self.y_train is None:
+            raise ValueError("Data must be prepared before running experiment")
 
-    def _convert_min_child_weight_to_pct(self, X: pd.DataFrame, min_child_weight: int) -> float:
-        """
-        Convert min_child_weight back to percentage based on dataset size.
+        cv_results = self._run_grid_search(self.X_train, self.y_train)
 
-        Params:
-        - X (DataFrame): feature data used for size calculation
-        - min_child_weight (int): minimum child weight value
+        if cv_results.get('best_params'):
+            best_params = {
+                k.replace('regressor__', ''): v
+                for k, v in cv_results['best_params'].items()
+            }
+            self.modeling_config['model_params'].update(best_params)
+            logger.info(f"Updated model params with CV best params: {best_params}")
 
-        Returns:
-        - pct (float): corresponding percentage of dataset size
-        """
-        n_samples = X.shape[0]
-        return min_child_weight / n_samples
+        self._build_pipeline()
+        self._fit()
+
+        result = {
+            'pipeline': self.pipeline,
+            'cv_results': cv_results
+        }
+
+        if return_data:
+            self.y_pred = self._predict()  # Store prediction in instance
+            result.update({
+                'X_train': self.X_train,
+                'X_test': self.X_test,
+                'y_train': self.y_train,
+                'y_test': self.y_test,
+                'y_pred': self.y_pred,
+            })
+
+        return result
 
 
+
+    # -----------------------------------
+    #      Modeling Helper Methods
+    # -----------------------------------
 
     def _build_pipeline(self) -> None:
         """
@@ -83,11 +118,62 @@ class BaseModel:
                 model_params.pop('min_child_weight_pct')
             )
 
-        model = XGBRegressor(**model_params)
+        # Pipeline Begins
         self.pipeline = Pipeline([
-            ('regressor', model)
+            ('drop_columns', DropColumnPatterns(
+                drop_patterns=self.modeling_config['feature_selection']['drop_patterns']
+            )),
+            ('regressor', XGBRegressor(**model_params))
         ])
 
+
+    def _fit(self) -> None:
+        """
+        Fit the pipeline on training data with early stopping using test set.
+        """
+        # Get pipeline steps
+        transformer = self.pipeline[:-1]
+        regressor = self.pipeline[-1]
+
+        # Fit transformer and transform both train and test
+        X_train_transformed = transformer.fit_transform(self.X_train)
+        X_test_transformed = transformer.transform(self.X_test)
+
+        # Create eval set with transformed data
+        eval_set = [(X_train_transformed, self.y_train),
+                    (X_test_transformed, self.y_test)]
+
+        # Fit final regressor with transformed data
+        regressor.fit(
+            X_train_transformed,
+            self.y_train,
+            eval_set=eval_set
+        )
+
+        self.training_time = time.time() - self.start_time
+        logger.info("Training completed after %.2f seconds.", self.training_time)
+
+
+    def _predict(self) -> pd.Series:
+        """
+        Make predictions on the test set.
+
+        Returns:
+        - predictions (Series): predicted values for the test set, indexed like y_test
+        """
+        # Get raw predictions from pipeline
+        raw_predictions = self.pipeline.predict(self.X_test)
+
+        # Convert to Series with same index as test data
+        self.y_pred = pd.Series(raw_predictions, index=self.X_test.index)
+        return self.y_pred
+
+
+
+
+    # -----------------------------------
+    #         Grid Search Methods
+    # -----------------------------------
 
     def _run_grid_search(self, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
         """
@@ -128,6 +214,7 @@ class BaseModel:
 
         # Create pipeline for grid search
         cv_pipeline = Pipeline([
+            ('drop_columns', DropColumnPatterns()),
             ('regressor', XGBRegressor(**cv_model_params))
         ])
 
@@ -206,80 +293,106 @@ class BaseModel:
                     .sort_values(by='avg_score', ascending=False)
                 )
 
-    def _fit(self) -> None:
+
+
+
+    # -----------------------------------
+    #           Utility Methods
+    # -----------------------------------
+
+    def _convert_min_child_pct_to_weight(self, X: pd.DataFrame, base_pct: float = 0.01) -> int:
         """
-        Fit the pipeline on training data with early stopping using test set.
-        """
-        # Create eval set for monitoring validation performance
-        eval_set = [(self.X_test, self.y_test)]
-
-        # Pass eval_set to XGBoost through the pipeline
-        # The regressor__ prefix routes the parameter to the XGBoost step
-        u.notify('correct')
-        self.pipeline.fit(
-            self.X_train,
-            self.y_train,
-            regressor__eval_set=eval_set
-        )
-
-        self.training_time = time.time() - self.start_time
-        logger.info("Training completed after %.2f seconds.", self.training_time)
-
-
-    def construct_base_model(self, return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
-        """
-        Core experiment runner with parameter tuning and model fitting.
+        Calculate min_child_weight based on dataset size.
 
         Params:
-        - return_data (bool): Whether to return train/test splits and predictions
+        - X (DataFrame): feature data to determine size from
+        - base_pct (float): baseline percentage for min_child_weight calculation
 
         Returns:
-        - result (dict): Contains fitted pipeline and optionally train/test data
+        - min_child_weight (int): calculated minimum child weight
         """
-        if self.X_train is None or self.y_train is None:
-            raise ValueError("Data must be prepared before running experiment")
+        n_samples = X.shape[0]
+        return max(1, int(n_samples * base_pct))
 
-        cv_results = self._run_grid_search(self.X_train, self.y_train)
-
-        if cv_results.get('best_params'):
-            best_params = {
-                k.replace('regressor__', ''): v
-                for k, v in cv_results['best_params'].items()
-            }
-            self.modeling_config['model_params'].update(best_params)
-            logger.info(f"Updated model params with CV best params: {best_params}")
-
-        self._build_pipeline()
-        self._fit()
-
-        result = {
-            'pipeline': self.pipeline,
-            'cv_results': cv_results
-        }
-
-        if return_data:
-            self.y_pred = self._predict()  # Store prediction in instance
-            result.update({
-                'X_train': self.X_train,
-                'X_test': self.X_test,
-                'y_train': self.y_train,
-                'y_test': self.y_test,
-                'y_pred': self.y_pred,
-            })
-
-        return result
-
-
-    def _predict(self) -> pd.Series:
+    def _convert_min_child_weight_to_pct(self, X: pd.DataFrame, min_child_weight: int) -> float:
         """
-        Make predictions on the test set.
+        Convert min_child_weight back to percentage based on dataset size.
+
+        Params:
+        - X (DataFrame): feature data used for size calculation
+        - min_child_weight (int): minimum child weight value
 
         Returns:
-        - predictions (Series): predicted values for the test set, indexed like y_test
+        - pct (float): corresponding percentage of dataset size
         """
-        # Get raw predictions from pipeline
-        raw_predictions = self.pipeline.predict(self.X_test)
+        n_samples = X.shape[0]
+        return min_child_weight / n_samples
 
-        # Convert to Series with same index as test data
-        self.y_pred = pd.Series(raw_predictions, index=self.X_test.index)
-        return self.y_pred
+
+
+
+# -----------------------------------
+#           Pipeline Steps
+# -----------------------------------
+
+class DropColumnPatterns(BaseEstimator, TransformerMixin):
+    """
+    Pipeline step that drops columns based on the patterns provided in the config, including
+    support for * wildcards.
+
+    Valid format example: 'training_clusters|k2_cluster/*|trading/*'
+    """
+    def __init__(self, drop_patterns=None):
+        """
+        Transformer for dropping columns based on patterns.
+
+        Params:
+        - drop_patterns (list): List of patterns to match columns for dropping.
+        """
+        self.drop_patterns = drop_patterns
+        self.columns_to_drop = None  # Persist calculated columns to drop
+
+    def fit(self, X, y=None):
+        """
+        Identify columns to drop based on the given patterns.
+
+        Params:
+        - X (DataFrame): Input training data.
+        - y (Series): Target variable (ignored).
+
+        Returns:
+        - self: Fitted transformer.
+        """
+        # Only update columns_to_drop if drop_patterns is explicitly set
+        if self.drop_patterns is not None:
+            all_columns = X.columns.tolist()
+            self.columns_to_drop = fs.identify_matching_columns(
+                self.drop_patterns, all_columns
+            )
+            logger.info(f"Identified {len(self.columns_to_drop)} columns to drop")
+        else:
+            # If no patterns are provided, log and leave columns_to_drop unchanged
+            logger.info("No drop_patterns provided. Keeping columns_to_drop unchanged.")
+
+        return self
+
+    def transform(self, X):
+        """
+        Drop the identified columns from the input data.
+
+        Params:
+        - X (DataFrame): Input data.
+
+        Returns:
+        - DataFrame: Data with specified columns dropped.
+        """
+        if not self.columns_to_drop:
+            logger.info("No columns to drop. Returning data unchanged.")
+            return X
+
+        # Filter columns that exist in the current dataset
+        dropped_columns = [col for col in self.columns_to_drop if col in X.columns]
+        logger.info(f"Dropping {len(dropped_columns)} columns: {dropped_columns}")
+
+        # Drop columns safely
+        return X.drop(columns=dropped_columns, errors='ignore')

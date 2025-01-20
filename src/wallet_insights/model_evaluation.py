@@ -272,7 +272,8 @@ class RegressionEvaluator:
 
         # Calculate aggregated metrics
         importance_summary_df = feature_importance_df.groupby('prefix').agg(
-            total_importance=('importance', 'sum')
+            total_importance=('importance', 'sum'),
+            total_features=('importance', 'count')
         )
 
         # Get highest importance feature for each prefix
@@ -288,6 +289,7 @@ class RegressionEvaluator:
                                .sort_values(by='total_importance', ascending=False)
                                .rename(columns={
                                    'total_importance': 'Total Importance',
+                                   'total_features': 'Total Features',
                                    'best_feature': 'Best Feature',
                                    'best_importance': 'Best Importance'
                                })

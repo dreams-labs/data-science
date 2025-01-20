@@ -28,7 +28,7 @@ training_data:
 data_cleaning:
 
     # Wallet cohort thresholds
-    min_coins_traded: 0  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
+    min_coins_traded: 1  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
     max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
 
     min_wallet_investment: 10000 # time weighted average balance filter
@@ -80,11 +80,6 @@ features:
 
     # Feature Selection
     feature_selection:
-        variance_threshold: -1
-        correlation_threshold: 2.0
-        protected_features: [
-            'cluster|'
-        ]
 
 
 
@@ -98,8 +93,27 @@ modeling:
 
     # Which wallet performance metric to use as the target variable.
     target_variable: "crypto_net_gain/max_investment/winsorized"
-    drop_columns: []
     train_test_split: 0.2  # test size
+
+    # CheckpointValidation
+    # WalletModel Feature Selection
+    feature_selection:
+        # Column patterns to remove
+        drop_patterns: [
+            # 'timing|*',
+            # 'performance|*',
+            # 'trading|*',
+            # 'mktcap|*',
+            # 'transfers|*',
+            # 'cluster|*',
+        ]
+
+        # Correlation/variance-based removal
+        variance_threshold: 0.00 # features with this level of variance or less will be removed
+        correlation_threshold: 1.0 # features above this correlation coefficient will be removed
+        protected_features: [
+            'cluster|'
+        ]
 
     # CheckpointValidation
     # WalletModel Params
@@ -109,7 +123,7 @@ modeling:
 
         # Core Tree Params (Always Active)
         # -------------------------------
-        eval_metric: ['rmse', 'mae', 'mphe']
+        eval_metric: ['rmse']
 
         max_depth: 17  # how deep the trees can go
         min_child_weight_pct: 0.0002  # what % of rows each tree must have
@@ -131,3 +145,70 @@ modeling:
         nthread: -1
 
         random_state: 42
+
+
+    # CheckpointValidation
+    # WalletModel Grid Search
+    grid_search_params:
+
+        # Turn On or Off
+        # enabled: True # whether to grid search
+        enabled: False # whether to grid search
+
+        # Search Methodology
+        n_iter: 10  # random search limit
+        scoring: 'neg_root_mean_squared_error'
+        n_splits: 2  # cv splits
+        verbose_level: 3  # scikit-learn verbosity
+
+        # Target variables
+        target_variables: [
+            "crypto_net_gain/max_investment/winsorized",
+            "crypto_net_gain/max_investment/ntile_rank",
+        ]
+
+
+        # Params
+        param_grid:
+
+            # Depth and Child Weight
+            # regressor__min_child_weight_pct: [0.0001, 0.0002, 0.0005, 0.001]
+            # regressor__max_depth: [15, 17, 19, 21]  # basic depth param
+
+
+            # Col/Row Sampling
+            # regressor__subsample: [0.8, 0.9, 1.0]
+            # regressor__colsample_bytree: [0.9, 1.0]
+
+            # # Model Speed
+            # regressor__tree_method: ['hist', 'approx', 'auto']
+            # regressor__max_bin: [64, 128, 256]
+            # regressor__gamma: [0.0, 0.1, 1.0]  # controls the minimum loss reduction needed to split a node
+
+
+            # Tree Training Speed Overrides
+            regressor__n_estimators: [200]
+            regressor__learning_rate: [0.05]
+            regressor__gamma: [0.01]
+
+            # Optimize for Speed
+            regressor__n_jobs: [4]  # how many models to build at once
+            regressor__nthread: [4]  # how many threads each model can use
+            regressor__max_bin: [128]
+            regressor__tree_method: ['hist']
+
+
+            # Column Selection
+            drop_columns__drop_patterns: [
+                [],
+                ['timing|*'],
+                ['performance|*'],
+                ['trading|*'],
+                ['mktcap|*'],
+                ['transfers|*'],
+                ['cluster|*'],
+            ]
+
+
+    # Coin model workflow params
+    score_name: "iterating"  # reference name for feature columns etc

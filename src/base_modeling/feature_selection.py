@@ -1,4 +1,6 @@
 import logging
+import fnmatch
+from typing import List,Set
 import pandas as pd
 import numpy as np
 
@@ -7,6 +9,37 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
+
+
+# ------------------------------------
+#      Column Dropping Functions
+# ------------------------------------
+
+def identify_matching_columns(column_patterns: List[str], all_columns: List[str]) -> Set[str]:
+    """
+    Match columns that contain all non-wildcard parts of patterns, preserving sequence and structure.
+
+    Params:
+    - column_patterns: List of patterns with * wildcards.
+    - all_columns: List of actual column names.
+
+    Returns:
+    - matched_columns: Set of columns matching any pattern.
+    """
+    matched = set()
+    for pattern in column_patterns:
+        for column in all_columns:
+            # Match using fnmatch to preserve structure and sequence
+            if fnmatch.fnmatch(column, pattern):
+                matched.add(column)
+
+    return matched
+
+
+
+# ------------------------------------
+#    Variance/Correlation Functions
+# ------------------------------------
 
 def remove_low_variance_features(
     training_df: pd.DataFrame,
@@ -28,7 +61,7 @@ def remove_low_variance_features(
     - reduced_df (DataFrame): DataFrame with low variance features removed
     """
     # If the threshold is 0 then don't compute anything
-    if variance_threshold == 0:
+    if variance_threshold < 0:
         logger.info("Didn't apply variance-based feature selection.")
         return training_df
 
@@ -36,7 +69,7 @@ def remove_low_variance_features(
     if scale_before_selection:
         scaled_df = (training_df - training_df.mean()) / training_df.std()
         feature_variances = scaled_df.var()
-        scale_log = "after standard scaling"
+        scale_log = " after standard scaling"
     else:
         feature_variances = training_df.var()
         scale_log = ""
@@ -58,8 +91,8 @@ def remove_low_variance_features(
     reduced_df = training_df[high_variance_features]
 
     logger.info(
-        f"Removed {training_df.shape[1] - reduced_df.shape[1]} features {scale_log}"
-        f" with variance below {variance_threshold}"
+        f"Removed {training_df.shape[1] - reduced_df.shape[1]} features{scale_log}"
+        f" with variance at or below {variance_threshold}"
         f" while protecting {len(protected_cols) if protected_features else 0} features"
     )
 
@@ -84,7 +117,7 @@ def remove_correlated_features(
     - reduced_df (DataFrame): DataFrame with correlated features removed
     """
     # If the threshold is 1.0 then don't compute anything
-    if correlation_threshold == 1.0:
+    if correlation_threshold >= 1.0:
         logger.info("Didn't apply correlation-based feature selection.")
         return training_df
 
