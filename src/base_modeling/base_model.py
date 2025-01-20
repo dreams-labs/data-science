@@ -214,6 +214,7 @@ class BaseModel:
 
         # Create pipeline for grid search
         cv_pipeline = Pipeline([
+            ('drop_columns', DropColumnPatterns()),
             ('regressor', XGBRegressor(**cv_model_params))
         ])
 

@@ -129,7 +129,7 @@ coin_modeling:
         # Search methodology
         n_iter: 60  # random search limit
         scoring: 'neg_root_mean_squared_error'
-        n_splits: 2  # cv splits
+        n_splits: 3  # cv splits
         n_jobs: -1
         verbose_level: 3  # scikit-learn verbosity
 
@@ -142,23 +142,31 @@ coin_modeling:
 
             # Col/Row Sampling
             # regressor__subsample: [0.5, .6, .7, .8, .9, 1.0]
-            regressor__colsample_bytree: [0.9, 1.0]
+            # regressor__colsample_bytree: [0.9, 1.0]
 
             # # Model Speed
             # regressor__tree_method: ['hist', 'approx', 'auto']
             # regressor__max_bin: [64, 128, 256]
             # regressor__gamma: [0.0, 0.1, 1.0]  # controls the minimum loss reduction needed to split a node
 
-
             # # Tree Training Speed Overrides
-            # regressor__n_estimators: [150]
-            # regressor__learning_rate: [0.05]
+            regressor__n_estimators: [150]
+            regressor__learning_rate: [0.05]
 
             # # Optimize for Speed
             # regressor__n_jobs: [4]  # how many models to build at once
             # regressor__nthread: [4]  # how many threads each model can use
             # # regressor__max_bin: [128]
             # # regressor__tree_method: ['hist']
+
+            drop_columns__drop_patterns: [
+                [],
+                ['scor*'],
+                ['all*'],
+                ['training_cluster*']
+            ]
+
+
 
 
     # Coin model workflow params
