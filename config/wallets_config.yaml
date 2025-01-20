@@ -100,11 +100,11 @@ modeling:
     feature_selection:
         # Column patterns to remove
         drop_patterns: [
-            'timing|*',
-            'performance|*',
-            'trading|*',
-            'mktcap|*',
-            'transfers|*',
+            # 'timing|*',
+            # 'performance|*',
+            # 'trading|*',
+            # 'mktcap|*',
+            # 'transfers|*',
             # 'cluster|*',
         ]
 
@@ -123,7 +123,7 @@ modeling:
 
         # Core Tree Params (Always Active)
         # -------------------------------
-        eval_metric: ['rmse', 'mae', 'mphe']
+        eval_metric: ['rmse']
 
         max_depth: 17  # how deep the trees can go
         min_child_weight_pct: 0.0002  # what % of rows each tree must have
@@ -152,13 +152,13 @@ modeling:
     grid_search_params:
 
         # Turn On or Off
-        enabled: True # whether to grid search
-        # enabled: False # whether to grid search
+        # enabled: True # whether to grid search
+        enabled: False # whether to grid search
 
         # Search Methodology
         n_iter: 10  # random search limit
         scoring: 'neg_root_mean_squared_error'
-        n_splits: 3  # cv splits
+        n_splits: 2  # cv splits
         verbose_level: 3  # scikit-learn verbosity
 
         # Target variables
