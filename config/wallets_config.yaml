@@ -28,7 +28,7 @@ training_data:
 data_cleaning:
 
     # Wallet cohort thresholds
-    min_coins_traded: 0  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
+    min_coins_traded: 1  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
     max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
 
     min_wallet_investment: 10000 # time weighted average balance filter
@@ -80,11 +80,18 @@ features:
 
     # Feature Selection
     feature_selection:
-        variance_threshold: -1
-        correlation_threshold: 2.0
-        protected_features: [
-            'cluster|'
-        ]
+
+feature_selection:
+    variance_threshold: 0.00 # features with this level of variance or less will be removed
+    correlation_threshold: 1.0 # features above this correlation coefficient will be removed
+
+
+    protected_features: [
+        'cluster|'
+    ]
+    drop_columns: [
+        ''
+    ]
 
 
 
