@@ -153,11 +153,11 @@ coin_modeling:
             regressor__n_estimators: [150]
             regressor__learning_rate: [0.05]
 
-            # # Optimize for Speed
-            # regressor__n_jobs: [4]  # how many models to build at once
-            # regressor__nthread: [4]  # how many threads each model can use
-            # # regressor__max_bin: [128]
-            # # regressor__tree_method: ['hist']
+            # Optimize for Speed
+            regressor__n_jobs: [4]  # how many models to build at once
+            regressor__nthread: [4]  # how many threads each model can use
+            regressor__max_bin: [128]
+            regressor__tree_method: ['hist']
 
             drop_columns__drop_patterns: [
                 [],
