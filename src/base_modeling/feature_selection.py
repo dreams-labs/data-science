@@ -1,4 +1,5 @@
 import logging
+from typing import List,Set
 import pandas as pd
 import numpy as np
 
@@ -7,6 +8,42 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
+
+
+# ------------------------------------
+#           Column Dropping
+# ------------------------------------
+
+def identify_matching_columns(column_patterns: List[str], all_columns: List[str]) -> Set[str]:
+    """
+    Match columns that contain all non-wildcard parts of patterns, preserving sequence and structure.
+
+    Params:
+    - column_patterns: List of patterns with * wildcards.
+    - all_columns: List of actual column names.
+
+    Returns:
+    - matched_columns: Set of columns matching any pattern.
+    """
+    import fnmatch
+
+    matched = set()
+    for pattern in column_patterns:
+        # Convert the pattern with wildcards (*) into a proper glob-like pattern
+        regex_pattern = pattern.replace('*', '.*')  # Replace * with regex equivalent
+
+        for column in all_columns:
+            # Match using fnmatch to preserve structure and sequence
+            if fnmatch.fnmatch(column, pattern):
+                matched.add(column)
+
+    return matched
+
+
+
+# ------------------------------------
+#    Variance/Correlation Selection
+# ------------------------------------
 
 def remove_low_variance_features(
     training_df: pd.DataFrame,
