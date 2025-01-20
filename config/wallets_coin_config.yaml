@@ -46,8 +46,8 @@ wallet_features:
     # Balance metrics params
     wallet_balance_dates: [
         # TODO: needs profits imputation logic to use dates other than modeling start/end
-        # '2024-11-20',
-        '2024-10-31',
+        '2024-11-20',
+        # '2024-10-31',
     ]
 
     # Score features params
@@ -91,8 +91,8 @@ coin_modeling:
             # 'score_quantile|net_gain_winsorized_checkpoint_residual/*',
             # 'score_quantile|net_gain_winsorized_checkpoint_residual/*|trading/*',
             # 'score_quantile|net_gain_winsorized_checkpoint_residual/*|balances/*',
-            'scor*',
-            'all*',
+            # 'scor*',
+            # 'all*',
             # 'training_cluster*'
         ]
 
