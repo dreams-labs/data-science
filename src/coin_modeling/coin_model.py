@@ -34,14 +34,12 @@ class CoinModel(BaseModel):
         # Store full dataset
         self.training_data_df = feature_df.copy()
 
-        # Drop specified columns and separate target
+        # Separate target variable
         target_var = self.modeling_config['target_variable']
-        drop_cols = self.modeling_config.get('drop_columns', [])
-
-        X = feature_df.drop([target_var] + drop_cols, axis=1)
+        X = feature_df.drop([target_var], axis=1)
         y = feature_df[target_var]
 
-        # Create train/test split
+        # Split into training and test sets
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
             X, y,
             test_size=self.modeling_config['train_test_split'],
@@ -49,6 +47,7 @@ class CoinModel(BaseModel):
         )
 
         return X, y
+
 
     def construct_coin_model(self, feature_df: pd.DataFrame,
                           return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:

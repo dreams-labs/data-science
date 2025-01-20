@@ -5,10 +5,13 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.pipeline import Pipeline
+from sklearn.base import BaseEstimator, TransformerMixin
 from xgboost import XGBRegressor
 
 # Local modules
+import base_modeling.feature_selection as fs
 import utils as u
+
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
 
@@ -27,17 +30,25 @@ class BaseModel:
         Params:
         - wallets_config (dict): configuration dictionary for modeling parameters.
         """
-        self.start_time = time.time()
-        self.training_time = None
+        # Key Params
         self.modeling_config = modeling_config
+        self.training_data_df = None
+
+        # Pipeline Steps
         self.pipeline = None
+        self.columns_to_drop = None
+        self.random_search = None
+
+        # Model Datasets
         self.X_train = None
         self.X_test = None
         self.y_train = None
         self.y_test = None
         self.y_pred = None
-        self.training_data_df = None
-        self.random_search = None
+
+        # Utils
+        self.start_time = time.time()
+        self.training_time = None
 
 
 
@@ -107,9 +118,12 @@ class BaseModel:
                 model_params.pop('min_child_weight_pct')
             )
 
-        model = XGBRegressor(**model_params)
+        # Pipeline Begins
         self.pipeline = Pipeline([
-            ('regressor', model)
+            ('drop_columns', DropColumnPatterns(
+                drop_patterns=self.modeling_config['feature_selection']['drop_patterns']
+            )),
+            ('regressor', XGBRegressor(**model_params))
         ])
 
 
@@ -117,8 +131,13 @@ class BaseModel:
         """
         Fit the pipeline on training data with early stopping using test set.
         """
-        # Create eval set for monitoring validation performance
-        eval_set = [(self.X_test, self.y_test)]
+        # First fit the transformer on training data only
+        self.pipeline[:-1].fit(self.X_train)
+
+        # Transform test data using fitted transformer
+        transformed_X_test = self.pipeline[:-1].transform(self.X_test)
+        eval_set = [(transformed_X_test, self.y_test)]
+
 
         # Pass eval_set to XGBoost through the pipeline
         # The regressor__ prefix routes the parameter to the XGBoost step
@@ -146,8 +165,6 @@ class BaseModel:
         # Convert to Series with same index as test data
         self.y_pred = pd.Series(raw_predictions, index=self.X_test.index)
         return self.y_pred
-
-
 
 
 
@@ -307,3 +324,66 @@ class BaseModel:
         """
         n_samples = X.shape[0]
         return min_child_weight / n_samples
+
+
+
+
+# -----------------------------------
+#           Pipeline Steps
+# -----------------------------------
+
+class DropColumnPatterns(BaseEstimator, TransformerMixin):
+    def __init__(self, drop_patterns=None):
+        """
+        Transformer for dropping columns based on patterns.
+
+        Params:
+        - drop_patterns (list): List of patterns to match columns for dropping.
+        """
+        self.drop_patterns = drop_patterns
+        self.columns_to_drop = None  # Persist calculated columns to drop
+
+    def fit(self, X, y=None):
+        """
+        Identify columns to drop based on the given patterns.
+
+        Params:
+        - X (DataFrame): Input training data.
+        - y (Series): Target variable (ignored).
+
+        Returns:
+        - self: Fitted transformer.
+        """
+        # Only update columns_to_drop if drop_patterns is explicitly set
+        if self.drop_patterns is not None:
+            all_columns = X.columns.tolist()
+            self.columns_to_drop = fs.identify_matching_columns(
+                self.drop_patterns, all_columns
+            )
+            logger.info(f"Identified {len(self.columns_to_drop)} columns to drop")
+        else:
+            # If no patterns are provided, log and leave columns_to_drop unchanged
+            logger.info("No drop_patterns provided. Keeping columns_to_drop unchanged.")
+
+        return self
+
+    def transform(self, X):
+        """
+        Drop the identified columns from the input data.
+
+        Params:
+        - X (DataFrame): Input data.
+
+        Returns:
+        - DataFrame: Data with specified columns dropped.
+        """
+        if not self.columns_to_drop:
+            logger.info("No columns to drop. Returning data unchanged.")
+            return X
+
+        # Filter columns that exist in the current dataset
+        dropped_columns = [col for col in self.columns_to_drop if col in X.columns]
+        logger.info(f"Dropping {len(dropped_columns)} columns: {dropped_columns}")
+
+        # Drop columns safely
+        return X.drop(columns=dropped_columns, errors='ignore')

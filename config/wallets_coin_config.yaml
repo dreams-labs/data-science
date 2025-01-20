@@ -88,9 +88,9 @@ coin_modeling:
         # Column patterns to remove
         drop_patterns: [
             'training_clusters|k2_cluster/*|trading/*',
-            # 'score_quantile|net_gain_winsorized_checkpoint_residual/*',
-            # 'score_quantile|net_gain_winsorized_checkpoint_residual/*|trading/*',
-            # 'score_quantile|net_gain_winsorized_checkpoint_residual/*|balances/*',
+            'score_quantile|net_gain_winsorized_checkpoint_residual/*',
+            'score_quantile|net_gain_winsorized_checkpoint_residual/*|trading/*',
+            'score_quantile|net_gain_winsorized_checkpoint_residual/*|balances/*',
         ]
 
         # Correlation/variance-based removal
