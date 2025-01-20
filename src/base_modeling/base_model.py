@@ -131,21 +131,23 @@ class BaseModel:
         """
         Fit the pipeline on training data with early stopping using test set.
         """
-        # First fit the transformer on training data only
-        self.pipeline[:-1].fit(self.X_train)
+        # Get pipeline steps
+        transformer = self.pipeline[:-1]
+        regressor = self.pipeline[-1]
 
-        # Transform test data using fitted transformer
-        transformed_X_test = self.pipeline[:-1].transform(self.X_test)
-        eval_set = [(transformed_X_test, self.y_test)]
+        # Fit transformer and transform both train and test
+        X_train_transformed = transformer.fit_transform(self.X_train)
+        X_test_transformed = transformer.transform(self.X_test)
 
+        # Create eval set with transformed data
+        eval_set = [(X_train_transformed, self.y_train),
+                    (X_test_transformed, self.y_test)]
 
-        # Pass eval_set to XGBoost through the pipeline
-        # The regressor__ prefix routes the parameter to the XGBoost step
-        u.notify('correct')
-        self.pipeline.fit(
-            self.X_train,
+        # Fit final regressor with transformed data
+        regressor.fit(
+            X_train_transformed,
             self.y_train,
-            regressor__eval_set=eval_set
+            eval_set=eval_set
         )
 
         self.training_time = time.time() - self.start_time
