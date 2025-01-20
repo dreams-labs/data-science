@@ -16,6 +16,12 @@ import utils as u  # pylint: disable=C0413  # import must be at top
 logger = logging.getLogger(__name__)
 
 
+
+
+# -----------------------------------
+#        Market Data Functions
+# -----------------------------------
+
 def retrieve_market_data(dataset='prod'):
     """
     Retrieves market data from the core.coin_market_data table and converts coin_id to categorical
@@ -274,6 +280,12 @@ def impute_market_cap(market_data_df, min_coverage=0.7, max_multiple=1.0):
     return df_copy
 
 
+
+
+
+# ------------------------------------
+#        Profits Data Functions
+# ------------------------------------
 
 def retrieve_profits_data(start_date, end_date, min_wallet_inflows, dataset='prod'):
     """
@@ -570,6 +582,13 @@ def retrieve_metadata_data():
     return metadata_df
 
 
+
+
+
+
+# ----------------------------------
+#       Macro Trends Functions
+# ----------------------------------
 
 def retrieve_macro_trends_data():
     """

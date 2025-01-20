@@ -372,7 +372,7 @@ class DropColumnPatterns(BaseEstimator, TransformerMixin):
         self.drop_patterns = drop_patterns
         self.columns_to_drop = None  # Persist calculated columns to drop
 
-    def fit(self, X, y=None):
+    def fit(self, X):
         """
         Identify columns to drop based on the given patterns.
 
