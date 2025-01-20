@@ -1,4 +1,5 @@
 import logging
+import fnmatch
 from typing import List,Set
 import pandas as pd
 import numpy as np
@@ -25,13 +26,8 @@ def identify_matching_columns(column_patterns: List[str], all_columns: List[str]
     Returns:
     - matched_columns: Set of columns matching any pattern.
     """
-    import fnmatch
-
     matched = set()
     for pattern in column_patterns:
-        # Convert the pattern with wildcards (*) into a proper glob-like pattern
-        regex_pattern = pattern.replace('*', '.*')  # Replace * with regex equivalent
-
         for column in all_columns:
             # Match using fnmatch to preserve structure and sequence
             if fnmatch.fnmatch(column, pattern):
