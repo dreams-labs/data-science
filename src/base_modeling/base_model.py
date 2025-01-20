@@ -40,35 +40,59 @@ class BaseModel:
         self.random_search = None
 
 
-    def _convert_min_child_pct_to_weight(self, X: pd.DataFrame, base_pct: float = 0.01) -> int:
+
+    # -----------------------------------
+    #     Primary Modeling Interface
+    # -----------------------------------
+
+    def construct_base_model(self, return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
         """
-        Calculate min_child_weight based on dataset size.
+        Core experiment runner with parameter tuning and model fitting.
 
         Params:
-        - X (DataFrame): feature data to determine size from
-        - base_pct (float): baseline percentage for min_child_weight calculation
+        - return_data (bool): Whether to return train/test splits and predictions
 
         Returns:
-        - min_child_weight (int): calculated minimum child weight
+        - result (dict): Contains fitted pipeline and optionally train/test data
         """
-        n_samples = X.shape[0]
-        return max(1, int(n_samples * base_pct))
+        if self.X_train is None or self.y_train is None:
+            raise ValueError("Data must be prepared before running experiment")
 
-    def _convert_min_child_weight_to_pct(self, X: pd.DataFrame, min_child_weight: int) -> float:
-        """
-        Convert min_child_weight back to percentage based on dataset size.
+        cv_results = self._run_grid_search(self.X_train, self.y_train)
 
-        Params:
-        - X (DataFrame): feature data used for size calculation
-        - min_child_weight (int): minimum child weight value
+        if cv_results.get('best_params'):
+            best_params = {
+                k.replace('regressor__', ''): v
+                for k, v in cv_results['best_params'].items()
+            }
+            self.modeling_config['model_params'].update(best_params)
+            logger.info(f"Updated model params with CV best params: {best_params}")
 
-        Returns:
-        - pct (float): corresponding percentage of dataset size
-        """
-        n_samples = X.shape[0]
-        return min_child_weight / n_samples
+        self._build_pipeline()
+        self._fit()
+
+        result = {
+            'pipeline': self.pipeline,
+            'cv_results': cv_results
+        }
+
+        if return_data:
+            self.y_pred = self._predict()  # Store prediction in instance
+            result.update({
+                'X_train': self.X_train,
+                'X_test': self.X_test,
+                'y_train': self.y_train,
+                'y_test': self.y_test,
+                'y_pred': self.y_pred,
+            })
+
+        return result
 
 
+
+    # -----------------------------------
+    #      Modeling Helper Methods
+    # -----------------------------------
 
     def _build_pipeline(self) -> None:
         """
@@ -88,6 +112,49 @@ class BaseModel:
             ('regressor', model)
         ])
 
+
+    def _fit(self) -> None:
+        """
+        Fit the pipeline on training data with early stopping using test set.
+        """
+        # Create eval set for monitoring validation performance
+        eval_set = [(self.X_test, self.y_test)]
+
+        # Pass eval_set to XGBoost through the pipeline
+        # The regressor__ prefix routes the parameter to the XGBoost step
+        u.notify('correct')
+        self.pipeline.fit(
+            self.X_train,
+            self.y_train,
+            regressor__eval_set=eval_set
+        )
+
+        self.training_time = time.time() - self.start_time
+        logger.info("Training completed after %.2f seconds.", self.training_time)
+
+
+    def _predict(self) -> pd.Series:
+        """
+        Make predictions on the test set.
+
+        Returns:
+        - predictions (Series): predicted values for the test set, indexed like y_test
+        """
+        # Get raw predictions from pipeline
+        raw_predictions = self.pipeline.predict(self.X_test)
+
+        # Convert to Series with same index as test data
+        self.y_pred = pd.Series(raw_predictions, index=self.X_test.index)
+        return self.y_pred
+
+
+
+
+
+
+    # -----------------------------------
+    #         Grid Search Methods
+    # -----------------------------------
 
     def _run_grid_search(self, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
         """
@@ -206,80 +273,37 @@ class BaseModel:
                     .sort_values(by='avg_score', ascending=False)
                 )
 
-    def _fit(self) -> None:
+
+
+
+    # -----------------------------------
+    #           Utility Methods
+    # -----------------------------------
+
+    def _convert_min_child_pct_to_weight(self, X: pd.DataFrame, base_pct: float = 0.01) -> int:
         """
-        Fit the pipeline on training data with early stopping using test set.
-        """
-        # Create eval set for monitoring validation performance
-        eval_set = [(self.X_test, self.y_test)]
-
-        # Pass eval_set to XGBoost through the pipeline
-        # The regressor__ prefix routes the parameter to the XGBoost step
-        u.notify('correct')
-        self.pipeline.fit(
-            self.X_train,
-            self.y_train,
-            regressor__eval_set=eval_set
-        )
-
-        self.training_time = time.time() - self.start_time
-        logger.info("Training completed after %.2f seconds.", self.training_time)
-
-
-    def construct_base_model(self, return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
-        """
-        Core experiment runner with parameter tuning and model fitting.
+        Calculate min_child_weight based on dataset size.
 
         Params:
-        - return_data (bool): Whether to return train/test splits and predictions
+        - X (DataFrame): feature data to determine size from
+        - base_pct (float): baseline percentage for min_child_weight calculation
 
         Returns:
-        - result (dict): Contains fitted pipeline and optionally train/test data
+        - min_child_weight (int): calculated minimum child weight
         """
-        if self.X_train is None or self.y_train is None:
-            raise ValueError("Data must be prepared before running experiment")
+        n_samples = X.shape[0]
+        return max(1, int(n_samples * base_pct))
 
-        cv_results = self._run_grid_search(self.X_train, self.y_train)
-
-        if cv_results.get('best_params'):
-            best_params = {
-                k.replace('regressor__', ''): v
-                for k, v in cv_results['best_params'].items()
-            }
-            self.modeling_config['model_params'].update(best_params)
-            logger.info(f"Updated model params with CV best params: {best_params}")
-
-        self._build_pipeline()
-        self._fit()
-
-        result = {
-            'pipeline': self.pipeline,
-            'cv_results': cv_results
-        }
-
-        if return_data:
-            self.y_pred = self._predict()  # Store prediction in instance
-            result.update({
-                'X_train': self.X_train,
-                'X_test': self.X_test,
-                'y_train': self.y_train,
-                'y_test': self.y_test,
-                'y_pred': self.y_pred,
-            })
-
-        return result
-
-
-    def _predict(self) -> pd.Series:
+    def _convert_min_child_weight_to_pct(self, X: pd.DataFrame, min_child_weight: int) -> float:
         """
-        Make predictions on the test set.
+        Convert min_child_weight back to percentage based on dataset size.
+
+        Params:
+        - X (DataFrame): feature data used for size calculation
+        - min_child_weight (int): minimum child weight value
 
         Returns:
-        - predictions (Series): predicted values for the test set, indexed like y_test
+        - pct (float): corresponding percentage of dataset size
         """
-        # Get raw predictions from pipeline
-        raw_predictions = self.pipeline.predict(self.X_test)
-
-        # Convert to Series with same index as test data
-        self.y_pred = pd.Series(raw_predictions, index=self.X_test.index)
-        return self.y_pred
+        n_samples = X.shape[0]
+        return min_child_weight / n_samples
