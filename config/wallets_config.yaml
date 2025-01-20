@@ -100,16 +100,16 @@ modeling:
     feature_selection:
         # Column patterns to remove
         drop_patterns: [
-            'timing|*',
-            # 'performance|*',
-            'performance|*/log|*',
-            'performance|*/ntile_rank|*',
+            # 'timing|*',
+            # # 'performance|*',
+            # 'performance|*/log|*',
+            # 'performance|*/ntile_rank|*',
 
-            'trading|*',
-            # 'mktcap|*',
-            # 'transfers|*',
-            'cluster|*',
-            '*|w1',
+            # 'trading|*',
+            # # 'mktcap|*',
+            # # 'transfers|*',
+            # 'cluster|*',
+            # '*|w1',
 
         ]
 
