@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 # ------------------------------------
-#           Column Dropping
+#      Column Dropping Functions
 # ------------------------------------
 
 def identify_matching_columns(column_patterns: List[str], all_columns: List[str]) -> Set[str]:
@@ -38,7 +38,7 @@ def identify_matching_columns(column_patterns: List[str], all_columns: List[str]
 
 
 # ------------------------------------
-#    Variance/Correlation Selection
+#    Variance/Correlation Functions
 # ------------------------------------
 
 def remove_low_variance_features(
