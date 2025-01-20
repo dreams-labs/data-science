@@ -190,28 +190,48 @@ class BaseModel:
         if not self.modeling_config.get('grid_search_params', {}).get('enabled'):
             logger.info("Constructing production model with base params...")
             return {}
-
-        # Get base model params and handle child weight percentages
         logger.info("Initiating grid search...")
+        u.notify('gadget')
+
+        # 1. Retrieve base params
+        # -----------------------
         cv_model_params = self.modeling_config['model_params'].copy()
+
+        # Handle 'min_child_weight_pct' to 'min_child_weight' conversion
         if cv_model_params.get('min_child_weight_pct'):
             cv_model_params['min_child_weight'] = self._convert_min_child_pct_to_weight(
                 self.X_train,
                 cv_model_params.pop('min_child_weight_pct')
             )
 
-        # Get grid search params and handle child weight percentages
+        # Store base column drop patterns
+        base_drop_patterns = self.modeling_config['feature_selection']['drop_patterns']
+
+
+        # 2. Prepare grid search params
+        # -----------------------------
         grid_search_params = self.modeling_config['grid_search_params']
+
+        # Handle 'min_child_weight_pct' to 'min_child_weight' conversion
         if 'regressor__min_child_weight_pct' in grid_search_params['param_grid']:
             pct_grid = grid_search_params['param_grid'].pop('regressor__min_child_weight_pct')
             grid_search_params['param_grid']['regressor__min_child_weight'] = [
                 self._convert_min_child_pct_to_weight(X, pct) for pct in pct_grid
             ]
 
+        # Add base drop patterns in addition to the grid search params
+        grid_search_params['param_grid']['drop_columns__drop_patterns'] = [
+            base_drop_patterns + grid_pattern
+            for grid_pattern in grid_search_params['param_grid']['drop_columns__drop_patterns']
+        ]
+
         # Remove params that don't apply to the model
         for param in ['early_stopping_rounds', 'eval_metric', 'verbose']:
             cv_model_params.pop(param, None)
 
+
+        # 3. Search
+        # ---------
         # Create pipeline for grid search
         cv_pipeline = Pipeline([
             ('drop_columns', DropColumnPatterns()),
@@ -279,7 +299,7 @@ class BaseModel:
             for _, row in results_df.iterrows():
                 report_data.append({
                     'param': param_name,
-                    'param_value': row[param],
+                    'param_value': str(row[param]),
                     'avg_score': row['mean_test_score'],
                     'total_builds': len(results_df)
                 })
@@ -289,7 +309,7 @@ class BaseModel:
 
         return (report_df
                     .groupby(['param','param_value'])[['avg_score']]
-                    .mean()
+                    .mean('avg_score')
                     .sort_values(by='avg_score', ascending=False)
                 )
 
@@ -392,7 +412,7 @@ class DropColumnPatterns(BaseEstimator, TransformerMixin):
 
         # Filter columns that exist in the current dataset
         dropped_columns = [col for col in self.columns_to_drop if col in X.columns]
-        logger.info(f"Dropping {len(dropped_columns)} columns: {dropped_columns}")
+        logger.info(f"Dropping {len(dropped_columns)} columns.")
 
         # Drop columns safely
         return X.drop(columns=dropped_columns, errors='ignore')

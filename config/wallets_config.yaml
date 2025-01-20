@@ -100,12 +100,15 @@ modeling:
     feature_selection:
         # Column patterns to remove
         drop_patterns: [
-            # 'timing|*',
+            'timing|*',
             # 'performance|*',
-            # 'trading|*',
+            'performance|*/log|*',
+            'performance|*/ntile_rank|*',
+
+            'trading|*',
             # 'mktcap|*',
             # 'transfers|*',
-            # 'cluster|*',
+            'cluster|*',
         ]
 
         # Correlation/variance-based removal
@@ -152,8 +155,8 @@ modeling:
     grid_search_params:
 
         # Turn On or Off
-        # enabled: True # whether to grid search
-        enabled: False # whether to grid search
+        enabled: True # whether to grid search
+        # enabled: False # whether to grid search
 
         # Search Methodology
         n_iter: 10  # random search limit
@@ -172,8 +175,8 @@ modeling:
         param_grid:
 
             # Depth and Child Weight
-            # regressor__min_child_weight_pct: [0.0001, 0.0002, 0.0005, 0.001]
-            # regressor__max_depth: [15, 17, 19, 21]  # basic depth param
+            regressor__min_child_weight_pct: [0.0001, 0.0002, 0.0005, 0.001]
+            regressor__max_depth: [15, 17, 19, 21]  # basic depth param
 
 
             # Col/Row Sampling
@@ -201,12 +204,20 @@ modeling:
             # Column Selection
             drop_columns__drop_patterns: [
                 [],
-                ['timing|*'],
-                ['performance|*'],
-                ['trading|*'],
-                ['mktcap|*'],
-                ['transfers|*'],
-                ['cluster|*'],
+                # ['timing|*'],
+                # ['performance|*/base|*'],
+                # ['performance|*/winsorized|*'],
+                # ['performance|*/log|*'],
+                # ['performance|*/rank|*'],
+                # ['performance|*/ntile_rank|*'],
+                # ['trading|*'],
+                # ['mktcap|*'],
+                # ['transfers|*'],
+                ['transfers|avg_buyer_number|*'],
+                ['transfers|median_buyer_number|*'],
+                ['transfers|new_coin_buy_counts|*'],
+                ['transfers|min_buyer_number|*'],
+                # ['cluster|*'],
             ]
 
 
