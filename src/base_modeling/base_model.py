@@ -335,6 +335,12 @@ class BaseModel:
 # -----------------------------------
 
 class DropColumnPatterns(BaseEstimator, TransformerMixin):
+    """
+    Pipeline step that drops columns based on the patterns provided in the config, including
+    support for * wildcards.
+
+    Valid format example: 'training_clusters|k2_cluster/*|trading/*'
+    """
     def __init__(self, drop_patterns=None):
         """
         Transformer for dropping columns based on patterns.
