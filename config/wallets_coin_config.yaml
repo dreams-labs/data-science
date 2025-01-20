@@ -58,14 +58,6 @@ wallet_features:
         'average_transaction'
     ]
 
-# CheckpointValidation
-# CoinModel Feature Selection
-# Params used to remove unnecessary features
-feature_selection:
-    scale_before_selection: False # whether to apply variance thresholds before or after scaling data
-    variance_threshold: 0.00 # features with this level of variance or less will be removed
-    correlation_threshold: 1.999 # features above this correlation coefficient will be removed
-
 
 # CheckpointValidation
 # CoinModel Modeling Config
@@ -85,9 +77,26 @@ coin_modeling:
     # target_variable: "coin_return_pctile_full"
     target_variable: "coin_return_pctile"
     train_test_split: 0.2  # test size
-
     returns_winsorization: 0.01
-    drop_columns: []
+
+
+    # CheckpointValidation
+    # CoinModel Feature Selection
+    # Params used to remove unnecessary features
+    feature_selection:
+
+        # Column patterns to remove
+        drop_patterns: [
+            'training_clusters|k2_cluster/*|trading/*',
+            # 'score_quantile|net_gain_winsorized_checkpoint_residual/*',
+            # 'score_quantile|net_gain_winsorized_checkpoint_residual/*|trading/*',
+            # 'score_quantile|net_gain_winsorized_checkpoint_residual/*|balances/*',
+        ]
+
+        # Correlation/variance-based removal
+        scale_before_selection: False # whether to apply variance thresholds before or after scaling data
+        variance_threshold: 0.00 # features with this level of variance or less will be removed
+        correlation_threshold: 1.999 # features above this correlation coefficient will be removed
 
 
     # CheckpointValidation

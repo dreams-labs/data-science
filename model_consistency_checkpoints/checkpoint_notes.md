@@ -1,4 +1,22 @@
 # dda 570 ablation analysis
+checkpoint 3 restyle base model
+Model Performance Summary
+===================================
+Test Samples:             442
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.239
+RMSE:                     0.252
+MAE:                      0.208
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.001
+Standard Dev of Residuals:0.252
+95% Prediction Interval:  ±0.493
+
+
 checkpoint 2
 Model Performance Summary
 ===================================
