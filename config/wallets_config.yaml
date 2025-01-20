@@ -81,18 +81,6 @@ features:
     # Feature Selection
     feature_selection:
 
-feature_selection:
-    variance_threshold: 0.00 # features with this level of variance or less will be removed
-    correlation_threshold: 1.0 # features above this correlation coefficient will be removed
-
-
-    protected_features: [
-        'cluster|'
-    ]
-    drop_columns: [
-        ''
-    ]
-
 
 
 # CheckpointValidation
@@ -105,8 +93,27 @@ modeling:
 
     # Which wallet performance metric to use as the target variable.
     target_variable: "crypto_net_gain/max_investment/winsorized"
-    drop_columns: []
     train_test_split: 0.2  # test size
+
+    # CheckpointValidation
+    # WalletModel Feature Selection
+    feature_selection:
+        # Column patterns to remove
+        drop_patterns: [
+            'timing|*',
+            'performance|*',
+            'trading|*',
+            'mktcap|*',
+            'transfers|*',
+            # 'cluster|*',
+        ]
+
+        # Correlation/variance-based removal
+        variance_threshold: 0.00 # features with this level of variance or less will be removed
+        correlation_threshold: 1.0 # features above this correlation coefficient will be removed
+        protected_features: [
+            'cluster|'
+        ]
 
     # CheckpointValidation
     # WalletModel Params
