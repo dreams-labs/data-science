@@ -59,6 +59,15 @@ wallet_features:
     ]
 
 # CheckpointValidation
+# CoinModel Feature Selection
+# Params used to remove unnecessary features
+feature_selection:
+    scale_before_selection: False # whether to apply variance thresholds before or after scaling data
+    variance_threshold: 0.00 # features with this level of variance or less will be removed
+    correlation_threshold: 1.999 # features above this correlation coefficient will be removed
+
+
+# CheckpointValidation
 # CoinModel Modeling Config
 # Variables used in the generation of the validation period coin model
 coin_modeling:
@@ -66,11 +75,6 @@ coin_modeling:
     # Thresholds for coin inclusion in training data
     min_cohort_wallets: 20  # how many wallets must hold a coin for the coin to be elegible for forecasting
     min_cohort_balance: 20000  # how much USD all wallets must hold for the coin to be elegible for forecasting
-
-    # Params used to remove unnecessary features
-    feature_selection:
-        variance_threshold: 0.0
-        correlation_threshold: 1.0
 
     # Thresholds for coin inclusion in training data
     min_market_cap: 00_000  # coins below this market cap will not be included in performance assessments
