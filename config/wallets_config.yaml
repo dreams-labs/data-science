@@ -107,16 +107,16 @@ modeling:
     feature_selection:
         # Column patterns to remove
         drop_patterns: [
-            # 'timing|*',
-            # 'performance|*',
-            'performance|*/log|*',
-            'performance|*/ntile_rank|*',
+            # # 'timing|*',
+            # # 'performance|*',
+            # 'performance|*/log|*',
+            # 'performance|*/ntile_rank|*',
 
-            'trading|*',
-            # 'mktcap|*',
-            # 'transfers|*',
-            'cluster|*',
-            '*|w1',
+            # 'trading|*',
+            # # 'mktcap|*',
+            # # 'transfers|*',
+            # 'cluster|*',
+            # '*|w1',
 
         ]
 
@@ -164,7 +164,7 @@ modeling:
     grid_search_params:
 
         # Turn On or Off
-        # enabled: True # whether to grid search
+        enabled: True # whether to grid search
 
         # Search Methodology
         n_iter: 50  # random search limit
@@ -213,12 +213,15 @@ modeling:
             drop_columns__drop_patterns: [
                 [],
                 # ['timing|*'],
+                ['timing|price_sma_2/lead_21/*'],
+                ['timing|price_sma_2/lag_21/*'],
+                # ['timing|*'],
                 # ['performance|*/base|*'],
                 # ['performance|*/winsorized|*'],
                 # ['performance|*/log|*'],
                 # ['performance|*/rank|*'],
                 # ['performance|*/ntile_rank|*'],
-                ['trading|*'],
+                # ['trading|*'],
                 # ['mktcap|*'],
                 # ['transfers|*'],
                 # ['transfers|avg_buyer_number|*'],

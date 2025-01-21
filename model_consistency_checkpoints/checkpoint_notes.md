@@ -1,4 +1,27 @@
 # dda 579 ablation experiment
+add back timing features just prices
+Model Performance Summary
+===================================
+Test Samples:             51,409
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.638
+RMSE:                     0.186
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.730
+RMSE:                     0.129
+MAE:                      0.086
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.001
+Standard Dev of Residuals:0.186
+95% Prediction Interval:  ±0.366
+
 checkpoint 6 modeling june 24
 Model Performance Summary
 ===================================
