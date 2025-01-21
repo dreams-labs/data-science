@@ -86,8 +86,8 @@ def calculate_profits_features(wallet_features_df: pd.DataFrame) -> pd.DataFrame
     - wallet_features_df (DataFrame): Required columns:
         - crypto_net_gain: Total gain including unrealized
         - net_crypto_investment: Net realized gain
-        - total_crypto_buys: Sum of buy transactions
-        - total_crypto_sells: Sum of sell transactions
+        - total_crypto_inflows: Sum of buy transactions
+        - total_crypto_outflows: Sum of sell transactions
 
     Returns:
     - profits_df (DataFrame): Profit profits_features with columns:
@@ -110,8 +110,8 @@ def calculate_profits_features(wallet_features_df: pd.DataFrame) -> pd.DataFrame
     # )
 
     # # Volume-based profits_features
-    # profits_features_df['buy_volume'] = wallet_features_df['total_crypto_buys']
-    # profits_features_df['sell_volume'] = wallet_features_df['total_crypto_sells']
+    # profits_features_df['buy_volume'] = wallet_features_df['total_crypto_inflows']
+    # profits_features_df['sell_volume'] = wallet_features_df['total_crypto_outflows']
     # profits_features_df['total_volume'] = wallet_features_df['total_volume']
     # profits_features_df['net_volume'] = profits_features_df['buy_volume'] - profits_features_df['sell_volume']
 

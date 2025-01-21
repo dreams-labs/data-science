@@ -45,8 +45,8 @@ def test_profits_features_calculation():
     mock_input = pd.DataFrame({
         'crypto_net_gain': [100, -50],
         'net_crypto_investment': [80, -30],
-        'total_crypto_buys': [1000, 500],
-        'total_crypto_sells': [920, 530]
+        'total_crypto_inflows': [1000, 500],
+        'total_crypto_outflows': [920, 530]
     })
     result = wpf.calculate_profits_features(mock_input)
     assert np.allclose(result['crypto_net_gain'], mock_input['crypto_net_gain'])

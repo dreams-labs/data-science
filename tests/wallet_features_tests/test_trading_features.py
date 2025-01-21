@@ -264,10 +264,10 @@ def test_w01_multiple_coins(test_trading_features_df):
     wallet_features = test_trading_features_df.loc[wallet]
 
     # Calculate expected values
-    # total_crypto_buys: btc(100 + 50) + eth(200 + 50) = 400
+    # total_crypto_inflows: btc(100 + 50) + eth(200 + 50) = 400
     expected_buys = 400
 
-    # total_crypto_sells: no sells = 0
+    # total_crypto_outflows: no sells = 0
     expected_sells = 0
 
     # net_crypto_investment: 400 - 0 = 400
@@ -301,8 +301,8 @@ def test_w01_multiple_coins(test_trading_features_df):
     expected_ratio = 400 / 356.20
 
     # Assert all values match
-    assert wallet_features['total_crypto_buys'] == expected_buys
-    assert wallet_features['total_crypto_sells'] == expected_sells
+    assert wallet_features['total_crypto_inflows'] == expected_buys
+    assert wallet_features['total_crypto_outflows'] == expected_sells
     assert wallet_features['net_crypto_investment'] == expected_net
     assert wallet_features['crypto_net_gain'] == expected_gain
     assert wallet_features['transaction_days'] == expected_txn_days
@@ -330,10 +330,10 @@ def test_w08_offsetting_transactions(test_trading_features_df):
 
     print(wallet_features)
     # Calculate expected values
-    # total_crypto_buys: 10000 + 500 balance = 10500
+    # total_crypto_inflows: 10000 + 500 balance = 10500
     expected_buys = 10000 + 500
 
-    # total_crypto_sells: 10000 sell = 10000
+    # total_crypto_outflows: 10000 sell = 10000
     expected_sells = 10000
 
     # net_crypto_investment: 10000 - 10000 = 0
@@ -371,8 +371,8 @@ def test_w08_offsetting_transactions(test_trading_features_df):
     expected_ratio = 20000 / 451.74
 
     # Assert all values match
-    assert wallet_features['total_crypto_buys'] == expected_buys
-    assert wallet_features['total_crypto_sells'] == expected_sells
+    assert wallet_features['total_crypto_inflows'] == expected_buys
+    assert wallet_features['total_crypto_outflows'] == expected_sells
     assert wallet_features['net_crypto_investment'] == expected_net
     assert wallet_features['crypto_net_gain'] == expected_gain
     assert wallet_features['transaction_days'] == expected_txn_days
@@ -399,10 +399,10 @@ def test_w09_memecoin_winner(test_trading_features_df):
     wallet_features = test_trading_features_df.loc[wallet]
 
     # Calculate expected values
-    # total_crypto_buys: initial 100 buy
+    # total_crypto_inflows: initial 100 buy
     expected_buys = 100
 
-    # total_crypto_sells: 500 + 100 = 600 in sells
+    # total_crypto_outflows: 500 + 100 = 600 in sells
     expected_sells = 600
 
     # net_crypto_investment: 100 - 600 = -500
@@ -436,8 +436,8 @@ def test_w09_memecoin_winner(test_trading_features_df):
     expected_ratio = 700 / 35.65322
 
     # Assert all values match
-    assert wallet_features['total_crypto_buys'] == expected_buys
-    assert wallet_features['total_crypto_sells'] == expected_sells
+    assert wallet_features['total_crypto_inflows'] == expected_buys
+    assert wallet_features['total_crypto_outflows'] == expected_sells
     assert wallet_features['net_crypto_investment'] == expected_net
     assert wallet_features['crypto_net_gain'] == expected_gain
     assert wallet_features['transaction_days'] == expected_txn_days
@@ -608,25 +608,25 @@ def test_volume_aggregation_after_remapping(test_trading_features_df,
     # Map original volumes to new wallet structure
     original_volumes = pd.DataFrame({
         'total_volume': test_trading_features_df['total_volume'],
-        'total_crypto_buys': test_trading_features_df['total_crypto_buys'],
-        'total_crypto_sells': test_trading_features_df['total_crypto_sells']
+        'total_crypto_inflows': test_trading_features_df['total_crypto_inflows'],
+        'total_crypto_outflows': test_trading_features_df['total_crypto_outflows']
     })
     original_volumes['new_wallet'] = original_volumes.index.map(wallet_mapping)
 
     # Calculate expected volumes by grouping by new wallet address
     expected_volumes = original_volumes.groupby('new_wallet').agg({
         'total_volume': 'sum',
-        'total_crypto_buys': 'sum',
-        'total_crypto_sells': 'sum'
+        'total_crypto_inflows': 'sum',
+        'total_crypto_outflows': 'sum'
     }).sort_index()
 
     # Get actual volumes from remapped features
     actual_volumes = test_remapped_trading_features_df[
-        ['total_volume', 'total_crypto_buys', 'total_crypto_sells']
+        ['total_volume', 'total_crypto_inflows', 'total_crypto_outflows']
     ].sort_index()
 
     # Compare each volume metric
-    for col in ['total_volume', 'total_crypto_buys', 'total_crypto_sells']:
+    for col in ['total_volume', 'total_crypto_inflows', 'total_crypto_outflows']:
         assert np.allclose(expected_volumes[col], actual_volumes[col], equal_nan=True), \
             f"{col} doesn't match after remapping"
 
@@ -755,8 +755,8 @@ def test_trading_metrics_aggregation(test_trading_features_df,
 
     # Sum original wallet metrics grouped by their new mapped wallet
     original_metrics = pd.DataFrame(test_trading_features_df[[
-        'total_crypto_buys',
-        'total_crypto_sells',
+        'total_crypto_inflows',
+        'total_crypto_outflows',
         'net_crypto_investment',
         'crypto_net_gain'
     ]])
@@ -765,8 +765,8 @@ def test_trading_metrics_aggregation(test_trading_features_df,
 
     # Get actual remapped metrics
     actual = test_remapped_trading_features_df[[
-        'total_crypto_buys',
-        'total_crypto_sells',
+        'total_crypto_inflows',
+        'total_crypto_outflows',
         'net_crypto_investment',
         'crypto_net_gain'
     ]].sort_index()
