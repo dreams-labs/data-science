@@ -117,7 +117,7 @@ def remove_correlated_features(
     - reduced_df (DataFrame): DataFrame with correlated features removed
     """
     # If the threshold is 1.0 then don't compute anything
-    if correlation_threshold >= 1.0:
+    if correlation_threshold > 1.0:
         logger.info("Didn't apply correlation-based feature selection.")
         return training_df
 
