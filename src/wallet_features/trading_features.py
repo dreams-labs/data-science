@@ -263,18 +263,18 @@ def calculate_observed_activity_columns(profits_df: pd.DataFrame,
     )
     observed_activity_df = metrics_df
 
-    # FeatureRemoval due to no predictiveness
-    # # Extract index levels once
-    # index_frame = observed_profits_df.index.to_frame(index=False)
+    # Extract index levels once
+    index_frame = observed_profits_df.index.to_frame(index=False)
 
-    # # Calculate unique counts from index_frame in single operation
-    # unique_counts = index_frame.groupby('wallet_address').agg(
-    #     unique_coins_traded=('coin_id', 'nunique'),
-    #     transaction_days=('date', 'nunique')
-    # )
+    # Calculate unique counts from index_frame in single operation
+    unique_counts = index_frame.groupby('wallet_address').agg(
+        unique_coins_traded=('coin_id', 'nunique'),
+        # # FeatureRemoval due to no predictiveness
+        # transaction_days=('date', 'nunique')
+    )
 
     # # Combine metrics
-    # observed_activity_df = observed_activity_df.join(unique_counts)
+    observed_activity_df = observed_activity_df.join(unique_counts)
 
     # FeatureRemoval due to no predictiveness
     # # Add activity density
