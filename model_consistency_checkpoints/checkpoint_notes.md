@@ -1,5 +1,5 @@
 # dda 579 ablation experiment
-increase max gap days to 30 from 14
+increase max gap days to 30 from 14 0.08LR
 
 
 checkpoint 7

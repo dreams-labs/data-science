@@ -22,10 +22,10 @@ training_data:
     ]
     modeling_period_start: "2024-03-01"
     modeling_period_end: "2024-04-01"
-    # validation_period_end: "2024-11-20"
+    # validation_period_end: "2024-11-20"   
     # modeling_period_start: "2024-10-01"
     # modeling_period_end: "2024-10-31"
-    # validation_period_end: "2024-11-20"
+    # validation_period_end: "2024-11-30"
 
     # Whether to use hybrid coin-wallet ids
     hybridize_wallet_ids: False  # if true, training data will be keyed on wallet-coin pairs
@@ -54,7 +54,7 @@ data_cleaning:
 
     # Market data filters
     max_initial_market_cap: 999150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
-    max_gap_days: 14  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
+    max_gap_days: 30  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
     min_daily_volume: 500 # Minimum average daily volume the coin must have
 
     # Warnings about potential data gaps in profits_df or market_data_df
