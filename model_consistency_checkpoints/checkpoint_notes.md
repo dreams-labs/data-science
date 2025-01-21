@@ -1,3 +1,23 @@
+# dda 555 cash flows trading features
+checkpoint 1 working after rename cols
+Model Performance Summary
+===================================
+Test Samples:             79,724
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.710
+RMSE:                     0.175
+MAE:                      0.086
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.657
+RMSE:                     0.130
+MAE:                      0.069
+
+
+
 # dda 585 grid searchin
 checkpoint 3 good to move on
 Model Performance Summary
