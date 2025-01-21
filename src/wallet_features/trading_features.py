@@ -42,9 +42,9 @@ def calculate_wallet_trading_features(
 
     Returns:
     - trading_features_df (DataFrame): Trading metrics keyed on wallet_address with columns:
-        - total_crypto_inflows: Sum of positive balance changes
-        - total_crypto_outflows: Sum of negative balance changes
-        - net_crypto_investment: Net sum of all balance changes
+        - crypto_inflows: Sum of positive balance changes
+        - crypto_outflows: Sum of negative balance changes
+        - crypto_net_flows: Net sum of all balance changes
         - crypto_net_gain: Final unrealized gain
         - transaction_days: Number of days with activity
         - unique_coins_traded: Number of unique coins
@@ -55,18 +55,21 @@ def calculate_wallet_trading_features(
     """
     # Validate profits_df
     profits_df = profits_df.copy()
-    profits_df = ensure_index(profits_df, period_start_date, period_end_date)
+    profits_df = ensure_index(profits_df,
+                              period_start_date, period_end_date)
 
     # Calculate configured metrics
     # ----------------------------
     # Add crypto balance/transfers/gain helper columns
-    profits_df = calculate_crypto_balance_columns(profits_df, period_start_date)
+    profits_df = calculate_crypto_balance_columns(profits_df,
+                                                  period_start_date, period_end_date)
 
     # Calculate net_gain and max_investment columns
     gain_and_investment_df = calculate_gain_and_investment_columns(profits_df)
 
     # Calculated metrics that ignore imputed transactions
-    observed_activity_df = calculate_observed_activity_columns(profits_df,period_start_date,period_end_date)
+    observed_activity_df = calculate_observed_activity_columns(profits_df,
+                                                               period_start_date, period_end_date)
 
     # Merge together
     trading_features_df = gain_and_investment_df.join(observed_activity_df)
@@ -102,7 +105,8 @@ def calculate_wallet_trading_features(
 # -----------------------------------
 
 def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
-                                   period_start_date: str
+                                   period_start_date: str,
+                                   period_end_date: str,
                                    ) -> pd.DataFrame:
     """
     Adds crypto balance change columns using multiindex operations.
@@ -116,6 +120,7 @@ def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
     """
     profits_df['crypto_balance_change'] = profits_df['usd_net_transfers']
     profits_df = buy_crypto_start_balance(profits_df, period_start_date)
+    profits_df = sell_crypto_end_balance(profits_df, period_end_date)
 
     # Use index-aware cumsum() since data is already sorted by (coin_id, wallet_address, date)
     profits_df['crypto_cumulative_transfers'] = (profits_df
@@ -152,6 +157,33 @@ def buy_crypto_start_balance(df: pd.DataFrame, period_start_date: str) -> pd.Dat
 
 
 
+def sell_crypto_end_balance(df: pd.DataFrame, period_end_date: str) -> pd.DataFrame:
+    """
+    Adjusts crypto_balance_change and sets usd_balance to 0 for the ending balance date.
+
+    Params:
+    - df (DataFrame): Input df with multiindex (coin_id, wallet_address, date).
+    - period_end_date (str): Period end in 'YYYY-MM-DD'.
+
+    Returns:
+    - df (DataFrame): DataFrame with adjusted crypto_balance_change and usd_balance.
+    """
+    ending_balance_date = datetime.strptime(period_end_date, '%Y-%m-%d')
+
+    # Use IndexSlice to efficiently select the ending balance date
+    idx = pd.IndexSlice
+    end_slice = idx[:, :, ending_balance_date]
+
+    # Update crypto_balance_change
+    df.loc[end_slice, 'crypto_balance_change'] = -1 * df.loc[end_slice, 'usd_balance']
+
+    # Set usd_balance to 0
+    df.loc[end_slice, 'usd_balance'] = 0
+
+    return df
+
+
+
 def calculate_gain_and_investment_columns(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
     Calculates net gain and max investment using multiindex operations.
@@ -164,9 +196,9 @@ def calculate_gain_and_investment_columns(profits_df: pd.DataFrame) -> pd.DataFr
     - gain_and_investment_df (DataFrame): Wallet metrics with columns:
         - max_investment: Maximum cumulative transfers (floored at 0)
         - crypto_net_gain: Final unrealized gain per wallet
-        - total_crypto_inflows: Sum of positive balance changes
-        - total_crypto_outflows: Sum of negative balance changes
-        - net_crypto_investment: Net balance changes
+        - crypto_inflows: Sum of positive balance changes
+        - crypto_outflows: Sum of negative balance changes
+        - crypto_net_flows: Net balance changes
     """
     # Get last entry per wallet-coin using index levels
     last_rows = profits_df.groupby(level=['coin_id', 'wallet_address'], observed=True).last()
@@ -184,9 +216,9 @@ def calculate_gain_and_investment_columns(profits_df: pd.DataFrame) -> pd.DataFr
     # Calculate all investment metrics in one groupby
     investments_df = profits_df.groupby(level='wallet_address', observed=True).agg(
         max_investment=('crypto_cumulative_transfers', 'max'),
-        total_crypto_inflows=('positive_changes', 'sum'),
-        total_crypto_outflows=('negative_changes', 'sum'),
-        net_crypto_investment=('crypto_balance_change', 'sum')
+        crypto_inflows=('positive_changes', 'sum'),
+        crypto_outflows=('negative_changes', 'sum'),
+        crypto_net_flows=('crypto_balance_change', 'sum')
     )
     investments_df['max_investment'] = investments_df['max_investment'].clip(lower=0)
 
@@ -197,6 +229,7 @@ def calculate_gain_and_investment_columns(profits_df: pd.DataFrame) -> pd.DataFr
 
 
 
+# pylint:disable=unused-argument  # params were used for FeatureRemoval features
 def calculate_observed_activity_columns(profits_df: pd.DataFrame,
                                     period_start_date: str,
                                     period_end_date: str) -> pd.DataFrame:
@@ -213,30 +246,41 @@ def calculate_observed_activity_columns(profits_df: pd.DataFrame,
     """
     # Filter and add absolute changes
     observed_profits_df = profits_df.loc[~profits_df['is_imputed']].copy()
-    observed_profits_df['abs_balance_change'] = observed_profits_df['crypto_balance_change'].abs()
+    observed_profits_df['abs_balance_change'] = observed_profits_df['usd_net_transfers'].abs()
 
-    # Extract index levels once
-    index_frame = observed_profits_df.index.to_frame(index=False)
+    # Add buy/sell columns
+    balance_changes = profits_df['usd_net_transfers']
+    profits_df['positive_changes'] = balance_changes.clip(lower=0)
+    profits_df['negative_changes'] = (-balance_changes).clip(lower=0)
 
     # Combine metrics in a single groupby where possible
     metrics_df = observed_profits_df.groupby(level='wallet_address', observed=True).agg(
         total_volume=('abs_balance_change', 'sum'),
-        average_transaction=('abs_balance_change', 'mean')
+        average_transaction=('abs_balance_change', 'mean'),
+        crypto_cash_buys=('positive_changes', 'sum'),
+        crypto_cash_sells=('negative_changes', 'sum'),
+        crypto_net_cash_flows=('crypto_balance_change', 'sum'),
     )
+    observed_activity_df = metrics_df
 
-    # Calculate unique counts from index_frame in single operation
-    unique_counts = index_frame.groupby('wallet_address').agg(
-        unique_coins_traded=('coin_id', 'nunique'),
-        transaction_days=('date', 'nunique')
-    )
+    # FeatureRemoval due to no predictiveness
+    # # Extract index levels once
+    # index_frame = observed_profits_df.index.to_frame(index=False)
 
-    # Combine metrics
-    observed_activity_df = metrics_df.join(unique_counts)
+    # # Calculate unique counts from index_frame in single operation
+    # unique_counts = index_frame.groupby('wallet_address').agg(
+    #     unique_coins_traded=('coin_id', 'nunique'),
+    #     transaction_days=('date', 'nunique')
+    # )
 
-    # Add activity density
-    period_duration = (datetime.strptime(period_end_date, '%Y-%m-%d') -
-                      datetime.strptime(period_start_date, '%Y-%m-%d')).days + 1
-    observed_activity_df['activity_density'] = observed_activity_df['transaction_days'] / period_duration
+    # # Combine metrics
+    # observed_activity_df = observed_activity_df.join(unique_counts)
+
+    # FeatureRemoval due to no predictiveness
+    # # Add activity density
+    # period_duration = (datetime.strptime(period_end_date, '%Y-%m-%d') -
+    #                   datetime.strptime(period_start_date, '%Y-%m-%d')).days + 1
+    # observed_activity_df['activity_density'] = observed_activity_df['transaction_days'] / period_duration
 
     return observed_activity_df
 
