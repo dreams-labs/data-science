@@ -1,4 +1,141 @@
 # dda 579 ablation experiment
+increase max gap days to 30 from 14
+
+
+checkpoint 7
+faster learning rate 0.07
+Model Performance Summary
+===================================
+Test Samples:             66,456
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.690
+RMSE:                     0.318
+MAE:                      0.162
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.683
+RMSE:                     0.201
+MAE:                      0.135
+
+
+faster learning rate 0.06
+Model Performance Summary
+===================================
+Test Samples:             66,456
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.690
+RMSE:                     0.318
+MAE:                      0.163
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.687
+RMSE:                     0.200
+MAE:                      0.134
+
+
+end trading features analysis
+Model Performance Summary
+===================================
+Test Samples:             66,456
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.687
+RMSE:                     0.319
+MAE:                      0.164
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.678
+RMSE:                     0.202
+MAE:                      0.136
+
+
+
+add trading features
+Model Performance Summary
+===================================
+Test Samples:             66,456
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.687
+RMSE:                     0.319
+MAE:                      0.164
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.678
+RMSE:                     0.202
+MAE:                      0.136
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.001
+Standard Dev of Residuals:0.319
+95% Prediction Interval:  ±0.625
+
+
+remove correlated features .97
+Model Performance Summary
+===================================
+Test Samples:             66,456
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.686
+RMSE:                     0.320
+MAE:                      0.164
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.688
+RMSE:                     0.199
+MAE:                      0.132
+
+
+remove correlated features .99
+Model Performance Summary
+===================================
+Test Samples:             66,456
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.686
+RMSE:                     0.320
+MAE:                      0.164
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.688
+RMSE:                     0.199
+MAE:                      0.132
+
+
+remove 2022 window boundary
+Model Performance Summary
+===================================
+Test Samples:             66,456
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.686
+RMSE:                     0.320
+MAE:                      0.164
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.688
+RMSE:                     0.199
+MAE:                      0.132
+
+
 predict march 2024 with data through 2020
 Model Performance Summary
 ===================================
