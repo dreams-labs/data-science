@@ -6,14 +6,21 @@
 # WalletModel Period Boundaries
 training_data:
     training_window_starts: [
+        "2023-01-01",
         "2023-06-01",
         "2024-01-01",
         "2024-04-01",
-        "2024-10-01",
+        "2024-05-01",
+        # "2024-9-01",
+        # "2024-9-01",
+        # "2024-10-01",
     ]
-    modeling_period_start: "2024-11-01"
-    modeling_period_end: "2024-11-20"
-    validation_period_end: "2024-11-30"
+    modeling_period_start: "2024-6-01"
+    modeling_period_end: "2024-7-01"
+    # validation_period_end: "2024-11-20"
+    # modeling_period_start: "2024-10-01"
+    # modeling_period_end: "2024-10-31"
+    # validation_period_end: "2024-11-20"
 
     # Whether to use hybrid coin-wallet ids
     hybridize_wallet_ids: False  # if true, training data will be keyed on wallet-coin pairs
@@ -65,8 +72,8 @@ features:
     include_twb_metrics: False
 
     # Performance Params
+    returns_winsorization: 0.01
     ranking_ntiles: 4
-    returns_winsorization: 0.02
 
     # Clustering Params
     clustering_n_components: 25
@@ -101,15 +108,15 @@ modeling:
         # Column patterns to remove
         drop_patterns: [
             # 'timing|*',
-            # # 'performance|*',
-            # 'performance|*/log|*',
-            # 'performance|*/ntile_rank|*',
+            # 'performance|*',
+            'performance|*/log|*',
+            'performance|*/ntile_rank|*',
 
-            # 'trading|*',
-            # # 'mktcap|*',
-            # # 'transfers|*',
-            # 'cluster|*',
-            # '*|w1',
+            'trading|*',
+            # 'mktcap|*',
+            # 'transfers|*',
+            'cluster|*',
+            '*|w1',
 
         ]
 
@@ -175,9 +182,9 @@ modeling:
         # Params
         param_grid:
 
-            # Depth and Child Weight
-            regressor__min_child_weight_pct: [0.0001, 0.0002, 0.0005, 0.001]
-            regressor__max_depth: [15, 17, 19, 21]  # basic depth param
+            # # Depth and Child Weight
+            # regressor__min_child_weight_pct: [0.0001, 0.0002, 0.0005, 0.001]
+            # regressor__max_depth: [15, 17, 19, 21]  # basic depth param
 
 
             # Col/Row Sampling
@@ -190,16 +197,16 @@ modeling:
             # regressor__gamma: [0.0, 0.1, 1.0]  # controls the minimum loss reduction needed to split a node
 
 
-            # Tree Training Speed Overrides
-            regressor__n_estimators: [200]
-            regressor__learning_rate: [0.05]
-            regressor__gamma: [0.01]
+            # # Tree Training Speed Overrides
+            # regressor__n_estimators: [200]
+            # regressor__learning_rate: [0.05]
+            # regressor__gamma: [0.01]
 
-            # Optimize for Speed
-            regressor__n_jobs: [4]  # how many models to build at once
-            regressor__nthread: [4]  # how many threads each model can use
-            regressor__max_bin: [128]
-            regressor__tree_method: ['hist']
+            # # Optimize for Speed
+            # regressor__n_jobs: [4]  # how many models to build at once
+            # regressor__nthread: [4]  # how many threads each model can use
+            # regressor__max_bin: [128]
+            # regressor__tree_method: ['hist']
 
 
             # Column Selection
@@ -211,7 +218,7 @@ modeling:
                 # ['performance|*/log|*'],
                 # ['performance|*/rank|*'],
                 # ['performance|*/ntile_rank|*'],
-                # ['trading|*'],
+                ['trading|*'],
                 # ['mktcap|*'],
                 # ['transfers|*'],
                 # ['transfers|avg_buyer_number|*'],
