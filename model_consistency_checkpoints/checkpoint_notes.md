@@ -1,4 +1,63 @@
 # dda 585 grid searchin
+checkpoint 3 good to move on
+Model Performance Summary
+===================================
+Test Samples:             79,724
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.710
+RMSE:                     0.175
+MAE:                      0.086
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.657
+RMSE:                     0.130
+MAE:                      0.069
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.000
+Standard Dev of Residuals:0.175
+95% Prediction Interval:  ±0.344
+
+
+
+checkpoint 2
+Model Performance Summary
+===================================
+Test Samples:             79,724
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.707
+RMSE:                     0.176
+MAE:                      0.087
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.626
+RMSE:                     0.136
+MAE:                      0.069
+
+
+smaller gamma
+Model Performance Summary
+===================================
+Test Samples:             79,724
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.706
+RMSE:                     0.177
+MAE:                      0.088
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.635
+RMSE:                     0.134
+MAE:                      0.069
 
 
 checkpoint 1 deeper trees
