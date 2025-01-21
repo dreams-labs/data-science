@@ -8,14 +8,14 @@ time_series:
                 sma:
                     parameters:
                         window: [2]
-        #         rsi:
-        #             parameters:
-        #                 window: [5]
-        # volume:
-        #     indicators:
-        #         sma:
-        #             parameters:
-        #                 window: [5]
+                # rsi:
+                #     parameters:
+                #         window: [7]
+        volume:
+            indicators:
+                sma:
+                    parameters:
+                        window: [12]
         # mfi:
         #     indicators:
         #         sma:

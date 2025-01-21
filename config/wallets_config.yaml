@@ -6,17 +6,22 @@
 # WalletModel Period Boundaries
 training_data:
     training_window_starts: [
+        "2020-01-01",
+        "2021-01-01",
+        "2022-01-01",
         "2023-01-01",
         "2023-06-01",
+        "2023-09-01",
         "2024-01-01",
-        "2024-04-01",
-        "2024-05-01",
-        # "2024-9-01",
+        "2024-02-01",
+        # "2024-03-01",
+        # "2024-04-01",
+        # "2024-05-01",
         # "2024-9-01",
         # "2024-10-01",
     ]
-    modeling_period_start: "2024-6-01"
-    modeling_period_end: "2024-7-01"
+    modeling_period_start: "2024-03-01"
+    modeling_period_end: "2024-04-01"
     # validation_period_end: "2024-11-20"
     # modeling_period_start: "2024-10-01"
     # modeling_period_end: "2024-10-31"
@@ -107,21 +112,30 @@ modeling:
     feature_selection:
         # Column patterns to remove
         drop_patterns: [
-            # # 'timing|*',
-            # # 'performance|*',
-            # 'performance|*/log|*',
-            # 'performance|*/ntile_rank|*',
+            # 'timing|*',
+            'timing|*/buy_mean*',
+            'timing|*/sell_mean*',
+            'timing|*/sell_weighted*',
 
-            # 'trading|*',
-            # # 'mktcap|*',
-            # # 'transfers|*',
-            # 'cluster|*',
-            # '*|w1',
+            # 'performance|*',
+            'performance|*/log|*',
+            'performance|*/ntile_rank|*',
+
+            'trading|*',
+
+            # 'mktcap|*',
+
+            # 'transfers|*',
+            # 'transfers|new_coin_buy_counts|*',
+            # 'transfers|median_buyer_number|*',
+
+            'cluster|*',
+            '*|w1',
 
         ]
 
         # Correlation/variance-based removal
-        variance_threshold: 0.00 # features with this level of variance or less will be removed
+        variance_threshold: -10.00 # features with this level of variance or less will be removed
         correlation_threshold: 1.0 # features above this correlation coefficient will be removed
         protected_features: [
             'cluster|'
@@ -145,8 +159,8 @@ modeling:
         # Performance Profiles (Choose One Section)
         # --------------------------------------
         # CHECKPOINTER
-        n_estimators: 300  # number of trees to train in the model
-        learning_rate: 0.025  # step size for updates to weights during training
+        n_estimators: 400  # number of trees to train in the model
+        learning_rate: 0.05  # step size for updates to weights during training
         early_stopping_rounds: 25  # stop training if no improvement after x rounds
         gamma: 0.01  # minimum gain required to split further on a leaf node
         tree_method: 'hist'  # method for building trees, e.g., histogram-based
@@ -164,12 +178,12 @@ modeling:
     grid_search_params:
 
         # Turn On or Off
-        enabled: True # whether to grid search
+        # enabled: True # whether to grid search
 
         # Search Methodology
         n_iter: 50  # random search limit
         scoring: 'neg_root_mean_squared_error'
-        n_splits: 2  # cv splits
+        n_splits: 3  # cv splits
         verbose_level: 3  # scikit-learn verbosity
 
         # Target variables
@@ -197,24 +211,43 @@ modeling:
             # regressor__gamma: [0.0, 0.1, 1.0]  # controls the minimum loss reduction needed to split a node
 
 
-            # # Tree Training Speed Overrides
-            # regressor__n_estimators: [200]
-            # regressor__learning_rate: [0.05]
-            # regressor__gamma: [0.01]
+            # Tree Training Speed Overrides
+            regressor__n_estimators: [200]
+            regressor__learning_rate: [0.05]
+            regressor__gamma: [0.01]
 
-            # # Optimize for Speed
-            # regressor__n_jobs: [4]  # how many models to build at once
-            # regressor__nthread: [4]  # how many threads each model can use
-            # regressor__max_bin: [128]
-            # regressor__tree_method: ['hist']
+            # Optimize for Speed
+            regressor__n_jobs: [4]  # how many models to build at once
+            regressor__nthread: [4]  # how many threads each model can use
+            regressor__max_bin: [128]
+            regressor__tree_method: ['hist']
 
 
             # Column Selection
             drop_columns__drop_patterns: [
                 [],
                 # ['timing|*'],
-                ['timing|price_sma_2/lead_21/*'],
-                ['timing|price_sma_2/lag_21/*'],
+                # ['timing|price_sma_2/lead_21/*'],
+                # ['timing|price_sma_2/lag_15/*'],
+                # ['timing|price_sma_2/lag_21/*'],
+                # ['timing|price_sma_2/lag_30/*'],
+                # ['timing|*/buy_mean*'],
+                # ['timing|*/sell_mean*'],
+                # ['timing|*/buy_weighted*'],
+                # ['timing|*/sell_weighted*'],
+                # ['timing|price_rsi_*/*'],
+                # ['timing|price_rsi_*/*'],
+                # ['timing|mfi*/*'],
+                # ['timing|obv*/*'],
+                # ['timing|volume_sma_3/*'],
+                # ['timing|volume_sma_7/*'],
+                # ['timing|volume_sma_12/*_15*'],
+                # ['timing|volume_sma_12/*_21*'],
+                # ['timing|volume_sma_12/*_30*'],
+                # ['timing|price_sma_*/*'],
+                # ['timing|*/*_7/*'],
+                # ['timing|*/*_21/*'],
+                # ['timing|*/*_50/*'],
                 # ['timing|*'],
                 # ['performance|*/base|*'],
                 # ['performance|*/winsorized|*'],
