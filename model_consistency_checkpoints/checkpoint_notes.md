@@ -1,5 +1,22 @@
 # dda 579 ablation experiment
+checkpoint 8
+back to november 2024
 increase max gap days to 30 from 14 0.08LR
+Model Performance Summary
+===================================
+Test Samples:             79,724
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.693
+RMSE:                     0.181
+MAE:                      0.093
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.656
+RMSE:                     0.130
+MAE:                      0.065
 
 
 checkpoint 7
