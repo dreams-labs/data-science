@@ -1,3 +1,25 @@
+# dda 585 grid searchin
+
+
+checkpoint 1 deeper trees
+Model Performance Summary
+===================================
+Test Samples:             79,724
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.705
+RMSE:                     0.177
+MAE:                      0.089
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.639
+RMSE:                     0.133
+MAE:                      0.067
+
+
+
 # dda 579 ablation experiment
 checkpoint 8
 back to november 2024

@@ -160,8 +160,8 @@ modeling:
         # -------------------------------
         eval_metric: ['rmse']
 
-        max_depth: 17  # how deep the trees can go
-        min_child_weight_pct: 0.0002  # what % of rows each tree must have
+        max_depth: 21  # how deep the trees can go
+        min_child_weight_pct: 0.0001  # what % of rows each tree must have
         subsample: 1.0  # samples rows, e.g. trees use x% of all wallet rows
         colsample_bytree: 0.9  # samples columns, e.g. trees use x% of all column features
 
@@ -169,9 +169,9 @@ modeling:
         # --------------------------------------
         # CHECKPOINTER
         n_estimators: 400  # number of trees to train in the model
-        learning_rate: 0.08  # step size for updates to weights during training
+        learning_rate: 0.06  # step size for updates to weights during training
         early_stopping_rounds: 25  # stop training if no improvement after x rounds
-        gamma: 0.01  # minimum gain required to split further on a leaf node
+        gamma: 0.005  # minimum gain required to split further on a leaf node
         tree_method: 'hist'  # method for building trees, e.g., histogram-based
         max_bin: 256  # how many bins to categorize features into
 
@@ -192,7 +192,7 @@ modeling:
         # Search Methodology
         n_iter: 50  # random search limit
         scoring: 'neg_root_mean_squared_error'
-        n_splits: 3  # cv splits
+        n_splits: 2  # cv splits
         verbose_level: 3  # scikit-learn verbosity
 
         # Target variables
@@ -206,8 +206,8 @@ modeling:
         param_grid:
 
             # # Depth and Child Weight
-            # regressor__min_child_weight_pct: [0.0001, 0.0002, 0.0005, 0.001]
-            # regressor__max_depth: [15, 17, 19, 21]  # basic depth param
+            regressor__min_child_weight_pct: [0.0005, 0.0001, 0.00015]
+            regressor__max_depth: [19, 21, 23, 25, 27]  # basic depth param
 
             # Col/Row Sampling
             # regressor__subsample: [0.8, 0.9, 1.0]
@@ -216,13 +216,13 @@ modeling:
             # # Model Speed
             # regressor__tree_method: ['hist', 'approx', 'auto']
             # regressor__max_bin: [64, 128, 256]
-            # regressor__gamma: [0.0, 0.1, 1.0]  # controls the minimum loss reduction needed to split a node
+            regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
 
             # Tree Training Speed Overrides
             regressor__n_estimators: [200]
             regressor__learning_rate: [0.1]
-            regressor__gamma: [0.01]
+            # regressor__gamma: [0.01]
 
             # Optimize for Speed
             regressor__n_jobs: [4]  # how many models to build at once
