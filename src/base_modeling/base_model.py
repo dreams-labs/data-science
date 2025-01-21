@@ -372,13 +372,14 @@ class DropColumnPatterns(BaseEstimator, TransformerMixin):
         self.drop_patterns = drop_patterns
         self.columns_to_drop = None  # Persist calculated columns to drop
 
-    def fit(self, X):
+    # pylint:disable=unused-argument  # y param is needed to match pipeline structure
+    def fit(self, X, y=None):
         """
         Identify columns to drop based on the given patterns.
 
         Params:
         - X (DataFrame): Input training data.
-        - y (Series): Target variable (ignored).
+        - y (Series): Target variable (ignored but required for pipeline format).
 
         Returns:
         - self: Fitted transformer.
