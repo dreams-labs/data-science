@@ -709,8 +709,6 @@ def assert_period(df, period_start, period_end) -> None:
             raise ValueError("Found non-imputed records in starting balance")
 
 
-
-
 def cw_filter(df, coin_id, wallet_address):
     """
     Filter DataFrame by coin_id and wallet_address, sort by date if available.
