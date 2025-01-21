@@ -86,11 +86,6 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
 # Component Functions
 # -----------------------------
 
-class FeatureConfigError(Exception):
-    """Custom exception for feature configuration errors."""
-    pass
-
-@u.timing_decorator
 def calculate_offsets(
     market_indicators_data_df: pd.DataFrame
 ) -> pd.DataFrame:
@@ -155,7 +150,7 @@ def calculate_offsets(
     return market_timing_df
 
 
-@u.timing_decorator
+
 def calculate_relative_changes(
     market_timing_df: pd.DataFrame
 ) -> pd.DataFrame:
@@ -365,3 +360,13 @@ def generate_all_timing_features(
     ).fillna(0)
 
     return result
+
+
+
+# -----------------------------
+# Helper Functions
+# -----------------------------
+
+class FeatureConfigError(Exception):
+    """Custom exception for feature configuration errors."""
+    pass

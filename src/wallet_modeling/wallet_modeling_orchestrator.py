@@ -445,7 +445,10 @@ def generate_training_indicators_df(training_market_data_df_full,wallets_metrics
         )
 
     # Adds time series ratio metrics that can have additional indicators applied to them
-    market_indicators_data_df = ind.add_market_data_dualcolumn_indicators(training_market_data_df_full)
+    if any(k in wallets_metrics_config['time_series']['market_data'] for k in ['mfi', 'obv']):
+        market_indicators_data_df = ind.add_market_data_dualcolumn_indicators(training_market_data_df_full)
+    else:
+        market_indicators_data_df = training_market_data_df_full
 
     # Adds indicators to all configured time series
     market_indicators_data_df = ind.generate_time_series_indicators(market_indicators_data_df,

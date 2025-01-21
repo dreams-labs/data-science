@@ -1,3 +1,408 @@
+# dda 579 ablation experiment
+predict march 2024 with data through 2020
+Model Performance Summary
+===================================
+Test Samples:             66,456
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.687
+RMSE:                     0.319
+MAE:                      0.164
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.685
+RMSE:                     0.200
+MAE:                      0.132
+
+
+predict march 2024 with data through 2021
+Model Performance Summary
+===================================
+Test Samples:             61,078
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.671
+RMSE:                     0.336
+MAE:                      0.178
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.679
+RMSE:                     0.205
+MAE:                      0.139
+
+
+predict march 2024 with data through 2022
+Model Performance Summary
+===================================
+Test Samples:             48,450
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.640
+RMSE:                     0.369
+MAE:                      0.204
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.715
+RMSE:                     0.224
+MAE:                      0.147
+
+
+predict march 2024
+Model Performance Summary
+===================================
+Test Samples:             33,727
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.578
+RMSE:                     0.456
+MAE:                      0.259
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.758
+RMSE:                     0.261
+MAE:                      0.155
+
+
+volume longer sma
+Model Performance Summary
+===================================
+Test Samples:             51,409
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.662
+RMSE:                     0.180
+MAE:                      0.106
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.769
+RMSE:                     0.120
+MAE:                      0.079
+
+
+even higher learning rate, add trees
+Model Performance Summary
+===================================
+Test Samples:             51,409
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.659
+RMSE:                     0.181
+MAE:                      0.107
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.768
+RMSE:                     0.120
+MAE:                      0.079
+
+
+Model Performance Summary
+===================================
+Test Samples:             51,409
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.659
+RMSE:                     0.181
+MAE:                      0.107
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.761
+RMSE:                     0.121
+MAE:                      0.081
+
+
+raise learning rate
+Model Performance Summary
+===================================
+Test Samples:             51,409
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.649
+RMSE:                     0.184
+MAE:                      0.110
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.741
+RMSE:                     0.126
+MAE:                      0.084
+
+
+dropping most timing aggregations
+Core Metrics
+-----------------------------------
+R² Score:                 0.645
+RMSE:                     0.185
+MAE:                      0.111
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.736
+RMSE:                     0.128
+MAE:                      0.085
+
+
+with price and volume
+Model Performance Summary
+===================================
+Test Samples:             51,409
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.641
+RMSE:                     0.186
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.737
+RMSE:                     0.128
+MAE:                      0.086
+
+
+with volume timing
+Model Performance Summary
+===================================
+Test Samples:             51,409
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.640
+RMSE:                     0.186
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.734
+RMSE:                     0.128
+MAE:                      0.086
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.001
+Standard Dev of Residuals:0.186
+95% Prediction Interval:  ±0.365
+
+
+Model Performance Summary
+===================================
+Test Samples:             51,409
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.638
+RMSE:                     0.186
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.730
+RMSE:                     0.129
+MAE:                      0.086
+
+
+
+add back timing features just prices
+Model Performance Summary
+===================================
+Test Samples:             51,409
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.638
+RMSE:                     0.186
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.730
+RMSE:                     0.129
+MAE:                      0.086
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.001
+Standard Dev of Residuals:0.186
+95% Prediction Interval:  ±0.366
+
+checkpoint 6 modeling june 24
+Model Performance Summary
+===================================
+Test Samples:             51,409
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.635
+RMSE:                     0.187
+MAE:                      0.111
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.720
+RMSE:                     0.132
+MAE:                      0.086
+
+
+
+checkpoint 5
+Model Performance Summary
+===================================
+Test Samples:             442
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.239
+RMSE:                     0.252
+MAE:                      0.208
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.001
+Standard Dev of Residuals:0.252
+95% Prediction Interval:  ±0.493
+
+Model Performance Summary
+===================================
+Test Samples:             53,868
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.612
+RMSE:                     0.238
+MAE:                      0.147
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.702
+RMSE:                     0.151
+MAE:                      0.086
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.000
+Standard Dev of Residuals:0.238
+95% Prediction Interval:  ±0.466
+
+
+checkpoint 4
+Model Performance Summary
+===================================
+Test Samples:             442
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.206
+RMSE:                     0.257
+MAE:                      0.211
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.005
+Standard Dev of Residuals:0.257
+95% Prediction Interval:  ±0.504
+
+
+Model Performance Summary
+===================================
+Test Samples:             59,156
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.647
+RMSE:                     0.225
+MAE:                      0.129
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.777
+RMSE:                     0.131
+MAE:                      0.075
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.000
+Standard Dev of Residuals:0.225
+95% Prediction Interval:  ±0.442
+
+
+checkpoint 3
+10 modeling balance
+Model Performance Summary
+===================================
+Test Samples:             55,894
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.659
+RMSE:                     0.224
+MAE:                      0.128
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.766
+RMSE:                     0.134
+MAE:                      0.076
+
+
+
+checkpoint 2 ablated
+Model Performance Summary
+===================================
+Test Samples:             53,868
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.656
+RMSE:                     0.224
+MAE:                      0.128
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.758
+RMSE:                     0.136
+MAE:                      0.077
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.000
+Standard Dev of Residuals:0.224
+95% Prediction Interval:  ±0.438
+
+
+checkpoint 1 cuttin em out
+Model Performance Summary
+===================================
+Test Samples:             53,868
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.642
+RMSE:                     0.228
+MAE:                      0.133
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.720
+RMSE:                     0.146
+MAE:                      0.084
+
+
+
+
 # dda 570 ablation analysis
 checkpoint 6 ready to merge
 Model Performance Summary
