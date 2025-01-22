@@ -18,6 +18,10 @@ wallets_config = WalletsConfig()
 
 
 
+# -----------------------------------
+# Main Interface Function
+# -----------------------------------
+
 @u.timing_decorator
 def calculate_performance_features(trading_features_df,
                                    include_twb_metrics: bool = True) -> pd.DataFrame:
@@ -78,6 +82,10 @@ def calculate_performance_features(trading_features_df,
 
 
 
+# ---------------------------------
+#         Helper Functions
+# ---------------------------------
+
 def calculate_profits_features(wallet_features_df: pd.DataFrame) -> pd.DataFrame:
     """
     Generates candidate profit profits_features for return calculations.
@@ -102,18 +110,8 @@ def calculate_profits_features(wallet_features_df: pd.DataFrame) -> pd.DataFrame
     profits_features_df['crypto_net_gain'] = wallet_features_df['crypto_net_gain']
     profits_features_df['crypto_net_flows'] = wallet_features_df['crypto_net_flows']
 
-    # DISABLED FEATURES
-    # -----------------------------------------------------
-    # profits_features_df['unrealized_gain'] = (
-    #     wallet_features_df['crypto_net_gain'] -
-    #     wallet_features_df['crypto_net_flows']
-    # )
-
-    # # Volume-based profits_features
-    # profits_features_df['buy_volume'] = wallet_features_df['crypto_inflows']
-    # profits_features_df['sell_volume'] = wallet_features_df['crypto_outflows']
-    # profits_features_df['total_volume'] = wallet_features_df['total_volume']
-    # profits_features_df['net_volume'] = profits_features_df['buy_volume'] - profits_features_df['sell_volume']
+    # # FeatureRemoval values found to be nonpredictive
+    # profits_features_df['crypto_net_cash_flows'] = wallet_features_df['crypto_net_cash_flows']
 
     # Verify no nulls produced
     null_check = profits_features_df.isnull().sum()
@@ -161,40 +159,15 @@ def calculate_balance_features(trading_features_df: pd.DataFrame,
 
     # Basic size features
     balance_features_df['max_investment'] = trading_features_df['max_investment']
+    balance_features_df['crypto_inflows'] = trading_features_df['crypto_inflows']
+
+    # # FeatureRemoval values found to be nonpredictive
+    # balance_features_df['crypto_cash_buys'] = trading_features_df['crypto_cash_buys']
 
     # Add twb metrics if configured to
     if include_twb_metrics:
         balance_features_df['twb'] = trading_features_df['time_weighted_balance']
         balance_features_df['active_twb'] = trading_features_df['active_time_weighted_balance']
-
-    # DISABLED FEATURES
-    # -----------------------------------------------------
-    # # Hybrid features combining size and activity
-    # balance_features_df['activity_weighted_balance'] = (
-    #     trading_features_df['time_weighted_balance'] *
-    #     trading_features_df['activity_density']
-    # )
-
-    # balance_features_df['transaction_weighted_balance'] = (
-    #     trading_features_df['time_weighted_balance'] *
-    #     np.log1p(trading_features_df['transaction_days'])
-    # )
-
-    # balance_features_df['velocity_weighted_balance'] = (
-    #     trading_features_df['time_weighted_balance'] *
-    #     trading_features_df['volume_vs_twb_ratio'].clip(0, 10)  # Cap extreme velocity
-    # )
-
-    # balance_features_df['sustained_exposure'] = (
-    #     trading_features_df['time_weighted_balance'] *
-    #     np.sqrt(trading_features_df['transaction_days'])
-    # )
-
-    # balance_features_df['turnover_exposure'] = (
-    #     trading_features_df['total_volume'] *
-    #     (trading_features_df['time_weighted_balance'] /
-    #      (trading_features_df['max_investment']
-    # )
 
     # Verify no nulls produced
     null_check = balance_features_df.isnull().sum()

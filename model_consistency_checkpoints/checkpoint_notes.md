@@ -1,3 +1,111 @@
+# dda 586 performance features
+checkpoint 6
+Model Performance Summary
+===================================
+Test Samples:             56,708
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.661
+RMSE:                     0.222
+MAE:                      0.115
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.796
+RMSE:                     0.120
+MAE:                      0.065
+
+checkpoint 5 with twb perf only
+Model Performance Summary
+===================================
+Test Samples:             56,708
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.660
+RMSE:                     0.222
+MAE:                      0.116
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.794
+RMSE:                     0.121
+MAE:                      0.065
+
+checkpoint 4 with twb
+Model Performance Summary
+===================================
+Test Samples:             56,708
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.657
+RMSE:                     0.223
+MAE:                      0.116
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.792
+RMSE:                     0.122
+MAE:                      0.066
+
+
+checkpoint 3 filter combinations of features
+Model Performance Summary
+===================================
+Test Samples:             56,708
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.655
+RMSE:                     0.224
+MAE:                      0.117
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.809
+RMSE:                     0.117
+MAE:                      0.061
+
+
+checkpoint 2 add crypto_inflows
+Model Performance Summary
+===================================
+Test Samples:             56,708
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.654
+RMSE:                     0.224
+MAE:                      0.117
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.808
+RMSE:                     0.117
+MAE:                      0.062
+
+
+
+checkpoint 1 grid search logic
+Model Performance Summary
+===================================
+Test Samples:             56,708
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.651
+RMSE:                     0.225
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.809
+RMSE:                     0.117
+MAE:                      0.062
+
+
 # dda 555 cash flows trading features
 checkpoint 7 remove pre-2023
 Model Performance Summary
