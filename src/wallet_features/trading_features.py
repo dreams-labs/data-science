@@ -55,18 +55,21 @@ def calculate_wallet_trading_features(
     """
     # Validate profits_df
     profits_df = profits_df.copy()
-    profits_df = ensure_index(profits_df, period_start_date, period_end_date)
+    profits_df = ensure_index(profits_df,
+                              period_start_date, period_end_date)
 
     # Calculate configured metrics
     # ----------------------------
     # Add crypto balance/transfers/gain helper columns
-    profits_df = calculate_crypto_balance_columns(profits_df, period_start_date)
+    profits_df = calculate_crypto_balance_columns(profits_df,
+                                                  period_start_date, period_end_date)
 
     # Calculate net_gain and max_investment columns
     gain_and_investment_df = calculate_gain_and_investment_columns(profits_df)
 
     # Calculated metrics that ignore imputed transactions
-    observed_activity_df = calculate_observed_activity_columns(profits_df,period_start_date,period_end_date)
+    observed_activity_df = calculate_observed_activity_columns(profits_df,
+                                                               period_start_date, period_end_date)
 
     # Merge together
     trading_features_df = gain_and_investment_df.join(observed_activity_df)
@@ -102,7 +105,8 @@ def calculate_wallet_trading_features(
 # -----------------------------------
 
 def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
-                                   period_start_date: str
+                                   period_start_date: str,
+                                   period_end_date: str,
                                    ) -> pd.DataFrame:
     """
     Adds crypto balance change columns using multiindex operations.
@@ -116,6 +120,7 @@ def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
     """
     profits_df['crypto_balance_change'] = profits_df['usd_net_transfers']
     profits_df = buy_crypto_start_balance(profits_df, period_start_date)
+    # profits_df = sell_crypto_end_balance(profits_df, period_end_date)
 
     # Use index-aware cumsum() since data is already sorted by (coin_id, wallet_address, date)
     profits_df['crypto_cumulative_transfers'] = (profits_df
@@ -147,6 +152,33 @@ def buy_crypto_start_balance(df: pd.DataFrame, period_start_date: str) -> pd.Dat
     idx = pd.IndexSlice
     start_slice = idx[:, :, starting_balance_date]
     df.loc[start_slice, 'crypto_balance_change'] = df.loc[start_slice, 'usd_balance']
+
+    return df
+
+
+
+def sell_crypto_end_balance(df: pd.DataFrame, period_end_date: str) -> pd.DataFrame:
+    """
+    Adjusts crypto_balance_change and sets usd_balance to 0 for the ending balance date.
+
+    Params:
+    - df (DataFrame): Input df with multiindex (coin_id, wallet_address, date).
+    - period_end_date (str): Period end in 'YYYY-MM-DD'.
+
+    Returns:
+    - df (DataFrame): DataFrame with adjusted crypto_balance_change and usd_balance.
+    """
+    ending_balance_date = datetime.strptime(period_end_date, '%Y-%m-%d')
+
+    # Use IndexSlice to efficiently select the ending balance date
+    idx = pd.IndexSlice
+    end_slice = idx[:, :, ending_balance_date]
+
+    # Update crypto_balance_change
+    df.loc[end_slice, 'crypto_balance_change'] = -1 * df.loc[end_slice, 'usd_balance']
+
+    # Set usd_balance to 0
+    df.loc[end_slice, 'usd_balance'] = 0
 
     return df
 
