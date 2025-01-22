@@ -3,6 +3,7 @@ Calculates metrics aggregated at the wallet-coin-date level
 """
 import logging
 import numpy as np
+import pandas as pd
 
 # Local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
@@ -41,7 +42,13 @@ def calculate_market_cap_features(profits_df, market_data_df):
     # Force fill market cap gaps
     filled_market_cap_df = force_fill_market_cap(market_data_df)
 
-    # Merge market cap data
+    # Confirm all market cap columns exist in the df
+    market_cap_cols = wallets_config['features']['market_cap_feature_columns']
+    missing_cols = [col for col in market_cap_cols if col not in filled_market_cap_df.columns]
+    if missing_cols:
+        raise ValueError(f"The following columns are missing from the DataFrame: {missing_cols}")
+
+    # Merge market cap data onto profits_df
     profits_market_cap_df = profits_df.merge(
         filled_market_cap_df[['date', 'coin_id', 'market_cap_imputed', 'market_cap_filled']],
         on=['date', 'coin_id'],
@@ -55,15 +62,22 @@ def calculate_market_cap_features(profits_df, market_data_df):
         raise ValueError(f"Missing coin_id-date pairs in market_cap_df:\n{missing_pairs}")
     profits_market_cap_df = profits_market_cap_df.drop(columns=['_merge'])
 
+    # Generate market cap features for all market cap columns
+    all_features = []
+    for col in market_cap_cols:
+        # Calculate both feature sets
+        balance_wtd = calculate_ending_balance_weighted_market_cap(profits_market_cap_df, col)
+        volume_wtd = calculate_volume_weighted_market_cap(profits_market_cap_df, col)
 
-    # Calculate ending balance weighted metrics
-    wallet_end_balance_wtd_mc_df = calculate_ending_balance_weighted_market_cap(profits_market_cap_df, 'market_cap_filled')
+        # Add suffix to identify source column
+        suffix = f"/{col}"
+        features_df = balance_wtd.join(volume_wtd, how='inner')
+        features_df = features_df.add_suffix(suffix)
 
-    # Calculate volume-weighted metrics using only real transfers
-    volume_wtd_df = calculate_volume_weighted_market_cap(profits_market_cap_df, 'market_cap_filled')
+        all_features.append(features_df)
 
-    # Merge into a wallet-indexed df of features
-    market_cap_features_df = wallet_end_balance_wtd_mc_df.join(volume_wtd_df, how='inner')
+    # Join all feature sets together
+    market_cap_features_df = pd.concat(all_features, axis=1)
 
     return market_cap_features_df
 
