@@ -1,4 +1,28 @@
 # dda 555 cash flows trading features
+checkpoint 5 add sells logic
+Model Performance Summary
+===================================
+Test Samples:             79,677
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.714
+RMSE:                     0.175
+MAE:                      0.086
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.623
+RMSE:                     0.136
+MAE:                      0.068
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.001
+Standard Dev of Residuals:0.175
+95% Prediction Interval:  ±0.343
+
+
 checkpoint 4
 Model Performance Summary
 ===================================
