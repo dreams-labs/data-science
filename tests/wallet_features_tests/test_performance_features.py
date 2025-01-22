@@ -40,17 +40,17 @@ wallets_config = WalletsConfig.load_from_yaml(config_path)
 
 
 def test_profits_features_calculation():
-    """Verify that crypto_net_gain and net_crypto_investment are correctly
+    """Verify that crypto_net_gain and crypto_net_flows are correctly
     calculated and preserved from input data"""
     mock_input = pd.DataFrame({
         'crypto_net_gain': [100, -50],
-        'net_crypto_investment': [80, -30],
-        'total_crypto_buys': [1000, 500],
-        'total_crypto_sells': [920, 530]
+        'crypto_net_flows': [80, -30],
+        'crypto_inflows': [1000, 500],
+        'crypto_outflows': [920, 530]
     })
     result = wpf.calculate_profits_features(mock_input)
     assert np.allclose(result['crypto_net_gain'], mock_input['crypto_net_gain'])
-    assert np.allclose(result['net_crypto_investment'], mock_input['net_crypto_investment'])
+    assert np.allclose(result['crypto_net_flows'], mock_input['crypto_net_flows'])
 
 
 def test_balance_features_core_metrics():

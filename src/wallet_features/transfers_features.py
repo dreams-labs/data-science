@@ -103,6 +103,7 @@ def retrieve_transfers_sequencing(hybridize_wallet_ids: bool) -> pd.DataFrame:
 def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df):
     """
     Retrieves facts about the wallet's transfer activity based on blockchain data.
+    Period boundaries are defined by the dates in profits_df through the inner join.
 
     Params:
         profits_df (df): the profits_df for the period that the features will reflect

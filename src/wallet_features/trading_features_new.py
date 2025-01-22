@@ -159,8 +159,7 @@ def buy_crypto_start_balance(df: pd.DataFrame, period_start_date: str) -> pd.Dat
 
 def sell_crypto_end_balance(df: pd.DataFrame, period_end_date: str) -> pd.DataFrame:
     """
-    Adjusts crypto_balance_change by subtracting usd_balance and sets usd_balance to 0
-    for the ending balance date.
+    Adjusts crypto_balance_change and sets usd_balance to 0 for the ending balance date.
 
     Params:
     - df (DataFrame): Input df with multiindex (coin_id, wallet_address, date).
@@ -175,8 +174,8 @@ def sell_crypto_end_balance(df: pd.DataFrame, period_end_date: str) -> pd.DataFr
     idx = pd.IndexSlice
     end_slice = idx[:, :, ending_balance_date]
 
-    # Adjust crypto_balance_change by subtracting usd_balance
-    df.loc[end_slice, 'crypto_balance_change'] -= df.loc[end_slice, 'usd_balance']
+    # Update crypto_balance_change
+    df.loc[end_slice, 'crypto_balance_change'] = -1 * df.loc[end_slice, 'usd_balance']
 
     # Set usd_balance to 0
     df.loc[end_slice, 'usd_balance'] = 0

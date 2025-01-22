@@ -29,6 +29,7 @@ wallets_features_config = yaml.safe_load(Path('../config/wallets_features_config
 #      Primary Orchestration Functions
 # ------------------------------------------
 
+@u.timing_decorator
 def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_sequencing_df,
                               wallet_cohort, period_start_date, period_end_date):
     """

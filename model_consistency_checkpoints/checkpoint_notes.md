@@ -1,3 +1,136 @@
+# dda 555 cash flows trading features
+checkpoint 7 remove pre-2023
+Model Performance Summary
+===================================
+Test Samples:             56,708
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.651
+RMSE:                     0.225
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.809
+RMSE:                     0.117
+MAE:                      0.062
+
+
+checkpoint 6 up to date
+Model Performance Summary
+===================================
+Test Samples:             79,677
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.714
+RMSE:                     0.175
+MAE:                      0.086
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.623
+RMSE:                     0.136
+MAE:                      0.068
+
+
+checkpoint 5 add sells logic
+Model Performance Summary
+===================================
+Test Samples:             79,677
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.714
+RMSE:                     0.175
+MAE:                      0.086
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.623
+RMSE:                     0.136
+MAE:                      0.068
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.001
+Standard Dev of Residuals:0.175
+95% Prediction Interval:  ±0.343
+
+
+checkpoint 4
+Model Performance Summary
+===================================
+Test Samples:             79,724
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.710
+RMSE:                     0.175
+MAE:                      0.086
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.657
+RMSE:                     0.130
+MAE:                      0.069
+
+
+checkpoint 3 more restructuring
+Model Performance Summary
+===================================
+Test Samples:             79,724
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.710
+RMSE:                     0.175
+MAE:                      0.086
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.657
+RMSE:                     0.130
+MAE:                      0.069
+
+checkpoint 2: restructuring in trading_features
+Model Performance Summary
+===================================
+Test Samples:             79,724
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.710
+RMSE:                     0.175
+MAE:                      0.086
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.657
+RMSE:                     0.130
+MAE:                      0.069
+
+
+checkpoint 1 working after rename cols
+Model Performance Summary
+===================================
+Test Samples:             79,724
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.710
+RMSE:                     0.175
+MAE:                      0.086
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.657
+RMSE:                     0.130
+MAE:                      0.069
+
+
+
 # dda 585 grid searchin
 checkpoint 3 good to move on
 Model Performance Summary

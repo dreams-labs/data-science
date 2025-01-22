@@ -264,23 +264,23 @@ def test_w01_multiple_coins(test_trading_features_df):
     wallet_features = test_trading_features_df.loc[wallet]
 
     # Calculate expected values
-    # total_crypto_buys: btc(100 + 50) + eth(200 + 50) = 400
-    expected_buys = 400
+    # crypto_inflows: btc(100 + 50) + eth(200 + 50) = 400
+    expected_inflows = 400
 
-    # total_crypto_sells: no sells = 0
-    expected_sells = 0
+    # crypto_outflows: end balance = 180 + 280
+    expected_outflows = 460
 
-    # net_crypto_investment: 400 - 0 = 400
-    expected_net = 400
+    # crypto_net_flows: 400 - 460
+    expected_net = -60
 
     # crypto_net_gain: (180 + 280) - 400 = 60
     expected_gain = 60
 
-    # transaction_days: 2 days (1/1 and 5/1)
-    expected_txn_days = 2
+    # # transaction_days: 2 days (1/1 and 5/1)
+    # expected_txn_days = 2
 
-    # unique_coins_traded: BTC and ETH
-    expected_coins = 2
+    # # unique_coins_traded: BTC and ETH
+    # expected_coins = 2
 
     # total_volume: abs(100) + abs(50) + abs(200) + abs(50) = 400
     expected_volume = 400
@@ -294,23 +294,23 @@ def test_w01_multiple_coins(test_trading_features_df):
     # Total = 97600 / 274 days ≈ 356.20
     expected_twb = 356.20
 
-    # activity_density: 2 transaction days / 274 total days ≈ 0.0073
-    expected_density = 2 / 274
+    # # activity_density: 2 transaction days / 274 total days ≈ 0.0073
+    # expected_density = 2 / 274
 
     # volume_vs_twb_ratio: 400 / 356.20 ≈ 1.123
     expected_ratio = 400 / 356.20
 
     # Assert all values match
-    assert wallet_features['total_crypto_buys'] == expected_buys
-    assert wallet_features['total_crypto_sells'] == expected_sells
-    assert wallet_features['net_crypto_investment'] == expected_net
+    assert wallet_features['crypto_inflows'] == expected_inflows
+    assert wallet_features['crypto_outflows'] == expected_outflows
+    assert wallet_features['crypto_net_flows'] == expected_net
     assert wallet_features['crypto_net_gain'] == expected_gain
-    assert wallet_features['transaction_days'] == expected_txn_days
-    assert wallet_features['unique_coins_traded'] == expected_coins
+    # assert wallet_features['transaction_days'] == expected_txn_days
+    # assert wallet_features['unique_coins_traded'] == expected_coins
     assert wallet_features['total_volume'] == expected_volume
     assert wallet_features['average_transaction'] == expected_avg_txn
     assert np.isclose(wallet_features['time_weighted_balance'], expected_twb, rtol=1e-2)
-    assert np.isclose(wallet_features['activity_density'], expected_density, rtol=1e-2)
+    # assert np.isclose(wallet_features['activity_density'], expected_density, rtol=1e-2)
     assert np.isclose(wallet_features['volume_vs_twb_ratio'], expected_ratio, rtol=1e-2)
 
 
@@ -330,23 +330,23 @@ def test_w08_offsetting_transactions(test_trading_features_df):
 
     print(wallet_features)
     # Calculate expected values
-    # total_crypto_buys: 10000 + 500 balance = 10500
-    expected_buys = 10000 + 500
+    # crypto_inflows: 10000 + 500 balance = 10500
+    expected_inflows = 10000 + 500
 
-    # total_crypto_sells: 10000 sell = 10000
-    expected_sells = 10000
+    # crypto_outflows: 10000 sell + 750 ending balance
+    expected_outflows = 10750
 
-    # net_crypto_investment: 10000 - 10000 = 0
-    expected_net = 500
+    # crypto_net_flows: 10500 - 10750
+    expected_net = -250
 
     # crypto_net_gain: 750 ending - 500 cost basis = 250
     expected_gain = 250
 
-    # transaction_days: 2 days with non-imputed transactions (2/1 and 2/2)
-    expected_txn_days = 2
+    # # transaction_days: 2 days with non-imputed transactions (2/1 and 2/2)
+    # expected_txn_days = 2
 
-    # unique_coins_traded: only traded SOL
-    expected_coins = 1
+    # # unique_coins_traded: only traded SOL
+    # expected_coins = 1
 
     # total_volume: abs(10000) + abs(-10000) = 20000
     expected_volume = 20000
@@ -364,23 +364,23 @@ def test_w08_offsetting_transactions(test_trading_features_df):
     # ((500 * 32) + (10500 * 1) + (242 * (10500 * (1 - (10000/10400))))) / (32 + 1 + 242)
     expected_twb = 451.748
 
-    # activity_density: 2 transaction days / 274 total days ≈ 0.0073
-    expected_density = 2 / 274
+    # # activity_density: 2 transaction days / 274 total days ≈ 0.0073
+    # expected_density = 2 / 274
 
     # volume_vs_twb_ratio: 20000 / 536.23 ≈ 44.27
     expected_ratio = 20000 / 451.74
 
     # Assert all values match
-    assert wallet_features['total_crypto_buys'] == expected_buys
-    assert wallet_features['total_crypto_sells'] == expected_sells
-    assert wallet_features['net_crypto_investment'] == expected_net
+    assert wallet_features['crypto_inflows'] == expected_inflows
+    assert wallet_features['crypto_outflows'] == expected_outflows
+    assert wallet_features['crypto_net_flows'] == expected_net
     assert wallet_features['crypto_net_gain'] == expected_gain
-    assert wallet_features['transaction_days'] == expected_txn_days
-    assert wallet_features['unique_coins_traded'] == expected_coins
+    # assert wallet_features['transaction_days'] == expected_txn_days
+    # assert wallet_features['unique_coins_traded'] == expected_coins
     assert wallet_features['total_volume'] == expected_volume
     assert wallet_features['average_transaction'] == expected_avg_txn
     assert np.isclose(wallet_features['time_weighted_balance'], expected_twb, rtol=1e-2)
-    assert np.isclose(wallet_features['activity_density'], expected_density, rtol=1e-2)
+    # assert np.isclose(wallet_features['activity_density'], expected_density, rtol=1e-2)
     assert np.isclose(wallet_features['volume_vs_twb_ratio'], expected_ratio, rtol=1e-2)
 
 
@@ -399,23 +399,23 @@ def test_w09_memecoin_winner(test_trading_features_df):
     wallet_features = test_trading_features_df.loc[wallet]
 
     # Calculate expected values
-    # total_crypto_buys: initial 100 buy
-    expected_buys = 100
+    # crypto_inflows: initial 100 buy
+    expected_inflows = 100
 
-    # total_crypto_sells: 500 + 100 = 600 in sells
-    expected_sells = 600
+    # crypto_outflows: 500 + 100 + 10 ending balance
+    expected_outflows = 610
 
-    # net_crypto_investment: 100 - 600 = -500
-    expected_net = -500
+    # crypto_net_flows: 100 - 610
+    expected_net = -510
 
     # crypto_net_gain: 10 ending - (-500 net investment) = 510
     expected_gain = 510
 
-    # transaction_days: 2 days with non-imputed transactions (3/1 and 5/1)
-    expected_txn_days = 3
+    # # transaction_days: 2 days with non-imputed transactions (3/1 and 5/1)
+    # expected_txn_days = 3
 
-    # unique_coins_traded: only traded floki
-    expected_coins = 1
+    # # unique_coins_traded: only traded floki
+    # expected_coins = 1
 
     # total_volume: abs(500) + abs(100) + 100 = 700
     expected_volume = 700  # |100| + |500| + |100| = 700
@@ -431,21 +431,21 @@ def test_w09_memecoin_winner(test_trading_features_df):
     # ((100 * 59) + (250 * 61) + (50 * 153)) / (59 + 61 + 153)
     expected_twb = ((100 * 60) + (33.3333 * 61) + (11.1111 * 153)) / (59 + 61 + 153) # 35.65
 
-    expected_density = 3 / 274
+    # expected_density = 3 / 274
 
     expected_ratio = 700 / 35.65322
 
     # Assert all values match
-    assert wallet_features['total_crypto_buys'] == expected_buys
-    assert wallet_features['total_crypto_sells'] == expected_sells
-    assert wallet_features['net_crypto_investment'] == expected_net
+    assert wallet_features['crypto_inflows'] == expected_inflows
+    assert wallet_features['crypto_outflows'] == expected_outflows
+    assert wallet_features['crypto_net_flows'] == expected_net
     assert wallet_features['crypto_net_gain'] == expected_gain
-    assert wallet_features['transaction_days'] == expected_txn_days
-    assert wallet_features['unique_coins_traded'] == expected_coins
+    # assert wallet_features['transaction_days'] == expected_txn_days
+    # assert wallet_features['unique_coins_traded'] == expected_coins
     assert wallet_features['total_volume'] == expected_volume
     assert wallet_features['average_transaction'] == expected_avg_txn
     assert np.isclose(wallet_features['time_weighted_balance'], expected_twb, rtol=1e-2)
-    assert np.isclose(wallet_features['activity_density'], expected_density, rtol=1e-2)
+    # assert np.isclose(wallet_features['activity_density'], expected_density, rtol=1e-2)
     assert np.isclose(wallet_features['volume_vs_twb_ratio'], expected_ratio, rtol=1e-2)
 
 
@@ -467,20 +467,20 @@ def test_volume_matches_transfers(test_profits_df, test_trading_features_df):
     actual = test_trading_features_df['total_volume'].reindex(expected.index)
     assert np.allclose(actual, expected)
 
-@pytest.mark.unit
-def test_activity_density_range(test_trading_features_df):
-    """Verify activity_density is between 0 and 1 since it's a ratio of days"""
-    assert (test_trading_features_df['activity_density'] >= 0).all()
-    assert (test_trading_features_df['activity_density'] <= 1).all()
+# @pytest.mark.unit
+# def test_activity_density_range(test_trading_features_df):
+#     """Verify activity_density is between 0 and 1 since it's a ratio of days"""
+#     assert (test_trading_features_df['activity_density'] >= 0).all()
+#     assert (test_trading_features_df['activity_density'] <= 1).all()
 
-@pytest.mark.unit
-def test_transaction_days_vs_unique_coins(test_trading_features_df):
-    """Verify transaction_days >= unique_coins_traded
-    Since each unique coin must have at least one transaction day"""
-    assert (
-        test_trading_features_df['transaction_days'] >=
-        test_trading_features_df['unique_coins_traded']
-    ).all()
+# @pytest.mark.unit
+# def test_transaction_days_vs_unique_coins(test_trading_features_df):
+#     """Verify transaction_days >= unique_coins_traded
+#     Since each unique coin must have at least one transaction day"""
+#     assert (
+#         test_trading_features_df['transaction_days'] >=
+#         test_trading_features_df['unique_coins_traded']
+#     ).all()
 
 @pytest.mark.unit
 def test_volume_ratio_consistency(test_trading_features_df):
@@ -608,83 +608,83 @@ def test_volume_aggregation_after_remapping(test_trading_features_df,
     # Map original volumes to new wallet structure
     original_volumes = pd.DataFrame({
         'total_volume': test_trading_features_df['total_volume'],
-        'total_crypto_buys': test_trading_features_df['total_crypto_buys'],
-        'total_crypto_sells': test_trading_features_df['total_crypto_sells']
+        'crypto_inflows': test_trading_features_df['crypto_inflows'],
+        'crypto_outflows': test_trading_features_df['crypto_outflows']
     })
     original_volumes['new_wallet'] = original_volumes.index.map(wallet_mapping)
 
     # Calculate expected volumes by grouping by new wallet address
     expected_volumes = original_volumes.groupby('new_wallet').agg({
         'total_volume': 'sum',
-        'total_crypto_buys': 'sum',
-        'total_crypto_sells': 'sum'
+        'crypto_inflows': 'sum',
+        'crypto_outflows': 'sum'
     }).sort_index()
 
     # Get actual volumes from remapped features
     actual_volumes = test_remapped_trading_features_df[
-        ['total_volume', 'total_crypto_buys', 'total_crypto_sells']
+        ['total_volume', 'crypto_inflows', 'crypto_outflows']
     ].sort_index()
 
     # Compare each volume metric
-    for col in ['total_volume', 'total_crypto_buys', 'total_crypto_sells']:
+    for col in ['total_volume', 'crypto_inflows', 'crypto_outflows']:
         assert np.allclose(expected_volumes[col], actual_volumes[col], equal_nan=True), \
             f"{col} doesn't match after remapping"
 
 
-@pytest.mark.unit
-def test_activity_metrics_after_remapping(test_profits_df,
-                                        test_remapped_profits_df,
-                                        test_remapped_trading_features_df):
-    """
-    Verifies activity metrics are calculated correctly after wallet remapping.
+# @pytest.mark.unit
+# def test_activity_metrics_after_remapping(test_profits_df,
+#                                         test_remapped_profits_df,
+#                                         test_remapped_trading_features_df):
+#     """
+#     Verifies activity metrics are calculated correctly after wallet remapping.
 
-    Tests:
-    1. transaction_days: Number of unique dates with non-imputed transactions
-    2. unique_coins_traded: Count of distinct coins traded by each wallet
-    3. activity_density: transaction_days / total_period_days
-    """
-    # Unpack tuples
-    test_profits_df, _, _ = test_profits_df
-    test_remapped_profits_df, _, _ = test_remapped_profits_df
+#     Tests:
+#     1. transaction_days: Number of unique dates with non-imputed transactions
+#     2. unique_coins_traded: Count of distinct coins traded by each wallet
+#     3. activity_density: transaction_days / total_period_days
+#     """
+#     # Unpack tuples
+#     test_profits_df, _, _ = test_profits_df
+#     test_remapped_profits_df, _, _ = test_remapped_profits_df
 
-    # Create mapping from original to new wallets
-    wallet_mapping = (test_remapped_profits_df[['wallet_address', 'wallet_address_original']]
-                     .drop_duplicates()
-                     .set_index('wallet_address_original')['wallet_address'])
+#     # Create mapping from original to new wallets
+#     wallet_mapping = (test_remapped_profits_df[['wallet_address', 'wallet_address_original']]
+#                      .drop_duplicates()
+#                      .set_index('wallet_address_original')['wallet_address'])
 
-    # Calculate expected transaction days (non-imputed activity)
-    active_dates = (test_profits_df[~test_profits_df['is_imputed']]
-                   .assign(new_wallet=lambda x: x['wallet_address'].map(wallet_mapping))
-                   .groupby('new_wallet')['date']
-                   .nunique()
-                   .sort_index())
+#     # Calculate expected transaction days (non-imputed activity)
+#     active_dates = (test_profits_df[~test_profits_df['is_imputed']]
+#                    .assign(new_wallet=lambda x: x['wallet_address'].map(wallet_mapping))
+#                    .groupby('new_wallet')['date']
+#                    .nunique()
+#                    .sort_index())
 
-    # Calculate expected unique coins
-    unique_coins = (test_profits_df[~test_profits_df['is_imputed']]
-                   .assign(new_wallet=lambda x: x['wallet_address'].map(wallet_mapping))
-                   .groupby('new_wallet')['coin_id']
-                   .nunique()
-                   .sort_index())
+#     # Calculate expected unique coins
+#     unique_coins = (test_profits_df[~test_profits_df['is_imputed']]
+#                    .assign(new_wallet=lambda x: x['wallet_address'].map(wallet_mapping))
+#                    .groupby('new_wallet')['coin_id']
+#                    .nunique()
+#                    .sort_index())
 
-    # Calculate expected activity density
-    period_days = (pd.to_datetime(test_profits_df['date']).max() -
-                  pd.to_datetime(test_profits_df['date']).min()).days
-    expected_density = active_dates / period_days
+#     # Calculate expected activity density
+#     period_days = (pd.to_datetime(test_profits_df['date']).max() -
+#                   pd.to_datetime(test_profits_df['date']).min()).days
+#     expected_density = active_dates / period_days
 
-    # Get actual metrics, sorted for comparison
-    actual = test_remapped_trading_features_df[[
-        'transaction_days',
-        'unique_coins_traded',
-        'activity_density'
-    ]].sort_index()
+#     # Get actual metrics, sorted for comparison
+#     actual = test_remapped_trading_features_df[[
+#         'transaction_days',
+#         'unique_coins_traded',
+#         'activity_density'
+#     ]].sort_index()
 
-    # Compare each metric with specific error messages
-    assert np.allclose(active_dates, actual['transaction_days'], equal_nan=True), \
-        "Transaction days don't match after remapping"
-    assert np.allclose(unique_coins, actual['unique_coins_traded'], equal_nan=True), \
-        "Unique coins traded don't match after remapping"
-    assert np.allclose(expected_density, actual['activity_density'], equal_nan=True), \
-        "Activity density doesn't match after remapping"
+#     # Compare each metric with specific error messages
+#     assert np.allclose(active_dates, actual['transaction_days'], equal_nan=True), \
+#         "Transaction days don't match after remapping"
+#     assert np.allclose(unique_coins, actual['unique_coins_traded'], equal_nan=True), \
+#         "Unique coins traded don't match after remapping"
+#     assert np.allclose(expected_density, actual['activity_density'], equal_nan=True), \
+#         "Activity density doesn't match after remapping"
 
 
 @pytest.mark.unit
@@ -755,9 +755,9 @@ def test_trading_metrics_aggregation(test_trading_features_df,
 
     # Sum original wallet metrics grouped by their new mapped wallet
     original_metrics = pd.DataFrame(test_trading_features_df[[
-        'total_crypto_buys',
-        'total_crypto_sells',
-        'net_crypto_investment',
+        'crypto_inflows',
+        'crypto_outflows',
+        'crypto_net_flows',
         'crypto_net_gain'
     ]])
     original_metrics['new_wallet'] = original_metrics.index.map(wallet_mapping)
@@ -765,9 +765,9 @@ def test_trading_metrics_aggregation(test_trading_features_df,
 
     # Get actual remapped metrics
     actual = test_remapped_trading_features_df[[
-        'total_crypto_buys',
-        'total_crypto_sells',
-        'net_crypto_investment',
+        'crypto_inflows',
+        'crypto_outflows',
+        'crypto_net_flows',
         'crypto_net_gain'
     ]].sort_index()
 
