@@ -169,35 +169,6 @@ def calculate_balance_features(trading_features_df: pd.DataFrame,
         balance_features_df['twb'] = trading_features_df['time_weighted_balance']
         balance_features_df['active_twb'] = trading_features_df['active_time_weighted_balance']
 
-    # DISABLED FEATURES
-    # -----------------------------------------------------
-    # # Hybrid features combining size and activity
-    # balance_features_df['activity_weighted_balance'] = (
-    #     trading_features_df['time_weighted_balance'] *
-    #     trading_features_df['activity_density']
-    # )
-
-    # balance_features_df['transaction_weighted_balance'] = (
-    #     trading_features_df['time_weighted_balance'] *
-    #     np.log1p(trading_features_df['transaction_days'])
-    # )
-
-    # balance_features_df['velocity_weighted_balance'] = (
-    #     trading_features_df['time_weighted_balance'] *
-    #     trading_features_df['volume_vs_twb_ratio'].clip(0, 10)  # Cap extreme velocity
-    # )
-
-    # balance_features_df['sustained_exposure'] = (
-    #     trading_features_df['time_weighted_balance'] *
-    #     np.sqrt(trading_features_df['transaction_days'])
-    # )
-
-    # balance_features_df['turnover_exposure'] = (
-    #     trading_features_df['total_volume'] *
-    #     (trading_features_df['time_weighted_balance'] /
-    #      (trading_features_df['max_investment']
-    # )
-
     # Verify no nulls produced
     null_check = balance_features_df.isnull().sum()
     if null_check.any():

@@ -119,11 +119,12 @@ modeling:
             # 'performance|*',
             # 'performance|*/max_investment/*',
             # 'performance|*/crypto_inflows/*',
-            'performance|crypto_net_cash_flows/*',
             # 'performance|*/twb/*',
             # 'performance|*/active_twb/*',
+            'performance|crypto_net_cash_flows/*',
             'performance|crypto_net_gain/crypto_inflows/*',
-
+            'performance|crypto_net_gain/twb/*',
+            'performance|crypto_net_gain/active_twb/*',
             'performance|*/log|*',
             'performance|*/ntile_rank|*',
 
@@ -197,14 +198,16 @@ modeling:
     grid_search_params:
 
         # Turn On or Off
+        # -------------------------------
         # enabled: True # whether to grid search
-        build_post_search_model: False  # whether to build a model after the grid search
+
 
         # Search Methodology
         n_iter: 50  # random search limit
         scoring: 'neg_root_mean_squared_error'
         n_splits: 3  # cv splits
         verbose_level: 3  # scikit-learn verbosity
+        build_post_search_model: False  # whether to build a model after the grid search
 
         # Target variables
         target_variables: [
@@ -267,6 +270,7 @@ modeling:
                 # ['timing|*/*_21/*'],
                 # ['timing|*/*_50/*'],
                 # ['timing|*'],
+
                 # ['performance|crypto_net_gain/*'],
                 # ['performance|crypto_net_flows/*'],
                 # ['performance|crypto_net_cash_flows/*'],
@@ -275,7 +279,10 @@ modeling:
                 # ['performance|*/max_investment/*'],
                 # ['performance|*/crypto_inflows/*'],
                 # ['performance|crypto_net_gain/crypto_cash_buys/*'],
-                # ['performance|crypto_net_flows/crypto_inflows/*'],
+                # ['performance|crypto_net_gain/twb/*'],
+                # ['performance|crypto_net_gain/active_twb/*'],
+                # ['performance|crypto_net_flows/active_twb/*'],
+                # ['performance|crypto_net_flows/twb/*'],
                 # ['performance|crypto_net_flows/crypto_cash_buys/*'],
                 # ['performance|crypto_net_cash_flows/crypto_inflows/*'],
                 # ['performance|crypto_net_cash_flows/crypto_cash_buys/*'],
@@ -304,6 +311,7 @@ modeling:
                 # ['trading|active_time_weighted_balance|*'],
 
                 # ['mktcap|*'],
+
                 # ['transfers|*'],
                 # ['transfers|avg_buyer_number|*'],
                 # ['transfers|median_buyer_number|*'],
