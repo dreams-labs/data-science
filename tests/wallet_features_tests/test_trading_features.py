@@ -575,8 +575,147 @@ def test_calculate_time_weighted_returns_weighted_periods():
     assert abs(result.loc['wallet_a', 'annualized_twr'] - expected_annual) < 0.01
 
 
+@pytest.mark.unit
+def test_calculate_time_weighted_returns_w02_net_loss(test_profits_df):
+    """
+    Tests TWR calculation for w02_net_loss with a single coin and net losses.
+    """
+    profits_df, _, _ = test_profits_df
+
+    # Filter data for w02_net_loss
+    w02_data = profits_df[profits_df['wallet_address'] == 'w02_net_loss']
+
+    # BTC Calculation
+    # Period 1: Jan 1 - May 1 (120 days)
+    # Pre-transfer balance = 250 - (-100) = 350
+    # Period return = 350 / 300 ≈ 1.1667
+    # Weighted return = 0.1667 * 120 ≈ 20
+
+    # Period 2: May 1 - Oct 1 (153 days)
+    # Period return = 100 / 250 = 0.4
+    # Weighted return = -0.6 * 153 = -91.8
+
+    # Total weighted return = 20 - 91.8 = -71.8
+    # Total days = 120 + 153 = 273
+    # Time-weighted return = -71.8 / 273 ≈ -0.263
+
+    time_weighted_return = -71.8 / 274
+
+    # Annualized return
+    # Annualized TWR = ((1 + TWR) ** (365 / 273)) - 1
+    annualized_twr = ((1 + time_weighted_return) ** (365 / 274)) - 1
+
+    # Calculate TWR using the function
+    result = wtf.calculate_time_weighted_returns(w02_data)
+
+    # Assertions
+    assert result.loc['w02_net_loss', 'days_held'] == 274
+    assert abs(result.loc['w02_net_loss', 'time_weighted_return'] - time_weighted_return) < 0.001
+    assert abs(result.loc['w02_net_loss', 'annualized_twr'] - annualized_twr) < 0.001
 
 
+@pytest.mark.unit
+def test_calculate_time_weighted_returns_w01_btc(test_profits_df):
+    """
+    Tests TWR calculation for w01_multiple_coins (BTC only).
+    """
+    profits_df, _, _ = test_profits_df
+
+    # Filter data for w01_multiple_coins (BTC only)
+    btc_data = profits_df[
+        (profits_df['wallet_address'] == 'w01_multiple_coins') &
+        (profits_df['coin_id'] == 'btc')
+    ]
+
+    # Manual Calculation
+    # Period 1: Jan 1 - May 1 (121 days, inclusive)
+    # Pre-transfer balance = 120 - 50 = 70
+    # Previous balance = 100
+    # Period return = 70 / 100 = 0.7
+    # Weighted return = (0.7 - 1) * 121 = -36.3
+
+    # Period 2: May 2 - Oct 1 (153 days, inclusive)
+    # Pre-transfer balance = 180 (no transfer on Oct 1)
+    # Previous balance = 120
+    # Period return = 180 / 120 = 1.5
+    # Weighted return = (1.5 - 1) * 153 = 76.5
+
+    # Total weighted return = -36.3 + 76.5 = 40.2
+    # Total days = 121 + 153 = 274
+    # Time-weighted return = 40.2 / 274 ≈ 0.1467
+
+    total_days = 121 + 153  # 274
+    period_1_return = (70 / 100) - 1  # -0.3
+    period_1_weighted_return = period_1_return * 121  # -36.3
+
+    period_2_return = (180 / 120) - 1  # 0.5
+    period_2_weighted_return = period_2_return * 153  # 76.5
+
+    total_weighted_return = period_1_weighted_return + period_2_weighted_return  # -36.3 + 76.5 = 40.2
+    time_weighted_return = total_weighted_return / total_days  # 40.2 / 274 ≈ 0.1467
+
+    # Annualized return
+    annualized_twr = ((1 + time_weighted_return) ** (365 / total_days)) - 1
+
+    # Run the function
+    result = wtf.calculate_time_weighted_returns(btc_data)
+
+    # Assertions
+    assert result.loc['w01_multiple_coins', 'days_held'] == total_days
+    assert abs(result.loc['w01_multiple_coins', 'time_weighted_return'] - time_weighted_return) < 0.001
+    assert abs(result.loc['w01_multiple_coins', 'annualized_twr'] - annualized_twr) < 0.001
+
+
+@pytest.mark.unit
+def test_calculate_time_weighted_returns_w01_eth(test_profits_df):
+    """
+    Tests TWR calculation for w01_multiple_coins (ETH only).
+    """
+    profits_df, _, _ = test_profits_df
+
+    # Filter data for w01_multiple_coins (ETH only)
+    eth_data = profits_df[
+        (profits_df['wallet_address'] == 'w01_multiple_coins') &
+        (profits_df['coin_id'] == 'eth')
+    ]
+
+    # Manual Calculation
+    # Period 1: Jan 1 - May 1 (121 days, inclusive)
+    # Pre-transfer balance = 300 - 50 = 250
+    # Previous balance = 200
+    # Period return = 250 / 200 = 1.25
+    # Weighted return = (1.25 - 1) * 121 = 30.25
+
+    # Period 2: May 2 - Oct 1 (153 days, inclusive)
+    # Pre-transfer balance = 280 (no transfer on Oct 1)
+    # Previous balance = 300
+    # Period return = 280 / 300 = 0.9333
+    # Weighted return = (0.9333 - 1) * 153 ≈ -10.22
+
+    # Total weighted return = 30.25 - 10.22 = 20.03
+    # Total days = 121 + 153 = 274
+    # Time-weighted return = 20.03 / 274 ≈ 0.0731
+
+    total_days = 121 + 153  # 274
+    period_1_return = (250 / 200) - 1  # 0.25
+    period_1_weighted_return = period_1_return * 121  # 30.25
+
+    period_2_return = (280 / 300) - 1  # -0.0667
+    period_2_weighted_return = period_2_return * 153  # ≈ -10.22
+
+    total_weighted_return = period_1_weighted_return + period_2_weighted_return  # 30.25 - 10.22 = 20.03
+    time_weighted_return = total_weighted_return / total_days  # 20.03 / 274 ≈ 0.0731
+
+    # Annualized return
+    annualized_twr = ((1 + time_weighted_return) ** (365 / total_days)) - 1
+
+    # Run the function
+    result = wtf.calculate_time_weighted_returns(eth_data)
+
+    # Assertions
+    assert result.loc['w01_multiple_coins', 'days_held'] == total_days
+    assert abs(result.loc['w01_multiple_coins', 'time_weighted_return'] - time_weighted_return) < 0.001
+    assert abs(result.loc['w01_multiple_coins', 'annualized_twr'] - annualized_twr) < 0.001
 
 
 
