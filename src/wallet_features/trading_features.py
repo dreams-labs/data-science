@@ -270,7 +270,7 @@ def calculate_observed_activity_columns(profits_df: pd.DataFrame,
     # Calculate unique counts from index_frame in single operation
     unique_counts = index_frame.groupby('wallet_address').agg(
         unique_coins_traded=('coin_id', 'nunique'),
-        # # FeatureRemoval due to no predictiveness
+        # FeatureRemoval due to no predictiveness
         # transaction_days=('date', 'nunique')
     )
 
@@ -383,6 +383,7 @@ def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
     Returns:
     - DataFrame with cost basis for each wallet-coin-date
     """
+    logger.info('a')
     df = profits_df.copy()
 
     # Calculate opening balance before transfers
@@ -395,6 +396,7 @@ def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
         0
     ).astype('float64')
 
+    logger.info('b')
     # Track new cost basis from buys
     df['cost_basis_bought'] = np.where(
         df['crypto_balance_change'] > 0,
@@ -404,6 +406,7 @@ def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
 
     # Pre-sort the DataFrame to simplify iteration
     df = df.sort_values(['wallet_address', 'coin_id', 'date']).reset_index(drop=True)
+    logger.info('c')
 
     # Initialize an array for the cost basis
     crypto_cost_basis = np.zeros(len(df))
@@ -412,6 +415,7 @@ def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
     current_wallet_coin = None
     cumulative_cost_basis = 0
 
+    logger.info('d')
     for i in range(len(df)):
         wallet_coin = (df.at[i, 'wallet_address'], df.at[i, 'coin_id'])
 
@@ -427,6 +431,7 @@ def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
         )
         crypto_cost_basis[i] = cumulative_cost_basis
 
+    logger.info('e')
     # Assign the calculated values back to the DataFrame
     df['crypto_cost_basis'] = crypto_cost_basis
 
@@ -436,6 +441,7 @@ def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
     if len(profits_df) != len(result_df):
         raise ValueError('Record count mismatch')
 
+    logger.info('f')
     return result_df
 
 
