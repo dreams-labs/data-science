@@ -345,8 +345,8 @@ def test_w08_offsetting_transactions(test_trading_features_df):
     # # transaction_days: 2 days with non-imputed transactions (2/1 and 2/2)
     # expected_txn_days = 2
 
-    # # unique_coins_traded: only traded SOL
-    # expected_coins = 1
+    # unique_coins_traded: only traded SOL
+    expected_coins = 1
 
     # total_volume: abs(10000) + abs(-10000) = 20000
     expected_volume = 20000
@@ -376,7 +376,7 @@ def test_w08_offsetting_transactions(test_trading_features_df):
     assert wallet_features['crypto_net_flows'] == expected_net
     assert wallet_features['crypto_net_gain'] == expected_gain
     # assert wallet_features['transaction_days'] == expected_txn_days
-    # assert wallet_features['unique_coins_traded'] == expected_coins
+    assert wallet_features['unique_coins_traded'] == expected_coins
     assert wallet_features['total_volume'] == expected_volume
     assert wallet_features['average_transaction'] == expected_avg_txn
     assert np.isclose(wallet_features['time_weighted_balance'], expected_twb, rtol=1e-2)
@@ -414,8 +414,8 @@ def test_w09_memecoin_winner(test_trading_features_df):
     # # transaction_days: 2 days with non-imputed transactions (3/1 and 5/1)
     # expected_txn_days = 3
 
-    # # unique_coins_traded: only traded floki
-    # expected_coins = 1
+    # unique_coins_traded: only traded floki
+    expected_coins = 1
 
     # total_volume: abs(500) + abs(100) + 100 = 700
     expected_volume = 700  # |100| + |500| + |100| = 700
@@ -441,7 +441,7 @@ def test_w09_memecoin_winner(test_trading_features_df):
     assert wallet_features['crypto_net_flows'] == expected_net
     assert wallet_features['crypto_net_gain'] == expected_gain
     # assert wallet_features['transaction_days'] == expected_txn_days
-    # assert wallet_features['unique_coins_traded'] == expected_coins
+    assert wallet_features['unique_coins_traded'] == expected_coins
     assert wallet_features['total_volume'] == expected_volume
     assert wallet_features['average_transaction'] == expected_avg_txn
     assert np.isclose(wallet_features['time_weighted_balance'], expected_twb, rtol=1e-2)
@@ -467,6 +467,7 @@ def test_volume_matches_transfers(test_profits_df, test_trading_features_df):
     actual = test_trading_features_df['total_volume'].reindex(expected.index)
     assert np.allclose(actual, expected)
 
+# FeatureRemoval due to nonpredictiveness
 # @pytest.mark.unit
 # def test_activity_density_range(test_trading_features_df):
 #     """Verify activity_density is between 0 and 1 since it's a ratio of days"""
@@ -501,6 +502,80 @@ def test_average_transaction_bounds(test_trading_features_df):
         test_trading_features_df['average_transaction'] <=
         test_trading_features_df['total_volume']
     ).all()
+
+
+
+# ------------------------------------------------- #
+# calculate_time_weighted_returns() unit tests
+# ------------------------------------------------- #
+
+@pytest.mark.unit
+def test_calculate_time_weighted_returns_imputed_case():
+    """Tests TWR calculation for a wallet with only imputed balances."""
+
+    # Setup test data
+    test_data = pd.DataFrame([
+        {'coin_id': 'btc', 'wallet_address': 'wallet_a', 'date': '2024-01-01',
+         'usd_balance': 50, 'usd_net_transfers': 0, 'is_imputed': True},
+        {'coin_id': 'btc', 'wallet_address': 'wallet_a', 'date': '2024-10-01',
+         'usd_balance': 70, 'usd_net_transfers': 0, 'is_imputed': True},
+    ])
+    test_data['date'] = pd.to_datetime(test_data['date'])
+
+    # Calculate TWR
+    result = wtf.calculate_time_weighted_returns(test_data)
+
+    # Expected values
+    expected_twr = 0.40  # (70-50)/50 = 0.4
+    expected_days = 274  # Jan 1 to Oct 1
+    expected_annual = ((1 + 0.40) ** (365/274)) - 1  # ≈ 0.55
+
+    # Assertions with tolerance for floating point
+    assert abs(result.loc['wallet_a', 'time_weighted_return'] - expected_twr) < 0.001
+    assert result.loc['wallet_a', 'days_held'] == expected_days
+    assert abs(result.loc['wallet_a', 'annualized_twr'] - expected_annual) < 0.001
+
+
+@pytest.mark.unit
+def test_calculate_time_weighted_returns_weighted_periods():
+    """Tests TWR calculation with different holding periods, amounts, and a transfer."""
+
+    test_data = pd.DataFrame([
+        {'coin_id': 'eth', 'wallet_address': 'wallet_a', 'date': '2024-01-01',
+            'usd_balance': 100, 'usd_net_transfers': 100, 'is_imputed': False},  # Initial $100
+        {'coin_id': 'eth', 'wallet_address': 'wallet_a', 'date': '2024-02-01',
+            'usd_balance': 250, 'usd_net_transfers': 50, 'is_imputed': False},    # Added $50, value up
+        {'coin_id': 'eth', 'wallet_address': 'wallet_a', 'date': '2024-10-01',
+            'usd_balance': 125, 'usd_net_transfers': 0, 'is_imputed': True}     # Value dropped
+    ])
+
+    test_data['date'] = pd.to_datetime(test_data['date'])
+    result = wtf.calculate_time_weighted_returns(test_data)
+
+    # Manual calculation:
+    # Period 1: Jan 1 - Feb 1 (31 days)
+    # Pre-transfer balance = 250 - 50 = 200
+    # Return = 200/100 = 100% = 1.0
+    # Weighted return = 1.0 * 31 = 31
+
+    # Period 2: Feb 1 - Oct 1 (243 days)
+    # Return = 125/250 = -50% = -0.5
+    # Weighted return = -0.5 * 243 = -121.5
+
+    # Total days = 274
+    # Time weighted return = (31 - 121.5) / 274 = -0.33
+    expected_twr = -0.33
+
+    # Annualized = (1 - 0.33)^(365/274) - 1 ≈ -0.41
+    expected_annual = ((1 + expected_twr) ** (365/274)) - 1
+
+    # Assertions
+    assert result.loc['wallet_a', 'days_held'] == 274
+    assert abs(result.loc['wallet_a', 'time_weighted_return'] - expected_twr) < 0.01
+    assert abs(result.loc['wallet_a', 'annualized_twr'] - expected_annual) < 0.01
+
+
+
 
 
 
@@ -631,6 +706,7 @@ def test_volume_aggregation_after_remapping(test_trading_features_df,
             f"{col} doesn't match after remapping"
 
 
+# FeatureRemoval due to nonpredictiveness
 # @pytest.mark.unit
 # def test_activity_metrics_after_remapping(test_profits_df,
 #                                         test_remapped_profits_df,
