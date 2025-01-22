@@ -92,8 +92,7 @@ features:
     # Market Timing Params
     market_cap_feature_columns: [  # which columns to generate market cap features with
         'market_cap_filled',
-        'market_cap_imputed',
-        'market_cap'
+        'market_cap_unadj'
     ]
 
 
@@ -124,7 +123,6 @@ modeling:
             # 'performance|*/crypto_inflows/*',
             # 'performance|*/twb/*',
             # 'performance|*/active_twb/*',
-            'performance|crypto_net_cash_flows/*',
             'performance|crypto_net_gain/crypto_inflows/*',
             'performance|crypto_net_gain/twb/*',
             'performance|crypto_net_gain/active_twb/*',
@@ -149,7 +147,6 @@ modeling:
             'trading|active_time_weighted_balance|*',
 
             # 'mktcap|*',
-            'mktcap|*/market_cap_imputed|*',
             # 'mktcap|end_portfolio_wtd_market_cap/market_cap|*',
 
             # 'transfers|*',

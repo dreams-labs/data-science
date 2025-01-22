@@ -35,10 +35,8 @@ def calculate_market_cap_features(profits_df, market_data_df):
     Returns:
     - market_cap_features_df (DataFrame): Market cap features indexed on wallet_address
     """
-    # Identify columns to make features with
+    # 1. Identify relevant columns and modify dfs as needed
     market_cap_cols = wallets_config['features']['market_cap_feature_columns']
-
-    # Copy dfs
     profits_df = profits_df.copy()
     market_data_df = market_data_df.copy()
 
@@ -46,18 +44,22 @@ def calculate_market_cap_features(profits_df, market_data_df):
     if 'market_cap_filled' in market_cap_cols and 'market_cap_filled' not in market_data_df.columns:
         market_data_df = force_fill_market_cap(market_data_df)
 
+    # Alias the base column if applicable
+    if 'market_cap_unadj' in market_cap_cols:
+        market_data_df['market_cap_unadj'] = market_data_df['market_cap']
+
     # Confirm all market cap columns exist in the df
     missing_cols = [col for col in market_cap_cols if col not in market_data_df.columns]
     if missing_cols:
         raise ValueError(f"The following columns are missing from the DataFrame: {missing_cols}")
 
-    # Merge market cap data onto profits_df
+
+    # 2. Merge market cap data onto profits_df
     profits_market_cap_df = profits_df.merge(
         market_data_df[['date', 'coin_id'] + market_cap_cols],
         on=['date', 'coin_id'],
         how='left',
-        indicator=True
-    )
+        indicator=True)
 
     # Confirm all pairs matched
     missing_pairs = profits_market_cap_df[profits_market_cap_df['_merge'] == 'left_only'][['coin_id', 'date']]
@@ -65,7 +67,8 @@ def calculate_market_cap_features(profits_df, market_data_df):
         raise ValueError(f"Missing coin_id-date pairs in market_cap_df:\n{missing_pairs}")
     profits_market_cap_df = profits_market_cap_df.drop(columns=['_merge'])
 
-    # Generate market cap features for all market cap columns
+
+    # 3. Generate market cap features for all market cap columns
     all_features = []
     for col in market_cap_cols:
         # Calculate both feature sets
