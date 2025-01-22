@@ -1,3 +1,22 @@
+# dda 589 twb indexify
+checkpoint 1
+Model Performance Summary
+===================================
+Test Samples:             56,708
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.661
+RMSE:                     0.222
+MAE:                      0.115
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.796
+RMSE:                     0.120
+MAE:                      0.065
+
+
 # dda 586 performance features
 checkpoint 6
 Model Performance Summary
