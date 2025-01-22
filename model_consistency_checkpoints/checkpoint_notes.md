@@ -1,4 +1,22 @@
 # dda 555 cash flows trading features
+checkpoint 7 remove pre-2023
+Model Performance Summary
+===================================
+Test Samples:             56,708
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.651
+RMSE:                     0.225
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.809
+RMSE:                     0.117
+MAE:                      0.062
+
+
 checkpoint 6 up to date
 Model Performance Summary
 ===================================
