@@ -221,9 +221,10 @@ def generate_training_features(
     wallet_training_data_df_full.to_parquet(f"{parquet_folder}/wallet_training_data_df_full_unclustered.parquet", index=True)  # pylint:disable=line-too-long
 
     # Generate clusters
-    training_cluster_features_df = wcl.create_kmeans_cluster_features(wallet_training_data_df_full)
-    training_cluster_features_df = training_cluster_features_df.add_prefix('cluster|')
-    wallet_training_data_df_full = wallet_training_data_df_full.join(training_cluster_features_df, how='inner')
+    if 'clustering_n_clusters' in wallets_config.get('features', {}):
+        training_cluster_features_df = wcl.create_kmeans_cluster_features(wallet_training_data_df_full)
+        training_cluster_features_df = training_cluster_features_df.add_prefix('cluster|')
+        wallet_training_data_df_full = wallet_training_data_df_full.join(training_cluster_features_df, how='inner')
 
     # Verify cohort integrity
     missing_wallets = set(wallet_cohort) - set(wallet_training_data_df_full.index)
