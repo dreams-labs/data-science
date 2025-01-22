@@ -199,7 +199,7 @@ modeling:
 
         # Turn On or Off
         # -------------------------------
-        enabled: True # whether to grid search
+        # enabled: True # whether to grid search
         # -------------------------------
 
 

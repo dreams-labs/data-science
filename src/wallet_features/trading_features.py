@@ -77,8 +77,6 @@ def calculate_wallet_trading_features(
     # Add twb if configured to do so
     if include_twb_metrics:
 
-        profits_df.reset_index(inplace=True)
-
         # Calculate time weighted balance using the cost basis
         time_weighted_df = aggregate_time_weighted_balance(profits_df)
 
@@ -303,6 +301,9 @@ def aggregate_time_weighted_balance(profits_df: pd.DataFrame) -> pd.DataFrame:
 
     # Calculate cost basis for each wallet-coin pair and merge into main dataframe
     cost_basis_df = get_cost_basis_df(profits_df)
+
+    profits_df.reset_index(inplace=True)
+
     profits_df = profits_df.merge(
         cost_basis_df,
         on=['wallet_address', 'coin_id', 'date'],
@@ -384,6 +385,8 @@ def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
     - DataFrame with cost basis for each wallet-coin-date
     """
     logger.info('a')
+    if not profits_df.index.is_monotonic_increasing:
+        raise ValueError("profits_df index should be sorted")
     df = profits_df.copy()
 
     # Calculate opening balance before transfers
@@ -405,7 +408,7 @@ def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
     ).astype('float64')
 
     # Pre-sort the DataFrame to simplify iteration
-    df = df.sort_values(['wallet_address', 'coin_id', 'date']).reset_index(drop=True)
+    # df = df.sort_values(['wallet_address', 'coin_id', 'date']).reset_index(drop=True)
     logger.info('c')
 
     # Initialize an array for the cost basis
@@ -415,7 +418,8 @@ def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
     current_wallet_coin = None
     cumulative_cost_basis = 0
 
-    logger.info('d')
+    df.reset_index(inplace=True)
+
     for i in range(len(df)):
         wallet_coin = (df.at[i, 'wallet_address'], df.at[i, 'coin_id'])
 
