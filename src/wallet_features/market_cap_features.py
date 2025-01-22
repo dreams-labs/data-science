@@ -35,22 +35,25 @@ def calculate_market_cap_features(profits_df, market_data_df):
     Returns:
     - market_cap_features_df (DataFrame): Market cap features indexed on wallet_address
     """
+    # Identify columns to make features with
+    market_cap_cols = wallets_config['features']['market_cap_feature_columns']
+
     # Copy dfs
     profits_df = profits_df.copy()
     market_data_df = market_data_df.copy()
 
-    # Force fill market cap gaps
-    filled_market_cap_df = force_fill_market_cap(market_data_df)
+    # Force fill market cap gaps if applicable
+    if 'market_cap_filled' in market_cap_cols and 'market_cap_filled' not in market_data_df.columns:
+        market_data_df = force_fill_market_cap(market_data_df)
 
     # Confirm all market cap columns exist in the df
-    market_cap_cols = wallets_config['features']['market_cap_feature_columns']
-    missing_cols = [col for col in market_cap_cols if col not in filled_market_cap_df.columns]
+    missing_cols = [col for col in market_cap_cols if col not in market_data_df.columns]
     if missing_cols:
         raise ValueError(f"The following columns are missing from the DataFrame: {missing_cols}")
 
     # Merge market cap data onto profits_df
     profits_market_cap_df = profits_df.merge(
-        filled_market_cap_df[['date', 'coin_id', 'market_cap_imputed', 'market_cap_filled']],
+        market_data_df[['date', 'coin_id'] + market_cap_cols],
         on=['date', 'coin_id'],
         how='left',
         indicator=True

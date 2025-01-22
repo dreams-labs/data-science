@@ -91,7 +91,9 @@ features:
 
     # Market Timing Params
     market_cap_feature_columns: [  # which columns to generate market cap features with
-        'market_cap_filled'
+        'market_cap_filled',
+        'market_cap_imputed',
+        'market_cap'
     ]
 
 
@@ -147,6 +149,8 @@ modeling:
             'trading|active_time_weighted_balance|*',
 
             # 'mktcap|*',
+            'mktcap|*/market_cap_imputed|*',
+            # 'mktcap|end_portfolio_wtd_market_cap/market_cap|*',
 
             # 'transfers|*',
 
@@ -293,7 +297,7 @@ modeling:
                 # ['performance|*/winsorized|*'],
                 # ['performance|*/log|*'],
                 # ['performance|*/rank|*'],
-                ['performance|*/ntile_rank|*'],
+                # ['performance|*/ntile_rank|*'],
 
                 # ['trading|*'],
                 # ['trading|crypto_net_gain|*'],
@@ -313,6 +317,13 @@ modeling:
                 # ['trading|active_time_weighted_balance|*'],
 
                 # ['mktcap|*'],
+                # ['mktcap|end_portfolio_wtd_market_cap/market_cap_filled|*'],
+                # ['mktcap|volume_wtd_market_cap/market_cap_filled|*'],
+                # ['mktcap|end_portfolio_wtd_market_cap/market_cap|*'],
+                # ['mktcap|volume_wtd_market_cap/market_cap|*'],
+                # ['mktcap|*/market_cap_filled|*'],
+                # ['mktcap|*/market_cap_imputed|*'],
+                # ['mktcap|*/market_cap|*'],
 
                 # ['transfers|*'],
                 # ['transfers|avg_buyer_number|*'],

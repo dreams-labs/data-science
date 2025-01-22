@@ -1,4 +1,22 @@
 # dda 465 market cap features
+checkpoint 4 tested with features
+Model Performance Summary
+===================================
+Test Samples:             56,708
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.668
+RMSE:                     0.219
+MAE:                      0.114
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.812
+RMSE:                     0.116
+MAE:                      0.062
+
+
 checkpoint 3 loop is working
 Model Performance Summary
 ===================================
