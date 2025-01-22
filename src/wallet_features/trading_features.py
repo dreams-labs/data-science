@@ -248,10 +248,18 @@ def calculate_observed_activity_columns(profits_df: pd.DataFrame,
     observed_profits_df = profits_df.loc[~profits_df['is_imputed']].copy()
     observed_profits_df['abs_balance_change'] = observed_profits_df['usd_net_transfers'].abs()
 
+    # Add buy/sell columns
+    balance_changes = profits_df['usd_net_transfers']
+    profits_df['positive_changes'] = balance_changes.clip(lower=0)
+    profits_df['negative_changes'] = (-balance_changes).clip(lower=0)
+
     # Combine metrics in a single groupby where possible
     metrics_df = observed_profits_df.groupby(level='wallet_address', observed=True).agg(
         total_volume=('abs_balance_change', 'sum'),
-        average_transaction=('abs_balance_change', 'mean')
+        average_transaction=('abs_balance_change', 'mean'),
+        crypto_cash_buys=('positive_changes', 'sum'),
+        crypto_cash_sells=('negative_changes', 'sum'),
+        crypto_net_cash_flows=('crypto_balance_change', 'sum'),
     )
     observed_activity_df = metrics_df
 

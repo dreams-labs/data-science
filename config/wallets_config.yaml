@@ -131,6 +131,9 @@ modeling:
             'trading|max_investment|*',
             'trading|crypto_net_flows|*',
             'trading|crypto_outflows|*',
+            'trading|crypto_net_cash_flows|*',
+            'trading|crypto_cash_sells|*',
+            'trading|crypto_cash_buys|*',
 
             # 'mktcap|*',
 
@@ -271,6 +274,10 @@ modeling:
                 # ['trading|max_investment|*'],
                 # ['trading|crypto_net_flows|*'],
                 # ['trading|crypto_outflows|*'],
+                ['trading|crypto_net_cash_flows|*'],
+                ['trading|crypto_cash_sells|*'],
+                ['trading|crypto_cash_buys|*'],
+
                 # ['mktcap|*'],
                 # ['transfers|*'],
                 # ['transfers|avg_buyer_number|*'],
