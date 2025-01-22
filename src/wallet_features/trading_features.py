@@ -247,28 +247,31 @@ def calculate_observed_activity_columns(profits_df: pd.DataFrame,
     observed_profits_df = profits_df.loc[~profits_df['is_imputed']].copy()
     observed_profits_df['abs_balance_change'] = observed_profits_df['crypto_balance_change'].abs()
 
-    # Extract index levels once
-    index_frame = observed_profits_df.index.to_frame(index=False)
-
     # Combine metrics in a single groupby where possible
     metrics_df = observed_profits_df.groupby(level='wallet_address', observed=True).agg(
         total_volume=('abs_balance_change', 'sum'),
         average_transaction=('abs_balance_change', 'mean')
     )
+    observed_activity_df = metrics_df
+
+    # Extract index levels once
+    index_frame = observed_profits_df.index.to_frame(index=False)
 
     # Calculate unique counts from index_frame in single operation
     unique_counts = index_frame.groupby('wallet_address').agg(
         unique_coins_traded=('coin_id', 'nunique'),
-        transaction_days=('date', 'nunique')
+        # # FeatureRemoval due to no predictiveness
+        # transaction_days=('date', 'nunique')
     )
 
-    # Combine metrics
-    observed_activity_df = metrics_df.join(unique_counts)
+    # # Combine metrics
+    observed_activity_df = observed_activity_df.join(unique_counts)
 
-    # Add activity density
-    period_duration = (datetime.strptime(period_end_date, '%Y-%m-%d') -
-                      datetime.strptime(period_start_date, '%Y-%m-%d')).days + 1
-    observed_activity_df['activity_density'] = observed_activity_df['transaction_days'] / period_duration
+    # FeatureRemoval due to no predictiveness
+    # # Add activity density
+    # period_duration = (datetime.strptime(period_end_date, '%Y-%m-%d') -
+    #                   datetime.strptime(period_start_date, '%Y-%m-%d')).days + 1
+    # observed_activity_df['activity_density'] = observed_activity_df['transaction_days'] / period_duration
 
     return observed_activity_df
 
