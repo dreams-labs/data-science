@@ -1,4 +1,22 @@
 # dda 465 market cap features
+checkpoint 2 add colname param
+Model Performance Summary
+===================================
+Test Samples:             56,708
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.655
+RMSE:                     0.224
+MAE:                      0.117
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.809
+RMSE:                     0.117
+MAE:                      0.061
+
+
 checkpoint 1 remove twb
 Model Performance Summary
 ===================================

@@ -60,7 +60,7 @@ def calculate_market_cap_features(profits_df, market_data_df):
     wallet_end_balance_wtd_mc_df = calculate_ending_balance_weighted_market_cap(profits_market_cap_df, 'market_cap_filled')
 
     # Calculate volume-weighted metrics using only real transfers
-    volume_wtd_df = calculate_volume_weighted_market_cap(profits_market_cap_df)
+    volume_wtd_df = calculate_volume_weighted_market_cap(profits_market_cap_df, 'market_cap_filled')
 
     # Merge into a wallet-indexed df of features
     market_cap_features_df = wallet_end_balance_wtd_mc_df.join(volume_wtd_df, how='inner')
@@ -99,13 +99,14 @@ def force_fill_market_cap(market_data_df):
     return market_data_df
 
 
-def calculate_volume_weighted_market_cap(profits_market_features_df):
+def calculate_volume_weighted_market_cap(profits_market_features_df, market_cap_column):
     """
     Calculate volume-weighted average market cap for each wallet address.
     If volume is 0 for all records of a wallet, uses simple average instead.
 
     Parameters:
-    - profits_market_features_df (df): DataFrame containing wallet_address, volume, and market_cap_filled
+    - profits_market_features_df (df): DataFrame containing wallet_address, volume, and market_cap_column
+    - market_cap_column (str): the column with market cap data in it
 
     Returns:
     pandas.DataFrame: DataFrame with wallet addresses and column 'volume_wtd_market_cap'
@@ -113,11 +114,14 @@ def calculate_volume_weighted_market_cap(profits_market_features_df):
     # Create a copy to avoid modifying original
     df_calc = profits_market_features_df.copy()
 
+    # Remove any records of coins that do not have market cap data available
+    df_calc = df_calc.dropna(subset=[market_cap_column])
+
     # Volume is equal to absolute value of USD transfers
     df_calc['volume'] = abs(df_calc['usd_net_transfers'])
 
     # Multiply volume by mc for weighted average calculations
-    df_calc['market_cap_volume'] = df_calc['volume'] * df_calc['market_cap_filled']
+    df_calc['market_cap_volume'] = df_calc['volume'] * df_calc[market_cap_column]
 
 
     # Calculate each wallet's total ending crypto balance and market cap dollars

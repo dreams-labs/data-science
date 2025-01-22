@@ -89,9 +89,10 @@ features:
     offset_winsorization: 0.02 # comparisons between metrics and their offset values will be winsorized by this amount
     timing_metrics_min_transaction_size: 20  # trades below this USD threshold will not be evaluated for market timing peformance or transfers buyer sequencing
 
-    # Feature Selection
-    feature_selection:
-
+    # Market Timing Params
+    market_cap_feature_columns: [  # which columns to generate market cap features with
+        'market_cap_filled'
+    ]
 
 
 # CheckpointValidation
