@@ -148,6 +148,7 @@ class BaseModel:
                     (X_test_transformed, self.y_test)]
 
         # Fit final regressor with transformed data
+        logger.info(f"Training model using data with shape: {X_train_transformed.shape}...")
         regressor.fit(
             X_train_transformed,
             self.y_train,
