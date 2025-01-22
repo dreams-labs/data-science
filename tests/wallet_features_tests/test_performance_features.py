@@ -197,6 +197,3 @@ def test_transform_performance_ratios(sample_performance_features_df, monkeypatc
             expected_ntile_rank.values,
             equal_nan=True
         )
-
-
-
