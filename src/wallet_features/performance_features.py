@@ -109,6 +109,8 @@ def calculate_profits_features(wallet_features_df: pd.DataFrame) -> pd.DataFrame
     # Primary gain profits_features
     profits_features_df['crypto_net_gain'] = wallet_features_df['crypto_net_gain']
     profits_features_df['crypto_net_flows'] = wallet_features_df['crypto_net_flows']
+
+    # # FeatureRemoval values found to be nonpredictive
     # profits_features_df['crypto_net_cash_flows'] = wallet_features_df['crypto_net_cash_flows']
 
     # Verify no nulls produced

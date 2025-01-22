@@ -73,7 +73,7 @@ data_cleaning:
 # WalletModel Features
 features:
     # Trading Params
-    include_twb_metrics: False
+    include_twb_metrics: True
 
     # Performance Params
     returns_winsorization: 0.01
@@ -119,8 +119,11 @@ modeling:
             # 'performance|*',
             # 'performance|*/max_investment/*',
             # 'performance|*/crypto_inflows/*',
-            'performance|*/crypto_cash_buys/*',
+            'performance|crypto_net_cash_flows/*',
+            # 'performance|*/twb/*',
+            # 'performance|*/active_twb/*',
             'performance|crypto_net_gain/crypto_inflows/*',
+
             'performance|*/log|*',
             'performance|*/ntile_rank|*',
 
@@ -138,6 +141,8 @@ modeling:
             'trading|crypto_net_cash_flows|*',
             'trading|crypto_cash_sells|*',
             'trading|crypto_cash_buys|*',
+            'trading|time_weighted_balance|*',
+            'trading|active_time_weighted_balance|*',
 
             # 'mktcap|*',
 
@@ -264,18 +269,23 @@ modeling:
                 # ['timing|*'],
                 # ['performance|crypto_net_gain/*'],
                 # ['performance|crypto_net_flows/*'],
+                # ['performance|crypto_net_cash_flows/*'],
+                # ['performance|*/twb/*'],
+                # ['performance|*/active_twb/*'],
                 # ['performance|*/max_investment/*'],
                 # ['performance|*/crypto_inflows/*'],
-                # ['performance|crypto_net_gain/crypto_inflows/*'],
-                ['performance|crypto_net_gain/crypto_cash_buys/*'],
-                ['performance|crypto_net_flows/crypto_inflows/*'],
-                ['performance|crypto_net_flows/crypto_cash_buys/*'],
+                # ['performance|crypto_net_gain/crypto_cash_buys/*'],
+                # ['performance|crypto_net_flows/crypto_inflows/*'],
+                # ['performance|crypto_net_flows/crypto_cash_buys/*'],
+                # ['performance|crypto_net_cash_flows/crypto_inflows/*'],
+                # ['performance|crypto_net_cash_flows/crypto_cash_buys/*'],
                 # ['performance|*/crypto_cash_buys/*'],
                 # ['performance|*/base|*'],
                 # ['performance|*/winsorized|*'],
                 # ['performance|*/log|*'],
                 # ['performance|*/rank|*'],
                 # ['performance|*/ntile_rank|*'],
+
                 # ['trading|*'],
                 # ['trading|crypto_net_gain|*'],
                 # ['trading|unique_coins_traded|*'],
@@ -290,6 +300,8 @@ modeling:
                 # ['trading|crypto_net_cash_flows|*'],
                 # ['trading|crypto_cash_sells|*'],
                 # ['trading|crypto_cash_buys|*'],
+                # ['trading|time_weighted_balance|*'],
+                # ['trading|active_time_weighted_balance|*'],
 
                 # ['mktcap|*'],
                 # ['transfers|*'],

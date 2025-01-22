@@ -1,4 +1,40 @@
 # dda 586 performance features
+checkpoint 5 with twb perf only
+Model Performance Summary
+===================================
+Test Samples:             56,708
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.660
+RMSE:                     0.222
+MAE:                      0.116
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.794
+RMSE:                     0.121
+MAE:                      0.065
+
+
+checkpoint 4 with twb
+Model Performance Summary
+===================================
+Test Samples:             56,708
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.657
+RMSE:                     0.223
+MAE:                      0.116
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.792
+RMSE:                     0.122
+MAE:                      0.066
+
+
 checkpoint 3 filter combinations of features
 Model Performance Summary
 ===================================
