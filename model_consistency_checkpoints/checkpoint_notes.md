@@ -1,3 +1,23 @@
+# dda 590 add feature counts
+checkpoint 1 all set
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       275
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.671
+RMSE:                     0.219
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.812
+RMSE:                     0.116
+MAE:                      0.062
+
+
 # dda 465 market cap features
 checkpoint 6 base params
 Model Performance Summary

@@ -195,7 +195,8 @@ class RegressionEvaluator:
             "=" * 35,
         ]
 
-        # Add sample sizes
+        # Add sample sizes and feature count
+        n_features = len(self.feature_names) if self.feature_names is not None else 0
         if hasattr(self.metrics, 'total_cohort_samples'):
             summary.extend([
                 f"Training Cohort:          {self.metrics['total_cohort_samples']:,d}",
@@ -206,6 +207,7 @@ class RegressionEvaluator:
         else:
             summary.extend([
                 f"Test Samples:             {self.metrics['test_samples']:,d}",
+                f"Number of Features:       {n_features:,d}",
                 ""
             ])
 
@@ -230,14 +232,14 @@ class RegressionEvaluator:
                 ""
             ])
 
-        # Add residuals analysis
-        summary.extend([
-            "Residuals Analysis",
-            "-" * 35,
-            f"Mean of Residuals:        {self.metrics['residuals_mean']:.3f}",
-            f"Standard Dev of Residuals:{self.metrics['residuals_std']:.3f}",
-            f"95% Prediction Interval:  ±{self.metrics['prediction_interval_95']:.3f}"
-        ])
+        # # Add residuals analysis
+        # summary.extend([
+        #     "Residuals Analysis",
+        #     "-" * 35,
+        #     f"Mean of Residuals:        {self.metrics['residuals_mean']:.3f}",
+        #     f"Standard Dev of Residuals:{self.metrics['residuals_std']:.3f}",
+        #     f"95% Prediction Interval:  ±{self.metrics['prediction_interval_95']:.3f}"
+        # ])
 
         return "\n".join(summary)
 
