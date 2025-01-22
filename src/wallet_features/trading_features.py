@@ -384,7 +384,7 @@ def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
     Returns:
     - DataFrame with cost basis for each wallet-coin-date
     """
-    logger.info('a')
+    # Confirm index is sorted
     if not profits_df.index.is_monotonic_increasing:
         raise ValueError("profits_df index should be sorted")
     df = profits_df.copy()
@@ -399,17 +399,12 @@ def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
         0
     ).astype('float64')
 
-    logger.info('b')
     # Track new cost basis from buys
     df['cost_basis_bought'] = np.where(
         df['crypto_balance_change'] > 0,
         df['crypto_balance_change'],
         0
     ).astype('float64')
-
-    # Pre-sort the DataFrame to simplify iteration
-    # df = df.sort_values(['wallet_address', 'coin_id', 'date']).reset_index(drop=True)
-    logger.info('c')
 
     # Initialize an array for the cost basis
     crypto_cost_basis = np.zeros(len(df))
@@ -418,8 +413,8 @@ def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
     current_wallet_coin = None
     cumulative_cost_basis = 0
 
+    # TO DO: convert rest of function to use index calculations
     df.reset_index(inplace=True)
-
     for i in range(len(df)):
         wallet_coin = (df.at[i, 'wallet_address'], df.at[i, 'coin_id'])
 
@@ -435,7 +430,6 @@ def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
         )
         crypto_cost_basis[i] = cumulative_cost_basis
 
-    logger.info('e')
     # Assign the calculated values back to the DataFrame
     df['crypto_cost_basis'] = crypto_cost_basis
 
@@ -445,7 +439,6 @@ def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
     if len(profits_df) != len(result_df):
         raise ValueError('Record count mismatch')
 
-    logger.info('f')
     return result_df
 
 
