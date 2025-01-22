@@ -245,7 +245,7 @@ def calculate_observed_activity_columns(profits_df: pd.DataFrame,
     """
     # Filter and add absolute changes
     observed_profits_df = profits_df.loc[~profits_df['is_imputed']].copy()
-    observed_profits_df['abs_balance_change'] = observed_profits_df['crypto_balance_change'].abs()
+    observed_profits_df['abs_balance_change'] = observed_profits_df['usd_net_transfers'].abs()
 
     # Combine metrics in a single groupby where possible
     metrics_df = observed_profits_df.groupby(level='wallet_address', observed=True).agg(
