@@ -230,6 +230,7 @@ def calculate_gain_and_investment_columns(profits_df: pd.DataFrame) -> pd.DataFr
 
 
 
+# pylint:disable=unused-argument  # params were used for FeatureRemoval features
 def calculate_observed_activity_columns(profits_df: pd.DataFrame,
                                     period_start_date: str,
                                     period_end_date: str) -> pd.DataFrame:
