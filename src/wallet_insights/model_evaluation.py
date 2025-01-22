@@ -390,7 +390,7 @@ class RegressionEvaluator:
         sns.kdeplot(data=self.y_pred, ax=ax,
                    label='Modeling Cohort (pred)', color='#69c4ff')
         sns.kdeplot(data=self.training_cohort_pred, ax=ax,
-                   label='Training Cohort (pred)', color='#ff6969')
+                   label='Inactive Wallets (pred)', color='#ff6969')
         sns.kdeplot(data=self.training_cohort_actuals, ax=ax,
                    label='Actual Values', color='#69ff69')
 
