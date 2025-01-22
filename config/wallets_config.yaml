@@ -77,7 +77,7 @@ features:
 
     # Performance Params
     returns_winsorization: 0.01
-    ranking_ntiles: 4
+    ranking_ntiles: 2
 
     # Clustering Params
     clustering_n_components: 25
@@ -199,7 +199,8 @@ modeling:
 
         # Turn On or Off
         # -------------------------------
-        # enabled: True # whether to grid search
+        enabled: True # whether to grid search
+        # -------------------------------
 
 
         # Search Methodology
@@ -291,7 +292,7 @@ modeling:
                 # ['performance|*/winsorized|*'],
                 # ['performance|*/log|*'],
                 # ['performance|*/rank|*'],
-                # ['performance|*/ntile_rank|*'],
+                ['performance|*/ntile_rank|*'],
 
                 # ['trading|*'],
                 # ['trading|crypto_net_gain|*'],
