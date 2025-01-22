@@ -136,6 +136,11 @@ class WalletModel(BaseModel):
         self._prepare_data(training_data_df, modeling_cohort_target_var_df)
         result = super().construct_base_model(return_data)
 
+        # If grid search is run and doesn't request a model, don't make predictions
+        if self.modeling_config.get('grid_search_params', {}).get('enabled') is True and \
+        self.modeling_config.get('grid_search_params', {}).get('build_post_search_model') is False:
+            return result
+
         # Add wallet-specific predictions if requested
         if return_data:
             training_cohort_pred = self._predict_training_cohort()

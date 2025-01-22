@@ -189,11 +189,12 @@ modeling:
 
         # Turn On or Off
         # enabled: True # whether to grid search
+        build_post_search_model: False  # whether to build a model after the grid search
 
         # Search Methodology
         n_iter: 50  # random search limit
         scoring: 'neg_root_mean_squared_error'
-        n_splits: 3  # cv splits
+        n_splits: 2  # cv splits
         verbose_level: 3  # scikit-learn verbosity
 
         # Target variables
@@ -258,6 +259,8 @@ modeling:
                 # ['timing|*/*_21/*'],
                 # ['timing|*/*_50/*'],
                 # ['timing|*'],
+                # ['performance|crypto_net_gain/*'],
+                # ['performance|crypto_net_flows/*'],
                 # ['performance|*/base|*'],
                 # ['performance|*/winsorized|*'],
                 # ['performance|*/log|*'],
@@ -278,7 +281,7 @@ modeling:
                 # ['trading|crypto_cash_sells|*'],
                 # ['trading|crypto_cash_buys|*'],
 
-                # ['mktcap|*'],
+                ['mktcap|*'],
                 # ['transfers|*'],
                 # ['transfers|avg_buyer_number|*'],
                 # ['transfers|median_buyer_number|*'],
