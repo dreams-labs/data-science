@@ -232,14 +232,14 @@ class RegressionEvaluator:
                 ""
             ])
 
-        # # Add residuals analysis
-        # summary.extend([
-        #     "Residuals Analysis",
-        #     "-" * 35,
-        #     f"Mean of Residuals:        {self.metrics['residuals_mean']:.3f}",
-        #     f"Standard Dev of Residuals:{self.metrics['residuals_std']:.3f}",
-        #     f"95% Prediction Interval:  ±{self.metrics['prediction_interval_95']:.3f}"
-        # ])
+        # Add residuals analysis
+        summary.extend([
+            "Residuals Analysis",
+            "-" * 35,
+            f"Mean of Residuals:        {self.metrics['residuals_mean']:.3f}",
+            f"Standard Dev of Residuals:{self.metrics['residuals_std']:.3f}",
+            f"95% Prediction Interval:  ±{self.metrics['prediction_interval_95']:.3f}"
+        ])
 
         return "\n".join(summary)
 
