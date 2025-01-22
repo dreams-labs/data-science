@@ -1,4 +1,41 @@
 # dda 586 performance features
+checkpoint 3 filter combinations of features
+Model Performance Summary
+===================================
+Test Samples:             56,708
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.655
+RMSE:                     0.224
+MAE:                      0.117
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.809
+RMSE:                     0.117
+MAE:                      0.061
+
+
+checkpoint 2 add crypto_inflows
+Model Performance Summary
+===================================
+Test Samples:             56,708
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.654
+RMSE:                     0.224
+MAE:                      0.117
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.808
+RMSE:                     0.117
+MAE:                      0.062
+
+
+
 checkpoint 1 grid search logic
 Model Performance Summary
 ===================================

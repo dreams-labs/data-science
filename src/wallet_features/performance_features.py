@@ -18,6 +18,10 @@ wallets_config = WalletsConfig()
 
 
 
+# -----------------------------------
+# Main Interface Function
+# -----------------------------------
+
 @u.timing_decorator
 def calculate_performance_features(trading_features_df,
                                    include_twb_metrics: bool = True) -> pd.DataFrame:
@@ -78,6 +82,10 @@ def calculate_performance_features(trading_features_df,
 
 
 
+# ---------------------------------
+#         Helper Functions
+# ---------------------------------
+
 def calculate_profits_features(wallet_features_df: pd.DataFrame) -> pd.DataFrame:
     """
     Generates candidate profit profits_features for return calculations.
@@ -102,19 +110,6 @@ def calculate_profits_features(wallet_features_df: pd.DataFrame) -> pd.DataFrame
     profits_features_df['crypto_net_gain'] = wallet_features_df['crypto_net_gain']
     profits_features_df['crypto_net_flows'] = wallet_features_df['crypto_net_flows']
     # profits_features_df['crypto_net_cash_flows'] = wallet_features_df['crypto_net_cash_flows']
-
-    # DISABLED FEATURES
-    # -----------------------------------------------------
-    # profits_features_df['unrealized_gain'] = (
-    #     wallet_features_df['crypto_net_gain'] -
-    #     wallet_features_df['crypto_net_flows']
-    # )
-
-    # # Volume-based profits_features
-    # profits_features_df['buy_volume'] = wallet_features_df['crypto_inflows']
-    # profits_features_df['sell_volume'] = wallet_features_df['crypto_outflows']
-    # profits_features_df['total_volume'] = wallet_features_df['total_volume']
-    # profits_features_df['net_volume'] = profits_features_df['buy_volume'] - profits_features_df['sell_volume']
 
     # Verify no nulls produced
     null_check = profits_features_df.isnull().sum()
@@ -162,7 +157,9 @@ def calculate_balance_features(trading_features_df: pd.DataFrame,
 
     # Basic size features
     balance_features_df['max_investment'] = trading_features_df['max_investment']
-    # balance_features_df['crypto_inflows'] = trading_features_df['crypto_inflows']
+    balance_features_df['crypto_inflows'] = trading_features_df['crypto_inflows']
+
+    # # FeatureRemoval values found to be nonpredictive
     # balance_features_df['crypto_cash_buys'] = trading_features_df['crypto_cash_buys']
 
     # Add twb metrics if configured to

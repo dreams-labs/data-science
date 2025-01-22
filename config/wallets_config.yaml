@@ -117,6 +117,10 @@ modeling:
             'timing|*/sell_weighted*',
 
             # 'performance|*',
+            # 'performance|*/max_investment/*',
+            # 'performance|*/crypto_inflows/*',
+            'performance|*/crypto_cash_buys/*',
+            'performance|crypto_net_gain/crypto_inflows/*',
             'performance|*/log|*',
             'performance|*/ntile_rank|*',
 
@@ -194,7 +198,7 @@ modeling:
         # Search Methodology
         n_iter: 50  # random search limit
         scoring: 'neg_root_mean_squared_error'
-        n_splits: 2  # cv splits
+        n_splits: 3  # cv splits
         verbose_level: 3  # scikit-learn verbosity
 
         # Target variables
@@ -202,7 +206,6 @@ modeling:
             "crypto_net_gain/max_investment/winsorized",
             # "crypto_net_gain/max_investment/ntile_rank",
         ]
-
 
         # Params
         param_grid:
@@ -261,6 +264,13 @@ modeling:
                 # ['timing|*'],
                 # ['performance|crypto_net_gain/*'],
                 # ['performance|crypto_net_flows/*'],
+                # ['performance|*/max_investment/*'],
+                # ['performance|*/crypto_inflows/*'],
+                # ['performance|crypto_net_gain/crypto_inflows/*'],
+                ['performance|crypto_net_gain/crypto_cash_buys/*'],
+                ['performance|crypto_net_flows/crypto_inflows/*'],
+                ['performance|crypto_net_flows/crypto_cash_buys/*'],
+                # ['performance|*/crypto_cash_buys/*'],
                 # ['performance|*/base|*'],
                 # ['performance|*/winsorized|*'],
                 # ['performance|*/log|*'],
@@ -281,7 +291,7 @@ modeling:
                 # ['trading|crypto_cash_sells|*'],
                 # ['trading|crypto_cash_buys|*'],
 
-                ['mktcap|*'],
+                # ['mktcap|*'],
                 # ['transfers|*'],
                 # ['transfers|avg_buyer_number|*'],
                 # ['transfers|median_buyer_number|*'],
