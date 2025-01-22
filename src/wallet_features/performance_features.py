@@ -161,7 +161,7 @@ def calculate_balance_features(trading_features_df: pd.DataFrame,
     balance_features_df['max_investment'] = trading_features_df['max_investment']
     balance_features_df['crypto_inflows'] = trading_features_df['crypto_inflows']
 
-    # # FeatureRemoval values found to be nonpredictive
+    # FeatureRemoval values found to be nonpredictive
     # balance_features_df['crypto_cash_buys'] = trading_features_df['crypto_cash_buys']
 
     # Add twb metrics if configured to
