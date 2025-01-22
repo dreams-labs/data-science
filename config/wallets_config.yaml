@@ -64,7 +64,7 @@ data_cleaning:
     transfers_coverage_warning_min_pct_increase: 0.05  # ...and the % of coin without transfers data has increased by this value, issue a warning
 
     # Market cap imputation filters
-    min_mc_imputation_coverage: 0.3  # coins with market cap coverage below this level will have hardcoded market cap values filled
+    min_mc_imputation_coverage: 0.1  # coins with market cap coverage below this level will have hardcoded market cap values filled
     max_mc_imputation_multiple: 3.0  # don't impute dates where the imputed market cap exceeds the max known market cap * this ratio
     market_cap_default_fill:  500000  # coins below the imputation coverage level will have empty values filled with this
 
@@ -73,7 +73,7 @@ data_cleaning:
 # WalletModel Features
 features:
     # Trading Params
-    include_twb_metrics: True
+    include_twb_metrics: False
 
     # Performance Params
     returns_winsorization: 0.01
@@ -89,9 +89,11 @@ features:
     offset_winsorization: 0.02 # comparisons between metrics and their offset values will be winsorized by this amount
     timing_metrics_min_transaction_size: 20  # trades below this USD threshold will not be evaluated for market timing peformance or transfers buyer sequencing
 
-    # Feature Selection
-    feature_selection:
-
+    # Market Timing Params
+    market_cap_feature_columns: [  # which columns to generate market cap features with
+        'market_cap_filled',
+        'market_cap_unadj'
+    ]
 
 
 # CheckpointValidation
@@ -121,7 +123,6 @@ modeling:
             # 'performance|*/crypto_inflows/*',
             # 'performance|*/twb/*',
             # 'performance|*/active_twb/*',
-            'performance|crypto_net_cash_flows/*',
             'performance|crypto_net_gain/crypto_inflows/*',
             'performance|crypto_net_gain/twb/*',
             'performance|crypto_net_gain/active_twb/*',
@@ -146,6 +147,7 @@ modeling:
             'trading|active_time_weighted_balance|*',
 
             # 'mktcap|*',
+            # 'mktcap|end_portfolio_wtd_market_cap/market_cap|*',
 
             # 'transfers|*',
 
@@ -199,7 +201,7 @@ modeling:
 
         # Turn On or Off
         # -------------------------------
-        # enabled: True # whether to grid search
+        # enabled: True
         # -------------------------------
 
 
@@ -292,7 +294,7 @@ modeling:
                 # ['performance|*/winsorized|*'],
                 # ['performance|*/log|*'],
                 # ['performance|*/rank|*'],
-                ['performance|*/ntile_rank|*'],
+                # ['performance|*/ntile_rank|*'],
 
                 # ['trading|*'],
                 # ['trading|crypto_net_gain|*'],
@@ -312,6 +314,13 @@ modeling:
                 # ['trading|active_time_weighted_balance|*'],
 
                 # ['mktcap|*'],
+                # ['mktcap|end_portfolio_wtd_market_cap/market_cap_filled|*'],
+                # ['mktcap|volume_wtd_market_cap/market_cap_filled|*'],
+                # ['mktcap|end_portfolio_wtd_market_cap/market_cap|*'],
+                # ['mktcap|volume_wtd_market_cap/market_cap|*'],
+                # ['mktcap|*/market_cap_filled|*'],
+                # ['mktcap|*/market_cap_imputed|*'],
+                # ['mktcap|*/market_cap|*'],
 
                 # ['transfers|*'],
                 # ['transfers|avg_buyer_number|*'],

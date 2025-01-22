@@ -512,7 +512,7 @@ def identify_modeling_cohort(modeling_period_profits_df: pd.DataFrame) -> pd.Dat
     modeling_wallets_df = wtf.calculate_wallet_trading_features(modeling_period_profits_df,
                                             wallets_config['training_data']['modeling_period_start'],
                                             wallets_config['training_data']['modeling_period_end'],
-                                            include_twb_metrics=True)
+                                            include_twb_metrics=False)
 
     # Extract thresholds
     modeling_min_investment = wallets_config['modeling']['modeling_min_investment']

@@ -110,7 +110,7 @@ def calculate_profits_features(wallet_features_df: pd.DataFrame) -> pd.DataFrame
     profits_features_df['crypto_net_gain'] = wallet_features_df['crypto_net_gain']
     profits_features_df['crypto_net_flows'] = wallet_features_df['crypto_net_flows']
 
-    # # FeatureRemoval values found to be nonpredictive
+    # FeatureRemoval values found to be nonpredictive
     # profits_features_df['crypto_net_cash_flows'] = wallet_features_df['crypto_net_cash_flows']
 
     # Verify no nulls produced
@@ -161,7 +161,7 @@ def calculate_balance_features(trading_features_df: pd.DataFrame,
     balance_features_df['max_investment'] = trading_features_df['max_investment']
     balance_features_df['crypto_inflows'] = trading_features_df['crypto_inflows']
 
-    # # FeatureRemoval values found to be nonpredictive
+    # FeatureRemoval values found to be nonpredictive
     # balance_features_df['crypto_cash_buys'] = trading_features_df['crypto_cash_buys']
 
     # Add twb metrics if configured to

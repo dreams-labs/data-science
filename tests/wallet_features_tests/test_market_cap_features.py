@@ -112,7 +112,7 @@ def test_calculate_volume_weighted_market_cap_mixed_scenarios():
         {'wallet_address': 4, 'usd_net_transfers': 50, 'market_cap_filled': 3000, 'is_imputed': False},
     ])
 
-    result = wmc.calculate_volume_weighted_market_cap(input_df)
+    result = wmc.calculate_volume_weighted_market_cap(input_df,'market_cap_filled')
 
     # Calculate expected values:
     # Wallet 1: (1000*100 + 2000*200 + 3000*300)/(100 + 200 + 300) = 2333.33
