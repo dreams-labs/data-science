@@ -74,9 +74,10 @@ def calculate_wallet_trading_features(
     trading_features_df = gain_and_investment_df.join(observed_activity_df)
 
 
-    # # 2. Calculate Time Weighted Return
-    # twr_df = calculate_wallet_time_weighted_returns(profits_df)
-    # trading_features_df = trading_features_df.join(twr_df)
+    # 2. Calculate Time Weighted Return
+    twr_df = calculate_wallet_time_weighted_returns(profits_df)
+    trading_features_df = trading_features_df.join(twr_df)
+
 
     # 3. Calculate Time Weighted Balance if configured to do so
     if include_twb_metrics:
@@ -497,7 +498,6 @@ def calculate_wallet_coin_time_weighted_returns(profits_df: pd.DataFrame) -> pd.
     # 1. Validate and format df
     # -------------------------
     profits_df = profits_df.copy()
-    profits_df = u.ensure_index(profits_df)
 
     # Remove rows below materiality threshold
     profits_df = profits_df[~(
