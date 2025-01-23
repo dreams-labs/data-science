@@ -1,7 +1,6 @@
 # Project specific
 artifacts/
 config_archive/
-model_consistency_checkpoints/waiting_room/
 logs/
 
 # Notebooks

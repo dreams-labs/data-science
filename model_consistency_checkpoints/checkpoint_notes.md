@@ -1,3 +1,77 @@
+# dda 595 grid searchin
+revisiting # dda 465 market cap features and # dda 593 better ablation
+and found all performances had dropped to w.667, doesn't seem worth extended effort to dig deeper right now and may related to database changes
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       92
+Features per Window:      23
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.667
+RMSE:                     0.219
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.812
+RMSE:                     0.116
+MAE:                      0.061
+
+
+
+
+checkpoint 2 need to return to old config
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       92
+Features per Window:      23
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.667
+RMSE:                     0.219
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.812
+RMSE:                     0.116
+MAE:                      0.061
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.002
+Standard Dev of Residuals:0.219
+95% Prediction Interval:  ±0.429
+
+
+checkpoint 1 data to 2020
+Model Performance Summary
+===================================
+Test Samples:             79,166
+Number of Features:       330
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.756
+RMSE:                     0.161
+MAE:                      0.076
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.824
+RMSE:                     0.093
+MAE:                      0.056
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.001
+Standard Dev of Residuals:0.161
+95% Prediction Interval:  ±0.316
+
 # dda 593 better ablation
 checkpoint 2
 alas TWR did not help

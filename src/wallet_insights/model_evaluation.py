@@ -197,6 +197,8 @@ class RegressionEvaluator:
 
         # Add sample sizes and feature count
         n_features = len(self.feature_names) if self.feature_names is not None else 0
+        n_all_windows = sum(1 for feature in self.feature_names if '|all_windows' in feature)
+
         if hasattr(self.metrics, 'total_cohort_samples'):
             summary.extend([
                 f"Training Cohort:          {self.metrics['total_cohort_samples']:,d}",
@@ -208,6 +210,7 @@ class RegressionEvaluator:
             summary.extend([
                 f"Test Samples:             {self.metrics['test_samples']:,d}",
                 f"Number of Features:       {n_features:,d}",
+                f"Features per Window:      {n_all_windows:,d}",
                 ""
             ])
 

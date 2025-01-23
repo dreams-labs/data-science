@@ -42,9 +42,11 @@ class BaseModel:
 
         # Model Datasets
         self.X_train = None
-        self.X_test = None
         self.y_train = None
+        self.X_test = None
         self.y_test = None
+        self.X_validate = None
+        self.X_validate = None
         self.y_pred = None
 
         # Utils
@@ -227,15 +229,22 @@ class BaseModel:
             ]
 
         # Combine drop patterns in grid search params with base drop patterns
-        if self.modeling_config['grid_search_params'].get('drop_patterns_include_n_features'):
-            drop_pattern_combinations = self._create_drop_pattern_combinations()
+        if 'drop_columns__drop_patterns' in grid_search_params['param_grid']:
+
+            # if adding features in groups of n, use helper function
+            if self.modeling_config['grid_search_params'].get('drop_patterns_include_n_features'):
+                drop_pattern_combinations = self._create_drop_pattern_combinations()
+
+            # if removing features one by one, generate combinations
+            else:
+                base_drop_patterns = self.modeling_config['feature_selection']['drop_patterns']
+                drop_pattern_combinations = [
+                    base_drop_patterns + grid_pattern
+                    for grid_pattern in grid_search_params['param_grid']['drop_columns__drop_patterns']
+                ]
+
+            # Override config with the merged drop_patterns
             grid_search_params['param_grid']['drop_columns__drop_patterns'] = drop_pattern_combinations
-        else:
-            base_drop_patterns = self.modeling_config['feature_selection']['drop_patterns']
-            grid_search_params['param_grid']['drop_columns__drop_patterns'] = [
-                base_drop_patterns + grid_pattern
-                for grid_pattern in grid_search_params['param_grid']['drop_columns__drop_patterns']
-            ]
 
 
         # 3. Search
