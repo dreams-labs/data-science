@@ -523,6 +523,7 @@ def test_calculate_time_weighted_returns_imputed_case():
     test_data['date'] = pd.to_datetime(test_data['date'])
 
     # Calculate TWR
+    test_data = test_data.set_index(['coin_id', 'wallet_address', 'date']).sort_index()
     result = wtf.calculate_time_weighted_returns(test_data)
 
     # Expected values
@@ -550,6 +551,7 @@ def test_calculate_time_weighted_returns_weighted_periods():
     ])
 
     test_data['date'] = pd.to_datetime(test_data['date'])
+    test_data = test_data.set_index(['coin_id', 'wallet_address', 'date']).sort_index()
     result = wtf.calculate_time_weighted_returns(test_data)
 
     # Manual calculation:
@@ -606,6 +608,7 @@ def test_calculate_time_weighted_returns_w02_net_loss(test_profits_df):
     annualized_twr = ((1 + time_weighted_return) ** (365 / 274)) - 1
 
     # Calculate TWR using the function
+    w02_data = w02_data.set_index(['coin_id', 'wallet_address', 'date']).sort_index()
     result = wtf.calculate_time_weighted_returns(w02_data)
 
     # Assertions
@@ -657,7 +660,7 @@ def test_calculate_time_weighted_returns_w01_btc(test_profits_df):
     # Annualized return
     annualized_twr = ((1 + time_weighted_return) ** (365 / total_days)) - 1
 
-    # Run the function
+    btc_data = btc_data.set_index(['coin_id', 'wallet_address', 'date']).sort_index()
     result = wtf.calculate_time_weighted_returns(btc_data)
 
     # Assertions
@@ -710,6 +713,7 @@ def test_calculate_time_weighted_returns_w01_eth(test_profits_df):
     annualized_twr = ((1 + time_weighted_return) ** (365 / total_days)) - 1
 
     # Run the function
+    eth_data = eth_data.set_index(['coin_id', 'wallet_address', 'date']).sort_index()
     result = wtf.calculate_time_weighted_returns(eth_data)
 
     # Assertions

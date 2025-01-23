@@ -455,42 +455,35 @@ def calculate_time_weighted_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
     Returns:
     - twr_df (DataFrame): TWR metrics keyed on wallet_address
     """
-    step_time = time.time()
-    # Validate profits_df
+    # 1. Validate and format df
+    # -------------------------
     profits_df = profits_df.copy()
-    profits_df = profits_df.set_index(['coin_id', 'wallet_address', 'date'])
-    # Sort if needed
-    if not profits_df.index.is_monotonic_increasing:
-        profits_df = profits_df.sort_index()
 
-    # # Remove rows below materiality threshold
-    # profits_df = profits_df[~(
-    #     (profits_df['usd_balance'] < wallets_config['features']['usd_materiality']) &
-    #     (abs(profits_df['usd_net_transfers']) < wallets_config['features']['usd_materiality'])
-    # )]
+    # Remove rows below materiality threshold
+    profits_df = profits_df[~(
+        (profits_df['usd_balance'] < wallets_config['features']['usd_materiality']) &
+        (abs(profits_df['usd_net_transfers']) < wallets_config['features']['usd_materiality'])
+    )]
 
     # Confirm index is sorted
     if not profits_df.index.is_monotonic_increasing:
         raise ValueError("profits_df index should be sorted")
+
+    # Reset date index to use in calculations
     profits_df = profits_df.reset_index('date')
 
-    logger.info(f'a {time.time() - step_time}')
-    step_time = time.time()
 
-
-    logger.info(f'b {time.time() - step_time}')
-    step_time = time.time()
+    # 2. Calculate base metrics
+    # -------------------------
     # Calculate holding period returns
     profits_df['pre_transfer_balance'] = profits_df['usd_balance'] - profits_df['usd_net_transfers']
     profits_df['prev_balance'] = (profits_df.groupby(['wallet_address', 'coin_id'], observed=True)
-                                ['usd_balance']
-                                .shift().fillna(0))
+                                  ['usd_balance']
+                                  .shift().fillna(0))
     profits_df['days_held'] = (profits_df.groupby(['wallet_address', 'coin_id'], observed=True)
-                            ['date']
-                            .diff().dt.days.fillna(0))
+                              ['date']
+                              .diff().dt.days.fillna(0))
 
-    logger.info(f'c {time.time() - step_time}')
-    step_time = time.time()
     # Calculate period returns and weights
     profits_df['period_return'] = np.where(
         profits_df['usd_net_transfers'] != 0,
@@ -503,32 +496,26 @@ def calculate_time_weighted_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
     # Weight by holding period duration
     profits_df['weighted_return'] = (profits_df['period_return'] - 1) * profits_df['days_held']
 
-
-    logger.info(f'd {time.time() - step_time}')
-    step_time = time.time()
     # Get wallet-coin level date ranges
     wallet_coin_dates = profits_df.groupby(['wallet_address', 'coin_id'],observed=True)['date'].agg(['min', 'max'])
     total_days = (wallet_coin_dates['max'] - wallet_coin_dates['min']).dt.days
 
-    logger.info(f'e {time.time() - step_time}')
-    step_time = time.time()
 
-    logger.info(f'f {time.time() - step_time}')
-    step_time = time.time()
-
+    # 3. Calculate TWR and return df
+    # ------------------------------
     # Calculate TWR per wallet-coin pair
-    wallet_coin_weighted_returns = profits_df.groupby(['wallet_address', 'coin_id'],observed=True)['weighted_return'].sum().fillna(0)
+    wallet_coin_weighted_returns = (profits_df.groupby(['wallet_address', 'coin_id'],observed=True)
+                                    ['weighted_return']
+                                    .sum().fillna(0))
 
     # Build TWR DataFrame maintaining wallet-coin granularity
     twr_df = pd.DataFrame(index=total_days.index)  # Index is now MultiIndex (wallet, coin)
     twr_df['days_held'] = total_days
     twr_df['time_weighted_return'] = wallet_coin_weighted_returns / twr_df['days_held']
 
-
-    logger.info(f'g {time.time() - step_time}')
-    step_time = time.time()
     # Annualize returns
-    twr_df['annualized_twr'] = ((1 + twr_df['time_weighted_return']) ** (365 / twr_df['days_held'])) - 1
+    twr_df['annualized_twr'] = (((1 + twr_df['time_weighted_return']) ** (365 / twr_df['days_held']) - 1)
+                                .clip(upper=wallets_config['features']['twr_max_annual_return']))
     twr_df = twr_df.replace([np.inf, -np.inf], np.nan)
 
     # Winsorize output
@@ -536,9 +523,6 @@ def calculate_time_weighted_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
     if returns_winsorization > 0:
         twr_df['time_weighted_return'] = u.winsorize(twr_df['time_weighted_return'],returns_winsorization)
         twr_df['annualized_twr'] = u.winsorize(twr_df['annualized_twr'],returns_winsorization)
-
-    logger.info(f'h {time.time() - step_time}')
-    step_time = time.time()
 
     return twr_df
 
