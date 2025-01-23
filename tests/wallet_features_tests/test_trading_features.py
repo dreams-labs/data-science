@@ -531,9 +531,9 @@ def test_calculate_time_weighted_returns_imputed_case():
     expected_annual = ((1 + 0.40) ** (365/274)) - 1  # ≈ 0.55
 
     # Assertions with tolerance for floating point
-    assert abs(result.loc['wallet_a', 'time_weighted_return'] - expected_twr) < 0.001
-    assert result.loc['wallet_a', 'days_held'] == expected_days
-    assert abs(result.loc['wallet_a', 'annualized_twr'] - expected_annual) < 0.001
+    assert abs(result.loc[('wallet_a', 'btc'), 'time_weighted_return'] - expected_twr) < 0.001
+    assert result.loc[('wallet_a', 'btc'), 'days_held'] == expected_days
+    assert abs(result.loc[('wallet_a', 'btc'), 'annualized_twr'] - expected_annual) < 0.001
 
 
 @pytest.mark.unit
@@ -570,9 +570,9 @@ def test_calculate_time_weighted_returns_weighted_periods():
     expected_annual = ((1 + expected_twr) ** (365/274)) - 1
 
     # Assertions
-    assert result.loc['wallet_a', 'days_held'] == 274
-    assert abs(result.loc['wallet_a', 'time_weighted_return'] - expected_twr) < 0.01
-    assert abs(result.loc['wallet_a', 'annualized_twr'] - expected_annual) < 0.01
+    assert result.loc[('wallet_a', 'eth'), 'days_held'] == 274
+    assert abs(result.loc[('wallet_a', 'eth'), 'time_weighted_return'] - expected_twr) < 0.01
+    assert abs(result.loc[('wallet_a', 'eth'), 'annualized_twr'] - expected_annual) < 0.01
 
 
 @pytest.mark.unit
@@ -609,9 +609,9 @@ def test_calculate_time_weighted_returns_w02_net_loss(test_profits_df):
     result = wtf.calculate_time_weighted_returns(w02_data)
 
     # Assertions
-    assert result.loc['w02_net_loss', 'days_held'] == 274
-    assert abs(result.loc['w02_net_loss', 'time_weighted_return'] - time_weighted_return) < 0.001
-    assert abs(result.loc['w02_net_loss', 'annualized_twr'] - annualized_twr) < 0.001
+    assert result.loc[('w02_net_loss', 'btc'), 'days_held'] == 274
+    assert abs(result.loc[('w02_net_loss', 'btc'), 'time_weighted_return'] - time_weighted_return) < 0.001
+    assert abs(result.loc[('w02_net_loss', 'btc'), 'annualized_twr'] - annualized_twr) < 0.001
 
 
 @pytest.mark.unit
@@ -661,9 +661,9 @@ def test_calculate_time_weighted_returns_w01_btc(test_profits_df):
     result = wtf.calculate_time_weighted_returns(btc_data)
 
     # Assertions
-    assert result.loc['w01_multiple_coins', 'days_held'] == total_days
-    assert abs(result.loc['w01_multiple_coins', 'time_weighted_return'] - time_weighted_return) < 0.001
-    assert abs(result.loc['w01_multiple_coins', 'annualized_twr'] - annualized_twr) < 0.001
+    assert result.loc[('w01_multiple_coins', 'btc'), 'days_held'] == total_days
+    assert abs(result.loc[('w01_multiple_coins', 'btc'), 'time_weighted_return'] - time_weighted_return) < 0.001
+    assert abs(result.loc[('w01_multiple_coins', 'btc'), 'annualized_twr'] - annualized_twr) < 0.001
 
 
 @pytest.mark.unit
@@ -713,9 +713,9 @@ def test_calculate_time_weighted_returns_w01_eth(test_profits_df):
     result = wtf.calculate_time_weighted_returns(eth_data)
 
     # Assertions
-    assert result.loc['w01_multiple_coins', 'days_held'] == total_days
-    assert abs(result.loc['w01_multiple_coins', 'time_weighted_return'] - time_weighted_return) < 0.001
-    assert abs(result.loc['w01_multiple_coins', 'annualized_twr'] - annualized_twr) < 0.001
+    assert result.loc[('w01_multiple_coins', 'eth'), 'days_held'] == total_days
+    assert abs(result.loc[('w01_multiple_coins', 'eth'), 'time_weighted_return'] - time_weighted_return) < 0.001
+    assert abs(result.loc[('w01_multiple_coins', 'eth'), 'annualized_twr'] - annualized_twr) < 0.001
 
 
 

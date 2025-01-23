@@ -75,6 +75,7 @@ features:
     # Trading Params
     include_twb_metrics: False  # whether to calculate time weighted balances
     usd_materiality: 5  # dates with both transfers and balances below this level will be ignored for time weighted returns
+    twr_max_annual_return: 100.0  # caps the max annual return at this percent (100.0 is a 100x return)
 
     # Performance Params
     returns_winsorization: 0.01
