@@ -1,6 +1,7 @@
 import time
 import logging
 from typing import Dict, Union
+from itertools import combinations
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import RandomizedSearchCV

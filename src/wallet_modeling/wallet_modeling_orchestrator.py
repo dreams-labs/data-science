@@ -369,8 +369,7 @@ def define_training_wallet_cohort(profits_df: pd.DataFrame,
     # Compute wallet level metrics over duration of training period
     training_wallet_metrics_df = wtf.calculate_wallet_trading_features(training_profits_df,
                                                                        training_period_start,
-                                                                       training_period_end,
-                                                                       include_twb_metrics=False)
+                                                                       training_period_end)
 
     # Apply filters based on wallet behavior during the training period
     filtered_training_wallet_metrics_df = wtd.apply_wallet_thresholds(training_wallet_metrics_df)
@@ -511,8 +510,7 @@ def identify_modeling_cohort(modeling_period_profits_df: pd.DataFrame) -> pd.Dat
     # Calculate modeling period wallet metrics
     modeling_wallets_df = wtf.calculate_wallet_trading_features(modeling_period_profits_df,
                                             wallets_config['training_data']['modeling_period_start'],
-                                            wallets_config['training_data']['modeling_period_end'],
-                                            include_twb_metrics=False)
+                                            wallets_config['training_data']['modeling_period_end'])
 
     # Extract thresholds
     modeling_min_investment = wallets_config['modeling']['modeling_min_investment']

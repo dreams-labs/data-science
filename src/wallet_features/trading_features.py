@@ -26,7 +26,8 @@ def calculate_wallet_trading_features(
     profits_df: pd.DataFrame,
     period_start_date: str,
     period_end_date: str,
-    include_twb_metrics: bool = True
+    include_twb_metrics: bool = False,
+    include_twr_metrics: bool = False,
 ) -> pd.DataFrame:
     """
     Calculates comprehensive crypto trading metrics for each wallet.
@@ -74,17 +75,16 @@ def calculate_wallet_trading_features(
     trading_features_df = gain_and_investment_df.join(observed_activity_df)
 
 
-    # 2. Calculate Time Weighted Return
-    twr_df = calculate_wallet_time_weighted_returns(profits_df)
-    trading_features_df = trading_features_df.join(twr_df)
+    # 2. Calculate Time Weighted Return if configured to do so
+    if include_twr_metrics:
+        twr_df = calculate_wallet_time_weighted_returns(profits_df)
+        trading_features_df = trading_features_df.join(twr_df)
 
 
     # 3. Calculate Time Weighted Balance if configured to do so
     if include_twb_metrics:
-        # Calculate time weighted balance using the cost basis
         twb_df = aggregate_time_weighted_balance(profits_df)
-
-        # Join all full metric dataframes
+        profits_df = u.ensure_index(profits_df)
         trading_features_df = trading_features_df.join(twb_df)
 
         # Calculate volume to time-weighted balance ratio
@@ -94,7 +94,6 @@ def calculate_wallet_trading_features(
             0
         )
 
-        profits_df = u.ensure_index(profits_df)
 
     # Fill missing values and handle edge cases
     trading_features_df = trading_features_df.fillna(0).replace(-0, 0)

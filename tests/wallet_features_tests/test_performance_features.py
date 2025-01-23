@@ -35,7 +35,7 @@ wallets_config = WalletsConfig.load_from_yaml(config_path)
 # ===================================================== #
 
 # ------------------------------------------------- #
-# calculate_time_weighted_returns() unit tests
+# calculate_wallet_coin_time_weighted_returns() unit tests
 # ------------------------------------------------- #
 
 

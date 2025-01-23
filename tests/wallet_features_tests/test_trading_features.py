@@ -242,7 +242,8 @@ def test_trading_features_df(test_profits_df):
     # Compute trading features
     wallet_trading_features_df = wtf.calculate_wallet_trading_features(test_profits_df,
                                                                        training_period_start,
-                                                                       training_period_end)
+                                                                       training_period_end,
+                                                                       include_twb_metrics=True)
 
     # Return dates for recalculation
     return wallet_trading_features_df
@@ -506,11 +507,11 @@ def test_average_transaction_bounds(test_trading_features_df):
 
 
 # ------------------------------------------------- #
-# calculate_time_weighted_returns() unit tests
+# calculate_wallet_coin_time_weighted_returns() unit tests
 # ------------------------------------------------- #
 
 @pytest.mark.unit
-def test_calculate_time_weighted_returns_imputed_case():
+def test_calculate_wallet_coin_time_weighted_returns_imputed_case():
     """Tests TWR calculation for a wallet with only imputed balances."""
 
     # Setup test data
@@ -524,7 +525,7 @@ def test_calculate_time_weighted_returns_imputed_case():
 
     # Calculate TWR
     test_data = test_data.set_index(['coin_id', 'wallet_address', 'date']).sort_index()
-    result = wtf.calculate_time_weighted_returns(test_data)
+    result = wtf.calculate_wallet_coin_time_weighted_returns(test_data)
 
     # Expected values
     expected_twr = 0.40  # (70-50)/50 = 0.4
@@ -538,7 +539,7 @@ def test_calculate_time_weighted_returns_imputed_case():
 
 
 @pytest.mark.unit
-def test_calculate_time_weighted_returns_weighted_periods():
+def test_calculate_wallet_coin_time_weighted_returns_weighted_periods():
     """Tests TWR calculation with different holding periods, amounts, and a transfer."""
 
     test_data = pd.DataFrame([
@@ -552,7 +553,7 @@ def test_calculate_time_weighted_returns_weighted_periods():
 
     test_data['date'] = pd.to_datetime(test_data['date'])
     test_data = test_data.set_index(['coin_id', 'wallet_address', 'date']).sort_index()
-    result = wtf.calculate_time_weighted_returns(test_data)
+    result = wtf.calculate_wallet_coin_time_weighted_returns(test_data)
 
     # Manual calculation:
     # Period 1: Jan 1 - Feb 1 (31 days)
@@ -578,7 +579,7 @@ def test_calculate_time_weighted_returns_weighted_periods():
 
 
 @pytest.mark.unit
-def test_calculate_time_weighted_returns_w02_net_loss(test_profits_df):
+def test_calculate_wallet_coin_time_weighted_returns_w02_net_loss(test_profits_df):
     """
     Tests TWR calculation for w02_net_loss with a single coin and net losses.
     """
@@ -609,7 +610,7 @@ def test_calculate_time_weighted_returns_w02_net_loss(test_profits_df):
 
     # Calculate TWR using the function
     w02_data = w02_data.set_index(['coin_id', 'wallet_address', 'date']).sort_index()
-    result = wtf.calculate_time_weighted_returns(w02_data)
+    result = wtf.calculate_wallet_coin_time_weighted_returns(w02_data)
 
     # Assertions
     assert result.loc[('w02_net_loss', 'btc'), 'days_held'] == 274
@@ -618,7 +619,7 @@ def test_calculate_time_weighted_returns_w02_net_loss(test_profits_df):
 
 
 @pytest.mark.unit
-def test_calculate_time_weighted_returns_w01_btc(test_profits_df):
+def test_calculate_wallet_coin_time_weighted_returns_w01_btc(test_profits_df):
     """
     Tests TWR calculation for w01_multiple_coins (BTC only).
     """
@@ -661,7 +662,7 @@ def test_calculate_time_weighted_returns_w01_btc(test_profits_df):
     annualized_twr = ((1 + time_weighted_return) ** (365 / total_days)) - 1
 
     btc_data = btc_data.set_index(['coin_id', 'wallet_address', 'date']).sort_index()
-    result = wtf.calculate_time_weighted_returns(btc_data)
+    result = wtf.calculate_wallet_coin_time_weighted_returns(btc_data)
 
     # Assertions
     assert result.loc[('w01_multiple_coins', 'btc'), 'days_held'] == total_days
@@ -670,7 +671,7 @@ def test_calculate_time_weighted_returns_w01_btc(test_profits_df):
 
 
 @pytest.mark.unit
-def test_calculate_time_weighted_returns_w01_eth(test_profits_df):
+def test_calculate_wallet_coin_time_weighted_returns_w01_eth(test_profits_df):
     """
     Tests TWR calculation for w01_multiple_coins (ETH only).
     """
@@ -714,7 +715,7 @@ def test_calculate_time_weighted_returns_w01_eth(test_profits_df):
 
     # Run the function
     eth_data = eth_data.set_index(['coin_id', 'wallet_address', 'date']).sort_index()
-    result = wtf.calculate_time_weighted_returns(eth_data)
+    result = wtf.calculate_wallet_coin_time_weighted_returns(eth_data)
 
     # Assertions
     assert result.loc[('w01_multiple_coins', 'eth'), 'days_held'] == total_days
@@ -797,7 +798,8 @@ def test_remapped_trading_features_df(test_remapped_profits_df):
     # Compute trading features
     remapped_wallet_trading_features_df = wtf.calculate_wallet_trading_features(remapped_profits_df,
                                                                        training_period_start,
-                                                                       training_period_end)
+                                                                       training_period_end,
+                                                                       include_twb_metrics=True)
 
     # Confirm that all the addresses have been mapped
     expected_addresses = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6']
