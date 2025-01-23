@@ -709,6 +709,7 @@ def assert_period(df, period_start, period_end) -> None:
             raise ValueError("Found non-imputed records in starting balance")
 
 
+@timing_decorator
 def ensure_index(df: pd.DataFrame) -> pd.DataFrame:
     """
     Params:

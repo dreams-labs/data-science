@@ -457,16 +457,13 @@ def calculate_time_weighted_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
     # 1. Validate and format df
     # -------------------------
     profits_df = profits_df.copy()
+    profits_df = u.ensure_index(profits_df)
 
     # Remove rows below materiality threshold
     profits_df = profits_df[~(
         (profits_df['usd_balance'] < wallets_config['features']['usd_materiality']) &
         (abs(profits_df['usd_net_transfers']) < wallets_config['features']['usd_materiality'])
     )]
-
-    # Confirm index is sorted
-    if not profits_df.index.is_monotonic_increasing:
-        raise ValueError("profits_df index should be sorted")
 
     # Reset date index to use in calculations
     profits_df = profits_df.reset_index('date')
