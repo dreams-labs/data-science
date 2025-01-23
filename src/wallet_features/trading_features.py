@@ -2,6 +2,7 @@
 Calculates metrics related to trading activity
 """
 import logging
+import time
 from datetime import datetime,timedelta
 import pandas as pd
 import numpy as np
@@ -454,13 +455,38 @@ def calculate_time_weighted_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
     Returns:
     - twr_df (DataFrame): TWR metrics keyed on wallet_address
     """
-    profits_df = profits_df.sort_values(['wallet_address', 'coin_id', 'date'])
+    step_time = time.time()
+    # Validate profits_df
+    profits_df = profits_df.copy()
+    profits_df = profits_df.set_index(['coin_id', 'wallet_address', 'date'])
+    # Sort if needed
+    if not profits_df.index.is_monotonic_increasing:
+        profits_df = profits_df.sort_index()
 
+    # # Remove rows below materiality threshold
+    # profits_df = profits_df[~(
+    #     (profits_df['usd_balance'] < wallets_config['features']['usd_materiality']) &
+    #     (abs(profits_df['usd_net_transfers']) < wallets_config['features']['usd_materiality'])
+    # )]
+
+    # Confirm index is sorted
+    if not profits_df.index.is_monotonic_increasing:
+        raise ValueError("profits_df index should be sorted")
+    profits_df = profits_df.reset_index('date')
+
+    logger.info(f'a {time.time() - step_time}')
+    step_time = time.time()
+
+
+    logger.info(f'b {time.time() - step_time}')
+    step_time = time.time()
     # Calculate holding period returns
     profits_df['pre_transfer_balance'] = profits_df['usd_balance'] - profits_df['usd_net_transfers']
-    profits_df['prev_balance'] = profits_df.groupby(['wallet_address', 'coin_id'])['usd_balance'].shift()
-    profits_df['days_held'] = profits_df.groupby(['wallet_address', 'coin_id'])['date'].diff().dt.days
+    profits_df['prev_balance'] = profits_df.groupby(['wallet_address', 'coin_id'], observed=True)['usd_balance'].shift().fillna(0)
+    profits_df['days_held'] = profits_df.groupby(['wallet_address', 'coin_id'], observed=True)['date'].diff().dt.days.fillna(0)
 
+    logger.info(f'c {time.time() - step_time}')
+    step_time = time.time()
     # Calculate period returns and weights
     profits_df['period_return'] = np.where(
         profits_df['usd_net_transfers'] != 0,
@@ -473,9 +499,18 @@ def calculate_time_weighted_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
     # Weight by holding period duration
     profits_df['weighted_return'] = (profits_df['period_return'] - 1) * profits_df['days_held']
 
-    # Get total days for each wallet
-    total_days = profits_df.groupby('wallet_address')['date'].agg(lambda x: (x.max() - x.min()).days)
 
+    logger.info(f'd {time.time() - step_time}')
+    step_time = time.time()
+
+    # Get wallet level date ranges using numpy operations
+    wallet_dates = profits_df.groupby(level='wallet_address')['date'].agg(['min', 'max'])
+    total_days = (wallet_dates['max'] - wallet_dates['min']).dt.days
+
+    logger.info(f'e {time.time() - step_time}')
+    step_time = time.time()
+
+    profits_df = profits_df.reset_index()
     # Calculate TWR using total days held
     def safe_twr(weighted_returns, wallet):
         if len(weighted_returns) == 0 or weighted_returns.isna().all():
@@ -483,6 +518,8 @@ def calculate_time_weighted_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
         days = max(total_days[wallet], 1)  # Get days for this wallet, minimum 1
         return weighted_returns.sum() / days
 
+    logger.info(f'f {time.time() - step_time}')
+    step_time = time.time()
     # Compute TWR and days_held using vectorized operations
     twr_df = profits_df.groupby('wallet_address').agg(
         time_weighted_return=('weighted_return',
@@ -490,6 +527,8 @@ def calculate_time_weighted_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
         days_held=('date', lambda x: max((x.max() - x.min()).days, 1))
     )
 
+    logger.info(f'g {time.time() - step_time}')
+    step_time = time.time()
     # Annualize returns
     twr_df['annualized_twr'] = ((1 + twr_df['time_weighted_return']) ** (365 / twr_df['days_held'])) - 1
     twr_df = twr_df.replace([np.inf, -np.inf], np.nan)
@@ -499,6 +538,8 @@ def calculate_time_weighted_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
     if returns_winsorization > 0:
         twr_df['time_weighted_return'] = u.winsorize(twr_df['time_weighted_return'],returns_winsorization)
         twr_df['annualized_twr'] = u.winsorize(twr_df['annualized_twr'],returns_winsorization)
+    logger.info(f'h {time.time() - step_time}')
+    step_time = time.time()
 
     return twr_df
 

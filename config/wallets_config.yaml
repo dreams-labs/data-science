@@ -73,7 +73,8 @@ data_cleaning:
 # WalletModel Features
 features:
     # Trading Params
-    include_twb_metrics: False
+    include_twb_metrics: False  # whether to calculate time weighted balances
+    usd_materiality: 5  # dates with both transfers and balances below this level will be ignored for time weighted returns
 
     # Performance Params
     returns_winsorization: 0.01
