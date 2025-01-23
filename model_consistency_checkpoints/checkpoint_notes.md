@@ -1,3 +1,56 @@
+# dda 593 better ablation
+checkpoint 2
+alas TWR did not help
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       92
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.671
+RMSE:                     0.219
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.812
+RMSE:                     0.116
+MAE:                      0.062
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.000
+Standard Dev of Residuals:0.219
+95% Prediction Interval:  ±0.428
+
+
+checkpoint 1 verifying model working normally
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       350
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.671
+RMSE:                     0.219
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.812
+RMSE:                     0.116
+MAE:                      0.062
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        0.000
+Standard Dev of Residuals:0.219
+95% Prediction Interval:  ±0.428
+
+
+
 # dda 437 time weighted returns
 checkpoint 3 toggle added
 Model Performance Summary

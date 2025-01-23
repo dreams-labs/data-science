@@ -1,7 +1,7 @@
 import time
 import logging
-from typing import Dict, Union
-from itertools import combinations
+from typing import Dict, Union, List
+from itertools import chain,combinations
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import RandomizedSearchCV
@@ -226,13 +226,16 @@ class BaseModel:
                 self._convert_min_child_pct_to_weight(X, pct) for pct in pct_grid
             ]
 
-
-        # Combine 'drop_patterns' in grid search params with base values
-        base_drop_patterns = self.modeling_config['feature_selection']['drop_patterns']
-        grid_search_params['param_grid']['drop_columns__drop_patterns'] = [
-            base_drop_patterns + grid_pattern
-            for grid_pattern in grid_search_params['param_grid']['drop_columns__drop_patterns']
-        ]
+        # Combine drop patterns in grid search params with base drop patterns
+        if self.modeling_config['grid_search_params'].get('drop_patterns_include_n_features'):
+            drop_pattern_combinations = self._create_drop_pattern_combinations()
+            grid_search_params['param_grid']['drop_columns__drop_patterns'] = drop_pattern_combinations
+        else:
+            base_drop_patterns = self.modeling_config['feature_selection']['drop_patterns']
+            grid_search_params['param_grid']['drop_columns__drop_patterns'] = [
+                base_drop_patterns + grid_pattern
+                for grid_pattern in grid_search_params['param_grid']['drop_columns__drop_patterns']
+            ]
 
 
         # 3. Search
@@ -270,6 +273,35 @@ class BaseModel:
             'best_score': -self.random_search.best_score_,
             'cv_results': self.random_search.cv_results_
         }
+
+
+    def _create_drop_pattern_combinations(self) -> List[List[str]]:
+        """
+        Generates lists of drop features that contain
+            1. all base drop patterns, plus
+            2. all grid search drop patterns except for n features, defined through
+                drop_patterns_include_n_features
+        """
+        max_additions = self.modeling_config['grid_search_params'].get('drop_patterns_include_n_features')
+        grid_patterns = self.modeling_config['grid_search_params']['param_grid']['drop_columns__drop_patterns']
+        base_patterns = self.modeling_config['feature_selection']['drop_patterns']
+
+        # Flatten all grid drop patterns into a single list
+        grid_patterns_list = list(chain.from_iterable(grid_patterns)) + ['feature_retainer']
+
+        # Create combinations of grid drop patterns that retain max_additions features
+        grid_pattern_combinations = [list(combo)
+                                    for combo in combinations(grid_patterns_list,
+                                                            len(grid_patterns_list) - max_additions)]
+
+        # Combine each grid_pattern_combination with the base drop patterns
+        search_drop_combinations = [
+            base_patterns + grid_pattern_combination
+            for grid_pattern_combination in grid_pattern_combinations
+        ]
+
+        return search_drop_combinations
+
 
     def generate_search_report(self, output_raw_data=False) -> pd.DataFrame:
         """
