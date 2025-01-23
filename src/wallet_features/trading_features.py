@@ -2,7 +2,6 @@
 Calculates metrics related to trading activity
 """
 import logging
-import time
 from datetime import datetime,timedelta
 import pandas as pd
 import numpy as np
@@ -56,8 +55,8 @@ def calculate_wallet_trading_features(
     """
     # Validate profits_df
     profits_df = profits_df.copy()
-    profits_df = ensure_index(profits_df,
-                              period_start_date, period_end_date)
+    profits_df = u.ensure_index(profits_df)
+    u.assert_period(profits_df,period_start_date, period_end_date)
 
     # Calculate configured metrics
     # ----------------------------
@@ -91,7 +90,7 @@ def calculate_wallet_trading_features(
             0
         )
 
-        profits_df = ensure_index(profits_df, period_start_date, period_end_date)
+        profits_df = u.ensure_index(profits_df)
 
     # Fill missing values and handle edge cases
     trading_features_df = trading_features_df.fillna(0).replace(-0, 0)
@@ -496,13 +495,13 @@ def calculate_time_weighted_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
     # Weight by holding period duration
     profits_df['weighted_return'] = (profits_df['period_return'] - 1) * profits_df['days_held']
 
+
+    # 3. Calculate TWR and return it
+    # ------------------------------
     # Get wallet-coin level date ranges
     wallet_coin_dates = profits_df.groupby(['wallet_address', 'coin_id'],observed=True)['date'].agg(['min', 'max'])
     total_days = (wallet_coin_dates['max'] - wallet_coin_dates['min']).dt.days
 
-
-    # 3. Calculate TWR and return df
-    # ------------------------------
     # Calculate TWR per wallet-coin pair
     wallet_coin_weighted_returns = (profits_df.groupby(['wallet_address', 'coin_id'],observed=True)
                                     ['weighted_return']
@@ -525,50 +524,3 @@ def calculate_time_weighted_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
         twr_df['annualized_twr'] = u.winsorize(twr_df['annualized_twr'],returns_winsorization)
 
     return twr_df
-
-
-
-# -----------------------------------
-#          Utility Functions
-# -----------------------------------
-
-@u.timing_decorator
-def ensure_index(profits_df: pd.DataFrame,
-                       period_start_date: str,
-                       period_end_date: str
-) -> pd.DataFrame:
-    """
-    Params:
-    - profits_df (DataFrame): Input profits data
-    - period_start_date (str): Period start date
-    - period_end_date (str): Period end date
-
-    Returns:
-    - DataFrame: Validated and properly indexed/sorted profits_df
-    """
-    required_cols = ['coin_id', 'wallet_address', 'date']
-
-    # Check existence of required columns
-    missing_cols = [col for col in required_cols
-                   if col not in profits_df.columns
-                   and col not in profits_df.index.names]
-    if missing_cols:
-        raise ValueError(f"Missing required columns: {missing_cols}")
-
-    # Convert to MultiIndex if needed
-    if not isinstance(profits_df.index, pd.MultiIndex):
-        index_cols = [col for col in required_cols if col in profits_df.columns]
-        profits_df = profits_df.set_index(index_cols)
-
-    # Ensure correct index names
-    if profits_df.index.names != required_cols:
-        profits_df = profits_df.reorder_levels(required_cols)
-
-    # Sort if needed
-    if not profits_df.index.is_monotonic_increasing:
-        profits_df = profits_df.sort_index()
-
-    # Assert period
-    u.assert_period(profits_df, period_start_date, period_end_date)
-
-    return profits_df
