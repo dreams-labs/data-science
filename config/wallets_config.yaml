@@ -74,7 +74,7 @@ data_cleaning:
 features:
     # Trading Params
     include_twb_metrics: False  # whether to calculate time weighted balances
-    include_twr_metrics: True  # whether to calculate time weighted returns
+    include_twr_metrics: False  # whether to calculate time weighted returns
     usd_materiality: 5  # dates with both transfers and balances below this level will be ignored for time weighted returns
     twr_max_annual_return: 100.0  # caps the max annual return at this percent (100.0 is a 100x return)
 
@@ -133,22 +133,6 @@ modeling:
             'performance|*/ntile_rank|*',
 
             # 'trading|*',
-            'trading|days_held/min|*',
-            'trading|days_held/max|*',
-            'trading|days_held/mean|*',
-            'trading|days_held/median|*',
-            'trading|days_held/std|*',
-            'trading|time_weighted_return/min|*',
-            'trading|time_weighted_return/max|*',
-            'trading|time_weighted_return/mean|*',
-            'trading|time_weighted_return/median|*',
-            'trading|time_weighted_return/std|*',
-            'trading|annualized_twr/min|*',
-            'trading|annualized_twr/max|*',
-            'trading|annualized_twr/mean|*',
-            'trading|annualized_twr/median|*',
-            'trading|annualized_twr/std|*',
-
             # 'trading|crypto_net_gain|*',
             # 'trading|total_volume|*',
             'trading|unique_coins_traded|*',
@@ -164,6 +148,10 @@ modeling:
             'trading|crypto_cash_buys|*',
             'trading|time_weighted_balance|*',
             'trading|active_time_weighted_balance|*',
+            'trading|days_held/*',
+            'trading|time_weighted_return/*',
+            'trading|annualized_twr/*',
+
 
             # 'mktcap|*',
             # 'mktcap|end_portfolio_wtd_market_cap/market_cap|*',
@@ -226,9 +214,10 @@ modeling:
 
         # Search Methodology
         n_iter: 50  # random search limit
-        n_splits: 2  # cv splits
-        # drop_columns_maximum_additions: 1
+        n_splits: 4  # cv splits
         scoring: 'neg_root_mean_squared_error'
+        drop_patterns_include_n_features: 1
+
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # scikit-learn verbosity
 
@@ -256,8 +245,8 @@ modeling:
 
 
             # Tree Training Speed Overrides
-            regressor__n_estimators: [2]
-            regressor__learning_rate: [0.1]
+            regressor__n_estimators: [250]
+            regressor__learning_rate: [0.08]
             # regressor__gamma: [0.01]
 
             # Optimize for Speed
@@ -292,8 +281,8 @@ modeling:
                 # ['timing|*/*_7/*'],
                 # ['timing|*/*_21/*'],
                 # ['timing|*/*_50/*'],
-                # ['timing|*'],
 
+                # ['performance|*'],
                 # ['performance|crypto_net_gain/*'],
                 # ['performance|crypto_net_flows/*'],
                 # ['performance|crypto_net_cash_flows/*'],
@@ -327,15 +316,14 @@ modeling:
                 # ['trading|time_weighted_return/mean|*'],
                 # ['trading|time_weighted_return/median|*'],
                 # ['trading|time_weighted_return/std|*'],
-                ['trading|annualized_twr/min|*'],
-                ['trading|annualized_twr/max|*'],
-                ['trading|annualized_twr/mean|*'],
+                # ['trading|annualized_twr/min|*'],
+                # ['trading|annualized_twr/max|*'],
+                # ['trading|annualized_twr/mean|*'],
                 # ['trading|annualized_twr/median|*'],
-                ['trading|annualized_twr/std|*'],
+                # ['trading|annualized_twr/std|*'],
                 # ['trading|days_held/*'],
                 # ['trading|time_weighted_return/*'],
                 # ['trading|time_weighted_return/*'],
-
                 # ['trading|crypto_net_gain|*'],
                 # ['trading|unique_coins_traded|*'],
                 # ['trading|transaction_days|*'],
