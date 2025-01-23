@@ -709,6 +709,51 @@ def assert_period(df, period_start, period_end) -> None:
             raise ValueError("Found non-imputed records in starting balance")
 
 
+@timing_decorator
+def ensure_index(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Params:
+    - df (DataFrame): Input data.
+
+    Returns:
+    - DataFrame: Validated and properly indexed/sorted DataFrame.
+    """
+    required_cols_date = ['coin_id', 'wallet_address', 'date']
+    required_cols_basic = ['coin_id', 'wallet_address']
+
+    # Check if the DataFrame is already indexed correctly
+    if df.index.names == required_cols_date or df.index.names == required_cols_basic:
+        # Validate sorting
+        if not df.index.is_monotonic_increasing:
+            df = df.sort_index()
+        return df
+
+    # Determine which columns are required based on the input format
+    if all(col in df.columns for col in required_cols_date):
+        index_cols = required_cols_date
+    elif all(col in df.columns for col in required_cols_basic):
+        index_cols = required_cols_basic
+    else:
+        raise ValueError(
+            "Input DataFrame must have either an index or columns for ['coin_id', 'wallet_address', 'date'] "
+            "or ['coin_id', 'wallet_address']."
+        )
+
+    # Convert to MultiIndex if needed
+    if not isinstance(df.index, pd.MultiIndex):
+        df = df.set_index(index_cols)
+
+    # Ensure correct index names
+    if df.index.names != index_cols:
+        df = df.reorder_levels(index_cols)
+
+    # Ensure sorting
+    if not df.index.is_monotonic_increasing:
+        df = df.sort_index()
+
+    return df
+
+
 def cw_filter(df, coin_id, wallet_address):
     """
     Filter DataFrame by coin_id and wallet_address, sort by date if available.
@@ -769,134 +814,6 @@ def df_nans(df):
     na_cells = na_rows.loc[:, na_rows.isna().any()]
 
     return na_rows, na_cells
-
-
-def df_mem(df):
-    """
-    Checks how much memory a dataframe is using
-    """
-    # Memory usage of each column
-    memory_usage = df.memory_usage(deep=True) / (1024 ** 2)
-    mem_df = pd.DataFrame(memory_usage)
-    mem_df.columns = ['mb']
-    mem_df['dtype'] = df.dtypes
-
-    # Total memory usage in bytes
-    total_memory = df.memory_usage(deep=True).sum()
-    print(f'Total memory usage: {total_memory / 1024 ** 2:.2f} MB')
-
-    return mem_df.sort_values(by='mb',ascending=False)
-
-
-def obj_mem(return_details=False) -> pd.DataFrame:
-    """
-    Params:
-    - return_details (bool): whether to return column names, types, and memory usage
-
-    Tracks both object-level and process-level memory usage with enhanced metadata.
-    Handles nested data structures better.
-    """
-
-    process = psutil.Process()
-    total_rss = process.memory_info().rss / (1024 * 1024)
-
-    # Get the calling frame to access its locals
-    calling_frame = inspect.currentframe().f_back
-
-    def find_name(obj):
-        """Helper to find variable name across namespaces"""
-        # Check globals first
-        name = next((name for name, value in globals().items() if value is obj), None)
-        if name:
-            return name
-
-        # Check calling frame's locals
-        if calling_frame:
-            name = next((name for name, value in calling_frame.f_locals.items() if value is obj), None)
-            if name:
-                return name
-
-        return 'unnamed'
-
-    # Track DataFrames in containers
-    container_refs = {}
-    for obj in gc.get_objects():
-        if isinstance(obj, (list, dict, tuple)):
-            try:
-                name = find_name(obj)
-                if name != 'unnamed':
-                    for idx, item in enumerate(obj if isinstance(obj, (list, tuple)) else obj.values()):
-                        if isinstance(item, pd.DataFrame):
-                            container_refs[id(item)] = f"{name}[{idx}]"
-            except:  # pylint:disable=bare-except
-                continue
-
-    # Gather all DataFrame info
-    objects = []
-    for obj in gc.get_objects():
-        try:
-            if not isinstance(obj, (pd.DataFrame, pd.Series, np.ndarray)):
-                continue
-
-            name = find_name(obj)
-            if name == 'unnamed':
-                name = container_refs.get(id(obj), 'unnamed')
-
-            if hasattr(obj, 'memory_usage'):
-                size = (obj.memory_usage(deep=True).sum() /
-                        (1024 * 1024))  # Convert to MB
-            else:
-                size = sys.getsizeof(obj) / (1024 * 1024)
-
-            if size >= 5:
-                metadata = {
-                    'name': name,
-                    'type': type(obj).__name__,
-                    'size_mb': round(size, 1),
-                    'shape': str(getattr(obj, 'shape', None)),
-                    'percent_of_total': round((size / total_rss) * 100, 1),
-                }
-
-                if isinstance(obj, pd.DataFrame):
-                    metadata.update({
-                        'columns': (str(list(obj.columns)[:3] + ['...']) if len(obj.columns) > 3
-                                    else str(list(obj.columns))),
-                        'memory_usage': str({col: f"{mem/1024/1024:.1f}MB"
-                                           for col, mem in obj.memory_usage(deep=True).items()
-                                           if mem/1024/1024 >= 1}),
-                        'dtypes': str({col: str(dtype)
-                                     for col, dtype in obj.dtypes.items()
-                                     if obj[col].memory_usage(deep=True)/1024/1024 >= 1})
-                    })
-
-                objects.append(metadata)
-        except:  # pylint:disable=bare-except
-            continue
-
-    # Clean up
-    del calling_frame
-
-    mem_df = pd.DataFrame(objects)
-
-    summary = pd.DataFrame([{
-        'name': 'TOTAL_PROCESS_MEMORY',
-        'type': 'ProcessRSS',
-        'size_mb': round(total_rss, 1),
-        'shape': None,
-        'percent_of_total': 100.0
-    }])
-
-    mem_df = pd.concat([summary, mem_df], ignore_index=True)
-    mem_df = mem_df.sort_values('size_mb', ascending=False).reset_index(drop=True)
-
-    cols = ['name', 'type', 'size_mb', 'shape', 'percent_of_total']
-    extra_cols = [col for col in mem_df.columns if col not in cols]
-
-    if return_details:
-        # Return column details if requested
-        return mem_df[cols + extra_cols]
-    else:
-        return mem_df[cols]
 
 
 def log_nan_counts(df):
@@ -1035,7 +952,6 @@ def notify(sound_name: Union[str, int] = None, prompt: str = None, voice_id: str
         return f"Error with playback: {e}"
 
 
-
 def notify_on_failure(shell, etype, value, tb, tb_offset=None):
     """
     Custom error handler that plays a notification sound
@@ -1050,6 +966,133 @@ def notify_on_failure(shell, etype, value, tb, tb_offset=None):
     # Call the original traceback display method
     shell.showtraceback((etype, value, tb), tb_offset=tb_offset)
 
+
+def df_mem(df):
+    """
+    Checks how much memory a dataframe is using
+    """
+    # Memory usage of each column
+    memory_usage = df.memory_usage(deep=True) / (1024 ** 2)
+    mem_df = pd.DataFrame(memory_usage)
+    mem_df.columns = ['mb']
+    mem_df['dtype'] = df.dtypes
+
+    # Total memory usage in bytes
+    total_memory = df.memory_usage(deep=True).sum()
+    print(f'Total memory usage: {total_memory / 1024 ** 2:.2f} MB')
+
+    return mem_df.sort_values(by='mb',ascending=False)
+
+
+def obj_mem(return_details=False) -> pd.DataFrame:
+    """
+    Params:
+    - return_details (bool): whether to return column names, types, and memory usage
+
+    Tracks both object-level and process-level memory usage with enhanced metadata.
+    Handles nested data structures better.
+    """
+
+    process = psutil.Process()
+    total_rss = process.memory_info().rss / (1024 * 1024)
+
+    # Get the calling frame to access its locals
+    calling_frame = inspect.currentframe().f_back
+
+    def find_name(obj):
+        """Helper to find variable name across namespaces"""
+        # Check globals first
+        name = next((name for name, value in globals().items() if value is obj), None)
+        if name:
+            return name
+
+        # Check calling frame's locals
+        if calling_frame:
+            name = next((name for name, value in calling_frame.f_locals.items() if value is obj), None)
+            if name:
+                return name
+
+        return 'unnamed'
+
+    # Track DataFrames in containers
+    container_refs = {}
+    for obj in gc.get_objects():
+        if isinstance(obj, (list, dict, tuple)):
+            try:
+                name = find_name(obj)
+                if name != 'unnamed':
+                    for idx, item in enumerate(obj if isinstance(obj, (list, tuple)) else obj.values()):
+                        if isinstance(item, pd.DataFrame):
+                            container_refs[id(item)] = f"{name}[{idx}]"
+            except:  # pylint:disable=bare-except
+                continue
+
+    # Gather all DataFrame info
+    objects = []
+    for obj in gc.get_objects():
+        try:
+            if not isinstance(obj, (pd.DataFrame, pd.Series, np.ndarray)):
+                continue
+
+            name = find_name(obj)
+            if name == 'unnamed':
+                name = container_refs.get(id(obj), 'unnamed')
+
+            if hasattr(obj, 'memory_usage'):
+                size = (obj.memory_usage(deep=True).sum() /
+                        (1024 * 1024))  # Convert to MB
+            else:
+                size = sys.getsizeof(obj) / (1024 * 1024)
+
+            if size >= 5:
+                metadata = {
+                    'name': name,
+                    'type': type(obj).__name__,
+                    'size_mb': round(size, 1),
+                    'shape': str(getattr(obj, 'shape', None)),
+                    'percent_of_total': round((size / total_rss) * 100, 1),
+                }
+
+                if isinstance(obj, pd.DataFrame):
+                    metadata.update({
+                        'columns': (str(list(obj.columns)[:3] + ['...']) if len(obj.columns) > 3
+                                    else str(list(obj.columns))),
+                        'memory_usage': str({col: f"{mem/1024/1024:.1f}MB"
+                                           for col, mem in obj.memory_usage(deep=True).items()
+                                           if mem/1024/1024 >= 1}),
+                        'dtypes': str({col: str(dtype)
+                                     for col, dtype in obj.dtypes.items()
+                                     if obj[col].memory_usage(deep=True)/1024/1024 >= 1})
+                    })
+
+                objects.append(metadata)
+        except:  # pylint:disable=bare-except
+            continue
+
+    # Clean up
+    del calling_frame
+
+    mem_df = pd.DataFrame(objects)
+
+    summary = pd.DataFrame([{
+        'name': 'TOTAL_PROCESS_MEMORY',
+        'type': 'ProcessRSS',
+        'size_mb': round(total_rss, 1),
+        'shape': None,
+        'percent_of_total': 100.0
+    }])
+
+    mem_df = pd.concat([summary, mem_df], ignore_index=True)
+    mem_df = mem_df.sort_values('size_mb', ascending=False).reset_index(drop=True)
+
+    cols = ['name', 'type', 'size_mb', 'shape', 'percent_of_total']
+    extra_cols = [col for col in mem_df.columns if col not in cols]
+
+    if return_details:
+        # Return column details if requested
+        return mem_df[cols + extra_cols]
+    else:
+        return mem_df[cols]
 
 
 # pylint: disable=dangerous-default-value

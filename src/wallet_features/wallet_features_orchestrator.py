@@ -77,7 +77,8 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
 
     trading_features_df = wtf.calculate_wallet_trading_features(profits_df,
         period_start_date,period_end_date,
-        wallets_config['features']['include_twb_metrics']
+        wallets_config['features']['include_twb_metrics'],
+        wallets_config['features']['include_twr_metrics']
     )
     feature_column_names['trading|'] = trading_features_df.columns
     wallet_features_df = wallet_features_df.join(trading_features_df, how='left')\

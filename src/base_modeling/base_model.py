@@ -1,6 +1,7 @@
 import time
 import logging
 from typing import Dict, Union
+from itertools import combinations
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import RandomizedSearchCV
@@ -198,41 +199,40 @@ class BaseModel:
         logger.info("Initiating grid search...")
         u.notify('gadget')
 
-        # 1. Retrieve base params
+        # 1. Retrieve and modify base params
         # -----------------------
-        cv_model_params = self.modeling_config['model_params'].copy()
+        base_model_params = self.modeling_config['model_params'].copy()
 
-        # Handle 'min_child_weight_pct' to 'min_child_weight' conversion
-        if cv_model_params.get('min_child_weight_pct'):
-            cv_model_params['min_child_weight'] = self._convert_min_child_pct_to_weight(
+        # Remove params that don't apply to the grid search
+        for param in ['early_stopping_rounds', 'eval_metric', 'verbose']:
+            base_model_params.pop(param, None)
+
+        # Handle 'min_child_weight_pct' in base params
+        if base_model_params.get('min_child_weight_pct'):
+            base_model_params['min_child_weight'] = self._convert_min_child_pct_to_weight(
                 self.X_train,
-                cv_model_params.pop('min_child_weight_pct')
+                base_model_params.pop('min_child_weight_pct')
             )
 
-        # Store base column drop patterns
-        base_drop_patterns = self.modeling_config['feature_selection']['drop_patterns']
 
-
-        # 2. Prepare grid search params
-        # -----------------------------
+        # 2. Prepare grid search param options
+        # ------------------------------------
         grid_search_params = self.modeling_config['grid_search_params']
 
-        # Handle 'min_child_weight_pct' to 'min_child_weight' conversion
+        # Handle 'min_child_weight_pct' in grid search params
         if 'regressor__min_child_weight_pct' in grid_search_params['param_grid']:
             pct_grid = grid_search_params['param_grid'].pop('regressor__min_child_weight_pct')
             grid_search_params['param_grid']['regressor__min_child_weight'] = [
                 self._convert_min_child_pct_to_weight(X, pct) for pct in pct_grid
             ]
 
-        # Add base drop patterns in addition to the grid search params
+
+        # Combine 'drop_patterns' in grid search params with base values
+        base_drop_patterns = self.modeling_config['feature_selection']['drop_patterns']
         grid_search_params['param_grid']['drop_columns__drop_patterns'] = [
             base_drop_patterns + grid_pattern
             for grid_pattern in grid_search_params['param_grid']['drop_columns__drop_patterns']
         ]
-
-        # Remove params that don't apply to the model
-        for param in ['early_stopping_rounds', 'eval_metric', 'verbose']:
-            cv_model_params.pop(param, None)
 
 
         # 3. Search
@@ -240,7 +240,7 @@ class BaseModel:
         # Create pipeline for grid search
         cv_pipeline = Pipeline([
             ('drop_columns', DropColumnPatterns()),
-            ('regressor', XGBRegressor(**cv_model_params))
+            ('regressor', XGBRegressor(**base_model_params))
         ])
 
         # Store the search object in the instance
@@ -251,8 +251,8 @@ class BaseModel:
             cv = grid_search_params['n_splits'],
             scoring = grid_search_params['scoring'],
             verbose = grid_search_params.get('verbose_level', 0),
-            n_jobs = cv_model_params.get('n_jobs', -1),
-            random_state = cv_model_params.get('random_state', 42),
+            n_jobs = base_model_params.get('n_jobs', -1),
+            random_state = base_model_params.get('random_state', 42),
         )
 
         self.random_search.fit(X, y)

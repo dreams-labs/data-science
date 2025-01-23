@@ -73,7 +73,10 @@ data_cleaning:
 # WalletModel Features
 features:
     # Trading Params
-    include_twb_metrics: False
+    include_twb_metrics: False  # whether to calculate time weighted balances
+    include_twr_metrics: True  # whether to calculate time weighted returns
+    usd_materiality: 5  # dates with both transfers and balances below this level will be ignored for time weighted returns
+    twr_max_annual_return: 100.0  # caps the max annual return at this percent (100.0 is a 100x return)
 
     # Performance Params
     returns_winsorization: 0.01
@@ -130,6 +133,22 @@ modeling:
             'performance|*/ntile_rank|*',
 
             # 'trading|*',
+            'trading|days_held/min|*',
+            'trading|days_held/max|*',
+            'trading|days_held/mean|*',
+            'trading|days_held/median|*',
+            'trading|days_held/std|*',
+            'trading|time_weighted_return/min|*',
+            'trading|time_weighted_return/max|*',
+            'trading|time_weighted_return/mean|*',
+            'trading|time_weighted_return/median|*',
+            'trading|time_weighted_return/std|*',
+            'trading|annualized_twr/min|*',
+            'trading|annualized_twr/max|*',
+            'trading|annualized_twr/mean|*',
+            'trading|annualized_twr/median|*',
+            'trading|annualized_twr/std|*',
+
             # 'trading|crypto_net_gain|*',
             # 'trading|total_volume|*',
             'trading|unique_coins_traded|*',
@@ -156,7 +175,7 @@ modeling:
         ]
 
         # Correlation/variance-based removal
-        variance_threshold: -10.00 # features with this level of variance or less will be removed
+        variance_threshold: -1.00 # features with this level of variance or less will be removed
         correlation_threshold: 1.95 # features above this correlation coefficient will be removed
         protected_features: [
             'cluster|'
@@ -207,10 +226,11 @@ modeling:
 
         # Search Methodology
         n_iter: 50  # random search limit
+        n_splits: 2  # cv splits
+        # drop_columns_maximum_additions: 1
         scoring: 'neg_root_mean_squared_error'
-        n_splits: 3  # cv splits
-        verbose_level: 3  # scikit-learn verbosity
         build_post_search_model: False  # whether to build a model after the grid search
+        verbose_level: 3  # scikit-learn verbosity
 
         # Target variables
         target_variables: [
@@ -236,7 +256,7 @@ modeling:
 
 
             # Tree Training Speed Overrides
-            regressor__n_estimators: [200]
+            regressor__n_estimators: [2]
             regressor__learning_rate: [0.1]
             # regressor__gamma: [0.01]
 
@@ -297,6 +317,25 @@ modeling:
                 # ['performance|*/ntile_rank|*'],
 
                 # ['trading|*'],
+                # ['trading|days_held/min|*'],
+                # ['trading|days_held/max|*'],
+                # ['trading|days_held/mean|*'],
+                # ['trading|days_held/median|*'],
+                # ['trading|days_held/std|*'],
+                # ['trading|time_weighted_return/min|*'],
+                # ['trading|time_weighted_return/max|*'],
+                # ['trading|time_weighted_return/mean|*'],
+                # ['trading|time_weighted_return/median|*'],
+                # ['trading|time_weighted_return/std|*'],
+                ['trading|annualized_twr/min|*'],
+                ['trading|annualized_twr/max|*'],
+                ['trading|annualized_twr/mean|*'],
+                # ['trading|annualized_twr/median|*'],
+                ['trading|annualized_twr/std|*'],
+                # ['trading|days_held/*'],
+                # ['trading|time_weighted_return/*'],
+                # ['trading|time_weighted_return/*'],
+
                 # ['trading|crypto_net_gain|*'],
                 # ['trading|unique_coins_traded|*'],
                 # ['trading|transaction_days|*'],

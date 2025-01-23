@@ -18,7 +18,7 @@ wallets_config = WalletsConfig()
 
 
 # -----------------------------------
-# Main Interface Function
+#       Main Interface Function
 # -----------------------------------
 
 @u.timing_decorator
@@ -26,7 +26,8 @@ def calculate_wallet_trading_features(
     profits_df: pd.DataFrame,
     period_start_date: str,
     period_end_date: str,
-    include_twb_metrics: bool = True,
+    include_twb_metrics: bool = False,
+    include_twr_metrics: bool = False,
 ) -> pd.DataFrame:
     """
     Calculates comprehensive crypto trading metrics for each wallet.
@@ -55,11 +56,10 @@ def calculate_wallet_trading_features(
     """
     # Validate profits_df
     profits_df = profits_df.copy()
-    profits_df = ensure_index(profits_df,
-                              period_start_date, period_end_date)
+    profits_df = u.ensure_index(profits_df)
+    u.assert_period(profits_df,period_start_date, period_end_date)
 
-    # Calculate configured metrics
-    # ----------------------------
+    # 1. Calculate Base Metrics
     # Add crypto balance/transfers/gain helper columns
     profits_df = calculate_crypto_balance_columns(profits_df,
                                                   period_start_date, period_end_date)
@@ -71,17 +71,21 @@ def calculate_wallet_trading_features(
     observed_activity_df = calculate_observed_activity_columns(profits_df,
                                                                period_start_date, period_end_date)
 
-    # Merge together
+    # Make trading_features_df via merge
     trading_features_df = gain_and_investment_df.join(observed_activity_df)
 
-    # Add twb if configured to do so
+
+    # 2. Calculate Time Weighted Return if configured to do so
+    if include_twr_metrics:
+        twr_df = calculate_wallet_time_weighted_returns(profits_df)
+        trading_features_df = trading_features_df.join(twr_df)
+
+
+    # 3. Calculate Time Weighted Balance if configured to do so
     if include_twb_metrics:
-
-        # Calculate time weighted balance using the cost basis
-        time_weighted_df = aggregate_time_weighted_balance(profits_df)
-
-        # Join all full metric dataframes
-        trading_features_df = trading_features_df.join(time_weighted_df)
+        twb_df = aggregate_time_weighted_balance(profits_df)
+        profits_df = u.ensure_index(profits_df)
+        trading_features_df = trading_features_df.join(twb_df)
 
         # Calculate volume to time-weighted balance ratio
         trading_features_df['volume_vs_twb_ratio'] = np.where(
@@ -90,7 +94,6 @@ def calculate_wallet_trading_features(
             0
         )
 
-        profits_df = ensure_index(profits_df, period_start_date, period_end_date)
 
     # Fill missing values and handle edge cases
     trading_features_df = trading_features_df.fillna(0).replace(-0, 0)
@@ -98,8 +101,9 @@ def calculate_wallet_trading_features(
     return trading_features_df
 
 
+
 # -----------------------------------
-# Support Functions
+#    Base Metrics Helper Functions
 # -----------------------------------
 
 def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
@@ -131,7 +135,6 @@ def calculate_crypto_balance_columns(profits_df: pd.DataFrame,
     return profits_df
 
 
-
 def buy_crypto_start_balance(df: pd.DataFrame, period_start_date: str) -> pd.DataFrame:
     """
     Sets start date crypto balance change using multiindex operations.
@@ -152,7 +155,6 @@ def buy_crypto_start_balance(df: pd.DataFrame, period_start_date: str) -> pd.Dat
     df.loc[start_slice, 'crypto_balance_change'] = df.loc[start_slice, 'usd_balance']
 
     return df
-
 
 
 def sell_crypto_end_balance(df: pd.DataFrame, period_end_date: str) -> pd.DataFrame:
@@ -180,7 +182,6 @@ def sell_crypto_end_balance(df: pd.DataFrame, period_end_date: str) -> pd.DataFr
     df.loc[end_slice, 'usd_balance'] = 0
 
     return df
-
 
 
 def calculate_gain_and_investment_columns(profits_df: pd.DataFrame) -> pd.DataFrame:
@@ -227,8 +228,7 @@ def calculate_gain_and_investment_columns(profits_df: pd.DataFrame) -> pd.DataFr
     return gain_and_investment_df
 
 
-
-# pylint:disable=unused-argument  # params were used for FeatureRemoval features
+# pylint:disable=unused-argument  # params used for # FeatureRemoval features
 def calculate_observed_activity_columns(profits_df: pd.DataFrame,
                                     period_start_date: str,
                                     period_end_date: str) -> pd.DataFrame:
@@ -284,6 +284,10 @@ def calculate_observed_activity_columns(profits_df: pd.DataFrame,
     return observed_activity_df
 
 
+
+# --------------------------------------------
+#    Time Weighted Balance Helper Functions
+# --------------------------------------------
 
 @u.timing_decorator
 def aggregate_time_weighted_balance(profits_df: pd.DataFrame) -> pd.DataFrame:
@@ -372,7 +376,6 @@ def aggregate_time_weighted_balance(profits_df: pd.DataFrame) -> pd.DataFrame:
     })
 
 
-
 @u.timing_decorator
 def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -443,47 +446,117 @@ def get_cost_basis_df(profits_df: pd.DataFrame) -> pd.DataFrame:
 
 
 
-# -----------------------------------
-#          Utility Functions
-# -----------------------------------
+
+# --------------------------------------------
+#    Time Weighted Returns Helper Functions
+# --------------------------------------------
 
 @u.timing_decorator
-def ensure_index(profits_df: pd.DataFrame,
-                       period_start_date: str,
-                       period_end_date: str
-) -> pd.DataFrame:
+def calculate_wallet_time_weighted_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
+    Aggregates time-weighted return metrics at wallet level.
+
     Params:
-    - profits_df (DataFrame): Input profits data
-    - period_start_date (str): Period start date
-    - period_end_date (str): Period end date
+    - twr_df (DataFrame): Contains wallet_address, coin_id, and metrics
 
     Returns:
-    - DataFrame: Validated and properly indexed/sorted profits_df
+    - wallet_stats (DataFrame): Wallet-level statistics
     """
-    required_cols = ['coin_id', 'wallet_address', 'date']
+    # Calculate wallet-coin level time weighted returns
+    wc_twr_df = calculate_wallet_coin_time_weighted_returns(profits_df)
 
-    # Check existence of required columns
-    missing_cols = [col for col in required_cols
-                   if col not in profits_df.columns
-                   and col not in profits_df.index.names]
-    if missing_cols:
-        raise ValueError(f"Missing required columns: {missing_cols}")
+    metrics = ['days_held', 'time_weighted_return', 'annualized_twr']
+    agg_funcs = ['mean', 'min', 'max', 'median', 'std']
 
-    # Convert to MultiIndex if needed
-    if not isinstance(profits_df.index, pd.MultiIndex):
-        index_cols = [col for col in required_cols if col in profits_df.columns]
-        profits_df = profits_df.set_index(index_cols)
+    # Vectorized aggregation
+    wallet_twr_df = wc_twr_df.groupby('wallet_address')[metrics].agg(agg_funcs)
 
-    # Ensure correct index names
-    if profits_df.index.names != required_cols:
-        profits_df = profits_df.reorder_levels(required_cols)
+    # Flatten column names
+    wallet_twr_df.columns = [f'{metric}/{func}'
+                          for metric in metrics
+                          for func in agg_funcs]
 
-    # Sort if needed
-    if not profits_df.index.is_monotonic_increasing:
-        profits_df = profits_df.sort_index()
+    return wallet_twr_df
 
-    # Assert period
-    u.assert_period(profits_df, period_start_date, period_end_date)
 
-    return profits_df
+def calculate_wallet_coin_time_weighted_returns(profits_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculates time-weighted returns (TWR) for coin-wallet pairs using actual holding period
+    in days.
+
+    This could be modified to calculate wallet level TWR if a complete cash flows and balance
+    series was made available. This would involve imputing balances for all the wallet's coins on
+    any day the wallet had a transaction with any coin so the balance data would be complete.
+
+    Params:
+    - profits_df (DataFrame): Daily profits data
+
+    Returns:
+    - twr_df (DataFrame): TWR metrics keyed on wallet_address
+    """
+    # 1. Validate and format df
+    # -------------------------
+    profits_df = profits_df.copy()
+
+    # Remove rows below materiality threshold
+    profits_df = profits_df[~(
+        (profits_df['usd_balance'] < wallets_config['features']['usd_materiality']) &
+        (abs(profits_df['usd_net_transfers']) < wallets_config['features']['usd_materiality'])
+    )]
+
+    # Reset date index to use in calculations
+    profits_df = profits_df.reset_index('date')
+
+
+    # 2. Calculate base metrics
+    # -------------------------
+    # Calculate holding period returns
+    profits_df['pre_transfer_balance'] = profits_df['usd_balance'] - profits_df['usd_net_transfers']
+    profits_df['prev_balance'] = (profits_df.groupby(['wallet_address', 'coin_id'], observed=True)
+                                  ['usd_balance']
+                                  .shift().fillna(0))
+    profits_df['days_held'] = (profits_df.groupby(['wallet_address', 'coin_id'], observed=True)
+                              ['date']
+                              .diff().dt.days.fillna(0))
+
+    # Calculate period returns and weights
+    profits_df['period_return'] = np.where(
+        profits_df['usd_net_transfers'] != 0,
+        profits_df['pre_transfer_balance'] / profits_df['prev_balance'],
+        profits_df['usd_balance'] / profits_df['prev_balance']
+    )
+    # For initial buys, fill with a 100% return value i.e. equivalent to balance == prev_balance
+    profits_df['period_return'] = profits_df['period_return'].replace([np.inf, -np.inf], 1).fillna(1)
+
+    # Weight by holding period duration
+    profits_df['weighted_return'] = (profits_df['period_return'] - 1) * profits_df['days_held']
+
+
+    # 3. Calculate TWR and return it
+    # ------------------------------
+    # Get wallet-coin level date ranges
+    wallet_coin_dates = profits_df.groupby(['wallet_address', 'coin_id'],observed=True)['date'].agg(['min', 'max'])
+    total_days = (wallet_coin_dates['max'] - wallet_coin_dates['min']).dt.days
+
+    # Calculate TWR per wallet-coin pair
+    wallet_coin_weighted_returns = (profits_df.groupby(['wallet_address', 'coin_id'],observed=True)
+                                    ['weighted_return']
+                                    .sum().fillna(0))
+
+    # Build TWR DataFrame maintaining wallet-coin granularity
+    twr_df = pd.DataFrame(index=total_days.index)  # Index is now MultiIndex (wallet, coin)
+    twr_df['days_held'] = total_days
+    twr_df['time_weighted_return'] = wallet_coin_weighted_returns / twr_df['days_held']
+
+    # Annualize returns
+    twr_df['annualized_twr'] = (((1 + twr_df['time_weighted_return']) ** (365 / twr_df['days_held']) - 1)
+                                .clip(upper=wallets_config['features']['twr_max_annual_return']))
+    twr_df = twr_df.replace([np.inf, -np.inf], np.nan)
+
+    # Winsorize output
+    returns_winsorization = wallets_config['features']['returns_winsorization']
+    if returns_winsorization > 0:
+        twr_df['time_weighted_return'] = u.winsorize(twr_df['time_weighted_return'],returns_winsorization)
+        twr_df['annualized_twr'] = u.winsorize(twr_df['annualized_twr'],returns_winsorization)
+
+    return twr_df
