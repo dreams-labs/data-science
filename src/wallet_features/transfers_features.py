@@ -4,6 +4,7 @@ Calculates metrics aggregated at the wallet-coin level
 
 import logging
 import pandas as pd
+import pandas_gbq
 from dreams_core.googlecloud import GoogleCloud as dgc
 
 # Local module imports
@@ -18,7 +19,7 @@ wallets_config = WalletsConfig()
 
 
 # -------------------------------------------------
-# Transfers Sequencing Features
+#          Transfers Sequencing Features
 # -------------------------------------------------
 # these identify which buyer number a wallet was to a given coin
 
@@ -138,9 +139,12 @@ def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
     return transfers_sequencing_features_df
 
 
+
+
 # -------------------------------------------------
-# Holding Behavior Features
+#            Holding Behavior Features
 # -------------------------------------------------
+
 # these identify which how long a wallet held their tokens
 
 # def retrieve_transfers():
@@ -176,8 +180,6 @@ def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
 #     transfers_df = u.df_downcast(transfers_df)
 
 #     return transfers_df
-
-
 
 
 # # needs to be moved to profits_df with a USD value floor
@@ -276,3 +278,96 @@ def calculate_average_holding_period(transfers_df):
     holding_days_df = holding_days_df[columns_to_keep]
 
     return holding_days_df
+
+
+
+
+# -------------------------------------------------
+#            Ideal Performance Features
+# -------------------------------------------------
+
+@u.timing_decorator
+def upload_profits_df_dates(training_profits_df: pd.DataFrame) -> None:
+    """
+    Uploads all coin/wallet/date combinations in profits_df to BigQuery temp table.
+
+    Params:
+    - training_profits_df (DataFrame): Source profits data
+    - project_id (str): GCP project identifier
+    """
+    upload_df = training_profits_df[['coin_id', 'date', 'wallet_address']].copy()
+
+    project_id = 'western-verve-411004'
+    table_id = f"{project_id}.temp.training_cohort_coin_dates"
+    schema = [
+        {'name': 'coin_id', 'type': 'string'},
+        {'name': 'date', 'type': 'date'},
+        {'name': 'wallet_address', 'type': 'integer'}
+    ]
+
+    pandas_gbq.to_gbq(
+        upload_df,
+        table_id,
+        project_id=project_id,
+        if_exists='replace',
+        table_schema=schema,
+        progress_bar=False
+    )
+
+
+@u.timing_decorator
+def get_ideal_transfers_df(training_period_end: str) -> pd.DataFrame:
+    """
+    Get wallet transfer data with price ranges.
+
+    Params:
+    - training_period_end (str): End date for training period
+
+    Returns:
+    - ideal_transfers_df (DataFrame): Transfer data with min/max prices
+    """
+    sql_query = f"""
+        with date_ranges as (
+            select wc.wallet_id
+            ,cwt.coin_id
+            ,cwt.date
+            ,COALESCE(
+                LEAD(cwt.date) OVER (PARTITION BY cwt.wallet_address, cwt.coin_id ORDER BY cwt.date) - interval 1 day,
+                '{training_period_end}'
+            ) as date_range
+            ,cwt.balance
+            ,cwt.net_transfers
+            from temp.wallet_modeling_training_cohort wc
+            join temp.training_cohort_coin_dates wcd on wcd.wallet_address = wc.wallet_id
+            join reference.wallet_ids xw on xw.wallet_id = wc.wallet_id
+            join core.coin_wallet_transfers cwt on cwt.wallet_address = xw.wallet_address
+                and cwt.coin_id = wcd.coin_id
+                and cwt.date = wcd.date
+            join core.coin_market_data cmd on cmd.coin_id = cwt.coin_id
+                and cmd.date = cwt.date
+            where cwt.date <= '{training_period_end}'
+        )
+
+        select dr.wallet_id as wallet_address
+        ,dr.coin_id
+        ,dr.date
+        ,dr.balance as token_balance
+        ,dr.net_transfers as token_net_transfers
+        ,max(cmd.price) as max_price
+        ,min(cmd.price) as min_price
+        from date_ranges dr
+        join core.coin_market_data cmd on cmd.coin_id = dr.coin_id
+            and cmd.date between dr.date and dr.date_range
+        where cmd.date <= '{training_period_end}'
+        group by 1,2,3,4,5
+        order by date,wallet_id,coin_id
+    """
+
+    ideal_transfers_df = dgc().run_sql(sql_query)
+
+    # Handle column dtypes
+    ideal_transfers_df['coin_id'] = ideal_transfers_df['coin_id'].astype('category')
+    ideal_transfers_df['date'] = ideal_transfers_df['date'].astype('datetime64[ns]')
+    ideal_transfers_df = u.df_downcast(ideal_transfers_df)
+
+    return ideal_transfers_df
