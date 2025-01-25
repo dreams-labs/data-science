@@ -422,3 +422,54 @@ def get_ideal_transfers_df(training_starting_balance_date: str,
 
 
     return ideal_transfers_df
+
+
+@u.timing_decorator
+def append_profits_data(ideal_transfers_df: pd.DataFrame,
+                        training_profits_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Merge profits data with ideal transfers, enforcing data consistency and type constraints.
+
+    Params:
+    - ideal_transfers_df (DataFrame): Ideal transfers to append
+    - training_profits_df (DataFrame): Source profits data
+
+    Returns:
+    - merged_df (DataFrame): Merged and validated transfers data
+    """
+    # Validate input sizes
+    if len(ideal_transfers_df) != len(training_profits_df):
+        raise ValueError(
+            f"Dataframe sizes do not match: ideal_transfers_df {ideal_transfers_df.shape} vs "
+            f"training_profits_df {training_profits_df.shape}"
+        )
+
+    # Standardize date types
+    for df in [ideal_transfers_df, training_profits_df]:
+        df['date'] = df['date'].astype('datetime64[ns]')
+
+    # Align categorical types
+    common_categories = pd.CategoricalDtype(
+        categories=training_profits_df['coin_id'].cat.categories,
+        ordered=False
+    )
+    training_profits_df['coin_id'] = training_profits_df['coin_id'].astype(common_categories)
+    ideal_transfers_df['coin_id'] = ideal_transfers_df['coin_id'].astype(common_categories)
+
+    # Execute merge
+    cols_to_merge = ['wallet_address', 'coin_id', 'date', 'usd_net_transfers', 'usd_balance']
+    merged_df = pd.merge_asof(
+        training_profits_df.sort_values(['date', 'wallet_address', 'coin_id'])[cols_to_merge],
+        ideal_transfers_df,
+        by=['wallet_address', 'coin_id'],
+        on='date',
+        direction='backward'
+    )
+
+    # Validate output quality
+    merged_df = u.ensure_index(merged_df)
+    merged_df = u.df_downcast(merged_df)
+    if merged_df.isna().sum().sum() > 0:
+        raise ValueError("Null values found in merged output")
+
+    return merged_df
