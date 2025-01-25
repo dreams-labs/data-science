@@ -552,6 +552,8 @@ def generate_scenario_features(scenario_profits_df: pd.DataFrame,
 
     # Convert to the Hypothetical feature set
     features = wallets_config['features']['hypothetical_performance_features']
+    if len(features) != len(set(features)):
+        raise ValueError("Duplicate features detected in hypothetical_performance_features")
     hypothetical_features_df = scenario_performance_df[features]
 
     # Remove '/' delimiters for better importance analysis parsing

@@ -114,9 +114,17 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     # Transfers features (left join, do not fill)
     # Uses only real transfers (~is_imputed)
     # -----------------------------------------------------------------------
-    transfers_features_df = wts.calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
+    transfers_sequencing_features_df = wts.calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
+    transfers_hypothetical_features_df = wts.calculate_transfers_hypothetical_features(profits_df,
+                                                                                       period_start_date,period_end_date)
+    logger.info(f'transfers_sequencing_features_df {transfers_sequencing_features_df.shape}')
+    logger.info(f'transfers_hypothetical_features_df {transfers_hypothetical_features_df.shape}')
+    transfers_features_df = transfers_sequencing_features_df.join(transfers_hypothetical_features_df,how='left')
+
     feature_column_names['transfers|'] = transfers_features_df.columns
     wallet_features_df = wallet_features_df.join(transfers_features_df, how='left')
+
+
 
     # Apply feature prefixes
     rename_map = {col: f"{prefix}{col}"
