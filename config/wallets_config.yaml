@@ -95,9 +95,9 @@ features:
 
     # Transfers Params
     hypothetical_performance_features: [
-        'crypto_net_flows/crypto_inflows/winsorized',
+        crypto_net_flows/crypto_inflows/winsorized,
         crypto_net_flows/max_investment/winsorized,
-        crypto_net_flows/max_investment/winsorized,
+        crypto_net_gain/max_investment/winsorized,
     ]
 
 
@@ -166,6 +166,9 @@ modeling:
             # 'mktcap|end_portfolio_wtd_market_cap/market_cap|*',
 
             # 'transfers|*',
+            transfers|*/crypto_net_flows_max_investment_winsorized|*,
+            transfers|*/crypto_net_flows_crypto_inflows_winsorized|*,
+            transfers|*/crypto_net_gain_max_investment_winsorized|*,
 
             'cluster|*',
             '*|w1',
@@ -225,7 +228,7 @@ modeling:
         n_iter: 40  # random search limit
         n_splits: 2  # cv splits
         scoring: 'neg_root_mean_squared_error'
-        # drop_patterns_include_n_features: 1
+        drop_patterns_include_n_features: 1
 
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # scikit-learn verbosity
@@ -269,8 +272,8 @@ modeling:
 
 
             # Column Selection
-            # drop_columns__drop_patterns: [
-            #     [],
+            drop_columns__drop_patterns: [
+                [],
             #     # ['timing|*'],
             #     # ['timing|price_sma_2/lead_21/*'],
             #     # ['timing|price_sma_2/lag_15/*'],
@@ -366,13 +369,19 @@ modeling:
             #     # ['transfers|median_buyer_number|*'],
             #     # ['transfers|new_coin_buy_counts|*'],
             #     # ['transfers|min_buyer_number|*'],
+            ['transfers|*/crypto_net_flows_max_investment_winsorized|*'],
+            ['transfers|*/crypto_net_flows_crypto_inflows_winsorized|*'],
+            ['transfers|*/crypto_net_gain_max_investment_winsorized|*'],
+
+
+
             #     # ['cluster|*'],
             #     # ['*|w1'],
             #     # ['*|w2'],
             #     # ['*|w3'],
             #     # ['*|w4'],
             #     # ['*|all_windows'],
-            # ]
+            ]
 
 
     # Coin model workflow params

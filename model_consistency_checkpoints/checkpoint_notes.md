@@ -1,4 +1,6 @@
 # dda 460 max unrealized gain/loss
+checkpoint 3 ready to start ablation testing
+
 checkpoint 2 preparing to integrate
 Model Performance Summary
 ===================================
