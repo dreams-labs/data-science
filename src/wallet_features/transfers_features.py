@@ -316,41 +316,78 @@ def upload_profits_df_dates(training_profits_df: pd.DataFrame) -> None:
 
 
 @u.timing_decorator
-def get_ideal_transfers_df(training_period_end: str) -> pd.DataFrame:
+def get_ideal_transfers_df(training_starting_balance_date: str,
+                           training_period_end: str) -> pd.DataFrame:
     """
     Get wallet transfer data with price ranges.
 
     Params:
+    - training_starting_balance_date (str): Starting balance date for training period
     - training_period_end (str): End date for training period
 
     Returns:
     - ideal_transfers_df (DataFrame): Transfer data with min/max prices
     """
     sql_query = f"""
-        with date_ranges as (
-            select wc.wallet_id
-            ,cwt.coin_id
-            ,cwt.date
-            ,COALESCE(
-                # all available transfers will return the day before the following transfer
-                LEAD(cwt.date) OVER (PARTITION BY cwt.wallet_address, cwt.coin_id ORDER BY cwt.date) - interval 1 day,
+        with first_price_dates as (
+            -- Get the first price date for coins which we need to fill starting_balances
+            select cmd.coin_id,
+            min(date) as first_price_date
+            from core.coin_market_data cmd
+            group by 1
+        ),
 
-                # the most recent transfer will return null from the lead, so coalesce-fill it with training_period_end
-                '{training_period_end}'
-            ) as date_range
-            ,cwt.balance
-            ,cwt.net_transfers
+        starting_balances as (
+            -- Get most recent balance ON OR BEFORE the starting balance date for each wallet-coin pair
+            -- This will be used to fill the initial balance for training period start
+            select cwt.wallet_address, cwt.coin_id, cwt.balance, cwt.date,
+            row_number() over(partition by cwt.wallet_address, cwt.coin_id order by date desc) as rn
+            from core.coin_wallet_transfers cwt
+            join first_price_dates fpd on fpd.coin_id = cwt.coin_id
+
+            -- if a transfer was during the period but before price data, it becomes the starting_balance
+            where (cwt.date <= greatest('{training_starting_balance_date}',fpd.first_price_date))
+        ),
+
+        date_ranges as (
+            select
+                wc.wallet_id,
+                wcd.coin_id,
+                wcd.date,
+                -- Use starting balance for first date, leave other nulls for python forward-fill
+                case
+                    when (
+                        -- cases when the first transfer was before the period
+                        wcd.date = '{training_starting_balance_date}' OR
+                        -- cases when the first transfer was before the period AND the first price was within the period
+                        -- (rows that exists in profits_df but not in the transfers table were imputed on the first price date)
+                        cwt.date is null
+                    ) then sb.balance
+                    else last_value(cwt.balance ignore nulls) over (
+                        partition by wc.wallet_id, wcd.coin_id
+                        order by wcd.date
+                        rows between unbounded preceding and current row
+                    )
+                end as balance,
+                coalesce(cwt.net_transfers, 0) as net_transfers,
+                COALESCE(
+                    -- All available transfers will return the day before the following transfer
+                    LEAD(wcd.date) OVER (PARTITION BY xw.wallet_address, wcd.coin_id ORDER BY wcd.date) - interval 1 day,
+                    -- The most recent transfer will return null from the lead, so coalesce-fill with training_period_end
+                    '{training_period_end}'
+                ) as date_range
             from temp.wallet_modeling_training_cohort wc
             join temp.training_cohort_coin_dates wcd on wcd.wallet_address = wc.wallet_id
             join reference.wallet_ids xw on xw.wallet_id = wc.wallet_id
-            join core.coin_wallet_transfers cwt on cwt.wallet_address = xw.wallet_address
+            left join core.coin_wallet_transfers cwt on cwt.wallet_address = xw.wallet_address
                 and cwt.coin_id = wcd.coin_id
                 and cwt.date = wcd.date
-            join core.coin_market_data cmd on cmd.coin_id = cwt.coin_id
-                and cmd.date = cwt.date
-
-            # hide transfers after training_period_end
-            where cwt.date <= '{training_period_end}'
+            left join starting_balances sb on sb.wallet_address = xw.wallet_address
+                and sb.coin_id = wcd.coin_id
+                and sb.rn = 1
+            join core.coin_market_data cmd on cmd.coin_id = wcd.coin_id
+                and cmd.date = wcd.date
+            where wcd.date <= '{training_period_end}'
         )
 
         select dr.wallet_id as wallet_address
@@ -363,19 +400,25 @@ def get_ideal_transfers_df(training_period_end: str) -> pd.DataFrame:
         from date_ranges dr
         join core.coin_market_data cmd on cmd.coin_id = dr.coin_id
             and cmd.date between dr.date and dr.date_range
-
-        # hide market data after training_period_end
         where cmd.date <= '{training_period_end}'
-
         group by 1,2,3,4,5
         order by date,wallet_id,coin_id
     """
-
     ideal_transfers_df = dgc().run_sql(sql_query)
 
     # Handle column dtypes
     ideal_transfers_df['coin_id'] = ideal_transfers_df['coin_id'].astype('category')
     ideal_transfers_df['date'] = ideal_transfers_df['date'].astype('datetime64[ns]')
     ideal_transfers_df = u.df_downcast(ideal_transfers_df)
+
+    # Forward fill balances to cover imputed period end rows
+    ideal_transfers_df['token_balance'] = (ideal_transfers_df.sort_values('date')
+                                           .groupby(['wallet_address', 'coin_id'])['token_balance']
+                                           .ffill())
+
+    # Confirm no nulls
+    if ideal_transfers_df.isna().sum().sum() > 0:
+        raise ValueError(f"Null values found in ideal_transfers_df. Review query:{sql_query}")
+
 
     return ideal_transfers_df
