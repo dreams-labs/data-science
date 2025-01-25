@@ -8,6 +8,8 @@ import pandas_gbq
 from dreams_core.googlecloud import GoogleCloud as dgc
 
 # Local module imports
+import wallet_features.performance_features as wpf
+import wallet_features.trading_features as wtf
 from wallet_modeling.wallets_config_manager import WalletsConfig
 import utils as u
 
@@ -473,3 +475,30 @@ def append_profits_data(ideal_transfers_df: pd.DataFrame,
         raise ValueError("Null values found in merged output")
 
     return merged_df
+
+
+def generate_scenario_features(scenario_profits_df: pd.DataFrame,
+                               training_start: str,
+                               training_end: str,) -> pd.DataFrame:
+    """
+    Generate trading and profit features for a given transfer scenario.
+
+    Params:
+    - scenario_profits_df (DataFrame): DataFrame with columns 'usd_balance' and 'usd_net_transfers'
+    - training_start (str): Training period start date
+    - training_end (str): Training period end date
+
+    Returns:
+    - scenario_features_df (DataFrame): Performance features for the profits_df scenario
+    """
+
+    # Generate features
+    scenario_profits_df = wtf.calculate_crypto_balance_columns(
+        scenario_profits_df, training_start, training_end
+    )
+    scenario_trading_df = wtf.calculate_gain_and_investment_columns(scenario_profits_df)
+    scenario_features_df = wpf.calculate_performance_features(
+        scenario_trading_df, include_twb_metrics=False
+    )
+
+    return scenario_features_df
