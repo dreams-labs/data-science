@@ -332,7 +332,10 @@ def get_ideal_transfers_df(training_period_end: str) -> pd.DataFrame:
             ,cwt.coin_id
             ,cwt.date
             ,COALESCE(
+                # all available transfers will return the day before the following transfer
                 LEAD(cwt.date) OVER (PARTITION BY cwt.wallet_address, cwt.coin_id ORDER BY cwt.date) - interval 1 day,
+
+                # the most recent transfer will return null from the lead, so coalesce-fill it with training_period_end
                 '{training_period_end}'
             ) as date_range
             ,cwt.balance
@@ -345,6 +348,8 @@ def get_ideal_transfers_df(training_period_end: str) -> pd.DataFrame:
                 and cwt.date = wcd.date
             join core.coin_market_data cmd on cmd.coin_id = cwt.coin_id
                 and cmd.date = cwt.date
+
+            # hide transfers after training_period_end
             where cwt.date <= '{training_period_end}'
         )
 
@@ -358,7 +363,10 @@ def get_ideal_transfers_df(training_period_end: str) -> pd.DataFrame:
         from date_ranges dr
         join core.coin_market_data cmd on cmd.coin_id = dr.coin_id
             and cmd.date between dr.date and dr.date_range
+
+        # hide market data after training_period_end
         where cmd.date <= '{training_period_end}'
+
         group by 1,2,3,4,5
         order by date,wallet_id,coin_id
     """
