@@ -1,5 +1,43 @@
 # dda 460 max unrealized gain/loss
+with all
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       116
+Features per Window:      29
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.664
+RMSE:                     0.220
+MAE:                      0.114
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.808
+RMSE:                     0.117
+MAE:                      0.063
+
+
 checkpoint 3 ready to start ablation testing
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       92
+Features per Window:      23
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.667
+RMSE:                     0.219
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.812
+RMSE:                     0.116
+MAE:                      0.061
+
 
 checkpoint 2 preparing to integrate
 Model Performance Summary
