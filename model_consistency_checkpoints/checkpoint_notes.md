@@ -1,4 +1,24 @@
 # dda 460 max unrealized gain/loss
+checkpoint 4 add sells_best/crypto_net_flows_crypto_inflows_winsorized
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       96
+Features per Window:      24
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.669
+RMSE:                     0.218
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.811
+RMSE:                     0.116
+MAE:                      0.062
+
+
 with all
 Model Performance Summary
 ===================================

@@ -166,9 +166,13 @@ modeling:
             # 'mktcap|end_portfolio_wtd_market_cap/market_cap|*',
 
             # 'transfers|*',
-            transfers|*/crypto_net_flows_max_investment_winsorized|*,
-            transfers|*/crypto_net_flows_crypto_inflows_winsorized|*,
-            transfers|*/crypto_net_gain_max_investment_winsorized|*,
+            # transfers|sells_best/crypto_net_flows_crypto_inflows_winsorized|*,
+
+            transfers|sells_best/crypto_net_flows_max_investment_winsorized|*,
+            transfers|sells_best/crypto_net_gain_max_investment_winsorized|*,
+            transfers|sells_worst/crypto_net_flows_max_investment_winsorized|*,
+            transfers|sells_worst/crypto_net_gain_max_investment_winsorized|*,
+            transfers|sells_worst/crypto_net_flows_crypto_inflows_winsorized|*,
 
             'cluster|*',
             '*|w1',
@@ -226,7 +230,7 @@ modeling:
 
         # Search Methodology
         n_iter: 40  # random search limit
-        n_splits: 2  # cv splits
+        n_splits: 3  # cv splits
         scoring: 'neg_root_mean_squared_error'
         drop_patterns_include_n_features: 1
 
@@ -265,8 +269,8 @@ modeling:
 
 
             # Optimize for Speed
-            regressor__n_jobs: [1]  # how many models to build at once
-            # regressor__nthread: [6]  # how many threads each model can use
+            regressor__n_jobs: [4]  # how many models to build at once
+            regressor__nthread: [4]  # how many threads each model can use
             # regressor__max_bin: [128]
             # regressor__tree_method: ['hist']
 
@@ -370,10 +374,8 @@ modeling:
             #     # ['transfers|new_coin_buy_counts|*'],
             #     # ['transfers|min_buyer_number|*'],
             ['transfers|sells_best/crypto_net_flows_max_investment_winsorized|*'],
-            ['transfers|sells_best/crypto_net_flows_crypto_inflows_winsorized|*'],
             ['transfers|sells_best/crypto_net_gain_max_investment_winsorized|*'],
             ['transfers|sells_worst/crypto_net_flows_max_investment_winsorized|*'],
-            ['transfers|sells_worst/crypto_net_flows_crypto_inflows_winsorized|*'],
             ['transfers|sells_worst/crypto_net_gain_max_investment_winsorized|*'],
 
 
