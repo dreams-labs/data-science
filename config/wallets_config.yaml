@@ -83,21 +83,24 @@ features:
     returns_winsorization: 0.01
     ranking_ntiles: 2
 
-    # Clustering Params
-    clustering_n_components: 25
-    # clustering_n_clusters: [2,4]
-    clustering_fill_method: 'fill_0'  # 'fill_0' or 'fill_mean'
-    clustering_include_pca: False
-
     # Market Timing Params
     offset_winsorization: 0.02 # comparisons between metrics and their offset values will be winsorized by this amount
     timing_metrics_min_transaction_size: 20  # trades below this USD threshold will not be evaluated for market timing peformance or transfers buyer sequencing
 
-    # Market Timing Params
+    # Market Cap Params
     market_cap_feature_columns: [  # which columns to generate market cap features with
         'market_cap_filled',
         'market_cap_unadj'
     ]
+
+    # Transfers Params
+
+
+    # Clustering Params
+    # clustering_n_clusters: [2,4]
+    clustering_n_components: 25
+    clustering_fill_method: 'fill_0'  # 'fill_0' or 'fill_mean'
+    clustering_include_pca: False
 
 
 # CheckpointValidation
