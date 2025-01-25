@@ -94,6 +94,11 @@ features:
     ]
 
     # Transfers Params
+    hypothetical_performance_features: [
+        'crypto_net_flows/crypto_inflows/winsorized',
+        crypto_net_flows/max_investment/winsorized,
+        crypto_net_flows/max_investment/winsorized,
+    ]
 
 
     # Clustering Params

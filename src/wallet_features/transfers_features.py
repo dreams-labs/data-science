@@ -4,6 +4,7 @@ Calculates metrics aggregated at the wallet-coin level
 
 import logging
 import pandas as pd
+import numpy as np
 import pandas_gbq
 from dreams_core.googlecloud import GoogleCloud as dgc
 
@@ -288,6 +289,50 @@ def calculate_average_holding_period(transfers_df):
 #            Ideal Performance Features
 # -------------------------------------------------
 
+
+@u.timing_decorator
+def calculate_transfers_hypothetical_features(
+    training_profits_df: pd.DataFrame,
+    period_start_date: str,
+    period_end_date: str
+) -> pd.DataFrame:
+    """
+    Calculates hypothetical wallet transfer features based on ideal price points.
+
+    Params:
+    - training_profits_df (DataFrame): Historical profits data
+    - period_start_date (str): Start of analysis period
+    - period_end_date (str): End of analysis period
+
+    Returns:
+    - hypothetical_features_df (DataFrame): Wallet-level hypothetical transfer features
+    """
+    # Upload profits data to temporary storage
+    upload_profits_df_dates(training_profits_df)
+
+    # Calculate ideal price points for each transfer
+    ideal_transfers_df = get_ideal_transfers_df(
+        period_start_date,
+        period_end_date
+    )
+
+    # Enrich with actual transfer history
+    ideal_transfers_df = append_profits_data(
+        ideal_transfers_df,
+        training_profits_df
+    )
+
+    # Generate wallet features
+    hypothetical_features_df = generate_hypothetical_features(
+        ideal_transfers_df,
+        period_start_date,
+        period_end_date
+    )
+
+    return hypothetical_features_df
+
+
+
 @u.timing_decorator
 def upload_profits_df_dates(training_profits_df: pd.DataFrame) -> None:
     """
@@ -315,6 +360,7 @@ def upload_profits_df_dates(training_profits_df: pd.DataFrame) -> None:
         table_schema=schema,
         progress_bar=False
     )
+
 
 
 @u.timing_decorator
@@ -426,6 +472,7 @@ def get_ideal_transfers_df(training_starting_balance_date: str,
     return ideal_transfers_df
 
 
+
 @u.timing_decorator
 def append_profits_data(ideal_transfers_df: pd.DataFrame,
                         training_profits_df: pd.DataFrame) -> pd.DataFrame:
@@ -477,28 +524,80 @@ def append_profits_data(ideal_transfers_df: pd.DataFrame,
     return merged_df
 
 
+
+@u.timing_decorator
 def generate_scenario_features(scenario_profits_df: pd.DataFrame,
-                               training_start: str,
-                               training_end: str,) -> pd.DataFrame:
+                               period_start_date: str,
+                               period_end_date: str,) -> pd.DataFrame:
     """
     Generate trading and profit features for a given transfer scenario.
 
     Params:
     - scenario_profits_df (DataFrame): DataFrame with columns 'usd_balance' and 'usd_net_transfers'
-    - training_start (str): Training period start date
-    - training_end (str): Training period end date
+    - period_start_date (str): Training period start date
+    - period_end_date (str): Training period end date
 
     Returns:
     - scenario_features_df (DataFrame): Performance features for the profits_df scenario
     """
 
-    # Generate features
+    # Generate performance features
     scenario_profits_df = wtf.calculate_crypto_balance_columns(
-        scenario_profits_df, training_start, training_end
+        scenario_profits_df, period_start_date, period_end_date
     )
     scenario_trading_df = wtf.calculate_gain_and_investment_columns(scenario_profits_df)
-    scenario_features_df = wpf.calculate_performance_features(
+    scenario_performance_df = wpf.calculate_performance_features(
         scenario_trading_df, include_twb_metrics=False
     )
 
-    return scenario_features_df
+    # Convert to the Hypothetical feature set
+    features = wallets_config['features']['hypothetical_performance_features']
+    hypothetical_features_df = scenario_performance_df[features]
+
+    # Remove '/' delimiters for better importance analysis parsing
+    hypothetical_features_df.columns = hypothetical_features_df.columns.str.replace('/', '_')
+
+    return hypothetical_features_df
+
+
+
+@u.timing_decorator
+def generate_hypothetical_features(ideal_transfers_df: pd.DataFrame,
+                                   period_start_date: str,
+                                   period_end_date: str) -> pd.DataFrame:
+    """
+    Generate features for best and worst case selling scenarios.
+
+    Params:
+    - ideal_transfers_df (DataFrame): Transfer data with min/max price columns
+    - period_start_date (str): Start date of analysis period
+    - period_end_date (str): End date of analysis period
+
+    Returns:
+    - hypothetical_features_df (DataFrame): Combined best/worst case features
+    """
+    # Generate best case scenario (sells at highest price)
+    best_profits_df = ideal_transfers_df[['usd_balance']].assign(
+        usd_net_transfers=np.where(
+            ideal_transfers_df['token_net_transfers'] < 0,
+            ideal_transfers_df['token_net_transfers'] * ideal_transfers_df['max_price'],
+            ideal_transfers_df['usd_net_transfers']
+        )
+    )
+    best_features = generate_scenario_features(best_profits_df, period_start_date, period_end_date)
+    best_features = best_features.add_prefix('sells_best/')
+
+    # Generate worst case scenario (sells at lowest price)
+    worst_profits_df = ideal_transfers_df[['usd_balance']].assign(
+        usd_net_transfers=np.where(
+            ideal_transfers_df['token_net_transfers'] < 0,
+            ideal_transfers_df['token_net_transfers'] * ideal_transfers_df['min_price'],
+            ideal_transfers_df['usd_net_transfers']
+        )
+    )
+    worst_features = generate_scenario_features(worst_profits_df, period_start_date, period_end_date)
+    worst_features = worst_features.add_prefix('sells_worst/')
+
+    hypothetical_features_df = pd.concat([best_features, worst_features], axis=1)
+
+    return hypothetical_features_df
