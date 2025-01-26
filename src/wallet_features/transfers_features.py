@@ -20,82 +20,192 @@ wallets_config = WalletsConfig()
 
 # these identify which buyer number a wallet was to a given coin
 
+# # OLD
+# def retrieve_transfers_sequencing(hybridize_wallet_ids: bool) -> pd.DataFrame:
+#     """
+#     Returns the buyer number for each wallet-coin pairing, where the first buyer
+#     receives rank 1 and the count increases for each subsequence wallet.
+
+#     Buyer numbers are calculated for all wallets but the returned df only includes
+#     wallets that were uploaded to the temp.wallet_modeling_training_cohort table.
+
+#     Params:
+#     - hybridize_wallet_ids (bool): whether the IDs are regular wallet_ids or hybrid wallet-coin IDs
+
+#     Returns:
+#     - buyer_numbers_df (df): dataframe showing that buyer number a wallet was for
+#         the associated coin_id.
+#     """
+#     # Wallet transactions below this threshold will not be included in the buyer sequencing
+#     minimum_transaction_size = wallets_config['features']['timing_metrics_min_transaction_size']
+
+#     # All data after the training period must be ignored to avoid data leakage
+#     training_period_end = wallets_config['training_data']['training_period_end']
+
+#     sequencing_sql_ctes = f"""
+#         with transaction_rank as (
+#             select coin_id
+#             ,wallet_address
+#             ,min(date) as first_transaction
+#             from core.coin_wallet_profits cwp
+#             where cwp.usd_net_transfers > {minimum_transaction_size}
+#             and cwp.date <= '{training_period_end}'
+#             group by 1,2
+#         ),
+
+#         buy_ordering as (
+#             select tr.coin_id
+#             ,tr.wallet_address
+#             ,first_transaction
+#             ,rank() over (partition by coin_id order by first_transaction asc) as buyer_number
+#             from transaction_rank tr
+#         )
+#         """
+
+#     if hybridize_wallet_ids is False:
+#         sequencing_sql = f"""
+#         {sequencing_sql_ctes}
+
+#         select wc.wallet_id as wallet_address -- rename to match the rest of the pipeline
+#         ,o.coin_id
+#         ,o.first_transaction
+#         ,o.buyer_number
+#         from buy_ordering o
+#         join reference.wallet_ids xw on xw.wallet_address = o.wallet_address
+#         join temp.wallet_modeling_training_cohort wc on wc.wallet_id = xw.wallet_id
+#         """
+#     else:
+#         sequencing_sql = f"""
+#         {sequencing_sql_ctes}
+
+#         select wc.hybrid_id as wallet_address -- rename to match the rest of the pipeline
+#         ,o.coin_id
+#         ,o.first_transaction
+#         ,o.buyer_number
+#         from buy_ordering o
+#         join temp.wallet_modeling_training_cohort wc on wc.wallet_address = o.wallet_address
+#             and wc.coin_id = o.coin_id
+#         """
+
+#     transfers_sequencing_df = dgc().run_sql(sequencing_sql)
+#     logger.info("Retrieved transfers data for %s wallet-coin pairs associated with %s wallets "
+#                 "in temp.wallet_modeling_training_cohort.",
+#                 len(transfers_sequencing_df), len(transfers_sequencing_df['wallet_address'].unique()))
+
+#     # Convert coin_id column to categorical to reduce memory usage
+#     transfers_sequencing_df['coin_id'] = transfers_sequencing_df['coin_id'].astype('category')
+#     transfers_sequencing_df = u.df_downcast(transfers_sequencing_df)
+
+#     return transfers_sequencing_df
+
+
+# NEW
 def retrieve_transfers_sequencing(hybridize_wallet_ids: bool) -> pd.DataFrame:
     """
-    Returns the buyer number for each wallet-coin pairing, where the first buyer
-    receives rank 1 and the count increases for each subsequence wallet.
-
-    Buyer numbers are calculated for all wallets but the returned df only includes
-    wallets that were uploaded to the temp.wallet_modeling_training_cohort table.
+    Returns buyer and seller sequence numbers for each wallet-coin pair, where the first
+    buyer/seller receives rank 1. Only includes wallets from wallet_modeling_training_cohort.
 
     Params:
-    - hybridize_wallet_ids (bool): whether the IDs are regular wallet_ids or hybrid wallet-coin IDs
+    - hybridize_wallet_ids (bool): Whether to use hybrid wallet-coin IDs vs regular wallet IDs
 
     Returns:
-    - buyer_numbers_df (df): dataframe showing that buyer number a wallet was for
-        the associated coin_id.
+    - sequence_df (DataFrame): Columns: wallet_address, coin_id, first_buy, first_sell,
+        buyer_number, seller_number
     """
-    # Wallet transactions below this threshold will not be included in the buyer sequencing
-    minimum_transaction_size = wallets_config['features']['timing_metrics_min_transaction_size']
+    # Minimum USD value to filter out dust/airdrops
+    min_txn_size = wallets_config['features']['timing_metrics_min_transaction_size']
+    training_end = wallets_config['training_data']['training_period_end']
 
-    # All data after the training period must be ignored to avoid data leakage
-    training_period_end = wallets_config['training_data']['training_period_end']
-
-    sequencing_sql_ctes = f"""
-        with transaction_rank as (
-            select coin_id
-            ,wallet_address
-            ,min(date) as first_transaction
-            from core.coin_wallet_profits cwp
-            where cwp.usd_net_transfers > {minimum_transaction_size}
-            and cwp.date <= '{training_period_end}'
-            group by 1,2
-        ),
-
-        buy_ordering as (
-            select tr.coin_id
-            ,tr.wallet_address
-            ,first_transaction
-            ,rank() over (partition by coin_id order by first_transaction asc) as buyer_number
-            from transaction_rank tr
-        )
-        """
-
+    # Set join table based on ID type
     if hybridize_wallet_ids is False:
-        sequencing_sql = f"""
-        {sequencing_sql_ctes}
-
-        select wc.wallet_id as wallet_address -- rename to match the rest of the pipeline
-        ,o.coin_id
-        ,o.first_transaction
-        ,o.buyer_number
-        from buy_ordering o
-        join reference.wallet_ids xw on xw.wallet_address = o.wallet_address
-        join temp.wallet_modeling_training_cohort wc on wc.wallet_id = xw.wallet_id
-        """
+        # non-hybridized wallet_ids need to be converted to wallet_address
+        id_column = 'wallet_id'
+        join_sequence = """
+            join (
+                select wc.wallet_id,
+                xw.wallet_address,
+                from temp.wallet_modeling_training_cohort wc
+                join reference.wallet_ids xw on xw.wallet_id = wc.wallet_id
+            ) wc using(wallet_address)
+            """
     else:
-        sequencing_sql = f"""
-        {sequencing_sql_ctes}
+        # hybridized ids already have wallet_address included in their table
+        id_column = 'hybrid_id'
+        join_sequence = """
+            join temp.wallet_modeling_training_cohort wc using(wallet_address, coin_id)
+            """
 
-        select wc.hybrid_id as wallet_address -- rename to match the rest of the pipeline
-        ,o.coin_id
-        ,o.first_transaction
-        ,o.buyer_number
-        from buy_ordering o
-        join temp.wallet_modeling_training_cohort wc on wc.wallet_address = o.wallet_address
-            and wc.coin_id = o.coin_id
-        """
+    sequencing_sql = f"""
+    with transaction_rank as (
+        select coin_id
+        ,wallet_address
+        ,min(case when usd_net_transfers > {min_txn_size} then date end) as first_buy
+        ,min(case when usd_net_transfers < -{min_txn_size} then date end) as first_sell
+        from core.coin_wallet_profits cwp
+        where abs(cwp.usd_net_transfers) > {min_txn_size}
+        and cwp.date <= '{training_end}'
+        group by 1,2
+    ),
 
-    transfers_sequencing_df = dgc().run_sql(sequencing_sql)
-    logger.info("Retrieved transfers data for %s wallet-coin pairs associated with %s wallets "
-                "in temp.wallet_modeling_training_cohort.",
-                len(transfers_sequencing_df), len(transfers_sequencing_df['wallet_address'].unique()))
 
-    # Convert coin_id column to categorical to reduce memory usage
-    transfers_sequencing_df['coin_id'] = transfers_sequencing_df['coin_id'].astype('category')
-    transfers_sequencing_df = u.df_downcast(transfers_sequencing_df)
+    buyer_ranks as (
+        select coin_id
+        ,wallet_address
+        ,first_buy
+        ,RANK() OVER (PARTITION BY coin_id ORDER BY first_buy ASC) as buyer_number
+        from transaction_rank
+        where first_buy is not null
+    ),
+    seller_ranks as (
+        select coin_id
+        ,wallet_address
+        ,first_sell
+        ,RANK() OVER (PARTITION BY coin_id ORDER BY first_sell ASC) as seller_number
+        from transaction_rank
+        where first_sell is not null
+    ),
+    sequence_ordering as (
+        select tr.coin_id
+        ,tr.wallet_address
+        ,tr.first_buy
+        ,tr.first_sell
+        ,b.buyer_number
+        ,s.seller_number
+        from transaction_rank tr
+        left join buyer_ranks b using (coin_id, wallet_address)
+        left join seller_ranks s using (coin_id, wallet_address)
+    ),
 
-    return transfers_sequencing_df
+    base_ordering as (
+        select
+            so.*,
+            wc.{id_column} as final_wallet_id
+        from sequence_ordering so
+        {join_sequence}
+    )
+
+    select
+        final_wallet_id as wallet_address,
+        coin_id,
+        first_buy,
+        first_sell,
+        buyer_number,
+        seller_number
+    from base_ordering
+    """
+    print(sequencing_sql)
+    sequence_df = dgc().run_sql(sequencing_sql)
+
+    # Log retrieval stats
+    logger.info("Retrieved sequence data for %s wallet-coin pairs across %s wallets",
+                len(sequence_df), len(sequence_df['wallet_address'].unique()))
+
+    # Optimize memory usage
+    sequence_df['coin_id'] = sequence_df['coin_id'].astype('category')
+    sequence_df = u.df_downcast(sequence_df)
+
+    return sequence_df
+
 
 
 # HYBRID
@@ -118,7 +228,7 @@ def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
         profits_df,
         transfers_sequencing_df,
         left_on=['coin_id', 'date', 'wallet_address'],
-        right_on=['coin_id', 'first_transaction', 'wallet_address'],
+        right_on=['coin_id', 'first_buy', 'wallet_address'],
         how='inner'
     )
 
