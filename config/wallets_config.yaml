@@ -167,10 +167,10 @@ modeling:
 
             # transfers|*,
             transfers|first_sell/*,
-            # [transfers|avg_buyer_number|*],
-            # [transfers|median_buyer_number|*],
-            # transfers|new_coin_buy_counts|*,
-            # [transfers|min_buyer_number|*],
+            # transfers|first_sell/avg_wallet_rank|*,
+            # transfers|first_sell/median_avg_wallet_rank|*,
+            # transfers|first_sell/min_avg_wallet_rank|*,
+            # transfers|first_sell/new_coin_transaction_counts|*,
 
             scenario|*,
             scenario|sells_best/crypto_net_flows_max_investment_winsorized*,
@@ -235,7 +235,7 @@ modeling:
         n_iter: 40  # random search limit
         n_splits: 4  # cv splits
         scoring: neg_root_mean_squared_error
-        # drop_patterns_include_n_features: 1
+        drop_patterns_include_n_features: 1
 
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # scikit-learn verbosity
@@ -370,10 +370,10 @@ modeling:
                 # [mktcap|*/market_cap|*],
 
                 # [transfers|*],
-                [transfers|first_sell/avg_wallet_rank|*],
-                [transfers|first_sell/median_avg_wallet_rank|*],
-                [transfers|first_sell/min_avg_wallet_rank|*],
-                [transfers|first_sell/new_coin_transaction_counts|*],
+                # [transfers|first_sell/avg_wallet_rank|*],
+                # [transfers|first_sell/median_avg_wallet_rank|*],
+                # [transfers|first_sell/min_avg_wallet_rank|*],
+                # [transfers|first_sell/new_coin_transaction_counts|*],
 
                 # [scenario|*],
                 # [scenario|sells_best/*],
