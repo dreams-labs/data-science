@@ -56,13 +56,9 @@ def calculate_scenario_features(
     # Generate wallet features
     scenario_features_df = generate_scenario_features(
         ideal_transfers_df,
-        training_profits_df,
         period_start_date,
         period_end_date
     )
-
-    # Generate scenario vs base comparison columns
-    scenario_features_df = add_scenario_vs_base_columns(scenario_features_df)
 
     # Data completeness check
     profits_wallets = training_profits_df['wallet_address'].drop_duplicates()
@@ -254,9 +250,8 @@ def generate_scenario_performance(scenario_profits_df: pd.DataFrame,
 
 @u.timing_decorator
 def generate_scenario_features(ideal_transfers_df: pd.DataFrame,
-                                   training_profits_df: pd.DataFrame,
-                                   period_start_date: str,
-                                   period_end_date: str) -> pd.DataFrame:
+                               period_start_date: str,
+                               period_end_date: str) -> pd.DataFrame:
     """
     Generate features for best and worst case selling scenarios.
 
@@ -269,11 +264,6 @@ def generate_scenario_features(ideal_transfers_df: pd.DataFrame,
     Returns:
     - scenario_features_df (DataFrame): Combined best/worst case features
     """
-    # Generate base case scenario
-    base_features = generate_scenario_performance(u.ensure_index(training_profits_df),
-                                                  period_start_date, period_end_date)
-    base_features = base_features.add_prefix('base/')
-
     # Generate best case scenario (sells at highest price)
     best_profits_df = ideal_transfers_df[['usd_balance']].assign(
         usd_net_transfers=np.where(
@@ -297,8 +287,7 @@ def generate_scenario_features(ideal_transfers_df: pd.DataFrame,
     worst_features = worst_features.add_prefix('sells_worst/')
 
     # Merge all together
-    scenario_features_df = base_features
-    scenario_features_df = pd.concat([scenario_features_df, best_features], axis=1)
+    scenario_features_df = best_features
     scenario_features_df = pd.concat([scenario_features_df, worst_features], axis=1)
 
     # Data quality checks
@@ -310,42 +299,41 @@ def generate_scenario_features(ideal_transfers_df: pd.DataFrame,
 
     return scenario_features_df
 
+# FeatureRemoval not predictive
+# def add_scenario_vs_base_columns(df: pd.DataFrame) -> pd.DataFrame:
+#     """
+#     Adds columns to the DataFrame by dividing each 'category/metric' column
+#     by the corresponding 'base/metric' column to calculate category vs base ratios.
 
+#     Params:
+#     - df (pd.DataFrame): Input DataFrame with category/metric column format.
 
-def add_scenario_vs_base_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Adds columns to the DataFrame by dividing each 'category/metric' column
-    by the corresponding 'base/metric' column to calculate category vs base ratios.
+#     Returns:
+#     - pd.DataFrame: Updated DataFrame with additional ratio columns.
+#     """
+#     # Extract unique category prefixes and metric suffixes
+#     categories = set(col.split('/', 1)[0] for col in df.columns if '/' in col)
+#     metric_suffixes = set(col.split('/', 1)[1] for col in df.columns if '/' in col)
 
-    Params:
-    - df (pd.DataFrame): Input DataFrame with category/metric column format.
+#     # Ensure 'base/' exists in categories
+#     if 'base' not in categories:
+#         raise ValueError("The DataFrame must contain 'base/' category columns for comparison.")
 
-    Returns:
-    - pd.DataFrame: Updated DataFrame with additional ratio columns.
-    """
-    # Extract unique category prefixes and metric suffixes
-    categories = set(col.split('/', 1)[0] for col in df.columns if '/' in col)
-    metric_suffixes = set(col.split('/', 1)[1] for col in df.columns if '/' in col)
+#     # Loop through categories excluding 'base' and calculate the ratios
+#     for category in categories - {'base'}:
+#         for suffix in metric_suffixes:
+#             base_col = f"base/{suffix}"
+#             category_col = f"{category}/{suffix}"
+#             new_col = f"{category}_v_base/{suffix}"
 
-    # Ensure 'base/' exists in categories
-    if 'base' not in categories:
-        raise ValueError("The DataFrame must contain 'base/' category columns for comparison.")
+#             # Check if both columns exist before dividing
+#             if base_col in df.columns and category_col in df.columns:
+#                 # Add the ratio column
+#                 df[new_col] = df[category_col] - df[base_col]
+#             else:
+#                 raise KeyError(f"Required columns missing: {base_col} or {category_col}")
 
-    # Loop through categories excluding 'base' and calculate the ratios
-    for category in categories - {'base'}:
-        for suffix in metric_suffixes:
-            base_col = f"base/{suffix}"
-            category_col = f"{category}/{suffix}"
-            new_col = f"{category}_v_base/{suffix}"
+#     # Drop all 'base/' columns
+#     df = df.drop(columns=[col for col in df.columns if col.startswith('base/')])
 
-            # Check if both columns exist before dividing
-            if base_col in df.columns and category_col in df.columns:
-                # Add the ratio column
-                df[new_col] = df[category_col] - df[base_col]
-            else:
-                raise KeyError(f"Required columns missing: {base_col} or {category_col}")
-
-    # Drop all 'base/' columns
-    df = df.drop(columns=[col for col in df.columns if col.startswith('base/')])
-
-    return df
+#     return df
