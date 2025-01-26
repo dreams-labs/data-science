@@ -98,6 +98,7 @@ def retrieve_transfers_sequencing(hybridize_wallet_ids: bool) -> pd.DataFrame:
     return transfers_sequencing_df
 
 
+# HYBRID
 @u.timing_decorator
 def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df):
     """
@@ -112,9 +113,8 @@ def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
         transfers_sequencing_features_df (df): dataframe indexed on wallet_address with
         transfers feature columns
     """
-
-    # Inner join lifetime transfers with the profits_df window to filter on date
-    window_transfers_data_df = pd.merge(
+    # Inner join lifetime transfers with profits_df to filter on valid dates and coins
+    window_transfers_df = pd.merge(
         profits_df,
         transfers_sequencing_df,
         left_on=['coin_id', 'date', 'wallet_address'],
@@ -123,17 +123,100 @@ def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
     )
 
     # Append buyer numbers to the merged_df
-    transfers_sequencing_features_df = window_transfers_data_df.groupby('wallet_address').agg({
-        'buyer_number': ['count', 'mean', 'median', 'min']
+    features_df = window_transfers_df.groupby('wallet_address').agg({
+        'buyer_number': ['count', 'mean', 'median', 'min'],
+        # 'seller_number': ['count', 'mean', 'median', 'min']
     })
-    transfers_sequencing_features_df.columns = [
+
+    # Rename columns
+    features_df.columns = [
         'new_coin_buy_counts',
         'avg_buyer_number',
         'median_buyer_number',
         'min_buyer_number'
     ]
 
-    return transfers_sequencing_features_df
+    return features_df
+
+# # OLD
+# @u.timing_decorator
+# def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df):
+#     """
+#     Retrieves facts about the wallet's transfer activity based on blockchain data.
+#     Period boundaries are defined by the dates in profits_df through the inner join.
+
+#     Params:
+#         profits_df (df): the profits_df for the period that the features will reflect
+#         transfers_sequencing_df (df): each wallet's lifetime transfers data
+
+#     Returns:
+#         transfers_sequencing_features_df (df): dataframe indexed on wallet_address with
+#         transfers feature columns
+#     """
+
+#     # Inner join lifetime transfers with the profits_df window to filter on date
+#     window_transfers_data_df = pd.merge(
+#         profits_df,
+#         transfers_sequencing_df,
+#         left_on=['coin_id', 'date', 'wallet_address'],
+#         right_on=['coin_id', 'first_transaction', 'wallet_address'],
+#         how='inner'
+#     )
+
+#     # Append buyer numbers to the merged_df
+#     transfers_sequencing_features_df = window_transfers_data_df.groupby('wallet_address').agg({
+#         'buyer_number': ['count', 'mean', 'median', 'min']
+#     })
+#     transfers_sequencing_features_df.columns = [
+#         'new_coin_buy_counts',
+#         'avg_buyer_number',
+#         'median_buyer_number',
+#         'min_buyer_number'
+#     ]
+
+#     return transfers_sequencing_features_df
+
+
+
+# # NEW
+# @u.timing_decorator
+# def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df):
+#     """
+#     Calculates buyer/seller sequence features within profits_df date window.
+
+#     Params:
+#         profits_df (DataFrame): profits data for feature window
+#         transfers_sequencing_df (DataFrame): lifetime sequencing data
+
+#     Returns:
+#         features_df (DataFrame): Indexed on wallet_address with sequence metrics
+#     """
+#     min_date = profits_df['date'].min()
+#     max_date = profits_df['date'].max()
+
+#     # Filter sequencing data to window
+#     window_df = transfers_sequencing_df[
+#         (transfers_sequencing_df['first_buy'].between(min_date, max_date)) |
+#         (transfers_sequencing_df['first_sell'].between(min_date, max_date))
+#     ]
+
+#     features_df = window_df.groupby('wallet_address').agg({
+#         'buyer_number': ['count', 'mean', 'median', 'min'],
+#         'seller_number': ['count', 'mean', 'median', 'min']
+#     })
+
+#     features_df.columns = [
+#         'first_buys/new_coin_transaction_counts',
+#         'first_buys/avg_wallet_rank',
+#         'first_buys/median_avg_wallet_rank',
+#         'first_buys/min_avg_wallet_rank',
+#         'first_sells/new_coin_transaction_counts',
+#         'first_sells/avg_wallet_rank',
+#         'first_sells/median_avg_wallet_rank',
+#         'first_sells/min_avg_wallet_rank',
+#     ]
+
+#     return features_df
 
 
 
