@@ -1,3 +1,24 @@
+# dda 602 sell features
+checkpoint 1: remove quotes
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       92
+Features per Window:      23
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.667
+RMSE:                     0.219
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.812
+RMSE:                     0.116
+MAE:                      0.061
+
+
 # dda 605 scenario features
 checkpoint 3
 with all scenario features added
