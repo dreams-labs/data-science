@@ -93,11 +93,12 @@ features:
         'market_cap_unadj'
     ]
 
-    # Transfers Params
+    # Scenarios Params
+    include_scenario_features: False
     scenario_performance_features: [
-        crypto_net_flows/crypto_inflows/winsorized,
+        # crypto_net_flows/crypto_inflows/winsorized,
         crypto_net_flows/max_investment/winsorized,
-        crypto_net_gain/max_investment/winsorized,
+        # crypto_net_gain/max_investment/winsorized,
     ]
 
 
@@ -161,29 +162,21 @@ modeling:
             'trading|time_weighted_return/*',
             'trading|annualized_twr/*',
 
-
             # 'mktcap|*',
             # 'mktcap|end_portfolio_wtd_market_cap/market_cap|*',
 
             # 'transfers|*',
+            transfers|sells_* ,
+            transfers|buys_* ,
+            # transfers|sells_best/crypto_net_flows_crypto_inflows_winsorized|*,
             # transfers|sells_best/crypto_net_flows_crypto_inflows_winsorized|*,
 
-            # scenario|*,
-            scenario|base/*,
-            # scenario|sells_best/crypto_net_flows_crypto_inflows_winsorized*,
-            # scenario|sells_best/crypto_net_flows_max_investment_winsorized*,
-            # scenario|sells_best/crypto_net_gain_max_investment_winsorized*,
-            # scenario|sells_worst/crypto_net_flows_crypto_inflows_winsorized*,
+            scenario|*,
+            scenario|sells_best/crypto_net_flows_max_investment_winsorized*,
             # scenario|sells_worst/crypto_net_flows_max_investment_winsorized*,
-            # scenario|sells_worst/crypto_net_gain_max_investment_winsorized*,
-            # scenario|sells_best_v_base/crypto_net_gain_max_investment_winsorized*,
-            # scenario|sells_best_v_base/crypto_net_flows_max_investment_winsorized*,
-            # scenario|sells_best_v_base/crypto_net_flows_crypto_inflows_winsorized*,
-            # scenario|sells_worst_v_base/crypto_net_gain_max_investment_winsorized*,
-            # scenario|sells_worst_v_base/crypto_net_flows_max_investment_winsorized*,
-            # scenario|sells_worst_v_base/crypto_net_flows_crypto_inflows_winsorized*,
 
             'cluster|*',
+
             '*|w1',
         ]
 
@@ -233,15 +226,15 @@ modeling:
 
         # Turn On or Off
         # -------------------------------
-        enabled: True
+        # enabled: True
         # -------------------------------
 
 
         # Search Methodology
         n_iter: 40  # random search limit
-        n_splits: 3  # cv splits
+        n_splits: 4  # cv splits
         scoring: 'neg_root_mean_squared_error'
-        drop_patterns_include_n_features: 1
+        # drop_patterns_include_n_features: 1
 
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # scikit-learn verbosity
@@ -269,23 +262,21 @@ modeling:
             # regressor__max_bin: [64, 128, 256]
             # regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
-
             # Tree Training Speed Overrides
-            regressor__n_estimators: [200]
-            regressor__learning_rate: [0.07]
-            regressor__gamma: [0.01]
-            regressor__subsample: [1.0]   # samples rows, e.g. trees use x% of all wallet rows
-
+            regressor__n_estimators: [250]
+            regressor__learning_rate: [0.05]
+            # regressor__gamma: [0.01]
 
             # Optimize for Speed
-            regressor__n_jobs: [4]  # how many models to build at once
-            regressor__nthread: [4]  # how many threads each model can use
+            # regressor__n_jobs: [4]  # how many models to build at once
+            # regressor__nthread: [4]  # how many threads each model can use
             # regressor__max_bin: [128]
             # regressor__tree_method: ['hist']
 
 
             # Column Selection
             drop_columns__drop_patterns: [
+                # [],
                 [],
                 # ['timing|*'],
                 # ['timing|price_sma_2/lead_21/*'],
@@ -384,15 +375,15 @@ modeling:
                 # ['transfers|min_buyer_number|*'],
 
                 # [scenario|*],
-                [scenario|sells_best/*],
-                [scenario|sells_worst/*],
-                [scenario|sells_best_v_base/*],
-                [scenario|sells_worst_v_base/*],
-                # [scenario|sells_best/crypto_net_flows_crypto_inflows_winsorized*],
-                # [scenario|sells_best/crypto_net_flows_max_investment_winsorized*],
+                # [scenario|sells_best/*],
+                # [scenario|sells_worst/*],
+                # [scenario|sells_best_v_base/*],
+                # [scenario|sells_worst_v_base/*],
+                [scenario|sells_best/crypto_net_flows_crypto_inflows_winsorized*],
+                [scenario|sells_best/crypto_net_flows_max_investment_winsorized*],
                 # [scenario|sells_best/crypto_net_gain_max_investment_winsorized*],
                 # [scenario|sells_worst/crypto_net_flows_crypto_inflows_winsorized*],
-                # [scenario|sells_worst/crypto_net_flows_max_investment_winsorized*],
+                [scenario|sells_worst/crypto_net_flows_max_investment_winsorized*],
                 # [scenario|sells_worst/crypto_net_gain_max_investment_winsorized*],
                 # [scenario|sells_best_v_base/crypto_net_gain_max_investment_winsorized*],
                 # [scenario|sells_best_v_base/crypto_net_flows_max_investment_winsorized*],

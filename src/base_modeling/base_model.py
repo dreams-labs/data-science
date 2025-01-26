@@ -152,6 +152,7 @@ class BaseModel:
 
         # Fit final regressor with transformed data
         logger.info(f"Training model using data with shape: {X_train_transformed.shape}...")
+        u.notify('startup')
         regressor.fit(
             X_train_transformed,
             self.y_train,
@@ -314,11 +315,13 @@ class BaseModel:
 
     def generate_search_report(self, output_raw_data=False) -> pd.DataFrame:
         """
-        Generate a report of the random search results.
+        Generate a report of the random search results, excluding constant parameters.
+
+        Params:
+        - output_raw_data (bool): If True, returns raw cv_results_
 
         Returns:
-        - report_df (DataFrame): A DataFrame with columns for 'param', 'param_value',
-                                'avg_score', and 'total_builds'.
+        - report_df (DataFrame): DataFrame with variable parameters and their scores
         """
         if not self.random_search:
             logger.error("Random search has not been run.")
@@ -327,20 +330,21 @@ class BaseModel:
             logger.error("cv_results_ is unavailable.")
             return None
 
-        # Extract cv_results from the random search
-        cv_results = self.random_search.cv_results_
+        results_df = pd.DataFrame(self.random_search.cv_results_)
 
-        # Convert cv_results to a DataFrame
-        results_df = pd.DataFrame(cv_results)
-
-        if output_raw_data is True:
+        if output_raw_data:
             return results_df
 
-        # Prepare a list to hold rows for the report
         report_data = []
+        param_cols = [col for col in results_df.columns if col.startswith("param_")]
 
-        # Loop through each parameter in the param grid
-        for param in [col for col in results_df.columns if col.startswith("param_")]:
+        # Only include parameters with multiple unique values
+        variable_params = [
+            col for col in param_cols
+            if results_df[col].nunique() > 1
+        ]
+
+        for param in variable_params:
             param_name = param.replace("param_", "")
             for _, row in results_df.iterrows():
                 report_data.append({
@@ -350,7 +354,6 @@ class BaseModel:
                     'total_builds': len(results_df)
                 })
 
-        # Create a DataFrame for the report
         report_df = pd.DataFrame(report_data)
 
         return (report_df
@@ -358,8 +361,6 @@ class BaseModel:
                     .mean('avg_score')
                     .sort_values(by='avg_score', ascending=False)
                 )
-
-
 
 
     # -----------------------------------

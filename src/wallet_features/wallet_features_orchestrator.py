@@ -13,6 +13,7 @@ import wallet_features.market_cap_features as wmc
 import wallet_features.trading_features as wtf
 import wallet_features.transfers_features as wts
 import wallet_features.market_timing_features as wmt
+import wallet_features.scenario_features as wsc
 import utils as u
 
 # Set up logger at the module level
@@ -119,11 +120,12 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
 
     # scenario transfers features (left join, do not fill)
     # -----------------------------------------------------------------------
-    transfers_scenario_features_df = wts.calculate_scenario_features(profits_df,
-                                                                     market_indicators_data_df,
-                                                                     period_start_date,period_end_date)
-    feature_column_names['scenario|'] = transfers_scenario_features_df.columns
-    wallet_features_df = wallet_features_df.join(transfers_scenario_features_df, how='left')
+    if wallets_config['features']['include_scenario_features'] is True:
+        transfers_scenario_features_df = wsc.calculate_scenario_features(profits_df,
+                                                                        market_indicators_data_df,
+                                                                        period_start_date,period_end_date)
+        feature_column_names['scenario|'] = transfers_scenario_features_df.columns
+        wallet_features_df = wallet_features_df.join(transfers_scenario_features_df, how='left')
 
 
     # Apply feature prefixes

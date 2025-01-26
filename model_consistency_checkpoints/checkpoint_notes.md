@@ -1,3 +1,69 @@
+# dda 605 scenario features
+checkpoint 3
+with all scenario features added
+
+
+confirm base performance
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       92
+Features per Window:      23
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.667
+RMSE:                     0.219
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.812
+RMSE:                     0.116
+MAE:                      0.061
+
+
+checkpoint 2 with best/worst sells
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       116
+Features per Window:      29
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.669
+RMSE:                     0.218
+MAE:                      0.112
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.804
+RMSE:                     0.118
+MAE:                      0.065
+
+
+
+checkpoint 1 new laptop
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       92
+Features per Window:      23
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.667
+RMSE:                     0.219
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.812
+RMSE:                     0.116
+MAE:                      0.061
+
+
 # dda 460 max unrealized gain/loss
 checkpoint 5 refactor and add ratios base
 Model Performance Summary
