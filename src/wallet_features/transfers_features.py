@@ -224,7 +224,7 @@ def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
     profits_df = u.ensure_index(profits_df)
 
     # Inner join lifetime transfers with profits_df to filter on valid dates and coins
-    window_transfers_df = pd.merge(
+    first_buy_transfers_df = pd.merge(
         profits_df,
         transfers_sequencing_df,
         left_index=True,
@@ -232,25 +232,23 @@ def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
         how='inner'
     )
 
-    # Append buyer numbers to the merged_df
-    features_df = window_transfers_df.groupby('wallet_address').agg({
+    first_buy_features_df = first_buy_transfers_df.groupby('wallet_address').agg({
         'buyer_number': ['count', 'mean', 'median', 'min'],
-        # 'seller_number': ['count', 'mean', 'median', 'min']
     })
 
-    # Rename columns
-    features_df.columns = [
-        'first_buys/new_coin_transaction_counts',
-        'first_buys/avg_wallet_rank',
-        'first_buys/median_avg_wallet_rank',
-        'first_buys/min_avg_wallet_rank',
+    first_buy_features_df.columns = [
+        'new_coin_transaction_counts',
+        'avg_wallet_rank',
+        'median_avg_wallet_rank',
+        'min_avg_wallet_rank',
 #         'first_sells/new_coin_transaction_counts',
 #         'first_sells/avg_wallet_rank',
 #         'first_sells/median_avg_wallet_rank',
 #         'first_sells/min_avg_wallet_rank',
     ]
+    first_buy_features_df = first_buy_features_df.add_prefix('first_buy/')
 
-    return features_df
+    return first_buy_features_df
 
 # # OLD
 # @u.timing_decorator
