@@ -1,4 +1,24 @@
 # dda 602 sell features
+CHECKPOINT2 branch
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       92
+Features per Window:      23
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.667
+RMSE:                     0.219
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.812
+RMSE:                     0.116
+MAE:                      0.061
+
+
 checkpoint 1: remove quotes
 Model Performance Summary
 ===================================
