@@ -166,6 +166,7 @@ modeling:
             # mktcap|end_portfolio_wtd_market_cap/market_cap|*,
 
             # transfers|*,
+            transfers|first_sell/*,
             # [transfers|avg_buyer_number|*],
             # [transfers|median_buyer_number|*],
             # transfers|new_coin_buy_counts|*,
@@ -369,10 +370,10 @@ modeling:
                 # [mktcap|*/market_cap|*],
 
                 # [transfers|*],
-                [transfers|avg_buyer_number|*],
-                [transfers|median_buyer_number|*],
-                [transfers|new_coin_buy_counts|*],
-                [transfers|min_buyer_number|*],
+                [transfers|first_sell/avg_wallet_rank|*],
+                [transfers|first_sell/median_avg_wallet_rank|*],
+                [transfers|first_sell/min_avg_wallet_rank|*],
+                [transfers|first_sell/new_coin_transaction_counts|*],
 
                 # [scenario|*],
                 # [scenario|sells_best/*],
