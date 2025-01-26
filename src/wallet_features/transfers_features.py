@@ -240,10 +240,14 @@ def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
 
     # Rename columns
     features_df.columns = [
-        'new_coin_buy_counts',
-        'avg_buyer_number',
-        'median_buyer_number',
-        'min_buyer_number'
+        'first_buys/new_coin_transaction_counts',
+        'first_buys/avg_wallet_rank',
+        'first_buys/median_avg_wallet_rank',
+        'first_buys/min_avg_wallet_rank',
+#         'first_sells/new_coin_transaction_counts',
+#         'first_sells/avg_wallet_rank',
+#         'first_sells/median_avg_wallet_rank',
+#         'first_sells/min_avg_wallet_rank',
     ]
 
     return features_df
