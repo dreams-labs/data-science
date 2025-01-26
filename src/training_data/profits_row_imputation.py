@@ -14,6 +14,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from dreams_core import core as dc
 
+# Local module imports
+import utils as u
+
 # set up logger at the module level
 logger = dc.setup_logger()
 
@@ -216,22 +219,22 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
                 profits_df.shape,
                 target_date)
 
+    # Create indices so we can use vectorized operations
+    profits_df = u.ensure_index(profits_df)
+    prices_df = u.ensure_index(prices_df.copy(deep=True))
+
     # Data Checks and Typecasting
     # ---------------------------
     # Convert date to datetime
     target_date = pd.to_datetime(target_date)
 
     # Check if target_date is earlier than all profits_df dates
-    if target_date < pd.to_datetime(profits_df['date'].min()):
+    if target_date < pd.to_datetime(profits_df.index.get_level_values('date').min()):
         raise ValueError("Target date is earlier than all dates in profits_df")
 
     # Check if target_date is later than all prices_df dates
-    if pd.to_datetime(target_date) >  pd.to_datetime(prices_df['date'].max()):
+    if pd.to_datetime(target_date) >  pd.to_datetime(prices_df.index.get_level_values('date').max()):
         raise ValueError("Target date is later than all dates in prices_df")
-
-    # Create indices so we can use vectorized operations
-    profits_df = profits_df.set_index(['coin_id', 'wallet_address', 'date'])
-    prices_df = prices_df.set_index(['coin_id', 'date']).copy(deep=True)
 
 
     # Step 1: Split profits_df records before and after the target_date

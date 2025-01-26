@@ -1,3 +1,30 @@
+# dda 608 training data
+checkpoint 1: w.667 add ensure_index()
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       92
+Features per Window:      23
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.667
+RMSE:                     0.219
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.809
+RMSE:                     0.117
+MAE:                      0.062
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.002
+Standard Dev of Residuals:0.219
+95% Prediction Interval:  ±0.429
+
+
 # dda 602 sell features
 CHECKPOINT2 checkpoint 9 ready to merge
 Model Performance Summary
