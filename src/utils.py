@@ -15,7 +15,6 @@ import itertools
 import logging
 import warnings
 import functools
-import pyttsx3
 import yaml
 import psutil
 import progressbar
@@ -895,12 +894,12 @@ def winsorize(data: pd.Series, cutoff: float = 0.01) -> pd.Series:
 #     Misc Notebook Helper Functions
 # ---------------------------------------- #
 
-def notify(sound_name: Union[str, int] = None, prompt: str = None, voice_id: str = None):
+def notify(sound_name: Union[str, int] = None, prompt: str = None, voice_id: str = 'Tessa'):
     """
     Play alert sound followed by optional TTS message.
 
     Params:
-    - sound_name (str|int): Name/index of sound from config (e.g. 'alert_bells' or 0)
+    - sound_name (str|int): Name/index of sound from config
     - prompt (str, optional): Text to speak using TTS
     - voice_id (str, optional): Specific voice ID for TTS
     """
@@ -939,19 +938,14 @@ def notify(sound_name: Union[str, int] = None, prompt: str = None, voice_id: str
         sound.play()
 
         if prompt:
-            time.sleep(1.2)
-            engine = pyttsx3.init()
-            voice_id = voice_id or os.getenv('ALERT_VOICE_ID')
-            engine.setProperty('voice', voice_id)
-            engine.setProperty('rate', 125)
-            engine.setProperty('volume', 0.4)
-            engine.say(prompt)
-            engine.runAndWait()
-            engine.stop()
-            del engine
+            time.sleep(0.8)
+            voice_cmd = f"say -v {voice_id} -r 125 '[[ volm 0.6 ]] {prompt}'"
+            os.system(voice_cmd)
 
     except Exception as e:  # pylint: disable=broad-exception-caught
         return f"Error with playback: {e}"
+
+
 
 
 def notify_on_failure(shell, etype, value, tb, tb_offset=None):
