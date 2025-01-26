@@ -166,13 +166,16 @@ modeling:
             # 'mktcap|end_portfolio_wtd_market_cap/market_cap|*',
 
             # 'transfers|*',
+            transfers|sells_* ,
+            transfers|buys_* ,
+            # transfers|sells_best/crypto_net_flows_crypto_inflows_winsorized|*,
             # transfers|sells_best/crypto_net_flows_crypto_inflows_winsorized|*,
 
-            # scenario|*,
+            scenario|*,
             scenario|base/*,
-            # scenario|sells_best/crypto_net_flows_crypto_inflows_winsorized*,
-            # scenario|sells_best/crypto_net_flows_max_investment_winsorized*,
-            # scenario|sells_best/crypto_net_gain_max_investment_winsorized*,
+            scenario|sells_best/crypto_net_flows_crypto_inflows_winsorized*,
+            scenario|sells_best/crypto_net_flows_max_investment_winsorized*,
+            scenario|sells_best/crypto_net_gain_max_investment_winsorized*,
             # scenario|sells_worst/crypto_net_flows_crypto_inflows_winsorized*,
             # scenario|sells_worst/crypto_net_flows_max_investment_winsorized*,
             # scenario|sells_worst/crypto_net_gain_max_investment_winsorized*,
@@ -233,7 +236,7 @@ modeling:
 
         # Turn On or Off
         # -------------------------------
-        enabled: True
+        # enabled: True
         # -------------------------------
 
 
@@ -278,14 +281,15 @@ modeling:
 
 
             # Optimize for Speed
-            regressor__n_jobs: [4]  # how many models to build at once
-            regressor__nthread: [4]  # how many threads each model can use
+            # regressor__n_jobs: [4]  # how many models to build at once
+            # regressor__nthread: [4]  # how many threads each model can use
             # regressor__max_bin: [128]
             # regressor__tree_method: ['hist']
 
 
             # Column Selection
             drop_columns__drop_patterns: [
+                # [],
                 [],
                 # ['timing|*'],
                 # ['timing|price_sma_2/lead_21/*'],
@@ -384,22 +388,22 @@ modeling:
                 # ['transfers|min_buyer_number|*'],
 
                 # [scenario|*],
-                [scenario|sells_best/*],
-                [scenario|sells_worst/*],
-                [scenario|sells_best_v_base/*],
-                [scenario|sells_worst_v_base/*],
+                # [scenario|sells_best/*],
+                # [scenario|sells_worst/*],
+                # [scenario|sells_best_v_base/*],
+                # [scenario|sells_worst_v_base/*],
                 # [scenario|sells_best/crypto_net_flows_crypto_inflows_winsorized*],
                 # [scenario|sells_best/crypto_net_flows_max_investment_winsorized*],
                 # [scenario|sells_best/crypto_net_gain_max_investment_winsorized*],
-                # [scenario|sells_worst/crypto_net_flows_crypto_inflows_winsorized*],
-                # [scenario|sells_worst/crypto_net_flows_max_investment_winsorized*],
-                # [scenario|sells_worst/crypto_net_gain_max_investment_winsorized*],
-                # [scenario|sells_best_v_base/crypto_net_gain_max_investment_winsorized*],
-                # [scenario|sells_best_v_base/crypto_net_flows_max_investment_winsorized*],
-                # [scenario|sells_best_v_base/crypto_net_flows_crypto_inflows_winsorized*],
-                # [scenario|sells_worst_v_base/crypto_net_gain_max_investment_winsorized*],
-                # [scenario|sells_worst_v_base/crypto_net_flows_max_investment_winsorized*],
-                # [scenario|sells_worst_v_base/crypto_net_flows_crypto_inflows_winsorized*],
+                [scenario|sells_worst/crypto_net_flows_crypto_inflows_winsorized*],
+                [scenario|sells_worst/crypto_net_flows_max_investment_winsorized*],
+                [scenario|sells_worst/crypto_net_gain_max_investment_winsorized*],
+                [scenario|sells_best_v_base/crypto_net_gain_max_investment_winsorized*],
+                [scenario|sells_best_v_base/crypto_net_flows_max_investment_winsorized*],
+                [scenario|sells_best_v_base/crypto_net_flows_crypto_inflows_winsorized*],
+                [scenario|sells_worst_v_base/crypto_net_gain_max_investment_winsorized*],
+                [scenario|sells_worst_v_base/crypto_net_flows_max_investment_winsorized*],
+                [scenario|sells_worst_v_base/crypto_net_flows_crypto_inflows_winsorized*],
 
 
                 # ['cluster|*'],
