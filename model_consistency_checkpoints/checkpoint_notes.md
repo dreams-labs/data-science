@@ -1,4 +1,24 @@
 # dda 602 sell features
+CHECKPOINT2 checkpoint 5 ready to add index
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       92
+Features per Window:      23
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.667
+RMSE:                     0.219
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.812
+RMSE:                     0.116
+MAE:                      0.061
+
+
 CHECKPOINT2 checkpoint 4 updated transfers query
 Model Performance Summary
 ===================================

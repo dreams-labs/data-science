@@ -192,6 +192,7 @@ def retrieve_transfers_sequencing(hybridize_wallet_ids: bool) -> pd.DataFrame:
         buyer_number,
         seller_number
     from base_ordering
+    order by 1,2,3,4
     """
     print(sequencing_sql)
     sequence_df = dgc().run_sql(sequencing_sql)
@@ -223,10 +224,13 @@ def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
         transfers_sequencing_features_df (df): dataframe indexed on wallet_address with
         transfers feature columns
     """
+    # profits_df = u.ensure_index(profits_df)
+
     # Inner join lifetime transfers with profits_df to filter on valid dates and coins
     window_transfers_df = pd.merge(
         profits_df,
         transfers_sequencing_df,
+        # left_index=True,
         left_on=['coin_id', 'date', 'wallet_address'],
         right_on=['coin_id', 'first_buy', 'wallet_address'],
         how='inner'
