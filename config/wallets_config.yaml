@@ -83,21 +83,29 @@ features:
     returns_winsorization: 0.01
     ranking_ntiles: 2
 
-    # Clustering Params
-    clustering_n_components: 25
-    # clustering_n_clusters: [2,4]
-    clustering_fill_method: 'fill_0'  # 'fill_0' or 'fill_mean'
-    clustering_include_pca: False
-
     # Market Timing Params
     offset_winsorization: 0.02 # comparisons between metrics and their offset values will be winsorized by this amount
     timing_metrics_min_transaction_size: 20  # trades below this USD threshold will not be evaluated for market timing peformance or transfers buyer sequencing
 
-    # Market Timing Params
+    # Market Cap Params
     market_cap_feature_columns: [  # which columns to generate market cap features with
         'market_cap_filled',
         'market_cap_unadj'
     ]
+
+    # Transfers Params
+    scenario_performance_features: [
+        crypto_net_flows/crypto_inflows/winsorized,
+        crypto_net_flows/max_investment/winsorized,
+        crypto_net_gain/max_investment/winsorized,
+    ]
+
+
+    # Clustering Params
+    # clustering_n_clusters: [2,4]
+    clustering_n_components: 25
+    clustering_fill_method: 'fill_0'  # 'fill_0' or 'fill_mean'
+    clustering_include_pca: False
 
 
 # CheckpointValidation
@@ -158,6 +166,22 @@ modeling:
             # 'mktcap|end_portfolio_wtd_market_cap/market_cap|*',
 
             # 'transfers|*',
+            # transfers|sells_best/crypto_net_flows_crypto_inflows_winsorized|*,
+
+            # scenario|*,
+            scenario|base/*,
+            # scenario|sells_best/crypto_net_flows_crypto_inflows_winsorized*,
+            # scenario|sells_best/crypto_net_flows_max_investment_winsorized*,
+            # scenario|sells_best/crypto_net_gain_max_investment_winsorized*,
+            # scenario|sells_worst/crypto_net_flows_crypto_inflows_winsorized*,
+            # scenario|sells_worst/crypto_net_flows_max_investment_winsorized*,
+            # scenario|sells_worst/crypto_net_gain_max_investment_winsorized*,
+            # scenario|sells_best_v_base/crypto_net_gain_max_investment_winsorized*,
+            # scenario|sells_best_v_base/crypto_net_flows_max_investment_winsorized*,
+            # scenario|sells_best_v_base/crypto_net_flows_crypto_inflows_winsorized*,
+            # scenario|sells_worst_v_base/crypto_net_gain_max_investment_winsorized*,
+            # scenario|sells_worst_v_base/crypto_net_flows_max_investment_winsorized*,
+            # scenario|sells_worst_v_base/crypto_net_flows_crypto_inflows_winsorized*,
 
             'cluster|*',
             '*|w1',
@@ -209,15 +233,15 @@ modeling:
 
         # Turn On or Off
         # -------------------------------
-        # enabled: True
+        enabled: True
         # -------------------------------
 
 
         # Search Methodology
         n_iter: 40  # random search limit
-        n_splits: 2  # cv splits
+        n_splits: 3  # cv splits
         scoring: 'neg_root_mean_squared_error'
-        # drop_patterns_include_n_features: 1
+        drop_patterns_include_n_features: 1
 
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # scikit-learn verbosity
@@ -249,122 +273,143 @@ modeling:
             # Tree Training Speed Overrides
             regressor__n_estimators: [200]
             regressor__learning_rate: [0.07]
-            # regressor__gamma: [0.01]
-            # regressor__subsample: [0.95, 1.0]   # samples rows, e.g. trees use x% of all wallet rows
+            regressor__gamma: [0.01]
+            regressor__subsample: [1.0]   # samples rows, e.g. trees use x% of all wallet rows
 
 
             # Optimize for Speed
-            regressor__n_jobs: [1]  # how many models to build at once
-            # regressor__nthread: [6]  # how many threads each model can use
+            regressor__n_jobs: [4]  # how many models to build at once
+            regressor__nthread: [4]  # how many threads each model can use
             # regressor__max_bin: [128]
             # regressor__tree_method: ['hist']
 
 
             # Column Selection
-            # drop_columns__drop_patterns: [
-            #     [],
-            #     # ['timing|*'],
-            #     # ['timing|price_sma_2/lead_21/*'],
-            #     # ['timing|price_sma_2/lag_15/*'],
-            #     # ['timing|price_sma_2/lag_21/*'],
-            #     # ['timing|price_sma_2/lag_30/*'],
-            #     # ['timing|*/buy_mean*'],
-            #     # ['timing|*/sell_mean*'],
-            #     # ['timing|*/buy_weighted*'],
-            #     # ['timing|*/sell_weighted*'],
-            #     # ['timing|price_rsi_*/*'],
-            #     # ['timing|price_rsi_*/*'],
-            #     # ['timing|mfi*/*'],
-            #     # ['timing|obv*/*'],
-            #     # ['timing|volume_sma_3/*'],
-            #     # ['timing|volume_sma_7/*'],
-            #     # ['timing|volume_sma_12/*_15*'],
-            #     # ['timing|volume_sma_12/*_21*'],
-            #     # ['timing|volume_sma_12/*_30*'],
-            #     # ['timing|price_sma_*/*'],
-            #     # ['timing|*/*_7/*'],
-            #     # ['timing|*/*_21/*'],
-            #     # ['timing|*/*_50/*'],
+            drop_columns__drop_patterns: [
+                [],
+                # ['timing|*'],
+                # ['timing|price_sma_2/lead_21/*'],
+                # ['timing|price_sma_2/lag_15/*'],
+                # ['timing|price_sma_2/lag_21/*'],
+                # ['timing|price_sma_2/lag_30/*'],
+                # ['timing|*/buy_mean*'],
+                # ['timing|*/sell_mean*'],
+                # ['timing|*/buy_weighted*'],
+                # ['timing|*/sell_weighted*'],
+                # ['timing|price_rsi_*/*'],
+                # ['timing|price_rsi_*/*'],
+                # ['timing|mfi*/*'],
+                # ['timing|obv*/*'],
+                # ['timing|volume_sma_3/*'],
+                # ['timing|volume_sma_7/*'],
+                # ['timing|volume_sma_12/*_15*'],
+                # ['timing|volume_sma_12/*_21*'],
+                # ['timing|volume_sma_12/*_30*'],
+                # ['timing|price_sma_*/*'],
+                # ['timing|*/*_7/*'],
+                # ['timing|*/*_21/*'],
+                # ['timing|*/*_50/*'],
 
-            #     # ['performance|*'],
-            #     # ['performance|crypto_net_gain/*'],
-            #     # ['performance|crypto_net_flows/*'],
-            #     # ['performance|crypto_net_cash_flows/*'],
-            #     # ['performance|*/twb/*'],
-            #     # ['performance|*/active_twb/*'],
-            #     # ['performance|*/max_investment/*'],
-            #     # ['performance|*/crypto_inflows/*'],
-            #     # ['performance|crypto_net_gain/crypto_cash_buys/*'],
-            #     # ['performance|crypto_net_gain/twb/*'],
-            #     # ['performance|crypto_net_gain/active_twb/*'],
-            #     # ['performance|crypto_net_flows/active_twb/*'],
-            #     # ['performance|crypto_net_flows/twb/*'],
-            #     # ['performance|crypto_net_flows/crypto_cash_buys/*'],
-            #     # ['performance|crypto_net_cash_flows/crypto_inflows/*'],
-            #     # ['performance|crypto_net_cash_flows/crypto_cash_buys/*'],
-            #     # ['performance|*/crypto_cash_buys/*'],
-            #     # ['performance|*/base|*'],
-            #     # ['performance|*/winsorized|*'],
-            #     # ['performance|*/log|*'],
-            #     # ['performance|*/rank|*'],
-            #     # ['performance|*/ntile_rank|*'],
+                # ['performance|*'],
+                # ['performance|crypto_net_gain/*'],
+                # ['performance|crypto_net_flows/*'],
+                # ['performance|crypto_net_cash_flows/*'],
+                # ['performance|*/twb/*'],
+                # ['performance|*/active_twb/*'],
+                # ['performance|*/max_investment/*'],
+                # ['performance|*/crypto_inflows/*'],
+                # ['performance|crypto_net_gain/crypto_cash_buys/*'],
+                # ['performance|crypto_net_gain/twb/*'],
+                # ['performance|crypto_net_gain/active_twb/*'],
+                # ['performance|crypto_net_flows/active_twb/*'],
+                # ['performance|crypto_net_flows/twb/*'],
+                # ['performance|crypto_net_flows/crypto_cash_buys/*'],
+                # ['performance|crypto_net_cash_flows/crypto_inflows/*'],
+                # ['performance|crypto_net_cash_flows/crypto_cash_buys/*'],
+                # ['performance|*/crypto_cash_buys/*'],
+                # ['performance|*/base|*'],
+                # ['performance|*/winsorized|*'],
+                # ['performance|*/log|*'],
+                # ['performance|*/rank|*'],
+                # ['performance|*/ntile_rank|*'],
 
-            #     # ['trading|*'],
-            #     # ['trading|days_held/min|*'],
-            #     # ['trading|days_held/max|*'],
-            #     # ['trading|days_held/mean|*'],
-            #     # ['trading|days_held/median|*'],
-            #     # ['trading|days_held/std|*'],
-            #     # ['trading|time_weighted_return/min|*'],
-            #     # ['trading|time_weighted_return/max|*'],
-            #     # ['trading|time_weighted_return/mean|*'],
-            #     # ['trading|time_weighted_return/median|*'],
-            #     # ['trading|time_weighted_return/std|*'],
-            #     # ['trading|annualized_twr/min|*'],
-            #     # ['trading|annualized_twr/max|*'],
-            #     # ['trading|annualized_twr/mean|*'],
-            #     # ['trading|annualized_twr/median|*'],
-            #     # ['trading|annualized_twr/std|*'],
-            #     # ['trading|days_held/*'],
-            #     # ['trading|time_weighted_return/*'],
-            #     # ['trading|time_weighted_return/*'],
-            #     # ['trading|crypto_net_gain|*'],
-            #     # ['trading|unique_coins_traded|*'],
-            #     # ['trading|transaction_days|*'],
-            #     # ['trading|total_volume|*'],
-            #     # ['trading|average_transaction|*'],
-            #     # ['trading|activity_density|*'],
-            #     # ['trading|crypto_inflows|*'],
-            #     # ['trading|max_investment|*'],
-            #     # ['trading|crypto_net_flows|*'],
-            #     # ['trading|crypto_outflows|*'],
-            #     # ['trading|crypto_net_cash_flows|*'],
-            #     # ['trading|crypto_cash_sells|*'],
-            #     # ['trading|crypto_cash_buys|*'],
-            #     # ['trading|time_weighted_balance|*'],
-            #     # ['trading|active_time_weighted_balance|*'],
+                # ['trading|*'],
+                # ['trading|days_held/min|*'],
+                # ['trading|days_held/max|*'],
+                # ['trading|days_held/mean|*'],
+                # ['trading|days_held/median|*'],
+                # ['trading|days_held/std|*'],
+                # ['trading|time_weighted_return/min|*'],
+                # ['trading|time_weighted_return/max|*'],
+                # ['trading|time_weighted_return/mean|*'],
+                # ['trading|time_weighted_return/median|*'],
+                # ['trading|time_weighted_return/std|*'],
+                # ['trading|annualized_twr/min|*'],
+                # ['trading|annualized_twr/max|*'],
+                # ['trading|annualized_twr/mean|*'],
+                # ['trading|annualized_twr/median|*'],
+                # ['trading|annualized_twr/std|*'],
+                # ['trading|days_held/*'],
+                # ['trading|time_weighted_return/*'],
+                # ['trading|time_weighted_return/*'],
+                # ['trading|crypto_net_gain|*'],
+                # ['trading|unique_coins_traded|*'],
+                # ['trading|transaction_days|*'],
+                # ['trading|total_volume|*'],
+                # ['trading|average_transaction|*'],
+                # ['trading|activity_density|*'],
+                # ['trading|crypto_inflows|*'],
+                # ['trading|max_investment|*'],
+                # ['trading|crypto_net_flows|*'],
+                # ['trading|crypto_outflows|*'],
+                # ['trading|crypto_net_cash_flows|*'],
+                # ['trading|crypto_cash_sells|*'],
+                # ['trading|crypto_cash_buys|*'],
+                # ['trading|time_weighted_balance|*'],
+                # ['trading|active_time_weighted_balance|*'],
 
-            #     # ['mktcap|*'],
-            #     # ['mktcap|end_portfolio_wtd_market_cap/market_cap_filled|*'],
-            #     # ['mktcap|volume_wtd_market_cap/market_cap_filled|*'],
-            #     # ['mktcap|end_portfolio_wtd_market_cap/market_cap|*'],
-            #     # ['mktcap|volume_wtd_market_cap/market_cap|*'],
-            #     # ['mktcap|*/market_cap_filled|*'],
-            #     # ['mktcap|*/market_cap_imputed|*'],
-            #     # ['mktcap|*/market_cap|*'],
+                # ['mktcap|*'],
+                # ['mktcap|end_portfolio_wtd_market_cap/market_cap_filled|*'],
+                # ['mktcap|volume_wtd_market_cap/market_cap_filled|*'],
+                # ['mktcap|end_portfolio_wtd_market_cap/market_cap|*'],
+                # ['mktcap|volume_wtd_market_cap/market_cap|*'],
+                # ['mktcap|*/market_cap_filled|*'],
+                # ['mktcap|*/market_cap_imputed|*'],
+                # ['mktcap|*/market_cap|*'],
 
-            #     # ['transfers|*'],
-            #     # ['transfers|avg_buyer_number|*'],
-            #     # ['transfers|median_buyer_number|*'],
-            #     # ['transfers|new_coin_buy_counts|*'],
-            #     # ['transfers|min_buyer_number|*'],
-            #     # ['cluster|*'],
-            #     # ['*|w1'],
-            #     # ['*|w2'],
-            #     # ['*|w3'],
-            #     # ['*|w4'],
-            #     # ['*|all_windows'],
-            # ]
+                # ['transfers|*'],
+                # ['transfers|avg_buyer_number|*'],
+                # ['transfers|median_buyer_number|*'],
+                # ['transfers|new_coin_buy_counts|*'],
+                # ['transfers|min_buyer_number|*'],
+
+                # [scenario|*],
+                [scenario|sells_best/*],
+                [scenario|sells_worst/*],
+                [scenario|sells_best_v_base/*],
+                [scenario|sells_worst_v_base/*],
+                # [scenario|sells_best/crypto_net_flows_crypto_inflows_winsorized*],
+                # [scenario|sells_best/crypto_net_flows_max_investment_winsorized*],
+                # [scenario|sells_best/crypto_net_gain_max_investment_winsorized*],
+                # [scenario|sells_worst/crypto_net_flows_crypto_inflows_winsorized*],
+                # [scenario|sells_worst/crypto_net_flows_max_investment_winsorized*],
+                # [scenario|sells_worst/crypto_net_gain_max_investment_winsorized*],
+                # [scenario|sells_best_v_base/crypto_net_gain_max_investment_winsorized*],
+                # [scenario|sells_best_v_base/crypto_net_flows_max_investment_winsorized*],
+                # [scenario|sells_best_v_base/crypto_net_flows_crypto_inflows_winsorized*],
+                # [scenario|sells_worst_v_base/crypto_net_gain_max_investment_winsorized*],
+                # [scenario|sells_worst_v_base/crypto_net_flows_max_investment_winsorized*],
+                # [scenario|sells_worst_v_base/crypto_net_flows_crypto_inflows_winsorized*],
+
+
+                # ['cluster|*'],
+
+                # ['*|w1'],
+                # ['*|w2'],
+                # ['*|w3'],
+                # ['*|w4'],
+                # ['*|all_windows'],
+            ]
 
 
     # Coin model workflow params

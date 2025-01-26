@@ -1,3 +1,125 @@
+# dda 460 max unrealized gain/loss
+checkpoint 5 refactor and add ratios base
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       92
+Features per Window:      23
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.667
+RMSE:                     0.219
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.812
+RMSE:                     0.116
+MAE:                      0.061
+
+
+
+checkpoint 4 add sells_best/crypto_net_flows_crypto_inflows_winsorized
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       96
+Features per Window:      24
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.669
+RMSE:                     0.218
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.811
+RMSE:                     0.116
+MAE:                      0.062
+
+
+with all
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       116
+Features per Window:      29
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.664
+RMSE:                     0.220
+MAE:                      0.114
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.808
+RMSE:                     0.117
+MAE:                      0.063
+
+
+checkpoint 3 ready to start ablation testing
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       92
+Features per Window:      23
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.667
+RMSE:                     0.219
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.812
+RMSE:                     0.116
+MAE:                      0.061
+
+
+checkpoint 2 preparing to integrate
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       92
+Features per Window:      23
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.667
+RMSE:                     0.219
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.812
+RMSE:                     0.116
+MAE:                      0.061
+
+
+checkpoint 1 ready to start
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       92
+Features per Window:      23
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.667
+RMSE:                     0.219
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.812
+RMSE:                     0.116
+MAE:                      0.061
+
+
 # dda 595 grid searchin
 revisiting # dda 465 market cap features and # dda 593 better ablation
 and found all performances had dropped to w.667, doesn't seem worth extended effort to dig deeper right now and may related to database changes
@@ -18,8 +140,6 @@ Inactive Wallets Cohort Metrics
 R² Score:                 0.812
 RMSE:                     0.116
 MAE:                      0.061
-
-
 
 
 checkpoint 2 need to return to old config

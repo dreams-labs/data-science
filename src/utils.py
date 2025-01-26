@@ -806,14 +806,16 @@ def cw_sample(profits_df: pd.DataFrame, n: int = 5) -> pd.DataFrame:
     return subset_df
 
 
-def df_nans(df):
+def df_nans(df,cells=False):
     """
     Returns rows and cells in a df that contain NaN values.
     """
     na_rows = df[df.isna().any(axis=1)]
-    na_cells = na_rows.loc[:, na_rows.isna().any()]
+    if cells is False:
+        return na_rows
 
-    return na_rows, na_cells
+    na_cells = na_rows.loc[:, na_rows.isna().any()]
+    return na_cells
 
 
 def log_nan_counts(df):
