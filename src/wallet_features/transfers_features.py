@@ -223,32 +223,45 @@ def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
     """
     profits_df = u.ensure_index(profits_df)
 
-    # Inner join lifetime transfers with profits_df to filter on valid dates and coins
-    first_buy_transfers_df = pd.merge(
-        profits_df,
-        transfers_sequencing_df,
-        left_index=True,
-        right_on=['coin_id', 'wallet_address', 'first_buy'],
-        how='inner'
-    )
+    # Define transfer types and their corresponding column names
+    transfer_types = {
+        'first_buy': 'buyer_number',
+        # 'first_sell': 'seller_number'
+    }
 
-    first_buy_features_df = first_buy_transfers_df.groupby('wallet_address').agg({
-        'buyer_number': ['count', 'mean', 'median', 'min'],
-    })
+    feature_dfs = []
 
-    first_buy_features_df.columns = [
-        'new_coin_transaction_counts',
-        'avg_wallet_rank',
-        'median_avg_wallet_rank',
-        'min_avg_wallet_rank',
-#         'first_sells/new_coin_transaction_counts',
-#         'first_sells/avg_wallet_rank',
-#         'first_sells/median_avg_wallet_rank',
-#         'first_sells/min_avg_wallet_rank',
-    ]
-    first_buy_features_df = first_buy_features_df.add_prefix('first_buy/')
+    for transfer_type, number_col in transfer_types.items():
+        # Inner join lifetime transfers with profits_df to filter on valid dates and coins
+        transfers_df = pd.merge(
+            profits_df,
+            transfers_sequencing_df,
+            left_index=True,
+            right_on=['coin_id', 'wallet_address', transfer_type],
+            how='inner'
+        )
 
-    return first_buy_features_df
+        # Generate features
+        features_df = transfers_df.groupby('wallet_address').agg({
+            number_col: ['count', 'mean', 'median', 'min']
+        })
+
+        # Rename columns
+        features_df.columns = [
+            'new_coin_transaction_counts',
+            'avg_wallet_rank',
+            'median_avg_wallet_rank',
+            'min_avg_wallet_rank'
+        ]
+
+        # Add prefix for feature type
+        features_df = features_df.add_prefix(f'{transfer_type}/')
+        feature_dfs.append(features_df)
+
+    # Combine features from both transfer types
+    combined_features_df = pd.concat(feature_dfs, axis=1)
+
+    return combined_features_df
 
 # # OLD
 # @u.timing_decorator
