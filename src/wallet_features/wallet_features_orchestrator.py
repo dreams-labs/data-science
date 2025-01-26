@@ -74,7 +74,6 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     # Trading features (left join, fill 0s)
     # Requires both starting_balance_date and period_end_date imputed rows
     # -----------------------------------------------------------------------
-
     trading_features_df = wtf.calculate_wallet_trading_features(profits_df,
         period_start_date,period_end_date,
         wallets_config['features']['include_twb_metrics'],
@@ -115,23 +114,25 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     # Uses only real transfers (~is_imputed)
     # -----------------------------------------------------------------------
     transfers_sequencing_features_df = wts.calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
-    transfers_hypothetical_features_df = wts.calculate_transfers_hypothetical_features(profits_df,
-                                                                           period_start_date,period_end_date)
-    logger.info(f'transfers_sequencing_features_df {transfers_sequencing_features_df.shape}')
-    logger.info(f'transfers_hypothetical_features_df {transfers_hypothetical_features_df.shape}')
-    transfers_features_df = transfers_sequencing_features_df.join(transfers_hypothetical_features_df,how='left')
+    feature_column_names['transfers|'] = transfers_sequencing_features_df.columns
+    wallet_features_df = wallet_features_df.join(transfers_sequencing_features_df, how='left')
 
-    feature_column_names['transfers|'] = transfers_features_df.columns
-    wallet_features_df = wallet_features_df.join(transfers_features_df, how='left')
-
+    # scenario transfers features (left join, do not fill)
+    # -----------------------------------------------------------------------
+    transfers_scenario_features_df = wts.calculate_scenario_features(profits_df,
+                                                                     market_indicators_data_df,
+                                                                     period_start_date,period_end_date)
+    feature_column_names['scenario|'] = transfers_scenario_features_df.columns
+    wallet_features_df = wallet_features_df.join(transfers_scenario_features_df, how='left')
 
 
     # Apply feature prefixes
     rename_map = {col: f"{prefix}{col}"
                 for prefix, cols in feature_column_names.items()
                 for col in cols}
+    wallet_features_df = wallet_features_df.rename(columns=rename_map)
 
-    return wallet_features_df.rename(columns=rename_map)
+    return wallet_features_df
 
 
 
