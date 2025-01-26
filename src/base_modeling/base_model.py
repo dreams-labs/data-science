@@ -341,7 +341,7 @@ class BaseModel:
         # Only include parameters with multiple unique values
         variable_params = [
             col for col in param_cols
-            if results_df[col].nunique() > 1
+            if results_df[col].apply(lambda x: tuple(x) if isinstance(x, list) else x).nunique() > 1
         ]
 
         for param in variable_params:

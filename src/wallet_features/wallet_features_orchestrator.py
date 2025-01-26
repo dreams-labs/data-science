@@ -84,8 +84,19 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     wallet_features_df = wallet_features_df.join(trading_features_df, how='left')\
         .fillna({col: 0 for col in trading_features_df.columns})
 
+    # Transfers features (left join, do not fill)
+    # Uses only real transfers (~is_imputed)
+    # -----------------------------------------------------------------------
+    transfers_sequencing_features_df = wts.calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
+    feature_column_names['transfers|'] = transfers_sequencing_features_df.columns
+    wallet_features_df = wallet_features_df.join(transfers_sequencing_features_df, how='left')
+
+
+
+    # BELOW FUNCTIONS DO NOT WORK WITH INDICES AND SHOULD BE EVENTUALLY REFACTORED
     profits_df.reset_index(inplace=True)
     market_indicators_data_df.reset_index(inplace=True)
+
 
     # Performance features (left join, do not fill)
     # Requires both starting_balance_date and period_end_date imputed rows (same as trading)
@@ -111,14 +122,7 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     feature_column_names['mktcap|'] = market_features_df.columns
     wallet_features_df = wallet_features_df.join(market_features_df, how='left')
 
-    # Transfers features (left join, do not fill)
-    # Uses only real transfers (~is_imputed)
-    # -----------------------------------------------------------------------
-    transfers_sequencing_features_df = wts.calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
-    feature_column_names['transfers|'] = transfers_sequencing_features_df.columns
-    wallet_features_df = wallet_features_df.join(transfers_sequencing_features_df, how='left')
-
-    # scenario transfers features (left join, do not fill)
+    # Scenario transfers features (left join, do not fill)
     # -----------------------------------------------------------------------
     if wallets_config['features']['include_scenario_features'] is True:
         transfers_scenario_features_df = wsc.calculate_scenario_features(profits_df,
