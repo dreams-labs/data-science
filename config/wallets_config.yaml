@@ -138,14 +138,10 @@ modeling:
             timing|*/buy_mean*,
             timing|*/sell_mean*,
             timing|*/sell_weighted*,
+            # timing|volume_sma_12/lead_120/*,
 
 
-            # timing|price_sma_2/lag_200/*,
-            # timing|price_sma_2/lag_60/*,
 
-            # timing|volume_sma_12/lag_80/*,
-
-            # timing|volume_sma_12/lead_150/*,
 
 
 
@@ -153,7 +149,8 @@ modeling:
             timing|volume_sma_12/lead_365/*,
             timing|volume_sma_12/lead_300/*,
             timing|volume_sma_12/lead_200/*,
-
+            # timing|volume_sma_12/lead_150/*,
+            timing|volume_sma_12/lead_100/*,
             timing|volume_sma_12/lead_80/*,
             timing|volume_sma_12/lead_50/*,
 
@@ -161,10 +158,11 @@ modeling:
             timing|price_sma_2/lag_500/*,
             timing|price_sma_2/lag_365/*,
             timing|price_sma_2/lag_300/*,
-
+            # timing|price_sma_2/lag_200/*,
             timing|price_sma_2/lag_150/*,
             timing|price_sma_2/lag_100/*,
             timing|price_sma_2/lag_80/*,
+            # timing|price_sma_2/lag_50/*,
 
 
             timing|price_sma_2/lead_500/*,
@@ -172,7 +170,7 @@ modeling:
             timing|price_sma_2/lead_300/*,
             timing|price_sma_2/lead_200/*,
             timing|price_sma_2/lead_150/*,
-            timing|price_sma_2/lead_100/*,
+            # timing|price_sma_2/lead_100/*,
             timing|price_sma_2/lead_80/*,
             timing|price_sma_2/lead_50/*,
 
@@ -183,6 +181,7 @@ modeling:
             timing|volume_sma_12/lag_200/*,
             timing|volume_sma_12/lag_150/*,
             timing|volume_sma_12/lag_100/*,
+            # timing|volume_sma_12/lag_80/*,
             timing|volume_sma_12/lag_50/*,
 
 

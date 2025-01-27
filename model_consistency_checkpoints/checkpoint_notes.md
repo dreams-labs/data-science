@@ -1,5 +1,45 @@
 # dda 592 longer term timing features
-checkpoint 4: w.679 price lag60,100 lead100; vol lag80 lead150
+checkpoint 6: w.679 price lag50,200 lead100; vol lag80 lead150
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       112
+Features per Window:      28
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.681
+RMSE:                     0.214
+MAE:                      0.111
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.814
+RMSE:                     0.115
+MAE:                      0.062
+
+
+checkpoint 5: w.679 price lag50,200; vol lag80
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       104
+Features per Window:      26
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.678
+RMSE:                     0.215
+MAE:                      0.112
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.816
+RMSE:                     0.114
+MAE:                      0.061
+
+
+checkpoint 4: w.679 price lag60,100 lead100; vol lag80 lead100,150
 Model Performance Summary
 ===================================
 Test Samples:             56,708
@@ -19,7 +59,7 @@ RMSE:                     0.116
 MAE:                      0.062
 
 
-checkpoint 4: w.681 price lag60,100; vol lag80 lead150
+checkpoint 4: w.681 price lag60,100; vol lag80 lead150 plus more i didnt notice
 Model Performance Summary
 ===================================
 Test Samples:             56,708
