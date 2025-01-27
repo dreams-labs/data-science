@@ -140,7 +140,7 @@ modeling:
             timing|*/sell_weighted*,
 
             # timing|price_sma_2/lag_200/*,
-            # timing|price_sma_2/lag_50/*,
+            # timing|price_sma_2/lag_60/*,
             # timing|volume_sma_12/lead_120/*,
             # timing|volume_sma_12/lead_100/*,
 
@@ -150,8 +150,9 @@ modeling:
             timing|volume_sma_12/lag_200/*,
             timing|volume_sma_12/lag_150/*,
             timing|volume_sma_12/lag_100/*,
-            timing|volume_sma_12/lag_80/*,
+            # timing|volume_sma_12/lag_80/*,
             timing|volume_sma_12/lag_50/*,
+
             timing|volume_sma_12/lead_500/*,
             timing|volume_sma_12/lead_365/*,
             timing|volume_sma_12/lead_300/*,
