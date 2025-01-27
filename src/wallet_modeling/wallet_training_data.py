@@ -149,13 +149,14 @@ def format_and_save_datasets(profits_df, market_data_df, period_start_date, parq
     # Clean profits_df
     profits_df, _ = dr.clean_profits_df(profits_df, wallets_config['data_cleaning'])
 
+    # Drop irrelevant columns
+    profits_df = profits_df.drop(['usd_inflows_cumulative','profits_cumulative'])
+
     # Round relevant columns
     columns_to_round = [
-        'profits_cumulative'
-        ,'usd_balance'
-        ,'usd_net_transfers'
-        ,'usd_inflows'
-        ,'usd_inflows_cumulative'
+        'usd_balance',
+        'usd_net_transfers',
+        'usd_inflows',
     ]
     profits_df.loc[:, columns_to_round] = (profits_df[columns_to_round]
                                         .round(2)

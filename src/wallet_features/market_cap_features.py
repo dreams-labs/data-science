@@ -206,3 +206,44 @@ def calculate_ending_balance_weighted_market_cap(profits_market_cap_df, market_c
     )
 
     return wallet_end_balance_wtd_mc_df[['end_portfolio_wtd_market_cap']]
+
+
+
+def compute_distribution_features(profits_df: pd.DataFrame, market_cap_col: str) -> pd.DataFrame:
+    """
+    Params:
+    - profits_df (DataFrame): Includes at least 'wallet_address', 'coin_id', 'usd_balance', and market_cap_col columns.
+      Assumes each wallet-coin-date row has daily data (or at least a final row).
+    - market_cap_col (str): Name of the column with market cap data.
+
+    Returns:
+    - features_df (DataFrame): wallet-level features. Columns might include:
+        - portfolio_mcap_std: std dev of market caps across a wallet's final-held coins.
+        - concentration_index: sum of squared position weights (Herfindahl-Hirschman).
+        - largest_coin_frac: fraction of total balance in the single biggest coin.
+        - largest_coin_usd: absolute USD balance in the single biggest coin.
+    """
+    # Keep only the final row per coin to focus on ending balances.
+    final_balances = profits_df.drop_duplicates(subset=["wallet_address", "coin_id"], keep="last")
+
+    # Remove rows without key data
+    final_balances = final_balances.dropna(subset=[market_cap_col, "usd_balance"])
+
+    # Compute total USD balance per wallet (vectorized group sum)
+    final_balances["total_usd_balance"] = final_balances.groupby("wallet_address", observed=True)["usd_balance"].transform("sum")
+
+    # Filter out wallets with zero total balance
+    final_balances = final_balances[final_balances["total_usd_balance"] > 0]
+
+    # Fraction of total balance each coin holds
+    final_balances["coin_fraction"] = final_balances["usd_balance"] / final_balances["total_usd_balance"]
+
+    # Aggregate to wallet level
+    features_df = final_balances.groupby("wallet_address", observed=True).agg(
+        portfolio_mcap_std=(market_cap_col, "std"),
+        concentration_index=("coin_fraction", lambda x: (x**2).sum()),  # Herfindahl-Hirschman
+        largest_coin_frac=("coin_fraction", "max"),                     # largest single bet as %
+        largest_coin_usd=("usd_balance", "max")                         # largest single bet in USD
+    )
+
+    return features_df

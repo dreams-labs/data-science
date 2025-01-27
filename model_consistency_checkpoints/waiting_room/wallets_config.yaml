@@ -91,6 +91,15 @@ features:
 #     offset_winsorization: 0.02 # comparisons between metrics and their offset values will be winsorized by this amount
 #     timing_metrics_min_transaction_size: 20  # trades below this USD threshold will not be evaluated for market timing peformance or transfers buyer sequencing
 
+    # Scenarios Params
+    include_scenario_features: True
+    scenario_performance_features: [
+        # crypto_net_flows/crypto_inflows/winsorized,
+        crypto_net_flows/max_investment/winsorized,
+        # crypto_net_gain/max_investment/winsorized,
+    ]
+
+
 #     # Feature Selection
 #     feature_selection:
 
