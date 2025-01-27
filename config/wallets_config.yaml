@@ -173,6 +173,15 @@ modeling:
 
             # mktcap|*,
             # mktcap|end_portfolio_wtd_market_cap/market_cap|*,
+            mktcap|concentration_index/market_cap_filled|*,
+            mktcap|largest_coin_frac/market_cap_filled|*,
+            mktcap|largest_coin_usd/market_cap_filled|*,
+            mktcap|end_portfolio_wtd_market_cap/market_cap_unadj|*,
+            mktcap|volume_wtd_market_cap/market_cap_unadj|*,
+            mktcap|portfolio_mcap_std/market_cap_unadj|*,
+            mktcap|concentration_index/market_cap_unadj|*,
+            mktcap|largest_coin_frac/market_cap_unadj|*,
+            mktcap|largest_coin_usd/market_cap_unadj|*,
 
             # transfers|*,
             # transfers|first_sell/*,
@@ -291,13 +300,6 @@ modeling:
                 # [timing|price_sma_2/lag_21/*],
                 # [timing|price_sma_2/lag_30/*],
                 # [timing|*/buy_mean*],
-                # [timing|*/buy_weighted*],
-                # [timing|volume_sma_12/*_30*],
-                # [timing|price_sma_*/*],
-                # [timing|*/*_7/*],
-                # [timing|*/*_21/*],
-                # [timing|price_sma_2/lag_500/*],
-                # [timing|price_sma_2/lag_365/*],
 
 
                 # [performance|*],
@@ -307,9 +309,6 @@ modeling:
                 # [trading|*],
                 # [trading|days_held/min|*],
                 # [trading|days_held/max|*],
-                # [trading|days_held/mean|*],
-                # [trading|days_held/median|*],
-                # [trading|days_held/std|*],
 
 
                 # [mktcap|*],
@@ -320,6 +319,15 @@ modeling:
                 # [mktcap|*/market_cap_filled|*],
                 # [mktcap|*/market_cap_imputed|*],
                 # [mktcap|*/market_cap|*],
+                [mktcap|concentration_index/market_cap_filled|*],
+                [mktcap|largest_coin_frac/market_cap_filled|*],
+                [mktcap|largest_coin_usd/market_cap_filled|*],
+                [mktcap|end_portfolio_wtd_market_cap/market_cap_unadj|*],
+                [mktcap|volume_wtd_market_cap/market_cap_unadj|*],
+                [mktcap|portfolio_mcap_std/market_cap_unadj|*],
+                [mktcap|concentration_index/market_cap_unadj|*],
+                [mktcap|largest_coin_frac/market_cap_unadj|*],
+                [mktcap|largest_coin_usd/market_cap_unadj|*],
 
                 # [transfers|*],
                 # [transfers|first_buy/*],

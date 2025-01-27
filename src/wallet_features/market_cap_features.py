@@ -69,15 +69,23 @@ def calculate_market_cap_features(profits_df, market_data_df):
 
 
     # 3. Generate market cap features for all market cap columns
+    # Precompute end balance profits_df
+    profits_market_cap_df_end = (profits_market_cap_df.copy()
+                                 .drop_duplicates(subset=['coin_id', 'wallet_address'],
+                                                  keep='last'))
+
     all_features = []
     for col in market_cap_cols:
         # Calculate both feature sets
-        balance_wtd = calculate_ending_balance_weighted_market_cap(profits_market_cap_df, col)
+        balance_wtd = calculate_ending_balance_weighted_market_cap(profits_market_cap_df_end, col)
         volume_wtd = calculate_volume_weighted_market_cap(profits_market_cap_df, col)
+        distribution = calculate_distribution_features(profits_market_cap_df_end, col)
 
         # Add suffix to identify source column
         suffix = f"/{col}"
-        features_df = balance_wtd.join(volume_wtd, how='inner')
+        features_df = balance_wtd
+        features_df = features_df.join(volume_wtd, how='inner')
+        features_df = features_df.join(distribution, how='inner')
         features_df = features_df.add_suffix(suffix)
 
         all_features.append(features_df)
@@ -119,14 +127,15 @@ def force_fill_market_cap(market_data_df):
     return market_data_df
 
 
-def calculate_volume_weighted_market_cap(profits_market_features_df, market_cap_column):
+
+def calculate_volume_weighted_market_cap(profits_market_features_df, market_cap_col):
     """
     Calculate volume-weighted average market cap for each wallet address.
     If volume is 0 for all records of a wallet, uses simple average instead.
 
     Parameters:
-    - profits_market_features_df (df): DataFrame containing wallet_address, volume, and market_cap_column
-    - market_cap_column (str): the column with market cap data in it
+    - profits_market_features_df (df): DataFrame containing wallet_address, volume, and market_cap_col
+    - market_cap_col (str): the column with market cap data in it
 
     Returns:
     pandas.DataFrame: DataFrame with wallet addresses and column 'volume_wtd_market_cap'
@@ -135,14 +144,13 @@ def calculate_volume_weighted_market_cap(profits_market_features_df, market_cap_
     df_calc = profits_market_features_df.copy()
 
     # Remove any records of coins that do not have market cap data available
-    df_calc = df_calc.dropna(subset=[market_cap_column])
+    df_calc = df_calc.dropna(subset=[market_cap_col])
 
     # Volume is equal to absolute value of USD transfers
     df_calc['volume'] = abs(df_calc['usd_net_transfers'])
 
     # Multiply volume by mc for weighted average calculations
-    df_calc['market_cap_volume'] = df_calc['volume'] * df_calc[market_cap_column]
-
+    df_calc['market_cap_volume'] = df_calc['volume'] * df_calc[market_cap_col]
 
     # Calculate each wallet's total ending crypto balance and market cap dollars
     wallet_volume_wtd_mc_df = df_calc.groupby('wallet_address',observed=True).agg(
@@ -162,32 +170,26 @@ def calculate_volume_weighted_market_cap(profits_market_features_df, market_cap_
     return wallet_volume_wtd_mc_df[['volume_wtd_market_cap']]
 
 
-def calculate_ending_balance_weighted_market_cap(profits_market_cap_df, market_cap_column):
+
+def calculate_ending_balance_weighted_market_cap(profits_df_end, market_cap_col):
     """
     Calculate USD balance-weighted average market cap for each wallet address
     using only the most recent date's data.
 
     Parameters:
-    - profits_market_cap_df (df): profits_df with column market_cap_column
-    - market_cap_column (str): the column with market cap data in it
+    - profits_df_end (df): profits_df with column market_cap_col on the period end date
+    - market_cap_col (str): the column with market cap data in it
 
     Returns:
     - wallet_end_balance_wtd_mc_df (df): DataFrame with index wallet_address and column
         'end_portfolio_wtd_market_cap' showing avg mc weighted by ending balance
     """
-    # Create a copy to avoid modifying original
-    profits_df_end = profits_market_cap_df.copy()
-
     # Retrieve the ending balances of all coin-wallet pairs
-    profits_df_end = profits_df_end.drop_duplicates(subset=['coin_id', 'wallet_address'],
-                                                    keep='last')
-
-    # Remove any records of coins that do not have market cap data available
-    profits_df_end = profits_df_end.dropna(subset=[market_cap_column])
+    profits_df_end = profits_df_end.copy().dropna(subset=[market_cap_col])
 
     # Compute the ending market cap dollars
     profits_df_end['market_cap_balance'] = (profits_df_end['usd_balance']
-                                            * profits_df_end[market_cap_column])
+                                            * profits_df_end[market_cap_col])
 
     # Calculate each wallet's total ending crypto balance and market cap dollars
     wallet_end_balance_wtd_mc_df = profits_df_end.groupby('wallet_address',observed=True).agg(
@@ -209,41 +211,45 @@ def calculate_ending_balance_weighted_market_cap(profits_market_cap_df, market_c
 
 
 
-def compute_distribution_features(profits_df: pd.DataFrame, market_cap_col: str) -> pd.DataFrame:
+def calculate_distribution_features(profits_df_end: pd.DataFrame, market_cap_col: str) -> pd.DataFrame:
     """
     Params:
-    - profits_df (DataFrame): Includes at least 'wallet_address', 'coin_id', 'usd_balance', and market_cap_col columns.
-      Assumes each wallet-coin-date row has daily data (or at least a final row).
+    - profits_df_end (df): profits_df with column market_cap_col on the period end date
     - market_cap_col (str): Name of the column with market cap data.
 
     Returns:
-    - features_df (DataFrame): wallet-level features. Columns might include:
-        - portfolio_mcap_std: std dev of market caps across a wallet's final-held coins.
-        - concentration_index: sum of squared position weights (Herfindahl-Hirschman).
-        - largest_coin_frac: fraction of total balance in the single biggest coin.
-        - largest_coin_usd: absolute USD balance in the single biggest coin.
+    - features_df (DataFrame): Wallet-level features with columns:
+        - portfolio_mcap_std: Std dev of market caps for final-held coins.
+        - concentration_index: Sum of squared position weights (Herfindahl-Hirschman).
+        - largest_coin_frac: Fraction of total balance in the largest single coin.
+        - largest_coin_usd: Absolute USD balance of the largest single coin.
     """
-    # Keep only the final row per coin to focus on ending balances.
-    final_balances = profits_df.drop_duplicates(subset=["wallet_address", "coin_id"], keep="last")
+    # Retrieve the ending balances of all coin-wallet pairs
+    profits_df_end = profits_df_end.copy().dropna(subset=[market_cap_col])
 
-    # Remove rows without key data
-    final_balances = final_balances.dropna(subset=[market_cap_col, "usd_balance"])
+    # Compute total balance per wallet
+    profits_df_end["total_usd_balance"] = profits_df_end.groupby(
+        "wallet_address",
+        observed=True
+    )["usd_balance"].transform("sum")
 
-    # Compute total USD balance per wallet (vectorized group sum)
-    final_balances["total_usd_balance"] = final_balances.groupby("wallet_address", observed=True)["usd_balance"].transform("sum")
+    # Filter out zero-balance wallets
+    profits_df_end = profits_df_end[profits_df_end["total_usd_balance"] > 0]
 
-    # Filter out wallets with zero total balance
-    final_balances = final_balances[final_balances["total_usd_balance"] > 0]
+    # Fraction of total balance for each coin
+    profits_df_end["coin_fraction"] = (
+        profits_df_end["usd_balance"] / profits_df_end["total_usd_balance"]
+    )
 
-    # Fraction of total balance each coin holds
-    final_balances["coin_fraction"] = final_balances["usd_balance"] / final_balances["total_usd_balance"]
+    # Precompute squared fractions for Herfindahl-Hirschman Index
+    profits_df_end["coin_fraction_sq"] = profits_df_end["coin_fraction"] ** 2
 
     # Aggregate to wallet level
-    features_df = final_balances.groupby("wallet_address", observed=True).agg(
+    features_df = profits_df_end.groupby("wallet_address", observed=True).agg(
         portfolio_mcap_std=(market_cap_col, "std"),
-        concentration_index=("coin_fraction", lambda x: (x**2).sum()),  # Herfindahl-Hirschman
-        largest_coin_frac=("coin_fraction", "max"),                     # largest single bet as %
-        largest_coin_usd=("usd_balance", "max")                         # largest single bet in USD
+        concentration_index=("coin_fraction_sq", "sum"),
+        largest_coin_frac=("coin_fraction", "max"),
+        largest_coin_usd=("usd_balance", "max")
     )
 
     return features_df
