@@ -15,10 +15,10 @@ wallets_config = WalletsConfig()
 
 
 # -----------------------------------
-#       Main Interface Function
+#       Data Retrieval Function
 # -----------------------------------
 
-def retrieve_transfers_sequencing(hybridize_wallet_ids: bool) -> pd.DataFrame:
+def retrieve_transfers_sequencing(hybridize_wallet_ids: bool = False) -> pd.DataFrame:
     """
     Returns buyer and seller sequence numbers for each wallet-coin pair, where the first
     buyer/seller receives rank 1. Only includes wallets from wallet_modeling_training_cohort.
@@ -112,6 +112,7 @@ def retrieve_transfers_sequencing(hybridize_wallet_ids: bool) -> pd.DataFrame:
     from base_ordering
     order by 1,2,3,4
     """
+    print(sequencing_sql)
     sequence_df = dgc().run_sql(sequencing_sql)
 
     # Log retrieval stats
@@ -124,6 +125,11 @@ def retrieve_transfers_sequencing(hybridize_wallet_ids: bool) -> pd.DataFrame:
 
     return sequence_df
 
+
+
+# --------------------------------------
+#        Features Main Interface
+# --------------------------------------
 
 @u.timing_decorator
 def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df):
@@ -141,6 +147,32 @@ def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
     """
     profits_df = u.ensure_index(profits_df)
 
+    # Features related to the wallet-coin pairs' first buy and sell transfers
+    first_transfers_features_df = calculate_first_transfers_features(profits_df, transfers_sequencing_df)
+
+    # Merge all together
+    combined_features_df = first_transfers_features_df
+
+    return combined_features_df
+
+
+# --------------------------------------
+#       Features Helper Functions
+# --------------------------------------
+
+def calculate_first_transfers_features(profits_df, transfers_sequencing_df):
+    """
+    Retrieves facts about the wallet's transfer activity based on blockchain data.
+    Period boundaries are defined by the dates in profits_df through the inner join.
+
+    Params:
+        profits_df (df): the profits_df for the period that the features will reflect
+        transfers_sequencing_df (df): each wallet's lifetime transfers data
+
+    Returns:
+        first_transfers_features_df (df): dataframe indexed on wallet_address with
+        transfers feature columns
+    """
     # Define transfer types and their corresponding column names
     transfer_types = {
         'first_buy': 'buyer_number',
@@ -177,9 +209,14 @@ def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
         feature_dfs.append(features_df)
 
     # Combine features from both transfer types
-    combined_features_df = pd.concat(feature_dfs, axis=1)
+    first_transfers_features_df = pd.concat(feature_dfs, axis=1)
 
-    return combined_features_df
+    return first_transfers_features_df
+
+
+
+
+
 
 
 

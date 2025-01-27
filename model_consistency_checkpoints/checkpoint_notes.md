@@ -1,3 +1,24 @@
+# dda 609 more transfers features
+checkpoint 1: w.667 split transfers features function
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       92
+Features per Window:      23
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.667
+RMSE:                     0.219
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.809
+RMSE:                     0.117
+MAE:                      0.062
+
+
 # dda 608 training data
 checkpoint 5: w.667 time to merge
 Model Performance Summary
