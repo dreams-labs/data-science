@@ -173,13 +173,14 @@ modeling:
 
             # mktcap|*,
             # mktcap|end_portfolio_wtd_market_cap/market_cap|*,
+
+            mktcap|portfolio_mcap_std/market_cap_filled|*,
             mktcap|concentration_index/market_cap_filled|*,
             mktcap|largest_coin_frac/market_cap_filled|*,
             mktcap|largest_coin_usd/market_cap_filled|*,
-            mktcap|end_portfolio_wtd_market_cap/market_cap_unadj|*,
-            mktcap|volume_wtd_market_cap/market_cap_unadj|*,
+
             mktcap|portfolio_mcap_std/market_cap_unadj|*,
-            mktcap|concentration_index/market_cap_unadj|*,
+            # mktcap|concentration_index/market_cap_unadj|*,
             mktcap|largest_coin_frac/market_cap_unadj|*,
             mktcap|largest_coin_usd/market_cap_unadj|*,
 
@@ -319,13 +320,12 @@ modeling:
                 # [mktcap|*/market_cap_filled|*],
                 # [mktcap|*/market_cap_imputed|*],
                 # [mktcap|*/market_cap|*],
+                [mktcap|portfolio_mcap_std/market_cap_filled|*],
                 [mktcap|concentration_index/market_cap_filled|*],
                 [mktcap|largest_coin_frac/market_cap_filled|*],
                 [mktcap|largest_coin_usd/market_cap_filled|*],
-                [mktcap|end_portfolio_wtd_market_cap/market_cap_unadj|*],
-                [mktcap|volume_wtd_market_cap/market_cap_unadj|*],
                 [mktcap|portfolio_mcap_std/market_cap_unadj|*],
-                [mktcap|concentration_index/market_cap_unadj|*],
+                # [mktcap|concentration_index/market_cap_unadj|*],
                 [mktcap|largest_coin_frac/market_cap_unadj|*],
                 [mktcap|largest_coin_usd/market_cap_unadj|*],
 
