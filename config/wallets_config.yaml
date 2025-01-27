@@ -101,7 +101,7 @@ features:
     ]
 
     # Scenarios Params
-    include_scenario_features: True
+    include_scenario_features: False
     scenario_performance_features: [
         # crypto_net_flows/crypto_inflows/winsorized,
         crypto_net_flows/max_investment/winsorized,
@@ -184,12 +184,6 @@ modeling:
 
             # scenario|*,
             # scenario|sells_best/*,
-            scenario|sells_worst/*,
-            scenario|buys_best/*,
-            scenario|buys_worst/*,
-
-            # scenario|sells_best/crypto_net_flows_max_investment_winsorized*,
-            # scenario|sells_worst/crypto_net_flows_max_investment_winsorized*,
 
             cluster|*,
 
@@ -335,10 +329,6 @@ modeling:
                 # [transfers|first_buy/median_avg_wallet_rank|*],
 
                 # [scenario|*],
-                # [scenario|sells_best/*],
-                # [scenario|sells_worst/*],
-                [scenario|buys_best/*],
-                [scenario|buys_worst/*],
                 # [scenario|buy_delay_wtd_performance|*],
 
                 # [cluster|*],
