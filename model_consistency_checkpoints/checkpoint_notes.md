@@ -1,4 +1,24 @@
 # dda 592 longer term timing features
+checkpoint 7: w.681 final params
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       108
+Features per Window:      27
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.681
+RMSE:                     0.214
+MAE:                      0.111
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.816
+RMSE:                     0.115
+MAE:                      0.061
+
+
 checkpoint 6: w.679 price lag50,200 lead100; vol lag80 lead150
 Model Performance Summary
 ===================================
