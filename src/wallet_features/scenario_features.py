@@ -271,7 +271,7 @@ def generate_scenario_features(ideal_transfers_df: pd.DataFrame,
     Returns:
     - scenario_features_df (DataFrame): Combined best/worst case features
     """
-    # Generate best case scenario (sells at highest price)
+    # Generate best case sells scenario (sells at highest price)
     best_sells_profits_df = ideal_transfers_df[['usd_balance']].assign(
         usd_net_transfers=np.where(
             ideal_transfers_df['token_net_transfers'] < 0,
@@ -282,7 +282,7 @@ def generate_scenario_features(ideal_transfers_df: pd.DataFrame,
     best_sells_features = generate_scenario_performance(best_sells_profits_df, period_start_date, period_end_date)
     best_sells_features = best_sells_features.add_prefix('sells_best/')
 
-    # Generate worst case scenario (sells at lowest price)
+    # Generate worst case buys scenario (sells at lowest price)
     worst_sells_profits_df = ideal_transfers_df[['usd_balance']].assign(
         usd_net_transfers=np.where(
             ideal_transfers_df['token_net_transfers'] < 0,
@@ -293,9 +293,33 @@ def generate_scenario_features(ideal_transfers_df: pd.DataFrame,
     worst_sells_features = generate_scenario_performance(worst_sells_profits_df, period_start_date, period_end_date)
     worst_sells_features = worst_sells_features.add_prefix('sells_worst/')
 
+    # Generate best case buys scenario (buys at lowest price)
+    best_buys_profits_df = ideal_transfers_df[['usd_balance']].assign(
+        usd_net_transfers=np.where(
+            ideal_transfers_df['token_net_transfers'] > 0,
+            ideal_transfers_df['token_net_transfers'] * ideal_transfers_df['min_price'],
+            ideal_transfers_df['usd_net_transfers']
+        )
+    )
+    best_buys_features = generate_scenario_performance(best_buys_profits_df, period_start_date, period_end_date)
+    best_buys_features = best_buys_features.add_prefix('buys_best/')
+
+    # Generate worst case buys scenario (buys at highest price)
+    worst_buys_profits_df = ideal_transfers_df[['usd_balance']].assign(
+        usd_net_transfers=np.where(
+            ideal_transfers_df['token_net_transfers'] > 0,
+            ideal_transfers_df['token_net_transfers'] * ideal_transfers_df['max_price'],
+            ideal_transfers_df['usd_net_transfers']
+        )
+    )
+    worst_buys_features = generate_scenario_performance(worst_buys_profits_df, period_start_date, period_end_date)
+    worst_buys_features = worst_buys_features.add_prefix('buys_worst/')
+
     # Merge all together
     scenario_features_df = best_sells_features
     scenario_features_df = pd.concat([scenario_features_df, worst_sells_features], axis=1)
+    scenario_features_df = pd.concat([scenario_features_df, best_buys_features], axis=1)
+    scenario_features_df = pd.concat([scenario_features_df, worst_buys_features], axis=1)
 
     # Data quality checks
     all_wallets = set(ideal_transfers_df.index.get_level_values('wallet_address'))
