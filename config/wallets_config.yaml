@@ -93,6 +93,13 @@ features:
         market_cap_unadj
     ]
 
+    # Transfers Params
+    include_transfers_features: [
+        first_buy,
+        # first_sell,
+        # initial_hold_time,
+    ]
+
     # Scenarios Params
     include_scenario_features: False
     scenario_performance_features: [
@@ -101,6 +108,7 @@ features:
         # crypto_net_gain/max_investment/winsorized,
     ]
 
+    # Market Timing Params
 
     # Clustering Params
     # clustering_n_clusters: [2,4]
@@ -166,11 +174,12 @@ modeling:
             # mktcap|end_portfolio_wtd_market_cap/market_cap|*,
 
             # transfers|*,
-            transfers|first_sell/*,
-            # transfers|first_sell/avg_wallet_rank|*,
-            # transfers|first_sell/median_avg_wallet_rank|*,
-            # transfers|first_sell/min_avg_wallet_rank|*,
-            # transfers|first_sell/new_coin_transaction_counts|*,
+            # transfers|first_sell/*,
+            # transfers|initial_hold_time/*,
+            # transfers|initial_hold_time/avg_wallet_rank|*,
+            # transfers|initial_hold_time/median_avg_wallet_rank|*,
+            # transfers|initial_hold_time/min_avg_wallet_rank|*,
+            # transfers|initial_hold_time/new_coin_transaction_counts|*,
 
             scenario|*,
             scenario|sells_best/crypto_net_flows_max_investment_winsorized*,
@@ -225,7 +234,6 @@ modeling:
     # WalletModel Grid Search
     grid_search_params:
 
-        # Turn On or Off
         # -------------------------------
         # enabled: True
         # -------------------------------
@@ -369,11 +377,22 @@ modeling:
                 # [mktcap|*/market_cap_imputed|*],
                 # [mktcap|*/market_cap|*],
 
-                # [transfers|*],
+                [transfers|*],
+                [transfers|first_buy/*],
+                [transfers|first_sell/*],
+                [transfers|initial_hold_time/*],
+                # [transfers|first_buy/avg_wallet_rank|*],
+                # [transfers|first_buy/median_avg_wallet_rank|*],
+                # [transfers|first_buy/min_avg_wallet_rank|*],
+                # [transfers|first_buy/new_coin_transaction_counts|*],
                 # [transfers|first_sell/avg_wallet_rank|*],
                 # [transfers|first_sell/median_avg_wallet_rank|*],
                 # [transfers|first_sell/min_avg_wallet_rank|*],
                 # [transfers|first_sell/new_coin_transaction_counts|*],
+                # [transfers|initial_hold_time/avg_wallet_rank|*],
+                # [transfers|initial_hold_time/median_avg_wallet_rank|*],
+                # [transfers|initial_hold_time/min_avg_wallet_rank|*],
+                # [transfers|initial_hold_time/new_coin_transaction_counts|*],
 
                 # [scenario|*],
                 # [scenario|sells_best/*],

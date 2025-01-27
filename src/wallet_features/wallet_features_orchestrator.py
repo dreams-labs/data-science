@@ -87,7 +87,7 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     # Transfers features (left join, do not fill)
     # Uses only real transfers (~is_imputed)
     # -----------------------------------------------------------------------
-    transfers_sequencing_features_df = wts.calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df)
+    transfers_sequencing_features_df = wts.calculate_transfers_features(profits_df, transfers_sequencing_df)
     feature_column_names['transfers|'] = transfers_sequencing_features_df.columns
     wallet_features_df = wallet_features_df.join(transfers_sequencing_features_df, how='left')
 

@@ -1,4 +1,5 @@
 import logging
+from typing import List
 import pandas as pd
 from dreams_core.googlecloud import GoogleCloud as dgc
 
@@ -15,10 +16,10 @@ wallets_config = WalletsConfig()
 
 
 # -----------------------------------
-#       Main Interface Function
+#       Data Retrieval Function
 # -----------------------------------
 
-def retrieve_transfers_sequencing(hybridize_wallet_ids: bool) -> pd.DataFrame:
+def retrieve_transfers_sequencing(hybridize_wallet_ids: bool = False) -> pd.DataFrame:
     """
     Returns buyer and seller sequence numbers for each wallet-coin pair, where the first
     buyer/seller receives rank 1. Only includes wallets from wallet_modeling_training_cohort.
@@ -57,10 +58,10 @@ def retrieve_transfers_sequencing(hybridize_wallet_ids: bool) -> pd.DataFrame:
     with transaction_rank as (
         select coin_id
         ,wallet_address
-        ,min(case when usd_net_transfers > {min_txn_size} then date end) as first_buy
-        ,min(case when usd_net_transfers < -{min_txn_size} then date end) as first_sell
+        ,min(case when usd_net_transfers >= {min_txn_size} then date end) as first_buy
+        ,min(case when usd_net_transfers <= -{min_txn_size} then date end) as first_sell
         from core.coin_wallet_profits cwp
-        where abs(cwp.usd_net_transfers) > {min_txn_size}
+        where abs(cwp.usd_net_transfers) >= {min_txn_size}
         and cwp.date <= '{training_end}'
         group by 1,2
     ),
@@ -112,6 +113,7 @@ def retrieve_transfers_sequencing(hybridize_wallet_ids: bool) -> pd.DataFrame:
     from base_ordering
     order by 1,2,3,4
     """
+    print(sequencing_sql)
     sequence_df = dgc().run_sql(sequencing_sql)
 
     # Log retrieval stats
@@ -125,61 +127,156 @@ def retrieve_transfers_sequencing(hybridize_wallet_ids: bool) -> pd.DataFrame:
     return sequence_df
 
 
+
+# --------------------------------------
+#        Features Main Interface
+# --------------------------------------
+
 @u.timing_decorator
-def calculate_transfers_sequencing_features(profits_df, transfers_sequencing_df):
+def calculate_transfers_features(profits_df, transfers_sequencing_df):
     """
     Retrieves facts about the wallet's transfer activity based on blockchain data.
     Period boundaries are defined by the dates in profits_df through the inner join.
 
     Params:
-        profits_df (df): the profits_df for the period that the features will reflect
+    - profits_df (df): the profits_df for the period that the features will reflect
         transfers_sequencing_df (df): each wallet's lifetime transfers data
 
     Returns:
-        transfers_sequencing_features_df (df): dataframe indexed on wallet_address with
+    - transfers_sequencing_features_df (df): dataframe indexed on wallet_address with
         transfers feature columns
     """
+    # Get list of requested features
+    include_features = wallets_config['features']['include_transfers_features']
+    if len(include_features) == 0:
+        return pd.DataFrame()
+
+    # Assign index
     profits_df = u.ensure_index(profits_df)
 
-    # Define transfer types and their corresponding column names
-    transfer_types = {
-        'first_buy': 'buyer_number',
-        # 'first_sell': 'seller_number' # FeatureRemoval first sell wasn't predictive
+    # Calculate initial_hold_time in days
+    transfers_sequencing_df['initial_hold_time'] = (
+        transfers_sequencing_df['first_sell'] - transfers_sequencing_df['first_buy']
+    ).dt.days
+
+    # Features related to the wallet-coin pairs' first buy and sell transfers
+    first_transfers_features_df = calculate_first_transfers_features(profits_df,
+                                                                     transfers_sequencing_df,
+                                                                     include_features)
+
+    # Merge all together
+    combined_features_df = first_transfers_features_df
+
+    return combined_features_df
+
+
+# --------------------------------------
+#       Features Helper Functions
+# --------------------------------------
+
+def calculate_first_transfers_features(profits_df: pd.DataFrame,
+                                   transfers_sequencing_df: pd.DataFrame,
+                                   include_features: List) -> pd.DataFrame:
+    """
+    Params:
+    - profits_df (DataFrame): profits data defining period boundaries
+    - transfers_sequencing_df (DataFrame): lifetime transfers data for each wallet
+    - include_features (List): list of features to calculate
+
+    Returns:
+    - first_transfers_features_df (DataFrame): wallet transfer features indexed by wallet_address
+    """
+    # Define transfer types and their corresponding parameters
+    feature_params = {
+        'first_buy': {
+            'date_col': 'first_buy',
+            'number_col': 'buyer_number'
+        },
+        'first_sell': {
+            'date_col': 'first_sell',
+            'number_col': 'seller_number'
+        },
+        'initial_hold_time': {
+            'date_col': 'first_sell',
+            'number_col': 'initial_hold_time'
+        }
     }
+
+    # Validate features
+    invalid_features = set(include_features) - set(feature_params.keys())
+    if invalid_features:
+        raise ValueError(f"Features not found in feature_params: {invalid_features}")
 
     feature_dfs = []
 
-    for transfer_type, number_col in transfer_types.items():
-        # Inner join lifetime transfers with profits_df to filter on valid dates and coins
+    for transfer_type in include_features:
+        params = feature_params[transfer_type]
         transfers_df = pd.merge(
             profits_df,
             transfers_sequencing_df,
             left_index=True,
-            right_on=['coin_id', 'wallet_address', transfer_type],
+            right_on=['coin_id', 'wallet_address', params['date_col']],
             how='inner'
         )
 
-        # Generate features
+        # Aggregate features
         features_df = transfers_df.groupby('wallet_address').agg({
-            number_col: ['count', 'mean', 'median', 'min']
+            params['number_col']: ['count', 'mean', 'median', 'min']
         })
 
-        # Rename columns
+        # Rename columns and add prefix
         features_df.columns = [
             'new_coin_transaction_counts',
             'avg_wallet_rank',
             'median_avg_wallet_rank',
             'min_avg_wallet_rank'
         ]
-
-        # Add prefix for feature type
         features_df = features_df.add_prefix(f'{transfer_type}/')
         feature_dfs.append(features_df)
 
-    # Combine features from both transfer types
-    combined_features_df = pd.concat(feature_dfs, axis=1)
+    first_transfers_features_df = pd.concat(feature_dfs, axis=1)
 
-    return combined_features_df
+    return first_transfers_features_df
+
+
+def calculate_initial_hold_time(
+    transfers_sequencing_df: pd.DataFrame,
+    profits_df: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Calculates the initial hold time (in days) for each record in the transfers_sequencing_df,
+    but only includes records where first_sell falls between the min_date and max_date
+    defined by the profits_df.
+
+    Params:
+    - transfers_sequencing_df (DataFrame): Contains columns such as wallet_address, coin_id,
+      first_buy, first_sell, buyer_number, seller_number.
+    - profits_df (DataFrame): Defines the valid date range with its index, which must contain
+      min and max boundaries.
+
+    Returns:
+    - hold_time_df (DataFrame): Original DataFrame with an additional initial_hold_time column
+      for valid records.
+    """
+    # Extract min_date and max_date from profits_df
+    min_date = profits_df.index.min()
+    max_date = profits_df.index.max()
+
+    # Filter records where first_sell is within the valid date range
+    filtered_transfers_df = transfers_sequencing_df[
+        (transfers_sequencing_df['first_sell'] >= min_date) &
+        (transfers_sequencing_df['first_sell'] <= max_date)
+    ].copy()
+
+    # Calculate initial_hold_time in days
+    filtered_transfers_df['initial_hold_time'] = (
+        filtered_transfers_df['first_sell'] - filtered_transfers_df['first_buy']
+    ).dt.days
+
+    return filtered_transfers_df
+
+
+
 
 
 
