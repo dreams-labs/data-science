@@ -1,4 +1,26 @@
 # dda 616 buys scenarios
+checkpoint 2: w.679 best sells only helpful feature
+best sells only
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       116
+Features per Window:      29
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.679
+RMSE:                     0.215
+MAE:                      0.111
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.814
+RMSE:                     0.115
+MAE:                      0.062
+
+
+
 checkpoint 1: w.678 no scenarios
 Model Performance Summary
 ===================================
