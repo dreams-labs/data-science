@@ -138,6 +138,10 @@ def multithreaded_impute_profits_rows(profits_df, prices_df, target_date, n_thre
     # Partition profits_df on coin_id
     logger.debug("Splitting profits_df into %s partitions for date %s...",n_threads,target_date)
 
+    # Create indices so we can use vectorized operations
+    profits_df = u.ensure_index(profits_df)
+    prices_df = u.ensure_index(prices_df.copy(deep=True))
+
     profits_df_partitions = create_partitions(profits_df, n_threads)
 
     # Create a thread-safe queue to store results
@@ -218,10 +222,6 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
     logger.info('%s Imputing rows for all coin-wallet pairs in profits_df on %s...',
                 profits_df.shape,
                 target_date)
-
-    # Create indices so we can use vectorized operations
-    profits_df = u.ensure_index(profits_df)
-    prices_df = u.ensure_index(prices_df.copy(deep=True))
 
     # Data Checks and Typecasting
     # ---------------------------
@@ -388,25 +388,23 @@ def calculate_new_profits_values(profits_df, target_date):
 
 def create_partitions(profits_df, n_partitions):
     """
-    Partition a DataFrame into multiple subsets based on unique coin_ids.
+    Partition an indexed DataFrame into multiple subsets based on unique coin_ids.
 
-    Parameters:
-    - profits_df (pd.DataFrame): The input DataFrame to be partitioned. Must contain
-        a 'coin_id' column.
-    - n_partitions (int): The number of partitions to create.
+    Params:
+    - profits_df (DataFrame): MultiIndexed on ['coin_id', 'wallet_address', 'date']
+    - n_partitions (int): Number of partitions to create
 
     Returns:
-    - partition_dfs (List[pd.DataFrame]): A list of DataFrames, each representing
-        a partition of the original data.
+    - partition_dfs (List[DataFrame]): List of partitioned DataFrames
     """
-    # Get unique coin_ids and convert to a regular list
-    unique_coin_ids = profits_df['coin_id'].unique().tolist()
+    # Get unique coin_ids from the index
+    unique_coin_ids = profits_df.index.get_level_values('coin_id').unique().tolist()
 
-    # Shuffle the list of coin_ids
+    # Shuffle coin_ids
     np.random.seed(88)
     np.random.shuffle(unique_coin_ids)
 
-    # Calculate the number of coin_ids per partition
+    # Calculate coins per partition
     coins_per_partition = len(unique_coin_ids) // n_partitions
 
     # Create partitions
@@ -416,11 +414,10 @@ def create_partitions(profits_df, n_partitions):
         end_idx = start_idx + coins_per_partition if i < n_partitions - 1 else None
         partition_coin_ids = unique_coin_ids[start_idx:end_idx]
 
-        # Create a boolean mask for the current partition
-        mask = profits_df['coin_id'].isin(partition_coin_ids)
-
-        # Add the partition to the list
-        partition_dfs.append(profits_df[mask].copy(deep=True))
+        # Use IndexSlice to filter the MultiIndex
+        idx = pd.IndexSlice
+        partition_df = profits_df.loc[idx[partition_coin_ids, :, :], :].copy()
+        partition_dfs.append(partition_df)
 
     return partition_dfs
 

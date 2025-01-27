@@ -108,6 +108,8 @@ class BaseModel:
 
 
 
+
+
     # -----------------------------------
     #      Modeling Helper Methods
     # -----------------------------------
@@ -127,6 +129,11 @@ class BaseModel:
 
         # Pipeline Begins
         self.pipeline = Pipeline([
+            # ('feature_selector', FeatureSelector(
+            #     variance_threshold=self.modeling_config['feature_selection']['variance_threshold'],
+            #     correlation_threshold=self.modeling_config['feature_selection']['correlation_threshold'],
+            #     protected_features=self.modeling_config['feature_selection']['protected_features']
+            # )),
             ('drop_columns', DropColumnPatterns(
                 drop_patterns=self.modeling_config['feature_selection']['drop_patterns']
             )),
@@ -176,6 +183,8 @@ class BaseModel:
         # Convert to Series with same index as test data
         self.y_pred = pd.Series(raw_predictions, index=self.X_test.index)
         return self.y_pred
+
+
 
 
 
@@ -363,6 +372,7 @@ class BaseModel:
                 )
 
 
+
     # -----------------------------------
     #           Utility Methods
     # -----------------------------------
@@ -398,6 +408,8 @@ class BaseModel:
 
 
 
+
+
 # -----------------------------------
 #           Pipeline Steps
 # -----------------------------------
@@ -419,8 +431,8 @@ class DropColumnPatterns(BaseEstimator, TransformerMixin):
         self.drop_patterns = drop_patterns
         self.columns_to_drop = None  # Persist calculated columns to drop
 
-    # pylint:disable=unused-argument  # y param is needed to match pipeline structure
-    def fit(self, X, y=None):
+
+    def fit(self, X, y=None): # pylint:disable=unused-argument  # y param needed for pipeline structure
         """
         Identify columns to drop based on the given patterns.
 
@@ -444,6 +456,7 @@ class DropColumnPatterns(BaseEstimator, TransformerMixin):
 
         return self
 
+
     def transform(self, X):
         """
         Drop the identified columns from the input data.
@@ -464,3 +477,46 @@ class DropColumnPatterns(BaseEstimator, TransformerMixin):
 
         # Drop columns safely
         return X.drop(columns=dropped_columns, errors='ignore')
+
+
+
+class FeatureSelector(BaseEstimator, TransformerMixin):
+    """Pipeline step for feature selection based on variance and correlation"""
+
+    def __init__(self, variance_threshold: float, correlation_threshold: float,
+                 protected_features: List[str]):
+        """
+        Params:
+        - variance_threshold (float): Minimum variance threshold for features
+        - correlation_threshold (float): Maximum correlation threshold between features
+        - protected_features (List[str]): Features to retain regardless of thresholds
+        """
+        self.variance_threshold = variance_threshold
+        self.correlation_threshold = correlation_threshold
+        self.protected_features = protected_features
+        self.selected_features = None
+
+
+    def fit(self, X: pd.DataFrame, y=None):  # pylint:disable=unused-argument  # y param needed for pipeline structure
+        """Identify features to keep based on variance and correlation thresholds"""
+        # Remove low variance features
+        post_variance_df = fs.remove_low_variance_features(
+            X,
+            self.variance_threshold,
+            self.protected_features
+        )
+
+        # Remove correlated features
+        post_correlation_df = fs.remove_correlated_features(
+            post_variance_df,
+            self.correlation_threshold,
+            self.protected_features
+        )
+
+        self.selected_features = post_correlation_df.columns.tolist()
+        return self
+
+
+    def transform(self, X: pd.DataFrame):
+        """Apply feature selection"""
+        return X[self.selected_features]
