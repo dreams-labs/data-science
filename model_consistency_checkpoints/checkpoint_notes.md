@@ -1,3 +1,24 @@
+# dda 613 timing feature params
+checkpoint 1: w.679 offset winsorization 0.01
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       112
+Features per Window:      28
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.679
+RMSE:                     0.215
+MAE:                      0.112
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.818
+RMSE:                     0.114
+MAE:                      0.061
+
+
 # dda 592 longer term timing features
 checkpoint 7: w.681 final params
 Model Performance Summary
