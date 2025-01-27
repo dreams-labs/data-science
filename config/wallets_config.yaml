@@ -184,8 +184,6 @@ modeling:
             # scenario|*,
             # scenario|sells_best/*,
             scenario|sells_worst/*,
-            scenario|buy_delay_wtd_performance|*,
-            scenario|sell_delay_wtd_performance|*,
 
             # scenario|sells_best/crypto_net_flows_max_investment_winsorized*,
             # scenario|sells_worst/crypto_net_flows_max_investment_winsorized*,
@@ -240,15 +238,15 @@ modeling:
     grid_search_params:
 
         # -------------------------------
-        # enabled: True
+        enabled: True
         # -------------------------------
+        drop_patterns_include_n_features: 1
 
 
         # Search Methodology
         n_iter: 40  # random search limit
         n_splits: 4  # cv splits
         scoring: neg_root_mean_squared_error
-        drop_patterns_include_n_features: 1
 
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # scikit-learn verbosity
@@ -293,27 +291,14 @@ modeling:
                 # [],
                 [],
                 # [timing|*],
-                # [timing|price_sma_2/lead_21/*],
-                # [timing|price_sma_2/lag_15/*],
                 # [timing|price_sma_2/lag_21/*],
                 # [timing|price_sma_2/lag_30/*],
                 # [timing|*/buy_mean*],
-                # [timing|*/sell_mean*],
                 # [timing|*/buy_weighted*],
-                # [timing|*/sell_weighted*],
-                # [timing|price_rsi_*/*],
-                # [timing|price_rsi_*/*],
-                # [timing|mfi*/*],
-                # [timing|obv*/*],
-                # [timing|volume_sma_3/*],
-                # [timing|volume_sma_7/*],
-                # [timing|volume_sma_12/*_15*],
-                # [timing|volume_sma_12/*_21*],
                 # [timing|volume_sma_12/*_30*],
                 # [timing|price_sma_*/*],
                 # [timing|*/*_7/*],
                 # [timing|*/*_21/*],
-                # [timing|*/*_50/*],
 
                 # [performance|*],
                 # [performance|crypto_net_gain/*],
@@ -402,8 +387,8 @@ modeling:
                 # [scenario|*],
                 # [scenario|sells_best/*],
                 # [scenario|sells_worst/*],
-                # [scenario|buy_delay_wtd_performance|*],
-                # [scenario|sell_delay_wtd_performance|*],
+                [scenario|buy_delay_wtd_performance|*],
+                [scenario|sell_delay_wtd_performance|*],
                 # [scenario|sells_best_v_base/*],
                 # [scenario|sells_worst_v_base/*],
                 # [scenario|sells_best/crypto_net_flows_crypto_inflows_winsorized*],

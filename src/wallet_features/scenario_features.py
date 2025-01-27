@@ -59,12 +59,14 @@ def calculate_scenario_features(
         period_start_date,
         period_end_date
     )
+    scenario_features_df = performance_features_df
 
-    # Generate ratio features
-    performance_ratios_df = generate_delay_wtd_relative_performance(ideal_transfers_df)
+    # FeatureRemoval not predictive
+    # # Generate ratio features
+    # performance_ratios_df = generate_delay_wtd_relative_performance(ideal_transfers_df)
+    # scenario_features_df = performance_features_df.join(performance_ratios_df,how='inner')
 
     # Merge and confirm data completeness
-    scenario_features_df = performance_features_df.join(performance_ratios_df,how='inner')
 
     # Data completeness check
     profits_wallets = training_profits_df['wallet_address'].drop_duplicates()
