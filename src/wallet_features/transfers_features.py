@@ -113,7 +113,6 @@ def retrieve_transfers_sequencing(hybridize_wallet_ids: bool = False) -> pd.Data
     from base_ordering
     order by 1,2,3,4
     """
-    print(sequencing_sql)
     sequence_df = dgc().run_sql(sequencing_sql)
 
     # Log retrieval stats
