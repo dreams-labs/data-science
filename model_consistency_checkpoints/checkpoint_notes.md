@@ -1,3 +1,85 @@
+# dda 592 longer term timing features
+checkpoint 2: w.678 price lag50,200; vol lead 100
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       108
+Features per Window:      27
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.678
+RMSE:                     0.215
+MAE:                      0.112
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.814
+RMSE:                     0.115
+MAE:                      0.062
+
+
+checkpoint 1: w.677 price lag 50,200
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       100
+Features per Window:      25
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.677
+RMSE:                     0.215
+MAE:                      0.112
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.814
+RMSE:                     0.115
+MAE:                      0.062
+
+
+checkpoint 1: w.677 price lag 200
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       96
+Features per Window:      24
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.676
+RMSE:                     0.216
+MAE:                      0.112
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.813
+RMSE:                     0.115
+MAE:                      0.062
+
+
+base scenario, random seed changes from new columns in full training data df
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       92
+Features per Window:      23
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.666
+RMSE:                     0.219
+MAE:                      0.114
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.808
+RMSE:                     0.117
+MAE:                      0.063
+
+
+
 # dda 606 perfect buys
 checkpoint 2: w.669 with sells_best
 Model Performance Summary

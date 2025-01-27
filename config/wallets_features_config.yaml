@@ -3,8 +3,12 @@
 market_timing:
   offsets:
     price_sma_2:
-      offsets: [-30,-15]
+      offsets: [-30,-15
+          ,-500,-365,-300,-200,-150,-100,-80,-50,50,80,100,150,200,300,365,500
+      ]
       retain_base_columns: False
     volume_sma_12:
-      offsets: [-21,21]
+      offsets: [-21,21,120
+          ,-500,-365,-300,-200,-150,-100,-80,-50,50,80,100,150,200,300,365,500
+      ]
       retain_base_columns: False

@@ -101,7 +101,7 @@ features:
     ]
 
     # Scenarios Params
-    include_scenario_features: True
+    include_scenario_features: False
     scenario_performance_features: [
         # crypto_net_flows/crypto_inflows/winsorized,
         crypto_net_flows/max_investment/winsorized,
@@ -138,6 +138,45 @@ modeling:
             timing|*/buy_mean*,
             timing|*/sell_mean*,
             timing|*/sell_weighted*,
+
+            # timing|price_sma_2/lag_200/*,
+            # timing|price_sma_2/lag_50/*,
+            # timing|volume_sma_12/lead_120/*,
+            # timing|volume_sma_12/lead_100/*,
+
+            timing|volume_sma_12/lag_500/*,
+            timing|volume_sma_12/lag_365/*,
+            timing|volume_sma_12/lag_300/*,
+            timing|volume_sma_12/lag_200/*,
+            timing|volume_sma_12/lag_150/*,
+            timing|volume_sma_12/lag_100/*,
+            timing|volume_sma_12/lag_80/*,
+            timing|volume_sma_12/lag_50/*,
+            timing|volume_sma_12/lead_500/*,
+            timing|volume_sma_12/lead_365/*,
+            timing|volume_sma_12/lead_300/*,
+            timing|volume_sma_12/lead_200/*,
+            timing|volume_sma_12/lead_100/*,
+            timing|volume_sma_12/lead_80/*,
+            timing|volume_sma_12/lead_50/*,
+
+            timing|price_sma_2/lag_500/*,
+            timing|price_sma_2/lag_365/*,
+            timing|price_sma_2/lag_300/*,
+            timing|price_sma_2/lag_150/*,
+            timing|price_sma_2/lag_100/*,
+            timing|price_sma_2/lag_80/*,
+
+            timing|price_sma_2/lead_500/*,
+            timing|price_sma_2/lead_365/*,
+            timing|price_sma_2/lead_300/*,
+            timing|price_sma_2/lead_200/*,
+            timing|price_sma_2/lead_150/*,
+            timing|price_sma_2/lead_80/*,
+            timing|price_sma_2/lead_50/*,
+
+
+
 
             # performance|*,
             # performance|*/max_investment/*,
@@ -238,12 +277,13 @@ modeling:
     grid_search_params:
 
         # -------------------------------
-        enabled: True
+        # enabled: True
         # -------------------------------
-        drop_patterns_include_n_features: 1
 
 
         # Search Methodology
+        drop_patterns_include_n_features: 1
+
         n_iter: 40  # random search limit
         n_splits: 4  # cv splits
         scoring: neg_root_mean_squared_error
@@ -251,11 +291,11 @@ modeling:
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # scikit-learn verbosity
 
-        # Target variables
-        target_variables: [
-            crypto_net_gain/max_investment/winsorized,
-            # crypto_net_gain/max_investment/ntile_rank,
-        ]
+        # # Target variables
+        # target_variables: [
+        #     crypto_net_gain/max_investment/winsorized,
+        #     # crypto_net_gain/max_investment/ntile_rank,
+        # ]
 
         # Params
         param_grid:
@@ -275,7 +315,7 @@ modeling:
             # regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            regressor__n_estimators: [250]
+            regressor__n_estimators: [200]
             regressor__learning_rate: [0.05]
             # regressor__gamma: [0.01]
 
@@ -288,8 +328,8 @@ modeling:
 
             # Column Selection
             drop_columns__drop_patterns: [
-                # [],
                 [],
+                # [],
                 # [timing|*],
                 # [timing|price_sma_2/lag_21/*],
                 # [timing|price_sma_2/lag_30/*],
@@ -299,6 +339,38 @@ modeling:
                 # [timing|price_sma_*/*],
                 # [timing|*/*_7/*],
                 # [timing|*/*_21/*],
+                # [timing|price_sma_2/lag_500/*],
+                # [timing|price_sma_2/lag_365/*],
+                # [timing|price_sma_2/lag_300/*],
+                # [timing|price_sma_2/lag_200/*],
+                # [timing|price_sma_2/lag_150/*],
+                # [timing|price_sma_2/lag_100/*],
+                # [timing|price_sma_2/lag_80/*],
+                # [timing|price_sma_2/lag_50/*],
+                # [timing|price_sma_2/lead_500/*],
+                # [timing|price_sma_2/lead_365/*],
+                # [timing|price_sma_2/lead_300/*],
+                # [timing|price_sma_2/lead_200/*],
+                # [timing|price_sma_2/lead_150/*],
+                # [timing|price_sma_2/lead_100/*],
+                # [timing|price_sma_2/lead_80/*],
+                # [timing|price_sma_2/lead_50/*],
+                [timing|volume_sma_12/lag_500/*],
+                [timing|volume_sma_12/lag_365/*],
+                [timing|volume_sma_12/lag_300/*],
+                [timing|volume_sma_12/lag_200/*],
+                [timing|volume_sma_12/lag_150/*],
+                [timing|volume_sma_12/lag_100/*],
+                [timing|volume_sma_12/lag_80/*],
+                [timing|volume_sma_12/lag_50/*],
+                # [timing|volume_sma_12/lead_500/*],
+                # [timing|volume_sma_12/lead_365/*],
+                # [timing|volume_sma_12/lead_300/*],
+                # [timing|volume_sma_12/lead_200/*],
+                # [timing|volume_sma_12/lead_150/*],
+                # [timing|volume_sma_12/lead_100/*],
+                # [timing|volume_sma_12/lead_80/*],
+                # [timing|volume_sma_12/lead_50/*],
 
                 # [performance|*],
                 # [performance|crypto_net_gain/*],
@@ -387,8 +459,8 @@ modeling:
                 # [scenario|*],
                 # [scenario|sells_best/*],
                 # [scenario|sells_worst/*],
-                [scenario|buy_delay_wtd_performance|*],
-                [scenario|sell_delay_wtd_performance|*],
+                # [scenario|buy_delay_wtd_performance|*],
+                # [scenario|sell_delay_wtd_performance|*],
                 # [scenario|sells_best_v_base/*],
                 # [scenario|sells_worst_v_base/*],
                 # [scenario|sells_best/crypto_net_flows_crypto_inflows_winsorized*],
