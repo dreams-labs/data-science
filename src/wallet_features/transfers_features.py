@@ -58,10 +58,10 @@ def retrieve_transfers_sequencing(hybridize_wallet_ids: bool = False) -> pd.Data
     with transaction_rank as (
         select coin_id
         ,wallet_address
-        ,min(case when usd_net_transfers > {min_txn_size} then date end) as first_buy
-        ,min(case when usd_net_transfers < -{min_txn_size} then date end) as first_sell
+        ,min(case when usd_net_transfers >= {min_txn_size} then date end) as first_buy
+        ,min(case when usd_net_transfers <= -{min_txn_size} then date end) as first_sell
         from core.coin_wallet_profits cwp
-        where abs(cwp.usd_net_transfers) > {min_txn_size}
+        where abs(cwp.usd_net_transfers) >= {min_txn_size}
         and cwp.date <= '{training_end}'
         group by 1,2
     ),
