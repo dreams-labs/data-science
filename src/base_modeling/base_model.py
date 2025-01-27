@@ -130,8 +130,8 @@ class BaseModel:
         # Pipeline Begins
         self.pipeline = Pipeline([
             ('feature_selector', FeatureSelector(
-                variance_threshold=self.modeling_config['feature_selection']['variance_threshold'],
-                correlation_threshold=self.modeling_config['feature_selection']['correlation_threshold'],
+                variance_threshold=self.modeling_config['feature_selection'].get('variance_threshold'),
+                correlation_threshold=self.modeling_config['feature_selection'].get('correlation_threshold'),
                 protected_features=self.modeling_config['feature_selection']['protected_features']
             )),
             ('drop_columns', DropColumnPatterns(

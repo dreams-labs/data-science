@@ -43,7 +43,7 @@ def identify_matching_columns(column_patterns: List[str], all_columns: List[str]
 
 def remove_low_variance_features(
     training_df: pd.DataFrame,
-    variance_threshold: float = 0.01,
+    variance_threshold: float = None,
     protected_features: list = None,
     scale_before_selection: bool = True
 ) -> pd.DataFrame:
@@ -60,49 +60,44 @@ def remove_low_variance_features(
     Returns:
     - reduced_df (DataFrame): DataFrame with low variance features removed
     """
-    # If the threshold is 0 then don't compute anything
-    if variance_threshold < 0:
-        logger.info("Didn't apply variance-based feature selection.")
+    if variance_threshold is None or variance_threshold < 0:
+        logger.info("Skipping variance-based feature selection entirely.")
+        return training_df  # no changes
+
+    # Work on a copy so we don’t mutate in-place
+    _df = training_df.copy()
+
+    # Either scale first or just compute raw variances
+    if scale_before_selection:
+        scaled = (_df - _df.mean()) / _df.std(ddof=0)  # ddof=0 to avoid 1/n bias
+        variances = scaled.var()
+    else:
+        variances = _df.var()
+
+    # Identify columns with variance <= threshold
+    columns_to_drop = variances[variances <= variance_threshold].index.tolist()
+
+    # Remove protected columns from that list
+    if protected_features:
+        columns_to_drop = [
+            col
+            for col in columns_to_drop
+            if not any(col.startswith(prefix) for prefix in protected_features)
+        ]
+
+    # Short-circuit if we end up with zero columns to drop
+    if not columns_to_drop:
+        logger.info("No columns found below the variance threshold. Returning original data unchanged.")
         return training_df
 
-    # Calculate variances with optional scaling
-    if scale_before_selection:
-        scaled_df = (training_df - training_df.mean()) / training_df.std()
-        feature_variances = scaled_df.var()
-        scale_log = " after standard scaling"
-    else:
-        feature_variances = training_df.var()
-        scale_log = ""
-
-    # Get features exceeding threshold
-    high_variance_features = feature_variances[
-        feature_variances > variance_threshold
-    ].index.tolist()
-
-    # Add protected features regardless of variance
-    if protected_features:
-        protected_cols = [
-            col for col in training_df.columns
-            if any(col.startswith(p) for p in protected_features)
-        ]
-        high_variance_features = list(set(high_variance_features + protected_cols))
-
-    # Select columns from original unscaled data
-    reduced_df = training_df[high_variance_features]
-
-    logger.info(
-        f"Removed {training_df.shape[1] - reduced_df.shape[1]} features{scale_log}"
-        f" with variance at or below {variance_threshold}"
-        f" while protecting {len(protected_cols) if protected_features else 0} features"
-    )
-
-    return reduced_df
-
+    # Otherwise drop them
+    logger.info(f"Dropping {len(columns_to_drop)} columns with variance <= {variance_threshold}")
+    return training_df.drop(columns=columns_to_drop)
 
 
 def remove_correlated_features(
     training_df: pd.DataFrame,
-    correlation_threshold: float = 0.95,
+    correlation_threshold: float = None,
     protected_features: list = None
 ) -> pd.DataFrame:
     """
@@ -117,7 +112,7 @@ def remove_correlated_features(
     - reduced_df (DataFrame): DataFrame with correlated features removed
     """
     # If the threshold is 1.0 then don't compute anything
-    if correlation_threshold > 1.0:
+    if correlation_threshold is None or correlation_threshold > 1.0:
         logger.info("Didn't apply correlation-based feature selection.")
         return training_df
 

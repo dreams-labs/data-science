@@ -1,4 +1,26 @@
 # dda 608 training data
+
+checkpoint 4: w.667 feature selection w nulls
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       92
+Features per Window:      23
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.667
+RMSE:                     0.219
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.809
+RMSE:                     0.117
+MAE:                      0.062
+
+
+
 checkpoint 3: w.667 feature selection into model
 Model Performance Summary
 ===================================
