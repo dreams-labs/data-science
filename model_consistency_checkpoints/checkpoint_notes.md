@@ -1,4 +1,64 @@
 # dda 613 timing feature params
+checkpoint 3: w.678 min transacction size 5
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       112
+Features per Window:      28
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.678
+RMSE:                     0.215
+MAE:                      0.112
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.817
+RMSE:                     0.114
+MAE:                      0.061
+
+
+checkpoint 2: w. offset winsorization 0.05
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       112
+Features per Window:      28
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.676
+RMSE:                     0.216
+MAE:                      0.112
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.812
+RMSE:                     0.116
+MAE:                      0.**062**
+
+
+checkpoint 1: w.681 offset winsorization 0.03
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       112
+Features per Window:      28
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.681
+RMSE:                     0.214
+MAE:                      0.111
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.818
+RMSE:                     0.114
+MAE:                      0.061
+
+
 checkpoint 1: w.679 offset winsorization 0.01
 Model Performance Summary
 ===================================
