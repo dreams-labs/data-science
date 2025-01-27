@@ -1,3 +1,45 @@
+# dda 606 perfect buys
+checkpoint 2: w.669 with sells_best
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       96
+Features per Window:      24
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.669
+RMSE:                     0.218
+MAE:                      0.112
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.808
+RMSE:                     0.117
+MAE:                      0.063
+
+
+checkpoint 1: w.667 ready to test features
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       92
+Features per Window:      23
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.667
+RMSE:                     0.219
+MAE:                      0.113
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.809
+RMSE:                     0.117
+MAE:                      0.062
+
+
+
 # dda 609 more transfers features
 checkpoint 3: w.667 fix greater than or equals
 Model Performance Summary

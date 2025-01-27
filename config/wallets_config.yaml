@@ -101,7 +101,7 @@ features:
     ]
 
     # Scenarios Params
-    include_scenario_features: False
+    include_scenario_features: True
     scenario_performance_features: [
         # crypto_net_flows/crypto_inflows/winsorized,
         crypto_net_flows/max_investment/winsorized,
@@ -181,8 +181,11 @@ modeling:
             # transfers|initial_hold_time/min_avg_wallet_rank|*,
             # transfers|initial_hold_time/new_coin_transaction_counts|*,
 
-            scenario|*,
-            scenario|sells_best/crypto_net_flows_max_investment_winsorized*,
+            # scenario|*,
+            # scenario|sells_best/*,
+            scenario|sells_worst/*,
+
+            # scenario|sells_best/crypto_net_flows_max_investment_winsorized*,
             # scenario|sells_worst/crypto_net_flows_max_investment_winsorized*,
 
             cluster|*,
@@ -235,15 +238,15 @@ modeling:
     grid_search_params:
 
         # -------------------------------
-        # enabled: True
+        enabled: True
         # -------------------------------
+        drop_patterns_include_n_features: 1
 
 
         # Search Methodology
         n_iter: 40  # random search limit
         n_splits: 4  # cv splits
         scoring: neg_root_mean_squared_error
-        drop_patterns_include_n_features: 1
 
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # scikit-learn verbosity
@@ -288,27 +291,14 @@ modeling:
                 # [],
                 [],
                 # [timing|*],
-                # [timing|price_sma_2/lead_21/*],
-                # [timing|price_sma_2/lag_15/*],
                 # [timing|price_sma_2/lag_21/*],
                 # [timing|price_sma_2/lag_30/*],
                 # [timing|*/buy_mean*],
-                # [timing|*/sell_mean*],
                 # [timing|*/buy_weighted*],
-                # [timing|*/sell_weighted*],
-                # [timing|price_rsi_*/*],
-                # [timing|price_rsi_*/*],
-                # [timing|mfi*/*],
-                # [timing|obv*/*],
-                # [timing|volume_sma_3/*],
-                # [timing|volume_sma_7/*],
-                # [timing|volume_sma_12/*_15*],
-                # [timing|volume_sma_12/*_21*],
                 # [timing|volume_sma_12/*_30*],
                 # [timing|price_sma_*/*],
                 # [timing|*/*_7/*],
                 # [timing|*/*_21/*],
-                # [timing|*/*_50/*],
 
                 # [performance|*],
                 # [performance|crypto_net_gain/*],
@@ -377,10 +367,10 @@ modeling:
                 # [mktcap|*/market_cap_imputed|*],
                 # [mktcap|*/market_cap|*],
 
-                [transfers|*],
-                [transfers|first_buy/*],
-                [transfers|first_sell/*],
-                [transfers|initial_hold_time/*],
+                # [transfers|*],
+                # [transfers|first_buy/*],
+                # [transfers|first_sell/*],
+                # [transfers|initial_hold_time/*],
                 # [transfers|first_buy/avg_wallet_rank|*],
                 # [transfers|first_buy/median_avg_wallet_rank|*],
                 # [transfers|first_buy/min_avg_wallet_rank|*],
@@ -397,6 +387,8 @@ modeling:
                 # [scenario|*],
                 # [scenario|sells_best/*],
                 # [scenario|sells_worst/*],
+                [scenario|buy_delay_wtd_performance|*],
+                [scenario|sell_delay_wtd_performance|*],
                 # [scenario|sells_best_v_base/*],
                 # [scenario|sells_worst_v_base/*],
                 # [scenario|sells_best/crypto_net_flows_crypto_inflows_winsorized*],

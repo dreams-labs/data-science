@@ -53,12 +53,20 @@ def calculate_scenario_features(
         training_market_indicators_df
     )
 
-    # Generate wallet features
-    scenario_features_df = generate_scenario_features(
+    # Generate performance features
+    performance_features_df = generate_scenario_features(
         ideal_transfers_df,
         period_start_date,
         period_end_date
     )
+    scenario_features_df = performance_features_df
+
+    # FeatureRemoval not predictive
+    # # Generate ratio features
+    # performance_ratios_df = generate_delay_wtd_relative_performance(ideal_transfers_df)
+    # scenario_features_df = performance_features_df.join(performance_ratios_df,how='inner')
+
+    # Merge and confirm data completeness
 
     # Data completeness check
     profits_wallets = training_profits_df['wallet_address'].drop_duplicates()
@@ -138,13 +146,14 @@ def get_ideal_transfers_df(training_period_end: str) -> pd.DataFrame:
         select dr.wallet_id as wallet_address
         ,dr.coin_id
         ,dr.date
+        ,DATE_DIFF(dr.date_range, dr.date, DAY) as days_until_next_transfer
         ,max(cmd.price) as max_price
         ,min(cmd.price) as min_price
         from date_ranges dr
         join core.coin_market_data cmd on cmd.coin_id = dr.coin_id
             and cmd.date between dr.date and dr.date_range
         where cmd.date <= '{training_period_end}'
-        group by 1,2,3
+        group by 1,2,3,4
         order by date,wallet_id,coin_id
         """
     ideal_transfers_df = dgc().run_sql(sql_query)
@@ -298,6 +307,91 @@ def generate_scenario_features(ideal_transfers_df: pd.DataFrame,
         raise ValueError("Null values found in scenario_performance_features.")
 
     return scenario_features_df
+
+
+
+def generate_delay_wtd_relative_performance(ideal_transfers_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculates delay-weighted relative performance metrics for buys and sells.
+
+    Params:
+    - ideal_transfers_df (DataFrame): Must contain columns: usd_net_transfers, min_price,
+      max_price, price, days_until_next_transfer, wallet_address
+
+    Returns:
+    - DataFrame: Wallet-level metrics with columns:
+      - buy_delay_wtd_performance: Buy timing efficiency weighted by delay until next transfer
+      - sell_delay_wtd_performance: Sell timing efficiency weighted by delay until next transfer
+    """
+    relative_df = pd.DataFrame(index=ideal_transfers_df.index)
+
+    # Buy efficiency: ratio of minimum price to actual purchase price
+    is_buy = ideal_transfers_df['usd_net_transfers'] > 0
+    relative_df['buy_pct_of_ideal'] = np.where(
+        is_buy,
+        ideal_transfers_df['min_price'] / ideal_transfers_df['price'],
+        np.nan
+    )
+    relative_df['buy_delays'] = np.where(
+        is_buy,
+        ideal_transfers_df['days_until_next_transfer'],
+        np.nan
+    )
+    relative_df['buy_wtd'] = (
+        relative_df['buy_pct_of_ideal'] *
+        relative_df['buy_delays']
+    )
+
+    # Sell efficiency: ratio of actual sale price to maximum price
+    is_sell = ideal_transfers_df['usd_net_transfers'] < 0
+    relative_df['sell_pct_of_ideal'] = np.where(
+        is_sell,
+        ideal_transfers_df['price'] / ideal_transfers_df['max_price'],
+        np.nan
+    )
+    relative_df['sell_delays'] = np.where(
+        is_sell,
+        ideal_transfers_df['days_until_next_transfer'],
+        np.nan
+    )
+    relative_df['sell_wtd'] = (
+        relative_df['sell_pct_of_ideal'] *
+        relative_df['sell_delays']
+    )
+
+    # Aggregate to wallet level
+    wtd_avgs_df = relative_df.reset_index().groupby('wallet_address').agg({
+        'buy_wtd': 'sum',
+        'buy_delays': 'sum',
+        'sell_wtd': 'sum',
+        'sell_delays': 'sum',
+    })
+
+    # Safe division for weighted performance ratios
+    wtd_avgs_df['buy_delay_wtd_performance'] = np.where(
+        wtd_avgs_df['buy_delays'] > 0,
+        wtd_avgs_df['buy_wtd'] / wtd_avgs_df['buy_delays'],
+        np.nan
+    )
+    wtd_avgs_df['sell_delay_wtd_performance'] = np.where(
+        wtd_avgs_df['sell_delays'] > 0,
+        wtd_avgs_df['sell_wtd'] / wtd_avgs_df['sell_delays'],
+        np.nan
+    )
+
+    # Validate relative performance metrics are between 0 and 1
+    for col in ['buy_delay_wtd_performance', 'sell_delay_wtd_performance']:
+        if not (
+            wtd_avgs_df[col].dropna().between(0, 1, inclusive='both').all()
+        ):
+            raise ValueError(
+                f"Found {col} values outside expected range [0,1]. "
+                f"Min: {wtd_avgs_df[col].min():.3f}, Max: {wtd_avgs_df[col].max():.3f}"
+            )
+
+    return wtd_avgs_df[['buy_delay_wtd_performance', 'sell_delay_wtd_performance']]
+
+
 
 # FeatureRemoval not predictive
 # def add_scenario_vs_base_columns(df: pd.DataFrame) -> pd.DataFrame:
