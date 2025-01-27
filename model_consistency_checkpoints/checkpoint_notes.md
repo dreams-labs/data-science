@@ -1,4 +1,44 @@
 # dda 613 timing feature params
+checkpoint 5: w.678 I thought this was base...
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       112
+Features per Window:      28
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.678
+RMSE:                     0.215
+MAE:                      0.112
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.816
+RMSE:                     0.114
+MAE:                      0.061
+
+
+checkpoint 4: w.678 min transacction size 30
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       112
+Features per Window:      28
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.678
+RMSE:                     0.215
+MAE:                      0.111
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.816
+RMSE:                     0.115
+MAE:                      0.061
+
+
 checkpoint 3: w.678 min transacction size 3
 Model Performance Summary
 ===================================
