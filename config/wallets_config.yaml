@@ -181,7 +181,12 @@ modeling:
             # transfers|initial_hold_time/min_avg_wallet_rank|*,
             # transfers|initial_hold_time/new_coin_transaction_counts|*,
 
-            scenario|*,
+            # scenario|*,
+            # scenario|sells_best/*,
+            scenario|sells_worst/*,
+            scenario|buy_delay_wtd_performance|*,
+            scenario|sell_delay_wtd_performance|*,
+
             # scenario|sells_best/crypto_net_flows_max_investment_winsorized*,
             # scenario|sells_worst/crypto_net_flows_max_investment_winsorized*,
 
@@ -377,10 +382,10 @@ modeling:
                 # [mktcap|*/market_cap_imputed|*],
                 # [mktcap|*/market_cap|*],
 
-                [transfers|*],
-                [transfers|first_buy/*],
-                [transfers|first_sell/*],
-                [transfers|initial_hold_time/*],
+                # [transfers|*],
+                # [transfers|first_buy/*],
+                # [transfers|first_sell/*],
+                # [transfers|initial_hold_time/*],
                 # [transfers|first_buy/avg_wallet_rank|*],
                 # [transfers|first_buy/median_avg_wallet_rank|*],
                 # [transfers|first_buy/min_avg_wallet_rank|*],
@@ -397,6 +402,8 @@ modeling:
                 # [scenario|*],
                 # [scenario|sells_best/*],
                 # [scenario|sells_worst/*],
+                # [scenario|buy_delay_wtd_performance|*],
+                # [scenario|sell_delay_wtd_performance|*],
                 # [scenario|sells_best_v_base/*],
                 # [scenario|sells_worst_v_base/*],
                 # [scenario|sells_best/crypto_net_flows_crypto_inflows_winsorized*],
