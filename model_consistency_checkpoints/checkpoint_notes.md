@@ -1,4 +1,24 @@
 # dda 613 timing feature params
+checkpoint 6: backtrack to base timing params
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       92
+Features per Window:      23
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.666
+RMSE:                     0.219
+MAE:                      0.114
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.808
+RMSE:                     0.117
+MAE:                      0.063
+
+
 checkpoint 5: w.678 I thought this was base...
 Model Performance Summary
 ===================================
