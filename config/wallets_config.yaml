@@ -143,8 +143,6 @@ modeling:
             # timing|price_sma_2/lag_200/*,
             # timing|price_sma_2/lag_60/*,
 
-            timing|price_sma_2/lead_100/*,
-
             # timing|volume_sma_12/lag_80/*,
 
             # timing|volume_sma_12/lead_150/*,
@@ -174,7 +172,7 @@ modeling:
             timing|price_sma_2/lead_300/*,
             timing|price_sma_2/lead_200/*,
             timing|price_sma_2/lead_150/*,
-
+            timing|price_sma_2/lead_100/*,
             timing|price_sma_2/lead_80/*,
             timing|price_sma_2/lead_50/*,
 
