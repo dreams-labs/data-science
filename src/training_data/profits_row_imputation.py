@@ -14,6 +14,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from dreams_core import core as dc
 
+# Local module imports
+import utils as u
+
 # set up logger at the module level
 logger = dc.setup_logger()
 
@@ -135,6 +138,10 @@ def multithreaded_impute_profits_rows(profits_df, prices_df, target_date, n_thre
     # Partition profits_df on coin_id
     logger.debug("Splitting profits_df into %s partitions for date %s...",n_threads,target_date)
 
+    # Create indices so we can use vectorized operations
+    profits_df = u.ensure_index(profits_df)
+    prices_df = u.ensure_index(prices_df.copy(deep=True))
+
     profits_df_partitions = create_partitions(profits_df, n_threads)
 
     # Create a thread-safe queue to store results
@@ -222,16 +229,12 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
     target_date = pd.to_datetime(target_date)
 
     # Check if target_date is earlier than all profits_df dates
-    if target_date < pd.to_datetime(profits_df['date'].min()):
+    if target_date < pd.to_datetime(profits_df.index.get_level_values('date').min()):
         raise ValueError("Target date is earlier than all dates in profits_df")
 
     # Check if target_date is later than all prices_df dates
-    if pd.to_datetime(target_date) >  pd.to_datetime(prices_df['date'].max()):
+    if pd.to_datetime(target_date) >  pd.to_datetime(prices_df.index.get_level_values('date').max()):
         raise ValueError("Target date is later than all dates in prices_df")
-
-    # Create indices so we can use vectorized operations
-    profits_df = profits_df.set_index(['coin_id', 'wallet_address', 'date'])
-    prices_df = prices_df.set_index(['coin_id', 'date']).copy(deep=True)
 
 
     # Step 1: Split profits_df records before and after the target_date
@@ -385,25 +388,23 @@ def calculate_new_profits_values(profits_df, target_date):
 
 def create_partitions(profits_df, n_partitions):
     """
-    Partition a DataFrame into multiple subsets based on unique coin_ids.
+    Partition an indexed DataFrame into multiple subsets based on unique coin_ids.
 
-    Parameters:
-    - profits_df (pd.DataFrame): The input DataFrame to be partitioned. Must contain
-        a 'coin_id' column.
-    - n_partitions (int): The number of partitions to create.
+    Params:
+    - profits_df (DataFrame): MultiIndexed on ['coin_id', 'wallet_address', 'date']
+    - n_partitions (int): Number of partitions to create
 
     Returns:
-    - partition_dfs (List[pd.DataFrame]): A list of DataFrames, each representing
-        a partition of the original data.
+    - partition_dfs (List[DataFrame]): List of partitioned DataFrames
     """
-    # Get unique coin_ids and convert to a regular list
-    unique_coin_ids = profits_df['coin_id'].unique().tolist()
+    # Get unique coin_ids from the index
+    unique_coin_ids = profits_df.index.get_level_values('coin_id').unique().tolist()
 
-    # Shuffle the list of coin_ids
+    # Shuffle coin_ids
     np.random.seed(88)
     np.random.shuffle(unique_coin_ids)
 
-    # Calculate the number of coin_ids per partition
+    # Calculate coins per partition
     coins_per_partition = len(unique_coin_ids) // n_partitions
 
     # Create partitions
@@ -413,11 +414,10 @@ def create_partitions(profits_df, n_partitions):
         end_idx = start_idx + coins_per_partition if i < n_partitions - 1 else None
         partition_coin_ids = unique_coin_ids[start_idx:end_idx]
 
-        # Create a boolean mask for the current partition
-        mask = profits_df['coin_id'].isin(partition_coin_ids)
-
-        # Add the partition to the list
-        partition_dfs.append(profits_df[mask].copy(deep=True))
+        # Use IndexSlice to filter the MultiIndex
+        idx = pd.IndexSlice
+        partition_df = profits_df.loc[idx[partition_coin_ids, :, :], :].copy()
+        partition_dfs.append(partition_df)
 
     return partition_dfs
 

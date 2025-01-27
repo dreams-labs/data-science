@@ -718,7 +718,7 @@ def ensure_index(df: pd.DataFrame) -> pd.DataFrame:
     - DataFrame: Validated and properly indexed/sorted DataFrame.
     """
     required_cols_date = ['coin_id', 'wallet_address', 'date']
-    required_cols_basic = ['coin_id', 'wallet_address']
+    required_cols_basic = ['coin_id', 'date']
 
     # Check if the DataFrame is already indexed correctly
     if df.index.names == required_cols_date or df.index.names == required_cols_basic:
