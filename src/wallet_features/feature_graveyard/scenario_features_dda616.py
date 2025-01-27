@@ -61,6 +61,11 @@ def calculate_scenario_features(
     )
     scenario_features_df = performance_features_df
 
+    # FeatureRemoval not predictive
+    # # Generate ratio features
+    # performance_ratios_df = generate_delay_wtd_relative_performance(ideal_transfers_df)
+    # scenario_features_df = performance_features_df.join(performance_ratios_df,how='inner')
+
     # Data completeness check
     profits_wallets = training_profits_df['wallet_address'].drop_duplicates()
     feature_wallets = scenario_features_df.index.get_level_values('wallet_address')
@@ -277,8 +282,45 @@ def generate_scenario_features(ideal_transfers_df: pd.DataFrame,
     best_sells_features = generate_scenario_performance(best_sells_profits_df, period_start_date, period_end_date)
     best_sells_features = best_sells_features.add_prefix('sells_best/')
 
+    # FeatureRemoval not predictive
+    # # Generate worst case buys scenario (sells at lowest price)
+    # worst_sells_profits_df = ideal_transfers_df[['usd_balance']].assign(
+    #     usd_net_transfers=np.where(
+    #         ideal_transfers_df['token_net_transfers'] < 0,
+    #         ideal_transfers_df['token_net_transfers'] * ideal_transfers_df['min_price'],
+    #         ideal_transfers_df['usd_net_transfers']
+    #     )
+    # )
+    # worst_sells_features = generate_scenario_performance(worst_sells_profits_df, period_start_date, period_end_date)
+    # worst_sells_features = worst_sells_features.add_prefix('sells_worst/')
+
+    # # Generate best case buys scenario (buys at lowest price)
+    # best_buys_profits_df = ideal_transfers_df[['usd_balance']].assign(
+    #     usd_net_transfers=np.where(
+    #         ideal_transfers_df['token_net_transfers'] > 0,
+    #         ideal_transfers_df['token_net_transfers'] * ideal_transfers_df['min_price'],
+    #         ideal_transfers_df['usd_net_transfers']
+    #     )
+    # )
+    # best_buys_features = generate_scenario_performance(best_buys_profits_df, period_start_date, period_end_date)
+    # best_buys_features = best_buys_features.add_prefix('buys_best/')
+
+    # # Generate worst case buys scenario (buys at highest price)
+    # worst_buys_profits_df = ideal_transfers_df[['usd_balance']].assign(
+    #     usd_net_transfers=np.where(
+    #         ideal_transfers_df['token_net_transfers'] > 0,
+    #         ideal_transfers_df['token_net_transfers'] * ideal_transfers_df['max_price'],
+    #         ideal_transfers_df['usd_net_transfers']
+    #     )
+    # )
+    # worst_buys_features = generate_scenario_performance(worst_buys_profits_df, period_start_date, period_end_date)
+    # worst_buys_features = worst_buys_features.add_prefix('buys_worst/')
+
     # Merge all together
     scenario_features_df = best_sells_features
+    # scenario_features_df = pd.concat([scenario_features_df, worst_sells_features], axis=1)
+    # scenario_features_df = pd.concat([scenario_features_df, best_buys_features], axis=1)
+    # scenario_features_df = pd.concat([scenario_features_df, worst_buys_features], axis=1)
 
     # Data quality checks
     all_wallets = set(ideal_transfers_df.index.get_level_values('wallet_address'))
@@ -288,3 +330,128 @@ def generate_scenario_features(ideal_transfers_df: pd.DataFrame,
         raise ValueError("Null values found in scenario_performance_features.")
 
     return scenario_features_df
+
+
+
+# FeatureRemoval not predictive
+# def generate_delay_wtd_relative_performance(ideal_transfers_df: pd.DataFrame) -> pd.DataFrame:
+#     """
+#     Calculates delay-weighted relative performance metrics for buys and sells.
+
+#     Params:
+#     - ideal_transfers_df (DataFrame): Must contain columns: usd_net_transfers, min_price,
+#       max_price, price, days_until_next_transfer, wallet_address
+
+#     Returns:
+#     - DataFrame: Wallet-level metrics with columns:
+#       - buy_delay_wtd_performance: Buy timing efficiency weighted by delay until next transfer
+#       - sell_delay_wtd_performance: Sell timing efficiency weighted by delay until next transfer
+#     """
+#     relative_df = pd.DataFrame(index=ideal_transfers_df.index)
+
+#     # Buy efficiency: ratio of minimum price to actual purchase price
+#     is_buy = ideal_transfers_df['usd_net_transfers'] > 0
+#     relative_df['buy_pct_of_ideal'] = np.where(
+#         is_buy,
+#         ideal_transfers_df['min_price'] / ideal_transfers_df['price'],
+#         np.nan
+#     )
+#     relative_df['buy_delays'] = np.where(
+#         is_buy,
+#         ideal_transfers_df['days_until_next_transfer'],
+#         np.nan
+#     )
+#     relative_df['buy_wtd'] = (
+#         relative_df['buy_pct_of_ideal'] *
+#         relative_df['buy_delays']
+#     )
+
+#     # Sell efficiency: ratio of actual sale price to maximum price
+#     is_sell = ideal_transfers_df['usd_net_transfers'] < 0
+#     relative_df['sell_pct_of_ideal'] = np.where(
+#         is_sell,
+#         ideal_transfers_df['price'] / ideal_transfers_df['max_price'],
+#         np.nan
+#     )
+#     relative_df['sell_delays'] = np.where(
+#         is_sell,
+#         ideal_transfers_df['days_until_next_transfer'],
+#         np.nan
+#     )
+#     relative_df['sell_wtd'] = (
+#         relative_df['sell_pct_of_ideal'] *
+#         relative_df['sell_delays']
+#     )
+
+#     # Aggregate to wallet level
+#     wtd_avgs_df = relative_df.reset_index().groupby('wallet_address').agg({
+#         'buy_wtd': 'sum',
+#         'buy_delays': 'sum',
+#         'sell_wtd': 'sum',
+#         'sell_delays': 'sum',
+#     })
+
+#     # Safe division for weighted performance ratios
+#     wtd_avgs_df['buy_delay_wtd_performance'] = np.where(
+#         wtd_avgs_df['buy_delays'] > 0,
+#         wtd_avgs_df['buy_wtd'] / wtd_avgs_df['buy_delays'],
+#         np.nan
+#     )
+#     wtd_avgs_df['sell_delay_wtd_performance'] = np.where(
+#         wtd_avgs_df['sell_delays'] > 0,
+#         wtd_avgs_df['sell_wtd'] / wtd_avgs_df['sell_delays'],
+#         np.nan
+#     )
+
+#     # Validate relative performance metrics are between 0 and 1
+#     for col in ['buy_delay_wtd_performance', 'sell_delay_wtd_performance']:
+#         if not (
+#             wtd_avgs_df[col].dropna().between(0, 1, inclusive='both').all()
+#         ):
+#             raise ValueError(
+#                 f"Found {col} values outside expected range [0,1]. "
+#                 f"Min: {wtd_avgs_df[col].min():.3f}, Max: {wtd_avgs_df[col].max():.3f}"
+#             )
+
+#     return wtd_avgs_df[['buy_delay_wtd_performance', 'sell_delay_wtd_performance']]
+
+
+
+# FeatureRemoval not predictive
+# def add_scenario_vs_base_columns(df: pd.DataFrame) -> pd.DataFrame:
+#     """
+#     Adds columns to the DataFrame by dividing each 'category/metric' column
+#     by the corresponding 'base/metric' column to calculate category vs base ratios.
+
+#     Params:
+#     - df (pd.DataFrame): Input DataFrame with category/metric column format.
+
+#     Returns:
+#     - pd.DataFrame: Updated DataFrame with additional ratio columns.
+#     """
+#     # Extract unique category prefixes and metric suffixes
+#     categories = set(col.split('/', 1)[0] for col in df.columns if '/' in col)
+#     metric_suffixes = set(col.split('/', 1)[1] for col in df.columns if '/' in col)
+
+#     # Ensure 'base/' exists in categories
+#     if 'base' not in categories:
+#         raise ValueError("The DataFrame must contain 'base/' category columns for comparison.")
+
+#     # Loop through categories excluding 'base' and calculate the ratios
+#     for category in categories - {'base'}:
+#         for suffix in metric_suffixes:
+#             base_col = f"base/{suffix}"
+#             category_col = f"{category}/{suffix}"
+#             new_col = f"{category}_v_base/{suffix}"
+
+#             # Check if both columns exist before dividing
+#             if base_col in df.columns and category_col in df.columns:
+#                 # Add the ratio column
+#                 df[new_col] = df[category_col] - df[base_col]
+#             else:
+#                 raise KeyError(f"Required columns missing: {base_col} or {category_col}")
+
+#     # Drop all 'base/' columns
+#     df = df.drop(columns=[col for col in df.columns if col.startswith('base/')])
+
+#     return df

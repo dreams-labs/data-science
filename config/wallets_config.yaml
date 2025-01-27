@@ -101,7 +101,7 @@ features:
     ]
 
     # Scenarios Params
-    include_scenario_features: False
+    include_scenario_features: True
     scenario_performance_features: [
         # crypto_net_flows/crypto_inflows/winsorized,
         crypto_net_flows/max_investment/winsorized,
@@ -185,6 +185,8 @@ modeling:
             # scenario|*,
             # scenario|sells_best/*,
             scenario|sells_worst/*,
+            scenario|buys_best/*,
+            scenario|buys_worst/*,
 
             # scenario|sells_best/crypto_net_flows_max_investment_winsorized*,
             # scenario|sells_worst/crypto_net_flows_max_investment_winsorized*,
@@ -241,7 +243,6 @@ modeling:
         # -------------------------------
         # enabled: True
         # -------------------------------
-
 
         # Search Methodology
         drop_patterns_include_n_features: 1
@@ -336,6 +337,8 @@ modeling:
                 # [scenario|*],
                 # [scenario|sells_best/*],
                 # [scenario|sells_worst/*],
+                [scenario|buys_best/*],
+                [scenario|buys_worst/*],
                 # [scenario|buy_delay_wtd_performance|*],
 
                 # [cluster|*],
