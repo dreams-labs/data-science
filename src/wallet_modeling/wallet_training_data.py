@@ -154,6 +154,8 @@ def format_and_save_datasets(profits_df, market_data_df, period_start_date, parq
         'usd_balance',
         'usd_net_transfers',
         'usd_inflows',
+        'profits_cumulative',
+        'usd_inflows_cumulative',
     ]
     profits_df.loc[:, columns_to_round] = (profits_df[columns_to_round]
                                         .round(2)

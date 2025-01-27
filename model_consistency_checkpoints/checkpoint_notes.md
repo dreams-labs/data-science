@@ -1,4 +1,25 @@
 # dda 613 timing feature params
+checkpoint 7: reenable new timing params
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       112
+Features per Window:      28
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.678
+RMSE:                     0.215
+MAE:                      0.112
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.816
+RMSE:                     0.114
+MAE:                      0.061
+
+
+
 checkpoint 6: backtrack to base timing params
 Model Performance Summary
 ===================================
