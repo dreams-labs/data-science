@@ -1,5 +1,5 @@
 # dda 613 timing feature params
-checkpoint 3: w.678 min transacction size 5
+checkpoint 3: w.678 min transacction size 3
 Model Performance Summary
 ===================================
 Test Samples:             56,708
