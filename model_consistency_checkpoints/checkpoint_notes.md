@@ -1,3 +1,165 @@
+# dda 613 timing feature params
+checkpoint 7: reenable new timing params
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       112
+Features per Window:      28
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.678
+RMSE:                     0.215
+MAE:                      0.112
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.816
+RMSE:                     0.114
+MAE:                      0.061
+
+
+
+checkpoint 6: backtrack to base timing params
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       92
+Features per Window:      23
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.666
+RMSE:                     0.219
+MAE:                      0.114
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.808
+RMSE:                     0.117
+MAE:                      0.063
+
+
+checkpoint 5: w.678 I thought this was base...
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       112
+Features per Window:      28
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.678
+RMSE:                     0.215
+MAE:                      0.112
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.816
+RMSE:                     0.114
+MAE:                      0.061
+
+
+checkpoint 4: w.678 min transacction size 30
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       112
+Features per Window:      28
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.678
+RMSE:                     0.215
+MAE:                      0.111
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.816
+RMSE:                     0.115
+MAE:                      0.061
+
+
+checkpoint 3: w.678 min transacction size 3
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       112
+Features per Window:      28
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.678
+RMSE:                     0.215
+MAE:                      0.112
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.817
+RMSE:                     0.114
+MAE:                      0.061
+
+
+checkpoint 2: w. offset winsorization 0.05
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       112
+Features per Window:      28
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.676
+RMSE:                     0.216
+MAE:                      0.112
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.812
+RMSE:                     0.116
+MAE:                      0.**062**
+
+
+checkpoint 1: w.681 offset winsorization 0.03
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       112
+Features per Window:      28
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.681
+RMSE:                     0.214
+MAE:                      0.111
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.818
+RMSE:                     0.114
+MAE:                      0.061
+
+
+checkpoint 1: w.679 offset winsorization 0.01
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       112
+Features per Window:      28
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.679
+RMSE:                     0.215
+MAE:                      0.112
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.818
+RMSE:                     0.114
+MAE:                      0.061
+
+
 # dda 592 longer term timing features
 checkpoint 7: w.681 final params
 Model Performance Summary

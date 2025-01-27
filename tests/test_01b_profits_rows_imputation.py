@@ -18,6 +18,7 @@ from dreams_core import core as dc
 # pyright: reportMissingImports=false
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 import training_data.profits_row_imputation as pri
+import utils as u
 
 load_dotenv()
 logger = dc.setup_logger()
@@ -381,6 +382,7 @@ def sample_profits_df_missing_dates():
                          df.groupby(['coin_id', 'wallet_address'])['usd_net_transfers'].cumsum())
 
     df = df.reset_index()
+    df = u.ensure_index(df)
 
     return df
 
@@ -407,6 +409,8 @@ def sample_prices_df_missing_dates():
 
     df = pd.DataFrame(data)
     df['date'] = pd.to_datetime(df['date'])
+
+    df = u.ensure_index(df)
     return df
 
 @pytest.mark.unit
@@ -441,6 +445,9 @@ def test_impute_profits_df_rows_base_case(sample_profits_df_missing_dates,
     assert len(result) == 4  # 2 coins * 2 wallets
 
     # Check calculations for imputed rows
+    sample_profits_df_missing_dates = sample_profits_df_missing_dates.reset_index()
+    sample_prices_df_missing_dates = sample_prices_df_missing_dates.reset_index()
+
     for _, row in result.iterrows():
         coin_id = row['coin_id']
         wallet_address = row['wallet_address']

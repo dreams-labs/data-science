@@ -708,7 +708,7 @@ def assert_period(df, period_start, period_end) -> None:
             raise ValueError("Found non-imputed records in starting balance")
 
 
-@timing_decorator
+
 def ensure_index(df: pd.DataFrame) -> pd.DataFrame:
     """
     Params:
@@ -717,6 +717,8 @@ def ensure_index(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
     - DataFrame: Validated and properly indexed/sorted DataFrame.
     """
+    start_time = time.time()
+
     required_cols_date = ['coin_id', 'wallet_address', 'date']
     required_cols_basic = ['coin_id', 'date']
 
@@ -750,7 +752,16 @@ def ensure_index(df: pd.DataFrame) -> pd.DataFrame:
     if not df.index.is_monotonic_increasing:
         df = df.sort_index()
 
+    # Log duration
+    if time.time() - start_time >= 1:
+        logger.info('(%.1fs) Completed ensure_index.',
+                    time.time() - start_time)
+    else:
+        logger.debug('(%.1fs) Completed ensure_index.',
+                    time.time() - start_time)
+
     return df
+
 
 
 def cw_filter(df, coin_id, wallet_address):
