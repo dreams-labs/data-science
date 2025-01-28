@@ -1,6 +1,3 @@
-"""
-Calculates metrics aggregated at the wallet-coin-date level
-"""
 import logging
 import numpy as np
 import pandas as pd
@@ -236,20 +233,10 @@ def calculate_distribution_features(profits_df_end: pd.DataFrame, market_cap_col
     # Filter out zero-balance wallets
     profits_df_end = profits_df_end[profits_df_end["total_usd_balance"] > 0]
 
-    # Fraction of total balance for each coin
-    profits_df_end["coin_fraction"] = (
-        profits_df_end["usd_balance"] / profits_df_end["total_usd_balance"]
-    )
-
-    # Precompute squared fractions for Herfindahl-Hirschman Index
-    profits_df_end["coin_fraction_sq"] = profits_df_end["coin_fraction"] ** 2
-
     # Aggregate to wallet level
     features_df = profits_df_end.groupby("wallet_address", observed=True).agg(
         portfolio_mcap_std=(market_cap_col, "std"),
-        concentration_index=("coin_fraction_sq", "sum"),
-        largest_coin_frac=("coin_fraction", "max"),
-        largest_coin_usd=("usd_balance", "max")
+        portfolio_mcap_min=(market_cap_col, "min"),
     )
 
     return features_df
