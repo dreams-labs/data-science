@@ -1,3 +1,24 @@
+# dda 598
+checkpoint 1: w.694 performance matches
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.694
+RMSE:                     0.210
+MAE:                      0.107
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.816
+RMSE:                     0.115
+MAE:                      0.061
+
+
 # dda 612 portfolio features
 checkpoint 6: w.694 rebuild all files, ready to merge?
 Model Performance Summary

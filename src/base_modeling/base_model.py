@@ -142,21 +142,20 @@ class BaseModel:
         ])
 
 
-    # # NEW
-    # def _split_data(self, X: pd.DataFrame, y: pd.Series) -> None:
-    #     """
-    #     Create train/test split for the model.
+    def _split_data(self, X: pd.DataFrame, y: pd.Series) -> None:
+        """
+        Create train/test split for the model.
 
-    #     Params:
-    #     - X (DataFrame): feature data for modeling cohort
-    #     - y (Series): target variable for modeling cohort
-    #     """
-    #     self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-    #         X,
-    #         y,
-    #         test_size=self.modeling_config['train_test_split'],
-    #         random_state=self.modeling_config['model_params'].get('random_state', 42)
-    #     )
+        Params:
+        - X (DataFrame): feature data for modeling cohort
+        - y (Series): target variable for modeling cohort
+        """
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
+            X,
+            y,
+            test_size=self.modeling_config['train_test_split'],
+            random_state=self.modeling_config['model_params'].get('random_state', 42)
+        )
 
 
     def _fit(self) -> None:
