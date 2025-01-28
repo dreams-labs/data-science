@@ -1,4 +1,47 @@
 # dda 619 grid searchin
+
+
+
+12d/20w/5000n/.02lr/.005g eval size .05
+Model Performance Summary
+===================================
+Test Samples:             79,166
+Number of Features:       429
+Features per Window:      39
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.764
+RMSE:                     0.159
+MAE:                      0.078
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.838
+RMSE:                     0.089
+MAE:                      0.052
+
+
+12d/30w/5000n/.02lr/.005g eval size .05
+Model Performance Summary
+===================================
+Test Samples:             79,166
+Number of Features:       429
+Features per Window:      39
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.764
+RMSE:                     0.159
+MAE:                      0.078
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.833
+RMSE:                     0.091
+MAE:                      0.053
+
+
 12d/30w/5000n/.015lr/.005g eval size .05
 rmse at 200
 [200]	validation_0-rmse:0.18599	validation_1-rmse:0.20190
