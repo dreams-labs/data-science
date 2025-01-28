@@ -128,7 +128,9 @@ modeling:
 
     # Which wallet performance metric to use as the target variable.
     target_variable: crypto_net_gain/max_investment/winsorized
-    test_size: 0.000001  # what % of the total population will be used as test
+
+    # Train/Test/Eval split
+    test_size: 0.2  # what % of the total population will be used as test
     eval_size: 0.2  # what % used for the early stopping eval set
 
     # CheckpointValidation
