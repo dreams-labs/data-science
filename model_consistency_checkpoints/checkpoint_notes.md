@@ -1,3 +1,104 @@
+# dda 596 market cap aggregations
+checkpoint 5: w.689 ready to merge
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       120
+Features per Window:      30
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.689
+RMSE:                     0.211
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.816
+RMSE:                     0.114
+MAE:                      0.061
+
+
+checkpoint 4: w.689 min/max unadj
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       120
+Features per Window:      30
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.689
+RMSE:                     0.211
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.816
+RMSE:                     0.114
+MAE:                      0.061
+
+
+checkpoint 3: w.686 add concentration_index/market_cap_unadj
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       116
+Features per Window:      29
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.686
+RMSE:                     0.212
+MAE:                      0.110
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.821
+RMSE:                     0.113
+MAE:                      0.059
+
+
+checkpoint 2: w. base case fixed drop patterns
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       112
+Features per Window:      28
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.679
+RMSE:                     0.215
+MAE:                      0.111
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.817
+RMSE:                     0.114
+MAE:                      0.060
+
+
+checkpoint 1: w.667 too low base case
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       108
+Features per Window:      27
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.667
+RMSE:                     0.219
+MAE:                      0.115
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.815
+RMSE:                     0.115
+MAE:                      0.060
+
+
 # dda 616 buys scenarios
 checkpoint 2: w.679 best sells only helpful feature
 best sells only
