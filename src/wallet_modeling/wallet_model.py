@@ -2,7 +2,6 @@ import logging
 from typing import Dict, Union, Tuple
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 
 # Local modules
@@ -27,13 +26,16 @@ class WalletModel(BaseModel):
     #           Helper Methods
     # -----------------------------------
 
-    def _prepare_data(self, training_data_df: pd.DataFrame,
-                      modeling_cohort_target_var_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
+    def _prepare_data(self,
+                      training_data_df: pd.DataFrame,
+                      modeling_cohort_target_var_df: pd.DataFrame
+                      ) -> Tuple[pd.DataFrame, pd.Series]:
         """
+        Prepare wallet-specific data for modeling. Returns features and target only.
+
         Params:
         - training_data_df (DataFrame): full training cohort feature data
         - modeling_cohort_target_var_df (DataFrame): Contains in_modeling_cohort flag and target variable
-                                                for full training cohort
 
         Returns:
         - X (DataFrame): feature data for modeling cohort
@@ -43,31 +45,21 @@ class WalletModel(BaseModel):
         self.training_data_df = training_data_df.copy()
 
         # Validate indexes are wallet addresses and matching
-        if not (training_data_df.index.name == 'wallet_address' and
-                modeling_cohort_target_var_df.index.name == 'wallet_address'):
+        if not (training_data_df.index.name == 'wallet_address'
+                and modeling_cohort_target_var_df.index.name == 'wallet_address'):
             raise ValueError("Both dataframes must have wallet_address as index")
 
         # Join target data to features
-        modeling_df = training_data_df.join(
-            modeling_cohort_target_var_df,
-            how='left'
-        )
+        modeling_df = training_data_df.join(modeling_cohort_target_var_df, how='left')
 
         # Filter to modeling cohort for training
-        modeling_cohort_mask = modeling_df['in_modeling_cohort'] == 1
-        modeling_df = modeling_df[modeling_cohort_mask]
+        cohort_mask = modeling_df['in_modeling_cohort'] == 1
+        modeling_df = modeling_df[cohort_mask]
 
         # Separate target variable
         target_var = self.modeling_config['target_variable']
         X = modeling_df.drop([target_var, 'in_modeling_cohort'], axis=1)
         y = modeling_df[target_var]
-
-        # Create train/test split for final model
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            X, y,
-            test_size=self.modeling_config['train_test_split'],
-            random_state=self.modeling_config['model_params']['random_state']
-        )
 
         return X, y
 
@@ -103,9 +95,11 @@ class WalletModel(BaseModel):
     #         Primary Interface
     # -----------------------------------
 
-    def construct_wallet_model(self, training_data_df: pd.DataFrame,
-                            modeling_cohort_target_var_df: pd.DataFrame,
-                            return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
+    # NEW
+    def construct_wallet_model(self,
+                                training_data_df: pd.DataFrame,
+                                modeling_cohort_target_var_df: pd.DataFrame,
+                                return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
         """
         Run wallet-specific modeling experiment.
 
@@ -119,29 +113,30 @@ class WalletModel(BaseModel):
         """
         logger.info("Beginning model construction...")
 
-        # Validate all training data has targets and remove excess target rows
+        # Validate all training data has targets
         if not training_data_df.index.isin(modeling_cohort_target_var_df.index).all():
-            raise ValueError(
-                "Some training data points are missing target values. "
-                f"Found {(~training_data_df.index.isin(modeling_cohort_target_var_df.index)).sum()} "
-                "training rows without targets."
-            )
+            raise ValueError("Some training data points are missing target values.")
 
         # Filter target df to only include rows with training data
         modeling_cohort_target_var_df = modeling_cohort_target_var_df[
             modeling_cohort_target_var_df.index.isin(training_data_df.index)
         ]
 
-        # Run base experiment
-        self._prepare_data(training_data_df, modeling_cohort_target_var_df)
-        result = super().construct_base_model(return_data)
+        # Prepare data (just X, y now)
+        X, y = self._prepare_data(training_data_df, modeling_cohort_target_var_df)
 
-        # If grid search is run and doesn't request a model, don't make predictions
+        # Do the actual train/test split in BaseModel
+        self._split_data(X, y)
+
+        # Run base experiment
+        result = super().construct_base_model(return_data=return_data)
+
+        # If grid search was run and no final model is requested
         if self.modeling_config.get('grid_search_params', {}).get('enabled') is True and \
         self.modeling_config.get('grid_search_params', {}).get('build_post_search_model') is False:
             return result
 
-        # Add wallet-specific predictions if requested
+        # Optionally store predictions for the full training cohort
         if return_data:
             training_cohort_pred = self._predict_training_cohort()
             target_var = self.modeling_config['target_variable']
