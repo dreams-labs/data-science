@@ -198,7 +198,7 @@ modeling:
             # balance|*,
             balance|coin_fraction_std|*,
             balance|concentration_index|*,
-            balance|largest_coin_frac|*, #retain
+            # balance|largest_coin_frac|*, #retain
             balance|largest_coin_usd|*,
             balance|median_coin_frac|*,
             balance|min_coin_frac|*,
