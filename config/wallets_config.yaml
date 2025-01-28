@@ -172,17 +172,16 @@ modeling:
             trading|annualized_twr/*,
 
             # mktcap|*,
-            # mktcap|end_portfolio_wtd_market_cap/market_cap|*,
-
+            mktcap|portfolio_mcap_mean/market_cap_filled|*,
+            mktcap|portfolio_mcap_median/market_cap_filled|*,
+            mktcap|portfolio_mcap_min/market_cap_filled|*,
+            mktcap|portfolio_mcap_max/market_cap_filled|*, #retain?
             mktcap|portfolio_mcap_std/market_cap_filled|*,
-            mktcap|concentration_index/market_cap_filled|*,
-            mktcap|largest_coin_frac/market_cap_filled|*,
-            mktcap|largest_coin_usd/market_cap_filled|*,
-
+            mktcap|portfolio_mcap_mean/market_cap_unadj|*,
+            mktcap|portfolio_mcap_median/market_cap_unadj|*,
+            # mktcap|portfolio_mcap_min/market_cap_unadj|*, #retain
+            # mktcap|portfolio_mcap_max/market_cap_unadj|*, #retain
             mktcap|portfolio_mcap_std/market_cap_unadj|*,
-            mktcap|concentration_index/market_cap_unadj|*,
-            mktcap|largest_coin_frac/market_cap_unadj|*,
-            mktcap|largest_coin_usd/market_cap_unadj|*,
 
             # transfers|*,
             # transfers|first_sell/*,
@@ -313,21 +312,16 @@ modeling:
 
 
                 # [mktcap|*],
-                # [mktcap|end_portfolio_wtd_market_cap/market_cap_filled|*],
-                # [mktcap|volume_wtd_market_cap/market_cap_filled|*],
-                # [mktcap|end_portfolio_wtd_market_cap/market_cap|*],
-                # [mktcap|volume_wtd_market_cap/market_cap|*],
-                # [mktcap|*/market_cap_filled|*],
-                # [mktcap|*/market_cap_imputed|*],
-                # [mktcap|*/market_cap|*],
+                [mktcap|portfolio_mcap_mean/market_cap_filled|*],
+                [mktcap|portfolio_mcap_median/market_cap_filled|*],
+                [mktcap|portfolio_mcap_min/market_cap_filled|*],
+                [mktcap|portfolio_mcap_max/market_cap_filled|*],
                 [mktcap|portfolio_mcap_std/market_cap_filled|*],
-                [mktcap|concentration_index/market_cap_filled|*],
-                [mktcap|largest_coin_frac/market_cap_filled|*],
-                [mktcap|largest_coin_usd/market_cap_filled|*],
+
+                [mktcap|portfolio_mcap_count/market_cap_unadj|*],
+                [mktcap|portfolio_mcap_mean/market_cap_unadj|*],
+                [mktcap|portfolio_mcap_median/market_cap_unadj|*],
                 [mktcap|portfolio_mcap_std/market_cap_unadj|*],
-                # [mktcap|concentration_index/market_cap_unadj|*],
-                [mktcap|largest_coin_frac/market_cap_unadj|*],
-                [mktcap|largest_coin_usd/market_cap_unadj|*],
 
                 # [transfers|*],
                 # [transfers|first_buy/*],

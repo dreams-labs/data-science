@@ -235,8 +235,11 @@ def calculate_distribution_features(profits_df_end: pd.DataFrame, market_cap_col
 
     # Aggregate to wallet level
     features_df = profits_df_end.groupby("wallet_address", observed=True).agg(
-        portfolio_mcap_std=(market_cap_col, "std"),
+        portfolio_mcap_mean=(market_cap_col, "mean"),
+        portfolio_mcap_median=(market_cap_col, "median"),
         portfolio_mcap_min=(market_cap_col, "min"),
+        portfolio_mcap_max=(market_cap_col, "max"),
+        portfolio_mcap_std=(market_cap_col, "std"),
     )
 
     return features_df
