@@ -1,4 +1,26 @@
 # dda 612 portfolio features
+<!-- checkpoint 3: w. add balance|largest_coin_frac -->
+
+checkpoint 3: w.689 tree depth back to 21
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       120
+Features per Window:      30
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.689
+RMSE:                     0.211
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.816
+RMSE:                     0.114
+MAE:                      0.061
+
+
 checkpoint 2: w.688 begin grid
 Model Performance Summary
 ===================================

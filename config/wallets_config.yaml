@@ -195,8 +195,15 @@ modeling:
             # scenario|*,
             # scenario|sells_best/*,
 
-            balance|*,
-
+            # balance|*,
+            balance|coin_fraction_std|*,
+            balance|concentration_index|*,
+            balance|largest_coin_frac|*, #retain
+            balance|largest_coin_usd|*,
+            balance|median_coin_frac|*,
+            balance|min_coin_frac|*,
+            balance|n_coins|*,
+            balance|total_usd_balance|*,
 
             cluster|*,
 
@@ -220,7 +227,7 @@ modeling:
         # -------------------------------
         eval_metric: [rmse]
 
-        max_depth: 23  # how deep the trees can go
+        max_depth: 21  # how deep the trees can go
         # min_child_weight_pct: 0.0001  # what % of rows each tree must have
         min_child_weight: 15  # what % of rows each tree must have
         subsample: 1.0  # samples rows, e.g. trees use x% of all wallet rows
@@ -252,7 +259,7 @@ modeling:
         # -------------------------------
 
         # Search Methodology
-        drop_patterns_include_n_features: 2
+        drop_patterns_include_n_features: 1
 
         n_iter: 40  # random search limit
         n_splits: 4  # cv splits
@@ -316,16 +323,8 @@ modeling:
 
 
                 # [mktcap|*],
-                [mktcap|portfolio_mcap_mean/market_cap_filled|*],
-                [mktcap|portfolio_mcap_median/market_cap_filled|*],
-                [mktcap|portfolio_mcap_min/market_cap_filled|*],
-                [mktcap|portfolio_mcap_max/market_cap_filled|*],
-                [mktcap|portfolio_mcap_std/market_cap_filled|*],
-
-                [mktcap|portfolio_mcap_count/market_cap_unadj|*],
-                [mktcap|portfolio_mcap_mean/market_cap_unadj|*],
-                [mktcap|portfolio_mcap_median/market_cap_unadj|*],
-                [mktcap|portfolio_mcap_std/market_cap_unadj|*],
+                # [mktcap|portfolio_mcap_mean/market_cap_filled|*],
+                # [mktcap|portfolio_mcap_median/market_cap_filled|*],
 
                 # [transfers|*],
                 # [transfers|first_buy/*],
@@ -336,6 +335,16 @@ modeling:
 
                 # [scenario|*],
                 # [scenario|buy_delay_wtd_performance|*],
+
+                # [balance|*],
+                [balance|coin_fraction_std|*],
+                [balance|concentration_index|*],
+                # [balance|largest_coin_frac|*],
+                [balance|largest_coin_usd|*],
+                [balance|median_coin_frac|*],
+                [balance|min_coin_frac|*],
+                [balance|n_coins|*],
+                [balance|total_usd_balance|*],
 
                 # [cluster|*],
 
