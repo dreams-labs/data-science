@@ -7,6 +7,13 @@ end validation outcome
 [300]	validation_0-rmse:0.07262	validation_1-rmse:0.20884
 [399]	validation_0-rmse:0.06199	validation_1-rmse:0.20830
 
+base end val outcome
+[0]	validation_0-rmse:0.36929	validation_1-rmse:0.36896
+[100]	validation_0-rmse:0.11871	validation_1-rmse:0.21650
+[200]	validation_0-rmse:0.09012	validation_1-rmse:0.21173
+[300]	validation_0-rmse:0.07287	validation_1-rmse:0.21016
+[399]	validation_0-rmse:0.06166	validation_1-rmse:0.20973
+
 
 # dda 598
 checkpoint 1: w.694 performance matches
