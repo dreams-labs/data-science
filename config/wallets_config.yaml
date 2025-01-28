@@ -108,7 +108,8 @@ features:
         # crypto_net_gain/max_investment/winsorized,
     ]
 
-    # Market Timing Params
+    # Balance Params
+    balance_features_min_balance: 20  # determines
 
     # Clustering Params
     # clustering_n_clusters: [2,4]
@@ -193,6 +194,16 @@ modeling:
 
             # scenario|*,
             # scenario|sells_best/*,
+
+            # balance|*,
+            balance|coin_fraction_std|*,
+            balance|concentration_index|*,
+            # balance|largest_coin_frac|*, #retain
+            balance|largest_coin_usd|*,
+            balance|median_coin_frac|*,
+            balance|min_coin_frac|*,
+            balance|n_coins|*,
+            balance|total_usd_balance|*,
 
             cluster|*,
 
@@ -281,7 +292,7 @@ modeling:
             # regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            regressor__n_estimators: [200]
+            regressor__n_estimators: [250]
             regressor__learning_rate: [0.05]
             # regressor__gamma: [0.01]
 
@@ -312,16 +323,8 @@ modeling:
 
 
                 # [mktcap|*],
-                [mktcap|portfolio_mcap_mean/market_cap_filled|*],
-                [mktcap|portfolio_mcap_median/market_cap_filled|*],
-                [mktcap|portfolio_mcap_min/market_cap_filled|*],
-                [mktcap|portfolio_mcap_max/market_cap_filled|*],
-                [mktcap|portfolio_mcap_std/market_cap_filled|*],
-
-                [mktcap|portfolio_mcap_count/market_cap_unadj|*],
-                [mktcap|portfolio_mcap_mean/market_cap_unadj|*],
-                [mktcap|portfolio_mcap_median/market_cap_unadj|*],
-                [mktcap|portfolio_mcap_std/market_cap_unadj|*],
+                # [mktcap|portfolio_mcap_mean/market_cap_filled|*],
+                # [mktcap|portfolio_mcap_median/market_cap_filled|*],
 
                 # [transfers|*],
                 # [transfers|first_buy/*],
@@ -332,6 +335,16 @@ modeling:
 
                 # [scenario|*],
                 # [scenario|buy_delay_wtd_performance|*],
+
+                # [balance|*],
+                [balance|coin_fraction_std|*],
+                [balance|concentration_index|*],
+                # [balance|largest_coin_frac|*],
+                [balance|largest_coin_usd|*],
+                [balance|median_coin_frac|*],
+                [balance|min_coin_frac|*],
+                [balance|n_coins|*],
+                [balance|total_usd_balance|*],
 
                 # [cluster|*],
 

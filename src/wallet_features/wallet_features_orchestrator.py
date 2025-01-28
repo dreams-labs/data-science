@@ -14,6 +14,7 @@ import wallet_features.trading_features as wtf
 import wallet_features.transfers_features as wts
 import wallet_features.market_timing_features as wmt
 import wallet_features.scenario_features as wsc
+import wallet_features.balance_features as wbf
 import utils as u
 
 # Set up logger at the module level
@@ -73,24 +74,23 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     feature_column_names = {}
 
     # Trading features (left join, fill 0s)
-    # Requires both starting_balance_date and period_end_date imputed rows
-    # -----------------------------------------------------------------------
     trading_features_df = wtf.calculate_wallet_trading_features(profits_df,
         period_start_date,period_end_date,
         wallets_config['features']['include_twb_metrics'],
-        wallets_config['features']['include_twr_metrics']
-    )
+        wallets_config['features']['include_twr_metrics'])
     feature_column_names['trading|'] = trading_features_df.columns
     wallet_features_df = wallet_features_df.join(trading_features_df, how='left')\
         .fillna({col: 0 for col in trading_features_df.columns})
 
     # Transfers features (left join, do not fill)
-    # Uses only real transfers (~is_imputed)
-    # -----------------------------------------------------------------------
     transfers_sequencing_features_df = wts.calculate_transfers_features(profits_df, transfers_sequencing_df)
     feature_column_names['transfers|'] = transfers_sequencing_features_df.columns
     wallet_features_df = wallet_features_df.join(transfers_sequencing_features_df, how='left')
 
+    # Balance features (left join, do not fill)
+    balance_features_df = wbf.calculate_balance_features(profits_df)
+    feature_column_names['balance|'] = balance_features_df.columns
+    wallet_features_df = wallet_features_df.join(balance_features_df, how='left')
 
 
     # BELOW FUNCTIONS DO NOT WORK WITH INDICES AND SHOULD BE EVENTUALLY REFACTORED
@@ -99,31 +99,23 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
 
 
     # Performance features (left join, do not fill)
-    # Requires both starting_balance_date and period_end_date imputed rows (same as trading)
-    # -----------------------------------------------------------------------
     performance_features_df = wpf.calculate_performance_features(wallet_features_df,
-        wallets_config['features']['include_twb_metrics']
-    )
+                                                wallets_config['features']['include_twb_metrics'])
     feature_column_names['performance|'] = performance_features_df.columns
     wallet_features_df = wallet_features_df.join(performance_features_df, how='left')
 
     # Market timing features (left join, fill 0s)
-    # Uses only real transfers (~is_imputed)
-    # -----------------------------------------------------------------------
     timing_features_df = wmt.calculate_market_timing_features(profits_df, market_indicators_data_df)
     feature_column_names['timing|'] = timing_features_df.columns
     wallet_features_df = wallet_features_df.join(timing_features_df, how='left')\
         .fillna({col: 0 for col in timing_features_df.columns})
 
     # Market cap features (left join, do not full)
-    # Volume weighted uses real transfers, balance weighted uses period_end_date
-    # -----------------------------------------------------------------------
     market_features_df = wmc.calculate_market_cap_features(profits_df, market_indicators_data_df)
     feature_column_names['mktcap|'] = market_features_df.columns
     wallet_features_df = wallet_features_df.join(market_features_df, how='left')
 
     # Scenario transfers features (left join, do not fill)
-    # -----------------------------------------------------------------------
     if wallets_config['features']['include_scenario_features'] is True:
         transfers_scenario_features_df = wsc.calculate_scenario_features(profits_df,
                                                                         market_indicators_data_df,

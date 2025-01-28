@@ -1,3 +1,166 @@
+# dda 612 portfolio features
+checkpoint 6: w.694 rebuild all files, ready to merge?
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.694
+RMSE:                     0.210
+MAE:                      0.107
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.816
+RMSE:                     0.115
+MAE:                      0.061
+
+
+checkpoint 5: w.694 add largest_coin_frac+total_usd_balance
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       128
+Features per Window:      32
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.694
+RMSE:                     0.210
+MAE:                      0.108
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.816
+RMSE:                     0.115
+MAE:                      0.061
+
+
+checkpoint 4: w.694 add balance|largest_coin_frac
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.694
+RMSE:                     0.210
+MAE:                      0.107
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.816
+RMSE:                     0.115
+MAE:                      0.061
+
+
+checkpoint 3: w.689 tree depth back to 21
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       120
+Features per Window:      30
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.689
+RMSE:                     0.211
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.816
+RMSE:                     0.114
+MAE:                      0.061
+
+
+checkpoint 2: w.688 begin grid
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       120
+Features per Window:      30
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.688
+RMSE:                     0.212
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.815
+RMSE:                     0.115
+MAE:                      0.061
+
+
+checkpoint 1: w.688 slightly too low?
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       120
+Features per Window:      30
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.688
+RMSE:                     0.212
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.815
+RMSE:                     0.115
+MAE:                      0.061
+
+
+# dda X596 market cap aggregations
+checkpoint 4: w.675 base case too low again
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       112
+Features per Window:      28
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.675
+RMSE:                     0.216
+MAE:                      0.112
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.816
+RMSE:                     0.114
+MAE:                      0.060
+
+
+checkpoint 3: w.679 baseline
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       112
+Features per Window:      28
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.679
+RMSE:                     0.215
+MAE:                      0.111
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.817
+RMSE:                     0.114
+MAE:                      0.060
+
+
+
 # dda 596 market cap aggregations
 checkpoint 5: w.689 ready to merge
 Model Performance Summary
@@ -39,7 +202,48 @@ RMSE:                     0.114
 MAE:                      0.061
 
 
-checkpoint 3: w.686 add concentration_index/market_cap_unadj
+checkpoint 3: w.687 concentration and stdv unadj
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       120
+Features per Window:      30
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.687
+RMSE:                     0.212
+MAE:                      0.110
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.820
+RMSE:                     0.113
+MAE:                      0.060
+
+
+largest_coin_usd/market_cap_filled
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       116
+Features per Window:      29
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.678
+RMSE:                     0.215
+MAE:                      0.112
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.817
+RMSE:                     0.114
+MAE:                      0.060
+
+
+
+checkpoint 3: w.686 concentration_index/market_cap_unadj
 Model Performance Summary
 ===================================
 Test Samples:             56,708
