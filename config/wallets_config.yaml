@@ -108,7 +108,8 @@ features:
         # crypto_net_gain/max_investment/winsorized,
     ]
 
-    # Market Timing Params
+    # Balance Params
+    balance_features_min_balance: 20  # determines
 
     # Clustering Params
     # clustering_n_clusters: [2,4]
@@ -173,16 +174,11 @@ modeling:
 
             # mktcap|*,
             # mktcap|end_portfolio_wtd_market_cap/market_cap|*,
-
+            mktcap|portfolio_mcap_min/market_cap_filled|*,
+            mktcap|portfolio_mcap_min/market_cap_unadj|*,
             mktcap|portfolio_mcap_std/market_cap_filled|*,
-            mktcap|concentration_index/market_cap_filled|*,
-            mktcap|largest_coin_frac/market_cap_filled|*,
-            mktcap|largest_coin_usd/market_cap_filled|*,
-
             mktcap|portfolio_mcap_std/market_cap_unadj|*,
-            # mktcap|concentration_index/market_cap_unadj|*,
-            mktcap|largest_coin_frac/market_cap_unadj|*,
-            mktcap|largest_coin_usd/market_cap_unadj|*,
+
 
             # transfers|*,
             # transfers|first_sell/*,
@@ -194,6 +190,9 @@ modeling:
 
             # scenario|*,
             # scenario|sells_best/*,
+
+            balance|*,
+
 
             cluster|*,
 
@@ -217,7 +216,7 @@ modeling:
         # -------------------------------
         eval_metric: [rmse]
 
-        max_depth: 21  # how deep the trees can go
+        max_depth: 23  # how deep the trees can go
         # min_child_weight_pct: 0.0001  # what % of rows each tree must have
         min_child_weight: 15  # what % of rows each tree must have
         subsample: 1.0  # samples rows, e.g. trees use x% of all wallet rows
@@ -249,7 +248,7 @@ modeling:
         # -------------------------------
 
         # Search Methodology
-        drop_patterns_include_n_features: 1
+        drop_patterns_include_n_features: 2
 
         n_iter: 40  # random search limit
         n_splits: 4  # cv splits
@@ -282,7 +281,7 @@ modeling:
             # regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            regressor__n_estimators: [200]
+            regressor__n_estimators: [250]
             regressor__learning_rate: [0.05]
             # regressor__gamma: [0.01]
 
@@ -321,13 +320,13 @@ modeling:
                 # [mktcap|*/market_cap_imputed|*],
                 # [mktcap|*/market_cap|*],
                 [mktcap|portfolio_mcap_std/market_cap_filled|*],
-                [mktcap|concentration_index/market_cap_filled|*],
-                [mktcap|largest_coin_frac/market_cap_filled|*],
-                [mktcap|largest_coin_usd/market_cap_filled|*],
+                # [mktcap|concentration_index/market_cap_filled|*],
+                # [mktcap|largest_coin_frac/market_cap_filled|*],
+                # [mktcap|largest_coin_usd/market_cap_filled|*],
                 [mktcap|portfolio_mcap_std/market_cap_unadj|*],
                 # [mktcap|concentration_index/market_cap_unadj|*],
-                [mktcap|largest_coin_frac/market_cap_unadj|*],
-                [mktcap|largest_coin_usd/market_cap_unadj|*],
+                # [mktcap|largest_coin_frac/market_cap_unadj|*],
+                # [mktcap|largest_coin_usd/market_cap_unadj|*],
 
                 # [transfers|*],
                 # [transfers|first_buy/*],

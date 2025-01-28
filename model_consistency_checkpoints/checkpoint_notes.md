@@ -1,5 +1,69 @@
 # dda 596 market cap aggregations
-checkpoint 3: w.686 add concentration_index/market_cap_unadj
+
+
+checkpoint 4: w.675 base case too low again
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       112
+Features per Window:      28
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.675
+RMSE:                     0.216
+MAE:                      0.112
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.816
+RMSE:                     0.114
+MAE:                      0.060
+
+
+
+checkpoint 3: w.687 concentration and stdv unadj
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       120
+Features per Window:      30
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.687
+RMSE:                     0.212
+MAE:                      0.110
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.820
+RMSE:                     0.113
+MAE:                      0.060
+
+
+largest_coin_usd/market_cap_filled
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       116
+Features per Window:      29
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.678
+RMSE:                     0.215
+MAE:                      0.112
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.817
+RMSE:                     0.114
+MAE:                      0.060
+
+
+
+checkpoint 3: w.686 concentration_index/market_cap_unadj
 Model Performance Summary
 ===================================
 Test Samples:             56,708
