@@ -1,3 +1,40 @@
+# dda 597 eval set logic
+checkpoint 2: w.682 base params test performance 60/20/20
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.682
+RMSE:                     0.214
+MAE:                      0.111
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.762
+RMSE:                     0.130
+MAE:                      0.070
+
+
+checkpoint 1: rsme.20830 assess performance vs 20% eval set
+end validation outcome
+[0]	validation_0-rmse:0.37012	validation_1-rmse:0.37039
+[100]	validation_0-rmse:0.11748	validation_1-rmse:0.21537
+[200]	validation_0-rmse:0.08937	validation_1-rmse:0.21043
+[300]	validation_0-rmse:0.07262	validation_1-rmse:0.20884
+[399]	validation_0-rmse:0.06199	validation_1-rmse:0.20830
+
+base end val outcome
+[0]	validation_0-rmse:0.36929	validation_1-rmse:0.36896
+[100]	validation_0-rmse:0.11871	validation_1-rmse:0.21650
+[200]	validation_0-rmse:0.09012	validation_1-rmse:0.21173
+[300]	validation_0-rmse:0.07287	validation_1-rmse:0.21016
+[399]	validation_0-rmse:0.06166	validation_1-rmse:0.20973
+
+
 # dda 598
 checkpoint 1: w.694 performance matches
 Model Performance Summary

@@ -4,8 +4,7 @@ from typing import Dict, Union, List
 from itertools import chain,combinations
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import RandomizedSearchCV, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.base import BaseEstimator, TransformerMixin
 from xgboost import XGBRegressor
@@ -44,10 +43,10 @@ class BaseModel:
         # Model Datasets
         self.X_train = None
         self.y_train = None
+        self.X_eval = None
+        self.y_eval = None
         self.X_test = None
         self.y_test = None
-        self.X_validate = None
-        self.X_validate = None
         self.y_pred = None
 
         # Utils
@@ -142,18 +141,36 @@ class BaseModel:
         ])
 
 
+    # Modify _split_data method to do two splits:
     def _split_data(self, X: pd.DataFrame, y: pd.Series) -> None:
         """
-        Create train/test split for the model.
+        Create train/eval/test splits relative to total population.
 
         Params:
-        - X (DataFrame): feature data for modeling cohort
-        - y (Series): target variable for modeling cohort
+        - X (DataFrame): feature data
+        - y (Series): target variable
+
+        Test split happens first, then eval split is calculated relative to original population.
+        For example: test_size=0.2, eval_size=0.1 means:
+        - 20% goes to test
+        - 10% of total (12.5% of remaining) goes to eval
+        - 70% goes to train
         """
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            X,
-            y,
-            test_size=self.modeling_config['train_test_split'],
+        # First split off test set
+        X_temp, self.X_test, y_temp, self.y_test = train_test_split(
+            X, y,
+            test_size=self.modeling_config['test_size'],
+            random_state=self.modeling_config['model_params'].get('random_state', 42)
+        )
+
+        # Calculate eval split size relative to original population
+        remaining_fraction = 1 - self.modeling_config['test_size']
+        relative_eval_size = self.modeling_config['eval_size'] / remaining_fraction
+
+        # Split remaining data into train/eval
+        self.X_train, self.X_eval, self.y_train, self.y_eval = train_test_split(
+            X_temp, y_temp,
+            test_size=relative_eval_size,
             random_state=self.modeling_config['model_params'].get('random_state', 42)
         )
 
@@ -166,13 +183,14 @@ class BaseModel:
         transformer = self.pipeline[:-1]
         regressor = self.pipeline[-1]
 
-        # Fit transformer and transform both train and test
+        # Fit transformer and transform X_train
         X_train_transformed = transformer.fit_transform(self.X_train)
-        X_test_transformed = transformer.transform(self.X_test)
 
-        # Create eval set with transformed data
+        # Create eval set with transformed data for early stopping
+        X_eval_transformed = transformer.transform(self.X_eval)
         eval_set = [(X_train_transformed, self.y_train),
-                    (X_test_transformed, self.y_test)]
+                    (X_eval_transformed, self.y_eval)]
+
 
         # Fit final regressor with transformed data
         logger.info(f"Training model using data with shape: {X_train_transformed.shape}...")
