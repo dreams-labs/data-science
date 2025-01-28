@@ -203,7 +203,7 @@ modeling:
             balance|median_coin_frac|*,
             balance|min_coin_frac|*,
             balance|n_coins|*,
-            balance|total_usd_balance|*,
+            # balance|total_usd_balance|*,
 
             cluster|*,
 

@@ -1,4 +1,24 @@
 # dda 612 portfolio features
+checkpoint 5: w.694 add largest_coin_frac+total_usd_balance
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       128
+Features per Window:      32
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.694
+RMSE:                     0.210
+MAE:                      0.108
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.816
+RMSE:                     0.115
+MAE:                      0.061
+
+
 checkpoint 4: w.694 add balance|largest_coin_frac
 Model Performance Summary
 ===================================
