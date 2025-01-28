@@ -4,6 +4,7 @@ from typing import Dict, Union, List
 from itertools import chain,combinations
 import pandas as pd
 import numpy as np
+from sklearn.model_selection import train_test_split
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -111,7 +112,7 @@ class BaseModel:
 
 
     # -----------------------------------
-    #      Modeling Helper Methods
+    #      Pipeline/Modeling Methods
     # -----------------------------------
 
     def _build_pipeline(self) -> None:
@@ -139,6 +140,23 @@ class BaseModel:
             )),
             ('regressor', XGBRegressor(**model_params))
         ])
+
+
+    # # NEW
+    # def _split_data(self, X: pd.DataFrame, y: pd.Series) -> None:
+    #     """
+    #     Create train/test split for the model.
+
+    #     Params:
+    #     - X (DataFrame): feature data for modeling cohort
+    #     - y (Series): target variable for modeling cohort
+    #     """
+    #     self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
+    #         X,
+    #         y,
+    #         test_size=self.modeling_config['train_test_split'],
+    #         random_state=self.modeling_config['model_params'].get('random_state', 42)
+    #     )
 
 
     def _fit(self) -> None:

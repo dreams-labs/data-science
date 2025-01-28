@@ -27,6 +27,45 @@ class WalletModel(BaseModel):
     #           Helper Methods
     # -----------------------------------
 
+    # # NEW
+    # def _prepare_data(self,
+    #                   training_data_df: pd.DataFrame,
+    #                   modeling_cohort_target_var_df: pd.DataFrame
+    #                   ) -> Tuple[pd.DataFrame, pd.Series]:
+    #     """
+    #     Prepare wallet-specific data for modeling. Returns features and target only.
+
+    #     Params:
+    #     - training_data_df (DataFrame): full training cohort feature data
+    #     - modeling_cohort_target_var_df (DataFrame): Contains in_modeling_cohort flag and target variable
+
+    #     Returns:
+    #     - X (DataFrame): feature data for modeling cohort
+    #     - y (Series): target variable for modeling cohort
+    #     """
+    #     # Store full training cohort for later scoring
+    #     self.training_data_df = training_data_df.copy()
+
+    #     # Validate indexes are wallet addresses and matching
+    #     if not (training_data_df.index.name == 'wallet_address'
+    #             and modeling_cohort_target_var_df.index.name == 'wallet_address'):
+    #         raise ValueError("Both dataframes must have wallet_address as index")
+
+    #     # Join target data to features
+    #     modeling_df = training_data_df.join(modeling_cohort_target_var_df, how='left')
+
+    #     # Filter to modeling cohort for training
+    #     cohort_mask = modeling_df['in_modeling_cohort'] == 1
+    #     modeling_df = modeling_df[cohort_mask]
+
+    #     # Separate target variable
+    #     target_var = self.modeling_config['target_variable']
+    #     X = modeling_df.drop([target_var, 'in_modeling_cohort'], axis=1)
+    #     y = modeling_df[target_var]
+
+    #     return X, y
+
+    # OLD
     def _prepare_data(self, training_data_df: pd.DataFrame,
                       modeling_cohort_target_var_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
         """
@@ -103,6 +142,7 @@ class WalletModel(BaseModel):
     #         Primary Interface
     # -----------------------------------
 
+    # OLD
     def construct_wallet_model(self, training_data_df: pd.DataFrame,
                             modeling_cohort_target_var_df: pd.DataFrame,
                             return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
@@ -155,3 +195,59 @@ class WalletModel(BaseModel):
         u.notify('notify')
 
         return result
+
+    # # NEW
+    # def construct_wallet_model(self,
+    #                             training_data_df: pd.DataFrame,
+    #                             modeling_cohort_target_var_df: pd.DataFrame,
+    #                             return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
+    #     """
+    #     Run wallet-specific modeling experiment.
+
+    #     Params:
+    #     - training_data_df (DataFrame): full training cohort feature data
+    #     - modeling_cohort_target_var_df (DataFrame): Contains modeling cohort flag and target
+    #     - return_data (bool): Whether to return train/test splits and predictions
+
+    #     Returns:
+    #     - result (dict): Contains fitted pipeline, predictions, and optional train/test data
+    #     """
+    #     logger.info("Beginning model construction...")
+
+    #     # Validate all training data has targets
+    #     if not training_data_df.index.isin(modeling_cohort_target_var_df.index).all():
+    #         raise ValueError("Some training data points are missing target values.")
+
+    #     # Filter target df to only include rows with training data
+    #     modeling_cohort_target_var_df = modeling_cohort_target_var_df[
+    #         modeling_cohort_target_var_df.index.isin(training_data_df.index)
+    #     ]
+
+    #     # Prepare data (just X, y now)
+    #     X, y = self._prepare_data(training_data_df, modeling_cohort_target_var_df)
+
+    #     # Do the actual train/test split in BaseModel
+    #     self._split_data(X, y)
+
+    #     # Run base experiment
+    #     result = super().construct_base_model(return_data=return_data)
+
+    #     # If grid search was run and no final model is requested
+    #     if self.modeling_config.get('grid_search_params', {}).get('enabled') is True and \
+    #     self.modeling_config.get('grid_search_params', {}).get('build_post_search_model') is False:
+    #         return result
+
+    #     # Optionally store predictions for the full training cohort
+    #     if return_data:
+    #         training_cohort_pred = self._predict_training_cohort()
+    #         target_var = self.modeling_config['target_variable']
+    #         full_cohort_actuals = modeling_cohort_target_var_df[target_var]
+
+    #         result.update({
+    #             'training_cohort_pred': training_cohort_pred,
+    #             'training_cohort_actuals': full_cohort_actuals
+    #         })
+
+    #     u.notify('notify')
+
+    #     return result
