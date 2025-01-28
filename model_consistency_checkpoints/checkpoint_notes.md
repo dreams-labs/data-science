@@ -21,6 +21,26 @@ RMSE:                     0.114
 MAE:                      0.060
 
 
+checkpoint 3: w.679 baseline
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       112
+Features per Window:      28
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.679
+RMSE:                     0.215
+MAE:                      0.111
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.817
+RMSE:                     0.114
+MAE:                      0.060
+
+
 
 checkpoint 3: w.687 concentration and stdv unadj
 Model Performance Summary
