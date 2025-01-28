@@ -180,7 +180,7 @@ modeling:
             mktcap|largest_coin_usd/market_cap_filled|*,
 
             mktcap|portfolio_mcap_std/market_cap_unadj|*,
-            # mktcap|concentration_index/market_cap_unadj|*,
+            mktcap|concentration_index/market_cap_unadj|*,
             mktcap|largest_coin_frac/market_cap_unadj|*,
             mktcap|largest_coin_usd/market_cap_unadj|*,
 
