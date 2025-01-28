@@ -87,11 +87,10 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     feature_column_names['transfers|'] = transfers_sequencing_features_df.columns
     wallet_features_df = wallet_features_df.join(transfers_sequencing_features_df, how='left')
 
-    # # Balance features (left join, do not fill)
-    # balance_features_df = wbf.calculate_balance_features(profits_df)
-    # feature_column_names['balance|'] = balance_features_df.columns
-    # wallet_features_df = wallet_features_df.join(balance_features_df, how='left')
-
+    # Balance features (left join, do not fill)
+    balance_features_df = wbf.calculate_balance_features(profits_df)
+    feature_column_names['balance|'] = balance_features_df.columns
+    wallet_features_df = wallet_features_df.join(balance_features_df, how='left')
 
 
     # BELOW FUNCTIONS DO NOT WORK WITH INDICES AND SHOULD BE EVENTUALLY REFACTORED
