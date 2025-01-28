@@ -1,3 +1,24 @@
+# dda 612 portfolio features
+checkpoint 1: w.688 slightly too low?
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       120
+Features per Window:      30
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.688
+RMSE:                     0.212
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.815
+RMSE:                     0.115
+MAE:                      0.061
+
+
 # dda X596 market cap aggregations
 checkpoint 4: w.675 base case too low again
 Model Performance Summary
