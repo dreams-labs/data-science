@@ -183,23 +183,51 @@ class BaseModel:
         transformer = self.pipeline[:-1]
         regressor = self.pipeline[-1]
 
-        # Fit transformer and transform X_train
+        # Fit transformer and transform X_train and X_eval for early stopping
         X_train_transformed = transformer.fit_transform(self.X_train)
-
-        # Create eval set with transformed data for early stopping
         X_eval_transformed = transformer.transform(self.X_eval)
         eval_set = [(X_train_transformed, self.y_train),
                     (X_eval_transformed, self.y_eval)]
 
 
-        # Fit final regressor with transformed data
-        logger.info(f"Training model using data with shape: {X_train_transformed.shape}...")
-        u.notify('startup')
-        regressor.fit(
-            X_train_transformed,
-            self.y_train,
-            eval_set=eval_set
-        )
+        # Check if phase training is enabled
+        phase_config = self.modeling_config.get('phase_training', {})
+        if not phase_config.get('enabled'):
+            # Original single-phase training
+            logger.info(f"Training model using data with shape: {X_train_transformed.shape}...")
+            u.notify('startup')
+            regressor.fit(
+                X_train_transformed,
+                self.y_train,
+                eval_set=eval_set
+            )
+        else:
+            # Multi-phase training
+            logger.info(f"Beginning phase training with {len(phase_config['phases'])} phases...")
+            u.notify('startup')
+
+            # Store original parameters
+            base_params = regressor.get_params()
+
+            for i, phase in enumerate(phase_config['phases'], 1):
+                # Update all parameters specified in this phase
+                current_params = base_params.copy()
+                current_params.update(phase['params'])
+
+                # Ensure eval_metric is string
+                current_params['eval_metric'] = 'rmse'
+
+                # Log all parameter overrides
+                param_changes = {k: v for k, v in phase['params'].items()}
+                logger.info(f"Phase {i}: Training with parameters: {param_changes}")
+
+                regressor.set_params(**current_params)
+                regressor.fit(
+                    X_train_transformed,
+                    self.y_train,
+                    eval_set=eval_set,
+                    xgb_model=None if i == 1 else regressor
+                )
 
         self.training_time = time.time() - self.start_time
         logger.info("Training completed after %.2f seconds.", self.training_time)
@@ -218,8 +246,6 @@ class BaseModel:
         # Convert to Series with same index as test data
         self.y_pred = pd.Series(raw_predictions, index=self.X_test.index)
         return self.y_pred
-
-
 
 
 
