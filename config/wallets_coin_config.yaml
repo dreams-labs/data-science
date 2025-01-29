@@ -27,8 +27,7 @@ wallet_segments:
     # Scores to include as segments + metrics
     wallet_scores_path: "temp/wallet_modeling_score_dfs"
     wallet_scores: [
-        # 'net_gain_winsorized_checkpoint_hybridized',
-        'net_gain_winsorized_checkpoint',
+        net_flows_max_investment_dda619_grid,
     ]
 
     # score_segment_quantiles: [0.1, 0.3, 0.5, 0.7, 0.9]  # higher is better; how to assign wallet a score segment
@@ -36,7 +35,7 @@ wallet_segments:
     training_period_cluster_groups: [2]  # which n clusters assignment from the training period to segment by
 
     # where to save local files
-    parquet_folder: 'temp/coin_modeling_dfs'
+    parquet_folder: temp/coin_modeling_dfs
 
 
 # CheckpointValidation
@@ -46,8 +45,8 @@ wallet_features:
     # Balance metrics params
     wallet_balance_dates: [
         # TODO: needs profits imputation logic to use dates other than modeling start/end
-        '2024-11-20',
-        # '2024-10-31',
+        2024-11-20,
+        # 2024-10-31,
     ]
 
     # Score features params
@@ -55,7 +54,7 @@ wallet_features:
 
     # Metrics to drop based on low observed importance
     drop_trading_metrics: [
-        'average_transaction'
+        average_transaction
     ]
 
 
@@ -87,15 +86,15 @@ coin_modeling:
 
         # Column patterns to remove
         drop_patterns: [
-            '*|traing/activity_density|*',
-            # 'score_quantile|net_gain_winsorized_checkpoint_score/trading|',
-            # 'score_quantile|net_gain_winsorized_checkpoint_residual/trading|',
-            # 'training_clusters|k2_cluster/trading|',
-            # 'all_wallets|all/trading|',
-            # 'score_quantile|net_gain_winsorized_checkpoint_residual/balances|',
-            # 'score_quantile|net_gain_winsorized_checkpoint_score/balances|',
-            # 'training_clusters|k2_cluster/balances|',
-            # 'all_wallets|all/balances|',
+            *|traing/activity_density|*,
+            # score_quantile|net_gain_winsorized_checkpoint_score/trading|,
+            # score_quantile|net_gain_winsorized_checkpoint_residual/trading|,
+            # training_clusters|k2_cluster/trading|,
+            # all_wallets|all/trading|,
+            # score_quantile|net_gain_winsorized_checkpoint_residual/balances|,
+            # score_quantile|net_gain_winsorized_checkpoint_score/balances|,
+            # training_clusters|k2_cluster/balances|,
+            # all_wallets|all/balances|,
         ]
 
         # Correlation/variance-based removal
@@ -115,7 +114,7 @@ coin_modeling:
         gamma: 0.01
         min_child_weight: 5
         early_stopping_rounds: 20
-        eval_metric: 'rmse'
+        eval_metric: rmse
 
         # non modeling metaparams
         random_state: 42
@@ -130,7 +129,7 @@ coin_modeling:
 
         # Search methodology
         n_iter: 60  # random search limit
-        scoring: 'neg_root_mean_squared_error'
+        scoring: neg_root_mean_squared_error
         n_splits: 3  # cv splits
         n_jobs: -1
         verbose_level: 3  # scikit-learn verbosity
@@ -147,7 +146,7 @@ coin_modeling:
             # regressor__colsample_bytree: [0.9, 1.0]
 
             # # Model Speed
-            # regressor__tree_method: ['hist', 'approx', 'auto']
+            # regressor__tree_method: [hist, approx, auto]
             # regressor__max_bin: [64, 128, 256]
             # regressor__gamma: [0.0, 0.1, 1.0]  # controls the minimum loss reduction needed to split a node
 
@@ -159,13 +158,13 @@ coin_modeling:
             regressor__n_jobs: [4]  # how many models to build at once
             regressor__nthread: [4]  # how many threads each model can use
             regressor__max_bin: [128]
-            regressor__tree_method: ['hist']
+            regressor__tree_method: [hist]
 
             drop_columns__drop_patterns: [
                 [],
-                ['scor*'],
-                ['all*'],
-                ['training_cluster*']
+                [scor*],
+                [all*],
+                [training_cluster*]
             ]
 
 
