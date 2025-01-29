@@ -1,4 +1,247 @@
 # dda 619 grid searchin
+12d/30w/5000n/.02lr lambda 1 alpha 5
+
+
+12d/30w/500n/.2lr lambda 1 alpha 5 subsample 0.8
+Model Performance Summary
+===================================
+Test Samples:             79,166
+Number of Features:       429
+Features per Window:      39
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.745
+RMSE:                     0.165
+MAE:                      0.084
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.780
+RMSE:                     0.104
+MAE:                      0.069
+
+
+12d/30w/500n/.2lr lambda .5 alpha 5
+Model Performance Summary
+===================================
+Test Samples:             79,166
+Number of Features:       429
+Features per Window:      39
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.748
+RMSE:                     0.164
+MAE:                      0.083
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.807
+RMSE:                     0.098
+MAE:                      0.061
+
+12d/30w/500n/.2lr lambda 1 alpha 5
+Model Performance Summary
+===================================
+Test Samples:             79,166
+Number of Features:       429
+Features per Window:      39
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.749
+RMSE:                     0.164
+MAE:                      0.083
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.810
+RMSE:                     0.097
+MAE:                      0.060
+
+
+12d/20w/500n/.2lr lambda 1 alpha 5
+Model Performance Summary
+===================================
+Test Samples:             79,166
+Number of Features:       429
+Features per Window:      39
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.746
+RMSE:                     0.165
+MAE:                      0.084
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.809
+RMSE:                     0.097
+MAE:                      0.060
+
+
+12d/30w/500n/.2lr lambda 1 alpha 10
+Model Performance Summary
+===================================
+Test Samples:             79,166
+Number of Features:       429
+Features per Window:      39
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.744
+RMSE:                     0.165
+MAE:                      0.085
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.806
+RMSE:                     0.098
+MAE:                      0.059
+
+
+12d/30w/500n/.2lr lambda 1 alpha 5
+Model Performance Summary
+===================================
+Test Samples:             79,166
+Number of Features:       429
+Features per Window:      39
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.749
+RMSE:                     0.164
+MAE:                      0.083
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.810
+RMSE:                     0.097
+MAE:                      0.060
+
+
+12d/30w/500n/.2lr lambda 1 alpha 2
+Model Performance Summary
+===================================
+Test Samples:             79,166
+Number of Features:       429
+Features per Window:      39
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.746
+RMSE:                     0.165
+MAE:                      0.083
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.814
+RMSE:                     0.096
+MAE:                      0.060
+
+
+12d/30w/500n/.2lr lambda 1 alpha 0.5
+Model Performance Summary
+===================================
+Test Samples:             79,166
+Number of Features:       429
+Features per Window:      39
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.745
+RMSE:                     0.165
+MAE:                      0.083
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.805
+RMSE:                     0.098
+MAE:                      0.060
+
+
+12d/30w/500n/.2lr lambda 1 alpha 0
+Model Performance Summary
+===================================
+Test Samples:             79,166
+Number of Features:       429
+Features per Window:      39
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.744
+RMSE:                     0.165
+MAE:                      0.084
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.796
+RMSE:                     0.100
+MAE:                      0.063
+
+
+12d/30w/500n/.2lr lambda 3 alpha 0
+Model Performance Summary
+===================================
+Test Samples:             79,166
+Number of Features:       429
+Features per Window:      39
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.744
+RMSE:                     0.165
+MAE:                      0.084
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.795
+RMSE:                     0.100
+MAE:                      0.062
+
+
+
+12d/20w/5000n/.02lr/.005g eval size .05
+Model Performance Summary
+===================================
+Test Samples:             79,166
+Number of Features:       429
+Features per Window:      39
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.764
+RMSE:                     0.159
+MAE:                      0.078
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.838
+RMSE:                     0.089
+MAE:                      0.052
+
+
+12d/30w/5000n/.02lr/.005g eval size .05
+Model Performance Summary
+===================================
+Test Samples:             79,166
+Number of Features:       429
+Features per Window:      39
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.764
+RMSE:                     0.159
+MAE:                      0.078
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.833
+RMSE:                     0.091
+MAE:                      0.053
+
+
 12d/30w/5000n/.015lr/.005g eval size .05
 rmse at 200
 [200]	validation_0-rmse:0.18599	validation_1-rmse:0.20190

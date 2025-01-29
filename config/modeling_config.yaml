@@ -49,8 +49,8 @@ modeling:
 
 
 
-    modeling_folder: "..//modeling"  # location of the modeling folder where outputs will be saved
-    config_folder: "..//config"  # location of the config folder where base case config files are
+    modeling_folder: "../artifacts/modeling"  # location of the modeling folder where outputs will be saved
+    config_folder: "../config"  # location of the config folder where base case config files are
     random_seed: 38  # Random seed for reproducibility
 
 evaluation:

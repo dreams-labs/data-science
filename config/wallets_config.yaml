@@ -231,9 +231,9 @@ modeling:
         # -------------------------------
         eval_metric: [rmse]
 
-        max_depth: 15  # how deep the trees can go
+        max_depth: 12  # how deep the trees can go
         # min_child_weight_pct: 0.0001  # what % of rows each tree must have
-        min_child_weight: 20  # what % of rows each tree must have
+        min_child_weight: 30  # what % of rows each tree must have
         subsample: 1.0  # samples rows, e.g. trees use x% of all wallet rows
         colsample_bytree: 1.0  # samples columns, e.g. trees use x% of all column features
 
@@ -241,9 +241,14 @@ modeling:
         # --------------------------------------
         # CHECKPOINTER
         n_estimators: 5000  # number of trees to train in the model
-        learning_rate: 0.015  # step size for updates to weights during training
+        learning_rate: 0.02  # step size for updates to weights during training
         early_stopping_rounds: 25  # stop training if no improvement after x rounds
+
+        # Regularization
+        reg_alpha: 10.0  # L1 regularization - encourages leaf weights to be zero
+        reg_lambda: 1.0  # L2 regularization - reduces magnitude of leaf weights
         gamma: 0.005  # minimum gain required to split further on a leaf node
+
         tree_method: hist  # method for building trees, e.g., histogram-based
         max_bin: 256  # how many bins to categorize features into
 
@@ -283,21 +288,25 @@ modeling:
 
             # # Depth and Child Weight
             # regressor__min_child_weight_pct: [0.00004, 0.00007, 0.0001]
-            regressor__min_child_weight: [15, 20]
-            regressor__max_depth: [13,15,17]  # basic depth param
+            regressor__max_depth: [10,12,14]  # basic depth param
+            # regressor__min_child_weight: [15,20,30]
 
             # Col/Row Sampling
             # regressor__subsample: [0.8, 0.9, 1.0]   # samples rows, e.g. trees use x% of all wallet rows
             # regressor__colsample_bytree: [0.95, 1.0]   # samples columns, e.g. trees use x% of all column features
 
+            # Regularization
+            # regressor__gamma: [0.002, 0.005, 0.01]  # controls the minimum loss reduction needed to split a node
+            'regressor__reg_alpha': [0, 0.1, 0.5]  # L1 regularization - encourages leaf weights to be zero
+            'regressor__reg_lambda': [1.0, 2.0]  # L2 regularization - reduces magnitude of leaf weights
+
             # # Model Speed
             # regressor__tree_method: [hist, approx, auto]
             # regressor__max_bin: [64, 128, 256]
-            regressor__gamma: [0.002, 0.005, 0.01]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            regressor__n_estimators: [350]
-            regressor__learning_rate: [0.03]
+            regressor__n_estimators: [800]
+            regressor__learning_rate: [0.05]
             # regressor__gamma: [0.01]
 
             # Optimize for Speed
