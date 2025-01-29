@@ -128,7 +128,9 @@ modeling:
     modeling_min_coins_traded: 0
 
     # Which wallet performance metric to use as the target variable.
-    target_variable: crypto_net_gain/max_investment/winsorized
+    # target_variable: crypto_net_gain/max_investment/winsorized
+    # target_variable: crypto_net_flows/max_investment/winsorized
+    target_variable: crypto_net_gain
 
     # Train/Test/Eval split
     test_size: 0.2  # what % of the total population will be used as test
@@ -241,12 +243,12 @@ modeling:
         # --------------------------------------
         # CHECKPOINTER
         n_estimators: 5000  # number of trees to train in the model
-        learning_rate: 0.05  # step size for updates to weights during training
+        learning_rate: 0.02  # step size for updates to weights during training
         early_stopping_rounds: 25  # stop training if no improvement after x rounds
 
         # Regularization
-        reg_alpha: 10.0  # L1 regularization - encourages leaf weights to be zero
-        reg_lambda: 1.0  # L2 regularization - reduces magnitude of leaf weights
+        # reg_alpha: 1.0  # L1 regularization - encourages leaf weights to be zero
+        # reg_lambda: 1.0  # L2 regularization - reduces magnitude of leaf weights
         gamma: 0.005  # minimum gain required to split further on a leaf node
 
         tree_method: hist  # method for building trees, e.g., histogram-based
@@ -261,14 +263,18 @@ modeling:
 
     # Phase training section
     phase_training:
-        enabled: true
+        enabled: False
         phases:
             - params:
-                reg_alpha: 20
+                max_depth: 9
+                min_child_weight: 100
+                gamma: 0.02
             - params:
-                reg_alpha: 5
-            - params:
-                reg_alpha: 0
+                max_depth: 12
+                min_child_weight: 30
+                gamma: 0.005
+
+
 
 
 
