@@ -420,10 +420,11 @@ class BaseModel:
         if output_raw_data:
             return results_df
 
+        # Extract base patterns to remove them from display
+        base_patterns = set(self.modeling_config['feature_selection']['drop_patterns'])
+
         report_data = []
         param_cols = [col for col in results_df.columns if col.startswith("param_")]
-
-        # Only include parameters with multiple unique values
         variable_params = [
             col for col in param_cols
             if results_df[col].apply(lambda x: tuple(x) if isinstance(x, list) else x).nunique() > 1
@@ -432,20 +433,26 @@ class BaseModel:
         for param in variable_params:
             param_name = param.replace("param_", "")
             for _, row in results_df.iterrows():
+                param_value = row[param]
+
+                # Clean up drop patterns display
+                if param_name == 'drop_columns__drop_patterns' and isinstance(param_value, list):
+                    # Only show patterns that aren't in base config
+                    unique_patterns = [p for p in param_value if p not in base_patterns and p != 'feature_retainer']
+                    param_value = unique_patterns if unique_patterns else ['feature_retainer']
+
                 report_data.append({
                     'param': param_name,
-                    'param_value': str(row[param]),
+                    'param_value': str(param_value),
                     'avg_score': row['mean_test_score'],
                     'total_builds': len(results_df)
                 })
 
-        report_df = pd.DataFrame(report_data)
+        return (pd.DataFrame(report_data)
+                .groupby(['param','param_value'])[['avg_score']]
+                .mean('avg_score')
+                .sort_values(by='avg_score', ascending=False))
 
-        return (report_df
-                    .groupby(['param','param_value'])[['avg_score']]
-                    .mean('avg_score')
-                    .sort_values(by='avg_score', ascending=False)
-                )
 
 
 
