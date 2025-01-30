@@ -109,7 +109,7 @@ def prepare_training_data(
                     wallets_config['training_data']['training_period_end'])
 
     # Generate market indicators
-    def generate_market_indicators(market_data_df_full):
+    def generate_market_indicators():
         logger.info("Generating market indicators...")
         market_indicators_df = generate_training_indicators_df(
             market_data_df_full,

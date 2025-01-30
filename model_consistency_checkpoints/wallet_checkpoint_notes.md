@@ -1,4 +1,47 @@
 # dda 627 softer coin filters
+max_gap_days: 20
+Removed 666 coins (563 for gaps, 175 for volume) and 536951 total records.
+Model Performance Summary
+===================================
+Test Samples:             69,462
+Number of Features:       155
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.708
+RMSE:                     0.191
+MAE:                      0.096
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.778
+RMSE:                     0.109
+MAE:                      0.060
+
+
+
+max_gap_days: 60
+Removed 406 coins (269 for gaps, 175 for volume) and 338000 total records.
+Model Performance Summary
+===================================
+Test Samples:             70,193
+Number of Features:       155
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.708
+RMSE:                     0.191
+MAE:                      0.096
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.762
+RMSE:                     0.113
+MAE:                      0.063
+
+
 checkpoint 2: w.713 more parallelization
 Model Performance Summary
 ===================================
