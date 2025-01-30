@@ -1,3 +1,24 @@
+# dda 626 new coins
+checkpoint 1: w.692 base with eval+test set split
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.692
+RMSE:                     0.209
+MAE:                      0.108
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.806
+RMSE:                     0.117
+MAE:                      0.063
+
+
 # dda 621 phase training
 base high performance
 12d/30w/5000n/.02lr/.005g
