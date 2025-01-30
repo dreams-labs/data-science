@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 from typing import List
 import pandas as pd
+import numpy as np
 import yaml
 
 # Local module imports
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 wallets_metrics_config = u.load_config('../config/wallets_metrics_config.yaml')
 wallets_features_config = yaml.safe_load(Path('../config/wallets_features_config.yaml').read_text(encoding='utf-8'))
+wallets_coin_config = yaml.safe_load(Path('../config/wallets_coin_config.yaml').read_text(encoding='utf-8'))
 
 
 
@@ -45,13 +47,16 @@ def load_wallet_scores(wallet_scores: list, wallet_scores_path: str) -> pd.DataF
         feature_cols.append(f'scores|{score_name}_score')
 
         # Add residuals column
-        score_df[f'scores|{score_name}_residual'] = (
-            score_df[f'score|{score_name}'] - score_df[f'actual|{score_name}']
-        )
-        feature_cols.append(f'scores|{score_name}_residual')
+        if wallets_coin_config['wallet_segments']['wallet_scores_residuals_segments'] is True:
+            score_df[f'scores|{score_name}_residual'] = (
+                score_df[f'score|{score_name}'] - score_df[f'actual|{score_name}']
+            )
+            feature_cols.append(f'scores|{score_name}_residual')
 
         # Add confidence if provided
-        if f'confidence|{score_name}' in score_df.columns:
+        if ((wallets_coin_config['wallet_segments']['wallet_scores_confidence_segments'] is True)
+            & (f'confidence|{score_name}' in score_df.columns)
+            ):
             score_df[f'scores|{score_name}_confidence'] = score_df[f'confidence|{score_name}']
             feature_cols.append(f'scores|{score_name}_confidence')
 
@@ -93,25 +98,25 @@ def calculate_aggregation_metrics(
 
     metrics = segment_data.groupby(level='coin_id', observed=True).agg({
         metric_column: 'sum',
-        segment_family: 'count'  # More efficient than wallet_address count
+        segment_family: 'count'
     }).rename(columns={
         metric_column: f'{segment_family}/{segment_value}|{metric_column}|aggregations/sum',
         segment_family: f'{segment_family}/{segment_value}|{metric_column}|aggregations/count'
     })
 
-    # Calculate percentages using vectorized operations
+    # Calculate percentages using Series division with fill_value=np.nan
     sum_col = f'{segment_family}/{segment_value}|{metric_column}|aggregations/sum'
     count_col = f'{segment_family}/{segment_value}|{metric_column}|aggregations/count'
 
-    metrics[f'{sum_col}_pct'] = metrics[sum_col].div(
-        totals_df[f'{segment_family}/total|{metric_column}|aggregations/sum']
-    ).fillna(0)
+    total_sum = totals_df[f'{segment_family}/total|{metric_column}|aggregations/sum']
+    total_count = totals_df[f'{segment_family}/total|{metric_column}|aggregations/count']
 
-    metrics[f'{count_col}_pct'] = metrics[count_col].div(
-        totals_df[f'{segment_family}/total|{metric_column}|aggregations/count']
-    ).fillna(0)
+    # Handle division with explicit zero check
+    metrics[f'{sum_col}_pct'] = (metrics[sum_col] / total_sum).replace([np.inf, -np.inf], np.nan)
+    metrics[f'{count_col}_pct'] = (metrics[count_col] / total_count).replace([np.inf, -np.inf], np.nan)
 
     return metrics
+
 
 
 def calculate_score_weighted_metrics(
@@ -144,8 +149,8 @@ def calculate_score_weighted_metrics(
     # Get metric totals using index-aware groupby
     weight_sums = segment_data.groupby(level='coin_id', observed=True)[metric_column].sum()
 
-    # Compute weighted averages
-    weighted_scores = score_sums.div(weight_sums, axis=0)
+    # Handle division with explicit inf replacement
+    weighted_scores = score_sums.div(weight_sums, axis=0).replace([np.inf, -np.inf], np.nan)
 
     # Create renamed columns dict
     renamed_cols = {

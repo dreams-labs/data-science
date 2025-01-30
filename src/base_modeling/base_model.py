@@ -366,6 +366,21 @@ class BaseModel:
         grid_patterns = self.modeling_config['grid_search_params']['param_grid']['drop_columns__drop_patterns']
         base_patterns = self.modeling_config['feature_selection']['drop_patterns']
 
+        # First get columns that remain after base patterns
+        all_columns = self.X_train.columns.tolist()
+        base_drops = fs.identify_matching_columns(base_patterns, all_columns)
+        remaining_columns = [col for col in all_columns if col not in base_drops]
+
+        # Validate grid patterns against remaining columns
+        for pattern_list in grid_patterns:
+            for pattern in pattern_list:
+                if pattern != 'feature_retainer':
+                    matching_cols = fs.identify_matching_columns([pattern], remaining_columns)
+                    if not matching_cols:
+                        raise ValueError(
+                            f"Grid search drop pattern '{pattern}' matches no columns after base drops"
+                        )
+
         # Flatten all grid drop patterns into a single list
         grid_patterns_list = list(chain.from_iterable(grid_patterns)) + ['feature_retainer']
 
@@ -405,10 +420,11 @@ class BaseModel:
         if output_raw_data:
             return results_df
 
+        # Extract base patterns to remove them from display
+        base_patterns = set(self.modeling_config['feature_selection']['drop_patterns'])
+
         report_data = []
         param_cols = [col for col in results_df.columns if col.startswith("param_")]
-
-        # Only include parameters with multiple unique values
         variable_params = [
             col for col in param_cols
             if results_df[col].apply(lambda x: tuple(x) if isinstance(x, list) else x).nunique() > 1
@@ -417,20 +433,26 @@ class BaseModel:
         for param in variable_params:
             param_name = param.replace("param_", "")
             for _, row in results_df.iterrows():
+                param_value = row[param]
+
+                # Clean up drop patterns display
+                if param_name == 'drop_columns__drop_patterns' and isinstance(param_value, list):
+                    # Only show patterns that aren't in base config
+                    unique_patterns = [p for p in param_value if p not in base_patterns and p != 'feature_retainer']
+                    param_value = unique_patterns if unique_patterns else ['feature_retainer']
+
                 report_data.append({
                     'param': param_name,
-                    'param_value': str(row[param]),
+                    'param_value': str(param_value),
                     'avg_score': row['mean_test_score'],
                     'total_builds': len(results_df)
                 })
 
-        report_df = pd.DataFrame(report_data)
+        return (pd.DataFrame(report_data)
+                .groupby(['param','param_value'])[['avg_score']]
+                .mean('avg_score')
+                .sort_values(by='avg_score', ascending=False))
 
-        return (report_df
-                    .groupby(['param','param_value'])[['avg_score']]
-                    .mean('avg_score')
-                    .sort_values(by='avg_score', ascending=False)
-                )
 
 
 

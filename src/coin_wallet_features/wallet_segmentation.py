@@ -3,6 +3,8 @@ Functions for assigning wallets to different segments or cohorts, which can then
 used to compare metrics between the features.
 """
 import logging
+from pathlib import Path
+import yaml
 import pandas as pd
 import numpy as np
 
@@ -11,7 +13,7 @@ import wallet_features.clustering_features as wcl
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
-
+wallets_coin_config = yaml.safe_load(Path('../config/wallets_coin_config.yaml').read_text(encoding='utf-8'))
 
 
 def calculate_wallet_quantiles(score_series: pd.Series, quantiles: list[float]) -> pd.DataFrame:
@@ -88,12 +90,15 @@ def assign_wallet_score_quantiles(wallet_segmentation_df, wallet_scores, score_s
         wallet_segmentation_df = wallet_segmentation_df.join(wallet_quantiles,how='inner')
 
         # Append residual quantiles
-        wallet_quantiles = calculate_wallet_quantiles(wallet_segmentation_df[f'scores|{score_name}_residual'],
-                                                   score_segment_quantiles)
-        wallet_segmentation_df = wallet_segmentation_df.join(wallet_quantiles,how='inner')
+        if wallets_coin_config['wallet_segments']['wallet_scores_residuals_segments'] is True:
+            wallet_quantiles = calculate_wallet_quantiles(wallet_segmentation_df[f'scores|{score_name}_residual'],
+                                                    score_segment_quantiles)
+            wallet_segmentation_df = wallet_segmentation_df.join(wallet_quantiles,how='inner')
 
         # Append confidence quantiles
-        if f'scores|{score_name}_confidence' in wallet_segmentation_df.columns:
+        if ((wallets_coin_config['wallet_segments']['wallet_scores_confidence_segments'] is True)
+            & (f'scores|{score_name}_confidence' in wallet_segmentation_df.columns)
+            ):
             wallet_quantiles = calculate_wallet_quantiles(wallet_segmentation_df[f'scores|{score_name}_confidence'],
                                                     score_segment_quantiles)
             wallet_segmentation_df = wallet_segmentation_df.join(wallet_quantiles,how='inner')

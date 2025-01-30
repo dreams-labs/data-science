@@ -2,7 +2,6 @@ import logging
 from typing import Dict, Union, Tuple
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 
 
@@ -39,12 +38,8 @@ class CoinModel(BaseModel):
         X = feature_df.drop([target_var], axis=1)
         y = feature_df[target_var]
 
-        # Split into training and test sets
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            X, y,
-            test_size=self.modeling_config['train_test_split'],
-            random_state=self.modeling_config['model_params']['random_state']
-        )
+        # Let BaseModel handle the splits
+        self._split_data(X, y)
 
         return X, y
 
