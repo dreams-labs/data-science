@@ -109,37 +109,49 @@ def prepare_training_data(
                     wallets_config['training_data']['training_period_end'])
 
     # Generate market indicators
-    logger.info("Generating market indicators...")
-    market_indicators_df = generate_training_indicators_df(
-        market_data_df_full,
-        wallets_metrics_config,
-        parquet_filename=None
-    )
-    market_indicators_path = f"{parquet_folder}/training_market_indicators_data_df.parquet"
-    market_indicators_df.to_parquet(market_indicators_path, index=False)
-    generated_files.append(market_indicators_path)
-    del market_data_df_full, market_data_df
-
-    # Hybridize wallet IDs if configured
-    if wallets_config['training_data']['hybridize_wallet_ids']:
-        profits_df_full, hybrid_cw_id_map = hybridize_wallet_address(profits_df_full)
-        hybrid_map_path = f"{parquet_folder}/hybrid_cw_id_map.pkl"
-        pd.to_pickle(hybrid_cw_id_map, hybrid_map_path)
-        generated_files.append(hybrid_map_path)
-
-        upload_hybrid_wallet_mapping(hybrid_cw_id_map)
-        del hybrid_cw_id_map
+    def generate_market_indicators(market_data_df_full):
+        logger.info("Generating market indicators...")
+        market_indicators_df = generate_training_indicators_df(
+            market_data_df_full,
+            wallets_metrics_config,
+            parquet_filename=None
+        )
+        market_indicators_path = f"{parquet_folder}/training_market_indicators_data_df.parquet"
+        market_indicators_df.to_parquet(market_indicators_path, index=False)
+        return market_indicators_path
 
     # Define training wallet cohort
-    logger.info("Defining wallet cohort...")
-    profits_df, _ = define_training_wallet_cohort(
-        profits_df_full,
-        market_indicators_df,
-        wallets_config['training_data']['hybridize_wallet_ids']
-    )
-    profits_path = f"{parquet_folder}/training_profits_df.parquet"
-    profits_df.to_parquet(profits_path, index=True)
-    generated_files.append(profits_path)
+    def define_training_cohort(profits_df_full):
+        # Hybridize wallet IDs if configured
+        if wallets_config['training_data']['hybridize_wallet_ids']:
+            profits_df_full, hybrid_cw_id_map = hybridize_wallet_address(profits_df_full)
+            hybrid_map_path = f"{parquet_folder}/hybrid_cw_id_map.pkl"
+            pd.to_pickle(hybrid_cw_id_map, hybrid_map_path)
+            generated_files.append(hybrid_map_path)
+
+            upload_hybrid_wallet_mapping(hybrid_cw_id_map)
+            del hybrid_cw_id_map
+
+        logger.info("Defining wallet cohort...")
+        profits_df, _ = define_training_wallet_cohort(
+            profits_df_full.copy(),
+            market_data_df.copy(),
+            wallets_config['training_data']['hybridize_wallet_ids']
+        )
+        profits_path = f"{parquet_folder}/training_profits_df.parquet"
+        profits_df.to_parquet(profits_path, index=True)
+        return profits_path
+
+    # Run market indicators and cohort definition in parallel
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        market_future = executor.submit(generate_market_indicators)
+        cohort_future = executor.submit(define_training_cohort, profits_df_full)
+
+        market_indicators_path = market_future.result()
+        profits_path = cohort_future.result()
+
+
+    generated_files.extend([market_indicators_path, profits_path])
 
     # Retrieve transfers after cohort is in BigQuery
     logger.info("Retrieving transfers sequencing data...")
@@ -151,7 +163,7 @@ def prepare_training_data(
     generated_files.append(transfers_path)
 
     # Clean up memory
-    del profits_df_full, profits_df, market_indicators_df, transfers_df
+    del profits_df_full, market_data_df_full, transfers_df
     gc.collect()
 
     return generated_files
@@ -208,7 +220,7 @@ def generate_training_features(
     # Process windows in parallel
     logger.info("Processing windows in parallel...")
     window_features = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+    with concurrent.futures.ThreadPoolExecutor(wallets_config['features']['max_workers']) as executor:
         futures = [
             executor.submit(
                 process_window,
