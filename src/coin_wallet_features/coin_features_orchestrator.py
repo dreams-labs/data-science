@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 wallets_metrics_config = u.load_config('../config/wallets_metrics_config.yaml')
 wallets_features_config = yaml.safe_load(Path('../config/wallets_features_config.yaml').read_text(encoding='utf-8'))
+wallets_coin_config = yaml.safe_load(Path('../config/wallets_coin_config.yaml').read_text(encoding='utf-8'))
 
 
 
@@ -46,13 +47,16 @@ def load_wallet_scores(wallet_scores: list, wallet_scores_path: str) -> pd.DataF
         feature_cols.append(f'scores|{score_name}_score')
 
         # Add residuals column
-        score_df[f'scores|{score_name}_residual'] = (
-            score_df[f'score|{score_name}'] - score_df[f'actual|{score_name}']
-        )
-        feature_cols.append(f'scores|{score_name}_residual')
+        if wallets_coin_config['wallet_segments']['wallet_scores_residuals_segments'] is True:
+            score_df[f'scores|{score_name}_residual'] = (
+                score_df[f'score|{score_name}'] - score_df[f'actual|{score_name}']
+            )
+            feature_cols.append(f'scores|{score_name}_residual')
 
         # Add confidence if provided
-        if f'confidence|{score_name}' in score_df.columns:
+        if ((wallets_coin_config['wallet_segments']['wallet_scores_confidence_segments'] is True)
+            & (f'confidence|{score_name}' in score_df.columns)
+            ):
             score_df[f'scores|{score_name}_confidence'] = score_df[f'confidence|{score_name}']
             feature_cols.append(f'scores|{score_name}_confidence')
 
