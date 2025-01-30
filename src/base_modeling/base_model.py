@@ -366,6 +366,17 @@ class BaseModel:
         grid_patterns = self.modeling_config['grid_search_params']['param_grid']['drop_columns__drop_patterns']
         base_patterns = self.modeling_config['feature_selection']['drop_patterns']
 
+        # Ensure all grid patterns match at least one training data column
+        all_columns = self.X_train.columns.tolist()
+        for pattern_list in grid_patterns:
+            for pattern in pattern_list:
+                if pattern != 'feature_retainer':
+                    matching_cols = fs.identify_matching_columns([pattern], all_columns)
+                    if not matching_cols:
+                        raise ValueError(
+                            f"Grid search drop pattern '{pattern}' doesn't match any columns in training data"
+                        )
+
         # Flatten all grid drop patterns into a single list
         grid_patterns_list = list(chain.from_iterable(grid_patterns)) + ['feature_retainer']
 
