@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 from typing import List
 import pandas as pd
+import numpy as np
 import yaml
 
 # Local module imports
@@ -93,25 +94,25 @@ def calculate_aggregation_metrics(
 
     metrics = segment_data.groupby(level='coin_id', observed=True).agg({
         metric_column: 'sum',
-        segment_family: 'count'  # More efficient than wallet_address count
+        segment_family: 'count'
     }).rename(columns={
         metric_column: f'{segment_family}/{segment_value}|{metric_column}|aggregations/sum',
         segment_family: f'{segment_family}/{segment_value}|{metric_column}|aggregations/count'
     })
 
-    # Calculate percentages using vectorized operations
+    # Calculate percentages using Series division with fill_value=np.nan
     sum_col = f'{segment_family}/{segment_value}|{metric_column}|aggregations/sum'
     count_col = f'{segment_family}/{segment_value}|{metric_column}|aggregations/count'
 
-    metrics[f'{sum_col}_pct'] = metrics[sum_col].div(
-        totals_df[f'{segment_family}/total|{metric_column}|aggregations/sum']
-    ).fillna(0)
+    total_sum = totals_df[f'{segment_family}/total|{metric_column}|aggregations/sum']
+    total_count = totals_df[f'{segment_family}/total|{metric_column}|aggregations/count']
 
-    metrics[f'{count_col}_pct'] = metrics[count_col].div(
-        totals_df[f'{segment_family}/total|{metric_column}|aggregations/count']
-    ).fillna(0)
+    # Handle division with explicit zero check
+    metrics[f'{sum_col}_pct'] = (metrics[sum_col] / total_sum).replace([np.inf, -np.inf], np.nan)
+    metrics[f'{count_col}_pct'] = (metrics[count_col] / total_count).replace([np.inf, -np.inf], np.nan)
 
     return metrics
+
 
 
 def calculate_score_weighted_metrics(
@@ -144,8 +145,8 @@ def calculate_score_weighted_metrics(
     # Get metric totals using index-aware groupby
     weight_sums = segment_data.groupby(level='coin_id', observed=True)[metric_column].sum()
 
-    # Compute weighted averages
-    weighted_scores = score_sums.div(weight_sums, axis=0)
+    # Handle division with explicit inf replacement
+    weighted_scores = score_sums.div(weight_sums, axis=0).replace([np.inf, -np.inf], np.nan)
 
     # Create renamed columns dict
     renamed_cols = {
