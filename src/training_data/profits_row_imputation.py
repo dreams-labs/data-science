@@ -31,6 +31,11 @@ logger = dc.setup_logger()
 # to manipulate dfs.
 
 
+
+# ----------------------------------
+#         Utility Functions
+# ----------------------------------
+
 def identify_imputation_dates(config):
     """
     Identifies all dates that must be imputed into profits_df.
@@ -68,6 +73,10 @@ def identify_imputation_dates(config):
     return imputation_dates
 
 
+
+# -----------------------------------
+#       Main Interface Function
+# -----------------------------------
 
 def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
     """

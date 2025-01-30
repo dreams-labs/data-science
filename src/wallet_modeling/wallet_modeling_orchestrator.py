@@ -4,6 +4,7 @@ import logging
 import gc
 from datetime import datetime,timedelta
 from typing import Tuple,Optional,Dict,List
+import concurrent
 import pandas as pd
 import numpy as np
 import pandas_gbq
@@ -156,6 +157,7 @@ def prepare_training_data(
     return generated_files
 
 
+# OLD
 def generate_training_features(
     profits_df: pd.DataFrame,
     market_indicators_df: pd.DataFrame,
@@ -235,6 +237,151 @@ def generate_training_features(
     # Save final version
     wallet_training_data_df_full.to_parquet(f"{parquet_folder}/wallet_training_data_df_full.parquet", index=True)
 
+
+# NEW
+def process_window(
+    window_data: tuple,
+    market_indicators_df: pd.DataFrame,
+    transfers_df: pd.DataFrame,
+    wallet_cohort: List[int]
+) -> pd.DataFrame:
+    """
+    Process a single training window for feature generation.
+
+    Params:
+    - window_data (tuple): Contains (window_profits_df, window_number)
+    - market_indicators_df (DataFrame): Market indicators data
+    - transfers_df (DataFrame): Transfer sequence data
+    - wallet_cohort (List[int]): List of wallet addresses
+
+    Returns:
+    - window_features (DataFrame): Window features with appropriate suffix
+    """
+    window_profits_df, window_number = window_data
+
+    # Extract window dates
+    window_opening_balance_date = window_profits_df['date'].min()
+    window_start_date = window_opening_balance_date + timedelta(days=1)
+    window_end_date = window_profits_df['date'].max()
+
+    # Calculate features for this window
+    window_wallet_features_df = wfo.calculate_wallet_features(
+        window_profits_df,
+        market_indicators_df,
+        transfers_df,
+        wallet_cohort,
+        window_start_date.strftime('%Y-%m-%d'),
+        window_end_date.strftime('%Y-%m-%d')
+    )
+
+    # Add window suffix
+    return window_wallet_features_df.add_suffix(f'|w{window_number}')
+
+
+# NEW
+def generate_training_features2(
+    profits_df: pd.DataFrame,
+    market_indicators_df: pd.DataFrame,
+    transfers_df: pd.DataFrame,
+    wallet_cohort: List[int],
+    parquet_folder: str
+) -> None:
+    """
+    Orchestrates end-to-end feature generation with parallel window processing.
+
+    Params:
+    - profits_df: Training period profits data
+    - market_indicators_df: Market data with indicators
+    - transfers_df: Transfers sequencing data
+    - wallet_cohort: List of wallet addresses
+    - parquet_folder: Location for parquet storage
+    """
+    # Generate full period features
+    logger.info("Generating features for full training period...")
+    training_wallet_features_df = wfo.calculate_wallet_features(
+        profits_df,
+        market_indicators_df,
+        transfers_df,
+        wallet_cohort,
+        wallets_config['training_data']['training_period_start'],
+        wallets_config['training_data']['training_period_end']
+    )
+
+    # Initialize full features df with suffixed columns
+    wallet_training_data_df_full = training_wallet_features_df.add_suffix("|all_windows").copy()
+    wallet_training_data_df_full.to_parquet(f"{parquet_folder}/wallet_training_data_df_full.parquet", index=True)
+    del training_wallet_features_df
+    gc.collect()
+
+    # Split data into windows
+    training_windows_profits_dfs = split_training_window_profits_dfs(
+        profits_df,
+        market_indicators_df,
+        wallet_cohort
+    )
+
+    # Prepare window data for parallel processing
+    window_data = [
+        (window_df, i + 1)
+        for i, window_df in enumerate(training_windows_profits_dfs)
+    ]
+
+    # Process windows in parallel
+    logger.info("Processing windows in parallel...")
+    window_features = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        futures = [
+            executor.submit(
+                process_window,
+                data,
+                market_indicators_df,
+                transfers_df,
+                wallet_cohort
+            )
+            for data in window_data
+        ]
+
+        # Collect results as they complete
+        for future in concurrent.futures.as_completed(futures):
+            window_features.append(future.result())
+
+    # Join all window features at once
+    for window_feature_df in window_features:
+        wallet_training_data_df_full = wallet_training_data_df_full.join(
+            window_feature_df,
+            how='left'
+        )
+
+    # Save unclustered version
+    wallet_training_data_df_full.to_parquet(
+        f"{parquet_folder}/wallet_training_data_df_full_unclustered.parquet",
+        index=True
+    )
+
+    # Generate clusters if configured
+    if 'clustering_n_clusters' in wallets_config.get('features', {}):
+        training_cluster_features_df = wcl.create_kmeans_cluster_features(
+            wallet_training_data_df_full
+        )
+        training_cluster_features_df = training_cluster_features_df.add_prefix('cluster|')
+        wallet_training_data_df_full = wallet_training_data_df_full.join(
+            training_cluster_features_df,
+            how='inner'
+        )
+
+    # Verify cohort integrity
+    missing_wallets = set(wallet_cohort) - set(wallet_training_data_df_full.index)
+    if missing_wallets:
+        raise ValueError(
+            f"Lost {len(missing_wallets)} wallets from original cohort during feature "
+            f"generation. First few missing: {list(missing_wallets)[:5]}"
+        )
+
+    # Save final version
+    wallet_training_data_df_full.to_parquet(
+        f"{parquet_folder}/wallet_training_data_df_full.parquet",
+        index=True
+    )
 
 
 # -----------------------------------------
