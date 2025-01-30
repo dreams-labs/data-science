@@ -48,7 +48,7 @@ def calculate_balance_features(
     # Extract the final row per (coin_id, wallet_address) group
     profits_df_end = (
         profits_df
-        .groupby(level=["coin_id", "wallet_address"], group_keys=False)
+        .groupby(level=["coin_id", "wallet_address"], observed=True, group_keys=False)
         .tail(1)
         .copy()
     )
