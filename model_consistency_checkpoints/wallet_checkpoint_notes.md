@@ -1,3 +1,92 @@
+# dda 627 softer coin filters
+checkpoint 2: w.713 more parallelization
+Model Performance Summary
+===================================
+Test Samples:             69,961
+Number of Features:       155
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.713
+RMSE:                     0.189
+MAE:                      0.095
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.760
+RMSE:                     0.114
+MAE:                      0.063
+
+
+
+min_daily_volume: 500
+Model Performance Summary
+===================================
+Test Samples:             69,961
+Number of Features:       155
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.713
+RMSE:                     0.189
+MAE:                      0.095
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.760
+RMSE:                     0.114
+MAE:                      0.063
+
+
+min_daily_volume: 1000
+Removed 551 coins (350 for gaps, 273 for volume) and 438953 total records.
+Model Performance Summary
+===================================
+Test Samples:             69,839
+Number of Features:       155
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.704
+RMSE:                     0.193
+MAE:                      0.096
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.784
+RMSE:                     0.108
+MAE:                      0.059
+
+
+min_daily_volume: 100
+Removed 393 coins (350 for gaps, 62 for volume) and 326257 total records.
+Model Performance Summary
+===================================
+Test Samples:             70,022
+Number of Features:       155
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.705
+RMSE:                     0.192
+MAE:                      0.096
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.766
+RMSE:                     0.112
+MAE:                      0.062
+
+
+base
+Removed 473 coins (350 for gaps, 175 for volume) and 387628 total records.
+
+
+
 # dda 624 multithread wallet windows
 checkpoint 1: w.713 working multithreading
 Model Performance Summary
