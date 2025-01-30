@@ -1,3 +1,157 @@
+# dda 627 
+Model Performance Summary
+===================================
+Test Samples:             276,949
+Number of Features:       248
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.712
+RMSE:                     0.198
+MAE:                      0.097
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.760
+RMSE:                     0.122
+MAE:                      0.066
+
+
+
+# min threshold $1k min child wght 30 subsample .9 lr .07 gamma 0.01
+Model Performance Summary
+===================================
+Test Samples:             276,949
+Number of Features:       248
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.713
+RMSE:                     0.197
+MAE:                      0.096
+
+
+# min threshold $1k min child wght 30 subsample .9
+Model Performance Summary
+===================================
+Test Samples:             276,949
+Number of Features:       248
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.713
+RMSE:                     0.197
+MAE:                      0.097
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.768
+RMSE:                     0.120
+MAE:                      0.063
+
+
+# min threshold $1k min child wght 30 depth 18
+Model Performance Summary
+===================================
+Test Samples:             276,949
+Number of Features:       248
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.710
+RMSE:                     0.198
+MAE:                      0.098
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.765
+RMSE:                     0.120
+MAE:                      0.061
+
+
+# min threshold $1k min child wght 30
+Model Performance Summary
+===================================
+Test Samples:             276,949
+Number of Features:       248
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.713
+RMSE:                     0.197
+MAE:                      0.096
+
+
+# min threshold $1k min child wght 20
+Model Performance Summary
+===================================
+Test Samples:             276,949
+Number of Features:       248
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.713
+RMSE:                     0.197
+MAE:                      0.095
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.771
+RMSE:                     0.119
+MAE:                      0.063
+
+
+#
+add         '2024-03-01',
+dur: 3m30s
+Model Performance Summary
+===================================
+Test Samples:             69,462
+Number of Features:       217
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.719
+RMSE:                     0.187
+MAE:                      0.092
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.777
+RMSE:                     0.110
+MAE:                      0.059
+
+
+add         '2024-07-01',
+new features dur: 3m17s
+base features dur: 2m31s
+Model Performance Summary
+===================================
+Test Samples:             69,462
+Number of Features:       186
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.717
+RMSE:                     0.188
+MAE:                      0.092
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.772
+RMSE:                     0.111
+MAE:                      0.060
+
+
+
 # dda 627 softer coin filters
 max_gap_days: 20
 Removed 666 coins (563 for gaps, 175 for volume) and 536951 total records.
