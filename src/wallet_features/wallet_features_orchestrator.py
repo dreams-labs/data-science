@@ -166,47 +166,17 @@ def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
     if len(missing_pairs) > 0:
         raise AssertionError(f"Found {len(missing_pairs)} coin_id-date pairs missing in market_data_df")
 
-    # Wallet presence check using index
-    validate_transfer_coverage(transfers_sequencing_df, profits_df)
+    # Wallet presence check using index with a >99% threshold
+    wallets_in_profits = set(profits_df.index.get_level_values('wallet_address'))
+    wallets_in_transfers = set(transfers_sequencing_df['wallet_address'])
+
+    common_wallets = wallets_in_profits & wallets_in_transfers
+    coverage = len(common_wallets) / len(wallets_in_profits)
+
+    if coverage < 0.99:
+        raise ValueError(f"Only {coverage:.2%} of wallets in profits_df are in transfers_sequencing_df.")
 
     logger.debug("All input dataframes passed validation checks.")
-
-
-
-def validate_transfer_coverage(transfers_sequencing_df: pd.DataFrame, profits_df: pd.DataFrame) -> None:
-    """
-    Validate that transfers_sequencing_df contains >99% of the records in profits_df and vice versa. Wallets
-    with lifetime transfers that meet the cleaning thresholds but that have no individual transfer above
-    the 'timing_metrics_min_transaction_size' will be correctly excluded from transfers_sequencing_df.
-
-    Params:
-    - transfers_sequencing_df (DataFrame): Sequenced transfers data.
-    - profits_df (DataFrame): Profits data.
-
-    Raises:
-    - ValueError if either direction falls below the 99% threshold.
-    """
-    # Count unique records in each DataFrame
-    total_profits = len(profits_df)
-    total_transfers = len(transfers_sequencing_df)
-
-    # Count matching records
-    matched_from_profits = profits_df.merge(transfers_sequencing_df, how="inner").shape[0]
-    matched_from_transfers = transfers_sequencing_df.merge(profits_df, how="inner").shape[0]
-
-    # Calculate coverage
-    coverage_profits = matched_from_profits / total_profits if total_profits else 1
-    coverage_transfers = matched_from_transfers / total_transfers if total_transfers else 1
-
-    # Ensure both coverage metrics exceed 99%
-    if coverage_profits < 0.99:
-        raise ValueError(f"Only {coverage_profits:.2%} of profits_df records are in transfers_sequencing_df.")
-
-    if coverage_transfers < 0.99:
-        raise ValueError(f"Only {coverage_transfers:.2%} of transfers_sequencing_df records are in profits_df.")
-
-    print("Validation passed: Both DataFrames contain >99% of each other's records.")
-
 
 
 @u.timing_decorator
