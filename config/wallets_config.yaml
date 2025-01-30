@@ -8,7 +8,7 @@ training_data:
     training_window_starts: [
         # '2020-01-01',
         # '2021-01-01',
-        # '2022-01-01',
+        '2022-01-01',
         '2023-01-01',
         # '2023-06-01',
         # '2023-09-01',
@@ -353,23 +353,20 @@ modeling:
                 # [scenario|*],
                 # [scenario|buy_delay_wtd_performance|*],
 
-                # [balance|*],
-                [balance|coin_fraction_std|*],
-                [balance|concentration_index|*],
-                # [balance|largest_coin_frac|*],
-                [balance|largest_coin_usd|*],
-                [balance|median_coin_frac|*],
-                [balance|min_coin_frac|*],
-                [balance|n_coins|*],
-                [balance|total_usd_balance|*],
+                # # [balance|*],
+                # [balance|coin_fraction_std|*],
+                # [balance|concentration_index|*],
+                # # [balance|largest_coin_frac|*],
+                # [balance|largest_coin_usd|*],
+                # [balance|median_coin_frac|*],
+                # [balance|min_coin_frac|*],
+                # [balance|n_coins|*],
+                # [balance|total_usd_balance|*],
 
                 # [cluster|*],
 
-                # [*|w1],
-                # [*|w2],
-                # [*|w3],
-                # [*|w4],
-                # [*|all_windows],
+                ['*|w1'],
+
             ]
 
 

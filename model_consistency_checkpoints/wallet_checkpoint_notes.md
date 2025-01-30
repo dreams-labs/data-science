@@ -1,3 +1,86 @@
+# dda 624 multithread wallet windows
+checkpoint 1: w.713 working multithreading
+Model Performance Summary
+===================================
+Test Samples:             69,961
+Number of Features:       155
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.713
+RMSE:                     0.189
+MAE:                      0.095
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.760
+RMSE:                     0.114
+MAE:                      0.063
+
+
+
+# dda 626 new coins
+checkpoint 2: w.712 add 2022-01-01 window w new coins
+Model Performance Summary
+===================================
+Test Samples:             69,961
+Number of Features:       155
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.712
+RMSE:                     0.189
+MAE:                      0.095
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.762
+RMSE:                     0.113
+MAE:                      0.063
+
+
+add 2022-01-01 window
+Model Performance Summary
+===================================
+Test Samples:             68,198
+Number of Features:       155
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.716
+RMSE:                     0.184
+MAE:                      0.093
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.778
+RMSE:                     0.107
+MAE:                      0.061
+
+
+checkpoint 1: w.692 base with eval+test set split
+Model Performance Summary
+===================================
+Test Samples:             56,708
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.692
+RMSE:                     0.209
+MAE:                      0.108
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.806
+RMSE:                     0.117
+MAE:                      0.063
+
+
 # dda 621 phase training
 base high performance
 12d/30w/5000n/.02lr/.005g
