@@ -118,6 +118,9 @@ features:
     clustering_include_pca: False
 
 
+    # Metaparams
+    max_workers: 12
+
 # CheckpointValidation
 # WalletModel Modeling Config
 modeling:
