@@ -25,6 +25,79 @@ wallets_config = WalletsConfig()
 
 
 
+def analyze_coin_model_importance(feature_importances):
+    """
+    Splits the coin model feature importance df into component columns.
+
+    Params:
+    - feature_importance (dict of lists of floats): Output of wallet_evaluator.metrics['importances'].
+        Includes lists ['feature'] and ['importance']
+
+    Returns:
+    - feature_details_df (df): df with columns for all column components along with importance
+    """
+    # Convert lists to df
+    feature_importances_df = pd.DataFrame(feature_importances)
+
+    # Split on pipe delimiters
+    split_df = feature_importances_df['feature'].str.split('|', expand=True)
+    split_df.columns = ['segment_category','segment_family','metric','transformation']
+
+    # Split nested components
+    segment_families = split_df['segment_family'].str.split('/', expand=True)
+    segment_families.columns = ['segment_family', 'segment_value']
+
+    metrics = split_df['metric'].str.split('/', expand=True)
+    metrics.columns = ['metric', 'metric_detail']
+
+    transformations = split_df['transformation'].str.split('/', expand=True)
+    transformations.columns = ['transformation', 'transformation_method']
+
+    # Combine all components
+    feature_details_df = pd.concat([
+        split_df['segment_category'],
+        segment_families,
+        metrics,
+        transformations,
+    ], axis=1)
+
+    feature_details_df['feature_full'] = feature_importances_df['feature']
+    feature_details_df['importance'] = feature_importances_df['importance']
+
+    return feature_details_df
+
+
+
+def calculate_tree_confidence(model, wallet_training_data_df: pd.DataFrame) -> pd.Series:
+    """
+    Calculate confidence scores using tree prediction variance.
+
+    Params:
+    - model (XGBRegressor): Trained XGBoost model
+    - wallet_training_data_df (DataFrame): Training data for the full wallet cohort
+
+    Returns:
+    - confidence_scores (Series): Confidence score per prediction
+
+    Adding to scores DataFrame:
+        modeling_wallet_scores_df[f'confidence|{score_name}'] = confidence_scores
+    """
+    # Get per-tree predictions
+    tree_preds = np.array([
+        model.predict(wallet_training_data_df, iteration_range=(i, i+1), output_margin=True)
+        for i in range(model.best_iteration)
+    ]).T
+
+    # Calculate confidence using prediction variance
+    confidence_scores = pd.Series(
+        1 - np.std(tree_preds, axis=1) / np.mean(tree_preds, axis=1),
+        index=wallet_training_data_df.index
+    )
+
+    return confidence_scores
+
+
+
 def calculate_validation_metrics(X_test, y_pred, validation_profits_df, n_buckets=20, method='score_buckets'):
     """
     Params:
