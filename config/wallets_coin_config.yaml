@@ -76,10 +76,10 @@ coin_modeling:
     max_market_cap: 999350_000_000  # coins above this market cap will not be included in performance assessments
 
     # Target variable parameters
-    # target_variable: coin_return_winsorized
+    target_variable: coin_return_winsorized
     # target_variable: coin_return_pctile_full
-    target_variable: coin_return_pctile
-    returns_winsorization: 0.01
+    # target_variable: coin_return_pctile
+    returns_winsorization: 0.1
 
     # Train/Test/Eval split
     test_size: 0.2  # what % of the total population will be used as test
