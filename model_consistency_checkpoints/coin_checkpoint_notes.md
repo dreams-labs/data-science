@@ -1,4 +1,18 @@
 # dda 607 coin model more features
+checkpoint 3: c.166 min 25 wallets
+Model Performance Summary
+===================================
+Test Samples:             458
+Number of Features:       105
+Features per Window:      0
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.166
+RMSE:                     0.261
+MAE:                      0.220
+
+
 checkpoint 2: c.146 filter score segments
 Model Performance Summary
 ===================================

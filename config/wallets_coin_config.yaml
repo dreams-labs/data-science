@@ -35,7 +35,7 @@ wallet_segments:
     wallet_scores_residuals_segments: False
     wallet_scores_confidence_segments: False
 
-    # score_segment_quantiles: [0.1, 0.5, 0.9]  # higher is better; how to assign wallet a score segment
+    # score_segment_quantiles: [0.15, 0.85]  # higher is better; how to assign wallet a score segment
     score_segment_quantiles: [0.05, 0.15, 0.5, 0.85, 0.95]  # higher is better; how to assign wallet a score segment
     training_period_cluster_groups: [4]  # which n clusters assignment from the training period to segment by
 
@@ -68,7 +68,7 @@ wallet_features:
 coin_modeling:
 
     # Thresholds for coin inclusion in training data
-    min_cohort_wallets: 20  # how many wallets must hold a coin for the coin to be elegible for forecasting
+    min_cohort_wallets: 25  # how many wallets must hold a coin for the coin to be elegible for forecasting
     min_cohort_balance: 10  # how much USD all wallets must hold for the coin to be elegible for forecasting
 
     # Thresholds for coin inclusion in training data
@@ -102,6 +102,7 @@ coin_modeling:
             score_quantile|*_residual*,
             # net_flows_max_investment_dda619_grid_residual*,
             # net_flows_max_investment_dda619_grid_residual*,
+            # score_quantile|net_gain_max_investment_winsorized_base_score/15_85pct|*,
             # score_quantile|net_gain_max_investment_winsorized_base_score/0_5pct|*,
             # score_quantile|net_gain_max_investment_winsorized_base_score/5_15pct|*,
             score_quantile|net_gain_max_investment_winsorized_base_score/15_50pct|*,
@@ -134,7 +135,7 @@ coin_modeling:
             '*|trading/max_investment|*',
             '*|trading/total_volume|*',
             # '*|trading/unique_coins_traded|*',
-            '*|balance/usd_balance_241031|*',
+            # '*|balances/usd_balance_241031|*',
 
 
             # Transformations
@@ -165,12 +166,14 @@ coin_modeling:
     # CoinModel Params
     model_type: xgb
     model_params:
-        n_estimators: 200
+        n_estimators: 400
         max_depth: 5
         min_child_weight: 20
-        learning_rate: 0.02
+        learning_rate: 0.01
+        colsample_bytree: 1.0
         subsample: 1.0
-        gamma: 0.00
+        gamma: 0.05
+        max_bin: 256
         early_stopping_rounds: 20
         eval_metric: rmse
 
@@ -201,8 +204,8 @@ coin_modeling:
         param_grid:
 
             # # Depth and Child Weight
-            # regressor__max_depth: [3,4,5,6]
-            # regressor__min_child_weight: [10,15,20]
+            regressor__max_depth: [3,4,5,6]
+            regressor__min_child_weight: [10,15,20]
 
             # Col/Row Sampling
             # regressor__subsample: [0.5, .6, .7, .8, .9, 1.0]
