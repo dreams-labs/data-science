@@ -27,16 +27,17 @@ wallet_segments:
     # Scores to include as segments + metrics
     wallet_scores_path: temp/wallet_modeling_score_dfs
     wallet_scores: [
-        net_gain_winsorized_dda619_grid,
-        net_flows_max_investment_dda619_grid,
-        net_gain_dda619_grid,
+        net_gain_max_investment_winsorized_base
+        # net_gain_winsorized_dda619_grid,
+        # net_flows_max_investment_dda619_grid,
+        # net_gain_dda619_grid,
     ]
     wallet_scores_residuals_segments: False
     wallet_scores_confidence_segments: False
 
     score_segment_quantiles: [0.1, 0.5, 0.9]  # higher is better; how to assign wallet a score segment
     # score_segment_quantiles: [0.05, 0.15, 0.5, 0.85, 0.95]  # higher is better; how to assign wallet a score segment
-    # training_period_cluster_groups: [2]  # which n clusters assignment from the training period to segment by
+    training_period_cluster_groups: [2]  # which n clusters assignment from the training period to segment by
 
     # where to save local files
     parquet_folder: temp/coin_modeling_dfs
@@ -98,13 +99,16 @@ coin_modeling:
             all_wallets*,
 
             # score_quantile|*,
-            score_quantile|net_gain_winsorized_dda619_grid_residual*,
+            score_quantile|*_residual*,
             # net_flows_max_investment_dda619_grid_residual*,
             # net_flows_max_investment_dda619_grid_residual*,
 
             # time_series|*,
 
             # wallet_cohorts|*,
+
+            # training_clusters|*,
+
 
 
             # Metrics
@@ -206,7 +210,7 @@ coin_modeling:
             regressor__n_jobs: [4]  # how many models to build at once
             regressor__nthread: [4]  # how many threads each model can use
             # regressor__max_bin: [128]
-            regressor__tree_method: [hist]
+            # regressor__tree_method: [hist]
 
             drop_columns__drop_patterns: [
                 [],
@@ -223,20 +227,22 @@ coin_modeling:
             #     # ['*|trading/unique_coins_traded|*'],
             #     ['*|balance/usd_balance_241031|*'],
 
-                # ['*|score_dist/*'],
-                ['*|score_dist/net_gain_winsorized_dda619_grid_score_median'],
-                # ['*|score_dist/net_gain_winsorized_dda619_grid_score_p10'],
-                ['*|score_dist/net_gain_winsorized_dda619_grid_score_p90'],
-                ['*|score_dist/net_gain_winsorized_dda619_grid_score_std'],
-                ['*|score_dist/net_gain_winsorized_dda619_grid_residual_median'],
-                ['*|score_dist/net_gain_winsorized_dda619_grid_residual_p10'],
-                ['*|score_dist/net_gain_winsorized_dda619_grid_residual_p90'],
-                ['*|score_dist/net_gain_winsorized_dda619_grid_residual_std'],
+                # # ['*|score_dist/*'],
+                # ['*|score_dist/net_gain_winsorized_dda619_grid_score_median'],
+                # # ['*|score_dist/net_gain_winsorized_dda619_grid_score_p10'],
+                # ['*|score_dist/net_gain_winsorized_dda619_grid_score_p90'],
+                # ['*|score_dist/net_gain_winsorized_dda619_grid_score_std'],
+                # ['*|score_dist/net_gain_winsorized_dda619_grid_residual_median'],
+                # ['*|score_dist/net_gain_winsorized_dda619_grid_residual_p10'],
+                # ['*|score_dist/net_gain_winsorized_dda619_grid_residual_p90'],
+                # ['*|score_dist/net_gain_winsorized_dda619_grid_residual_std'],
 
+                ['training_clusters|k2_cluster/cluster_1|*'],
+                ['training_clusters|k2_cluster/cluster_0|*'],
             ]
 
 
 
 
     # Coin model workflow params
-    score_name: iterating  # reference name for feature columns etc
+    score_name: net_gain_max_investment_winsorized_base  # reference name for feature columns etc
