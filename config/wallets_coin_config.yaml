@@ -35,9 +35,9 @@ wallet_segments:
     wallet_scores_residuals_segments: False
     wallet_scores_confidence_segments: False
 
-    score_segment_quantiles: [0.1, 0.5, 0.9]  # higher is better; how to assign wallet a score segment
-    # score_segment_quantiles: [0.05, 0.15, 0.5, 0.85, 0.95]  # higher is better; how to assign wallet a score segment
-    training_period_cluster_groups: [2]  # which n clusters assignment from the training period to segment by
+    # score_segment_quantiles: [0.1, 0.5, 0.9]  # higher is better; how to assign wallet a score segment
+    score_segment_quantiles: [0.05, 0.15, 0.5, 0.85, 0.95]  # higher is better; how to assign wallet a score segment
+    training_period_cluster_groups: [4]  # which n clusters assignment from the training period to segment by
 
     # where to save local files
     parquet_folder: temp/coin_modeling_dfs
@@ -102,13 +102,24 @@ coin_modeling:
             score_quantile|*_residual*,
             # net_flows_max_investment_dda619_grid_residual*,
             # net_flows_max_investment_dda619_grid_residual*,
+            # score_quantile|net_gain_max_investment_winsorized_base_score/0_5pct|*,
+            # score_quantile|net_gain_max_investment_winsorized_base_score/5_15pct|*,
+            score_quantile|net_gain_max_investment_winsorized_base_score/15_50pct|*,
+            score_quantile|net_gain_max_investment_winsorized_base_score/50_85pct|*,
+            score_quantile|net_gain_max_investment_winsorized_base_score/85_95pct|*,
+            # score_quantile|net_gain_max_investment_winsorized_base_score/95_100pct|*,
 
             # time_series|*,
 
             # wallet_cohorts|*,
 
             # training_clusters|*,
-
+            training_clusters|k2_cluster/cluster_0|*,
+            training_clusters|k2_cluster/cluster_1|*,
+            training_clusters|k4_cluster/cluster_0|*,
+            training_clusters|k4_cluster/cluster_1|*,
+            # training_clusters|k4_cluster/cluster_2|*,
+            # training_clusters|k4_cluster/cluster_3|*,
 
 
             # Metrics
@@ -176,7 +187,7 @@ coin_modeling:
         # -------------------------------
 
         # Search Methodology
-        # drop_patterns_include_n_features: 1
+        drop_patterns_include_n_features: 1
 
         n_iter: 400  # random search limit
         n_splits: 4  # cv splits
@@ -214,6 +225,14 @@ coin_modeling:
 
             drop_columns__drop_patterns: [
                 [],
+
+                [score_quantile|net_gain_max_investment_winsorized_base_score/0_5pct|*],
+                [score_quantile|net_gain_max_investment_winsorized_base_score/5_15pct|*],
+                [score_quantile|net_gain_max_investment_winsorized_base_score/15_50pct|*],
+                [score_quantile|net_gain_max_investment_winsorized_base_score/50_85pct|*],
+                [score_quantile|net_gain_max_investment_winsorized_base_score/85_95pct|*],
+                [score_quantile|net_gain_max_investment_winsorized_base_score/95_100pct|*],
+
             #     # [],
             #     ['*|trading/crypto_cash_buys|*'],
             #     ['*|trading/crypto_cash_sells|*'],
@@ -237,8 +256,12 @@ coin_modeling:
                 # ['*|score_dist/net_gain_winsorized_dda619_grid_residual_p90'],
                 # ['*|score_dist/net_gain_winsorized_dda619_grid_residual_std'],
 
-                ['training_clusters|k2_cluster/cluster_1|*'],
-                ['training_clusters|k2_cluster/cluster_0|*'],
+                # ['training_clusters|k2_cluster/cluster_0|*'],
+                # ['training_clusters|k2_cluster/cluster_1|*'],
+                # ['training_clusters|k4_cluster/cluster_0|*'],
+                # ['training_clusters|k4_cluster/cluster_1|*'],
+                # ['training_clusters|k4_cluster/cluster_2|*'],
+                # ['training_clusters|k4_cluster/cluster_3|*'],
             ]
 
 
