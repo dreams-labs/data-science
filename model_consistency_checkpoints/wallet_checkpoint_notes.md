@@ -1,3 +1,24 @@
+# dda 607 coin model features
+checkpoint 1: w.693 back to base case
+Model Performance Summary
+===================================
+Test Samples:             57,955
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.693
+RMSE:                     0.212
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.776
+RMSE:                     0.129
+MAE:                      0.069
+
+
 # dda 627 softer coin filters
 max_gap_days: 20
 Removed 666 coins (563 for gaps, 175 for volume) and 536951 total records.
