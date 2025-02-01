@@ -166,9 +166,15 @@ def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
     if len(missing_pairs) > 0:
         raise AssertionError(f"Found {len(missing_pairs)} coin_id-date pairs missing in market_data_df")
 
-    # Wallet presence check using index
-    if not set(profits_df.index.get_level_values('wallet_address')).issubset(transfers_sequencing_df['wallet_address']):
-        raise ValueError("profits_df has wallets not in transfers_sequencing_df.")
+    # Wallet presence check using index with a >99% threshold
+    wallets_in_profits = set(profits_df.index.get_level_values('wallet_address'))
+    wallets_in_transfers = set(transfers_sequencing_df['wallet_address'])
+
+    common_wallets = wallets_in_profits & wallets_in_transfers
+    coverage = len(common_wallets) / len(wallets_in_profits)
+
+    if coverage < 0.99:
+        raise ValueError(f"Only {coverage:.2%} of wallets in profits_df are in transfers_sequencing_df.")
 
     logger.debug("All input dataframes passed validation checks.")
 

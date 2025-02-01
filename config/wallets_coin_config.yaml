@@ -82,7 +82,7 @@ coin_modeling:
     returns_winsorization: 0.1
 
     # Train/Test/Eval split
-    test_size: 0.2  # what % of the total population will be used as test
+    test_size: 0.1  # what % of the total population will be used as test
     eval_size: 0.05  # what % used for the early stopping eval set
 
 
