@@ -1,4 +1,25 @@
 # dda 615 index passthrough
+checkpoint 6: w.691 speed up validate_inputs
+Model Performance Summary
+===================================
+Test Samples:             57,955
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.691
+RMSE:                     0.213
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.783
+RMSE:                     0.127
+MAE:                      0.068
+
+
+
 checkpoint 5: w.691 ensure_index in prepare_dataframes()
 Model Performance Summary
 ===================================
