@@ -72,8 +72,8 @@ coin_modeling:
     min_cohort_balance: 10  # how much USD all wallets must hold for the coin to be elegible for forecasting
 
     # Thresholds for coin inclusion in training data
-    min_market_cap: 00_000  # coins below this market cap will not be included in performance assessments
-    max_market_cap: 999350_000_000  # coins above this market cap will not be included in performance assessments
+    min_market_cap: 000_000  # coins below this market cap will not be included in performance assessments
+    max_market_cap: 999150_000_000  # coins above this market cap will not be included in performance assessments
 
     # Target variable parameters
     target_variable: coin_return_winsorized
@@ -110,9 +110,6 @@ coin_modeling:
             score_quantile|net_gain_max_investment_winsorized_base_score/85_95pct|*,
             # score_quantile|net_gain_max_investment_winsorized_base_score/95_100pct|*,
 
-            # time_series|*,
-
-            # wallet_cohorts|*,
 
             # training_clusters|*,
             training_clusters|k2_cluster/cluster_0|*,
@@ -122,6 +119,44 @@ coin_modeling:
             # training_clusters|k4_cluster/cluster_2|*,
             # training_clusters|k4_cluster/cluster_3|*,
 
+            # time_series|*,
+            time_series|market_data|market_cap_last,
+            time_series|market_data|mfi_first,
+            time_series|market_data|mfi_last,
+            time_series|market_data|obv_last,
+            time_series|market_data|price_rsi_14_first,
+            # time_series|market_data|price_rsi_14_last,
+            time_series|market_data|price_sma_5_pct_change_15d_period_1,
+            time_series|market_data|price_sma_5_pct_change_15d_period_2,
+            time_series|market_data|price_sma_5_pct_change_15d_period_3,
+            time_series|market_data|price_sma_5_pct_change_15d_period_4,
+            time_series|market_data|volume_pct_change_15d_period_1,
+            time_series|market_data|volume_pct_change_15d_period_2,
+            # time_series|market_data|volume_pct_change_15d_period_3,
+            # time_series|market_data|volume_pct_change_15d_period_4,
+            time_series|market_data|volume_sum_15d_period_1,
+            time_series|market_data|volume_sum_15d_period_2,
+            time_series|market_data|volume_sum_15d_period_3,
+            time_series|market_data|volume_sum_15d_period_4,
+
+            # wallet_cohorts|*,
+            wallet_cohorts|normies|buyers_new_sum_15d_period_1,
+            wallet_cohorts|normies|buyers_new_sum_15d_period_2,
+            wallet_cohorts|normies|total_balance_last_15d_period_1,
+            wallet_cohorts|normies|total_balance_last_15d_period_2,
+            wallet_cohorts|normies|total_bought_sum_15d_period_1,
+            wallet_cohorts|normies|total_bought_sum_15d_period_2,
+            wallet_cohorts|normies|total_holders_last_15d_period_1,
+            wallet_cohorts|normies|total_holders_last_15d_period_2,
+            wallet_cohorts|normies|total_sold_sum_15d_period_1,
+            wallet_cohorts|normies|total_sold_sum_15d_period_2,
+            wallet_cohorts|whales|buyers_new_sum,
+            # wallet_cohorts|whales|buyers_repeat_sum_15d_period_1,
+            # wallet_cohorts|whales|buyers_repeat_sum_15d_period_2,
+            wallet_cohorts|whales|total_balance_last_15d_period_1,
+            wallet_cohorts|whales|total_balance_last_15d_period_2,
+            wallet_cohorts|whales|total_bought_sum_15d_period_1,
+            wallet_cohorts|whales|total_bought_sum_15d_period_2,
 
             # Metrics
             # -------
@@ -154,6 +189,9 @@ coin_modeling:
             # '*|score_dist/net_gain_winsorized_dda619_grid_residual_p10',
             # '*|score_dist/net_gain_winsorized_dda619_grid_residual_p90',
             # '*|score_dist/net_gain_winsorized_dda619_grid_residual_std',
+            # '*|score_wtd/*',
+            '*_score_median',
+            # '*_score_p90'
         ]
 
         # Correlation/variance-based removal
@@ -167,12 +205,12 @@ coin_modeling:
     model_type: xgb
     model_params:
         n_estimators: 400
-        max_depth: 5
-        min_child_weight: 20
-        learning_rate: 0.01
+        max_depth: 3
+        min_child_weight: 10
+        learning_rate: 0.02
         colsample_bytree: 1.0
         subsample: 1.0
-        gamma: 0.05
+        gamma: 0.02
         max_bin: 256
         early_stopping_rounds: 20
         eval_metric: rmse
@@ -205,7 +243,7 @@ coin_modeling:
 
             # # Depth and Child Weight
             regressor__max_depth: [3,4,5,6]
-            regressor__min_child_weight: [10,15,20]
+            regressor__min_child_weight: [10,15,20,25]
 
             # Col/Row Sampling
             # regressor__subsample: [0.5, .6, .7, .8, .9, 1.0]
@@ -226,15 +264,51 @@ coin_modeling:
             # regressor__max_bin: [128]
             # regressor__tree_method: [hist]
 
-            drop_columns__drop_patterns: [
-                [],
+            # drop_columns__drop_patterns: [
+                # [],
+                # [time_series|market_data|market_cap_last],
+                # [time_series|market_data|mfi_first],
+                # [time_series|market_data|mfi_last],
+                # [time_series|market_data|obv_last],
+                # [time_series|market_data|price_rsi_14_first],
+                # [time_series|market_data|price_rsi_14_last],
+                # [time_series|market_data|price_sma_5_pct_change_15d_period_1],
+                # [time_series|market_data|price_sma_5_pct_change_15d_period_2],
+                # [time_series|market_data|price_sma_5_pct_change_15d_period_3],
+                # [time_series|market_data|price_sma_5_pct_change_15d_period_4],
+                # [time_series|market_data|volume_pct_change_15d_period_1],
+                # [time_series|market_data|volume_pct_change_15d_period_2],
+                # [time_series|market_data|volume_pct_change_15d_period_3],
+                # [time_series|market_data|volume_pct_change_15d_period_4],
+                # [time_series|market_data|volume_sum_15d_period_1],
+                # [time_series|market_data|volume_sum_15d_period_2],
+                # [time_series|market_data|volume_sum_15d_period_3],
+                # [time_series|market_data|volume_sum_15d_period_4],
+                # [wallet_cohorts|normies|buyers_new_sum_15d_period_1],
+                # [wallet_cohorts|normies|buyers_new_sum_15d_period_2],
+                # # [wallet_cohorts|normies|total_balance_last_15d_period_1],
+                # [wallet_cohorts|normies|total_balance_last_15d_period_2],
+                # [wallet_cohorts|normies|total_bought_sum_15d_period_1],
+                # [wallet_cohorts|normies|total_bought_sum_15d_period_2],
+                # [wallet_cohorts|normies|total_holders_last_15d_period_1],
+                # [wallet_cohorts|normies|total_holders_last_15d_period_2],
+                # [wallet_cohorts|normies|total_sold_sum_15d_period_1],
+                # [wallet_cohorts|normies|total_sold_sum_15d_period_2],
+                # [wallet_cohorts|whales|buyers_new_sum],
+                # [wallet_cohorts|whales|buyers_repeat_sum_15d_period_1],
+                # [wallet_cohorts|whales|buyers_repeat_sum_15d_period_2],
+                # [wallet_cohorts|whales|total_balance_last_15d_period_1],
+                # [wallet_cohorts|whales|total_balance_last_15d_period_2],
+                # [wallet_cohorts|whales|total_bought_sum_15d_period_1],
+                # [wallet_cohorts|whales|total_bought_sum_15d_period_2],
 
-                [score_quantile|net_gain_max_investment_winsorized_base_score/0_5pct|*],
-                [score_quantile|net_gain_max_investment_winsorized_base_score/5_15pct|*],
-                [score_quantile|net_gain_max_investment_winsorized_base_score/15_50pct|*],
-                [score_quantile|net_gain_max_investment_winsorized_base_score/50_85pct|*],
-                [score_quantile|net_gain_max_investment_winsorized_base_score/85_95pct|*],
-                [score_quantile|net_gain_max_investment_winsorized_base_score/95_100pct|*],
+
+                # [score_quantile|net_gain_max_investment_winsorized_base_score/0_5pct|*],
+                # [score_quantile|net_gain_max_investment_winsorized_base_score/5_15pct|*],
+                # [score_quantile|net_gain_max_investment_winsorized_base_score/15_50pct|*],
+                # [score_quantile|net_gain_max_investment_winsorized_base_score/50_85pct|*],
+                # [score_quantile|net_gain_max_investment_winsorized_base_score/85_95pct|*],
+                # [score_quantile|net_gain_max_investment_winsorized_base_score/95_100pct|*],
 
             #     # [],
             #     ['*|trading/crypto_cash_buys|*'],
@@ -265,7 +339,7 @@ coin_modeling:
                 # ['training_clusters|k4_cluster/cluster_1|*'],
                 # ['training_clusters|k4_cluster/cluster_2|*'],
                 # ['training_clusters|k4_cluster/cluster_3|*'],
-            ]
+            # ]
 
 
 
