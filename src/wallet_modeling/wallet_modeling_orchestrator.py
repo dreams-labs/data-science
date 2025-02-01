@@ -490,7 +490,7 @@ def split_training_window_profits_dfs(training_profits_df,training_market_data_d
                                                                         n_threads=1)
 
     # Split profits_df into training windows
-    # training_windows_profits_df = u.ensure_index(training_windows_profits_df)
+    training_windows_profits_df = u.ensure_index(training_windows_profits_df)
     training_windows_profits_dfs = wtd.split_training_window_dfs(training_windows_profits_df)
 
     return training_windows_profits_dfs

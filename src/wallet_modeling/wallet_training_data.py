@@ -216,17 +216,16 @@ def generate_training_window_imputation_dates() -> List[datetime]:
 
 
 
-def split_training_window_dfs(training_profits_df):
+def split_training_window_dfs(training_profits_df: pd.DataFrame) -> List[pd.DataFrame]:
     """
-    Splits the full profits_df into separate dfs for each training window
+    Splits the full profits_df into separate dfs for each training window.
+    Input df must have MultiIndex on (coin_id, wallet_address, date).
 
     Params:
-    - windows_profits_df (df): dataframe containing profits data for the full training period, with imputed rows
-        for each period window start and end
+    - training_profits_df (DataFrame): MultiIndexed df containing profits data
 
     Returns:
-    - training_windows_dfs (list of dfs): list of profits_dfs for each training window
-
+    - training_windows_dfs (list of DataFrames): list of profits_dfs for each window
     """
     logger.debug("Generating window-specific profits_dfs...")
 
@@ -244,31 +243,31 @@ def split_training_window_dfs(training_profits_df):
 
     # Generate starting balance dates for each period
     training_windows_starting_balance_dates = (
-        [training_windows_starts[0] - timedelta(days=1)] # The day before the first window start
-        + training_windows_ends[:-1] # the end date of one window is the starting balance date of the next
+        [training_windows_starts[0] - timedelta(days=1)]  # The day before the first window start
+        + training_windows_ends[:-1]  # the end date of one window is the starting balance date of the next
     )
 
     # Create array of DataFrames for each training period
     training_windows_profits_dfs = []
     for start_bal_date, end_date in zip(training_windows_starting_balance_dates, training_windows_ends):
-
         # Filter to between the starting balance date and end date
         window_df = training_profits_df[
-            (training_profits_df['date'] >= start_bal_date) & (training_profits_df['date'] <= end_date)
+            (training_profits_df.index.get_level_values('date') >= start_bal_date) &
+            (training_profits_df.index.get_level_values('date') <= end_date)
         ]
 
-        # Override records on the starting balance date to remove transfers
-        mask = window_df['date'] == start_bal_date
-        columns_to_update = ['usd_net_transfers', 'usd_inflows', 'is_imputed']
-        values_to_set = [0, 0, True]
-        window_df.loc[mask, columns_to_update] = values_to_set
+        # Override records on starting balance date using MultiIndex
+        start_date_idx = window_df.index[
+            window_df.index.get_level_values('date') == start_bal_date
+        ]
+        window_df.loc[start_date_idx, ['usd_net_transfers', 'usd_inflows', 'is_imputed']] = [0, 0, True]
 
         # Confirm the period boundaries are handled correctly
         start_date = start_bal_date + timedelta(days=1)
         u.assert_period(window_df, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
         training_windows_profits_dfs.append(window_df)
 
-    # Confirm that all window dfs' USD transfers add up to the USD transfers in the full training period
+    # Confirm that all window dfs' USD transfers add up to the full training period
     full_sum = training_profits_df['usd_net_transfers'].sum()
     window_sum = sum(df['usd_net_transfers'].sum() for df in training_windows_profits_dfs)
     if not np.isclose(full_sum, window_sum, rtol=1e-5):
@@ -279,12 +278,12 @@ def split_training_window_dfs(training_profits_df):
     for i, df in enumerate(training_windows_profits_dfs):
         logger.debug("Training Window %s (%s to %s): %s",
                     i + 1,
-                    df['date'].min().strftime('%Y-%m-%d'),
-                    df['date'].max().strftime('%Y-%m-%d'),
+                    df.index.get_level_values('date').min().strftime('%Y-%m-%d'),
+                    df.index.get_level_values('date').max().strftime('%Y-%m-%d'),
                     df.shape)
     logger.debug("Training Period (%s to %s): %s",
-                training_profits_df['date'].min().strftime('%Y-%m-%d'),
-                training_profits_df['date'].max().strftime('%Y-%m-%d'),
+                training_profits_df.index.get_level_values('date').min().strftime('%Y-%m-%d'),
+                training_profits_df.index.get_level_values('date').max().strftime('%Y-%m-%d'),
                 training_profits_df.shape)
 
     return training_windows_profits_dfs

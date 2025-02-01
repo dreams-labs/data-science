@@ -1,5 +1,25 @@
 # dda 615 index passthrough
-checkpoint 3: w691 restyle
+checkpoint 4: w.691 indexify split_training_window_profits_dfs
+Model Performance Summary
+===================================
+Test Samples:             57,955
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.691
+RMSE:                     0.213
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.783
+RMSE:                     0.127
+MAE:                      0.068
+
+
+checkpoint 3: w.691 restyle
 Model Performance Summary
 ===================================
 Test Samples:             57,955
