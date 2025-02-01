@@ -438,13 +438,13 @@ def define_training_wallet_cohort(profits_df: pd.DataFrame,
 
     # Impute the training period end (training period start is pre-imputed into profits_df generation)
     imputed_profits_df = pri.impute_profits_for_multiple_dates(profits_df, market_data_df,
-                                                               [training_period_end], n_threads=24)
+                                                               [training_period_end], n_threads=24,
+                                                               reset_index=False)
 
     # Create a training period only profits_df
-    training_profits_df = (
-        imputed_profits_df[imputed_profits_df['date'] <= training_period_end]
-        .copy()
-    )
+    training_profits_df = imputed_profits_df[
+        imputed_profits_df.index.get_level_values('date') <= training_period_end
+    ].copy()
 
     # Confirm valid dates for training period
     u.assert_period(profits_df, training_period_start, training_period_end)
@@ -468,7 +468,9 @@ def define_training_wallet_cohort(profits_df: pd.DataFrame,
                 len(training_wallet_cohort), time.time()-start_time)
 
     # Create a profits_df that only includes the wallet cohort
-    training_cohort_profits_df = training_profits_df[training_profits_df['wallet_address'].isin(training_wallet_cohort)]
+    training_cohort_profits_df = training_profits_df[
+        training_profits_df.index.get_level_values('wallet_address').isin(training_wallet_cohort)
+    ]
 
     return training_cohort_profits_df, training_wallet_cohort
 
@@ -480,14 +482,16 @@ def split_training_window_profits_dfs(training_profits_df,training_market_data_d
     Adds imputed rows at the start and end date of all windows
     """
     # Filter to only wallet cohort
-    cohort_profits_df = training_profits_df[training_profits_df['wallet_address'].isin(wallet_cohort)]
+    cohort_profits_df = training_profits_df[
+        training_profits_df.index.get_level_values('wallet_address').isin(wallet_cohort)
+    ]
 
     # Impute all training window dates
     training_window_boundary_dates = wtd.generate_training_window_imputation_dates()
     training_windows_profits_df = pri.impute_profits_for_multiple_dates(cohort_profits_df,
                                                                         training_market_data_df,
                                                                         training_window_boundary_dates,
-                                                                        n_threads=1)
+                                                                        n_threads=24, reset_index=False)
 
     # Split profits_df into training windows
     training_windows_profits_df = u.ensure_index(training_windows_profits_df)
