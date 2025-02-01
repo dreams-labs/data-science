@@ -204,7 +204,8 @@ def create_cluster_report(modeling_df: pd.DataFrame,
     base_metrics = [
         'trading|max_investment|all_windows',
         'trading|crypto_net_gain|all_windows',
-        'mktcap|end_portfolio_wtd_market_cap|all_windows',
+        'mktcap|end_portfolio_wtd_market_cap/market_cap_unadj|all_windows',
+        'mktcap|end_portfolio_wtd_market_cap/market_cap_filled|all_windows',
         'performance|crypto_net_gain/max_investment/base|all_windows',
     ]
     cluster_cols = [col for col in modeling_df.columns if col.startswith('cluster|')]

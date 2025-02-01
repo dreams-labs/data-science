@@ -8,7 +8,7 @@ training_data:
     training_window_starts: [
         # '2020-01-01',
         # '2021-01-01',
-        '2022-01-01',
+        # '2022-01-01',
         '2023-01-01',
         '2023-06-01',
         # '2023-09-01',
@@ -312,8 +312,8 @@ modeling:
             # regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            # regressor__n_estimators: [800]
-            # regressor__learning_rate: [0.05]
+            regressor__n_estimators: [250]
+            regressor__learning_rate: [0.05]
             # regressor__gamma: [0.01]
 
             # Optimize for Speed
@@ -366,9 +366,9 @@ modeling:
             #     # [balance|n_coins|*],
             #     # [balance|total_usd_balance|*],
 
-            #     # [cluster|*],
+                # [cluster|*],
 
-            #     # ['*|w1'],
+                ['*|w1'],
 
             # ]
 
