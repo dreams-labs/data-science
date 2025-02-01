@@ -611,8 +611,17 @@ def df_downcast(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
     - DataFrame: Optimized dataframe
     """
+    start_time = time.time()
+
     for col in df.columns:
         df = safe_downcast(df, col)
+
+    # Log duration
+    if time.time() - start_time >= 1:
+        logger.info('(%.1fs) Completed ensure_index.', time.time() - start_time)
+    else:
+        logger.debug('(%.1fs) Completed ensure_index.', time.time() - start_time)
+
     return df
 
 
@@ -754,11 +763,9 @@ def ensure_index(df: pd.DataFrame) -> pd.DataFrame:
 
     # Log duration
     if time.time() - start_time >= 1:
-        logger.info('(%.1fs) Completed ensure_index.',
-                    time.time() - start_time)
+        logger.info('(%.1fs) Completed ensure_index.', time.time() - start_time)
     else:
-        logger.debug('(%.1fs) Completed ensure_index.',
-                    time.time() - start_time)
+        logger.debug('(%.1fs) Completed ensure_index.', time.time() - start_time)
 
     return df
 
