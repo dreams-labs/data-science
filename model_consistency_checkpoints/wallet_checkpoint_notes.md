@@ -1,3 +1,18 @@
+# dda 615 index passthrough
+checkpoint 1: w.693 base case
+Model Performance Summary
+===================================
+Test Samples:             57,955
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.693
+RMSE:                     0.212
+MAE:                      0.109
+
+
 # dda 607 coin model features
 checkpoint 1: w.693 back to base case
 Model Performance Summary
