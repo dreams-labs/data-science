@@ -78,7 +78,6 @@ def test_calculate_new_profits_values_normal_data(sample_profits_df, target_date
         target_date (datetime): Fixture providing a target date for imputation.
     """
     result = pri.calculate_new_profits_values(sample_profits_df, target_date)
-    result = result.set_index(['coin_id', 'wallet_address', 'date'])
 
     # Check if the result has the correct structure
     assert isinstance(result, pd.DataFrame)
@@ -135,7 +134,6 @@ def test_calculate_new_profits_values_zero_price_change(zero_price_change_df, ta
         target_date (datetime): Fixture providing a target date for imputation.
     """
     result = pri.calculate_new_profits_values(zero_price_change_df, target_date)
-    result = result.set_index(['coin_id', 'wallet_address', 'date'])
 
     # Check if the result has the correct structure
     assert isinstance(result, pd.DataFrame)
@@ -191,7 +189,6 @@ def test_calculate_new_profits_values_negative_price_change(negative_price_chang
         target_date (datetime): Fixture providing a target date for imputation.
     """
     result = pri.calculate_new_profits_values(negative_price_change_df, target_date)
-    result = result.set_index(['coin_id', 'wallet_address', 'date'])
 
     # Check if the result has the correct structure
     assert isinstance(result, pd.DataFrame)
@@ -255,7 +252,6 @@ def test_calculate_new_profits_values_zero_usd_balance(zero_usd_balance_df, targ
         target_date (datetime): Fixture providing a target date for imputation.
     """
     result = pri.calculate_new_profits_values(zero_usd_balance_df, target_date)
-    result = result.set_index(['coin_id', 'wallet_address', 'date'])
 
     # Check if calculations are correct for all rows
     for (coin_id, wallet_address), group in zero_usd_balance_df.groupby(['coin_id', 'wallet_address']):
@@ -311,7 +307,6 @@ def test_calculate_new_profits_values_multiple_coins_wallets(
         target_date (datetime): Fixture providing a target date for imputation.
     """
     result = pri.calculate_new_profits_values(multiple_coins_wallets_df, target_date)
-    result = result.set_index(['coin_id', 'wallet_address', 'date'])
 
     # Check if calculations are correct for all rows
     for (coin_id, wallet_address), group in multiple_coins_wallets_df.groupby(['coin_id', 'wallet_address']):
@@ -430,6 +425,7 @@ def test_impute_profits_df_rows_base_case(sample_profits_df_missing_dates,
     result = pri.impute_profits_df_rows(sample_profits_df_missing_dates,
                                        sample_prices_df_missing_dates,
                                        target_date)
+    result = result.reset_index()
 
     # Check output structure
     assert isinstance(result, pd.DataFrame)

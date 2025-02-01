@@ -187,12 +187,16 @@ def generate_training_features(
     - wallet_cohort: List of wallet addresses
     - parquet_folder: Location for parquet storage
     """
+    # Ensure index
+    profits_df = u.ensure_index(profits_df)
+    market_indicators_df = u.ensure_index(market_indicators_df)
+
     # Generate full period features
     logger.info("Generating features for full training period...")
     training_wallet_features_df = wfo.calculate_wallet_features(
-        profits_df,
-        market_indicators_df,
-        transfers_df,
+        profits_df.copy(),
+        market_indicators_df.copy(),
+        transfers_df.copy(),
         wallet_cohort,
         wallets_config['training_data']['training_period_start'],
         wallets_config['training_data']['training_period_end']
@@ -212,7 +216,7 @@ def generate_training_features(
     )
 
     # Prepare window data for parallel processing
-    window_data = [
+    windows_profits_tuples = [
         (window_df, i + 1)
         for i, window_df in enumerate(training_windows_profits_dfs)
     ]
@@ -223,13 +227,13 @@ def generate_training_features(
     with concurrent.futures.ThreadPoolExecutor(wallets_config['features']['max_workers']) as executor:
         futures = [
             executor.submit(
-                process_window,
-                data,
+                calculate_window_features,
+                profits_tuple,
                 market_indicators_df,
                 transfers_df,
                 wallet_cohort
             )
-            for data in window_data
+            for profits_tuple in windows_profits_tuples
         ]
 
         # Collect results as they complete
@@ -276,7 +280,7 @@ def generate_training_features(
 
 
 
-def process_window(
+def calculate_window_features(
     window_data: tuple,
     market_indicators_df: pd.DataFrame,
     transfers_df: pd.DataFrame,
@@ -296,10 +300,10 @@ def process_window(
     """
     window_profits_df, window_number = window_data
 
-    # Extract window dates
-    window_opening_balance_date = window_profits_df['date'].min()
+    # Extract window dates from MultiIndex
+    window_opening_balance_date = window_profits_df.index.get_level_values('date').min()
     window_start_date = window_opening_balance_date + timedelta(days=1)
-    window_end_date = window_profits_df['date'].max()
+    window_end_date = window_profits_df.index.get_level_values('date').max()
 
     # Calculate features for this window
     window_wallet_features_df = wfo.calculate_wallet_features(
@@ -434,13 +438,13 @@ def define_training_wallet_cohort(profits_df: pd.DataFrame,
 
     # Impute the training period end (training period start is pre-imputed into profits_df generation)
     imputed_profits_df = pri.impute_profits_for_multiple_dates(profits_df, market_data_df,
-                                                               [training_period_end], n_threads=24)
+                                                               [training_period_end], n_threads=24,
+                                                               reset_index=False)
 
     # Create a training period only profits_df
-    training_profits_df = (
-        imputed_profits_df[imputed_profits_df['date'] <= training_period_end]
-        .copy()
-    )
+    training_profits_df = imputed_profits_df[
+        imputed_profits_df.index.get_level_values('date') <= training_period_end
+    ].copy()
 
     # Confirm valid dates for training period
     u.assert_period(profits_df, training_period_start, training_period_end)
@@ -464,7 +468,9 @@ def define_training_wallet_cohort(profits_df: pd.DataFrame,
                 len(training_wallet_cohort), time.time()-start_time)
 
     # Create a profits_df that only includes the wallet cohort
-    training_cohort_profits_df = training_profits_df[training_profits_df['wallet_address'].isin(training_wallet_cohort)]
+    training_cohort_profits_df = training_profits_df[
+        training_profits_df.index.get_level_values('wallet_address').isin(training_wallet_cohort)
+    ]
 
     return training_cohort_profits_df, training_wallet_cohort
 
@@ -476,16 +482,19 @@ def split_training_window_profits_dfs(training_profits_df,training_market_data_d
     Adds imputed rows at the start and end date of all windows
     """
     # Filter to only wallet cohort
-    cohort_profits_df = training_profits_df[training_profits_df['wallet_address'].isin(wallet_cohort)]
+    cohort_profits_df = training_profits_df[
+        training_profits_df.index.get_level_values('wallet_address').isin(wallet_cohort)
+    ]
 
     # Impute all training window dates
     training_window_boundary_dates = wtd.generate_training_window_imputation_dates()
     training_windows_profits_df = pri.impute_profits_for_multiple_dates(cohort_profits_df,
                                                                         training_market_data_df,
                                                                         training_window_boundary_dates,
-                                                                        n_threads=1)
+                                                                        n_threads=24, reset_index=False)
 
     # Split profits_df into training windows
+    training_windows_profits_df = u.ensure_index(training_windows_profits_df)
     training_windows_profits_dfs = wtd.split_training_window_dfs(training_windows_profits_df)
 
     return training_windows_profits_dfs

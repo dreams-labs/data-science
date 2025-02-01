@@ -36,7 +36,7 @@ logger = dc.setup_logger()
 #       Main Interface Function
 # -----------------------------------
 
-def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
+def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads, reset_index=True):
     """
     Wrapper function to impute profits for multiple dates using multithreaded processing.
 
@@ -45,6 +45,7 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
         prices_df (pd.DataFrame): DataFrame containing price information
         dates (list): List of dates (str or datetime) for which to impute rows
         n_threads (int): The number of threads to use for imputation
+        reset_index (bool): Whether to reset the index before returning the df
 
     Returns:
         pd.DataFrame: Updated profits_df with imputed rows for all specified dates
@@ -59,10 +60,17 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
     start_time = time.time()
     logger.info("Starting profits_df imputation for %s dates...", len(dates))
 
+    # Create indices so we can use vectorized operations
+    profits_df = u.ensure_index(profits_df)
+    prices_df = u.ensure_index(prices_df)
+
     new_rows_list = []
 
     for date in dates:
         new_rows_df = multithreaded_impute_profits_rows(profits_df, prices_df, date, n_threads)
+
+        if new_rows_df.empty:
+            continue
 
         # Check for NaN values
         if new_rows_df.isna().any().any():
@@ -71,10 +79,14 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads):
         new_rows_list.append(new_rows_df)
 
     # Concatenate all new rows at once
-    all_new_rows = pd.concat(new_rows_list, ignore_index=True)
+    all_new_rows = pd.concat(new_rows_list, ignore_index=False)
 
     # Append all new rows to profits_df
-    updated_profits_df = pd.concat([profits_df, all_new_rows], ignore_index=True)
+    updated_profits_df = pd.concat([profits_df, all_new_rows], ignore_index=False)
+
+    # Reset index if configured to
+    if reset_index is True:
+        updated_profits_df = updated_profits_df.reset_index()
 
     logger.info("Completed new row generation after %.2f seconds. Total rows after imputation: %s",
                 time.time() - start_time,
@@ -102,7 +114,7 @@ def multithreaded_impute_profits_rows(profits_df, prices_df, target_date, n_thre
         prices_df (pd.DataFrame): DataFrame containing price information
         target_date (str or datetime): The date for which to impute rows
         n_threads (int): The number of threads to run impute_profits_df_rows() with
-        log_column (bool): Whether to append a column indicating whether the row was imputed
+        reset_index (bool): Whether to reset the index before returning the df
 
     Returns:
         all_new_rows_df (pd.DataFrame): The set of new rows to be added to profits_df to
@@ -110,11 +122,6 @@ def multithreaded_impute_profits_rows(profits_df, prices_df, target_date, n_thre
     """
     # Partition profits_df on coin_id
     logger.debug("Splitting profits_df into %s partitions for date %s...",n_threads,target_date)
-
-    # Create indices so we can use vectorized operations
-    profits_df = u.ensure_index(profits_df)
-    prices_df = u.ensure_index(prices_df.copy(deep=True))
-
     profits_df_partitions = create_partitions(profits_df, n_threads)
 
     # Create a thread-safe queue to store results
@@ -156,7 +163,7 @@ def multithreaded_impute_profits_rows(profits_df, prices_df, target_date, n_thre
         logger.warning("No new rows imputed for %s.", target_date)
         all_new_rows_df = pd.DataFrame()
     else:
-        all_new_rows_df = pd.concat(results, ignore_index=True)
+        all_new_rows_df = pd.concat(results, ignore_index=False)
         logger.info("Generated %s new rows for date %s.",
                     len(all_new_rows_df),
                     target_date)
@@ -348,8 +355,8 @@ def calculate_new_profits_values(profits_df, target_date):
     new_rows_df['usd_inflows_cumulative'] = profits_df['usd_inflows_cumulative']
 
     # Set the date index to be the target_date
-    new_rows_df = new_rows_df.reset_index()
-    new_rows_df['date'] = target_date  # pylint: disable=E1137 # df does not support item assignment
+    if not new_rows_df.empty:
+        new_rows_df = override_date_level(new_rows_df, target_date)
 
     # Log the column as imputed if the lineage column was added from log_column=True
     if 'is_imputed' in profits_df.columns:
@@ -517,3 +524,25 @@ def test_partition_performance(profits_df, prices_df, target_date, partition_num
     plt.show()
 
     return results
+
+
+def override_date_level(df: pd.DataFrame, new_date) -> pd.DataFrame:
+    """
+    Params:
+    - df (DataFrame): input data with a MultiIndex including 'date'.
+    - new_date: the value to assign to all date levels.
+
+    Returns:
+    - df (DataFrame): updated DataFrame with 'date' index overridden.
+    """
+    # Get the position of the 'date' level in the MultiIndex
+    date_level = df.index.names.index('date')
+    # Create a new levels list: replace the 'date' level with a list containing only new_date
+    new_levels = list(df.index.levels)
+    new_levels[date_level] = [new_date]
+    # Create new codes: set all codes for 'date' to 0 so they all point to new_date
+    new_codes = list(df.index.codes)
+    new_codes[date_level] = np.zeros(len(df.index), dtype=int)
+    # Build a new MultiIndex with the updated level and codes
+    df.index = pd.MultiIndex(levels=new_levels, codes=new_codes, names=df.index.names)
+    return df

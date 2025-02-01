@@ -138,6 +138,7 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
 #         Utility Functions
 # ----------------------------------
 
+@u.timing_decorator
 def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
     """
     Validates pre-indexed DataFrames for the feature calculation pipeline.
@@ -158,19 +159,20 @@ def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
     if market_data_df[['price', 'volume', 'market_cap_filled']].isnull().any().any():
         raise ValueError("market_data_df contains NaN values in critical columns.")
 
-    # Check market data coverage using index operations
+    # Use pandas' optimized Index operations (faster than NumPy for Index objects)
     profits_dates = profits_df.index.droplevel('wallet_address').unique()
-    market_dates = market_data_df.index
-    missing_pairs = profits_dates.difference(market_dates)
+    market_dates = market_data_df.index.unique()
+    missing_pairs = profits_dates.difference(market_dates)  # Faster than NumPy set operations
 
-    if len(missing_pairs) > 0:
-        raise AssertionError(f"Found {len(missing_pairs)} coin_id-date pairs missing in market_data_df")
+    if missing_pairs.size > 0:
+        raise AssertionError(f"Found {missing_pairs.size} coin_id-date pairs missing in market_data_df")
 
-    # Wallet presence check using index with a >99% threshold
-    wallets_in_profits = set(profits_df.index.get_level_values('wallet_address'))
-    wallets_in_transfers = set(transfers_sequencing_df['wallet_address'])
+    # Use Index for wallet uniqueness (faster than set operations)
+    wallets_in_profits = profits_df.index.get_level_values('wallet_address').unique()
+    wallets_in_transfers = transfers_sequencing_df['wallet_address'].unique()
 
-    common_wallets = wallets_in_profits & wallets_in_transfers
+    # Use pandas' `.intersection()` which is optimized for Index objects
+    common_wallets = wallets_in_profits.intersection(wallets_in_transfers)
     coverage = len(common_wallets) / len(wallets_in_profits)
 
     if coverage < 0.99:
@@ -198,27 +200,9 @@ def prepare_dataframes(profits_df: pd.DataFrame,
     Returns:
     - tuple of prepared DataFrames: (profits_df, market_indicators_df, transfers_df)
     """
-    required_profits_cols = ['coin_id', 'wallet_address', 'date']
-    required_market_cols = ['coin_id', 'date']
-
-    # Validate profits_df structure
-    if not all(col in profits_df.columns or col in profits_df.index.names
-              for col in required_profits_cols):
-        raise ValueError(f"profits_df missing required columns: {required_profits_cols}")
-
-    # Set indices if needed
-    if not isinstance(profits_df.index, pd.MultiIndex):
-        profits_df.set_index(required_profits_cols, inplace=True, verify_integrity=True)
-
-    if not isinstance(market_indicators_df.index, pd.MultiIndex):
-        market_indicators_df.set_index(required_market_cols, inplace=True, verify_integrity=True)
-
-    # Sort indices if needed
-    if not profits_df.index.is_monotonic_increasing:
-        profits_df.sort_index(inplace=True)
-
-    if not market_indicators_df.index.is_monotonic_increasing:
-        market_indicators_df.sort_index(inplace=True)
+    # Ensure index
+    profits_df = u.ensure_index(profits_df)
+    market_indicators_df = u.ensure_index(market_indicators_df)
 
     # Run required validations
     u.assert_period(profits_df, period_start_date, period_end_date)
