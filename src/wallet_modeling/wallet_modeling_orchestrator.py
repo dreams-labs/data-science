@@ -187,6 +187,10 @@ def generate_training_features(
     - wallet_cohort: List of wallet addresses
     - parquet_folder: Location for parquet storage
     """
+    # Ensure index
+    profits_df = u.ensure_index(profits_df)
+    market_indicators_df = u.ensure_index(market_indicators_df)
+
     # Generate full period features
     logger.info("Generating features for full training period...")
     training_wallet_features_df = wfo.calculate_wallet_features(
@@ -212,7 +216,7 @@ def generate_training_features(
     )
 
     # Prepare window data for parallel processing
-    window_data = [
+    windows_profits_tuples = [
         (window_df, i + 1)
         for i, window_df in enumerate(training_windows_profits_dfs)
     ]
@@ -223,13 +227,13 @@ def generate_training_features(
     with concurrent.futures.ThreadPoolExecutor(wallets_config['features']['max_workers']) as executor:
         futures = [
             executor.submit(
-                process_window,
-                data,
+                calculate_window_features,
+                profits_tuple,
                 market_indicators_df,
                 transfers_df,
                 wallet_cohort
             )
-            for data in window_data
+            for profits_tuple in windows_profits_tuples
         ]
 
         # Collect results as they complete
@@ -276,7 +280,7 @@ def generate_training_features(
 
 
 
-def process_window(
+def calculate_window_features(
     window_data: tuple,
     market_indicators_df: pd.DataFrame,
     transfers_df: pd.DataFrame,
@@ -295,11 +299,14 @@ def process_window(
     - window_features (DataFrame): Window features with appropriate suffix
     """
     window_profits_df, window_number = window_data
-
     # Extract window dates
     window_opening_balance_date = window_profits_df['date'].min()
     window_start_date = window_opening_balance_date + timedelta(days=1)
     window_end_date = window_profits_df['date'].max()
+    # # Extract window dates from MultiIndex
+    # window_opening_balance_date = window_profits_df.index.get_level_values('date').min()
+    # window_start_date = window_opening_balance_date + timedelta(days=1)
+    # window_end_date = window_profits_df.index.get_level_values('date').max()
 
     # Calculate features for this window
     window_wallet_features_df = wfo.calculate_wallet_features(
@@ -486,6 +493,7 @@ def split_training_window_profits_dfs(training_profits_df,training_market_data_d
                                                                         n_threads=1)
 
     # Split profits_df into training windows
+    # training_windows_profits_df = u.ensure_index(training_windows_profits_df)
     training_windows_profits_dfs = wtd.split_training_window_dfs(training_windows_profits_df)
 
     return training_windows_profits_dfs
