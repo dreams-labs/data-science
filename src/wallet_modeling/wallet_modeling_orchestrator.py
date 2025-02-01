@@ -194,9 +194,9 @@ def generate_training_features(
     # Generate full period features
     logger.info("Generating features for full training period...")
     training_wallet_features_df = wfo.calculate_wallet_features(
-        profits_df,
-        market_indicators_df,
-        transfers_df,
+        profits_df.copy(),
+        market_indicators_df.copy(),
+        transfers_df.copy(),
         wallet_cohort,
         wallets_config['training_data']['training_period_start'],
         wallets_config['training_data']['training_period_end']
