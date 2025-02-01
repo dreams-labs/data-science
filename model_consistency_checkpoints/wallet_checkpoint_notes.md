@@ -1,4 +1,19 @@
 # dda 615 index passthrough
+checkpoint 2: w.691 add sort
+Model Performance Summary
+===================================
+Test Samples:             57,955
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.691
+RMSE:                     0.213
+MAE:                      0.109
+
+
+
 checkpoint 1: w.693 base case
 Model Performance Summary
 ===================================

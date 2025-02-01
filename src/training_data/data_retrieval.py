@@ -229,6 +229,7 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows, dataset='pro
         ,is_imputed
         from profits_merged pm
         join reference.wallet_ids id on id.wallet_address = pm.wallet_address
+        order by coin_id, wallet_address, date
     """
 
     # Run the SQL query using dgc's run_sql method
