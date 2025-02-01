@@ -299,14 +299,11 @@ def calculate_window_features(
     - window_features (DataFrame): Window features with appropriate suffix
     """
     window_profits_df, window_number = window_data
-    # Extract window dates
-    window_opening_balance_date = window_profits_df['date'].min()
+
+    # Extract window dates from MultiIndex
+    window_opening_balance_date = window_profits_df.index.get_level_values('date').min()
     window_start_date = window_opening_balance_date + timedelta(days=1)
-    window_end_date = window_profits_df['date'].max()
-    # # Extract window dates from MultiIndex
-    # window_opening_balance_date = window_profits_df.index.get_level_values('date').min()
-    # window_start_date = window_opening_balance_date + timedelta(days=1)
-    # window_end_date = window_profits_df.index.get_level_values('date').max()
+    window_end_date = window_profits_df.index.get_level_values('date').max()
 
     # Calculate features for this window
     window_wallet_features_df = wfo.calculate_wallet_features(
