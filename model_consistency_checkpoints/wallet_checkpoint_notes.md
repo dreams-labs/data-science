@@ -1,5 +1,5 @@
 # dda 629 predictiveness of wallet model
-checkpoint 2: w.689 mystery degradation
+checkpoint 2: w.689 aligns with checkpoint 1 rerun
 Model Performance Summary
 ===================================
 Test Samples:             57,906
