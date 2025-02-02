@@ -2,6 +2,7 @@ import time
 import logging
 from typing import Dict, Union, List
 from itertools import chain,combinations
+import pickle
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import RandomizedSearchCV, train_test_split
@@ -353,6 +354,23 @@ class BaseModel:
             'best_score': -self.random_search.best_score_,
             'cv_results': self.random_search.cv_results_
         }
+
+
+    def save_pipeline(self, filepath: str) -> None:
+        """
+        Save the fitted pipeline to disk using pickle.
+
+        Params:
+        - filepath (str): Path where pipeline should be saved, should end in .pkl
+        """
+        if self.pipeline is None:
+            raise ValueError("Pipeline must be fitted before saving")
+
+        # Save pipeline which contains both model and column transformers
+        with open(filepath, 'wb') as f:
+            pickle.dump(self.pipeline, f)
+
+        logger.info(f"Pipeline saved to {filepath}")
 
 
     def _create_drop_pattern_combinations(self) -> List[List[str]]:

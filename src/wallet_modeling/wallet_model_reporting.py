@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 import logging
+import pickle
 import pandas as pd
 import numpy as np
 from dreams_core.googlecloud import GoogleCloud as dgc
@@ -57,25 +58,33 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path):
             return obj.tolist()
         return obj
 
-    # Generate single UUID for all artifacts
-    model_id = str(uuid.uuid4())
+    # Validate required directories exist
+    base_dir = Path(base_path)
+    required_dirs = ['model_reports', 'wallet_scores', 'wallet_models']
+    missing_dirs = [dir_name for dir_name in required_dirs
+                    if not (base_dir / dir_name).exists()]
+    if missing_dirs:
+        raise FileNotFoundError(
+            f"Required directories {missing_dirs} not found in {base_dir}. "
+            "Please create them before saving model artifacts."
+        )
 
-    # Generate additional metadata for the filename
+    # 1. Generate model metadata
+    model_id = str(uuid.uuid4())
     model_time = datetime.now()
     filename_timestamp = model_time.strftime('%Y%m%d_%Hh%Mm%Ss')
     model_r2 = evaluation_dict['r2']
     model_report_filename = f"model_report_{filename_timestamp}_{model_r2:.3f}_{model_id}.json"
-    base_dir = Path(base_path)
-
-    if not base_dir.exists():
-        raise FileNotFoundError(f"Base directory {base_dir} does not exist")
-
-    # Create necessary directories
-    for dir_name in ['model_reports', 'wallet_scores']:
-        (base_dir / dir_name).mkdir(parents=True, exist_ok=True)
 
 
-    # 1. Save model report
+    # 2. Save model pipeline
+    pipeline_path = base_dir / 'wallet_models' / f"wallet_model_{model_id}.pkl"
+    with open(pipeline_path, 'wb') as f:
+        pickle.dump(model_results['pipeline'], f)
+    logger.info(f"Saved pipeline to {pipeline_path}")
+
+
+    # 3. Save model report
     report = {
         'model_id': model_id,
         'model_type': 'wallet',
@@ -90,7 +99,8 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path):
         json.dump(report, f, indent=2, default=numpy_type_converter)
     logger.info(f"Saved model report to {report_path}")
 
-    # Update wallet scores section
+
+    # 4. Save wallet scores
     wallet_addresses = get_training_cohort_addresses()
     wallet_scores_df = pd.DataFrame({
         'wallet_id': model_results['training_cohort_pred'].index,
