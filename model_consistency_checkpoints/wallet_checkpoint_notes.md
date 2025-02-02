@@ -1,4 +1,24 @@
 # dda 629 predictiveness of wallet model
+checkpoint 2: w.689 mystery degradation
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.689
+RMSE:                     0.216
+MAE:                      0.110
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.797
+RMSE:                     0.122
+MAE:                      0.065
+
+
 checkpoint 1: w.691 base case
 Model Performance Summary
 ===================================
