@@ -1,5 +1,5 @@
 """Allows the config file to be imported to other wallet .py files"""
-
+import copy
 from datetime import datetime, timedelta
 from pathlib import Path
 import yaml
@@ -57,8 +57,8 @@ class WalletsConfig:
         - WalletsConfig: The singleton instance with loaded configuration
         """
         instance = cls()
-        cls._yaml_path = Path(yaml_path)
-        instance.reload()
+        cls._yaml_path = Path(yaml_path)  # Store the path
+        instance.reload()  # Use reload method to load the config
         return instance
 
     def get(self, key, default=None):
@@ -105,44 +105,37 @@ class WalletsConfig:
 #           Utility Functions
 # -----------------------------------
 
-def add_derived_values(config: dict) -> dict:
+def add_derived_values(config_dict: dict) -> dict:
     """
     Add calculated values to a config dict including period boundaries and balance dates.
 
     Params:
-    - config (dict): Config dictionary containing training_data section
+    - config_dict (dict): Config dictionary containing training_data section
 
     Returns:
-    - dict: Config with added derived values
+    - dict: New config dict with added derived values
     """
-    if 'training_data' not in config:
-        return config
+    if 'training_data' not in config_dict:
+        return config_dict.copy()
 
-    cfg = config.copy()
+    # Create a fresh copy to avoid modifying original
+    cfg = {k: v.copy() if isinstance(v, dict) else v for k, v in config_dict.items()}
+    td = cfg['training_data']
 
     # Training Period Boundaries
-    first_window = min(cfg['training_data']['training_window_starts'])
-    cfg['training_data']['training_period_start'] = first_window
-
-    # Training balance date (1 day before period start)
+    first_window = min(td['training_window_starts'])
+    td['training_period_start'] = first_window
     training_start = datetime.strptime(first_window, "%Y-%m-%d")
-    training_balance_date = (training_start - timedelta(days=1)).strftime("%Y-%m-%d")
-    cfg['training_data']['training_starting_balance_date'] = training_balance_date
+    td['training_starting_balance_date'] = (training_start - timedelta(days=1)).strftime("%Y-%m-%d")
 
     # Modeling Period Boundaries
-    modeling_start = datetime.strptime(cfg['training_data']['modeling_period_start'], "%Y-%m-%d")
-    training_end = (modeling_start - timedelta(days=1)).strftime("%Y-%m-%d")
-    cfg['training_data']['training_period_end'] = training_end
-
-    # Modeling Period Balance Date
-    cfg['training_data']['modeling_starting_balance_date'] = training_end
+    modeling_start = datetime.strptime(td['modeling_period_start'], "%Y-%m-%d")
+    td['training_period_end'] = (modeling_start - timedelta(days=1)).strftime("%Y-%m-%d")
+    td['modeling_starting_balance_date'] = td['training_period_end']
 
     # Validation Period Boundaries
-    modeling_end = datetime.strptime(cfg['training_data']['modeling_period_end'], "%Y-%m-%d")
-    validation_start = (modeling_end + timedelta(days=1)).strftime("%Y-%m-%d")
-    cfg['training_data']['validation_period_start'] = validation_start
-
-    # Validation Period Balance Date
-    cfg['training_data']['validation_starting_balance_date'] = modeling_end
+    modeling_end = datetime.strptime(td['modeling_period_end'], "%Y-%m-%d")
+    td['validation_period_start'] = (modeling_end + timedelta(days=1)).strftime("%Y-%m-%d")
+    td['validation_starting_balance_date'] = td['modeling_period_end']
 
     return cfg
