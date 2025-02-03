@@ -1,8 +1,13 @@
 """Allows the config file to be imported to other wallet .py files"""
-
+import copy
 from datetime import datetime, timedelta
 from pathlib import Path
 import yaml
+
+
+# -------------------------
+#       Primary Class
+# -------------------------
 
 class WalletsConfig:
     """
@@ -45,19 +50,15 @@ class WalletsConfig:
         """
         Load configuration from a YAML file and store it in the singleton instance.
 
-        Args:
-            yaml_path (str or Path): Path to the YAML configuration file
+        Params:
+        - yaml_path (str or Path): Path to the YAML configuration file
 
         Returns:
-            WalletsConfig: The singleton instance with loaded configuration
-
-        Example:
-            config = WalletsConfig.load_from_yaml('../config/config.yaml')
+        - WalletsConfig: The singleton instance with loaded configuration
         """
         instance = cls()
         cls._yaml_path = Path(yaml_path)  # Store the path
         instance.reload()  # Use reload method to load the config
-        instance._add_derived_values()  # Add derived training period boundary dates
         return instance
 
     def get(self, key, default=None):
@@ -83,47 +84,8 @@ class WalletsConfig:
         """
         if self._yaml_path is None:
             raise FileNotFoundError("No config file path specified. Call load_from_yaml first.")
-        self.config = yaml.safe_load(self._yaml_path.read_text(encoding='utf-8'))
-        self._add_derived_values()  # Add derived training period boundary dates
-
-    def _add_derived_values(self):
-        """Add calculated values to the config including period boundaries and balance dates."""
-        if 'training_data' in self.config:
-            # Training Period Boundaries
-            first_window = min(self.config['training_data']['training_window_starts'])
-            self.config['training_data']['training_period_start'] = first_window
-
-            # Training balance date (1 day before period start)
-            training_start = datetime.strptime(first_window, "%Y-%m-%d")
-            training_balance_date = (training_start - timedelta(days=1)).strftime("%Y-%m-%d")
-            self.config['training_data']['training_starting_balance_date'] = training_balance_date
-
-
-            # Modeling Period Boundaries
-            modeling_start = datetime.strptime(
-                self.config['training_data']['modeling_period_start'],
-                "%Y-%m-%d"
-            )
-            training_end = (modeling_start - timedelta(days=1)).strftime("%Y-%m-%d")
-            self.config['training_data']['training_period_end'] = training_end
-
-            # Modeling Period Balance Date
-            modeling_balance_date = (modeling_start - timedelta(days=1)).strftime("%Y-%m-%d")
-            self.config['training_data']['modeling_starting_balance_date'] = modeling_balance_date
-
-
-            # Validation Period Boundaries
-            modeling_end = datetime.strptime(
-                self.config['training_data']['modeling_period_end'],
-                "%Y-%m-%d"
-            )
-            validation_start = (modeling_end + timedelta(days=1)).strftime("%Y-%m-%d")
-            self.config['training_data']['validation_period_start'] = validation_start
-
-            # Validation Period Balance Date
-            validation_start_dt = datetime.strptime(validation_start, "%Y-%m-%d")
-            validation_balance_date = (validation_start_dt - timedelta(days=1)).strftime("%Y-%m-%d")
-            self.config['training_data']['validation_starting_balance_date'] = validation_balance_date
+        raw_config = yaml.safe_load(self._yaml_path.read_text(encoding='utf-8'))
+        self.config = add_derived_values(raw_config)
 
     def __getitem__(self, key):
         # Enable dictionary-style access with square brackets (config['key'])
@@ -136,3 +98,44 @@ class WalletsConfig:
     def __str__(self):
         # Provide a string representation of the config for debugging
         return f"WalletsConfig(keys={list(self.config.keys())})"
+
+
+
+# -----------------------------------
+#           Utility Functions
+# -----------------------------------
+
+def add_derived_values(config_dict: dict) -> dict:
+    """
+    Add calculated values to a config dict including period boundaries and balance dates.
+
+    Params:
+    - config_dict (dict): Config dictionary containing training_data section
+
+    Returns:
+    - dict: New config dict with added derived values
+    """
+    if 'training_data' not in config_dict:
+        return config_dict.copy()
+
+    # Create a fresh copy to avoid modifying original
+    cfg = {k: v.copy() if isinstance(v, dict) else v for k, v in config_dict.items()}
+    td = cfg['training_data']
+
+    # Training Period Boundaries
+    first_window = min(td['training_window_starts'])
+    td['training_period_start'] = first_window
+    training_start = datetime.strptime(first_window, "%Y-%m-%d")
+    td['training_starting_balance_date'] = (training_start - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # Modeling Period Boundaries
+    modeling_start = datetime.strptime(td['modeling_period_start'], "%Y-%m-%d")
+    td['training_period_end'] = (modeling_start - timedelta(days=1)).strftime("%Y-%m-%d")
+    td['modeling_starting_balance_date'] = td['training_period_end']
+
+    # Validation Period Boundaries
+    modeling_end = datetime.strptime(td['modeling_period_end'], "%Y-%m-%d")
+    td['validation_period_start'] = (modeling_end + timedelta(days=1)).strftime("%Y-%m-%d")
+    td['validation_starting_balance_date'] = td['modeling_period_end']
+
+    return cfg
