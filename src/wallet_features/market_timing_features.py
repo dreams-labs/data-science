@@ -21,7 +21,6 @@ config_directory = current_dir / '..' / '..' / 'config'
 
 # Load wallets_config at the module level
 wallets_config = WalletsConfig()
-wallets_metrics_config = u.load_config(config_directory / 'wallets_metrics_config.yaml')
 wallets_features_config = yaml.safe_load((config_directory / 'wallets_features_config.yaml').read_text(encoding='utf-8'))  # pylint:disable=line-too-long
 
 
