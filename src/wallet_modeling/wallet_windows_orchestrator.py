@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 # Local module imports
-from wallet_modeling.wallets_config_manager import WalletsConfig
+import wallet_modeling.wallets_config_manager as wcm
 import utils as u
 
 # Set up logger at the module level
@@ -67,7 +67,7 @@ class MultiWindowTrainingOrchestrator:
             window_config['training_data']['parquet_folder'] = str(base_folder / folder_suffix)
 
             # Use WalletsConfig to add derived values
-            window_config = WalletsConfig.add_derived_values(window_config)
+            window_config = wcm.add_derived_values(window_config)
 
             # Log window configuration
             logger.info(
