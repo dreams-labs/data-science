@@ -93,16 +93,10 @@ def basic_market_timing_metrics_config():
         }
     }
 
-@pytest.fixture
-def mock_wallets_metrics_config(monkeypatch, basic_market_timing_metrics_config):
-    """Mock the wallets_metrics_config at the module level"""
-    monkeypatch.setattr(wmt, 'wallets_metrics_config', basic_market_timing_metrics_config)
-
-
 # Add these to your existing imports
 
 @pytest.mark.unit
-def test_successful_offset_calculation(mock_wallets_features_config,mock_wallets_metrics_config):
+def test_successful_offset_calculation(mock_wallets_features_config):
     """
     Test successful calculation of offsets when DataFrame has sufficient records.
 
@@ -146,7 +140,7 @@ def test_successful_offset_calculation(mock_wallets_features_config,mock_wallets
     )
 
 @pytest.mark.unit
-def test_insufficient_records(mock_wallets_features_config,mock_wallets_metrics_config):
+def test_insufficient_records(mock_wallets_features_config):
     """
     Test offset calculation when one coin has insufficient records.
 
@@ -200,7 +194,7 @@ def test_missing_column_in_df(monkeypatch):
 
 
 @pytest.mark.unit
-def test_relative_changes_calculation(mock_wallets_features_config,mock_wallets_metrics_config):
+def test_relative_changes_calculation(mock_wallets_features_config):
     """
     Test calculation of relative changes between base and offset columns.
 
