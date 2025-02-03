@@ -30,293 +30,313 @@ wallets_config = WalletsConfig()
 
 
 
-# ------------------------------------------
-#      Primary Orchestration Functions
-# ------------------------------------------
+# ----------------------------------------
+#       Primary Orchestration Class
+# ----------------------------------------
 
-@u.timing_decorator
-def retrieve_period_datasets(period_start_date, period_end_date, coin_cohort=None, parquet_prefix=None):
+class WalletTrainingOrchestrator:
     """
-    Retrieves and processes data for a specific period. If coin_cohort provided,
-    filters to those coins. Otherwise applies full cleaning pipeline to establish cohort.
-
-    Params:
-    - period_start_date,period_end_date (str): Period boundaries
-    - coin_cohort (set, optional): Coin IDs from training cohort
-    - parquet_prefix (str, optional): Prefix for saved parquet files
-
-    Returns:
-    - tuple: (profits_df, market_data_df, coin_cohort) for the period
+    Orchestrates wallet model training data preparation and feature generation.
     """
-    # Get raw period data
-    profits_df, market_data_df = wtd.retrieve_raw_datasets(period_start_date, period_end_date)
+    def __init__(
+        self,
+        wallets_config: WalletsConfig,
+        wallets_metrics_config: dict,
+        wallets_features_config: dict
+    ):
+        self.wallets_config = wallets_config
+        self.wallets_metrics_config = wallets_metrics_config
+        self.wallets_features_config = wallets_features_config
+        self.parquet_folder = wallets_config['training_data']['parquet_folder']
 
-    # Apply cleaning process including coin cohort filter if specified
-    market_data_df = wtd.clean_market_dataset(market_data_df, profits_df,
-                                                period_start_date, period_end_date,
-                                                coin_cohort)
-    profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
 
-    # Set the coin_cohort if it hadn't already been passed
-    if not coin_cohort:
-        coin_cohort = set(market_data_df['coin_id'].unique())
-        logger.info("Defined coin cohort of %s coins after applying data cleaning filters.",
-                    len(coin_cohort))
-
-    # Impute the period end (period start is pre-imputed during profits_df generation)
-    imputed_profits_df = pri.impute_profits_for_multiple_dates(profits_df, market_data_df,
-                                                               [period_end_date], n_threads=1)
-
-    # Format and optionally save the datasets
-    profits_df_formatted, market_data_df_formatted = wtd.format_and_save_datasets(
-        imputed_profits_df,
-        market_data_df,
+    @u.timing_decorator
+    def retrieve_period_datasets(
         period_start_date,
-        parquet_prefix
-    )
+        period_end_date,
+        coin_cohort=None,
+        parquet_prefix=None):
+        """
+        Retrieves and processes data for a specific period. If coin_cohort provided,
+        filters to those coins. Otherwise applies full cleaning pipeline to establish cohort.
 
-    return profits_df_formatted, market_data_df_formatted, coin_cohort
+        Params:
+        - period_start_date,period_end_date (str): Period boundaries
+        - coin_cohort (set, optional): Coin IDs from training cohort
+        - parquet_prefix (str, optional): Prefix for saved parquet files
 
+        Returns:
+        - tuple: (profits_df, market_data_df, coin_cohort) for the period
+        """
+        # Get raw period data
+        profits_df, market_data_df = wtd.retrieve_raw_datasets(period_start_date, period_end_date)
 
+        # Apply cleaning process including coin cohort filter if specified
+        market_data_df = wtd.clean_market_dataset(market_data_df, profits_df,
+                                                    period_start_date, period_end_date,
+                                                    coin_cohort)
+        profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
 
-def prepare_training_data(
-    profits_df_full: pd.DataFrame,
-    market_data_df_full: pd.DataFrame,
-    wallets_metrics_config: dict,
-    parquet_folder: str
-) -> List[str]:
-    """
-    Consolidated training data preparation pipeline that handles hybridization,
-    indicator generation, cohort definition and transfers retrieval.
+        # Set the coin_cohort if it hadn't already been passed
+        if not coin_cohort:
+            coin_cohort = set(market_data_df['coin_id'].unique())
+            logger.info("Defined coin cohort of %s coins after applying data cleaning filters.",
+                        len(coin_cohort))
 
-    Params:
-    - profits_df_full: Full historical profits DataFrame
-    - market_data_df_full: Full historical market data DataFrame
-    - wallets_metrics_config: Configuration for market indicators
-    - parquet_folder: Required folder for parquet storage
+        # Impute the period end (period start is pre-imputed during profits_df generation)
+        imputed_profits_df = pri.impute_profits_for_multiple_dates(profits_df, market_data_df,
+                                                                [period_end_date], n_threads=1)
 
-    Returns:
-    - List of generated parquet file paths
-    """
-    generated_files = []
-
-    # Remove market data before starting balance date and validate periods
-    market_data_df = market_data_df_full[
-        market_data_df_full['date'] >= wallets_config['training_data']['training_starting_balance_date']
-    ]
-    u.assert_period(market_data_df,
-                    wallets_config['training_data']['training_period_start'],
-                    wallets_config['training_data']['training_period_end'])
-
-    # Generate market indicators
-    def generate_market_indicators():
-        logger.info("Generating market indicators...")
-        market_indicators_df = generate_training_indicators_df(
-            market_data_df_full,
-            wallets_metrics_config,
-            parquet_filename=None
+        # Format and optionally save the datasets
+        profits_df_formatted, market_data_df_formatted = wtd.format_and_save_datasets(
+            imputed_profits_df,
+            market_data_df,
+            period_start_date,
+            parquet_prefix
         )
-        market_indicators_path = f"{parquet_folder}/training_market_indicators_data_df.parquet"
-        market_indicators_df.to_parquet(market_indicators_path, index=False)
-        return market_indicators_path
 
-    # Define training wallet cohort
-    def define_training_cohort(profits_df_full):
-        # Hybridize wallet IDs if configured
-        if wallets_config['training_data']['hybridize_wallet_ids']:
-            profits_df_full, hybrid_cw_id_map = hybridize_wallet_address(profits_df_full)
-            hybrid_map_path = f"{parquet_folder}/hybrid_cw_id_map.pkl"
-            pd.to_pickle(hybrid_cw_id_map, hybrid_map_path)
-            generated_files.append(hybrid_map_path)
+        return profits_df_formatted, market_data_df_formatted, coin_cohort
 
-            upload_hybrid_wallet_mapping(hybrid_cw_id_map)
-            del hybrid_cw_id_map
 
-        logger.info("Defining wallet cohort...")
-        profits_df, _ = define_training_wallet_cohort(
-            profits_df_full.copy(),
-            market_data_df.copy(),
+
+    def prepare_training_data(
+        profits_df_full: pd.DataFrame,
+        market_data_df_full: pd.DataFrame,
+        wallets_metrics_config: dict,
+        parquet_folder: str
+    ) -> List[str]:
+        """
+        Consolidated training data preparation pipeline that handles hybridization,
+        indicator generation, cohort definition and transfers retrieval.
+
+        Params:
+        - profits_df_full: Full historical profits DataFrame
+        - market_data_df_full: Full historical market data DataFrame
+        - wallets_metrics_config: Configuration for market indicators
+        - parquet_folder: Required folder for parquet storage
+
+        Returns:
+        - List of generated parquet file paths
+        """
+        generated_files = []
+
+        # Remove market data before starting balance date and validate periods
+        market_data_df = market_data_df_full[
+            market_data_df_full['date'] >= wallets_config['training_data']['training_starting_balance_date']
+        ]
+        u.assert_period(market_data_df,
+                        wallets_config['training_data']['training_period_start'],
+                        wallets_config['training_data']['training_period_end'])
+
+        # Generate market indicators
+        def generate_market_indicators():
+            logger.info("Generating market indicators...")
+            market_indicators_df = generate_training_indicators_df(
+                market_data_df_full,
+                wallets_metrics_config,
+                parquet_filename=None
+            )
+            market_indicators_path = f"{parquet_folder}/training_market_indicators_data_df.parquet"
+            market_indicators_df.to_parquet(market_indicators_path, index=False)
+            return market_indicators_path
+
+        # Define training wallet cohort
+        def define_training_cohort(profits_df_full):
+            # Hybridize wallet IDs if configured
+            if wallets_config['training_data']['hybridize_wallet_ids']:
+                profits_df_full, hybrid_cw_id_map = hybridize_wallet_address(profits_df_full)
+                hybrid_map_path = f"{parquet_folder}/hybrid_cw_id_map.pkl"
+                pd.to_pickle(hybrid_cw_id_map, hybrid_map_path)
+                generated_files.append(hybrid_map_path)
+
+                upload_hybrid_wallet_mapping(hybrid_cw_id_map)
+                del hybrid_cw_id_map
+
+            logger.info("Defining wallet cohort...")
+            profits_df, _ = define_training_wallet_cohort(
+                profits_df_full.copy(),
+                market_data_df.copy(),
+                wallets_config['training_data']['hybridize_wallet_ids']
+            )
+            profits_path = f"{parquet_folder}/training_profits_df.parquet"
+            profits_df.to_parquet(profits_path, index=True)
+            return profits_path
+
+        # Run market indicators and cohort definition in parallel
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            market_future = executor.submit(generate_market_indicators)
+            cohort_future = executor.submit(define_training_cohort, profits_df_full)
+
+            market_indicators_path = market_future.result()
+            profits_path = cohort_future.result()
+
+
+        generated_files.extend([market_indicators_path, profits_path])
+
+        # Retrieve transfers after cohort is in BigQuery
+        logger.info("Retrieving transfers sequencing data...")
+        transfers_df = wts.retrieve_transfers_sequencing(
             wallets_config['training_data']['hybridize_wallet_ids']
         )
-        profits_path = f"{parquet_folder}/training_profits_df.parquet"
-        profits_df.to_parquet(profits_path, index=True)
-        return profits_path
+        transfers_path = f"{parquet_folder}/training_transfers_sequencing_df.parquet"
+        transfers_df.to_parquet(transfers_path, index=True)
+        generated_files.append(transfers_path)
 
-    # Run market indicators and cohort definition in parallel
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        market_future = executor.submit(generate_market_indicators)
-        cohort_future = executor.submit(define_training_cohort, profits_df_full)
+        # Clean up memory
+        del profits_df_full, market_data_df_full, transfers_df
+        gc.collect()
 
-        market_indicators_path = market_future.result()
-        profits_path = cohort_future.result()
-
-
-    generated_files.extend([market_indicators_path, profits_path])
-
-    # Retrieve transfers after cohort is in BigQuery
-    logger.info("Retrieving transfers sequencing data...")
-    transfers_df = wts.retrieve_transfers_sequencing(
-        wallets_config['training_data']['hybridize_wallet_ids']
-    )
-    transfers_path = f"{parquet_folder}/training_transfers_sequencing_df.parquet"
-    transfers_df.to_parquet(transfers_path, index=True)
-    generated_files.append(transfers_path)
-
-    # Clean up memory
-    del profits_df_full, market_data_df_full, transfers_df
-    gc.collect()
-
-    return generated_files
+        return generated_files
 
 
 
-def generate_training_features(
-    profits_df: pd.DataFrame,
-    market_indicators_df: pd.DataFrame,
-    transfers_df: pd.DataFrame,
-    wallet_cohort: List[int],
-    parquet_folder: str
-) -> None:
-    """
-    Orchestrates end-to-end feature generation with parallel window processing.
+    def generate_training_features(
+        profits_df: pd.DataFrame,
+        market_indicators_df: pd.DataFrame,
+        transfers_df: pd.DataFrame,
+        wallet_cohort: List[int],
+        parquet_folder: str
+    ) -> None:
+        """
+        Orchestrates end-to-end feature generation with parallel window processing.
 
-    Params:
-    - profits_df: Training period profits data
-    - market_indicators_df: Market data with indicators
-    - transfers_df: Transfers sequencing data
-    - wallet_cohort: List of wallet addresses
-    - parquet_folder: Location for parquet storage
-    """
-    # Ensure index
-    profits_df = u.ensure_index(profits_df)
-    market_indicators_df = u.ensure_index(market_indicators_df)
+        Params:
+        - profits_df: Training period profits data
+        - market_indicators_df: Market data with indicators
+        - transfers_df: Transfers sequencing data
+        - wallet_cohort: List of wallet addresses
+        - parquet_folder: Location for parquet storage
+        """
+        # Ensure index
+        profits_df = u.ensure_index(profits_df)
+        market_indicators_df = u.ensure_index(market_indicators_df)
 
-    # Generate full period features
-    logger.info("Generating features for full training period...")
-    training_wallet_features_df = wfo.calculate_wallet_features(
-        profits_df.copy(),
-        market_indicators_df.copy(),
-        transfers_df.copy(),
-        wallet_cohort,
-        wallets_config['training_data']['training_period_start'],
-        wallets_config['training_data']['training_period_end']
-    )
+        # Generate full period features
+        logger.info("Generating features for full training period...")
+        training_wallet_features_df = wfo.calculate_wallet_features(
+            profits_df.copy(),
+            market_indicators_df.copy(),
+            transfers_df.copy(),
+            wallet_cohort,
+            wallets_config['training_data']['training_period_start'],
+            wallets_config['training_data']['training_period_end']
+        )
 
-    # Initialize full features df with suffixed columns
-    wallet_training_data_df_full = training_wallet_features_df.add_suffix("|all_windows").copy()
-    wallet_training_data_df_full.to_parquet(f"{parquet_folder}/wallet_training_data_df_full.parquet", index=True)
-    del training_wallet_features_df
-    gc.collect()
+        # Initialize full features df with suffixed columns
+        wallet_training_data_df_full = training_wallet_features_df.add_suffix("|all_windows").copy()
+        wallet_training_data_df_full.to_parquet(f"{parquet_folder}/wallet_training_data_df_full.parquet", index=True)
+        del training_wallet_features_df
+        gc.collect()
 
-    # Split data into windows
-    training_windows_profits_dfs = split_training_window_profits_dfs(
-        profits_df,
-        market_indicators_df,
-        wallet_cohort
-    )
+        # Split data into windows
+        training_windows_profits_dfs = split_training_window_profits_dfs(
+            profits_df,
+            market_indicators_df,
+            wallet_cohort
+        )
 
-    # Prepare window data for parallel processing
-    windows_profits_tuples = [
-        (window_df, i + 1)
-        for i, window_df in enumerate(training_windows_profits_dfs)
-    ]
-
-    # Process windows in parallel
-    logger.info("Processing windows in parallel...")
-    window_features = []
-    with concurrent.futures.ThreadPoolExecutor(wallets_config['features']['max_workers']) as executor:
-        futures = [
-            executor.submit(
-                calculate_window_features,
-                profits_tuple,
-                market_indicators_df,
-                transfers_df,
-                wallet_cohort
-            )
-            for profits_tuple in windows_profits_tuples
+        # Prepare window data for parallel processing
+        windows_profits_tuples = [
+            (window_df, i + 1)
+            for i, window_df in enumerate(training_windows_profits_dfs)
         ]
 
-        # Collect results as they complete
-        for future in concurrent.futures.as_completed(futures):
-            window_features.append(future.result())
+        # Process windows in parallel
+        logger.info("Processing windows in parallel...")
+        window_features = []
+        with concurrent.futures.ThreadPoolExecutor(wallets_config['features']['max_workers']) as executor:
+            futures = [
+                executor.submit(
+                    calculate_window_features,
+                    profits_tuple,
+                    market_indicators_df,
+                    transfers_df,
+                    wallet_cohort
+                )
+                for profits_tuple in windows_profits_tuples
+            ]
 
-    # Join all window features at once
-    for window_feature_df in window_features:
-        wallet_training_data_df_full = wallet_training_data_df_full.join(
-            window_feature_df,
-            how='left'
+            # Collect results as they complete
+            for future in concurrent.futures.as_completed(futures):
+                window_features.append(future.result())
+
+        # Join all window features at once
+        for window_feature_df in window_features:
+            wallet_training_data_df_full = wallet_training_data_df_full.join(
+                window_feature_df,
+                how='left'
+            )
+
+        # Save unclustered version
+        wallet_training_data_df_full.to_parquet(
+            f"{parquet_folder}/wallet_training_data_df_full_unclustered.parquet",
+            index=True
         )
 
-    # Save unclustered version
-    wallet_training_data_df_full.to_parquet(
-        f"{parquet_folder}/wallet_training_data_df_full_unclustered.parquet",
-        index=True
-    )
+        # Generate clusters if configured
+        if 'clustering_n_clusters' in wallets_config.get('features', {}):
+            training_cluster_features_df = wcl.create_kmeans_cluster_features(
+                wallet_training_data_df_full
+            )
+            training_cluster_features_df = training_cluster_features_df.add_prefix('cluster|')
+            wallet_training_data_df_full = wallet_training_data_df_full.join(
+                training_cluster_features_df,
+                how='inner'
+            )
 
-    # Generate clusters if configured
-    if 'clustering_n_clusters' in wallets_config.get('features', {}):
-        training_cluster_features_df = wcl.create_kmeans_cluster_features(
-            wallet_training_data_df_full
+        # Verify cohort integrity
+        missing_wallets = set(wallet_cohort) - set(wallet_training_data_df_full.index)
+        if missing_wallets:
+            raise ValueError(
+                f"Lost {len(missing_wallets)} wallets from original cohort during feature "
+                f"generation. First few missing: {list(missing_wallets)[:5]}"
+            )
+
+        # Save final version
+        wallet_training_data_df_full.to_parquet(
+            f"{parquet_folder}/wallet_training_data_df_full.parquet",
+            index=True
         )
-        training_cluster_features_df = training_cluster_features_df.add_prefix('cluster|')
-        wallet_training_data_df_full = wallet_training_data_df_full.join(
-            training_cluster_features_df,
-            how='inner'
+
+
+
+    def calculate_window_features(
+        window_data: tuple,
+        market_indicators_df: pd.DataFrame,
+        transfers_df: pd.DataFrame,
+        wallet_cohort: List[int]
+    ) -> pd.DataFrame:
+        """
+        Process a single training window for feature generation.
+
+        Params:
+        - window_data (tuple): Contains (window_profits_df, window_number)
+        - market_indicators_df (DataFrame): Market indicators data
+        - transfers_df (DataFrame): Transfer sequence data
+        - wallet_cohort (List[int]): List of wallet addresses
+
+        Returns:
+        - window_features (DataFrame): Window features with appropriate suffix
+        """
+        window_profits_df, window_number = window_data
+
+        # Extract window dates from MultiIndex
+        window_opening_balance_date = window_profits_df.index.get_level_values('date').min()
+        window_start_date = window_opening_balance_date + timedelta(days=1)
+        window_end_date = window_profits_df.index.get_level_values('date').max()
+
+        # Calculate features for this window
+        window_wallet_features_df = wfo.calculate_wallet_features(
+            window_profits_df.copy(),
+            market_indicators_df.copy(),
+            transfers_df.copy(),
+            wallet_cohort,
+            window_start_date.strftime('%Y-%m-%d'),
+            window_end_date.strftime('%Y-%m-%d')
         )
 
-    # Verify cohort integrity
-    missing_wallets = set(wallet_cohort) - set(wallet_training_data_df_full.index)
-    if missing_wallets:
-        raise ValueError(
-            f"Lost {len(missing_wallets)} wallets from original cohort during feature "
-            f"generation. First few missing: {list(missing_wallets)[:5]}"
-        )
-
-    # Save final version
-    wallet_training_data_df_full.to_parquet(
-        f"{parquet_folder}/wallet_training_data_df_full.parquet",
-        index=True
-    )
-
-
-
-def calculate_window_features(
-    window_data: tuple,
-    market_indicators_df: pd.DataFrame,
-    transfers_df: pd.DataFrame,
-    wallet_cohort: List[int]
-) -> pd.DataFrame:
-    """
-    Process a single training window for feature generation.
-
-    Params:
-    - window_data (tuple): Contains (window_profits_df, window_number)
-    - market_indicators_df (DataFrame): Market indicators data
-    - transfers_df (DataFrame): Transfer sequence data
-    - wallet_cohort (List[int]): List of wallet addresses
-
-    Returns:
-    - window_features (DataFrame): Window features with appropriate suffix
-    """
-    window_profits_df, window_number = window_data
-
-    # Extract window dates from MultiIndex
-    window_opening_balance_date = window_profits_df.index.get_level_values('date').min()
-    window_start_date = window_opening_balance_date + timedelta(days=1)
-    window_end_date = window_profits_df.index.get_level_values('date').max()
-
-    # Calculate features for this window
-    window_wallet_features_df = wfo.calculate_wallet_features(
-        window_profits_df.copy(),
-        market_indicators_df.copy(),
-        transfers_df.copy(),
-        wallet_cohort,
-        window_start_date.strftime('%Y-%m-%d'),
-        window_end_date.strftime('%Y-%m-%d')
-    )
-
-    # Add window suffix
-    return window_wallet_features_df.add_suffix(f'|w{window_number}')
+        # Add window suffix
+        return window_wallet_features_df.add_suffix(f'|w{window_number}')
 
 
 
