@@ -243,7 +243,7 @@ modeling:
         # Performance Profiles (Choose One Section)
         # --------------------------------------
         # CHECKPOINTER
-        n_estimators: 400  # number of trees to train in the model
+        n_estimators: 4  # number of trees to train in the model
         learning_rate: 0.05  # step size for updates to weights during training
         early_stopping_rounds: 25  # stop training if no improvement after x rounds
         gamma: 0.005  # minimum gain required to split further on a leaf node
