@@ -29,21 +29,31 @@ class MultiWindowTrainingOrchestrator:
         features_config: dict,
         windows_config: dict
     ):
+        # Param Configs
         self.base_config = base_config
         self.metrics_config = metrics_config
         self.features_config = features_config
         self.windows_config = windows_config
+
+        # Generated objects
+        self.all_windows_configs = None
         self.output_dfs = {}
 
 
-    def generate_window_configs(self) -> List[Dict]:
+
+
+    # -----------------------------------
+    #           Helper Methods
+    # -----------------------------------
+
+    def _generate_window_configs(self) -> List[Dict]:
         """
         Generates config dicts for each offset window.
 
         Returns:
         - List[Dict]: List of config dicts, one per offset window
         """
-        window_configs = []
+        all_windows_configs = []
         base_training_data = self.base_config['training_data']
 
         for offset_days in self.windows_config['offset_windows']['offsets']:
@@ -76,12 +86,6 @@ class MultiWindowTrainingOrchestrator:
                 f"to {window_config['training_data']['modeling_period_end']}"
             )
 
-            window_configs.append(window_config)
+            all_windows_configs.append(window_config)
 
-        return window_configs
-
-
-
-    # -----------------------------------
-    #           Helper Functions
-    # -----------------------------------
+        return all_windows_configs
