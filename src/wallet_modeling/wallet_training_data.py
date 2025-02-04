@@ -1,5 +1,6 @@
 """Primary sequence functions used to generate training data for the wallet modeling pipeline"""
 import logging
+import copy
 from datetime import datetime, timedelta
 from typing import List
 from concurrent.futures import ThreadPoolExecutor
@@ -26,7 +27,7 @@ logger = logging.getLogger(__name__)
 class WalletTrainingData:
     """Wrapper for training data preparation functions to store the config state"""
     def __init__(self, wallets_config):
-        self.wallets_config = wallets_config  # store the config at instance-level
+        self.wallets_config = copy.deepcopy(wallets_config)  # store the config at instance-level
 
 
 # -------------------------------------------
