@@ -94,7 +94,7 @@ class WalletTrainingDataOrchestrator:
         imputed_profits_df = pri.impute_profits_for_multiple_dates(
             profits_df, market_data_df,
             [period_end_date],
-            n_threads=6
+            n_threads=1
         )
 
         # Format and optionally save the datasets
@@ -469,7 +469,7 @@ class WalletTrainingDataOrchestrator:
 
         # Impute the training period end (training period start is pre-imputed into profits_df generation)
         imputed_profits_df = pri.impute_profits_for_multiple_dates(profits_df, market_data_df,
-                                                                [training_period_end], n_threads=24,
+                                                                [training_period_end], n_threads=1,
                                                                 reset_index=False)
 
         # Create a training period only profits_df
@@ -527,7 +527,7 @@ class WalletTrainingDataOrchestrator:
         training_windows_profits_df = pri.impute_profits_for_multiple_dates(cohort_profits_df,
                                                                             training_market_data_df,
                                                                             training_window_boundary_dates,
-                                                                            n_threads=24, reset_index=False)
+                                                                            n_threads=1, reset_index=False)
 
         # Split profits_df into training windows
         training_windows_profits_df = u.ensure_index(training_windows_profits_df)

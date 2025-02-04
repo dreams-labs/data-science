@@ -1,7 +1,9 @@
+"""Orchestrates the creation of training_data_dfs for multiple training windows"""
+import os
 import logging
 from pathlib import Path
 import copy
-from typing import List, Dict, Tuple
+from typing import List, Dict
 from datetime import datetime, timedelta
 import pandas as pd
 
@@ -43,7 +45,7 @@ class MultiWindowOrchestrator:
 
 
     @u.timing_decorator
-    def generate_window_training_data(self) -> Dict[str, pd.DataFrame]:
+    def generate_windows_training_data(self) -> Dict[str, pd.DataFrame]:
         """
         Generates training data for all window configs in parallel.
 
@@ -57,8 +59,11 @@ class MultiWindowOrchestrator:
 
         for window_config in self.all_windows_configs:
             model_start = window_config['training_data']['modeling_period_start']
-            parquet_folder = window_config['training_data']['parquet_folder']
             logger.info(f"Generating training data for window starting {model_start}")
+
+            # Generate name of parquet folder and create it if necessary
+            parquet_folder = window_config['training_data']['parquet_folder']
+            os.makedirs(parquet_folder, exist_ok=True)
 
             try:
                 # Initialize data generator with window-specific config
@@ -112,15 +117,17 @@ class MultiWindowOrchestrator:
 
     def _generate_window_configs(self) -> List[Dict]:
         """
-        Generates config dicts for each offset window.
+        Generates config dicts for each window, including the base (0 offset) and offset windows.
 
         Returns:
-        - List[Dict]: List of config dicts, one per offset window
+        - List[Dict]: List of config dicts, one per window.
         """
         all_windows_configs = []
         base_training_data = self.base_config['training_data']
+        # Include 0 offset for the base config along with other offsets
+        offsets = [0] + self.windows_config['offset_windows']['offsets']
 
-        for offset_days in self.windows_config['offset_windows']['offsets']:
+        for offset_days in offsets:
             # Deep copy base config to prevent mutations
             window_config = copy.deepcopy(self.base_config)
 
@@ -134,7 +141,13 @@ class MultiWindowOrchestrator:
                 new_date = base_date + timedelta(days=offset_days)
                 window_config['training_data'][date_key] = new_date.strftime('%Y-%m-%d')
 
-            # Create window-specific parquet folder
+            # Offset every date in training_window_starts
+            window_config['training_data']['training_window_starts'] = [
+                (datetime.strptime(dt, '%Y-%m-%d') + timedelta(days=offset_days)).strftime('%Y-%m-%d')
+                for dt in base_training_data['training_window_starts']
+            ]
+
+            # Update parquet folder based on new modeling_period_start
             model_start = window_config['training_data']['modeling_period_start']
             folder_suffix = datetime.strptime(model_start, '%Y-%m-%d').strftime('%y%m%d')
             base_folder = Path(base_training_data['parquet_folder'])
