@@ -19,22 +19,22 @@ wallets_config = WalletsConfig()
 #       Data Retrieval Function
 # -----------------------------------
 
-def retrieve_transfers_sequencing(hybridize_wallet_ids: bool = False) -> pd.DataFrame:
+def retrieve_transfers_sequencing(min_txn_size: int,
+                                  training_end: str,
+                                  hybridize_wallet_ids: bool = False) -> pd.DataFrame:
     """
     Returns buyer and seller sequence numbers for each wallet-coin pair, where the first
     buyer/seller receives rank 1. Only includes wallets from wallet_modeling_training_cohort.
 
     Params:
+    - min_txn_size (int): Minimum USD value to filter out dust/airdrops
+    - training_end (str): Training period end as YYYY-MM-DD string
     - hybridize_wallet_ids (bool): Whether to use hybrid wallet-coin IDs vs regular wallet IDs
 
     Returns:
     - sequence_df (DataFrame): Columns: wallet_address, coin_id, first_buy, first_sell,
         buyer_number, seller_number
     """
-    # Minimum USD value to filter out dust/airdrops
-    min_txn_size = wallets_config['features']['timing_metrics_min_transaction_size']
-    training_end = wallets_config['training_data']['training_period_end']
-
     # Set join table based on ID type
     if hybridize_wallet_ids is False:
         # non-hybridized wallet_ids need to be converted to wallet_address

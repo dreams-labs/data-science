@@ -63,10 +63,11 @@ def test_force_fill_market_cap_mixed_scenarios():
         ]
     })
 
-    result = wmc.force_fill_market_cap(input_df)
-
     # Get default fill value from module config
     default_fill = wallets_config['data_cleaning']['market_cap_default_fill']
+
+    result = wmc.force_fill_market_cap(input_df,default_fill)
+
 
     # Calculate expected values for each coin
     expected_values = {

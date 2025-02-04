@@ -19,6 +19,7 @@ import utils as u
 logger = logging.getLogger(__name__)
 
 # Load wallets_config at the module level
+wallets_config = WalletsConfig.load_from_yaml('../config/wallets_config.yaml')
 wallets_config = WalletsConfig()
 
 

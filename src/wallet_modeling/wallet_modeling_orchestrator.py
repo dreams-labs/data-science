@@ -1,6 +1,7 @@
 """Orchestrates groups of functions to generate wallet model pipeline"""
 import time
 import logging
+import copy
 import gc
 from datetime import datetime,timedelta
 from typing import Tuple,Optional,Dict,List
@@ -11,13 +12,13 @@ import pandas_gbq
 from google.cloud import bigquery
 
 # Local module imports
+from wallet_modeling.wallet_training_data import WalletTrainingData
 import training_data.profits_row_imputation as pri
 import coin_wallet_metrics.indicators as ind
-import wallet_modeling.wallet_training_data as wtd
+import wallet_features.wallet_features_orchestrator as wfo
 import wallet_features.trading_features as wtf
 import wallet_features.performance_features as wpf
 import wallet_features.transfers_features as wts
-import wallet_features.wallet_features_orchestrator as wfo
 import wallet_features.clustering_features as wcl
 import utils as u
 
@@ -39,11 +40,15 @@ class WalletTrainingDataOrchestrator:
         wallets_metrics_config: dict,
         wallets_features_config: dict
     ):
-        self.wallets_config = wallets_config
+        # Base configs
+        self.wallets_config = copy.deepcopy(wallets_config)
         self.wallets_metrics_config = wallets_metrics_config
         self.wallets_features_config = wallets_features_config
 
+        # Generated objects
         self.parquet_folder = self.wallets_config['training_data']['parquet_folder']
+        self.wtd = WalletTrainingData(wallets_config)  # pass config in
+
 
 
     @u.timing_decorator
@@ -67,12 +72,16 @@ class WalletTrainingDataOrchestrator:
         - tuple: (profits_df, market_data_df, coin_cohort) for the period
         """
         # Get raw period data
-        profits_df, market_data_df = wtd.retrieve_raw_datasets(period_start_date, period_end_date)
+        profits_df, market_data_df = self.wtd.retrieve_raw_datasets(
+            period_start_date,period_end_date
+        )
 
         # Apply cleaning process including coin cohort filter if specified
-        market_data_df = wtd.clean_market_dataset(market_data_df, profits_df,
-                                                    period_start_date, period_end_date,
-                                                    coin_cohort)
+        market_data_df = self.wtd.clean_market_dataset(
+            market_data_df, profits_df,
+            period_start_date, period_end_date,
+            coin_cohort
+        )
         profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
 
         # Set the coin_cohort if it hadn't already been passed
@@ -82,11 +91,14 @@ class WalletTrainingDataOrchestrator:
                         len(coin_cohort))
 
         # Impute the period end (period start is pre-imputed during profits_df generation)
-        imputed_profits_df = pri.impute_profits_for_multiple_dates(profits_df, market_data_df,
-                                                                [period_end_date], n_threads=1)
+        imputed_profits_df = pri.impute_profits_for_multiple_dates(
+            profits_df, market_data_df,
+            [period_end_date],
+            n_threads=6
+        )
 
         # Format and optionally save the datasets
-        profits_df_formatted, market_data_df_formatted = wtd.format_and_save_datasets(
+        profits_df_formatted, market_data_df_formatted = self.wtd.format_and_save_datasets(
             imputed_profits_df,
             market_data_df,
             period_start_date,
@@ -173,7 +185,9 @@ class WalletTrainingDataOrchestrator:
         # Retrieve transfers after cohort is in BigQuery
         logger.info("Retrieving transfers sequencing data...")
         transfers_df = wts.retrieve_transfers_sequencing(
-            self.wallets_config['training_data']['hybridize_wallet_ids']
+            self.wallets_config['features']['timing_metrics_min_transaction_size'],
+            self.wallets_config['training_data']['training_period_end'],
+            self.wallets_config['training_data']['hybridize_wallet_ids'],
         )
         transfers_path = f"{self.parquet_folder}/training_transfers_sequencing_df.parquet"
         transfers_df.to_parquet(transfers_path, index=True)
@@ -380,9 +394,9 @@ class WalletTrainingDataOrchestrator:
         return modeling_wallet_features_df
 
 
-    # -----------------------------------
-    #           Helper Functions
-    # -----------------------------------
+    # ----------------------------------
+    #           Helper Methods
+    # ----------------------------------
 
     def _calculate_window_features(
         self,
@@ -473,14 +487,14 @@ class WalletTrainingDataOrchestrator:
                                                                         training_period_end)
 
         # Apply filters based on wallet behavior during the training period
-        filtered_training_wallet_metrics_df = wtd.apply_wallet_thresholds(training_wallet_metrics_df)
+        filtered_training_wallet_metrics_df = self.wtd.apply_wallet_thresholds(training_wallet_metrics_df)
         training_wallet_cohort = filtered_training_wallet_metrics_df.index.values
 
         if len(training_wallet_cohort) == 0:
             raise ValueError("Cohort does not include any wallets. Cohort must include wallets.")
 
         # Upload the cohort to BigQuery for additional complex feature generation
-        wtd.upload_training_cohort(training_wallet_cohort, hybridize_wallet_ids)
+        self.wtd.upload_training_cohort(training_wallet_cohort, hybridize_wallet_ids)
         logger.info("Training wallet cohort defined as %s wallets after %.2f seconds.",
                     len(training_wallet_cohort), time.time()-start_time)
 
@@ -509,7 +523,7 @@ class WalletTrainingDataOrchestrator:
         ]
 
         # Impute all training window dates
-        training_window_boundary_dates = wtd.generate_training_window_imputation_dates()
+        training_window_boundary_dates = self.wtd.generate_training_window_imputation_dates()
         training_windows_profits_df = pri.impute_profits_for_multiple_dates(cohort_profits_df,
                                                                             training_market_data_df,
                                                                             training_window_boundary_dates,
@@ -517,7 +531,7 @@ class WalletTrainingDataOrchestrator:
 
         # Split profits_df into training windows
         training_windows_profits_df = u.ensure_index(training_windows_profits_df)
-        training_windows_profits_dfs = wtd.split_training_window_dfs(training_windows_profits_df)
+        training_windows_profits_dfs = self.wtd.split_training_window_dfs(training_windows_profits_df)
 
         return training_windows_profits_dfs
 

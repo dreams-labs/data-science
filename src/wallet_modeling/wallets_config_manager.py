@@ -1,8 +1,8 @@
 """Allows the config file to be imported to other wallet .py files"""
-import copy
 from datetime import datetime, timedelta
 from pathlib import Path
 import yaml
+
 
 
 # -------------------------

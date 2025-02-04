@@ -583,6 +583,7 @@ class DropColumnPatterns(BaseEstimator, TransformerMixin):
 
 class FeatureSelector(BaseEstimator, TransformerMixin):
     """Pipeline step for feature selection based on variance and correlation"""
+    __module__ = 'base_modeling.base_model'  # Add this line
 
     def __init__(self, variance_threshold: float, correlation_threshold: float,
                  protected_features: List[str]):
