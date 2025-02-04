@@ -39,7 +39,10 @@ def calculate_market_cap_features(profits_df, market_data_df):
 
     # Force fill market cap gaps if applicable
     if 'market_cap_filled' in market_cap_cols and 'market_cap_filled' not in market_data_df.columns:
-        market_data_df = force_fill_market_cap(market_data_df)
+        market_data_df = force_fill_market_cap(
+            market_data_df,
+            wallets_config['data_cleaning']['market_cap_default_fill']
+        )
 
     # Alias the base column if applicable
     if 'market_cap_unadj' in market_cap_cols:
@@ -97,7 +100,7 @@ def calculate_market_cap_features(profits_df, market_data_df):
 #         Helper Functions
 # ------------------------------
 
-def force_fill_market_cap(market_data_df):
+def force_fill_market_cap(market_data_df, default_market_cap_fill):
     """
     Creates a column 'market_cap_filled' with complete coverage by:
     1. Back- and forwardfilling any existing values which breached thresholds in
@@ -118,8 +121,7 @@ def force_fill_market_cap(market_data_df):
     market_data_df['market_cap_filled'] = market_data_df.groupby('coin_id',observed=True)['market_cap_filled'].ffill()
 
     # For coins with no market cap data at all, bulk fill with a constant
-    default_market_cap = wallets_config['data_cleaning']['market_cap_default_fill']
-    market_data_df['market_cap_filled'] = market_data_df['market_cap_filled'].fillna(default_market_cap)
+    market_data_df['market_cap_filled'] = market_data_df['market_cap_filled'].fillna(default_market_cap_fill)
 
     return market_data_df
 
