@@ -1,3 +1,6 @@
+# dda 642 multi window model
+
+
 # dda 636 time windows configs
 checkpoint 1: w.696 config and data generation working
 Model Performance Summary
