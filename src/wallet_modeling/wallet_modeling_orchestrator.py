@@ -11,13 +11,13 @@ import pandas_gbq
 from google.cloud import bigquery
 
 # Local module imports
+from wallet_modeling.wallet_training_data import WalletTrainingData
 import training_data.profits_row_imputation as pri
 import coin_wallet_metrics.indicators as ind
-import wallet_modeling.wallet_training_data as wtd
+import wallet_features.wallet_features_orchestrator as wfo
 import wallet_features.trading_features as wtf
 import wallet_features.performance_features as wpf
 import wallet_features.transfers_features as wts
-import wallet_features.wallet_features_orchestrator as wfo
 import wallet_features.clustering_features as wcl
 import utils as u
 
@@ -39,11 +39,15 @@ class WalletTrainingDataOrchestrator:
         wallets_metrics_config: dict,
         wallets_features_config: dict
     ):
+        # Base configs
         self.wallets_config = wallets_config
         self.wallets_metrics_config = wallets_metrics_config
         self.wallets_features_config = wallets_features_config
 
+        # Generated objects
         self.parquet_folder = self.wallets_config['training_data']['parquet_folder']
+        self.wtd = WalletTrainingData(wallets_config)  # pass config in
+
 
 
     @u.timing_decorator
@@ -67,12 +71,16 @@ class WalletTrainingDataOrchestrator:
         - tuple: (profits_df, market_data_df, coin_cohort) for the period
         """
         # Get raw period data
-        profits_df, market_data_df = wtd.retrieve_raw_datasets(period_start_date, period_end_date)
+        profits_df, market_data_df = self.wtd.retrieve_raw_datasets(
+            period_start_date,period_end_date
+        )
 
         # Apply cleaning process including coin cohort filter if specified
-        market_data_df = wtd.clean_market_dataset(market_data_df, profits_df,
-                                                    period_start_date, period_end_date,
-                                                    coin_cohort)
+        market_data_df = self.wtd.clean_market_dataset(
+            market_data_df, profits_df,
+            period_start_date, period_end_date,
+            coin_cohort
+        )
         profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
 
         # Set the coin_cohort if it hadn't already been passed
@@ -82,11 +90,14 @@ class WalletTrainingDataOrchestrator:
                         len(coin_cohort))
 
         # Impute the period end (period start is pre-imputed during profits_df generation)
-        imputed_profits_df = pri.impute_profits_for_multiple_dates(profits_df, market_data_df,
-                                                                [period_end_date], n_threads=1)
+        imputed_profits_df = pri.impute_profits_for_multiple_dates(
+            profits_df, market_data_df,
+            [period_end_date],
+            n_threads=6
+        )
 
         # Format and optionally save the datasets
-        profits_df_formatted, market_data_df_formatted = wtd.format_and_save_datasets(
+        profits_df_formatted, market_data_df_formatted = self.wtd.format_and_save_datasets(
             imputed_profits_df,
             market_data_df,
             period_start_date,
@@ -380,9 +391,9 @@ class WalletTrainingDataOrchestrator:
         return modeling_wallet_features_df
 
 
-    # -----------------------------------
-    #           Helper Functions
-    # -----------------------------------
+    # ----------------------------------
+    #           Helper Methods
+    # ----------------------------------
 
     def _calculate_window_features(
         self,
