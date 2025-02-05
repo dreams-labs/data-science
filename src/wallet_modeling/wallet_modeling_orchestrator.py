@@ -48,7 +48,7 @@ class WalletTrainingDataOrchestrator:
         # Generated objects
         self.parquet_folder = self.wallets_config['training_data']['parquet_folder']
         self.wtd = WalletTrainingData(wallets_config)  # pass config in
-
+        self.training_wallet_cohort = None
 
 
     @u.timing_decorator
@@ -516,7 +516,10 @@ class WalletTrainingDataOrchestrator:
             training_profits_df.index.get_level_values('wallet_address').isin(training_wallet_cohort)
         ]
 
-        return training_cohort_profits_df, training_wallet_cohort
+        # Store wallet cohort
+        self.training_wallet_cohort = training_wallet_cohort
+
+        return training_cohort_profits_df
 
 
 
