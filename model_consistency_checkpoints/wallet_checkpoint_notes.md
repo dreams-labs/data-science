@@ -1,4 +1,24 @@
 # dda 642 multi window model
+checkpoint 5: w.696 updated model reporting
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.696
+RMSE:                     0.213
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.800
+RMSE:                     0.121
+MAE:                      0.065
+
+
 checkpoint 4: w.696 wallet_model index match function
 Model Performance Summary
 ===================================
