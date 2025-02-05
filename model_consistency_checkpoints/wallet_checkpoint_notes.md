@@ -1,4 +1,6 @@
 # dda 633 predicting val period
+checkpoint 2: w.
+
 checkpoint 1: xw.721 multi window model working
 Model Performance Summary
 ===================================

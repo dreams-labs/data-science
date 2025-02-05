@@ -115,7 +115,8 @@ class WalletTrainingDataOrchestrator:
         self,
         profits_df_full: pd.DataFrame,
         market_data_df_full: pd.DataFrame,
-        return_files: bool = False
+        return_files: bool = False,
+        period: str = 'training'
     ) -> Union[None, Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
         """
         Consolidated training data preparation pipeline that handles hybridization,
@@ -125,17 +126,18 @@ class WalletTrainingDataOrchestrator:
         - profits_df_full: Full historical profits DataFrame
         - market_data_df_full: Full historical market data DataFrame
         - return_files: If True, returns input dataframes as tuple
+        - period: Which period to retrieve dates from
 
         Returns:
         - None or (profits_df, market_indicators_df, transfers_df) if return_files is True
         """
         # Remove market data before starting balance date and validate periods
         market_data_df = market_data_df_full[
-            market_data_df_full['date'] >= self.wallets_config['training_data']['training_starting_balance_date']
+            market_data_df_full['date'] >= self.wallets_config['training_data'][f'{period}_starting_balance_date']
         ]
         u.assert_period(market_data_df,
-                        self.wallets_config['training_data']['training_period_start'],
-                        self.wallets_config['training_data']['training_period_end'])
+                        self.wallets_config['training_data'][f'{period}_period_start'],
+                        self.wallets_config['training_data'][f'{period}_period_end'])
 
         # Generate market indicators
         def generate_market_indicators():
@@ -143,7 +145,8 @@ class WalletTrainingDataOrchestrator:
             market_indicators_df = self._generate_training_indicators_df(
                 market_data_df_full,
                 self.wallets_metrics_config,
-                parquet_filename=None
+                parquet_filename = None,
+                period = period
             )
             return market_indicators_df
 
@@ -180,15 +183,15 @@ class WalletTrainingDataOrchestrator:
             self.wallets_config['training_data']['hybridize_wallet_ids'],
         )
 
-        if return_files:
+        if return_files is True:
             # Return dfs without saving
             return (profits_df, market_indicators_df, transfers_df)
 
         else:
             # Save all files
-            profits_df.to_parquet(f"{self.parquet_folder}/training_profits_df.parquet",index=True)
-            market_indicators_df.to_parquet(f"{self.parquet_folder}/training_market_indicators_data_df.parquet",index=False)
-            transfers_df.to_parquet(f"{self.parquet_folder}/training_transfers_sequencing_df.parquet",index=True)
+            profits_df.to_parquet(f"{self.parquet_folder}/{period}_profits_df.parquet",index=True)
+            market_indicators_df.to_parquet(f"{self.parquet_folder}/{period}_market_indicators_data_df.parquet",index=False)
+            transfers_df.to_parquet(f"{self.parquet_folder}/{period}_transfers_sequencing_df.parquet",index=True)
 
             return None
 
@@ -315,7 +318,8 @@ class WalletTrainingDataOrchestrator:
     def prepare_modeling_features(
         self,
         modeling_profits_df_full: pd.DataFrame,
-        hybrid_cw_id_map: Optional[Dict] = None
+        hybrid_cw_id_map: Optional[Dict] = None,
+        period: str = 'modeling'
     ) -> pd.DataFrame:
         """
         Orchestrates data preparation and feature generation for modeling.
@@ -325,6 +329,8 @@ class WalletTrainingDataOrchestrator:
         - modeling_profits_df_full: Full profits DataFrame
         - config: Configuration dictionary
         - hybrid_cw_id_map: Optional mapping for hybrid wallet IDs
+        - period: Which period to retrieve dates from
+
 
         Returns:
         - modeling_wallet_features_df: Generated wallet features
@@ -340,7 +346,7 @@ class WalletTrainingDataOrchestrator:
             )
 
         # Filter profits to training cohort
-        if self.training_wallet_cohort:
+        if self.training_wallet_cohort is not None:
             modeling_profits_df = modeling_profits_df_full[
                 modeling_profits_df_full['wallet_address'].isin(self.training_wallet_cohort)
             ]
@@ -350,9 +356,9 @@ class WalletTrainingDataOrchestrator:
 
         # Assert period and save filtered/hybridized profits_df
         u.assert_period(modeling_profits_df,
-                        self.wallets_config['training_data']['modeling_period_start'],
-                        self.wallets_config['training_data']['modeling_period_end'])
-        output_path = f"{self.wallets_config['training_data']['parquet_folder']}/modeling_profits_df.parquet"
+                        self.wallets_config['training_data'][f'{period}_period_start'],
+                        self.wallets_config['training_data'][f'{period}_period_end'])
+        output_path = f"{self.wallets_config['training_data']['parquet_folder']}/{period}_profits_df.parquet"
         modeling_profits_df.to_parquet(output_path, index=False)
 
         # Initialize features DataFrame
@@ -378,9 +384,9 @@ class WalletTrainingDataOrchestrator:
         ).fillna({col: 0 for col in modeling_performance_features_df.columns})
 
         # Save features
-        output_path = f"{self.wallets_config['training_data']['parquet_folder']}/modeling_wallet_features_df.parquet"
+        output_path = f"{self.wallets_config['training_data']['parquet_folder']}/{period}_wallet_features_df.parquet"
         modeling_wallet_features_df.to_parquet(output_path, index=True)
-        logger.info("Saved modeling features to %s", output_path)
+        logger.info(f"Saved {period} features to %s", output_path)
 
         # Clean up memory
         del modeling_trading_features_df, modeling_performance_features_df, modeling_profits_df
@@ -541,7 +547,8 @@ class WalletTrainingDataOrchestrator:
         training_market_data_df_full,
         wallets_metrics_config,
         parquet_filename="training_market_indicators_data_df",
-        parquet_folder="temp/wallet_modeling_dfs"
+        parquet_folder="temp/wallet_modeling_dfs",
+        period='training',
     ):
         """
         Adds the configured indicators to the training period market_data_df and stores it
@@ -555,6 +562,7 @@ class WalletTrainingDataOrchestrator:
         - wallets_metrics_config (dict): metrics_config.py compatible metrics definitions
         - parquet_file, parquet_folder (strings): if these have values, the output df will be saved to this
             location instead of being returned
+        - period: Which period to retrieve dates from
 
         Returns:
         - market_indicators_data_df (df): market_data_df for the training period only
@@ -563,11 +571,11 @@ class WalletTrainingDataOrchestrator:
         logger.info("Beginning indicator generation process...")
 
         # Validate that no records exist after the training period
-        training_period_end = self.wallets_config['training_data']['training_period_end']
+        training_period_end = self.wallets_config['training_data'][f'{period}_period_end']
         latest_market_data_record = training_market_data_df_full['date'].max()
         if latest_market_data_record > pd.to_datetime(training_period_end):
             raise ValueError(
-                f"Detected data after the end of the training period in training_market_data_df_full."
+                f"Detected data after the end of the {period} period in market_data_df_full."
                 f"Latest record found: {latest_market_data_record} vs period end of {training_period_end}"
             )
 
@@ -587,11 +595,11 @@ class WalletTrainingDataOrchestrator:
         # Filters out pre-training period records now that we've computed lookback and rolling metrics
         market_indicators_data_df = market_indicators_data_df[
             market_indicators_data_df['date'] >=
-            self.wallets_config['training_data']['training_starting_balance_date']
+            self.wallets_config['training_data'][f'{period}_starting_balance_date']
         ]
 
         # Reset OBV to 0 at training start if it exists
-        training_start = pd.to_datetime(self.wallets_config['training_data']['training_starting_balance_date'])
+        training_start = pd.to_datetime(self.wallets_config['training_data'][f'{period}_starting_balance_date'])
         if 'obv' in market_indicators_data_df.columns:
             # Group by coin_id since OBV is coin-specific
             for coin_id in market_indicators_data_df['coin_id'].unique():
