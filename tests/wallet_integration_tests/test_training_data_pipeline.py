@@ -14,7 +14,7 @@ from dreams_core import core as dc
 # pyright: reportMissingImports=false
 sys.path.append(str(Path(__file__).parent.parent.parent / 'src'))
 from wallet_modeling.wallets_config_manager import WalletsConfig
-import wallet_modeling.wallet_modeling_orchestrator as wmo
+import wallet_modeling.wallet_training_data_orchestrator as wtdo
 
 load_dotenv()
 logger = dc.setup_logger()
@@ -51,20 +51,20 @@ def period_datasets():
     logger.setLevel(logging.WARNING)
 
     # Get initial training data and coin cohort
-    training_profits_df, training_market_df, coin_cohort = wmo.retrieve_period_datasets(
+    training_profits_df, training_market_df, coin_cohort = wtdo.retrieve_period_datasets(
         wallets_config['training_data']['training_period_start'],
         wallets_config['training_data']['training_period_end']
     )
 
     # Get modeling period data
-    modeling_profits_df, modeling_market_df, _ = wmo.retrieve_period_datasets(
+    modeling_profits_df, modeling_market_df, _ = wtdo.retrieve_period_datasets(
         wallets_config['training_data']['modeling_period_start'],
         wallets_config['training_data']['modeling_period_end'],
         coin_cohort=coin_cohort
     )
 
     # Get combined period data
-    combined_profits_df, combined_market_df, _ = wmo.retrieve_period_datasets(
+    combined_profits_df, combined_market_df, _ = wtdo.retrieve_period_datasets(
         wallets_config['training_data']['training_period_start'],
         wallets_config['training_data']['modeling_period_end'],
         coin_cohort=coin_cohort
@@ -287,14 +287,14 @@ def validation_datasets(period_datasets):
     coin_cohort = period_datasets[-1]
 
     # Get validation period data
-    validation_profits_df, validation_market_df, _ = wmo.retrieve_period_datasets(
+    validation_profits_df, validation_market_df, _ = wtdo.retrieve_period_datasets(
         wallets_config['training_data']['validation_period_start'],
         wallets_config['training_data']['validation_period_end'],
         coin_cohort=coin_cohort
     )
 
     # Get full range data
-    full_range_profits_df, full_range_market_df, _ = wmo.retrieve_period_datasets(
+    full_range_profits_df, full_range_market_df, _ = wtdo.retrieve_period_datasets(
         wallets_config['training_data']['training_period_start'],
         wallets_config['training_data']['validation_period_end'],
         coin_cohort=coin_cohort

@@ -1,3 +1,44 @@
+# dda 633 predicting val period
+checkpoint 2: w.698 adding validation period logic to training data orchestrator
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.698
+RMSE:                     0.212
+MAE:                      0.108
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.803
+RMSE:                     0.121
+MAE:                      0.064
+
+
+checkpoint 1: xw.721 multi window model working
+Model Performance Summary
+===================================
+Test Samples:             238,722
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.721
+RMSE:                     0.207
+MAE:                      0.114
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.761
+RMSE:                     0.135
+MAE:                      0.083
+
+
 # dda 642 multi window model
 checkpoint 10: w.696 it works?
 Model Performance Summary

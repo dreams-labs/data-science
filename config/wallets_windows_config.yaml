@@ -1,3 +1,3 @@
 # WalletModel Windows Config
 offset_windows:
-    offsets: [-120]
+    offsets: [-90, -180, -270, -360]

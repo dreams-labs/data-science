@@ -5,7 +5,7 @@ from typing import Dict, Optional
 import pandas as pd
 
 # Local module imports
-import wallet_modeling.wallet_modeling_orchestrator as wmo
+import wallet_modeling.wallet_training_data_orchestrator as wtdo
 import wallet_modeling.wallet_model as wm
 import wallet_modeling.wallet_model_reporting as wmr
 import wallet_features.performance_features as wpf
@@ -49,7 +49,7 @@ class ExperimentsManager:
         logger.info("Preparing modeling data")
 
         # Create modeling dataset using existing pipeline
-        modeling_wallets_df = wmo.filter_modeling_period_wallets(modeling_profits_df)
+        modeling_wallets_df = wtdo.filter_modeling_period_wallets(modeling_profits_df)
         target_vars_df = wpf.calculate_performance_features(modeling_wallets_df)
 
         # Use experiment-specific target variable
