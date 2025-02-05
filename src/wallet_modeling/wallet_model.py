@@ -103,8 +103,8 @@ class WalletModel(BaseModel):
         """
         logger.info("Beginning model construction...")
 
-        # # Validate indices match
-        # u.assert_matching_indices(training_data_df,modeling_cohort_target_var_df)
+        # Validate indices match
+        u.assert_matching_indices(training_data_df,modeling_cohort_target_var_df)
 
         # Filter target df to only include rows with training data
         modeling_cohort_target_var_df = modeling_cohort_target_var_df[
