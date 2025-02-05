@@ -72,20 +72,17 @@ class MultiWindowOrchestrator:
                     self.features_config
                 )
 
-                # 1. Retrieve base data
-                _,_,_ = data_generator.retrieve_period_datasets(
+                # 1. Generate TRAINING_DATA_DF
+                # Retrieve base data
+                training_profits_df_full,training_market_data_df_full,training_coin_cohort = data_generator.retrieve_period_datasets(
                     window_config['training_data']['training_period_start'],
-                    window_config['training_data']['training_period_end'],
-                    parquet_prefix='training'
+                    window_config['training_data']['training_period_end']
                 )
 
-                # 2. Select cohort and prepare training data
-                training_profits_df_full = pd.read_parquet(f"{parquet_folder}/training_profits_df_full.parquet")
-                training_market_data_df_full = pd.read_parquet(f"{parquet_folder}/training_market_data_df_full.parquet")
+                # Select cohort and prepare training data
                 data_generator.prepare_training_data(training_profits_df_full,training_market_data_df_full)
 
-                # 3. Generate training features
-                parquet_folder = window_config['training_data']['parquet_folder']
+                # Generate training features
                 training_profits_df = pd.read_parquet(f"{parquet_folder}/training_profits_df.parquet")
                 training_market_indicators_df = pd.read_parquet(f"{parquet_folder}/training_market_indicators_data_df.parquet")  # pylint:disable=line-too-long
                 training_transfers_df = pd.read_parquet(f"{parquet_folder}/training_transfers_sequencing_df.parquet")
@@ -96,11 +93,10 @@ class MultiWindowOrchestrator:
                     training_transfers_df
                 )
 
-                # Store with model start date as key
+                # Store filepath with model start date as key
                 training_data_filepath = f"{parquet_folder}/wallet_training_data_df_full.parquet"
                 window_training_data_filepaths[model_start] = training_data_filepath
-
-                logger.info(f"Successfully generated training data for {model_start}")
+                logger.info(f"Successfully generated training data for window {model_start}")
 
             except Exception as e:
                 logger.error(f"Failed to generate training data for {model_start}: {str(e)}")
