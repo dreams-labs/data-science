@@ -143,11 +143,6 @@ class WalletTrainingDataOrchestrator:
                 self.wallets_metrics_config,
                 parquet_filename=None
             )
-            market_indicators_df.to_parquet(
-                f"{self.parquet_folder}/training_market_indicators_data_df.parquet",
-                index=False
-            )
-            # Added return for optional collection
             return market_indicators_df
 
         # Define training wallet cohort
@@ -163,22 +158,17 @@ class WalletTrainingDataOrchestrator:
                 del hybrid_cw_id_map
 
             logger.info("Defining wallet cohort...")
-            profits_df, _ = self._define_training_wallet_cohort(
+            profits_df = self._define_training_wallet_cohort(
                 profits_df_full.copy(),
                 market_data_df.copy(),
                 self.wallets_config['training_data']['hybridize_wallet_ids']
             )
-            profits_df.to_parquet(
-                f"{self.parquet_folder}/training_profits_df.parquet",
-                index=True
-            )
-            # Added return for optional collection
             return profits_df
 
         # Modified to capture futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            market_future = executor.submit(generate_market_indicators)
-            profits_future = executor.submit(define_training_cohort, profits_df_full)
+            market_indicators_df = executor.submit(generate_market_indicators).result()
+            profits_df = executor.submit(define_training_cohort, profits_df_full).result()
 
         # Retrieve transfers after cohort is in BigQuery
         logger.info("Retrieving transfers sequencing data...")
@@ -187,26 +177,19 @@ class WalletTrainingDataOrchestrator:
             self.wallets_config['training_data']['training_period_end'],
             self.wallets_config['training_data']['hybridize_wallet_ids'],
         )
-        transfers_df.to_parquet(
-            f"{self.parquet_folder}/training_transfers_sequencing_df.parquet",
-            index=True
-        )
 
         if return_files:
-            # Collect results from futures
-            market_indicators_df = market_future.result()
-            profits_df = profits_future.result()
-            # Create tuple for return
-            return_tuple = (profits_df, market_indicators_df, transfers_df)
-            # Clean up memory if we're not returning these variables
-            del profits_df_full, market_data_df_full
-            gc.collect()
-            return return_tuple
+            # Return dfs without saving
+            return (profits_df, market_indicators_df, transfers_df)
+
         else:
-            # Original cleanup
-            del profits_df_full, market_data_df_full, transfers_df
-            gc.collect()
+            # Save all files
+            profits_df.to_parquet(f"{self.parquet_folder}/training_profits_df.parquet",index=True)
+            market_indicators_df.to_parquet(f"{self.parquet_folder}/training_market_indicators_data_df.parquet",index=False)
+            transfers_df.to_parquet(f"{self.parquet_folder}/training_transfers_sequencing_df.parquet",index=True)
+
             return None
+
 
 
 
