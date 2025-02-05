@@ -55,24 +55,27 @@ class MultiWindowOrchestrator:
             self.all_windows_configs = self._generate_window_configs()
 
         window_training_data_filepaths = {}
+        window_modeling_data_filepaths = {}
 
         for window_config in self.all_windows_configs:
             model_start = window_config['training_data']['modeling_period_start']
             logger.info(f"Generating training data for window starting {model_start}")
 
             # Generate name of parquet folder and create it if necessary
-            parquet_folder = window_config['training_data']['parquet_folder']
-            os.makedirs(parquet_folder, exist_ok=True)
+            window_parquet_folder = window_config['training_data']['parquet_folder']
+            os.makedirs(window_parquet_folder, exist_ok=True)
 
             try:
-                # Initialize data generator with window-specific config
+                # 1. Initialize data generator for window
+                # ---------------------------------------
                 data_generator = wmo.WalletTrainingDataOrchestrator(
                     window_config,
                     self.metrics_config,
                     self.features_config
                 )
 
-                # 1. Generate TRAINING_DATA_DF
+                # 2. Generate TRAINING_DATA_DFs
+                # -----------------------------
                 # Retrieve base data
                 training_profits_df_full,training_market_data_df_full,training_coin_cohort = data_generator.retrieve_period_datasets(
                     window_config['training_data']['training_period_start'],
@@ -80,23 +83,44 @@ class MultiWindowOrchestrator:
                 )
 
                 # Select cohort and prepare training data
-                data_generator.prepare_training_data(training_profits_df_full,training_market_data_df_full)
+                (training_profits_df, training_market_indicators_df, training_transfers_df
+                 ) = data_generator.prepare_training_data(training_profits_df_full, training_market_data_df_full, True)
 
-                # Generate training features
-                training_profits_df = pd.read_parquet(f"{parquet_folder}/training_profits_df.parquet")
-                training_market_indicators_df = pd.read_parquet(f"{parquet_folder}/training_market_indicators_data_df.parquet")  # pylint:disable=line-too-long
-                training_transfers_df = pd.read_parquet(f"{parquet_folder}/training_transfers_sequencing_df.parquet")
-
+                # Generate features
                 data_generator.generate_training_features(
                     training_profits_df,
                     training_market_indicators_df,
                     training_transfers_df
                 )
 
-                # Store filepath with model start date as key
-                training_data_filepath = f"{parquet_folder}/wallet_training_data_df_full.parquet"
-                window_training_data_filepaths[model_start] = training_data_filepath
+                # Store training data filepath
+                window_training_data_filepaths[model_start] = f"{window_parquet_folder}/wallet_training_data_df_full.parquet"
+
+
+                # 3. Generate MODELING_DATA_DFs
+                # -----------------------------
+                # Retrieve base data
+                modeling_profits_df_full,_,_ = data_generator.retrieve_period_datasets(
+                    window_config['training_data']['modeling_period_start'],
+                    window_config['training_data']['modeling_period_end'],
+                    training_coin_cohort)
+
+                # Generate modeling wallet features
+                hybrid_cw_id_map = None
+                if window_config['training_data']['hybridize_wallet_ids']:
+                    hybrid_cw_id_map = pd.read_pickle(f"{window_parquet_folder}/hybrid_cw_id_map.pkl")
+                _ = data_generator.prepare_modeling_features(
+                    modeling_profits_df_full,
+                    hybrid_cw_id_map
+                )
+
+                # Store modeling data filepath
+                window_modeling_data_filepaths[model_start] = f"{window_parquet_folder}/modeling_wallet_features_df.parquet"
+
+
                 logger.info(f"Successfully generated training data for window {model_start}")
+                u.notify('click_2')
+
 
             except Exception as e:
                 logger.error(f"Failed to generate training data for {model_start}: {str(e)}")
@@ -104,7 +128,7 @@ class MultiWindowOrchestrator:
 
         merged_df = self._merge_window_training_data(window_training_data_filepaths)
         logger.info("Generated multi-window TRAINING_DATA_DF with shape %s", merged_df.shape)
-        u.nofify('level_up')
+        u.notify('level_up')
 
         return merged_df
 

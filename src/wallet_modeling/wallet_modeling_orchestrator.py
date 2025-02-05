@@ -147,6 +147,8 @@ class WalletTrainingDataOrchestrator:
                 f"{self.parquet_folder}/training_market_indicators_data_df.parquet",
                 index=False
             )
+            # Added return for optional collection
+            return market_indicators_df
 
         # Define training wallet cohort
         def define_training_cohort(profits_df_full):
@@ -170,11 +172,13 @@ class WalletTrainingDataOrchestrator:
                 f"{self.parquet_folder}/training_profits_df.parquet",
                 index=True
             )
+            # Added return for optional collection
+            return profits_df
 
-        # Run market indicators and cohort definition in parallel
+        # Modified to capture futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            executor.submit(generate_market_indicators)
-            executor.submit(define_training_cohort, profits_df_full)
+            market_future = executor.submit(generate_market_indicators)
+            profits_future = executor.submit(define_training_cohort, profits_df_full)
 
         # Retrieve transfers after cohort is in BigQuery
         logger.info("Retrieving transfers sequencing data...")
@@ -188,9 +192,21 @@ class WalletTrainingDataOrchestrator:
             index=True
         )
 
-        # Clean up memory
-        del profits_df_full, market_data_df_full, transfers_df
-        gc.collect()
+        if return_files:
+            # Collect results from futures
+            market_indicators_df = market_future.result()
+            profits_df = profits_future.result()
+            # Create tuple for return
+            return_tuple = (profits_df, market_indicators_df, transfers_df)
+            # Clean up memory if we're not returning these variables
+            del profits_df_full, market_data_df_full
+            gc.collect()
+            return return_tuple
+        else:
+            # Original cleanup
+            del profits_df_full, market_data_df_full, transfers_df
+            gc.collect()
+            return None
 
 
 
@@ -207,7 +223,6 @@ class WalletTrainingDataOrchestrator:
         - profits_df: Training period profits data
         - market_indicators_df: Market data with indicators
         - transfers_df: Transfers sequencing data
-        - return_files: If True, returns input dataframes as tuple
         """
         # Ensure index
         profits_df = u.ensure_index(profits_df)
