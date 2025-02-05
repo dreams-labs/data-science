@@ -717,6 +717,25 @@ def assert_period(df, period_start, period_end) -> None:
             raise ValueError("Found non-imputed records in starting balance")
 
 
+def assert_matching_indices(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
+    """
+    Assert that two DataFrames have matching indices.
+
+    If either DataFrame's index is unsorted, sorts it for comparison.
+    Raises a ValueError if the indices differ.
+
+    Params:
+    - df1 (DataFrame): First DataFrame.
+    - df2 (DataFrame): Second DataFrame.
+    """
+    # Use sorted index only if necessary to optimize performance
+    idx1 = df1.index if df1.index.is_monotonic_increasing else df1.index.sort_values()
+    idx2 = df2.index if df2.index.is_monotonic_increasing else df2.index.sort_values()
+
+    # Check if indices match exactly
+    if not idx1.equals(idx2):
+        raise ValueError("DataFrames have mismatched indices.")
+
 
 def ensure_index(df: pd.DataFrame) -> pd.DataFrame:
     """
