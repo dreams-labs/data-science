@@ -38,17 +38,19 @@ class WalletTrainingDataOrchestrator:
         self,
         wallets_config: dict,
         wallets_metrics_config: dict,
-        wallets_features_config: dict
+        wallets_features_config: dict,
+        training_wallet_cohort: List[int] = None
     ):
         # Base configs
         self.wallets_config = copy.deepcopy(wallets_config)
         self.wallets_metrics_config = wallets_metrics_config
         self.wallets_features_config = wallets_features_config
+        self.training_wallet_cohort = training_wallet_cohort
 
         # Generated objects
         self.parquet_folder = self.wallets_config['training_data']['parquet_folder']
         self.wtd = WalletTrainingData(wallets_config)  # pass config in
-        self.training_wallet_cohort = None
+
 
 
     @u.timing_decorator
