@@ -306,6 +306,7 @@ class WalletTrainingDataOrchestrator:
 
 
 
+
     # -----------------------------------------
     #   Modeling Data Orchestration Methods
     # -----------------------------------------
@@ -338,16 +339,9 @@ class WalletTrainingDataOrchestrator:
                 hybrid_cw_id_map
             )
 
-        # Get training wallet cohort
-        logger.info("Loading training wallet cohort...")
-        training_wallet_cohort = pd.read_parquet(
-            f"{self.wallets_config['training_data']['parquet_folder']}/wallet_training_data_df_full.parquet",
-            columns=[]
-        ).index.values
-
         # Filter profits to training cohort
         modeling_profits_df = modeling_profits_df_full[
-            modeling_profits_df_full['wallet_address'].isin(training_wallet_cohort)
+            modeling_profits_df_full['wallet_address'].isin(self.training_wallet_cohort)
         ]
         del modeling_profits_df_full
 
@@ -360,7 +354,7 @@ class WalletTrainingDataOrchestrator:
 
         # Initialize features DataFrame
         logger.info("Generating modeling features...")
-        modeling_wallet_features_df = pd.DataFrame(index=training_wallet_cohort)
+        modeling_wallet_features_df = pd.DataFrame(index=self.training_wallet_cohort)
         modeling_wallet_features_df.index.name = 'wallet_address'
 
         # Generate trading features and identify modeling cohort
