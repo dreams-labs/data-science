@@ -95,7 +95,6 @@ class WalletModel(BaseModel):
     #         Primary Interface
     # -----------------------------------
 
-    # NEW
     def construct_wallet_model(self,
                                 training_data_df: pd.DataFrame,
                                 modeling_cohort_target_var_df: pd.DataFrame,

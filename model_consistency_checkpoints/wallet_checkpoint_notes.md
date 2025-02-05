@@ -1,3 +1,26 @@
+# dda 642 multi window model
+
+# dda 645 parquet file handling
+checkpoint 1: w.696 implemented file handling
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.696
+RMSE:                     0.213
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.800
+RMSE:                     0.121
+MAE:                      0.065
+
+
 # dda 636 time windows configs
 checkpoint 1: w.696 config and data generation working
 Model Performance Summary
