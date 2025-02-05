@@ -11,7 +11,7 @@ import pytest
 
 # pyright: reportMissingImports=false
 sys.path.append(str(Path(__file__).parent.parent.parent / 'src'))
-import wallet_modeling.wallet_modeling_orchestrator as wmo
+import wallet_modeling.wallet_training_data_orchestrator as wtdo
 
 
 
@@ -54,7 +54,7 @@ def test_wallet_coin_hybridization():
     original_df = test_df.copy()
 
     # Test hybridization
-    hybrid_df, hybrid_map = wmo.hybridize_wallet_address(test_df)
+    hybrid_df, hybrid_map = wtdo.hybridize_wallet_address(test_df)
 
     # Validate hybrid keys
     assert len(hybrid_map) == 6, "Should create exactly 6 unique mappings"
@@ -67,7 +67,7 @@ def test_wallet_coin_hybridization():
         "Non-key columns should remain unchanged"
 
     # Test dehybridization
-    restored_df = wmo.dehybridize_wallet_address(hybrid_df, hybrid_map)
+    restored_df = wtdo.dehybridize_wallet_address(hybrid_df, hybrid_map)
 
     # Validate restoration
     assert np.allclose(restored_df['wallet_address'], original_df['wallet_address'], equal_nan=True), \
@@ -130,7 +130,7 @@ def test_wallet_coin_hybridization_with_temporal_data():
     original_df = test_df.copy()
 
     # Test hybridization
-    hybrid_df, hybrid_map = wmo.hybridize_wallet_address(test_df)
+    hybrid_df, hybrid_map = wtdo.hybridize_wallet_address(test_df)
 
     # Validate unique wallet-coin pair mappings
     unique_wallet_coins = len(test_df.groupby(['wallet_address', 'coin_id']))
@@ -144,7 +144,7 @@ def test_wallet_coin_hybridization_with_temporal_data():
         "Should maintain same number of unique wallets per coin"
 
     # Test dehybridization
-    restored_df = wmo.dehybridize_wallet_address(hybrid_df, hybrid_map)
+    restored_df = wtdo.dehybridize_wallet_address(hybrid_df, hybrid_map)
 
     # Validate complete restoration
     assert np.allclose(restored_df['wallet_address'], original_df['wallet_address'], equal_nan=True), \

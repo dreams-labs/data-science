@@ -9,7 +9,7 @@ import pandas as pd
 
 # Local module imports
 import wallet_modeling.wallets_config_manager as wcm
-import wallet_modeling.wallet_modeling_orchestrator as wmo
+import wallet_modeling.wallet_training_data_orchestrator as wtdo
 import utils as u
 
 # Set up logger at the module level
@@ -71,7 +71,7 @@ class MultiWindowOrchestrator:
 
             try:
                 # 1. Initialize data generator for window
-                data_generator = wmo.WalletTrainingDataOrchestrator(
+                data_generator = wtdo.WalletTrainingDataOrchestrator(
                     window_config,
                     self.metrics_config,
                     self.features_config

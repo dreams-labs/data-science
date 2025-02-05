@@ -222,7 +222,7 @@ def test_profits_df(test_profits_data):
     )
     assert all(validation_results.values()), "Test data failed validation checks."
 
-    # Remove rows with a rounded 0 balance and 0 transfers which happens in wmo.retrieve_datasets() once validation checks are passed
+    # Remove rows with a rounded 0 balance and 0 transfers which happens in wtdo.retrieve_datasets() once validation checks are passed
     profits_df = profits_df[
         ~((profits_df['usd_balance'] == 0) &
         (profits_df['usd_net_transfers'] == 0))
@@ -774,7 +774,7 @@ def test_remapped_profits_df(test_profits_data):
     )
     assert all(validation_results.values()), "Test data failed validation checks."
 
-    # Remove rows with a rounded 0 balance and 0 transfers which happens in wmo.retrieve_datasets() once validation checks are passed
+    # Remove rows with a rounded 0 balance and 0 transfers which happens in wtdo.retrieve_datasets() once validation checks are passed
     profits_df = profits_df[
         ~((profits_df['usd_balance'] == 0) &
         (profits_df['usd_net_transfers'] == 0))
