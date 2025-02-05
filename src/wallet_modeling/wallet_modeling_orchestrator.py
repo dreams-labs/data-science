@@ -4,7 +4,7 @@ import logging
 import copy
 import gc
 from datetime import datetime,timedelta
-from typing import Tuple,Optional,Dict,List
+from typing import Tuple,Optional,Dict,List,Union
 import concurrent
 import pandas as pd
 import numpy as np
@@ -112,8 +112,9 @@ class WalletTrainingDataOrchestrator:
     def prepare_training_data(
         self,
         profits_df_full: pd.DataFrame,
-        market_data_df_full: pd.DataFrame
-    ) -> List[str]:
+        market_data_df_full: pd.DataFrame,
+        return_files: bool = False
+    ) -> Union[None, Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
         """
         Consolidated training data preparation pipeline that handles hybridization,
         indicator generation, cohort definition and transfers retrieval.
@@ -121,14 +122,11 @@ class WalletTrainingDataOrchestrator:
         Params:
         - profits_df_full: Full historical profits DataFrame
         - market_data_df_full: Full historical market data DataFrame
-        - wallets_metrics_config: Configuration for market indicators
-        - parquet_folder: Required folder for parquet storage
+        - return_files: If True, returns input dataframes as tuple
 
         Returns:
-        - List of generated parquet file paths
+        - None or (profits_df, market_indicators_df, transfers_df) if return_files is True
         """
-        generated_files = []
-
         # Remove market data before starting balance date and validate periods
         market_data_df = market_data_df_full[
             market_data_df_full['date'] >= self.wallets_config['training_data']['training_starting_balance_date']
@@ -145,19 +143,20 @@ class WalletTrainingDataOrchestrator:
                 self.wallets_metrics_config,
                 parquet_filename=None
             )
-            market_indicators_path = f"{self.parquet_folder}/training_market_indicators_data_df.parquet"
-            market_indicators_df.to_parquet(market_indicators_path, index=False)
-            return market_indicators_path
+            market_indicators_df.to_parquet(
+                f"{self.parquet_folder}/training_market_indicators_data_df.parquet",
+                index=False
+            )
 
         # Define training wallet cohort
         def define_training_cohort(profits_df_full):
             # Hybridize wallet IDs if configured
             if self.wallets_config['training_data']['hybridize_wallet_ids']:
                 profits_df_full, hybrid_cw_id_map = hybridize_wallet_address(profits_df_full)
-                hybrid_map_path = f"{self.parquet_folder}/hybrid_cw_id_map.pkl"
-                pd.to_pickle(hybrid_cw_id_map, hybrid_map_path)
-                generated_files.append(hybrid_map_path)
-
+                pd.to_pickle(
+                    hybrid_cw_id_map,
+                    f"{self.parquet_folder}/hybrid_cw_id_map.pkl"
+                )
                 upload_hybrid_wallet_mapping(hybrid_cw_id_map)
                 del hybrid_cw_id_map
 
@@ -167,20 +166,15 @@ class WalletTrainingDataOrchestrator:
                 market_data_df.copy(),
                 self.wallets_config['training_data']['hybridize_wallet_ids']
             )
-            profits_path = f"{self.parquet_folder}/training_profits_df.parquet"
-            profits_df.to_parquet(profits_path, index=True)
-            return profits_path
+            profits_df.to_parquet(
+                f"{self.parquet_folder}/training_profits_df.parquet",
+                index=True
+            )
 
         # Run market indicators and cohort definition in parallel
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            market_future = executor.submit(generate_market_indicators)
-            cohort_future = executor.submit(define_training_cohort, profits_df_full)
-
-            market_indicators_path = market_future.result()
-            profits_path = cohort_future.result()
-
-
-        generated_files.extend([market_indicators_path, profits_path])
+            executor.submit(generate_market_indicators)
+            executor.submit(define_training_cohort, profits_df_full)
 
         # Retrieve transfers after cohort is in BigQuery
         logger.info("Retrieving transfers sequencing data...")
@@ -189,15 +183,14 @@ class WalletTrainingDataOrchestrator:
             self.wallets_config['training_data']['training_period_end'],
             self.wallets_config['training_data']['hybridize_wallet_ids'],
         )
-        transfers_path = f"{self.parquet_folder}/training_transfers_sequencing_df.parquet"
-        transfers_df.to_parquet(transfers_path, index=True)
-        generated_files.append(transfers_path)
+        transfers_df.to_parquet(
+            f"{self.parquet_folder}/training_transfers_sequencing_df.parquet",
+            index=True
+        )
 
         # Clean up memory
         del profits_df_full, market_data_df_full, transfers_df
         gc.collect()
-
-        return generated_files
 
 
 
@@ -205,7 +198,7 @@ class WalletTrainingDataOrchestrator:
         self,
         profits_df: pd.DataFrame,
         market_indicators_df: pd.DataFrame,
-        transfers_df: pd.DataFrame,
+        transfers_df: pd.DataFrame
     ) -> None:
         """
         Orchestrates end-to-end feature generation with parallel window processing.
@@ -214,8 +207,7 @@ class WalletTrainingDataOrchestrator:
         - profits_df: Training period profits data
         - market_indicators_df: Market data with indicators
         - transfers_df: Transfers sequencing data
-        - wallet_cohort: List of wallet addresses
-        - parquet_folder: Location for parquet storage
+        - return_files: If True, returns input dataframes as tuple
         """
         # Ensure index
         profits_df = u.ensure_index(profits_df)
