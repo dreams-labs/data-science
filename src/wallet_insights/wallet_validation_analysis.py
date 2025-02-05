@@ -1,5 +1,7 @@
 import logging
 from typing import List, Dict
+from pathlib import Path
+import pickle
 import pandas as pd
 import numpy as np
 from sklearn.metrics import (
@@ -9,7 +11,6 @@ from sklearn.metrics import (
     explained_variance_score,
     mean_absolute_percentage_error,
 )
-
 
 # Local module imports
 from wallet_modeling.wallets_config_manager import WalletsConfig
@@ -24,6 +25,43 @@ logger = logging.getLogger(__name__)
 wallets_config = WalletsConfig()
 
 
+# ----------------------------------------
+#      Validation Period Predictions
+# ----------------------------------------
+
+def load_and_predict(model_id: str, new_data: pd.DataFrame, base_path: str) -> pd.Series:
+    """
+    Load a saved pipeline by UUID and generate predictions for new data.
+
+    Params:
+    - model_id (str): UUID of the saved model
+    - new_data (pd.DataFrame): New feature data for predictions
+    - base_path (str): Base path where model artifacts are stored
+
+    Returns:
+    - pd.Series: Predictions indexed by new_data index
+    """
+    pipeline_path = Path(base_path) / 'wallet_models' / f"wallet_model_{model_id}.pkl"
+
+    if not pipeline_path.exists():
+        raise FileNotFoundError(f"No pipeline found at {pipeline_path}")
+
+    with open(pipeline_path, 'rb') as f:
+        pipeline = pickle.load(f)
+
+    predictions = pd.Series(
+        pipeline.predict(new_data),
+        index=new_data.index
+    )
+
+    return predictions
+
+
+
+
+# ----------------------------------------
+#       Other Analytics Functions
+# ----------------------------------------
 
 def analyze_cohort_performance(performance_df: pd.DataFrame,
                              cohort_dict: Dict[str, List[str]],
