@@ -214,8 +214,9 @@ class WalletTrainingDataOrchestrator:
         self,
         profits_df: pd.DataFrame,
         market_indicators_df: pd.DataFrame,
-        transfers_df: pd.DataFrame
-    ) -> None:
+        transfers_df: pd.DataFrame,
+        return_files: bool = False
+    ) -> Union[None, pd.DataFrame]:
         """
         Orchestrates end-to-end feature generation with parallel window processing.
 
@@ -307,11 +308,16 @@ class WalletTrainingDataOrchestrator:
                 f"generation. First few missing: {list(missing_wallets)[:5]}"
             )
 
-        # Save final version
-        wallet_training_data_df_full.to_parquet(
-            f"{self.parquet_folder}/wallet_training_data_df_full.parquet",
-            index=True
-        )
+        # Return file if configured to
+        if return_files is True:
+            return wallet_training_data_df_full
+
+        # Otherwise save final version
+        else:
+            wallet_training_data_df_full.to_parquet(
+                f"{self.parquet_folder}/wallet_training_data_df_full.parquet",
+                index=True
+            )
 
 
 
