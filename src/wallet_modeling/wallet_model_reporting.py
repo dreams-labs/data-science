@@ -101,17 +101,28 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path):
 
 
     # 4. Save wallet scores
-    wallet_addresses = get_training_cohort_addresses()
     wallet_scores_df = pd.DataFrame({
         'wallet_id': model_results['training_cohort_pred'].index,
         'score': model_results['training_cohort_pred'],
         'in_modeling_cohort': model_results['training_cohort_pred'].index.isin(model_results['y_test'].index)
     })
-    wallet_scores_df = wallet_scores_df.merge(
-        wallet_addresses,
-        on='wallet_id',
-        how='left'
+
+    # Retrieve non-id wallet_address values
+    wallet_addresses = get_training_cohort_addresses()
+    wallet_scores_df = (
+        wallet_scores_df
+        .reset_index(level='wallet_address')
+        .merge(
+            wallet_addresses,
+            left_on='wallet_address',
+            right_on='wallet_id',
+            how='left',
+            suffixes=('_orig', '')  # keep right's wallet_address as is
+        )
+        .set_index('wallet_address', append=True)  # use wallet_address from wallet_addresses
+        .drop(['wallet_id', 'wallet_address_orig'], axis=1)  # drop unneeded columns
     )
+
     wallet_scores_path = base_dir / 'wallet_scores' / f"wallet_scores_{model_id}.csv"
     wallet_scores_df.to_csv(wallet_scores_path, index=True)
     logger.info(f"Saved wallet scores and addresses to {wallet_scores_path}")

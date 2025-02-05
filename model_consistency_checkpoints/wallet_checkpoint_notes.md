@@ -1,4 +1,224 @@
 # dda 642 multi window model
+checkpoint 10: w.696 it works?
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.696
+RMSE:                     0.213
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.800
+RMSE:                     0.121
+MAE:                      0.065
+
+
+checkpoint 9: w.696 _init_
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.696
+RMSE:                     0.213
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.800
+RMSE:                     0.121
+MAE:                      0.065
+
+
+checkpoint 8: w.696 prepare_training_data()
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.696
+RMSE:                     0.213
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.800
+RMSE:                     0.121
+MAE:                      0.065
+
+
+checkpoint 7: w.696 _define_training_wallet_cohort()
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.696
+RMSE:                     0.213
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.800
+RMSE:                     0.121
+MAE:                      0.065
+
+
+checkpoint 6: w.696 working on orchestrator
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.696
+RMSE:                     0.213
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.800
+RMSE:                     0.121
+MAE:                      0.065
+
+
+checkpoint 5: w.696 updated model reporting
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.696
+RMSE:                     0.213
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.800
+RMSE:                     0.121
+MAE:                      0.065
+
+
+checkpoint 4: w.696 wallet_model index match function
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.696
+RMSE:                     0.213
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.800
+RMSE:                     0.121
+MAE:                      0.065
+
+
+
+checkpoint 3: w.696 wallet_model updated
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.696
+RMSE:                     0.213
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.800
+RMSE:                     0.121
+MAE:                      0.065
+
+
+checkpoint 2: w.696 slowly reintegrating
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.696
+RMSE:                     0.213
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.800
+RMSE:                     0.121
+MAE:                      0.065
+
+
+checkpoint 1: w.696 multiwindow model works
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.696
+RMSE:                     0.213
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 -0.839
+RMSE:                     0.368
+MAE:                      0.242
+
+
+checkpoint 1: xw.685 multiwindow model works
+Model Performance Summary
+===================================
+Test Samples:             113,598
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.685
+RMSE:                     0.197
+MAE:                      0.107
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.785
+RMSE:                     0.122
+MAE:                      0.072
+
 
 # dda 645 parquet file handling
 checkpoint 1: w.696 implemented file handling

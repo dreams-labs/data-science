@@ -44,11 +44,6 @@ class WalletModel(BaseModel):
         # Store full training cohort for later scoring
         self.training_data_df = training_data_df.copy()
 
-        # Validate indexes are wallet addresses and matching
-        if not (training_data_df.index.name == 'wallet_address'
-                and modeling_cohort_target_var_df.index.name == 'wallet_address'):
-            raise ValueError("Both dataframes must have wallet_address as index")
-
         # Join target data to features
         modeling_df = training_data_df.join(modeling_cohort_target_var_df, how='left')
 
@@ -74,10 +69,6 @@ class WalletModel(BaseModel):
         """
         if self.training_data_df is None:
             raise ValueError("No training cohort data found. Run prepare_data first.")
-
-        # Validate indexes are wallet addresses and matching
-        if not self.training_data_df.index.name == 'wallet_address':
-            raise ValueError("training_data_df index must be wallet_address")
 
         predictions = pd.Series(
             self.pipeline.predict(self.training_data_df),
@@ -112,9 +103,8 @@ class WalletModel(BaseModel):
         """
         logger.info("Beginning model construction...")
 
-        # Validate all training data has targets
-        if not training_data_df.index.isin(modeling_cohort_target_var_df.index).all():
-            raise ValueError("Some training data points are missing target values.")
+        # Validate indices match
+        u.assert_matching_indices(training_data_df,modeling_cohort_target_var_df)
 
         # Filter target df to only include rows with training data
         modeling_cohort_target_var_df = modeling_cohort_target_var_df[

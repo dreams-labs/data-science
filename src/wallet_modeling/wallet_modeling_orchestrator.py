@@ -38,12 +38,14 @@ class WalletTrainingDataOrchestrator:
         self,
         wallets_config: dict,
         wallets_metrics_config: dict,
-        wallets_features_config: dict
+        wallets_features_config: dict,
+        training_wallet_cohort: List[int] = None
     ):
         # Base configs
         self.wallets_config = copy.deepcopy(wallets_config)
         self.wallets_metrics_config = wallets_metrics_config
         self.wallets_features_config = wallets_features_config
+        self.training_wallet_cohort = training_wallet_cohort
 
         # Generated objects
         self.parquet_folder = self.wallets_config['training_data']['parquet_folder']
@@ -143,11 +145,6 @@ class WalletTrainingDataOrchestrator:
                 self.wallets_metrics_config,
                 parquet_filename=None
             )
-            market_indicators_df.to_parquet(
-                f"{self.parquet_folder}/training_market_indicators_data_df.parquet",
-                index=False
-            )
-            # Added return for optional collection
             return market_indicators_df
 
         # Define training wallet cohort
@@ -163,22 +160,17 @@ class WalletTrainingDataOrchestrator:
                 del hybrid_cw_id_map
 
             logger.info("Defining wallet cohort...")
-            profits_df, _ = self._define_training_wallet_cohort(
+            profits_df = self._define_training_wallet_cohort(
                 profits_df_full.copy(),
                 market_data_df.copy(),
                 self.wallets_config['training_data']['hybridize_wallet_ids']
             )
-            profits_df.to_parquet(
-                f"{self.parquet_folder}/training_profits_df.parquet",
-                index=True
-            )
-            # Added return for optional collection
             return profits_df
 
         # Modified to capture futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            market_future = executor.submit(generate_market_indicators)
-            profits_future = executor.submit(define_training_cohort, profits_df_full)
+            market_indicators_df = executor.submit(generate_market_indicators).result()
+            profits_df = executor.submit(define_training_cohort, profits_df_full).result()
 
         # Retrieve transfers after cohort is in BigQuery
         logger.info("Retrieving transfers sequencing data...")
@@ -187,26 +179,19 @@ class WalletTrainingDataOrchestrator:
             self.wallets_config['training_data']['training_period_end'],
             self.wallets_config['training_data']['hybridize_wallet_ids'],
         )
-        transfers_df.to_parquet(
-            f"{self.parquet_folder}/training_transfers_sequencing_df.parquet",
-            index=True
-        )
 
         if return_files:
-            # Collect results from futures
-            market_indicators_df = market_future.result()
-            profits_df = profits_future.result()
-            # Create tuple for return
-            return_tuple = (profits_df, market_indicators_df, transfers_df)
-            # Clean up memory if we're not returning these variables
-            del profits_df_full, market_data_df_full
-            gc.collect()
-            return return_tuple
+            # Return dfs without saving
+            return (profits_df, market_indicators_df, transfers_df)
+
         else:
-            # Original cleanup
-            del profits_df_full, market_data_df_full, transfers_df
-            gc.collect()
+            # Save all files
+            profits_df.to_parquet(f"{self.parquet_folder}/training_profits_df.parquet",index=True)
+            market_indicators_df.to_parquet(f"{self.parquet_folder}/training_market_indicators_data_df.parquet",index=False)
+            transfers_df.to_parquet(f"{self.parquet_folder}/training_transfers_sequencing_df.parquet",index=True)
+
             return None
+
 
 
 
@@ -214,8 +199,9 @@ class WalletTrainingDataOrchestrator:
         self,
         profits_df: pd.DataFrame,
         market_indicators_df: pd.DataFrame,
-        transfers_df: pd.DataFrame
-    ) -> None:
+        transfers_df: pd.DataFrame,
+        return_files: bool = False
+    ) -> Union[None, pd.DataFrame]:
         """
         Orchestrates end-to-end feature generation with parallel window processing.
 
@@ -307,11 +293,17 @@ class WalletTrainingDataOrchestrator:
                 f"generation. First few missing: {list(missing_wallets)[:5]}"
             )
 
-        # Save final version
-        wallet_training_data_df_full.to_parquet(
-            f"{self.parquet_folder}/wallet_training_data_df_full.parquet",
-            index=True
-        )
+        # Return file if configured to
+        if return_files is True:
+            return wallet_training_data_df_full
+
+        # Otherwise save final version
+        else:
+            wallet_training_data_df_full.to_parquet(
+                f"{self.parquet_folder}/wallet_training_data_df_full.parquet",
+                index=True
+            )
+
 
 
 
@@ -347,16 +339,9 @@ class WalletTrainingDataOrchestrator:
                 hybrid_cw_id_map
             )
 
-        # Get training wallet cohort
-        logger.info("Loading training wallet cohort...")
-        training_wallet_cohort = pd.read_parquet(
-            f"{self.wallets_config['training_data']['parquet_folder']}/wallet_training_data_df_full.parquet",
-            columns=[]
-        ).index.values
-
         # Filter profits to training cohort
         modeling_profits_df = modeling_profits_df_full[
-            modeling_profits_df_full['wallet_address'].isin(training_wallet_cohort)
+            modeling_profits_df_full['wallet_address'].isin(self.training_wallet_cohort)
         ]
         del modeling_profits_df_full
 
@@ -369,7 +354,7 @@ class WalletTrainingDataOrchestrator:
 
         # Initialize features DataFrame
         logger.info("Generating modeling features...")
-        modeling_wallet_features_df = pd.DataFrame(index=training_wallet_cohort)
+        modeling_wallet_features_df = pd.DataFrame(index=self.training_wallet_cohort)
         modeling_wallet_features_df.index.name = 'wallet_address'
 
         # Generate trading features and identify modeling cohort
@@ -510,7 +495,10 @@ class WalletTrainingDataOrchestrator:
             training_profits_df.index.get_level_values('wallet_address').isin(training_wallet_cohort)
         ]
 
-        return training_cohort_profits_df, training_wallet_cohort
+        # Store wallet cohort
+        self.training_wallet_cohort = training_wallet_cohort
+
+        return training_cohort_profits_df
 
 
 

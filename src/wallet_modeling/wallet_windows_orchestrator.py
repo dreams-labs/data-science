@@ -3,7 +3,7 @@ import os
 import logging
 from pathlib import Path
 import copy
-from typing import List, Dict
+from typing import List,Dict,Tuple
 from datetime import datetime, timedelta
 import pandas as pd
 
@@ -44,22 +44,26 @@ class MultiWindowOrchestrator:
 
 
     @u.timing_decorator
-    def generate_windows_training_data(self) -> pd.DataFrame:
+    def generate_windows_training_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Generates training data for all window configs in parallel.
 
         Returns:
-        - merged_df (pd.DataFrame): DF indexed on wallet_address,
+        - merged_training_df: MultiIndexed on (wallet_address, window_start_date)
+        - merged_modeling_df: MultiIndexed on (wallet_address, window_start_date)
         """
+        u.notify('intro_3')
         if not self.all_windows_configs:
             self.all_windows_configs = self._generate_window_configs()
 
-        window_training_data_filepaths = {}
-        window_modeling_data_filepaths = {}
+        # Initialize storage for window DataFrames
+        training_window_dfs = {}
+        modeling_window_dfs = {}
 
         for window_config in self.all_windows_configs:
             model_start = window_config['training_data']['modeling_period_start']
-            logger.info(f"Generating training data for window starting {model_start}")
+            logger.info(f"Generating data for window starting {model_start}")
+            u.notify('futuristic')
 
             # Generate name of parquet folder and create it if necessary
             window_parquet_folder = window_config['training_data']['parquet_folder']
@@ -67,7 +71,6 @@ class MultiWindowOrchestrator:
 
             try:
                 # 1. Initialize data generator for window
-                # ---------------------------------------
                 data_generator = wmo.WalletTrainingDataOrchestrator(
                     window_config,
                     self.metrics_config,
@@ -75,63 +78,65 @@ class MultiWindowOrchestrator:
                 )
 
                 # 2. Generate TRAINING_DATA_DFs
-                # -----------------------------
-                # Retrieve base data
-                training_profits_df_full,training_market_data_df_full,training_coin_cohort = data_generator.retrieve_period_datasets(
+                training_profits_df_full, training_market_data_df_full, training_coin_cohort = data_generator.retrieve_period_datasets(
                     window_config['training_data']['training_period_start'],
                     window_config['training_data']['training_period_end']
                 )
 
-                # Select cohort and prepare training data
-                (training_profits_df, training_market_indicators_df, training_transfers_df
-                 ) = data_generator.prepare_training_data(training_profits_df_full, training_market_data_df_full, True)
-
-                # Generate features
-                data_generator.generate_training_features(
-                    training_profits_df,
-                    training_market_indicators_df,
-                    training_transfers_df
+                training_profits_df, training_market_indicators_df, training_transfers_df = data_generator.prepare_training_data(
+                    training_profits_df_full,
+                    training_market_data_df_full,
+                    return_files=True
                 )
 
-                # Store training data filepath
-                window_training_data_filepaths[model_start] = f"{window_parquet_folder}/wallet_training_data_df_full.parquet"
+                window_training_data_df = data_generator.generate_training_features(
+                    training_profits_df,
+                    training_market_indicators_df,
+                    training_transfers_df,
+                    return_files=True
+                )
 
+                # Store training df with window date
+                window_date = datetime.strptime(window_config['training_data']['modeling_period_start'], '%Y-%m-%d')
+                training_window_dfs[window_date] = window_training_data_df
 
                 # 3. Generate MODELING_DATA_DFs
-                # -----------------------------
-                # Retrieve base data
                 modeling_profits_df_full,_,_ = data_generator.retrieve_period_datasets(
                     window_config['training_data']['modeling_period_start'],
                     window_config['training_data']['modeling_period_end'],
-                    training_coin_cohort)
+                    training_coin_cohort
+                )
 
-                # Generate modeling wallet features
                 hybrid_cw_id_map = None
                 if window_config['training_data']['hybridize_wallet_ids']:
-                    hybrid_cw_id_map = pd.read_pickle(f"{window_parquet_folder}/hybrid_cw_id_map.pkl")
-                _ = data_generator.prepare_modeling_features(
+                    hybrid_cw_id_map = pd.read_pickle(f"{window_config['training_data']['parquet_folder']}/hybrid_cw_id_map.pkl")
+
+                window_modeling_features_df = data_generator.prepare_modeling_features(
                     modeling_profits_df_full,
                     hybrid_cw_id_map
                 )
 
-                # Store modeling data filepath
-                window_modeling_data_filepaths[model_start] = f"{window_parquet_folder}/modeling_wallet_features_df.parquet"
+                # Store modeling df with window date
+                modeling_window_dfs[window_date] = window_modeling_features_df
 
-
-                logger.info(f"Successfully generated training data for window {model_start}")
-                u.notify('click_2')
-
+                logger.info(f"Successfully generated data for window {model_start}")
 
             except Exception as e:
-                logger.error(f"Failed to generate training data for {model_start}: {str(e)}")
+                logger.error(f"Failed to generate data for {model_start}: {str(e)}")
                 raise
 
-        merged_df = self._merge_window_training_data(window_training_data_filepaths)
-        logger.info("Generated multi-window TRAINING_DATA_DF with shape %s", merged_df.shape)
+        # Merge window DataFrames
+        wallet_training_data_df = self._merge_window_dfs(training_window_dfs)
+        modeling_wallet_features_df = self._merge_window_dfs(modeling_window_dfs)
+
+        # Confirm indices match
+        u.assert_matching_indices(wallet_training_data_df,modeling_wallet_features_df)
+
+        logger.info("Generated multi-window DataFrames with shapes %s and %s",
+                    wallet_training_data_df.shape, modeling_wallet_features_df.shape)
         u.notify('level_up')
 
-        return merged_df
-
+        return wallet_training_data_df, modeling_wallet_features_df
 
 
     # -----------------------------------
@@ -192,48 +197,27 @@ class MultiWindowOrchestrator:
 
 
 
-    def _merge_window_training_data(self,window_training_data_filepaths: Dict[str, pd.DataFrame]
-        ) -> pd.DataFrame:
+    def _merge_window_dfs(self, window_dfs: Dict[datetime, pd.DataFrame]) -> pd.DataFrame:
         """
-        Merges training data from multiple windows into a single DataFrame with window dates in index.
-        Uses parquet files generated by generate_windows_training_data().
+        Merges window DataFrames into single MultiIndexed DataFrame.
+
+        Params:
+        - window_dfs: Dict mapping window dates to DataFrames
 
         Returns:
-        - merged_df (DataFrame): MultiIndexed DataFrame with (wallet_address, window_start_date)
+        - DataFrame: MultiIndexed on (wallet_address, window_start_date)
         """
-        logger.info("Beginning merge of %d window training datasets...",
-                    len(window_training_data_filepaths))
-
-        # Get window dates from config
-        window_dates = [
-            datetime.strptime(date, '%Y-%m-%d')
-            for date in self.base_config['training_data']['training_window_starts']
-        ]
-
-        # Create mapping of model start dates to file paths
-        date_file_map = dict(zip(window_dates, window_training_data_filepaths.values()))
-
         merged_dfs = []
-        for window_date, filepath in date_file_map.items():
-            # Read window training data
-            window_df = pd.read_parquet(filepath)
-
+        for window_date, df in window_dfs.items():
             # Add window date to index
-            window_df = window_df.set_index(
+            window_df = df.set_index(
                 pd.MultiIndex.from_product(
-                    [window_df.index, [window_date]],
+                    [df.index, [window_date]],
                     names=['wallet_address', 'window_start_date']
                 )
             )
-
             merged_dfs.append(window_df)
 
-        # Combine all windows
-        merged_df = pd.concat(merged_dfs, axis=0)
+        full_df = pd.concat(merged_dfs, axis=0).sort_index()
 
-        # Save merged result
-        output_path = f"{self.base_config['training_data']['parquet_folder']}/merged_training_data.parquet"
-        merged_df.to_parquet(output_path)
-        logger.info("Saved merged training data with shape %s to %s", merged_df.shape, output_path)
-
-        return merged_df
+        return full_df
