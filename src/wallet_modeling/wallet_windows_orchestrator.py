@@ -51,6 +51,8 @@ class MultiWindowOrchestrator:
         - merged_training_df: MultiIndexed on (wallet_address, window_start_date)
         - merged_modeling_df: MultiIndexed on (wallet_address, window_start_date)
         """
+        u.notify('futuristic')
+        u.notify('intro_3')
         if not self.all_windows_configs:
             self.all_windows_configs = self._generate_window_configs()
 
@@ -113,7 +115,7 @@ class MultiWindowOrchestrator:
                 modeling_window_dfs[window_date] = window_modeling_features_df
 
                 logger.info(f"Successfully generated data for window {model_start}")
-                u.notify('intro_1')
+                u.notify('intro_2')
 
             except Exception as e:
                 logger.error(f"Failed to generate data for {model_start}: {str(e)}")
