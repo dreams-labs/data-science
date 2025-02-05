@@ -1,4 +1,43 @@
 # dda 642 multi window model
+checkpoint 1: w.696 multiwindow model works
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.696
+RMSE:                     0.213
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 -0.839
+RMSE:                     0.368
+MAE:                      0.242
+
+
+checkpoint 1: xw.685 multiwindow model works
+Model Performance Summary
+===================================
+Test Samples:             113,598
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.685
+RMSE:                     0.197
+MAE:                      0.107
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.785
+RMSE:                     0.122
+MAE:                      0.072
+
 
 # dda 645 parquet file handling
 checkpoint 1: w.696 implemented file handling

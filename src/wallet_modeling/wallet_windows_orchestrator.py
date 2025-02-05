@@ -1,4 +1,5 @@
 """Orchestrates the creation of training_data_dfs for multiple training windows"""
+import os
 import logging
 from pathlib import Path
 import copy
@@ -51,7 +52,6 @@ class MultiWindowOrchestrator:
         - merged_training_df: MultiIndexed on (wallet_address, window_start_date)
         - merged_modeling_df: MultiIndexed on (wallet_address, window_start_date)
         """
-        u.notify('futuristic')
         u.notify('intro_3')
         if not self.all_windows_configs:
             self.all_windows_configs = self._generate_window_configs()
@@ -63,6 +63,11 @@ class MultiWindowOrchestrator:
         for window_config in self.all_windows_configs:
             model_start = window_config['training_data']['modeling_period_start']
             logger.info(f"Generating data for window starting {model_start}")
+            u.notify('futuristic')
+
+            # Generate name of parquet folder and create it if necessary
+            window_parquet_folder = window_config['training_data']['parquet_folder']
+            os.makedirs(window_parquet_folder, exist_ok=True)
 
             try:
                 # 1. Initialize data generator for window
@@ -115,27 +120,23 @@ class MultiWindowOrchestrator:
                 modeling_window_dfs[window_date] = window_modeling_features_df
 
                 logger.info(f"Successfully generated data for window {model_start}")
-                u.notify('intro_2')
 
             except Exception as e:
                 logger.error(f"Failed to generate data for {model_start}: {str(e)}")
                 raise
 
         # Merge window DataFrames
-        merged_training_df = self._merge_window_dfs(training_window_dfs)
-        merged_modeling_df = self._merge_window_dfs(modeling_window_dfs)
+        wallet_training_data_df = self._merge_window_dfs(training_window_dfs)
+        modeling_wallet_features_df = self._merge_window_dfs(modeling_window_dfs)
 
-        # Validate indices match
-        if not merged_training_df.index.get_level_values('wallet_address').equals(
-            merged_modeling_df.index.get_level_values('wallet_address')
-        ):
-            raise ValueError("Merged training and modeling DataFrames have mismatched wallet indices")
+        # Confirm indices match
+        u.assert_matching_indices(wallet_training_data_df,modeling_wallet_features_df)
 
         logger.info("Generated multi-window DataFrames with shapes %s and %s",
-                    merged_training_df.shape, merged_modeling_df.shape)
+                    wallet_training_data_df.shape, modeling_wallet_features_df.shape)
         u.notify('level_up')
 
-        return merged_training_df, merged_modeling_df
+        return wallet_training_data_df, modeling_wallet_features_df
 
 
     # -----------------------------------
@@ -217,4 +218,6 @@ class MultiWindowOrchestrator:
             )
             merged_dfs.append(window_df)
 
-        return pd.concat(merged_dfs, axis=0)
+        full_df = pd.concat(merged_dfs, axis=0).sort_index()
+
+        return full_df
