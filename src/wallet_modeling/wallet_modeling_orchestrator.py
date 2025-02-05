@@ -340,10 +340,13 @@ class WalletTrainingDataOrchestrator:
             )
 
         # Filter profits to training cohort
-        modeling_profits_df = modeling_profits_df_full[
-            modeling_profits_df_full['wallet_address'].isin(self.training_wallet_cohort)
-        ]
-        del modeling_profits_df_full
+        if self.training_wallet_cohort:
+            modeling_profits_df = modeling_profits_df_full[
+                modeling_profits_df_full['wallet_address'].isin(self.training_wallet_cohort)
+            ]
+            del modeling_profits_df_full
+        else:
+            modeling_profits_df = modeling_profits_df_full
 
         # Assert period and save filtered/hybridized profits_df
         u.assert_period(modeling_profits_df,
