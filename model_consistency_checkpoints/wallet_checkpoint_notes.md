@@ -1,4 +1,18 @@
 # dda 633 predicting val period
+checkpoint 4: w.698 updated features logic for validation functionality
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.698
+RMSE:                     0.212
+MAE:                      0.108
+
+
 checkpoint 3: w.698 back to 2023 laptop
 Model Performance Summary
 ===================================

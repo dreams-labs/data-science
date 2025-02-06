@@ -140,7 +140,7 @@ class WalletTrainingDataOrchestrator:
                         self.wallets_config['training_data'][f'{period}_period_end'])
 
         # Generate market indicators
-        def generate_market_indicators():
+        def generate_market_indicators_df():
             logger.info("Generating market indicators...")
             market_indicators_df = self._generate_training_indicators_df(
                 market_data_df_full,
@@ -151,7 +151,7 @@ class WalletTrainingDataOrchestrator:
             return market_indicators_df
 
         # Define training wallet cohort
-        def define_training_cohort(profits_df_full):
+        def generate_cohort_profits_df(profits_df_full):
             # Hybridize wallet IDs if configured
             if self.wallets_config['training_data']['hybridize_wallet_ids']:
                 profits_df_full, hybrid_cw_id_map = hybridize_wallet_address(profits_df_full)
@@ -163,34 +163,48 @@ class WalletTrainingDataOrchestrator:
                 del hybrid_cw_id_map
 
             logger.info("Defining wallet cohort...")
-            profits_df = self._define_training_wallet_cohort(
-                profits_df_full.copy(),
-                market_data_df.copy(),
-                self.wallets_config['training_data']['hybridize_wallet_ids']
+
+            # Apply necessary transformations (row imputation, filtering by date)
+            period_profits_df = self._transform_profits_for_period(
+                profits_df_full,
+                market_data_df,
+                self.wallets_config['training_data'][f'{period}_period_end']
             )
-            return profits_df
+
+            # If the cohort is already defined, just filter to it
+            if self.training_wallet_cohort is None:
+                self._define_training_wallet_cohort(
+                    period_profits_df.copy(),
+                    self.wallets_config['training_data']['hybridize_wallet_ids']
+                )
+
+            # Filter profits_df to cohort
+            cohort_profits_df = period_profits_df[
+                period_profits_df.index.get_level_values('wallet_address').isin(self.training_wallet_cohort)
+            ]
+            return cohort_profits_df
 
         # Modified to capture futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            market_indicators_df = executor.submit(generate_market_indicators).result()
-            profits_df = executor.submit(define_training_cohort, profits_df_full).result()
+            market_indicators_df = executor.submit(generate_market_indicators_df).result()
+            cohort_profits_df = executor.submit(generate_cohort_profits_df, profits_df_full).result()
 
         # Retrieve transfers after cohort is in BigQuery
         logger.info("Retrieving transfers sequencing data...")
         transfers_df = wts.retrieve_transfers_sequencing(
             self.wallets_config['features']['timing_metrics_min_transaction_size'],
-            self.wallets_config['training_data']['training_period_end'],
+            self.wallets_config['training_data'][f'{period}_period_end'],
             self.wallets_config['training_data']['hybridize_wallet_ids'],
         )
 
         if return_files is True:
             # Return dfs without saving
-            return (profits_df, market_indicators_df, transfers_df)
+            return (cohort_profits_df, market_indicators_df, transfers_df)
 
         else:
             # Save all files
-            profits_df.to_parquet(f"{self.parquet_folder}/{period}_profits_df.parquet",index=True)
-            market_indicators_df.to_parquet(f"{self.parquet_folder}/{period}_market_indicators_data_df.parquet",index=False)
+            cohort_profits_df.to_parquet(f"{self.parquet_folder}/{period}_profits_df.parquet",index=True)
+            market_indicators_df.to_parquet(f"{self.parquet_folder}/{period}_market_indicators_data_df.parquet",index=False)  # pylint:disable=line-too-long
             transfers_df.to_parquet(f"{self.parquet_folder}/{period}_transfers_sequencing_df.parquet",index=True)
 
             return None
@@ -203,7 +217,8 @@ class WalletTrainingDataOrchestrator:
         profits_df: pd.DataFrame,
         market_indicators_df: pd.DataFrame,
         transfers_df: pd.DataFrame,
-        return_files: bool = False
+        return_files: bool = False,
+        period: str = 'training'
     ) -> Union[None, pd.DataFrame]:
         """
         Orchestrates end-to-end feature generation with parallel window processing.
@@ -212,6 +227,7 @@ class WalletTrainingDataOrchestrator:
         - profits_df: Training period profits data
         - market_indicators_df: Market data with indicators
         - transfers_df: Transfers sequencing data
+        - period: Which period to retrieve dates from
         """
         # Ensure index
         profits_df = u.ensure_index(profits_df)
@@ -227,8 +243,8 @@ class WalletTrainingDataOrchestrator:
             market_indicators_df.copy(),
             transfers_df.copy(),
             wallet_cohort,
-            self.wallets_config['training_data']['training_period_start'],
-            self.wallets_config['training_data']['training_period_end']
+            self.wallets_config['training_data'][f'{period}_period_start'],
+            self.wallets_config['training_data'][f'{period}_period_end']
         )
 
         # Initialize full features df with suffixed columns
@@ -443,8 +459,7 @@ class WalletTrainingDataOrchestrator:
     @u.timing_decorator
     def _define_training_wallet_cohort(
         self,
-        profits_df: pd.DataFrame,
-        market_data_df: pd.DataFrame,
+        training_profits_df: pd.DataFrame,
         hybridize_wallet_ids: bool
     ) -> Tuple[pd.DataFrame, np.ndarray]:
         """
@@ -456,31 +471,14 @@ class WalletTrainingDataOrchestrator:
 
         Params:
         - profits_df (DataFrame): Historical profit and balance data for all wallets
-        - market_data_df (DataFrame): Market prices and metadata for relevant period
         - hybridize_wallet_ids (bool): whether the IDs are regular wallet_ids or hybrid wallet-coin IDs
-
-
-        Returns:
-        - training_cohort_profits_df (DataFrame): Profits data filtered to selected wallets
-        - training_wallet_cohort (ndarray): Array of wallet addresses that pass filters
         """
         start_time = time.time()
         training_period_start = self.wallets_config['training_data']['training_period_start']
         training_period_end = self.wallets_config['training_data']['training_period_end']
 
-        # Impute the training period end (training period start is pre-imputed into profits_df generation)
-        imputed_profits_df = pri.impute_profits_for_multiple_dates(profits_df, market_data_df,
-                                                                [training_period_end], n_threads=1,
-                                                                reset_index=False)
-
-        # Create a training period only profits_df
-        training_profits_df = imputed_profits_df[
-            imputed_profits_df.index.get_level_values('date') <= training_period_end
-        ].copy()
-
         # Confirm valid dates for training period
-        u.assert_period(profits_df, training_period_start, training_period_end)
-        u.assert_period(market_data_df, training_period_start, training_period_end)
+        u.assert_period(training_profits_df, training_period_start, training_period_end)
 
         # Compute wallet level metrics over duration of training period
         training_wallet_metrics_df = wtf.calculate_wallet_trading_features(training_profits_df,
@@ -499,15 +497,29 @@ class WalletTrainingDataOrchestrator:
         logger.info("Training wallet cohort defined as %s wallets after %.2f seconds.",
                     len(training_wallet_cohort), time.time()-start_time)
 
-        # Create a profits_df that only includes the wallet cohort
-        training_cohort_profits_df = training_profits_df[
-            training_profits_df.index.get_level_values('wallet_address').isin(training_wallet_cohort)
-        ]
-
         # Store wallet cohort
         self.training_wallet_cohort = training_wallet_cohort
 
-        return training_cohort_profits_df
+
+
+    def _transform_profits_for_period(
+        self,
+        profits_df: pd.DataFrame,
+        market_data_df: pd.DataFrame,
+        period_end: str
+    ) -> pd.DataFrame:
+        """
+        Impute and filter profits_df up to the given period end.
+        """
+        # Impute for the period end (training_period_start already pre-imputed)
+        imputed_df = pri.impute_profits_for_multiple_dates(
+            profits_df, market_data_df, [period_end], n_threads=1, reset_index=False
+        )
+        # Keep only records up to period_end
+        transformed_df = imputed_df[
+            imputed_df.index.get_level_values('date') <= period_end
+        ].copy()
+        return transformed_df
 
 
 
