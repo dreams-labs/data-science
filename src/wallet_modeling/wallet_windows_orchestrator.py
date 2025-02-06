@@ -152,8 +152,7 @@ class MultiWindowOrchestrator:
         """
         all_windows_configs = []
         base_training_data = self.base_config['training_data']
-        # Include 0 offset for the base config along with other offsets
-        offsets = [0] + self.windows_config['offset_windows']['offsets']
+        offsets = self.windows_config['offset_windows']['offsets']
 
         for offset_days in offsets:
             # Deep copy base config to prevent mutations
