@@ -1,5 +1,22 @@
 # dda 633 predicting val period
 checkpoint 5: w.698 add score saving bool
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.698
+RMSE:                     0.212
+MAE:                      0.108
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.803
+RMSE:                     0.121
+MAE:                      0.064
 
 
 checkpoint 4: w.698 updated features logic for validation functionality
