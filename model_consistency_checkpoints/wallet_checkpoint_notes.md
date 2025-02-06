@@ -1,4 +1,7 @@
 # dda 633 predicting val period
+checkpoint 5: w.698 add score saving bool
+
+
 checkpoint 4: w.698 updated features logic for validation functionality
 Model Performance Summary
 ===================================
