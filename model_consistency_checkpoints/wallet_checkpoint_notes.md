@@ -1,4 +1,24 @@
 # dda 633 predicting val period
+checkpoint 3: w.698 back to 2023 laptop
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.698
+RMSE:                     0.212
+MAE:                      0.108
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.803
+RMSE:                     0.121
+MAE:                      0.064
+
+
 checkpoint 2: w.698 adding validation period logic to training data orchestrator
 Model Performance Summary
 ===================================
