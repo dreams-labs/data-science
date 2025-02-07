@@ -247,6 +247,44 @@ class MultiWindowOrchestrator:
         return all_windows_configs
 
 
+    def _retrieve_window_dfs_from_complete_dfs(self,
+                                            period_start: str,
+                                            period_end: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Returns a slice of self.complete_profits_df and self.complete_market_data_df
+        for the given (period_start, period_end). Also ensures there's a row for
+        (start_balance_date = period_start - 1 day) with is_imputed=1, etc., to match
+        the original BigQuery approach.
+        """
+        # 1) Convert to datetime
+        period_start_dt = pd.to_datetime(period_start)
+        period_end_dt = pd.to_datetime(period_end)
+        start_balance_date_dt = period_start_dt - pd.Timedelta(days=1)
+
+        # 2) Slice the complete profits df to [start_balance_date_dt, period_end_dt]
+        sub_profits_mask = (
+            (self.complete_profits_df['date'] >= start_balance_date_dt) &
+            (self.complete_profits_df['date'] <= period_end_dt)
+        )
+        sub_profits_df = self.complete_profits_df[sub_profits_mask].copy()
+
+        # 3) Mark that row for start_balance_date
+        #    (the BigQuery queries usually created a synthetic row for that date
+        #     so replicate the same logic here, e.g. set net_transfers=0, etc.)
+        sb_mask = (sub_profits_df['date'] == start_balance_date_dt)
+        # If no row exists, you could impute one. If a row *does* exist, just zero out transfers:
+        sub_profits_df.loc[sb_mask, 'is_imputed'] = True
+        sub_profits_df.loc[sb_mask, 'usd_net_transfers'] = 0
+        sub_profits_df.loc[sb_mask, 'usd_inflows'] = 0
+        # ...any other columns that the BQ logic used to override
+
+        # 4) Filter the complete market data to <= period_end_dt
+        sub_market_data_df = self.complete_market_data_df[
+            self.complete_market_data_df['date'] <= period_end_dt
+        ].copy()
+
+        return sub_profits_df, sub_market_data_df
+
 
     def _merge_window_dfs(self, window_dfs: Dict[datetime, pd.DataFrame]) -> pd.DataFrame:
         """

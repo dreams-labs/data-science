@@ -1,3 +1,45 @@
+# dda 573 pull from complete dfs
+checkpoint 1: w.686 df params for retrieve_period_datasets()
+faster params
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.686
+RMSE:                     0.216
+MAE:                      0.116
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.788
+RMSE:                     0.125
+MAE:                      0.066
+
+
+base params
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.693
+RMSE:                     0.214
+MAE:                      0.109
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.798
+RMSE:                     0.122
+MAE:                      0.065
+
+
 # dda 633 predicting val period
 checkpoint 8: w.689 faster model params
 Model Performance Summary

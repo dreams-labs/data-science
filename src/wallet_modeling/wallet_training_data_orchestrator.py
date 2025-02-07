@@ -51,6 +51,10 @@ class WalletTrainingDataOrchestrator:
         self.parquet_folder = self.wallets_config['training_data']['parquet_folder']
         self.wtd = WalletTrainingData(wallets_config)  # pass config in
 
+        # Preexisting raw dfs if provided
+        self.profits_df = None
+        self.market_data_df = None
+
 
 
     @u.timing_decorator
@@ -74,9 +78,13 @@ class WalletTrainingDataOrchestrator:
         - tuple: (profits_df, market_data_df, coin_cohort) for the period
         """
         # Get raw period data
-        profits_df, market_data_df = self.wtd.retrieve_raw_datasets(
-            period_start_date,period_end_date
-        )
+        if self.profits_df is None or self.market_data_df is None:
+            profits_df, market_data_df = self.wtd.retrieve_raw_datasets(
+                period_start_date,period_end_date
+            )
+        else:
+            profits_df = self.profits_df
+            market_data_df = self.market_data_df
 
         # Apply cleaning process including coin cohort filter if specified
         market_data_df = self.wtd.clean_market_dataset(
