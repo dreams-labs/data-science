@@ -161,7 +161,7 @@ class MultiWindowOrchestrator:
             for date_key in [
                 'modeling_period_start',
                 'modeling_period_end',
-                'validation_period_end'
+                # 'validation_period_end'
             ]:
                 base_date = datetime.strptime(base_training_data[date_key], '%Y-%m-%d')
                 new_date = base_date + timedelta(days=offset_days)
