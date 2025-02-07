@@ -1,4 +1,24 @@
 # dda 633 predicting val period
+checkpoint 7: w.696 testing validation
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.696
+RMSE:                     0.213
+MAE:                      0.108
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.802
+RMSE:                     0.121
+MAE:                      0.064
+
+
 checkpoint 6: w.696 add market timing data availability and val period predictions functional
 Model Performance Summary
 ===================================

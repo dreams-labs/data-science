@@ -52,7 +52,6 @@ class MultiWindowOrchestrator:
         - merged_training_df: MultiIndexed on (wallet_address, window_start_date)
         - merged_modeling_df: MultiIndexed on (wallet_address, window_start_date)
         """
-        u.notify('intro_3')
         if not self.all_windows_configs:
             self.all_windows_configs = self._generate_window_configs()
 

@@ -26,7 +26,7 @@ def generate_and_save_wallet_model_artifacts(
     model_results: Dict,
     base_path: str,
     configs: Dict[str, Dict],
-    save_scores: bool
+    save_scores: bool = False
 ) -> Tuple[str, object, pd.DataFrame]:
     """
     Wrapper function to generate evaluations, metrics, and save all model artifacts.
