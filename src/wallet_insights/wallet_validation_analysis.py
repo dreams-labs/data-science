@@ -58,6 +58,45 @@ def load_and_predict(model_id: str, new_data: pd.DataFrame, base_path: str) -> p
 
 
 
+def evaluate_predictions(y_true: pd.Series, y_pred: pd.Series) -> dict:
+    """
+    Calculate core regression metrics for overlapping ids between y_true and y_pred.
+
+    Params:
+    - y_true (Series): Actual values with ids as index.
+    - y_pred (Series): Predicted values with ids as index.
+
+    Returns:
+    - dict: Core performance metrics computed on overlapping ids.
+    """
+    # Identify common ids between y_true and y_pred
+    common_idx = y_true.index.intersection(y_pred.index)
+    if common_idx.empty:
+        raise ValueError("No overlapping ids between y_true and y_pred")
+
+    # Filter to only overlapping ids
+    y_true_common = y_true.loc[common_idx]
+    y_pred_common = y_pred.loc[common_idx]
+
+    # Compute metrics using common indices
+    metrics = {
+        'r2': r2_score(y_true_common, y_pred_common),
+        'rmse': np.sqrt(mean_squared_error(y_true_common, y_pred_common)),
+        'mae': mean_absolute_error(y_true_common, y_pred_common),
+        'explained_variance': explained_variance_score(y_true_common, y_pred_common)
+    }
+
+    # Residuals analysis
+    residuals = y_true_common - y_pred_common
+    metrics.update({
+        'residuals_mean': residuals.mean(),
+        'residuals_std': residuals.std(),
+        'prediction_interval_95': 1.96 * residuals.std()
+    })
+
+    return metrics
+
+
 
 # ----------------------------------------
 #       Other Analytics Functions

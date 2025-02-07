@@ -13,8 +13,94 @@ import numpy as np
 from dreams_core.googlecloud import GoogleCloud as dgc
 import wallet_insights.model_evaluation as wime
 
-
+# Set up logger at the module level
 logger = logging.getLogger(__name__)
+
+
+
+# -----------------------------------
+#       Main Interface Function
+# -----------------------------------
+
+def generate_and_save_wallet_model_artifacts(
+    model_results: Dict,
+    base_path: str,
+    configs: Dict[str, Dict],
+    save_scores: bool = False
+) -> Tuple[str, object, pd.DataFrame]:
+    """
+    Wrapper function to generate evaluations, metrics, and save all model artifacts.
+    Uses WalletRegressionEvaluator for model evaluation.
+
+    Parameters:
+    - model_results (dict): Output from WalletModel.run_experiment containing:
+        - pipeline: The trained model pipeline
+        - X_train, X_test: Feature data
+        - y_train, y_test: Target data (modeling cohort)
+        - y_pred: Model predictions on modeling cohort test set
+        - training_cohort_pred: Predictions for full training cohort
+    - base_path (str): Base path for saving artifacts
+    - configs (dict of dicts): configs to store
+    - save_scores (bool): whether to save the wallet-level scores
+
+    Returns:
+    - dict: Dictionary containing:
+        - model_id: UUID of the saved artifacts
+        - evaluation: Model evaluation metrics
+        - wallet_scores: DataFrame of wallet-level predictions
+    """
+    # 1. Generate model evaluation metrics using WalletRegressionEvaluator
+    model = model_results['pipeline'].named_steps['regressor']
+    evaluator = wime.RegressionEvaluator(
+        y_train=model_results['y_train'],
+        y_test=model_results['y_test'],
+        y_pred=model_results['y_pred'],
+        training_cohort_pred=model_results['training_cohort_pred'],
+        training_cohort_actuals=model_results['training_cohort_actuals'],
+        model=model,
+        feature_names=model_results['pipeline'][:-1].transform(model_results['X_train']).columns.tolist()
+    )
+
+    # Create evaluation dictionary with the same structure as before
+    evaluation = {
+        **evaluator.metrics,
+        'summary_report': evaluator.summary_report(),
+        'cohort_sizes': {
+            'training_cohort': len(model_results['training_cohort_pred']),
+            'modeling_cohort': len(model_results['y_pred']),
+        }
+    }
+
+    # Create wallet scores DataFrame with both cohorts
+    wallet_scores_df = pd.DataFrame({
+        'score': model_results['training_cohort_pred'],
+        'actual': model_results['training_cohort_actuals'],
+        'in_modeling_cohort': model_results['training_cohort_pred'].index.isin(model_results['y_test'].index)
+    })
+
+    # 5. Save all artifacts
+    model_id = save_model_artifacts(
+        model_results={
+            **model_results,
+            'training_data': {
+                'n_samples': len(model_results['training_cohort_pred']),
+                'n_features': len(model_results['X_train'].columns)
+            }
+        },
+        evaluation_dict=evaluation,
+        configs=configs,
+        base_path=base_path,
+        save_scores=save_scores
+    )
+
+    return model_id, evaluator, wallet_scores_df
+
+
+
+
+# ---------------------------------
+#         Helper Functions
+# ---------------------------------
 
 def get_training_cohort_addresses():
     """
@@ -35,7 +121,7 @@ def get_training_cohort_addresses():
 
 
 
-def save_model_artifacts(model_results, evaluation_dict, configs, base_path):
+def save_model_artifacts(model_results, evaluation_dict, configs, base_path,save_scores):
     """
     Saves all model-related artifacts with a consistent UUID across files.
 
@@ -44,6 +130,7 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path):
     - evaluation_dict (dict): Model evaluation metrics and analysis
     - configs (dict): Dictionary containing configuration objects
     - base_path (str): Base path for saving all model artifacts
+    - save_scores (bool): whether to save the wallet-level scores
 
     Returns:
     - str: The UUID used for this model's artifacts
@@ -100,32 +187,33 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path):
     logger.info(f"Saved model report to {report_path}")
 
 
-    # 4. Save wallet scores
-    wallet_scores_df = pd.DataFrame({
-        'wallet_id': model_results['training_cohort_pred'].index,
-        'score': model_results['training_cohort_pred'],
-        'in_modeling_cohort': model_results['training_cohort_pred'].index.isin(model_results['y_test'].index)
-    })
+    # 4. Save wallet scores if configured to
+    if save_scores is True:
+        wallet_scores_df = pd.DataFrame({
+            'wallet_id': model_results['training_cohort_pred'].index,
+            'score': model_results['training_cohort_pred'],
+            'in_modeling_cohort': model_results['training_cohort_pred'].index.isin(model_results['y_test'].index)
+        })
 
-    # Retrieve non-id wallet_address values
-    wallet_addresses = get_training_cohort_addresses()
-    wallet_scores_df = (
-        wallet_scores_df
-        .reset_index(level='wallet_address')
-        .merge(
-            wallet_addresses,
-            left_on='wallet_address',
-            right_on='wallet_id',
-            how='left',
-            suffixes=('_orig', '')  # keep right's wallet_address as is
+        # Retrieve non-id wallet_address values
+        wallet_addresses = get_training_cohort_addresses()
+        wallet_scores_df = (
+            wallet_scores_df
+            .reset_index(level='wallet_address')
+            .merge(
+                wallet_addresses,
+                left_on='wallet_address',
+                right_on='wallet_id',
+                how='left',
+                suffixes=('_orig', '')  # keep right's wallet_address as is
+            )
+            .set_index('wallet_address', append=True)  # use wallet_address from wallet_addresses
+            .drop(['wallet_id', 'wallet_address_orig'], axis=1)  # drop unneeded columns
         )
-        .set_index('wallet_address', append=True)  # use wallet_address from wallet_addresses
-        .drop(['wallet_id', 'wallet_address_orig'], axis=1)  # drop unneeded columns
-    )
 
-    wallet_scores_path = base_dir / 'wallet_scores' / f"wallet_scores_{model_id}.csv"
-    wallet_scores_df.to_csv(wallet_scores_path, index=True)
-    logger.info(f"Saved wallet scores and addresses to {wallet_scores_path}")
+        wallet_scores_path = base_dir / 'wallet_scores' / f"wallet_scores_{model_id}.csv"
+        wallet_scores_df.to_csv(wallet_scores_path, index=True)
+        logger.info(f"Saved wallet scores and addresses to {wallet_scores_path}")
 
     return model_id
 
@@ -159,75 +247,3 @@ def load_model_artifacts(model_id, base_path):
         'report': report,
         'wallet_scores': wallet_scores,
     }
-
-
-
-def generate_and_save_wallet_model_artifacts(
-    model_results: Dict,
-    base_path: str,
-    configs: Dict[str, Dict]
-) -> Tuple[str, object, pd.DataFrame]:
-    """
-    Wrapper function to generate evaluations, metrics, and save all model artifacts.
-    Uses WalletRegressionEvaluator for model evaluation.
-
-    Parameters:
-    - model_results (dict): Output from WalletModel.run_experiment containing:
-        - pipeline: The trained model pipeline
-        - X_train, X_test: Feature data
-        - y_train, y_test: Target data (modeling cohort)
-        - y_pred: Model predictions on modeling cohort test set
-        - training_cohort_pred: Predictions for full training cohort
-    - base_path (str): Base path for saving artifacts
-    - configs (dict of dicts): configs to store
-
-    Returns:
-    - dict: Dictionary containing:
-        - model_id: UUID of the saved artifacts
-        - evaluation: Model evaluation metrics
-        - wallet_scores: DataFrame of wallet-level predictions
-    """
-    # 1. Generate model evaluation metrics using WalletRegressionEvaluator
-    model = model_results['pipeline'].named_steps['regressor']
-    evaluator = wime.RegressionEvaluator(
-        y_train=model_results['y_train'],
-        y_test=model_results['y_test'],
-        y_pred=model_results['y_pred'],
-        training_cohort_pred=model_results['training_cohort_pred'],
-        training_cohort_actuals=model_results['training_cohort_actuals'],
-        model=model,
-        feature_names=model_results['pipeline'][:-1].transform(model_results['X_train']).columns.tolist()
-    )
-
-    # Create evaluation dictionary with the same structure as before
-    evaluation = {
-        **evaluator.metrics,
-        'summary_report': evaluator.summary_report(),
-        'cohort_sizes': {
-            'training_cohort': len(model_results['training_cohort_pred']),
-            'modeling_cohort': len(model_results['y_pred']),
-        }
-    }
-
-    # Create wallet scores DataFrame with both cohorts
-    wallet_scores_df = pd.DataFrame({
-        'score': model_results['training_cohort_pred'],
-        'actual': model_results['training_cohort_actuals'],
-        'in_modeling_cohort': model_results['training_cohort_pred'].index.isin(model_results['y_test'].index)
-    })
-
-    # 5. Save all artifacts
-    model_id = save_model_artifacts(
-        model_results={
-            **model_results,
-            'training_data': {
-                'n_samples': len(model_results['training_cohort_pred']),
-                'n_features': len(model_results['X_train'].columns)
-            }
-        },
-        evaluation_dict=evaluation,
-        configs=configs,
-        base_path=base_path
-    )
-
-    return model_id, evaluator, wallet_scores_df

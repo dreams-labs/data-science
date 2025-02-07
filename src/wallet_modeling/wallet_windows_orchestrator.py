@@ -52,7 +52,6 @@ class MultiWindowOrchestrator:
         - merged_training_df: MultiIndexed on (wallet_address, window_start_date)
         - merged_modeling_df: MultiIndexed on (wallet_address, window_start_date)
         """
-        u.notify('intro_3')
         if not self.all_windows_configs:
             self.all_windows_configs = self._generate_window_configs()
 
@@ -152,8 +151,7 @@ class MultiWindowOrchestrator:
         """
         all_windows_configs = []
         base_training_data = self.base_config['training_data']
-        # Include 0 offset for the base config along with other offsets
-        offsets = [0] + self.windows_config['offset_windows']['offsets']
+        offsets = self.windows_config['offset_windows']['offsets']
 
         for offset_days in offsets:
             # Deep copy base config to prevent mutations
