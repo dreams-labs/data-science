@@ -197,7 +197,7 @@ class MultiWindowOrchestrator:
 
     def _generate_window_configs(self) -> List[Dict]:
         """
-        Generates config dicts for each window, including the base (0 offset) and offset windows.
+        Generates config dicts for each offset window.
 
         Returns:
         - List[Dict]: List of config dicts, one per window.
