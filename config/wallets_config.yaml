@@ -218,7 +218,7 @@ modeling:
         ]
 
         # Correlation/variance-based removal
-        variance_threshold: 0.00 # features with this level of variance or less will be removed
+        # variance_threshold: 0.00 # features with this level of variance or less will be removed
         # correlation_threshold: 2.0 # features above this correlation coefficient will be removed
         protected_features: [
             cluster|
