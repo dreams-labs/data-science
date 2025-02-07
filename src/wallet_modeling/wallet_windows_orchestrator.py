@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 # Local module imports
+from wallet_modeling.wallet_training_data import WalletTrainingData
 import wallet_modeling.wallets_config_manager as wcm
 import wallet_modeling.wallet_training_data_orchestrator as wtdo
 import utils as u
@@ -38,9 +39,58 @@ class MultiWindowOrchestrator:
         self.features_config = features_config
         self.windows_config = windows_config
 
+        # Generated configs
+        self.all_windows_configs = self._generate_window_configs()
+
+        # Complete df objects
+        self.complete_profits_df_file = None
+        self.complete_market_data_df_file = None
+        self.complete_profits_df = None
+        self.complete_market_data_df = None
+        self.wtd = WalletTrainingData(base_config)  # helper for complete df generation
+
         # Generated objects
-        self.all_windows_configs = None
         self.output_dfs = {}
+
+
+    def load_complete_raw_datasets(self) -> None:
+        """
+        Identifies the earliest training_period_start and latest modeling_period_end
+        across all windows, then retrieves the full profits and market data once,
+        storing both in memory and in parquet files.
+
+        Returns:
+        - None
+            """
+        # 1. Find earliest and latest boundaries across all windows
+        all_train_starts = []
+        all_model_ends = []
+        for cfg in self.all_windows_configs:
+            all_train_starts.extend(cfg['training_data']['training_window_starts'])
+            all_model_ends.append(cfg['training_data']['modeling_period_end'])
+
+        earliest_training_start = min(all_train_starts)
+        latest_modeling_end = max(all_model_ends)
+
+        logger.info("Retrieving complete dataset for range %s to %s.",
+                    earliest_training_start, latest_modeling_end)
+
+        # Retrieve the full data once (BigQuery or otherwise)
+        logger.info("Pulling complete raw datasets from %s through %s...",
+                    earliest_training_start, latest_modeling_end)
+        self.complete_profits_df, self.complete_market_data_df = \
+            self.wtd.retrieve_raw_datasets(earliest_training_start, latest_modeling_end)
+
+        # Save them to parquet for future reuse
+        self.complete_profits_df_file = f"{self.base_config['training_data']['parquet_folder']}/complete_profits_df.parquet"
+        self.complete_market_data_df_file = f"{self.base_config['training_data']['parquet_folder']}/complete_market_data_df.parquet"
+
+        self.complete_profits_df.to_parquet(self.complete_profits_df_file, index=False)
+        self.complete_market_data_df.to_parquet(self.complete_market_data_df_file, index=False)
+
+        logger.info("Saved complete profits to %s (%s rows), market data to %s (%s rows).",
+                    self.complete_profits_df_file, len(self.complete_profits_df),
+                    self.complete_market_data_df_file, len(self.complete_market_data_df))
 
 
     @u.timing_decorator
@@ -52,8 +102,6 @@ class MultiWindowOrchestrator:
         - merged_training_df: MultiIndexed on (wallet_address, window_start_date)
         - merged_modeling_df: MultiIndexed on (wallet_address, window_start_date)
         """
-        if not self.all_windows_configs:
-            self.all_windows_configs = self._generate_window_configs()
 
         # Initialize storage for window DataFrames
         training_window_dfs = {}
@@ -77,16 +125,18 @@ class MultiWindowOrchestrator:
                 )
 
                 # 2. Generate TRAINING_DATA_DFs
-                training_profits_df_full, training_market_data_df_full, training_coin_cohort = data_generator.retrieve_period_datasets(
-                    window_config['training_data']['training_period_start'],
-                    window_config['training_data']['training_period_end']
-                )
+                training_profits_df_full, training_market_data_df_full, training_coin_cohort = \
+                    data_generator.retrieve_period_datasets(
+                        window_config['training_data']['training_period_start'],
+                        window_config['training_data']['training_period_end']
+                    )
 
-                training_profits_df, training_market_indicators_df, training_transfers_df = data_generator.prepare_training_data(
-                    training_profits_df_full,
-                    training_market_data_df_full,
-                    return_files=True
-                )
+                training_profits_df, training_market_indicators_df, training_transfers_df = \
+                    data_generator.prepare_training_data(
+                        training_profits_df_full,
+                        training_market_data_df_full,
+                        return_files=True
+                    )
 
                 window_training_data_df = data_generator.generate_training_features(
                     training_profits_df,
@@ -96,7 +146,8 @@ class MultiWindowOrchestrator:
                 )
 
                 # Store training df with window date
-                window_date = datetime.strptime(window_config['training_data']['modeling_period_start'], '%Y-%m-%d')
+                window_date = datetime.strptime(
+                    window_config['training_data']['modeling_period_start'], '%Y-%m-%d')
                 training_window_dfs[window_date] = window_training_data_df
 
                 # 3. Generate MODELING_DATA_DFs
@@ -108,7 +159,8 @@ class MultiWindowOrchestrator:
 
                 hybrid_cw_id_map = None
                 if window_config['training_data']['hybridize_wallet_ids']:
-                    hybrid_cw_id_map = pd.read_pickle(f"{window_config['training_data']['parquet_folder']}/hybrid_cw_id_map.pkl")
+                    hybrid_cw_id_map = pd.read_pickle(
+                        f"{window_config['training_data']['parquet_folder']}/hybrid_cw_id_map.pkl")
 
                 window_modeling_features_df = data_generator.prepare_modeling_features(
                     modeling_profits_df_full,
@@ -183,7 +235,7 @@ class MultiWindowOrchestrator:
             window_config = wcm.add_derived_values(window_config)
 
             # Log window configuration
-            logger.info(
+            logger.debug(
                 f"Generated config for {offset_days} day offset window: "
                 f"modeling_period={window_config['training_data']['modeling_period_start']} "
                 f"to {window_config['training_data']['modeling_period_end']}"
