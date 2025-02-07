@@ -82,8 +82,9 @@ class MultiWindowOrchestrator:
             self.wtd.retrieve_raw_datasets(earliest_training_start, latest_modeling_end)
 
         # Save them to parquet for future reuse
-        self.complete_profits_df_file = f"{self.base_config['training_data']['parquet_folder']}/complete_profits_df.parquet"
-        self.complete_market_data_df_file = f"{self.base_config['training_data']['parquet_folder']}/complete_market_data_df.parquet"
+        parquet_folder = self.base_config['training_data']['parquet_folder']
+        self.complete_profits_df_file = f"{parquet_folder}/complete_profits_df.parquet"
+        self.complete_market_data_df_file = f"{parquet_folder}/complete_market_data_df.parquet"
 
         self.complete_profits_df.to_parquet(self.complete_profits_df_file, index=False)
         self.complete_market_data_df.to_parquet(self.complete_market_data_df_file, index=False)
