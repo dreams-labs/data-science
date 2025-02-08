@@ -236,6 +236,7 @@ class WalletTrainingData:
         - training_windows_dfs (list of DataFrames): list of profits_dfs for each window
         """
         logger.debug("Generating window-specific profits_dfs...")
+        u.ensure_index(training_profits_df)
 
         # Convert training window starts to sorted datetime
         training_windows_starts = sorted([
@@ -275,8 +276,10 @@ class WalletTrainingData:
             u.assert_period(window_df, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
             training_windows_profits_dfs.append(window_df)
 
-        # Confirm that all window dfs' USD transfers add up to the full training period
-        full_sum = training_profits_df['usd_net_transfers'].sum()
+        # Confirm that all window dfs' transfers match the full df's transfers starting from the first window
+        full_sum = (training_profits_df
+                    [training_profits_df.index.get_level_values('date') >= training_windows_starts[0]]
+                    ['usd_net_transfers'].sum())
         window_sum = sum(df['usd_net_transfers'].sum() for df in training_windows_profits_dfs)
         if not np.isclose(full_sum, window_sum, rtol=1e-5):
             raise ValueError(f"Net transfers in full training period ({full_sum}) do not match combined "
