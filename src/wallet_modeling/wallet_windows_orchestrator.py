@@ -127,7 +127,7 @@ class MultiWindowOrchestrator:
 
             try:
                 # 1. Initialize data generator for window
-                data_generator = wtdo.WalletTrainingDataOrchestrator(
+                training_generator = wtdo.WalletTrainingDataOrchestrator(
                     window_config,
                     self.metrics_config,
                     self.features_config
@@ -135,19 +135,19 @@ class MultiWindowOrchestrator:
 
                 # 2. Generate TRAINING_DATA_DFs
                 training_profits_df_full, training_market_data_df_full, training_coin_cohort = \
-                    data_generator.retrieve_period_datasets(
+                    training_generator.retrieve_period_datasets(
                         window_config['training_data']['training_period_start'],
                         window_config['training_data']['training_period_end']
                     )
 
                 training_profits_df, training_market_indicators_df, training_transfers_df = \
-                    data_generator.prepare_training_data(
+                    training_generator.prepare_training_data(
                         training_profits_df_full,
                         training_market_data_df_full,
                         return_files=True
                     )
 
-                window_training_data_df = data_generator.generate_training_features(
+                window_training_data_df = training_generator.generate_training_features(
                     training_profits_df,
                     training_market_indicators_df,
                     training_transfers_df,
@@ -160,7 +160,14 @@ class MultiWindowOrchestrator:
                 training_window_dfs[window_date] = window_training_data_df
 
                 # 3. Generate MODELING_DATA_DFs
-                modeling_profits_df_full,_,_ = data_generator.retrieve_period_datasets(
+                modeling_generator = wtdo.WalletTrainingDataOrchestrator(
+                    window_config,
+                    self.metrics_config,
+                    self.features_config,
+                    training_wallet_cohort = training_generator.training_wallet_cohort
+                )
+
+                modeling_profits_df_full,_,_ = modeling_generator.retrieve_period_datasets(
                     window_config['training_data']['modeling_period_start'],
                     window_config['training_data']['modeling_period_end'],
                     training_coin_cohort
@@ -171,7 +178,7 @@ class MultiWindowOrchestrator:
                     hybrid_cw_id_map = pd.read_pickle(
                         f"{window_config['training_data']['parquet_folder']}/hybrid_cw_id_map.pkl")
 
-                window_modeling_features_df = data_generator.prepare_modeling_features(
+                window_modeling_features_df = modeling_generator.prepare_modeling_features(
                     modeling_profits_df_full,
                     hybrid_cw_id_map
                 )
