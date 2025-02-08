@@ -35,6 +35,8 @@ training_data:
     parquet_folder: temp/wallet_modeling_dfs  # where to store parquet files
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
+    # Metaparams
+    n_threads_row_imputation: 4
 
 # CheckpointValidation
 # WalletModel Cleaning
@@ -118,8 +120,8 @@ features:
     clustering_fill_method: fill_0  # fill_0 or fill_mean
     clustering_include_pca: False
 
-
     # Metaparams
+    n_threads_row_imputation: 4
     max_workers: 12
 
 # CheckpointValidation
