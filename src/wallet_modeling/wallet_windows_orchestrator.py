@@ -31,7 +31,10 @@ class MultiWindowOrchestrator:
         base_config: dict,
         metrics_config: dict,
         features_config: dict,
-        windows_config: dict
+        windows_config: dict,
+        complete_profits_df: pd.DataFrame = None,
+        complete_market_data_df: pd.DataFrame = None,
+
     ):
         # Param Configs
         self.base_config = base_config
@@ -45,9 +48,9 @@ class MultiWindowOrchestrator:
         # Complete df objects
         self.complete_profits_df_file = None
         self.complete_market_data_df_file = None
-        self.complete_profits_df = None
-        self.complete_market_data_df = None
-        self.wtd = WalletTrainingData(base_config)  # helper for complete df generation
+        self.complete_profits_df = complete_profits_df
+        self.complete_market_data_df = complete_market_data_df
+        self.wtd = WalletTrainingData(self.base_config)  # helper for complete df generation
 
         # Generated objects
         self.output_dfs = {}
@@ -81,17 +84,22 @@ class MultiWindowOrchestrator:
         self.complete_profits_df, self.complete_market_data_df = \
             self.wtd.retrieve_raw_datasets(earliest_training_start, latest_modeling_end)
 
+        # Set index
+        self.complete_profits_df = u.ensure_index(self.complete_profits_df)
+        self.complete_market_data_df = u.ensure_index(self.complete_market_data_df)
+
         # Save them to parquet for future reuse
         parquet_folder = self.base_config['training_data']['parquet_folder']
         self.complete_profits_df_file = f"{parquet_folder}/complete_profits_df.parquet"
         self.complete_market_data_df_file = f"{parquet_folder}/complete_market_data_df.parquet"
 
-        self.complete_profits_df.to_parquet(self.complete_profits_df_file, index=False)
-        self.complete_market_data_df.to_parquet(self.complete_market_data_df_file, index=False)
+        self.complete_profits_df.to_parquet(self.complete_profits_df_file)
+        self.complete_market_data_df.to_parquet(self.complete_market_data_df_file)
 
         logger.info("Saved complete profits to %s (%s rows), market data to %s (%s rows).",
                     self.complete_profits_df_file, len(self.complete_profits_df),
                     self.complete_market_data_df_file, len(self.complete_market_data_df))
+
 
 
     @u.timing_decorator
@@ -247,43 +255,40 @@ class MultiWindowOrchestrator:
         return all_windows_configs
 
 
-    def _retrieve_window_dfs_from_complete_dfs(self,
-                                            period_start: str,
-                                            period_end: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def _transform_complete_dfs_for_window(self,
+                                           period_start: str,
+                                           period_end: str) -> pd.DataFrame:
         """
-        Returns a slice of self.complete_profits_df and self.complete_market_data_df
-        for the given (period_start, period_end). Also ensures there's a row for
-        (start_balance_date = period_start - 1 day) with is_imputed=1, etc., to match
-        the original BigQuery approach.
+        Impute and filter the complete_profits_df to remove all rows after the period_end
+        and impute the starting values as of the period_start starting balance date.
+
+        This function relies on the WalletTrainingData.split_training_window_dfs function
+        that is used to generate the profits_dfs for the multiple training period features.
+
+        Params:
+        - period_start (str): The training_period_start to use for the filtered df.
+        - period_end (str): The last date to retain in the self.complete_profits_df
         """
-        # 1) Convert to datetime
-        period_start_dt = pd.to_datetime(period_start)
-        period_end_dt = pd.to_datetime(period_end)
-        start_balance_date_dt = period_start_dt - pd.Timedelta(days=1)
+        # Keep only records up to period_end
+        profits_df = (self.complete_profits_df.copy()
+                      [self.complete_profits_df.index.get_level_values('date') <= period_end])
+        window_market_data_df = (self.complete_market_data_df.copy()
+                          [self.complete_market_data_df.index.get_level_values('date') <= period_end]
+                          .reset_index())
 
-        # 2) Slice the complete profits df to [start_balance_date_dt, period_end_dt]
-        sub_profits_mask = (
-            (self.complete_profits_df['date'] >= start_balance_date_dt) &
-            (self.complete_profits_df['date'] <= period_end_dt)
-        )
-        sub_profits_df = self.complete_profits_df[sub_profits_mask].copy()
+        # Create config with a training period of the param values
+        splitter_config = copy.deepcopy(self.base_config)
+        splitter_config['training_data']['training_window_starts'] = [period_start]
+        splitter_config['training_data']['training_period_end'] = period_end
 
-        # 3) Mark that row for start_balance_date
-        #    (the BigQuery queries usually created a synthetic row for that date
-        #     so replicate the same logic here, e.g. set net_transfers=0, etc.)
-        sb_mask = (sub_profits_df['date'] == start_balance_date_dt)
-        # If no row exists, you could impute one. If a row *does* exist, just zero out transfers:
-        sub_profits_df.loc[sb_mask, 'is_imputed'] = True
-        sub_profits_df.loc[sb_mask, 'usd_net_transfers'] = 0
-        sub_profits_df.loc[sb_mask, 'usd_inflows'] = 0
-        # ...any other columns that the BQ logic used to override
+        # Initiate WalletTrainingData with the only window being the training_period_start
+        complete_df_splitter = wtdo.WalletTrainingData(splitter_config)
 
-        # 4) Filter the complete market data to <= period_end_dt
-        sub_market_data_df = self.complete_market_data_df[
-            self.complete_market_data_df['date'] <= period_end_dt
-        ].copy()
+        # Use the logic for splitting training window profits_dfs to split the complete profits_df
+        window_profits_df = complete_df_splitter.split_training_window_dfs(u.ensure_index(profits_df))[0]
+        window_profits_df = window_profits_df.reset_index()
 
-        return sub_profits_df, sub_market_data_df
+        return window_profits_df, window_market_data_df
 
 
     def _merge_window_dfs(self, window_dfs: Dict[datetime, pd.DataFrame]) -> pd.DataFrame:
