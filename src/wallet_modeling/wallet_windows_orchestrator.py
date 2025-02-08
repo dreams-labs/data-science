@@ -101,7 +101,6 @@ class MultiWindowOrchestrator:
                     self.complete_market_data_df_file, len(self.complete_market_data_df))
 
 
-
     @u.timing_decorator
     def generate_windows_training_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
@@ -126,11 +125,22 @@ class MultiWindowOrchestrator:
             os.makedirs(window_parquet_folder, exist_ok=True)
 
             try:
-                # 1. Initialize data generator for window
+                # 1. Initialize data generator for window with presplit dfs
+                training_profits_df = None
+                training_market_data_df = None
+                if self.complete_profits_df is not None:
+                    training_profits_df,training_market_data_df = \
+                        self._transform_complete_dfs_for_window(
+                            window_config['training_data']['training_period_start'],
+                            window_config['training_data']['training_period_end']
+                        )
+
                 training_generator = wtdo.WalletTrainingDataOrchestrator(
                     window_config,
                     self.metrics_config,
-                    self.features_config
+                    self.features_config,
+                    profits_df = training_profits_df,
+                    market_data_df = training_market_data_df
                 )
 
                 # 2. Generate TRAINING_DATA_DFs
@@ -160,11 +170,23 @@ class MultiWindowOrchestrator:
                 training_window_dfs[window_date] = window_training_data_df
 
                 # 3. Generate MODELING_DATA_DFs
+                modeling_profits_df = None
+                modeling_market_data_df = None
+                if self.complete_profits_df is not None:
+                    modeling_profits_df,modeling_market_data_df = \
+                        self._transform_complete_dfs_for_window(
+                            window_config['training_data']['modeling_period_start'],
+                            window_config['training_data']['modeling_period_end']
+                        )
+
                 modeling_generator = wtdo.WalletTrainingDataOrchestrator(
                     window_config,
                     self.metrics_config,
                     self.features_config,
-                    training_wallet_cohort = training_generator.training_wallet_cohort
+                    training_wallet_cohort = training_generator.training_wallet_cohort,
+                    profits_df = modeling_profits_df,
+                    market_data_df = modeling_market_data_df
+
                 )
 
                 modeling_profits_df_full,_,_ = modeling_generator.retrieve_period_datasets(
