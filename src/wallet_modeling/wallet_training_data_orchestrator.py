@@ -323,6 +323,9 @@ class WalletTrainingDataOrchestrator:
                 f"generation. First few missing: {list(missing_wallets)[:5]}"
             )
 
+        # Convert index to non nullable dtype
+        wallet_training_data_df_full.index = wallet_training_data_df_full.index.astype('int64')
+
         # Return file if configured to
         if return_files is True:
             return wallet_training_data_df_full

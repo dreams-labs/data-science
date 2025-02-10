@@ -1,4 +1,24 @@
 # dda 573 pull from complete dfs
+checkpoint 3: w.686 single run; trying to reconcile windows vs single
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.686
+RMSE:                     0.216
+MAE:                      0.116
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.788
+RMSE:                     0.125
+MAE:                      0.066
+
+
 checkpoint 2: w.686 functions work but index trouble
 Model Performance Summary
 ===================================
