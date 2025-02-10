@@ -12,12 +12,12 @@ training_data:
         '2023-01-01',
         # '2023-06-01',
         # '2023-09-01',
-        # '2024-01-01',
+        '2024-01-01',
         # '2024-02-01',
-        '2024-03-01',
-        # '2024-04-01',
+        # '2024-03-01',
+        '2024-04-01',
         # '2024-05-01',
-        '2024-06-01',
+        # '2024-06-01',
         # '2024-07-01',
         # '2024-08-01',
         '2024-09-01',
@@ -35,6 +35,8 @@ training_data:
     parquet_folder: temp/wallet_modeling_dfs  # where to store parquet files
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
+    # Metaparams
+    n_threads_row_imputation: 4
 
 # CheckpointValidation
 # WalletModel Cleaning
@@ -118,8 +120,8 @@ features:
     clustering_fill_method: fill_0  # fill_0 or fill_mean
     clustering_include_pca: False
 
-
     # Metaparams
+    n_threads_row_imputation: 4
     max_workers: 12
 
 # CheckpointValidation
@@ -237,7 +239,7 @@ modeling:
         max_depth: 15  # how deep the trees can go
         # min_child_weight_pct: 0.0001  # what % of rows each tree must have
         min_child_weight: 25  # what % of rows each tree must have
-        subsample: 0.9  # samples rows, e.g. trees use x% of all wallet rows
+        subsample: 1.0  # samples rows, e.g. trees use x% of all wallet rows
         colsample_bytree: 0.9  # samples columns, e.g. trees use x% of all column features
 
         # Performance Profiles (Choose One Section)

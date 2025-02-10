@@ -39,7 +39,9 @@ class WalletTrainingDataOrchestrator:
         wallets_config: dict,
         wallets_metrics_config: dict,
         wallets_features_config: dict,
-        training_wallet_cohort: List[int] = None
+        training_wallet_cohort: List[int] = None,
+        profits_df = None,
+        market_data_df = None
     ):
         # Base configs
         self.wallets_config = copy.deepcopy(wallets_config)
@@ -50,6 +52,10 @@ class WalletTrainingDataOrchestrator:
         # Generated objects
         self.parquet_folder = self.wallets_config['training_data']['parquet_folder']
         self.wtd = WalletTrainingData(wallets_config)  # pass config in
+
+        # Preexisting raw dfs if provided
+        self.profits_df = profits_df
+        self.market_data_df = market_data_df
 
 
 
@@ -74,9 +80,14 @@ class WalletTrainingDataOrchestrator:
         - tuple: (profits_df, market_data_df, coin_cohort) for the period
         """
         # Get raw period data
-        profits_df, market_data_df = self.wtd.retrieve_raw_datasets(
-            period_start_date,period_end_date
-        )
+        if self.profits_df is None or self.market_data_df is None:
+            profits_df, market_data_df = self.wtd.retrieve_raw_datasets(
+                period_start_date,period_end_date
+            )
+        else:
+            logger.info("Cleaning datasets from provided versions...")
+            profits_df = self.profits_df
+            market_data_df = self.market_data_df
 
         # Apply cleaning process including coin cohort filter if specified
         market_data_df = self.wtd.clean_market_dataset(
@@ -312,6 +323,9 @@ class WalletTrainingDataOrchestrator:
                 f"generation. First few missing: {list(missing_wallets)[:5]}"
             )
 
+        # Convert index to non nullable dtype
+        wallet_training_data_df_full.index = wallet_training_data_df_full.index.astype('int64')
+
         # Return file if configured to
         if return_files is True:
             return wallet_training_data_df_full
@@ -543,7 +557,7 @@ class WalletTrainingDataOrchestrator:
         training_windows_profits_df = pri.impute_profits_for_multiple_dates(cohort_profits_df,
                                                                             training_market_data_df,
                                                                             training_window_boundary_dates,
-                                                                            n_threads=1, reset_index=False)
+                                                                            n_threads=4, reset_index=False)
 
         # Split profits_df into training windows
         training_windows_profits_df = u.ensure_index(training_windows_profits_df)
