@@ -55,6 +55,8 @@ class MultiWindowOrchestrator:
         # Generated objects
         self.output_dfs = {}
 
+        u.notify('wifi_drop')
+
 
     def load_complete_raw_datasets(self) -> None:
         """
