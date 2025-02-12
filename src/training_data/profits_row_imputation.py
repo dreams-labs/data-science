@@ -40,19 +40,15 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads, r
     """
     Wrapper function to impute profits for multiple dates using multithreaded processing.
 
-    Args:
-        profits_df (pd.DataFrame): DataFrame containing dated profits data for coin-wallet pairs
-        prices_df (pd.DataFrame): DataFrame containing price information
-        dates (list): List of dates (str or datetime) for which to impute rows
-        n_threads (int): The number of threads to use for imputation
-        reset_index (bool): Whether to reset the index before returning the df
+    Params:
+    - profits_df (DataFrame): DataFrame containing dated profits data
+    - prices_df (DataFrame): DataFrame containing price information
+    - dates (list): List of dates for imputation
+    - n_threads (int): Number of threads to use
+    - reset_index (bool): Whether to reset index before returning
 
     Returns:
-        pd.DataFrame: Updated profits_df with imputed rows for all specified dates
-
-    Raises:
-        ValueError: If any NaN values are found in the new_rows_df DataFrames.
-
+    - DataFrame: Updated profits_df with imputed rows (or original if no imputation needed)
     """
     if not isinstance(dates, list):
         raise TypeError(f"dates parameter '{dates}' must be a list.")
@@ -60,7 +56,7 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads, r
     start_time = time.time()
     logger.info("Starting profits_df imputation for %s dates...", len(dates))
 
-    # Create indices so we can use vectorized operations
+    # Create indices for vectorized operations
     profits_df = u.ensure_index(profits_df)
     prices_df = u.ensure_index(prices_df)
 
@@ -69,31 +65,28 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads, r
     for date in dates:
         new_rows_df = multithreaded_impute_profits_rows(profits_df, prices_df, date, n_threads)
 
-        if new_rows_df.empty:
-            continue
+        if not new_rows_df.empty:
+            if new_rows_df.isna().any().any():
+                raise ValueError(f"NaN values found in imputed rows for date: {date}")
+            new_rows_list.append(new_rows_df)
 
-        # Check for NaN values
-        if new_rows_df.isna().any().any():
-            raise ValueError(f"NaN values found in the imputed rows for date: {date}")
+    # If no new rows were generated, return original DataFrame
+    if not new_rows_list:
+        logger.info("No new rows generated during imputation. Returning original DataFrame.")
+        return profits_df.reset_index() if reset_index else profits_df
 
-        new_rows_list.append(new_rows_df)
-
-    # Concatenate all new rows at once
+    # Concatenate and append new rows
     all_new_rows = pd.concat(new_rows_list, ignore_index=False)
-
-    # Append all new rows to profits_df
     updated_profits_df = pd.concat([profits_df, all_new_rows], ignore_index=False)
 
-    # Reset index if configured to
-    if reset_index is True:
+    if reset_index:
         updated_profits_df = updated_profits_df.reset_index()
 
-    logger.info("Completed new row generation after %.2f seconds. Total rows after imputation: %s",
+    logger.info("Completed new row generation after %.2f seconds. Total rows: %s",
                 time.time() - start_time,
                 updated_profits_df.shape[0])
 
     return updated_profits_df
-
 
 
 
