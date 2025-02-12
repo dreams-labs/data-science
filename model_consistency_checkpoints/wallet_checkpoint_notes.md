@@ -1,4 +1,24 @@
 # dda 650 reconcile windows vs single
+checkpoint 2: w.686 coin cohorts both match 4938
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.686
+RMSE:                     0.216
+MAE:                      0.116
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.788
+RMSE:                     0.125
+MAE:                      0.066
+
+
 checkpoint 1: w.686 baseline single
 Model Performance Summary
 ===================================
