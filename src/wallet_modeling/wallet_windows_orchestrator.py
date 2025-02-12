@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 # Local module imports
+import training_data.profits_row_imputation as pri
 from wallet_modeling.wallet_training_data import WalletTrainingData
 import wallet_modeling.wallets_config_manager as wcm
 import wallet_modeling.wallet_training_data_orchestrator as wtdo
@@ -117,6 +118,7 @@ class MultiWindowOrchestrator:
         training_window_dfs = {}
         modeling_window_dfs = {}
 
+        u.notify('intro_3')
         for window_config in self.all_windows_configs:
             model_start = window_config['training_data']['modeling_period_start']
             logger.info(f"Generating data for window starting {model_start}")
@@ -301,11 +303,25 @@ class MultiWindowOrchestrator:
         - period_end (str): The last date to retain in the self.complete_profits_df
         """
         # Keep only records up to period_end
-        profits_df = (self.complete_profits_df.copy()
+        window_profits_df = (self.complete_profits_df.copy()
                       [self.complete_profits_df.index.get_level_values('date') <= period_end])
         window_market_data_df = (self.complete_market_data_df.copy()
-                          [self.complete_market_data_df.index.get_level_values('date') <= period_end]
-                          .reset_index())
+                                 [self.complete_market_data_df.index.get_level_values('date') <= period_end])
+
+        # Impute profits_df rows as of the period end
+        window_profits_df = pri.impute_profits_for_multiple_dates(
+            window_profits_df,
+            window_market_data_df,
+            [period_end],
+            n_threads=4,
+            reset_index=False
+        )
+
+        # Apply min_wallet_inflows filter
+        valid_rows = (window_profits_df.xs(period_end, level='date')
+                       ['usd_inflows_cumulative'] >= self.base_config['data_cleaning']['min_wallet_inflows'])
+        valid_pairs = valid_rows[valid_rows].index
+        window_profits_df = window_profits_df.loc[window_profits_df.index.droplevel('date').isin(valid_pairs)]
 
         # Create config with a training period of the param values
         splitter_config = copy.deepcopy(self.base_config)
@@ -316,10 +332,9 @@ class MultiWindowOrchestrator:
         complete_df_splitter = wtdo.WalletTrainingData(splitter_config)
 
         # Use the logic for splitting training window profits_dfs to split the complete profits_df
-        window_profits_df = complete_df_splitter.split_training_window_dfs(u.ensure_index(profits_df))[0]
-        window_profits_df = window_profits_df.reset_index()
+        window_profits_df = complete_df_splitter.split_training_window_dfs(u.ensure_index(window_profits_df))[0]
 
-        return window_profits_df, window_market_data_df
+        return window_profits_df.reset_index(), window_market_data_df.reset_index()
 
 
     def _merge_window_dfs(self, window_dfs: Dict[datetime, pd.DataFrame]) -> pd.DataFrame:
