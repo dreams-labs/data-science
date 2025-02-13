@@ -113,6 +113,8 @@ class MultiWindowOrchestrator:
         - merged_training_df: MultiIndexed on (wallet_address, window_start_date)
         - merged_modeling_df: MultiIndexed on (wallet_address, window_start_date)
         """
+        # Ensure the complete dfs encompass the full range of training_window_starts
+        self._assert_complete_coverage()
 
         # Initialize storage for window DataFrames
         training_window_dfs = {}
@@ -362,3 +364,48 @@ class MultiWindowOrchestrator:
         full_df = pd.concat(merged_dfs, axis=0).sort_index()
 
         return full_df
+
+
+
+    # -----------------------------------
+    #           Utility Methods
+    # -----------------------------------
+
+    def _assert_complete_coverage(self) -> None:
+        """
+        Verify that profits and market data fully cover all training windows.
+
+        Raises:
+        - ValueError: If data coverage is incomplete with specific boundary details
+        """
+        # Find earliest and latest boundaries
+        all_train_starts = []
+        all_model_ends = []
+        for cfg in self.all_windows_configs:
+            all_train_starts.extend(cfg['training_data']['training_window_starts'])
+            all_model_ends.append(cfg['training_data']['modeling_period_end'])
+
+        earliest_training_start = pd.to_datetime(min(all_train_starts))
+        latest_modeling_end = pd.to_datetime(max(all_model_ends))
+        earliest_starting_balance_date = earliest_training_start - timedelta(days=1)
+
+        # Get actual data boundaries
+        profits_start = self.complete_profits_df.index.get_level_values('date').min()
+        profits_end = self.complete_profits_df.index.get_level_values('date').max()
+        market_data_start = self.complete_market_data_df.index.get_level_values('date').min()
+        market_data_end = self.complete_market_data_df.index.get_level_values('date').max()
+
+        if not (
+            (profits_start <= earliest_starting_balance_date) and
+            (profits_end >= latest_modeling_end) and
+            (market_data_start <= earliest_starting_balance_date) and
+            (market_data_end >= latest_modeling_end)
+        ):
+            raise ValueError(
+                f"Insufficient data coverage for specified windows.\n"
+                f"Required coverage: {earliest_starting_balance_date.strftime('%Y-%m-%d')}"
+                f" to {latest_modeling_end.strftime('%Y-%m-%d')}\n"
+                f"Actual coverage:\n"
+                f"- Profits data: {profits_start.strftime('%Y-%m-%d')} to {profits_end.strftime('%Y-%m-%d')}\n"
+                f"- Market data: {market_data_start.strftime('%Y-%m-%d')} to {market_data_end.strftime('%Y-%m-%d')}"
+            )
