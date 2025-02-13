@@ -308,11 +308,12 @@ class MultiWindowOrchestrator:
         window_market_data_df = (self.complete_market_data_df.copy()
                                  [self.complete_market_data_df.index.get_level_values('date') <= period_end])
 
-        # Impute profits_df rows as of the period end
+        # Impute profits_df rows as of the period starting balance date and period end
+        period_starting_balance_date = (pd.to_datetime(period_start) - timedelta(days=1)).strftime('%Y-%m-%d')
         window_profits_df = pri.impute_profits_for_multiple_dates(
             window_profits_df,
             window_market_data_df,
-            [period_end],
+            [period_starting_balance_date,period_end],
             n_threads=4,
             reset_index=False
         )
