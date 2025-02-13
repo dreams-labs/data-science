@@ -618,9 +618,9 @@ def df_downcast(df: pd.DataFrame) -> pd.DataFrame:
 
     # Log duration
     if time.time() - start_time >= 1:
-        logger.info('(%.1fs) Completed ensure_index.', time.time() - start_time)
+        logger.info('(%.1fs) Completed df_downcast.', time.time() - start_time)
     else:
-        logger.debug('(%.1fs) Completed ensure_index.', time.time() - start_time)
+        logger.debug('(%.1fs) Completed df_downcast.', time.time() - start_time)
 
     return df
 
@@ -992,7 +992,7 @@ def notify_on_failure(shell, etype, value, tb, tb_offset=None):
     """
     try:
         # Play error notification
-        notify(19)
+        notify('ui_sound')
     except Exception:
         pass  # Safely ignore any errors with notify()
 
