@@ -26,10 +26,11 @@ class WalletModel(BaseModel):
     #           Helper Methods
     # -----------------------------------
 
-    def _prepare_data(self,
-                      training_data_df: pd.DataFrame,
-                      modeling_cohort_target_var_df: pd.DataFrame
-                      ) -> Tuple[pd.DataFrame, pd.Series]:
+    def _prepare_data(
+            self,
+            training_data_df: pd.DataFrame,
+            modeling_cohort_target_var_df: pd.DataFrame
+        ) -> Tuple[pd.DataFrame, pd.Series]:
         """
         Prepare wallet-specific data for modeling. Returns features and target only.
 
@@ -86,10 +87,12 @@ class WalletModel(BaseModel):
     #         Primary Interface
     # -----------------------------------
 
-    def construct_wallet_model(self,
-                                training_data_df: pd.DataFrame,
-                                modeling_cohort_target_var_df: pd.DataFrame,
-                                return_data: bool = True) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
+    def construct_wallet_model(
+            self,
+            training_data_df: pd.DataFrame,
+            modeling_cohort_target_var_df: pd.DataFrame,
+            return_data: bool = True
+        ) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
         """
         Run wallet-specific modeling experiment.
 
