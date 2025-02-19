@@ -1,3 +1,24 @@
+# dda 635 macroeconomic features
+checkpoint 1: w.688 multiwindow orchestrator fix
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.688
+RMSE:                     0.217
+MAE:                      0.116
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.787
+RMSE:                     0.125
+MAE:                      0.066
+
+
 # dda 650 reconcile windows vs single
 checkpoint 3: mw.688 they're matching??
 Model Performance Summary

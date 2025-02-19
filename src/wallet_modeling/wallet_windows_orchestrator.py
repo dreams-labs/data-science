@@ -70,22 +70,22 @@ class MultiWindowOrchestrator:
             """
         # 1. Find earliest and latest boundaries across all windows
         all_train_starts = []
-        all_model_ends = []
+        all_validation_ends = []
         for cfg in self.all_windows_configs:
             all_train_starts.extend(cfg['training_data']['training_window_starts'])
-            all_model_ends.append(cfg['training_data']['modeling_period_end'])
+            all_validation_ends.append(cfg['training_data']['validation_period_end'])
 
         earliest_training_start = min(all_train_starts)
-        latest_modeling_end = max(all_model_ends)
+        latest_validation_end = max(all_validation_ends)
 
         logger.info("Retrieving complete dataset for range %s to %s.",
-                    earliest_training_start, latest_modeling_end)
+                    earliest_training_start, latest_validation_end)
 
         # Retrieve the full data once (BigQuery or otherwise)
         logger.info("Pulling complete raw datasets from %s through %s...",
-                    earliest_training_start, latest_modeling_end)
+                    earliest_training_start, latest_validation_end)
         self.complete_profits_df, self.complete_market_data_df = \
-            self.wtd.retrieve_raw_datasets(earliest_training_start, latest_modeling_end)
+            self.wtd.retrieve_raw_datasets(earliest_training_start, latest_validation_end)
 
         # Set index
         self.complete_profits_df = u.ensure_index(self.complete_profits_df)
