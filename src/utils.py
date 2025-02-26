@@ -940,8 +940,10 @@ def notify(sound_name: Union[str, int] = None, prompt: str = None, voice_id: str
     - prompt (str, optional): Text to speak using TTS
     - voice_id (str, optional): Specific voice ID for TTS
     """
-    # Load sound config
-    config_path = Path("../../../Local/notification_sounds.yaml")
+    # Load sound config from sounds directory environment variable
+    sounds_directory = Path(os.environ.get('NOTIFICATION_SOUNDS_DIR', "../../../Local"))
+    config_path = sounds_directory / "notification_sounds.yaml"
+
     try:
         with open(config_path, encoding='utf-8') as f:
             config = yaml.safe_load(f)
@@ -970,7 +972,9 @@ def notify(sound_name: Union[str, int] = None, prompt: str = None, voice_id: str
         if not pygame.mixer.get_init():
             pygame.mixer.init()
 
-        sound = pygame.mixer.Sound(sound_config['path'])
+        # Use sounds_directory with the path from config
+        sound_path = sounds_directory / sound_config['path']
+        sound = pygame.mixer.Sound(sound_path)
         sound.set_volume(sound_config.get('volume', 1.0))
         sound.play()
 
