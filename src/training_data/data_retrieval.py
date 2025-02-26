@@ -252,51 +252,55 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows, dataset='pro
     return profits_df
 
 
-def retrieve_macro_trends_data():
+def retrieve_macro_trends_data(query_sql = None):
     """
     Retrieves Google Trends data from the macro_trends dataset. Because the data is weekly, it also
     resamples to daily records using linear interpolation.
 
+    Params:
+    - override_sql (str): Overrides the base query. Must have column 'date'.
+
     Returns:
     - google_trends_df: DataFrame keyed on date containing Google Trends values for multiple terms
     """
-    # query to retrieve all macro trends data at once
-    query_sql = """
-        with all_dates as (
-            select date from `macro_trends.bitcoin_indicators`
-            union distinct
-            select date from `macro_trends.crypto_global_market`
-            union distinct
-            select date from `macro_trends.google_trends`
-        )
-        select d.date
-        ,bi.btc_price
-        ,bi.cdd_terminal_adjusted_90dma as btc_cdd_terminal_adjusted_90dma
-        ,bi.fear_and_greed as btc_fear_and_greed
-        ,bi.mvrv_z_score as btc_mvrv_z_score
-        ,bi.vdd_multiple as btc_vdd_multiple
-        ,gm.market_cap as global_market_cap
-        ,gm.total_volume as global_volume
-        ,gt.altcoin_worldwide as gtrends_altcoin_worldwide
-        ,gt.cryptocurrency_worldwide as gtrends_cryptocurrency_worldwide
-        ,gt.solana_us as gtrends_solana_us
-        ,gt.cryptocurrency_us as gtrends_cryptocurrency_us
-        ,gt.bitcoin_us as gtrends_bitcoin_us
-        ,gt.solana_worldwide as gtrends_solana_worldwide
-        ,gt.coinbase_us as gtrends_coinbase_us
-        ,gt.bitcoin_worldwide as gtrends_bitcoin_worldwide
-        ,gt.ethereum_worldwide as gtrends_ethereum_worldwide
-        ,gt.ethereum_us as gtrends_ethereum_us
-        ,gt.altcoin_us as gtrends_altcoin_us
-        ,gt.coinbase_worldwide as gtrends_coinbase_worldwide
-        ,gt.memecoin_worldwide as gtrends_memecoin_worldwide
-        ,gt.memecoin_us as gtrends_memecoin_us
-        from all_dates d
-        left join `macro_trends.bitcoin_indicators` bi on bi.date = d.date
-        left join `macro_trends.crypto_global_market` gm on gm.date = d.date
-        left join `macro_trends.google_trends` gt on gt.date = d.date
-        order by date desc
-        """
+    if query_sql is None:
+        # query to retrieve all macro trends data at once
+        query_sql = """
+            with all_dates as (
+                select date from `macro_trends.bitcoin_indicators`
+                union distinct
+                select date from `macro_trends.crypto_global_market`
+                union distinct
+                select date from `macro_trends.google_trends`
+            )
+            select d.date
+            ,bi.btc_price
+            ,bi.cdd_terminal_adjusted_90dma as btc_cdd_terminal_adjusted_90dma
+            ,bi.fear_and_greed as btc_fear_and_greed
+            ,bi.mvrv_z_score as btc_mvrv_z_score
+            ,bi.vdd_multiple as btc_vdd_multiple
+            ,gm.market_cap as global_market_cap
+            ,gm.total_volume as global_volume
+            ,gt.altcoin_worldwide as gtrends_altcoin_worldwide
+            ,gt.cryptocurrency_worldwide as gtrends_cryptocurrency_worldwide
+            ,gt.solana_us as gtrends_solana_us
+            ,gt.cryptocurrency_us as gtrends_cryptocurrency_us
+            ,gt.bitcoin_us as gtrends_bitcoin_us
+            ,gt.solana_worldwide as gtrends_solana_worldwide
+            ,gt.coinbase_us as gtrends_coinbase_us
+            ,gt.bitcoin_worldwide as gtrends_bitcoin_worldwide
+            ,gt.ethereum_worldwide as gtrends_ethereum_worldwide
+            ,gt.ethereum_us as gtrends_ethereum_us
+            ,gt.altcoin_us as gtrends_altcoin_us
+            ,gt.coinbase_worldwide as gtrends_coinbase_worldwide
+            ,gt.memecoin_worldwide as gtrends_memecoin_worldwide
+            ,gt.memecoin_us as gtrends_memecoin_us
+            from all_dates d
+            left join `macro_trends.bitcoin_indicators` bi on bi.date = d.date
+            left join `macro_trends.crypto_global_market` gm on gm.date = d.date
+            left join `macro_trends.google_trends` gt on gt.date = d.date
+            order by date desc
+            """
 
     # Run the SQL query using dgc's run_sql method
     macro_trends_df = dgc().run_sql(query_sql)
