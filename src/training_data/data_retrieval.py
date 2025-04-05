@@ -671,25 +671,23 @@ def retrieve_metadata_data():
 #       Macro Trends Helpers
 # ----------------------------------
 
-def clean_macro_trends(macro_trends_df, config):
+def clean_macro_trends(macro_trends_df, macro_trends_cols):
     """
     Basic function to only retain the columns in macro_trends_df that have metrics described in
     the config files.
 
     Params:
     - macro_trends_df (DataFrame): df with macro trends data keyed on date
-    - config (dict): config.yaml
+    - macro_trends_cols (list): list of macro trends columns to clean
 
     Returns:
     - filtered_macro_trends_df (DataFrame): input df with non-metric configured columns removed
     """
     # 1. Filter to only relevant columns
     # ----------------------------------
-    # Get the keys from the config dictionary
-    metric_columns = list(config['datasets']['macro_trends'].keys()) if 'macro_trends' in config['datasets'] else []
 
     # Ensure 'date' is included
-    required_columns = ['date'] + metric_columns
+    required_columns = ['date'] + macro_trends_cols
 
     # Check if all required columns exist in the dataframe
     missing_columns = [col for col in required_columns if col not in macro_trends_df.columns]
