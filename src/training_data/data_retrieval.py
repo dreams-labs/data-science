@@ -306,8 +306,9 @@ def retrieve_macro_trends_data(query_sql = None):
             """
 
     # Run the SQL query using dgc's run_sql method
+    logger.info("Retrieving macro trends data from prod schema 'macro_trends'...")
     macro_trends_df = dgc().run_sql(query_sql)
-    logger.debug('Retrieved macro trends data with shape %s',macro_trends_df.shape)
+    logger.info('Retrieved macro trends data with shape %s',macro_trends_df.shape)
 
     # Convert the date column to datetime format
     macro_trends_df['date'] = pd.to_datetime(macro_trends_df['date'])

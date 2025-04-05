@@ -45,14 +45,16 @@ class WalletTrainingData:
         - period_start_date,period_end_date (YYYY-MM-DD): The data period boundary dates.
 
         Returns:
-        - profits_df, market_data_df: raw dataframes
+        - profits_df, market_data_df, macro_trends_df: raw dataframes
         """
         # Identify the date we need ending balances from
         period_start_date = datetime.strptime(period_start_date,'%Y-%m-%d')
         starting_balance_date = period_start_date - timedelta(days=1)
 
-        # Retrieve both datasets
-        with ThreadPoolExecutor(max_workers=2) as executor:
+        # Retrieve all datasets
+        with ThreadPoolExecutor(max_workers=3) as executor:
+
+            # Profits data
             profits_future = executor.submit(
                 dr.retrieve_profits_data,
                 starting_balance_date,
@@ -60,13 +62,21 @@ class WalletTrainingData:
                 self.wallets_config['data_cleaning']['min_wallet_inflows'],
                 self.wallets_config['training_data']['dataset']
             )
+
+            # Market data
             market_future = executor.submit(dr.retrieve_market_data,
                                             self.wallets_config['training_data']['dataset'])
 
+            # Macro trends data
+            macro_future = executor.submit(dr.retrieve_macro_trends_data)
+
+            # Merge all dfs
             profits_df = profits_future.result()
             market_data_df = market_future.result()
+            macro_trends_df = macro_future.result()
 
-        return profits_df, market_data_df
+
+        return profits_df, market_data_df, macro_trends_df
 
 
     def clean_market_dataset(self, market_data_df, profits_df, period_start_date, period_end_date, coin_cohort=None):

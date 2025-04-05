@@ -114,6 +114,14 @@ features:
     # Balance Params
     balance_features_min_balance: 20  # determines
 
+    # Macroeconomic Params
+    macroeconomic_features: [
+        btc_price,
+        btc_mvrv_z_score,
+        global_market_cap,
+        global_volume
+    ]
+
     # Clustering Params
     # clustering_n_clusters: [2,4]
     clustering_n_components: 25

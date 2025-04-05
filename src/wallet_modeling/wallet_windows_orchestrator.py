@@ -35,6 +35,7 @@ class MultiWindowOrchestrator:
         windows_config: dict,
         complete_profits_df: pd.DataFrame = None,
         complete_market_data_df: pd.DataFrame = None,
+        complete_macro_trends_df: pd.DataFrame = None,
 
     ):
         # Param Configs
@@ -49,8 +50,10 @@ class MultiWindowOrchestrator:
         # Complete df objects
         self.complete_profits_df_file = None
         self.complete_market_data_df_file = None
+        self.complete_macro_trends_df_file = None
         self.complete_profits_df = complete_profits_df
         self.complete_market_data_df = complete_market_data_df
+        self.complete_macro_trends_df = complete_macro_trends_df
         self.wtd = WalletTrainingData(self.base_config)  # helper for complete df generation
 
         # Generated objects
@@ -84,7 +87,7 @@ class MultiWindowOrchestrator:
         # Retrieve the full data once (BigQuery or otherwise)
         logger.info("Pulling complete raw datasets from %s through %s...",
                     earliest_training_start, latest_validation_end)
-        self.complete_profits_df, self.complete_market_data_df = \
+        self.complete_profits_df, self.complete_market_data_df, self.complete_macro_trends_df = \
             self.wtd.retrieve_raw_datasets(earliest_training_start, latest_validation_end)
 
         # Set index
@@ -95,13 +98,18 @@ class MultiWindowOrchestrator:
         parquet_folder = self.base_config['training_data']['parquet_folder']
         self.complete_profits_df_file = f"{parquet_folder}/complete_profits_df.parquet"
         self.complete_market_data_df_file = f"{parquet_folder}/complete_market_data_df.parquet"
+        self.complete_macro_trends_df_file = f"{parquet_folder}/complete_macro_trends_df.parquet"
 
         self.complete_profits_df.to_parquet(self.complete_profits_df_file)
         self.complete_market_data_df.to_parquet(self.complete_market_data_df_file)
+        self.complete_macro_trends_df.to_parquet(self.complete_macro_trends_df_file)
 
-        logger.info("Saved complete profits to %s (%s rows), market data to %s (%s rows).",
+        logger.info("Saved complete profits to %s (%s rows), market data to %s (%s rows), " \
+                    " market data to %s (%s rows).",
                     self.complete_profits_df_file, len(self.complete_profits_df),
-                    self.complete_market_data_df_file, len(self.complete_market_data_df))
+                    self.complete_market_data_df_file, len(self.complete_market_data_df),
+                    self.complete_macro_trends_df_file, len(self.complete_macro_trends_df)
+                    )
 
 
     @u.timing_decorator
