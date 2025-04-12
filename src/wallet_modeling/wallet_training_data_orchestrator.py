@@ -166,7 +166,7 @@ class WalletTrainingDataOrchestrator:
         # Generate market indicators
         def generate_market_indicators_df():
             logger.info("Generating market indicators...")
-            market_indicators_df = self._generate_market_data_indicators_df(
+            market_indicators_df = self._generate_indicators_df(
                 market_data_df_full,
                 parquet_filename = None,
                 period = period,
@@ -581,7 +581,7 @@ class WalletTrainingDataOrchestrator:
 
 
     @u.timing_decorator
-    def _generate_market_data_indicators_df(
+    def _generate_indicators_df(
         self,
         training_data_df_full,
         parquet_filename="training_market_indicators_data_df",
@@ -623,6 +623,9 @@ class WalletTrainingDataOrchestrator:
 
         # Adds time series ratio metrics that can have additional indicators applied to them
         if any(k in self.wallets_metrics_config['time_series'][metric_type] for k in ['mfi', 'obv']):
+            if metric_type != 'market_data':
+                raise ValueError("Dual column indicators MFI/OBV are only supported for market data.")
+
             indicators_df = ind.add_market_data_dualcolumn_indicators(training_data_df_full)
         else:
             indicators_df = training_data_df_full
