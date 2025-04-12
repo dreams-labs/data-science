@@ -140,7 +140,14 @@ class WalletTrainingData:
         return market_data_df
 
 
-    def format_and_save_datasets(self, profits_df, market_data_df, macro_trends_df, period_start_date, parquet_prefix=None):
+    def format_and_save_datasets(
+            self,
+            profits_df,
+            market_data_df,
+            macro_trends_df,
+            period_start_date,
+            parquet_prefix=None
+        ):
         """
         Formats and optionally saves the final datasets.
 
