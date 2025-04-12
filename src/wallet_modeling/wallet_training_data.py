@@ -140,12 +140,12 @@ class WalletTrainingData:
         return market_data_df
 
 
-    def format_and_save_datasets(self, profits_df, market_data_df, period_start_date, parquet_prefix=None):
+    def format_and_save_datasets(self, profits_df, market_data_df, macro_trends_df, period_start_date, parquet_prefix=None):
         """
         Formats and optionally saves the final datasets.
 
         Params:
-        - profits_df, market_data_df (DataFrames): Input dataframes
+        - profits_df, market_data_df, macro_trends_df (DataFrames): Input dataframes
         - starting_balance_date (datetime): Balance imputation date
         - parquet_prefix,parquet_folder (str): Save location params
 
@@ -197,9 +197,14 @@ class WalletTrainingData:
             market_data_file = f"{parquet_folder}/{parquet_prefix}_market_data_df_full.parquet"
             market_data_df.to_parquet(market_data_file,index=False)
             logger.info(f"Stored market_data_df with shape {market_data_df.shape} to {market_data_file}.")
-            return None, None
 
-        return profits_df, market_data_df
+            # Store macro_trends_df
+            macro_trends_file = f"{parquet_folder}/{parquet_prefix}_macro_trends_df_full.parquet"
+            macro_trends_df.to_parquet(macro_trends_file,index=False)
+            logger.info(f"Stored macro_trends_df with shape {macro_trends_df.shape} to {macro_trends_file}.")
+            return None, None, None
+
+        return profits_df, market_data_df, macro_trends_df
 
 
     def generate_training_window_imputation_dates(self) -> List[datetime]:

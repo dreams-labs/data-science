@@ -1,4 +1,24 @@
 # dda 635 macroeconomic features
+checkpoint 3: w.686 macro_trends_df online
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.686
+RMSE:                     0.216
+MAE:                      0.116
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.786
+RMSE:                     0.126
+MAE:                      0.067
+
+
 checkpoint 2: w.690 add macro df to orchestrators
 Model Performance Summary
 ===================================

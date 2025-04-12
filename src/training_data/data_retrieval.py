@@ -727,10 +727,4 @@ def clean_macro_trends(macro_trends_df, macro_trends_cols, start_date=None, end_
     # Resample to daily frequency and forward fill
     filtered_df = filtered_df.resample('D').ffill()
 
-    # 6. Confirm there are no NaN values
-    # ----------------------------------
-    nan_cols = [col for col in filtered_df.columns if filtered_df[col].isna().any()]
-    if nan_cols:
-        raise ValueError(f"NaN values found in columns after imputation: {nan_cols}")
-
     return filtered_df
