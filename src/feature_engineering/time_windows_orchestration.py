@@ -155,7 +155,8 @@ def prepare_all_windows_base_data(config, metrics_config):
 
     # Macro trends: retrieve and clean full history
     macro_trends_df = dr.retrieve_macro_trends_data()
-    macro_trends_df = dr.clean_macro_trends(macro_trends_df, config)
+    macro_trends_cols = list(config['datasets']['macro_trends'].keys()) if 'macro_trends' in config['datasets'] else []
+    macro_trends_df = dr.clean_macro_trends(macro_trends_df, macro_trends_cols)
 
 
     # 2. Filtering based on dataset overlap

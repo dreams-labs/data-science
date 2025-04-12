@@ -13,6 +13,7 @@ from google.cloud import bigquery
 
 # Local module imports
 from wallet_modeling.wallet_training_data import WalletTrainingData
+import training_data.data_retrieval as dr
 import training_data.profits_row_imputation as pri
 import coin_wallet_metrics.indicators as ind
 import wallet_features.wallet_features_orchestrator as wfo
@@ -41,7 +42,8 @@ class WalletTrainingDataOrchestrator:
         wallets_features_config: dict,
         training_wallet_cohort: List[int] = None,
         profits_df = None,
-        market_data_df = None
+        market_data_df = None,
+        macro_trends_df = None,
     ):
         # Base configs
         self.wallets_config = copy.deepcopy(wallets_config)
@@ -56,6 +58,7 @@ class WalletTrainingDataOrchestrator:
         # Preexisting raw dfs if provided
         self.profits_df = profits_df
         self.market_data_df = market_data_df
+        self.macro_trends_df = macro_trends_df
 
 
 
@@ -79,16 +82,19 @@ class WalletTrainingDataOrchestrator:
         Returns:
         - tuple: (profits_df, market_data_df, coin_cohort) for the period
         """
-        # Get raw period data
-        if self.profits_df is None or self.market_data_df is None:
-            profits_df, market_data_df = self.wtd.retrieve_raw_datasets(
+        # 1. Get raw period data
+        if self.profits_df is None or self.market_data_df is None or self.macro_trends_df is None:
+            profits_df, market_data_df, macro_trends_df = self.wtd.retrieve_raw_datasets(
                 period_start_date,period_end_date
             )
         else:
             logger.info("Cleaning datasets from provided versions...")
             profits_df = self.profits_df
             market_data_df = self.market_data_df
+            macro_trends_df = self.macro_trends_df
 
+
+        # 2. Clean raw datasets
         # Apply cleaning process including coin cohort filter if specified
         market_data_df = self.wtd.clean_market_dataset(
             market_data_df, profits_df,
@@ -97,28 +103,35 @@ class WalletTrainingDataOrchestrator:
         )
         profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
 
+        # Macro trends imputation, cleaning, validation
+        macro_trends_cols = list(self.wallets_metrics_config['macro_trends'].keys())
+        macro_trends_df = dr.clean_macro_trends(macro_trends_df, macro_trends_cols,
+                                        start_date = None,  # historical data is needed for indicators
+                                        end_date = period_end_date)
+
         # Set the coin_cohort if it hadn't already been passed
         if not coin_cohort:
             coin_cohort = set(market_data_df['coin_id'].unique())
             logger.info("Defined coin cohort of %s coins after applying data cleaning filters.",
                         len(coin_cohort))
 
-        # Impute the period end (period start is pre-imputed during profits_df generation)
+        # 3. Impute the period end (period start is pre-imputed during profits_df generation)
         imputed_profits_df = pri.impute_profits_for_multiple_dates(
             profits_df, market_data_df,
             [period_end_date],
             n_threads=1
         )
 
-        # Format and optionally save the datasets
-        profits_df_formatted, market_data_df_formatted = self.wtd.format_and_save_datasets(
+        # 4. Format and optionally save the datasets
+        profits_df_formatted, market_data_df_formatted, macro_trends_df_formatted = self.wtd.format_and_save_datasets(
             imputed_profits_df,
             market_data_df,
+            macro_trends_df,
             period_start_date,
             parquet_prefix
         )
 
-        return profits_df_formatted, market_data_df_formatted, coin_cohort
+        return profits_df_formatted, market_data_df_formatted, macro_trends_df_formatted, coin_cohort
 
 
 

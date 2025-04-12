@@ -252,65 +252,69 @@ def retrieve_profits_data(start_date, end_date, min_wallet_inflows, dataset='pro
     return profits_df
 
 
-def retrieve_macro_trends_data():
+def retrieve_macro_trends_data(query_sql = None):
     """
     Retrieves Google Trends data from the macro_trends dataset. Because the data is weekly, it also
     resamples to daily records using linear interpolation.
 
+    Params:
+    - override_sql (str): Overrides the base query. Must have column 'date'.
+
     Returns:
     - google_trends_df: DataFrame keyed on date containing Google Trends values for multiple terms
     """
-    # query to retrieve all macro trends data at once
-    query_sql = """
-        with all_dates as (
-            select date from `macro_trends.bitcoin_indicators`
-            union distinct
-            select date from `macro_trends.crypto_global_market`
-            union distinct
-            select date from `macro_trends.google_trends`
-        )
-        select d.date
-        ,bi.btc_price
-        ,bi.cdd_terminal_adjusted_90dma as btc_cdd_terminal_adjusted_90dma
-        ,bi.fear_and_greed as btc_fear_and_greed
-        ,bi.mvrv_z_score as btc_mvrv_z_score
-        ,bi.vdd_multiple as btc_vdd_multiple
-        ,gm.market_cap as global_market_cap
-        ,gm.total_volume as global_volume
-        ,gt.altcoin_worldwide as gtrends_altcoin_worldwide
-        ,gt.cryptocurrency_worldwide as gtrends_cryptocurrency_worldwide
-        ,gt.solana_us as gtrends_solana_us
-        ,gt.cryptocurrency_us as gtrends_cryptocurrency_us
-        ,gt.bitcoin_us as gtrends_bitcoin_us
-        ,gt.solana_worldwide as gtrends_solana_worldwide
-        ,gt.coinbase_us as gtrends_coinbase_us
-        ,gt.bitcoin_worldwide as gtrends_bitcoin_worldwide
-        ,gt.ethereum_worldwide as gtrends_ethereum_worldwide
-        ,gt.ethereum_us as gtrends_ethereum_us
-        ,gt.altcoin_us as gtrends_altcoin_us
-        ,gt.coinbase_worldwide as gtrends_coinbase_worldwide
-        ,gt.memecoin_worldwide as gtrends_memecoin_worldwide
-        ,gt.memecoin_us as gtrends_memecoin_us
-        from all_dates d
-        left join `macro_trends.bitcoin_indicators` bi on bi.date = d.date
-        left join `macro_trends.crypto_global_market` gm on gm.date = d.date
-        left join `macro_trends.google_trends` gt on gt.date = d.date
-        order by date desc
-        """
+    if query_sql is None:
+        # query to retrieve all macro trends data at once
+        query_sql = """
+            with all_dates as (
+                select date from `macro_trends.bitcoin_indicators`
+                union distinct
+                select date from `macro_trends.bitcoin_mvrv_z_score`
+                union distinct
+                select date from `macro_trends.crypto_global_market`
+                union distinct
+                select date from `macro_trends.google_trends`
+            )
+            select d.date
+            ,bz.btc_price
+            ,bi.cdd_terminal_adjusted_90dma as btc_cdd_terminal_adjusted_90dma
+            ,bi.fear_and_greed as btc_fear_and_greed
+            ,bz.btc_mvrv_z_score as btc_mvrv_z_score
+            ,bi.vdd_multiple as btc_vdd_multiple
+            ,gm.market_cap as global_market_cap
+            ,gm.total_volume as global_volume
+            ,gt.altcoin_worldwide as gtrends_altcoin_worldwide
+            ,gt.cryptocurrency_worldwide as gtrends_cryptocurrency_worldwide
+            ,gt.solana_us as gtrends_solana_us
+            ,gt.cryptocurrency_us as gtrends_cryptocurrency_us
+            ,gt.bitcoin_us as gtrends_bitcoin_us
+            ,gt.solana_worldwide as gtrends_solana_worldwide
+            ,gt.coinbase_us as gtrends_coinbase_us
+            ,gt.bitcoin_worldwide as gtrends_bitcoin_worldwide
+            ,gt.ethereum_worldwide as gtrends_ethereum_worldwide
+            ,gt.ethereum_us as gtrends_ethereum_us
+            ,gt.altcoin_us as gtrends_altcoin_us
+            ,gt.coinbase_worldwide as gtrends_coinbase_worldwide
+            ,gt.memecoin_worldwide as gtrends_memecoin_worldwide
+            ,gt.memecoin_us as gtrends_memecoin_us
+            from all_dates d
+            left join `macro_trends.bitcoin_indicators` bi on bi.date = d.date
+            left join `macro_trends.bitcoin_mvrv_z_score` bz on bz.date = d.date
+            left join `macro_trends.crypto_global_market` gm on gm.date = d.date
+            left join `macro_trends.google_trends` gt on gt.date = d.date
+            order by date desc
+            """
 
     # Run the SQL query using dgc's run_sql method
+    logger.info("Retrieving macro trends data from prod schema 'macro_trends'...")
     macro_trends_df = dgc().run_sql(query_sql)
-    logger.debug('Retrieved macro trends data with shape %s',macro_trends_df.shape)
+    logger.info('Retrieved macro trends data with shape %s',macro_trends_df.shape)
 
     # Convert the date column to datetime format
     macro_trends_df['date'] = pd.to_datetime(macro_trends_df['date'])
 
-    # Resample the df to fill in missing days by using date as the index
-    macro_trends_df = macro_trends_df.set_index('date')
-    macro_trends_df = macro_trends_df.resample('D').interpolate(method='time', limit_area='inside')
-
-    # Reset index
-    macro_trends_df = macro_trends_df.reset_index()
+    # Convert all numerical columns to 32 bit, using safe_downcast to avoid overflow
+    macro_trends_df = u.df_downcast(macro_trends_df)
 
     return macro_trends_df
 
@@ -663,51 +667,64 @@ def retrieve_metadata_data():
 #       Macro Trends Helpers
 # ----------------------------------
 
-def clean_macro_trends(macro_trends_df, config):
+def clean_macro_trends(macro_trends_df, macro_trends_cols, start_date=None, end_date=None):
     """
-    Basic function to only retain the columns in macro_trends_df that have metrics described in
-    the config files.
+    Cleans macro trends data by filtering to specified columns and date range,
+    validating data quality, and imputing missing values.
 
     Params:
     - macro_trends_df (DataFrame): df with macro trends data keyed on date
-    - config (dict): config.yaml
+    - macro_trends_cols (list): list of macro trends columns to clean
+    - start_date (str/datetime, optional): start date to filter data
+    - end_date (str/datetime, optional): end date to filter data
 
     Returns:
-    - filtered_macro_trends_df (DataFrame): input df with non-metric configured columns removed
+    - filtered_df (DataFrame): cleaned dataframe with date as index
     """
     # 1. Filter to only relevant columns
     # ----------------------------------
-    # Get the keys from the config dictionary
-    metric_columns = list(config['datasets']['macro_trends'].keys()) if 'macro_trends' in config['datasets'] else []
-
-    # Ensure 'date' is included
-    required_columns = ['date'] + metric_columns
+    required_columns = ['date'] + macro_trends_cols
 
     # Check if all required columns exist in the dataframe
     missing_columns = [col for col in required_columns if col not in macro_trends_df.columns]
-
     if missing_columns:
         raise ValueError(f"The following columns are missing from the dataframe: {', '.join(missing_columns)}")
 
-    # Filter the dataframe to only the required columns
-    filtered_macro_trends_df = macro_trends_df[required_columns]
+    # 2. Validate numeric columns
+    # ----------------------------------
+    for col in macro_trends_cols:
+        if not pd.api.types.is_numeric_dtype(macro_trends_df[col]):
+            raise ValueError(f"Column {col} is not numeric")
 
+    # 3. Filter to date range and set index
+    # ----------------------------------
+    filtered_df = macro_trends_df[required_columns].copy()
+    filtered_df['date'] = pd.to_datetime(filtered_df['date'])
+    filtered_df = filtered_df.set_index('date')
 
-    # 2. Confirm there are no mid-series nan values
-    # ---------------------------------------------
-    nan_checks = []
-    nan_cols = []
+    if start_date:
+        start_date = pd.to_datetime(start_date)
+        filtered_df = filtered_df[filtered_df.index >= start_date]
 
-    for col in filtered_macro_trends_df.columns:
-        # Check if there are NaNs in the middle of any columns
-        nan_check = u.check_nan_values(filtered_macro_trends_df[col])
-        nan_checks.append(nan_check)
+    if end_date:
+        end_date = pd.to_datetime(end_date)
+        filtered_df = filtered_df[filtered_df.index <= end_date]
 
-        # Store column name if there are NaNs in the middle of the series
-        if nan_check:
-            nan_cols.append(col)
+    if len(filtered_df) == 0:
+        raise ValueError("No data available in the specified date range")
 
-    if sum(nan_checks) > 0:
-        raise ValueError(f"NaN values found in macro_trends_df columns: {nan_cols}")
+    # 4. Check for gaps > 6 days
+    # ----------------------------------
+    if len(filtered_df) > 1:
+        date_diffs = filtered_df.index.to_series().diff().dt.days[1:]
+        max_gap = date_diffs.max()
+        if max_gap > 6:
+            gap_locations = filtered_df.index[1:][date_diffs > 6]
+            raise ValueError(f"Gaps larger than 6 days found in the data at: {gap_locations.tolist()}")
 
-    return filtered_macro_trends_df
+    # 5. Impute missing values
+    # ----------------------------------
+    # Resample to daily frequency and forward fill
+    filtered_df = filtered_df.resample('D').ffill()
+
+    return filtered_df

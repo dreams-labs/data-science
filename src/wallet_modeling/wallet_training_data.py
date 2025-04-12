@@ -45,14 +45,16 @@ class WalletTrainingData:
         - period_start_date,period_end_date (YYYY-MM-DD): The data period boundary dates.
 
         Returns:
-        - profits_df, market_data_df: raw dataframes
+        - profits_df, market_data_df, macro_trends_df: raw dataframes
         """
         # Identify the date we need ending balances from
         period_start_date = datetime.strptime(period_start_date,'%Y-%m-%d')
         starting_balance_date = period_start_date - timedelta(days=1)
 
-        # Retrieve both datasets
-        with ThreadPoolExecutor(max_workers=2) as executor:
+        # Retrieve all datasets
+        with ThreadPoolExecutor(max_workers=3) as executor:
+
+            # Profits data
             profits_future = executor.submit(
                 dr.retrieve_profits_data,
                 starting_balance_date,
@@ -60,13 +62,21 @@ class WalletTrainingData:
                 self.wallets_config['data_cleaning']['min_wallet_inflows'],
                 self.wallets_config['training_data']['dataset']
             )
+
+            # Market data
             market_future = executor.submit(dr.retrieve_market_data,
                                             self.wallets_config['training_data']['dataset'])
 
+            # Macro trends data
+            macro_future = executor.submit(dr.retrieve_macro_trends_data)
+
+            # Merge all dfs
             profits_df = profits_future.result()
             market_data_df = market_future.result()
+            macro_trends_df = macro_future.result()
 
-        return profits_df, market_data_df
+
+        return profits_df, market_data_df, macro_trends_df
 
 
     def clean_market_dataset(self, market_data_df, profits_df, period_start_date, period_end_date, coin_cohort=None):
@@ -130,12 +140,12 @@ class WalletTrainingData:
         return market_data_df
 
 
-    def format_and_save_datasets(self, profits_df, market_data_df, period_start_date, parquet_prefix=None):
+    def format_and_save_datasets(self, profits_df, market_data_df, macro_trends_df, period_start_date, parquet_prefix=None):
         """
         Formats and optionally saves the final datasets.
 
         Params:
-        - profits_df, market_data_df (DataFrames): Input dataframes
+        - profits_df, market_data_df, macro_trends_df (DataFrames): Input dataframes
         - starting_balance_date (datetime): Balance imputation date
         - parquet_prefix,parquet_folder (str): Save location params
 
@@ -187,9 +197,14 @@ class WalletTrainingData:
             market_data_file = f"{parquet_folder}/{parquet_prefix}_market_data_df_full.parquet"
             market_data_df.to_parquet(market_data_file,index=False)
             logger.info(f"Stored market_data_df with shape {market_data_df.shape} to {market_data_file}.")
-            return None, None
 
-        return profits_df, market_data_df
+            # Store macro_trends_df
+            macro_trends_file = f"{parquet_folder}/{parquet_prefix}_macro_trends_df_full.parquet"
+            macro_trends_df.to_parquet(macro_trends_file,index=False)
+            logger.info(f"Stored macro_trends_df with shape {macro_trends_df.shape} to {macro_trends_file}.")
+            return None, None, None
+
+        return profits_df, market_data_df, macro_trends_df
 
 
     def generate_training_window_imputation_dates(self) -> List[datetime]:

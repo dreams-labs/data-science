@@ -26,3 +26,47 @@ time_series:
         #         sma:
         #             parameters:
         #                 window: [5]
+
+
+# Time series keyed on only date
+macro_trends:
+    btc_price:
+        aggregations:
+            first:
+                scaling: "none"
+            last:
+                scaling: "none"
+            std:
+                scaling: "none"
+        indicators:
+            rsi:
+                parameters:
+                    window: [100]
+                aggregations:
+                    last:
+                        scaling: "none"
+    btc_mvrv_z_score:
+        aggregations:
+            first:
+                scaling: "none"
+            last:
+                scaling: "none"
+    global_market_cap:
+        aggregations:
+            first:
+                scaling: "none"
+            last:
+                scaling: "none"
+        indicators:
+            rsi:
+                parameters:
+                    window: [100]
+                aggregations:
+                    last:
+                        scaling: "none"
+    global_volume:
+        aggregations:
+            first:
+                scaling: "none"
+            last:
+                scaling: "none"

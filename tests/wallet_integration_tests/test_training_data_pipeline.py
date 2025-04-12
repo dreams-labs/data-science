@@ -51,20 +51,20 @@ def period_datasets():
     logger.setLevel(logging.WARNING)
 
     # Get initial training data and coin cohort
-    training_profits_df, training_market_df, coin_cohort = wtdo.retrieve_period_datasets(
+    training_profits_df, training_market_df, _, coin_cohort = wtdo.retrieve_period_datasets(
         wallets_config['training_data']['training_period_start'],
         wallets_config['training_data']['training_period_end']
     )
 
     # Get modeling period data
-    modeling_profits_df, modeling_market_df, _ = wtdo.retrieve_period_datasets(
+    modeling_profits_df, modeling_market_df, _, _ = wtdo.retrieve_period_datasets(
         wallets_config['training_data']['modeling_period_start'],
         wallets_config['training_data']['modeling_period_end'],
         coin_cohort=coin_cohort
     )
 
     # Get combined period data
-    combined_profits_df, combined_market_df, _ = wtdo.retrieve_period_datasets(
+    combined_profits_df, combined_market_df, _, _ = wtdo.retrieve_period_datasets(
         wallets_config['training_data']['training_period_start'],
         wallets_config['training_data']['modeling_period_end'],
         coin_cohort=coin_cohort
@@ -287,14 +287,14 @@ def validation_datasets(period_datasets):
     coin_cohort = period_datasets[-1]
 
     # Get validation period data
-    validation_profits_df, validation_market_df, _ = wtdo.retrieve_period_datasets(
+    validation_profits_df, validation_market_df, _, _ = wtdo.retrieve_period_datasets(
         wallets_config['training_data']['validation_period_start'],
         wallets_config['training_data']['validation_period_end'],
         coin_cohort=coin_cohort
     )
 
     # Get full range data
-    full_range_profits_df, full_range_market_df, _ = wtdo.retrieve_period_datasets(
+    full_range_profits_df, full_range_market_df, _, _ = wtdo.retrieve_period_datasets(
         wallets_config['training_data']['training_period_start'],
         wallets_config['training_data']['validation_period_end'],
         coin_cohort=coin_cohort
