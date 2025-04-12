@@ -313,6 +313,9 @@ def retrieve_macro_trends_data(query_sql = None):
     # Convert the date column to datetime format
     macro_trends_df['date'] = pd.to_datetime(macro_trends_df['date'])
 
+    # Convert all numerical columns to 32 bit, using safe_downcast to avoid overflow
+    macro_trends_df = u.df_downcast(macro_trends_df)
+
     return macro_trends_df
 
 
@@ -664,59 +667,70 @@ def retrieve_metadata_data():
 #       Macro Trends Helpers
 # ----------------------------------
 
-def clean_macro_trends(macro_trends_df, macro_trends_cols):
+def clean_macro_trends(macro_trends_df, macro_trends_cols, start_date=None, end_date=None):
     """
-    Basic function to only retain the columns in macro_trends_df that have metrics described in
-    the config files.
+    Cleans macro trends data by filtering to specified columns and date range,
+    validating data quality, and imputing missing values.
 
     Params:
     - macro_trends_df (DataFrame): df with macro trends data keyed on date
     - macro_trends_cols (list): list of macro trends columns to clean
+    - start_date (str/datetime, optional): start date to filter data
+    - end_date (str/datetime, optional): end date to filter data
 
     Returns:
-    - filtered_macro_trends_df (DataFrame): input df with non-metric configured columns removed
+    - filtered_df (DataFrame): cleaned dataframe with date as index
     """
     # 1. Filter to only relevant columns
     # ----------------------------------
-
-    # Ensure 'date' is included
     required_columns = ['date'] + macro_trends_cols
 
     # Check if all required columns exist in the dataframe
     missing_columns = [col for col in required_columns if col not in macro_trends_df.columns]
-
     if missing_columns:
         raise ValueError(f"The following columns are missing from the dataframe: {', '.join(missing_columns)}")
 
-    # Filter the dataframe to only the required columns
-    filtered_macro_trends_df = macro_trends_df[required_columns]
-
-
-    # 2. Impute missing values
+    # 2. Validate numeric columns
     # ----------------------------------
-    # Resample the df to fill in missing days by using date as the index
-    macro_trends_df = macro_trends_df.set_index('date')
-    macro_trends_df = macro_trends_df.resample('D').interpolate(method='time', limit_area='inside')
+    for col in macro_trends_cols:
+        if not pd.api.types.is_numeric_dtype(macro_trends_df[col]):
+            raise ValueError(f"Column {col} is not numeric")
 
-    # Reset index
-    macro_trends_df = macro_trends_df.reset_index()
+    # 3. Filter to date range and set index
+    # ----------------------------------
+    filtered_df = macro_trends_df[required_columns].copy()
+    filtered_df['date'] = pd.to_datetime(filtered_df['date'])
+    filtered_df = filtered_df.set_index('date')
 
+    if start_date:
+        start_date = pd.to_datetime(start_date)
+        filtered_df = filtered_df[filtered_df.index >= start_date]
 
-    # 3. Confirm there are no mid-series nan values
-    # ---------------------------------------------
-    nan_checks = []
-    nan_cols = []
+    if end_date:
+        end_date = pd.to_datetime(end_date)
+        filtered_df = filtered_df[filtered_df.index <= end_date]
 
-    for col in filtered_macro_trends_df.columns:
-        # Check if there are NaNs in the middle of any columns
-        nan_check = u.check_nan_values(filtered_macro_trends_df[col])
-        nan_checks.append(nan_check)
+    if len(filtered_df) == 0:
+        raise ValueError("No data available in the specified date range")
 
-        # Store column name if there are NaNs in the middle of the series
-        if nan_check:
-            nan_cols.append(col)
+    # 4. Check for gaps > 6 days
+    # ----------------------------------
+    if len(filtered_df) > 1:
+        date_diffs = filtered_df.index.to_series().diff().dt.days[1:]
+        max_gap = date_diffs.max()
+        if max_gap > 6:
+            gap_locations = filtered_df.index[1:][date_diffs > 6]
+            raise ValueError(f"Gaps larger than 6 days found in the data at: {gap_locations.tolist()}")
 
-    if sum(nan_checks) > 0:
-        raise ValueError(f"NaN values found in macro_trends_df columns: {nan_cols}")
+    # 5. Impute missing values
+    # ----------------------------------
+    # Resample to daily frequency and forward fill
+    filtered_df = filtered_df.resample('D').ffill()
 
-    return filtered_macro_trends_df
+    # 6. Confirm there are no NaN values
+    # ----------------------------------
+    nan_cols = [col for col in filtered_df.columns if filtered_df[col].isna().any()]
+    if nan_cols:
+        raise ValueError(f"NaN values found in columns after imputation: {nan_cols}")
+
+    return filtered_df
