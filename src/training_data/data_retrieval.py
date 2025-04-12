@@ -313,13 +313,6 @@ def retrieve_macro_trends_data(query_sql = None):
     # Convert the date column to datetime format
     macro_trends_df['date'] = pd.to_datetime(macro_trends_df['date'])
 
-    # Resample the df to fill in missing days by using date as the index
-    macro_trends_df = macro_trends_df.set_index('date')
-    macro_trends_df = macro_trends_df.resample('D').interpolate(method='time', limit_area='inside')
-
-    # Reset index
-    macro_trends_df = macro_trends_df.reset_index()
-
     return macro_trends_df
 
 
@@ -699,7 +692,17 @@ def clean_macro_trends(macro_trends_df, macro_trends_cols):
     filtered_macro_trends_df = macro_trends_df[required_columns]
 
 
-    # 2. Confirm there are no mid-series nan values
+    # 2. Impute missing values
+    # ----------------------------------
+    # Resample the df to fill in missing days by using date as the index
+    macro_trends_df = macro_trends_df.set_index('date')
+    macro_trends_df = macro_trends_df.resample('D').interpolate(method='time', limit_area='inside')
+
+    # Reset index
+    macro_trends_df = macro_trends_df.reset_index()
+
+
+    # 3. Confirm there are no mid-series nan values
     # ---------------------------------------------
     nan_checks = []
     nan_cols = []
