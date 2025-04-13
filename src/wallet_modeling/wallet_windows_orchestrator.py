@@ -158,7 +158,7 @@ class MultiWindowOrchestrator:
                 )
 
                 # 2. Generate TRAINING_DATA_DFs
-                training_profits_df_full, training_market_data_df_full, training_coin_cohort = \
+                training_profits_df_full, training_market_data_df_full, macro_trends_df_full, training_coin_cohort = \
                     training_generator.retrieve_period_datasets(
                         window_config['training_data']['training_period_start'],
                         window_config['training_data']['training_period_end']
@@ -203,7 +203,7 @@ class MultiWindowOrchestrator:
 
                 )
 
-                modeling_profits_df_full,_,_ = modeling_generator.retrieve_period_datasets(
+                modeling_profits_df_full,_,_,_ = modeling_generator.retrieve_period_datasets(
                     window_config['training_data']['modeling_period_start'],
                     window_config['training_data']['modeling_period_end'],
                     training_coin_cohort
@@ -350,7 +350,7 @@ class MultiWindowOrchestrator:
 
     def _merge_window_dfs(self, window_dfs: Dict[datetime, pd.DataFrame]) -> pd.DataFrame:
         """
-        Merges window DataFrames into single MultiIndexed DataFrame.
+        Merges window DataFrames into a single MultiIndexed DataFrame with non-nullable indices.
 
         Params:
         - window_dfs: Dict mapping window dates to DataFrames
@@ -360,13 +360,19 @@ class MultiWindowOrchestrator:
         """
         merged_dfs = []
         for window_date, df in window_dfs.items():
-            # Add window date to index
-            window_df = df.set_index(
-                pd.MultiIndex.from_product(
-                    [df.index, [window_date]],
-                    names=['wallet_address', 'window_start_date']
-                )
+            # Convert wallet_address index to non-nullable int64
+            wallet_index = df.index.astype("int64")
+
+            # Build a MultiIndex from the non-nullable wallet_index and the window_date
+            multi_idx = pd.MultiIndex.from_product(
+                [wallet_index, [window_date]],
+                names=['wallet_address', 'window_start_date']
             )
+
+            # Use a copy to avoid modifying the original DataFrame
+            window_df = df.copy()
+            window_df.index = multi_idx
+
             merged_dfs.append(window_df)
 
         full_df = pd.concat(merged_dfs, axis=0).sort_index()
