@@ -298,6 +298,7 @@ class WalletTrainingDataOrchestrator:
                 wfo.calculate_wallet_features,
                 profits_df.copy(),
                 market_indicators_df.copy(),
+                macro_indicators_df.copy(),
                 transfers_df.copy(),
                 wallet_cohort,
                 self.wallets_config['training_data'][f'{period}_period_start'],
@@ -310,6 +311,7 @@ class WalletTrainingDataOrchestrator:
                     self._calculate_window_features,
                     profits_tuple,
                     market_indicators_df,
+                    macro_indicators_df,
                     transfers_df,
                     wallet_cohort
                 )
