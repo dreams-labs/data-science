@@ -165,7 +165,8 @@ class MultiWindowOrchestrator:
                         window_config['training_data']['training_period_end']
                     )
 
-                training_profits_df, training_market_indicators_df, training_transfers_df = \
+                training_profits_df, training_market_indicators_df, \
+                training_macro_indicators_df, training_transfers_df = \
                     training_generator.prepare_training_data(
                         training_profits_df_full,
                         training_market_data_df_full,
@@ -176,6 +177,7 @@ class MultiWindowOrchestrator:
                 window_training_data_df = training_generator.generate_training_features(
                     training_profits_df,
                     training_market_indicators_df,
+                    training_macro_indicators_df,
                     training_transfers_df,
                     return_files=True
                 )

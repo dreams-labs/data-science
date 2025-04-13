@@ -237,7 +237,7 @@ class WalletTrainingDataOrchestrator:
 
         if return_files is True:
             # Return dfs without saving
-            return (cohort_profits_df, market_indicators_df, transfers_df)
+            return (cohort_profits_df, market_indicators_df, macro_indicators_df, transfers_df)
 
         else:
             # Save all files
@@ -255,62 +255,57 @@ class WalletTrainingDataOrchestrator:
         self,
         profits_df: pd.DataFrame,
         market_indicators_df: pd.DataFrame,
+        macro_indicators_df: pd.DataFrame,
         transfers_df: pd.DataFrame,
         return_files: bool = False,
         period: str = 'training'
     ) -> Union[None, pd.DataFrame]:
         """
-        Orchestrates end-to-end feature generation with parallel window processing.
+        Generates full period and window features concurrently.
 
         Params:
-        - profits_df: Training period profits data
-        - market_indicators_df: Market data with indicators
-        - transfers_df: Transfers sequencing data
-        - period: Which period to retrieve dates from
+        - profits_df (DataFrame): Training profits data.
+        - market_indicators_df (DataFrame): Market data with indicators.
+        - transfers_df (DataFrame): Transfers data.
+        - period (str): Period identifier.
+
+        Returns:
+        - DataFrame if return_files is True; otherwise writes to parquet.
         """
-        # Ensure index
+        # Ensure indices
         profits_df = u.ensure_index(profits_df)
         market_indicators_df = u.ensure_index(market_indicators_df)
 
-        # Define cohort based on profits_df
-        wallet_cohort = list(profits_df.index.get_level_values('wallet_address').drop_duplicates())
-
-        # Generate full period features
-        logger.info("Generating features for full training period...")
-        training_wallet_features_df = wfo.calculate_wallet_features(
-            profits_df.copy(),
-            market_indicators_df.copy(),
-            transfers_df.copy(),
-            wallet_cohort,
-            self.wallets_config['training_data'][f'{period}_period_start'],
-            self.wallets_config['training_data'][f'{period}_period_end']
+        # Define cohort from profits
+        wallet_cohort = list(
+            profits_df.index.get_level_values('wallet_address').drop_duplicates()
         )
 
-        # Initialize full features df with suffixed columns
-        wallet_training_data_df_full = training_wallet_features_df.add_suffix("|all_windows").copy()
-        wallet_training_data_df_full.to_parquet(
-            f"{self.parquet_folder}/wallet_training_data_df_full.parquet", index=True)
-        del training_wallet_features_df
-        gc.collect()
-
-        # Split data into windows
+        # Prepare split windows ahead of time
         training_windows_profits_dfs = self._split_training_window_profits_dfs(
-            profits_df,
-            market_indicators_df,
-            wallet_cohort
+            profits_df, market_indicators_df, wallet_cohort
         )
-
-        # Prepare window data for parallel processing
         windows_profits_tuples = [
-            (window_df, i + 1)
-            for i, window_df in enumerate(training_windows_profits_dfs)
+            (window_df, i + 1) for i, window_df in enumerate(training_windows_profits_dfs)
         ]
 
-        # Process windows in parallel
-        logger.info("Processing windows in parallel...")
-        window_features = []
-        with concurrent.futures.ThreadPoolExecutor(self.wallets_config['features']['max_workers']) as executor:
-            futures = [
+        # Run full period and window features concurrently
+        with concurrent.futures.ThreadPoolExecutor(
+                self.wallets_config['features']['max_workers']
+        ) as executor:
+            # Submit full period feature generation
+            full_period_future = executor.submit(
+                wfo.calculate_wallet_features,
+                profits_df.copy(),
+                market_indicators_df.copy(),
+                transfers_df.copy(),
+                wallet_cohort,
+                self.wallets_config['training_data'][f'{period}_period_start'],
+                self.wallets_config['training_data'][f'{period}_period_end']
+            )
+
+            # Submit window feature calculations
+            window_futures = [
                 executor.submit(
                     self._calculate_window_features,
                     profits_tuple,
@@ -321,15 +316,23 @@ class WalletTrainingDataOrchestrator:
                 for profits_tuple in windows_profits_tuples
             ]
 
-            # Collect results as they complete
-            for future in concurrent.futures.as_completed(futures):
-                window_features.append(future.result())
+            # Retrieve full period features result
+            training_wallet_features_df = full_period_future.result()
+            # Initialize full features DataFrame
+            wallet_training_data_df_full = training_wallet_features_df.add_suffix("|all_windows").copy()
+            wallet_training_data_df_full.to_parquet(
+                f"{self.parquet_folder}/wallet_training_data_df_full.parquet", index=True
+            )
+            del training_wallet_features_df
+            gc.collect()
+
+            # Collect window feature results as they complete
+            window_features = [future.result() for future in concurrent.futures.as_completed(window_futures)]
 
         # Join all window features at once
         for window_feature_df in window_features:
             wallet_training_data_df_full = wallet_training_data_df_full.join(
-                window_feature_df,
-                how='left'
+                window_feature_df, how='left'
             )
 
         # Generate clusters if configured
@@ -339,8 +342,7 @@ class WalletTrainingDataOrchestrator:
             )
             training_cluster_features_df = training_cluster_features_df.add_prefix('cluster|')
             wallet_training_data_df_full = wallet_training_data_df_full.join(
-                training_cluster_features_df,
-                how='inner'
+                training_cluster_features_df, how='inner'
             )
 
         # Verify cohort integrity
@@ -351,18 +353,15 @@ class WalletTrainingDataOrchestrator:
                 f"generation. First few missing: {list(missing_wallets)[:5]}"
             )
 
-        # Convert index to non nullable dtype
+        # Convert index to int64
         wallet_training_data_df_full.index = wallet_training_data_df_full.index.astype('int64')
 
-        # Return file if configured to
+        # Return file if configured, else save final version
         if return_files is True:
             return wallet_training_data_df_full
-
-        # Otherwise save final version
         else:
             wallet_training_data_df_full.to_parquet(
-                f"{self.parquet_folder}/wallet_training_data_df_full.parquet",
-                index=True
+                f"{self.parquet_folder}/wallet_training_data_df_full.parquet", index=True
             )
 
 
