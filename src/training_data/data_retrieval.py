@@ -725,6 +725,6 @@ def clean_macro_trends(macro_trends_df, macro_trends_cols, start_date=None, end_
     # 5. Impute missing values
     # ----------------------------------
     # Resample to daily frequency and forward fill
-    filtered_df = filtered_df.resample('D').ffill()
+    filtered_df = filtered_df.resample('D').asfreq().ffill()
 
     return filtered_df

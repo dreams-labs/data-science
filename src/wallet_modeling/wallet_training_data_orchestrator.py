@@ -104,7 +104,7 @@ class WalletTrainingDataOrchestrator:
         profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
 
         # Macro trends imputation, cleaning, validation
-        macro_trends_cols = list(self.wallets_metrics_config['macro_trends'].keys())
+        macro_trends_cols = list(self.wallets_metrics_config['time_series']['macro_trends'].keys())
         macro_trends_df = dr.clean_macro_trends(macro_trends_df, macro_trends_cols,
                                         start_date = None,  # historical data is needed for indicators
                                         end_date = period_end_date)
@@ -139,6 +139,7 @@ class WalletTrainingDataOrchestrator:
         self,
         profits_df_full: pd.DataFrame,
         market_data_df_full: pd.DataFrame,
+        macro_trends_df_full: pd.DataFrame,
         return_files: bool = False,
         period: str = 'training'
     ) -> Union[None, Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
@@ -149,6 +150,7 @@ class WalletTrainingDataOrchestrator:
         Params:
         - profits_df_full: Full historical profits DataFrame
         - market_data_df_full: Full historical market data DataFrame
+        - macro_trends_df_full: Full historical macro trends data DataFrame
         - return_files: If True, returns input dataframes as tuple
         - period: Which period to retrieve dates from
 
@@ -166,11 +168,22 @@ class WalletTrainingDataOrchestrator:
         # Generate market indicators
         def generate_market_indicators_df():
             logger.info("Generating market indicators...")
-            market_indicators_df = self._generate_training_indicators_df(
+            market_indicators_df = self._generate_indicators_df(
                 market_data_df_full,
-                self.wallets_metrics_config,
                 parquet_filename = None,
-                period = period
+                period = period,
+                metric_type = 'market_data'
+            )
+            return market_indicators_df
+
+        # Generate macro indicators
+        def generate_macro_indicators_df():
+            logger.info("Generating macro trends indicators...")
+            market_indicators_df = self._generate_indicators_df(
+                macro_trends_df_full.reset_index(),
+                parquet_filename = None,
+                period = period,
+                metric_type = 'macro_trends'
             )
             return market_indicators_df
 
@@ -211,6 +224,7 @@ class WalletTrainingDataOrchestrator:
         # Modified to capture futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             market_indicators_df = executor.submit(generate_market_indicators_df).result()
+            macro_indicators_df = executor.submit(generate_macro_indicators_df).result()
             cohort_profits_df = executor.submit(generate_cohort_profits_df, profits_df_full).result()
 
         # Retrieve transfers after cohort is in BigQuery
@@ -223,12 +237,13 @@ class WalletTrainingDataOrchestrator:
 
         if return_files is True:
             # Return dfs without saving
-            return (cohort_profits_df, market_indicators_df, transfers_df)
+            return (cohort_profits_df, market_indicators_df, macro_indicators_df, transfers_df)
 
         else:
             # Save all files
             cohort_profits_df.to_parquet(f"{self.parquet_folder}/{period}_profits_df.parquet",index=True)
             market_indicators_df.to_parquet(f"{self.parquet_folder}/{period}_market_indicators_data_df.parquet",index=False)  # pylint:disable=line-too-long
+            macro_indicators_df.to_parquet(f"{self.parquet_folder}/{period}_macro_indicators_df.parquet",index=False)  # pylint:disable=line-too-long
             transfers_df.to_parquet(f"{self.parquet_folder}/{period}_transfers_sequencing_df.parquet",index=True)
 
             return None
@@ -240,62 +255,57 @@ class WalletTrainingDataOrchestrator:
         self,
         profits_df: pd.DataFrame,
         market_indicators_df: pd.DataFrame,
+        macro_indicators_df: pd.DataFrame,
         transfers_df: pd.DataFrame,
         return_files: bool = False,
         period: str = 'training'
     ) -> Union[None, pd.DataFrame]:
         """
-        Orchestrates end-to-end feature generation with parallel window processing.
+        Generates full period and window features concurrently.
 
         Params:
-        - profits_df: Training period profits data
-        - market_indicators_df: Market data with indicators
-        - transfers_df: Transfers sequencing data
-        - period: Which period to retrieve dates from
+        - profits_df (DataFrame): Training profits data.
+        - market_indicators_df (DataFrame): Market data with indicators.
+        - transfers_df (DataFrame): Transfers data.
+        - period (str): Period identifier.
+
+        Returns:
+        - DataFrame if return_files is True; otherwise writes to parquet.
         """
-        # Ensure index
+        # Ensure indices
         profits_df = u.ensure_index(profits_df)
         market_indicators_df = u.ensure_index(market_indicators_df)
 
-        # Define cohort based on profits_df
-        wallet_cohort = list(profits_df.index.get_level_values('wallet_address').drop_duplicates())
-
-        # Generate full period features
-        logger.info("Generating features for full training period...")
-        training_wallet_features_df = wfo.calculate_wallet_features(
-            profits_df.copy(),
-            market_indicators_df.copy(),
-            transfers_df.copy(),
-            wallet_cohort,
-            self.wallets_config['training_data'][f'{period}_period_start'],
-            self.wallets_config['training_data'][f'{period}_period_end']
+        # Define cohort from profits
+        wallet_cohort = list(
+            profits_df.index.get_level_values('wallet_address').drop_duplicates()
         )
 
-        # Initialize full features df with suffixed columns
-        wallet_training_data_df_full = training_wallet_features_df.add_suffix("|all_windows").copy()
-        wallet_training_data_df_full.to_parquet(
-            f"{self.parquet_folder}/wallet_training_data_df_full.parquet", index=True)
-        del training_wallet_features_df
-        gc.collect()
-
-        # Split data into windows
+        # Prepare split windows ahead of time
         training_windows_profits_dfs = self._split_training_window_profits_dfs(
-            profits_df,
-            market_indicators_df,
-            wallet_cohort
+            profits_df, market_indicators_df, wallet_cohort
         )
-
-        # Prepare window data for parallel processing
         windows_profits_tuples = [
-            (window_df, i + 1)
-            for i, window_df in enumerate(training_windows_profits_dfs)
+            (window_df, i + 1) for i, window_df in enumerate(training_windows_profits_dfs)
         ]
 
-        # Process windows in parallel
-        logger.info("Processing windows in parallel...")
-        window_features = []
-        with concurrent.futures.ThreadPoolExecutor(self.wallets_config['features']['max_workers']) as executor:
-            futures = [
+        # Run full period and window features concurrently
+        with concurrent.futures.ThreadPoolExecutor(
+                self.wallets_config['features']['max_workers']
+        ) as executor:
+            # Submit full period feature generation
+            full_period_future = executor.submit(
+                wfo.calculate_wallet_features,
+                profits_df.copy(),
+                market_indicators_df.copy(),
+                transfers_df.copy(),
+                wallet_cohort,
+                self.wallets_config['training_data'][f'{period}_period_start'],
+                self.wallets_config['training_data'][f'{period}_period_end']
+            )
+
+            # Submit window feature calculations
+            window_futures = [
                 executor.submit(
                     self._calculate_window_features,
                     profits_tuple,
@@ -306,15 +316,23 @@ class WalletTrainingDataOrchestrator:
                 for profits_tuple in windows_profits_tuples
             ]
 
-            # Collect results as they complete
-            for future in concurrent.futures.as_completed(futures):
-                window_features.append(future.result())
+            # Retrieve full period features result
+            training_wallet_features_df = full_period_future.result()
+            # Initialize full features DataFrame
+            wallet_training_data_df_full = training_wallet_features_df.add_suffix("|all_windows").copy()
+            wallet_training_data_df_full.to_parquet(
+                f"{self.parquet_folder}/wallet_training_data_df_full.parquet", index=True
+            )
+            del training_wallet_features_df
+            gc.collect()
+
+            # Collect window feature results as they complete
+            window_features = [future.result() for future in concurrent.futures.as_completed(window_futures)]
 
         # Join all window features at once
         for window_feature_df in window_features:
             wallet_training_data_df_full = wallet_training_data_df_full.join(
-                window_feature_df,
-                how='left'
+                window_feature_df, how='left'
             )
 
         # Generate clusters if configured
@@ -324,8 +342,7 @@ class WalletTrainingDataOrchestrator:
             )
             training_cluster_features_df = training_cluster_features_df.add_prefix('cluster|')
             wallet_training_data_df_full = wallet_training_data_df_full.join(
-                training_cluster_features_df,
-                how='inner'
+                training_cluster_features_df, how='inner'
             )
 
         # Verify cohort integrity
@@ -336,18 +353,15 @@ class WalletTrainingDataOrchestrator:
                 f"generation. First few missing: {list(missing_wallets)[:5]}"
             )
 
-        # Convert index to non nullable dtype
+        # Convert index to int64
         wallet_training_data_df_full.index = wallet_training_data_df_full.index.astype('int64')
 
-        # Return file if configured to
+        # Return file if configured, else save final version
         if return_files is True:
             return wallet_training_data_df_full
-
-        # Otherwise save final version
         else:
             wallet_training_data_df_full.to_parquet(
-                f"{self.parquet_folder}/wallet_training_data_df_full.parquet",
-                index=True
+                f"{self.parquet_folder}/wallet_training_data_df_full.parquet", index=True
             )
 
 
@@ -581,13 +595,13 @@ class WalletTrainingDataOrchestrator:
 
 
     @u.timing_decorator
-    def _generate_training_indicators_df(
+    def _generate_indicators_df(
         self,
-        training_market_data_df_full,
-        wallets_metrics_config,
+        training_data_df_full,
         parquet_filename="training_market_indicators_data_df",
         parquet_folder="temp/wallet_modeling_dfs",
         period='training',
+        metric_type='market_data'
     ):
         """
         Adds the configured indicators to the training period market_data_df and stores it
@@ -596,73 +610,78 @@ class WalletTrainingDataOrchestrator:
         Default save location: temp/wallet_modeling_dfs/market_indicators_data_df.parquet
 
         Params:
-        - training_market_data_df_full (df): market_data_df with complete historical data, because indicators can
+        - training_data_df_full (df): df with complete historical data, because indicators can
             have long lookback periods (e.g. SMA 200)
-        - wallets_metrics_config (dict): metrics_config.py compatible metrics definitions
         - parquet_file, parquet_folder (strings): if these have values, the output df will be saved to this
             location instead of being returned
         - period: Which period to retrieve dates from
+        - metric_type (str): the key in wallet_metrics_config, e.g. 'market_data', 'macro_trends'
 
         Returns:
-        - market_indicators_data_df (df): market_data_df for the training period only
+        - indicators_df (df): indicators_df for the training period only
 
         """
         logger.info("Beginning indicator generation process...")
 
         # Validate that no records exist after the training period
         training_period_end = self.wallets_config['training_data'][f'{period}_period_end']
-        latest_market_data_record = training_market_data_df_full['date'].max()
-        if latest_market_data_record > pd.to_datetime(training_period_end):
+        latest_record = training_data_df_full['date'].max()
+        if latest_record > pd.to_datetime(training_period_end):
             raise ValueError(
-                f"Detected data after the end of the {period} period in market_data_df_full."
-                f"Latest record found: {latest_market_data_record} vs period end of {training_period_end}"
+                f"Detected data after the end of the {period} period in indicators input df."
+                f"Latest record found: {latest_record} vs period end of {training_period_end}"
             )
+        group_column = None
+        if 'coin_id' in training_data_df_full.reset_index().columns:
+            group_column = 'coin_id'
 
         # Adds time series ratio metrics that can have additional indicators applied to them
-        if any(k in wallets_metrics_config['time_series']['market_data'] for k in ['mfi', 'obv']):
-            market_indicators_data_df = ind.add_market_data_dualcolumn_indicators(training_market_data_df_full)
+        if (
+            metric_type == 'market_data' and
+            any(k in self.wallets_metrics_config['time_series']['market_data'] for k in ['mfi', 'obv'])
+        ):
+            indicators_df = ind.add_market_data_dualcolumn_indicators(training_data_df_full)
         else:
-            market_indicators_data_df = training_market_data_df_full
+            indicators_df = training_data_df_full
 
         # Adds indicators to all configured time series
-        market_indicators_data_df = ind.generate_time_series_indicators(
-            market_indicators_data_df,
-            wallets_metrics_config['time_series']['market_data'],
-            'coin_id'
+        indicators_df = ind.generate_time_series_indicators(
+            indicators_df,
+            self.wallets_metrics_config['time_series'][metric_type],
+            group_column
         )
 
-        # # Filters out pre-training period records now that we've computed lookback and rolling metrics
-        # market_indicators_data_df = market_indicators_data_df[
-        #     market_indicators_data_df['date'] >=
-        #     self.wallets_config['training_data'][f'{period}_starting_balance_date']
-        # ]
+        # Filters out pre-training period records now that we've computed lookback and rolling metrics
+        indicators_df = indicators_df[
+            indicators_df['date'] >=
+            self.wallets_config['training_data'][f'{period}_starting_balance_date']
+        ]
 
         # Reset OBV to 0 at training start if it exists
         training_start = pd.to_datetime(self.wallets_config['training_data'][f'{period}_starting_balance_date'])
-        if 'obv' in market_indicators_data_df.columns:
+        if 'obv' in indicators_df.columns:
             # Group by coin_id since OBV is coin-specific
-            for coin_id in market_indicators_data_df['coin_id'].unique():
-                mask = (market_indicators_data_df['coin_id'] == coin_id) & \
-                    (market_indicators_data_df['date'] >= training_start)
-                coin_idx = market_indicators_data_df[mask].index
+            for coin_id in indicators_df['coin_id'].unique():
+                mask = (indicators_df['coin_id'] == coin_id) & \
+                    (indicators_df['date'] >= training_start)
+                coin_idx = indicators_df[mask].index
                 if len(coin_idx) > 0:
                     # Reset OBV to start from 0 for each coin's training period
-                    market_indicators_data_df.loc[coin_idx, 'obv'] -= \
-                        market_indicators_data_df.loc[coin_idx[0], 'obv']
+                    indicators_df.loc[coin_idx, 'obv'] -= \
+                        indicators_df.loc[coin_idx[0], 'obv']
 
         # If a parquet file location is specified, store the files there and return nothing
         if parquet_filename:
             parquet_filepath = f"{parquet_folder}/{parquet_filename}.parquet"
-            market_indicators_data_df.to_parquet(parquet_filepath,index=False)
-            logger.info(f"Stored market_indicators_data_df with shape {market_indicators_data_df.shape} "
+            indicators_df.to_parquet(parquet_filepath,index=False)
+            logger.info(f"Stored indicators_data_df with shape {indicators_df.shape} "
                         f"to {parquet_filepath}.")
 
             return None
 
         # If no parquet file is configured then return the df
         else:
-            return market_indicators_data_df
-
+            return indicators_df
 
 
     @u.timing_decorator

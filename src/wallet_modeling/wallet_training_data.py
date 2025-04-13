@@ -140,7 +140,14 @@ class WalletTrainingData:
         return market_data_df
 
 
-    def format_and_save_datasets(self, profits_df, market_data_df, macro_trends_df, period_start_date, parquet_prefix=None):
+    def format_and_save_datasets(
+            self,
+            profits_df,
+            market_data_df,
+            macro_trends_df,
+            period_start_date,
+            parquet_prefix=None
+        ):
         """
         Formats and optionally saves the final datasets.
 
@@ -200,7 +207,7 @@ class WalletTrainingData:
 
             # Store macro_trends_df
             macro_trends_file = f"{parquet_folder}/{parquet_prefix}_macro_trends_df_full.parquet"
-            macro_trends_df.to_parquet(macro_trends_file,index=False)
+            macro_trends_df.reset_index().to_parquet(macro_trends_file,index=False)
             logger.info(f"Stored macro_trends_df with shape {macro_trends_df.shape} to {macro_trends_file}.")
             return None, None, None
 
