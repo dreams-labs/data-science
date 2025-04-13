@@ -106,7 +106,7 @@ class WalletTrainingDataOrchestrator:
         # Macro trends imputation, cleaning, validation
         macro_trends_cols = list(self.wallets_metrics_config['time_series']['macro_trends'].keys())
         macro_trends_df = dr.clean_macro_trends(macro_trends_df, macro_trends_cols,
-                                        start_date = None,  # historical data is needed for indicators
+                                        start_date = None,  # retain historical data for indicators
                                         end_date = period_end_date)
 
         # Set the coin_cohort if it hadn't already been passed
@@ -180,11 +180,13 @@ class WalletTrainingDataOrchestrator:
         def generate_macro_indicators_df():
             logger.info("Generating macro trends indicators...")
             market_indicators_df = self._generate_indicators_df(
-                macro_trends_df_full.reset_index(drop=True),
+                macro_trends_df_full.reset_index(),
                 parquet_filename = None,
                 period = period,
                 metric_type = 'macro_trends'
             )
+            market_indicators_df = market_indicators_df.set_index('date')
+
             return market_indicators_df
 
         # Define training wallet cohort
@@ -243,7 +245,7 @@ class WalletTrainingDataOrchestrator:
             # Save all files
             cohort_profits_df.to_parquet(f"{self.parquet_folder}/{period}_profits_df.parquet",index=True)
             market_indicators_df.to_parquet(f"{self.parquet_folder}/{period}_market_indicators_data_df.parquet",index=False)  # pylint:disable=line-too-long
-            macro_indicators_df.to_parquet(f"{self.parquet_folder}/{period}_macro_indicators_df.parquet",index=False)  # pylint:disable=line-too-long
+            macro_indicators_df.to_parquet(f"{self.parquet_folder}/{period}_macro_indicators_df.parquet",index=True)  # pylint:disable=line-too-long
             transfers_df.to_parquet(f"{self.parquet_folder}/{period}_transfers_sequencing_df.parquet",index=True)
 
             return None

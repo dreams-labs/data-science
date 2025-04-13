@@ -312,6 +312,7 @@ def retrieve_macro_trends_data(query_sql = None):
 
     # Convert the date column to datetime format
     macro_trends_df['date'] = pd.to_datetime(macro_trends_df['date'])
+    macro_trends_df = macro_trends_df.set_index('date')
 
     # Convert all numerical columns to 32 bit, using safe_downcast to avoid overflow
     macro_trends_df = u.df_downcast(macro_trends_df)
@@ -683,10 +684,8 @@ def clean_macro_trends(macro_trends_df, macro_trends_cols, start_date=None, end_
     """
     # 1. Filter to only relevant columns
     # ----------------------------------
-    required_columns = ['date'] + macro_trends_cols
-
     # Check if all required columns exist in the dataframe
-    missing_columns = [col for col in required_columns if col not in macro_trends_df.columns]
+    missing_columns = [col for col in macro_trends_cols if col not in macro_trends_df.columns]
     if missing_columns:
         raise ValueError(f"The following columns are missing from the dataframe: {', '.join(missing_columns)}")
 
@@ -698,9 +697,7 @@ def clean_macro_trends(macro_trends_df, macro_trends_cols, start_date=None, end_
 
     # 3. Filter to date range and set index
     # ----------------------------------
-    filtered_df = macro_trends_df[required_columns].copy()
-    filtered_df['date'] = pd.to_datetime(filtered_df['date'])
-    filtered_df = filtered_df.set_index('date')
+    filtered_df = macro_trends_df[macro_trends_cols].copy()
 
     if start_date:
         start_date = pd.to_datetime(start_date)
