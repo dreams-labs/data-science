@@ -231,7 +231,7 @@ class BaseModel:
                 )
 
         self.training_time = time.time() - self.start_time
-        logger.info("Training completed after %.2f seconds.", self.training_time)
+        logger.milestone("Training completed after %.2f seconds.", self.training_time)
 
 
     def _predict(self) -> pd.Series:

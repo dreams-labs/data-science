@@ -267,13 +267,13 @@ modeling:
 
         # Performance Profiles (Choose One Section)
         # --------------------------------------
-        # # CHECKPOINTER
-        # n_estimators: 250  # number of trees to train in the model
-        # learning_rate: 0.1  # step size for updates to weights during training
+        # CHECKPOINTER
+        n_estimators: 250  # number of trees to train in the model
+        learning_rate: 0.1  # step size for updates to weights during training
 
-        # PRODUCTION
-        n_estimators: 500  # number of trees to train in the model
-        learning_rate: 0.05  # step size for updates to weights during training
+        # # PRODUCTION
+        # n_estimators: 500  # number of trees to train in the model
+        # learning_rate: 0.05  # step size for updates to weights during training
 
         early_stopping_rounds: 25  # stop training if no improvement after x rounds
         gamma: 0.005  # minimum gain required to split further on a leaf node
@@ -288,7 +288,7 @@ modeling:
 
     # Phase training section
     phase_training:
-        enabled: True
+        enabled: False
         phases:
             - params:
                 max_depth: 9

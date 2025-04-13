@@ -1,3 +1,45 @@
+# dda 535 logger MILESTONEs
+checkpoint 1: CHECKPOINTERw.680 milestone implemented
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       140
+Features per Window:      35
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.680
+RMSE:                     0.220
+MAE:                      0.119
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.784
+RMSE:                     0.126
+MAE:                      0.068
+
+
+checkpoint 1: PRODUCTIONw.690 milestone implemented
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       140
+Features per Window:      35
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.690
+RMSE:                     0.216
+MAE:                      0.115
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.793
+RMSE:                     0.124
+MAE:                      0.065
+
+
+
 # dda 655 complete profits_df bug
 checkpoint 1: w.694 macro trends df fixed
 Model Performance Summary

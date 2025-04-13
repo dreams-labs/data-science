@@ -446,9 +446,12 @@ def get_expected_columns(metrics_config: Dict[str, Any]) -> List[str]:
 #        Function Modifiers
 # --------------------------------- #
 
-def timing_decorator(func):
+def timing_decorator(func_or_level=logging.INFO):
     """
     A decorator that logs the execution time of the decorated function.
+
+    Supports both @timing_decorator and @timing_decorator(level) syntax.
+
 
     This decorator wraps the given function, times its execution, and logs
     the time taken using the logger of the module where the decorated function
@@ -468,33 +471,36 @@ def timing_decorator(func):
     When my_function is called, it will log a message like:
     "my_function took 0.001 seconds to execute."
     """
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        logger = logging.getLogger(func.__module__) # pylint: disable=redefined-outer-name
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            logger.debug('Initiating %s...', func.__name__)
 
-        # Only log start with normal location
-        logger.debug('Initiating %s...', func.__name__)
+            start_time = time.time()
+            result = func(*args, **kwargs)
+            duration = time.time() - start_time
 
-        start_time = time.time()
-        result = func(*args, **kwargs)
-        duration = time.time() - start_time
+            record = logging.LogRecord(
+                name=logger.name,
+                level=level,
+                pathname=func.__code__.co_filename,
+                lineno=func.__code__.co_firstlineno,
+                msg='(%.1fs) Completed %s.',
+                args=(duration, func.__name__),
+                exc_info=None
+            )
+            logger.handle(record)
+            return result
+        return wrapper
 
-        # Create single custom record for timing log
-        record = logging.LogRecord(
-            name=logger.name,
-            level=logging.INFO,
-            pathname=func.__code__.co_filename,
-            lineno=func.__code__.co_firstlineno,
-            msg='(%.1fs) Completed %s.',
-            args=(duration, func.__name__),
-            exc_info=None
-        )
-
-        # Handle this record directly
-        logger.handle(record)
-
-        return result
-    return wrapper
+    if callable(func_or_level):
+        # Used as @timing_decorator
+        level = logging.INFO
+        return decorator(func_or_level)
+    else:
+        # Used as @timing_decorator(level)
+        level = func_or_level
+        return decorator
 
 
 def create_progress_bar(total_items):
@@ -1262,18 +1268,33 @@ def export_code(
     logger.info(f"Consolidation complete. All files are saved in {output_file}")
 
 
+# Define globally so other modules can safely import and use it
+MILESTONE_LEVEL = 25
+logging.MILESTONE = MILESTONE_LEVEL  # Make it accessible like logging.INFO
+logging.addLevelName(MILESTONE_LEVEL, "MILESTONE")
+
+
 def setup_notebook_logger(log_filepath: str = None) -> logging.Logger:
     """
     Sets up logging for notebook development with optional file output.
-    Configures root logger to allow propagation to module-level loggers.
+    Adds a custom MILESTONE log level (between INFO and WARNING).
 
     Params:
     - log_filepath (str, optional): Path for log file output
     """
-    root_logger = logging.getLogger()  # Get root logger
-    root_logger.setLevel(logging.INFO)  # Set level at root to allow propagation
+    MILESTONE_LEVEL = 25    # pylint: disable=invalid-name
+    logging.addLevelName(MILESTONE_LEVEL, "MILESTONE")
 
-    # Clear any existing handlers to avoid duplicates
+    def milestone(self, message, *args, **kwargs):
+        if self.isEnabledFor(MILESTONE_LEVEL):
+            self._log(MILESTONE_LEVEL, message, args, **kwargs)  # pylint: disable=protected-access
+
+    # Patch into Logger only once
+    if not hasattr(logging.Logger, "milestone"):
+        logging.Logger.milestone = milestone
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
     root_logger.handlers = []
 
     logging.basicConfig(

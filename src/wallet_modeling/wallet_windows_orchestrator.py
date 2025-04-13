@@ -61,7 +61,7 @@ class MultiWindowOrchestrator:
 
         u.notify('wifi_drop')
 
-
+    @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def load_complete_raw_datasets(self) -> None:
         """
         Identifies the earliest training_period_start and latest modeling_period_end
@@ -80,9 +80,6 @@ class MultiWindowOrchestrator:
 
         earliest_training_start = min(all_train_starts)
         latest_validation_end = max(all_validation_ends)
-
-        logger.info("Retrieving complete dataset for range %s to %s.",
-                    earliest_training_start, latest_validation_end)
 
         # Retrieve the full data once (BigQuery or otherwise)
         logger.info("Pulling complete raw datasets from %s through %s...",
@@ -112,7 +109,7 @@ class MultiWindowOrchestrator:
                     )
 
 
-    @u.timing_decorator
+    @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def generate_windows_training_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Generates training data for all window configs in parallel.

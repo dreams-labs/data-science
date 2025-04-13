@@ -511,7 +511,7 @@ class WalletTrainingDataOrchestrator:
 
 
 
-    @u.timing_decorator
+    @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def _define_training_wallet_cohort(
         self,
         training_profits_df: pd.DataFrame,
