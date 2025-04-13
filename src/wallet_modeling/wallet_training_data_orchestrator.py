@@ -106,7 +106,7 @@ class WalletTrainingDataOrchestrator:
         # Macro trends imputation, cleaning, validation
         macro_trends_cols = list(self.wallets_metrics_config['time_series']['macro_trends'].keys())
         macro_trends_df = dr.clean_macro_trends(macro_trends_df, macro_trends_cols,
-                                        start_date = None,  # historical data is needed for indicators
+                                        start_date = None,  # retain historical data for indicators
                                         end_date = period_end_date)
 
         # Set the coin_cohort if it hadn't already been passed
@@ -185,6 +185,8 @@ class WalletTrainingDataOrchestrator:
                 period = period,
                 metric_type = 'macro_trends'
             )
+            market_indicators_df = market_indicators_df.set_index('date')
+
             return market_indicators_df
 
         # Define training wallet cohort
@@ -243,7 +245,7 @@ class WalletTrainingDataOrchestrator:
             # Save all files
             cohort_profits_df.to_parquet(f"{self.parquet_folder}/{period}_profits_df.parquet",index=True)
             market_indicators_df.to_parquet(f"{self.parquet_folder}/{period}_market_indicators_data_df.parquet",index=False)  # pylint:disable=line-too-long
-            macro_indicators_df.to_parquet(f"{self.parquet_folder}/{period}_macro_indicators_df.parquet",index=False)  # pylint:disable=line-too-long
+            macro_indicators_df.to_parquet(f"{self.parquet_folder}/{period}_macro_indicators_df.parquet",index=True)  # pylint:disable=line-too-long
             transfers_df.to_parquet(f"{self.parquet_folder}/{period}_transfers_sequencing_df.parquet",index=True)
 
             return None
@@ -298,6 +300,7 @@ class WalletTrainingDataOrchestrator:
                 wfo.calculate_wallet_features,
                 profits_df.copy(),
                 market_indicators_df.copy(),
+                macro_indicators_df.copy(),
                 transfers_df.copy(),
                 wallet_cohort,
                 self.wallets_config['training_data'][f'{period}_period_start'],
@@ -310,6 +313,7 @@ class WalletTrainingDataOrchestrator:
                     self._calculate_window_features,
                     profits_tuple,
                     market_indicators_df,
+                    macro_indicators_df,
                     transfers_df,
                     wallet_cohort
                 )
@@ -460,6 +464,7 @@ class WalletTrainingDataOrchestrator:
         self,
         window_data: tuple,
         market_indicators_df: pd.DataFrame,
+        macro_indicators_df: pd.DataFrame,
         transfers_df: pd.DataFrame,
         wallet_cohort: List[int]
     ) -> pd.DataFrame:
@@ -469,6 +474,7 @@ class WalletTrainingDataOrchestrator:
         Params:
         - window_data (tuple): Contains (window_profits_df, window_number)
         - market_indicators_df (DataFrame): Market indicators data
+        - macro_indicators_df (DataFrame): Macroeconomic indicators data
         - transfers_df (DataFrame): Transfer sequence data
         - wallet_cohort (List[int]): List of wallet addresses
 
@@ -486,6 +492,7 @@ class WalletTrainingDataOrchestrator:
         window_wallet_features_df = wfo.calculate_wallet_features(
             window_profits_df.copy(),
             market_indicators_df.copy(),
+            macro_indicators_df.copy(),
             transfers_df.copy(),
             wallet_cohort,
             window_start_date.strftime('%Y-%m-%d'),

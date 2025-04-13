@@ -207,7 +207,7 @@ class WalletTrainingData:
 
             # Store macro_trends_df
             macro_trends_file = f"{parquet_folder}/{parquet_prefix}_macro_trends_df_full.parquet"
-            macro_trends_df.reset_index().to_parquet(macro_trends_file,index=False)
+            macro_trends_df.to_parquet(macro_trends_file,index=True)  # retain index for macro trends
             logger.info(f"Stored macro_trends_df with shape {macro_trends_df.shape} to {macro_trends_file}.")
             return None, None, None
 

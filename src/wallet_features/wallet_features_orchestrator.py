@@ -28,8 +28,15 @@ wallets_config = WalletsConfig()
 # ------------------------------------------
 
 @u.timing_decorator
-def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_sequencing_df,
-                              wallet_cohort, period_start_date, period_end_date):
+def calculate_wallet_features(
+        profits_df,
+        market_indicators_data_df,
+        macro_indicators_df,
+        transfers_sequencing_df,
+        wallet_cohort,
+        period_start_date,
+        period_end_date
+    ):
     """
     Calculates all features for the wallet_cohort in a given profits_df, returning a df with a
     row for every wallet in the cohort.
@@ -52,6 +59,7 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
         1. starting_balance_date (period start reference)
         2. period_end_date (period end reference)
     - market_indicators_data_df (df): Market data with technical indicators
+    - macro_indicators_df (df): Macroeconomic data with technical indicators
     - transfers_sequencing_df (df): Lifetime transfers data
     - wallet_cohort (array-like): All wallet addresses to include
     - period_start_date (str): Period start in 'YYYY-MM-DD' format
@@ -101,7 +109,10 @@ def calculate_wallet_features(profits_df, market_indicators_data_df, transfers_s
     wallet_features_df = wallet_features_df.join(performance_features_df, how='left')
 
     # Market timing features (left join, fill 0s)
-    timing_features_df = wmt.calculate_market_timing_features(profits_df, market_indicators_data_df)
+    timing_features_df = wmt.calculate_market_timing_features(
+        profits_df,
+        market_indicators_data_df,
+        macro_indicators_df)
     feature_column_names['timing|'] = timing_features_df.columns
     wallet_features_df = wallet_features_df.join(timing_features_df, how='left')\
         .fillna({col: 0 for col in timing_features_df.columns})
