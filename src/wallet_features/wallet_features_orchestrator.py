@@ -109,7 +109,10 @@ def calculate_wallet_features(
     wallet_features_df = wallet_features_df.join(performance_features_df, how='left')
 
     # Market timing features (left join, fill 0s)
-    timing_features_df = wmt.calculate_market_timing_features(profits_df, market_indicators_data_df)
+    timing_features_df = wmt.calculate_market_timing_features(
+        profits_df,
+        market_indicators_data_df,
+        macro_indicators_df)
     feature_column_names['timing|'] = timing_features_df.columns
     wallet_features_df = wallet_features_df.join(timing_features_df, how='left')\
         .fillna({col: 0 for col in timing_features_df.columns})

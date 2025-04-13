@@ -28,7 +28,11 @@ wallets_features_config = yaml.safe_load((config_directory / 'wallets_features_c
 # Main Interface
 # -----------------------------
 @u.timing_decorator
-def calculate_market_timing_features(profits_df, market_indicators_data_df):
+def calculate_market_timing_features(
+        profits_df,
+        market_indicators_data_df,
+        macro_indicators_df = None
+    ):
     """
     Calculate features capturing how wallet transaction timing aligns with future market movements.
 
@@ -53,6 +57,11 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
             - volume (float): Trading volume
             - all of the indicators specific in wallets_metrics_config
 
+        macro_indicators_df (pd.DataFrame): Macroeconomic data with columns:
+            - date (INDEX) (pd.Timestamp): Date of macroeconomic data
+            - all of the fields and indicators specified in wallet_metrics_config
+
+
     Returns:
         pd.DataFrame: Features indexed by wallet_address with columns for each market timing metric:
             {indicator}/lead_{n}_{direction}_{type}
@@ -64,6 +73,9 @@ def calculate_market_timing_features(profits_df, market_indicators_data_df):
 
             All wallet_addresses from the categorical index are included with zeros for missing data.
     """
+    # Merge date-indexed macroeconomic indicators onto the coin_id-date keyed market indicators
+    if macro_indicators_df is not None:
+        market_indicators_data_df = market_indicators_data_df.merge(macro_indicators_df.reset_index(), on='date')
 
     # add timing offset features
     market_timing_df = calculate_offsets(market_indicators_data_df)

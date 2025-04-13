@@ -8,3 +8,9 @@ market_timing:
         volume_sma_12:
             offsets: [-80, -21, 21, 100]
             retain_base_columns: False
+        global_volume:
+            offsets: [-100, -50, -21, 21, 50, 100]
+            retain_base_columns: False
+        global_volume:
+            offsets: [-100, -50, -21, 21, 50, 100]
+            retain_base_columns: False
