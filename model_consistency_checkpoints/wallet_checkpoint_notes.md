@@ -1,3 +1,25 @@
+# dda 654 macroeconomic features impact
+checkpoint 1: w.688 no impact
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.688
+RMSE:                     0.217
+MAE:                      0.115
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.789
+RMSE:                     0.125
+MAE:                      0.065
+
+
+
 # dda 635 macroeconomic features
 checkpoint 9: w.685 features now in model
 Model Performance Summary

@@ -156,6 +156,7 @@ modeling:
             timing|*/buy_mean*,
             timing|*/sell_mean*,
             timing|*/sell_weighted*,
+
             # timing|price_sma_2/lag_200/*,
 
             # performance|*,
@@ -315,7 +316,7 @@ modeling:
 
             # Col/Row Sampling
             # regressor__subsample: [0.8, 0.9, 1.0]   # samples rows, e.g. trees use x% of all wallet rows
-            regressor__colsample_bytree: [ 0.9, 0.95, 1.0]   # samples columns, e.g. trees use x% of all column features
+            # regressor__colsample_bytree: [ 0.9, 0.95, 1.0]   # samples columns, e.g. trees use x% of all column features
 
             # # Model Speed
             # regressor__tree_method: [hist, approx, auto]
@@ -328,17 +329,26 @@ modeling:
             # regressor__gamma: [0.01]
 
             # Optimize for Speed
-            regressor__n_jobs: [4]  # how many models to build at once
-            regressor__nthread: [4]  # how many threads each model can use
+            # regressor__n_jobs: [4]  # how many models to build at once
+            # regressor__nthread: [8]  # how many threads each model can use
             # regressor__max_bin: [128]
             # regressor__tree_method: [hist]
 
 
-            # # Column Selection
-            # drop_columns__drop_patterns: [
-            #     [],
+            # Column Selection
+            drop_columns__drop_patterns: [
+                [],
             #     # [],
             #     # [timing|*],
+                # [timing|btc_mvrv_z_score/lag_100/*],
+                # [timing|btc_mvrv_z_score/lag_50/*],
+                # [timing|btc_mvrv_z_score/lag_21/*],
+                # [timing|btc_mvrv_z_score/lead_100/*],
+                # [timing|btc_mvrv_z_score/lead_50/*],
+                # [timing|btc_mvrv_z_score/lead_21/*],
+                # [timing|global_market_cap/*],
+                # [timing|btc_price/*],
+                # [timing|global_volume/*],
             #     # [timing|price_sma_2/lag_21/*],
             #     # [timing|price_sma_2/lag_30/*],
             #     # [timing|*/buy_mean*],
@@ -381,7 +391,7 @@ modeling:
 
                 # ['*|w1'],
 
-            # ]
+            ]
 
 
     # Coin model workflow params
