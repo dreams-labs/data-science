@@ -180,7 +180,7 @@ class WalletTrainingDataOrchestrator:
         def generate_macro_indicators_df():
             logger.info("Generating macro trends indicators...")
             market_indicators_df = self._generate_indicators_df(
-                macro_trends_df_full.reset_index(),
+                macro_trends_df_full.reset_index(drop=True),
                 parquet_filename = None,
                 period = period,
                 metric_type = 'macro_trends'
@@ -462,6 +462,7 @@ class WalletTrainingDataOrchestrator:
         self,
         window_data: tuple,
         market_indicators_df: pd.DataFrame,
+        macro_indicators_df: pd.DataFrame,
         transfers_df: pd.DataFrame,
         wallet_cohort: List[int]
     ) -> pd.DataFrame:
@@ -471,6 +472,7 @@ class WalletTrainingDataOrchestrator:
         Params:
         - window_data (tuple): Contains (window_profits_df, window_number)
         - market_indicators_df (DataFrame): Market indicators data
+        - macro_indicators_df (DataFrame): Macroeconomic indicators data
         - transfers_df (DataFrame): Transfer sequence data
         - wallet_cohort (List[int]): List of wallet addresses
 
@@ -488,6 +490,7 @@ class WalletTrainingDataOrchestrator:
         window_wallet_features_df = wfo.calculate_wallet_features(
             window_profits_df.copy(),
             market_indicators_df.copy(),
+            macro_indicators_df.copy(),
             transfers_df.copy(),
             wallet_cohort,
             window_start_date.strftime('%Y-%m-%d'),
