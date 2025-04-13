@@ -139,6 +139,7 @@ class WalletTrainingDataOrchestrator:
         self,
         profits_df_full: pd.DataFrame,
         market_data_df_full: pd.DataFrame,
+        macro_trends_df_full: pd.DataFrame,
         return_files: bool = False,
         period: str = 'training'
     ) -> Union[None, Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
@@ -149,6 +150,7 @@ class WalletTrainingDataOrchestrator:
         Params:
         - profits_df_full: Full historical profits DataFrame
         - market_data_df_full: Full historical market data DataFrame
+        - macro_trends_df_full: Full historical macro trends data DataFrame
         - return_files: If True, returns input dataframes as tuple
         - period: Which period to retrieve dates from
 
@@ -170,7 +172,18 @@ class WalletTrainingDataOrchestrator:
                 market_data_df_full,
                 parquet_filename = None,
                 period = period,
-                metric_type='market_data'
+                metric_type = 'market_data'
+            )
+            return market_indicators_df
+
+        # Generate macro indicators
+        def generate_macro_indicators_df():
+            logger.info("Generating macro trends indicators...")
+            market_indicators_df = self._generate_indicators_df(
+                macro_trends_df_full.reset_index(),
+                parquet_filename = None,
+                period = period,
+                metric_type = 'macro_trends'
             )
             return market_indicators_df
 
@@ -211,6 +224,7 @@ class WalletTrainingDataOrchestrator:
         # Modified to capture futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             market_indicators_df = executor.submit(generate_market_indicators_df).result()
+            macro_indicators_df = executor.submit(generate_macro_indicators_df).result()
             cohort_profits_df = executor.submit(generate_cohort_profits_df, profits_df_full).result()
 
         # Retrieve transfers after cohort is in BigQuery
@@ -229,6 +243,7 @@ class WalletTrainingDataOrchestrator:
             # Save all files
             cohort_profits_df.to_parquet(f"{self.parquet_folder}/{period}_profits_df.parquet",index=True)
             market_indicators_df.to_parquet(f"{self.parquet_folder}/{period}_market_indicators_data_df.parquet",index=False)  # pylint:disable=line-too-long
+            macro_indicators_df.to_parquet(f"{self.parquet_folder}/{period}_macro_indicators_df.parquet",index=False)  # pylint:disable=line-too-long
             transfers_df.to_parquet(f"{self.parquet_folder}/{period}_transfers_sequencing_df.parquet",index=True)
 
             return None
@@ -622,7 +637,10 @@ class WalletTrainingDataOrchestrator:
             group_column = 'coin_id'
 
         # Adds time series ratio metrics that can have additional indicators applied to them
-        if metric_type == 'market_data' and any(k in self.wallets_metrics_config['time_series']['market_data'] for k in ['mfi', 'obv']):
+        if (
+            metric_type == 'market_data' and
+            any(k in self.wallets_metrics_config['time_series']['market_data'] for k in ['mfi', 'obv'])
+        ):
             indicators_df = ind.add_market_data_dualcolumn_indicators(training_data_df_full)
         else:
             indicators_df = training_data_df_full

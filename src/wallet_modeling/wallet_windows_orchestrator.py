@@ -158,7 +158,8 @@ class MultiWindowOrchestrator:
                 )
 
                 # 2. Generate TRAINING_DATA_DFs
-                training_profits_df_full, training_market_data_df_full, macro_trends_df_full, training_coin_cohort = \
+                training_profits_df_full, training_market_data_df_full, \
+                training_macro_trends_df_full, training_coin_cohort = \
                     training_generator.retrieve_period_datasets(
                         window_config['training_data']['training_period_start'],
                         window_config['training_data']['training_period_end']
@@ -168,6 +169,7 @@ class MultiWindowOrchestrator:
                     training_generator.prepare_training_data(
                         training_profits_df_full,
                         training_market_data_df_full,
+                        training_macro_trends_df_full,
                         return_files=True
                     )
 

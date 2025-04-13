@@ -1,4 +1,24 @@
 # dda 635 macroeconomic features
+checkpoint 7: DEVw.815 update prepare_training_data
+Model Performance Summary
+===================================
+Test Samples:             2,066
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.815
+RMSE:                     0.234
+MAE:                      0.124
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.837
+RMSE:                     0.139
+MAE:                      0.076
+
+
 checkpoint 6: w.689 multiwindow working
 Model Performance Summary
 ===================================
