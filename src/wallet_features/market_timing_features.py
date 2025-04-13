@@ -79,13 +79,13 @@ def calculate_market_timing_features(
 
     # add timing offset features
     market_timing_df = calculate_offsets(market_indicators_data_df)
-    market_timing_df,relative_change_columns = calculate_relative_changes(market_timing_df)
+    market_timing_df,features_columns = calculate_relative_changes(market_timing_df)
 
     # flatten the wallet-coin-date transactions into wallet-indexed features
     wallet_timing_features_df = generate_all_timing_features(
         profits_df,
         market_timing_df,
-        relative_change_columns,
+        features_columns,
         wallets_config['features']['timing_metrics_min_transaction_size'],
     )
 
@@ -179,7 +179,7 @@ def calculate_relative_changes(
 
     Returns:
         DataFrame with added relative change columns and optionally dropped base/offset columns
-        relative_change_columns: List of the relative change columns created
+        features_columns: List of the columns to generate features for
 
     Raises:
         FeatureConfigError: If configuration is invalid or required columns are missing
@@ -196,8 +196,10 @@ def calculate_relative_changes(
 
     # Keep track of columns to drop
     columns_to_drop = set()
-    # Keep track of columns to winsorize
+
+    # Keep track of columns to be used in feature generation
     relative_change_columns = []
+    retained_base_columns = []
 
     # Process each column and calculate relative changes
     for base_column, column_config in offset_config.items():
@@ -207,7 +209,14 @@ def calculate_relative_changes(
 
         try:
             offsets = column_config['offsets']
-            retain_base_columns = column_config.get('retain_base_columns', True)
+
+            # If retain_base_columns is False, mark columns for dropping
+            retain_base_columns = column_config.get('retain_base_columns', False)
+            if retain_base_columns:
+                retained_base_columns.append(base_column)
+            else:
+                columns_to_drop.add(base_column)
+
         except KeyError as e:
             raise FeatureConfigError(f"Invalid configuration for column '{base_column}': {str(e)}") from e
 
@@ -246,11 +255,6 @@ def calculate_relative_changes(
                 # Add column to winsorization list
                 relative_change_columns.append(change_column)
 
-                # If retain_base_columns is False, mark columns for dropping
-                if not retain_base_columns:
-                    columns_to_drop.add(base_column)
-                    columns_to_drop.add(offset_column)
-
             except Exception as e:
                 raise FeatureConfigError(f"Error calculating relative change between '{base_column}' " \
                                         f"and '{offset_column}': {str(e)}") from e
@@ -263,7 +267,10 @@ def calculate_relative_changes(
     if columns_to_drop:
         result_df = result_df.drop(columns=list(columns_to_drop))
 
-    return result_df,relative_change_columns
+    # Consolidate columns to generate features for
+    features_columns = retained_base_columns + relative_change_columns
+
+    return result_df,features_columns
 
 
 
@@ -316,7 +323,7 @@ def calculate_timing_features_for_column(df: pd.DataFrame, metric_column: str) -
 def generate_all_timing_features(
     profits_df,
     market_timing_df,
-    relative_change_columns,
+    features_columns,
     min_transaction_size=0
 ):
     """
@@ -325,7 +332,7 @@ def generate_all_timing_features(
     Args:
         profits_df (pd.DataFrame): DataFrame with columns [coin_id, date, wallet_address, usd_net_transfers]
         market_timing_df (pd.DataFrame): DataFrame with market timing metrics indexed by (coin_id, date)
-        relative_change_columns (list): List of column names from market_timing_df to analyze
+        features_columns (list): List of column names from market_timing_df to analyze
         min_transaction_size (float): Minimum absolute USD value of transaction to consider
 
     Returns:
@@ -341,14 +348,14 @@ def generate_all_timing_features(
 
     # Perform the merge once
     timing_profits_df = filtered_profits.merge(
-        market_timing_df[relative_change_columns + ['coin_id', 'date']],
+        market_timing_df[features_columns + ['coin_id', 'date']],
         on=['coin_id', 'date'],
         how='left'
     )
 
     # Calculate features for each column
     all_features = []
-    for col in relative_change_columns:
+    for col in features_columns:
         logger.debug("Generating timing performance features for %s...", col)
         col_features = calculate_timing_features_for_column(
             timing_profits_df,

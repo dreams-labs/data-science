@@ -153,10 +153,16 @@ modeling:
         # Column patterns to remove
         drop_patterns: [
             # timing|*,
-            timing|*/buy_mean*,
-            timing|*/sell_mean*,
-            timing|*/sell_weighted*,
-
+            timing|price*/buy_mean*,
+            timing|price*/sell_mean*,
+            timing|price*/sell_weighted*,
+            timing|volume*/buy_mean*,
+            timing|volume*/sell_mean*,
+            timing|volume*/sell_weighted*,
+            timing|btc_mvrv_z_score//*,
+            timing|global_market_cap/*,
+            timing|btc_price/*,
+            timing|global_volume/*,
             # timing|price_sma_2/lag_200/*,
 
             # performance|*,

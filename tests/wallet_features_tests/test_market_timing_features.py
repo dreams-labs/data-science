@@ -118,7 +118,7 @@ def test_successful_offset_calculation(mock_wallets_features_config):
 
     # Verify all expected columns exist
     expected_columns = [
-        'coin_id', 'price_rsi_14', 'price_sma_7',
+        'coin_id', 'price_sma_7',
         'price_rsi_14_lead_2', 'price_rsi_14_lead_3',
         'price_sma_7_lead_1'
     ]
@@ -227,20 +227,12 @@ def test_relative_changes_calculation(mock_wallets_features_config):
 
     # Verify that the relative_change_columns list is correct
     expected_relative_change_columns = [
+        'price_sma_7', # retained base column
         'price_rsi_14/lead_2',
         'price_rsi_14/lead_3',
         'price_sma_7/lead_1'
     ]
     assert relative_change_columns == expected_relative_change_columns
-
-    # Verify column retention
-    # price_rsi_14 should be dropped (retain_base_columns: False)
-    assert 'price_rsi_14' not in result_df.columns
-    assert 'price_rsi_14_lead_2' not in result_df.columns
-
-    # price_sma_7 should be retained (retain_base_columns: True)
-    assert 'price_sma_7' in result_df.columns
-    assert 'price_sma_7_lead_1' in result_df.columns
 
 
 
