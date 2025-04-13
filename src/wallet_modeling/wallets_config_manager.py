@@ -134,8 +134,18 @@ def add_derived_values(config_dict: dict) -> dict:
     td['modeling_starting_balance_date'] = td['training_period_end']
 
     # Validation Period Boundaries
+    # 1. Calculate the modeling period duration in days.
     modeling_end = datetime.strptime(td['modeling_period_end'], "%Y-%m-%d")
-    td['validation_period_start'] = (modeling_end + timedelta(days=1)).strftime("%Y-%m-%d")
-    td['validation_starting_balance_date'] = td['modeling_period_end']
+    modeling_duration = (modeling_end - modeling_start).days
+
+    # 2. Extract the raw validation_period_end from td.
+    validation_period_end = datetime.strptime(td['validation_period_end'], "%Y-%m-%d")
+
+    # 3. Create validation_period_start by subtracting the modeling duration from validation_period_end.
+    validation_period_start_dt = validation_period_end - timedelta(days=modeling_duration)
+    td['validation_period_start'] = validation_period_start_dt.strftime("%Y-%m-%d")
+
+    # 4. Calculate the starting balance date (one day before the period start).
+    td['validation_starting_balance_date'] = (validation_period_start_dt - timedelta(days=1)).strftime("%Y-%m-%d")
 
     return cfg

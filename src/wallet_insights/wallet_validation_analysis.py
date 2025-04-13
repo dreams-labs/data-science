@@ -348,6 +348,7 @@ def analyze_wallet_model_importance(feature_importances):
         split_df['feature_category'],
         features_df,
         segments_df,
+        feature_importance_df['feature'],
         feature_importance_df['importance']
     ], axis=1)
 
