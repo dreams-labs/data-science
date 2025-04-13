@@ -1277,19 +1277,32 @@ logging.addLevelName(MILESTONE_LEVEL, "MILESTONE")
 def setup_notebook_logger(log_filepath: str = None) -> logging.Logger:
     """
     Sets up logging for notebook development with optional file output.
-    Adds a custom MILESTONE log level (between INFO and WARNING).
+    Adds a custom MILESTONE log level (between INFO and WARNING), and colorizes terminal output.
 
     Params:
     - log_filepath (str, optional): Path for log file output
     """
-    MILESTONE_LEVEL = 25    # pylint: disable=invalid-name
-    logging.addLevelName(MILESTONE_LEVEL, "MILESTONE")
+    class ColorFormatter(logging.Formatter):
+        """Sets colors for the logs output using tail commands"""
+        COLOR_MAP = {
+            "MILESTONE": "\033[92m",  # bright green
+            "INFO": "\033[0m",        # default
+            "WARNING": "\033[93m",    # yellow
+            "ERROR": "\033[91m",      # red
+            "DEBUG": "\033[90m",      # gray
+            "CRITICAL": "\033[95m",   # magenta
+        }
+        RESET = "\033[0m"
+
+        def format(self, record):
+            color = self.COLOR_MAP.get(record.levelname, self.RESET)
+            record.levelname = f"{color}{record.levelname}{self.RESET}"
+            return super().format(record)
 
     def milestone(self, message, *args, **kwargs):
         if self.isEnabledFor(MILESTONE_LEVEL):
             self._log(MILESTONE_LEVEL, message, args, **kwargs)  # pylint: disable=protected-access
 
-    # Patch into Logger only once
     if not hasattr(logging.Logger, "milestone"):
         logging.Logger.milestone = milestone
 
@@ -1297,12 +1310,15 @@ def setup_notebook_logger(log_filepath: str = None) -> logging.Logger:
     root_logger.setLevel(logging.INFO)
     root_logger.handlers = []
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format='[%(asctime)s] %(levelname)s [%(module)s.%(funcName)s:%(lineno)d] %(message)s',
+    # Terminal handler with color
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(ColorFormatter(
+        '[%(asctime)s] %(levelname)s [%(module)s.%(funcName)s:%(lineno)d] %(message)s',
         datefmt='%d/%b/%Y %H:%M:%S'
-    )
+    ))
+    root_logger.addHandler(stream_handler)
 
+    # Optional file handler without color
     if log_filepath:
         file_handler = logging.FileHandler(log_filepath)
         file_handler.setFormatter(logging.Formatter(

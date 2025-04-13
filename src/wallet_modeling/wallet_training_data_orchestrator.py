@@ -62,7 +62,7 @@ class WalletTrainingDataOrchestrator:
 
 
 
-    @u.timing_decorator
+    @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def retrieve_period_datasets(
         self,
         period_start_date,
@@ -259,7 +259,7 @@ class WalletTrainingDataOrchestrator:
 
 
 
-
+    @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def generate_training_features(
         self,
         profits_df: pd.DataFrame,

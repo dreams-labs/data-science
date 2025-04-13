@@ -27,7 +27,7 @@ wallets_config = WalletsConfig()
 #      Primary Orchestration Functions
 # ------------------------------------------
 
-@u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
+@u.timing_decorator
 def calculate_wallet_features(
         profits_df,
         market_indicators_data_df,
