@@ -259,7 +259,7 @@ class WalletTrainingDataOrchestrator:
 
 
 
-
+    @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def generate_training_features(
         self,
         profits_df: pd.DataFrame,
@@ -549,7 +549,7 @@ class WalletTrainingDataOrchestrator:
 
         # Upload the cohort to BigQuery for additional complex feature generation
         self.wtd.upload_training_cohort(training_wallet_cohort, hybridize_wallet_ids)
-        logger.info("Training wallet cohort defined as %s wallets after %.2f seconds.",
+        logger.milestone("Training wallet cohort defined as %s wallets after %.2f seconds.",
                     len(training_wallet_cohort), time.time()-start_time)
 
         # Store wallet cohort
