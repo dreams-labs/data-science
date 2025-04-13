@@ -1,3 +1,25 @@
+# dda 655 complete profits_df bug
+checkpoint 1: w.694 macro trends df fixed
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       140
+Features per Window:      35
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.694
+RMSE:                     0.215
+MAE:                      0.116
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.798
+RMSE:                     0.122
+MAE:                      0.066
+
+
+
 # dda 656 more macroeconomic features
 checkpoint 2: w.694 ready to merge
 Model Performance Summary

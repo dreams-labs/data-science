@@ -84,6 +84,13 @@ class WalletTrainingDataOrchestrator:
         """
         # 1. Get raw period data
         if self.profits_df is None or self.market_data_df is None or self.macro_trends_df is None:
+            logger.info("Retrieving data from BigQuery due to missing DataFrames. ")
+            logger.info(
+                "Status: profits_df: %s, market_data_df: %s, macro_trends_df: %s.",
+                "Missing" if self.profits_df is None else "Loaded",
+                "Missing" if self.market_data_df is None else "Loaded",
+                "Missing" if self.macro_trends_df is None else "Loaded"
+            )
             profits_df, market_data_df, macro_trends_df = self.wtd.retrieve_raw_datasets(
                 period_start_date,period_end_date
             )
