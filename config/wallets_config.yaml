@@ -25,7 +25,8 @@ training_data:
     ]
     modeling_period_start: '2024-10-01'
     modeling_period_end: '2024-10-31'
-    validation_period_end: '2024-11-30'
+    validation_period_end: '2025-03-20'
+    # validation_period_end: '2024-10-20'
 
     # Whether to use hybrid coin-wallet ids
     hybridize_wallet_ids: False  # if true, training data will be keyed on wallet-coin pairs
@@ -153,17 +154,24 @@ modeling:
         # Column patterns to remove
         drop_patterns: [
             # timing|*,
-            timing|price*/buy_mean*,
-            timing|price*/sell_mean*,
-            timing|price*/sell_weighted*,
-            timing|volume*/buy_mean*,
-            timing|volume*/sell_mean*,
-            timing|volume*/sell_weighted*,
-            timing|btc_mvrv_z_score//*,
-            timing|global_market_cap/*,
-            timing|btc_price/*,
-            timing|global_volume/*,
+            timing|*/buy_mean*,
+            timing|*/sell_mean*,
+            timing|*/sell_weighted*,
+            # timing|price*/buy_mean*,
+            # timing|price*/sell_mean*,
+            # timing|price*/sell_weighted*,
+            # timing|volume*/buy_mean*,
+            # timing|volume*/sell_mean*,
+            # timing|volume*/sell_weighted*,
+            # timing|btc_mvrv_z_score/*,
+            # timing|global_market_cap/*,
+            # timing|btc_price/*,
+            # timing|global_volume/*,
             # timing|price_sma_2/lag_200/*,
+            # timing|btc_mvrv_z_score/buy_weighted|*,
+            # timing|btc_mvrv_z_score/buy_mean|*,
+            # timing|btc_mvrv_z_score/sell_mean|*,
+            # timing|btc_mvrv_z_score/sell_weighted|*,
 
             # performance|*,
             # performance|*/max_investment/*,
@@ -259,9 +267,14 @@ modeling:
 
         # Performance Profiles (Choose One Section)
         # --------------------------------------
-        # CHECKPOINTER
-        n_estimators: 300  # number of trees to train in the model
-        learning_rate: 0.1  # step size for updates to weights during training
+        # # CHECKPOINTER
+        # n_estimators: 250  # number of trees to train in the model
+        # learning_rate: 0.1  # step size for updates to weights during training
+
+        # PRODUCTION
+        n_estimators: 500  # number of trees to train in the model
+        learning_rate: 0.05  # step size for updates to weights during training
+
         early_stopping_rounds: 25  # stop training if no improvement after x rounds
         gamma: 0.005  # minimum gain required to split further on a leaf node
         tree_method: hist  # method for building trees, e.g., histogram-based
@@ -275,15 +288,15 @@ modeling:
 
     # Phase training section
     phase_training:
-        enabled: False
+        enabled: True
         phases:
             - params:
                 max_depth: 9
                 min_child_weight: 100
                 gamma: 0.02
             - params:
-                max_depth: 12
-                min_child_weight: 30
+                max_depth: 15
+                min_child_weight: 15
                 gamma: 0.005
 
 
@@ -317,8 +330,8 @@ modeling:
 
             # # Depth and Child Weight
             # regressor__min_child_weight_pct: [0.00004, 0.00007, 0.0001]
-            # regressor__min_child_weight: [15, 20, 30]
-            # regressor__max_depth: [15,18,21]  # basic depth param
+            # regressor__min_child_weight: [15, 25, 40]
+            # regressor__max_depth: [9,12,15,18]  # basic depth param
 
             # Col/Row Sampling
             # regressor__subsample: [0.8, 0.9, 1.0]   # samples rows, e.g. trees use x% of all wallet rows
@@ -330,8 +343,8 @@ modeling:
             # regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            regressor__n_estimators: [250]
-            regressor__learning_rate: [0.05]
+            regressor__n_estimators: [350]
+            regressor__learning_rate: [0.2]
             # regressor__gamma: [0.01]
 
             # Optimize for Speed
@@ -352,9 +365,15 @@ modeling:
                 # [timing|btc_mvrv_z_score/lead_100/*],
                 # [timing|btc_mvrv_z_score/lead_50/*],
                 # [timing|btc_mvrv_z_score/lead_21/*],
+                # [timing|btc_mvrv_z_score/*],
                 # [timing|global_market_cap/*],
                 # [timing|btc_price/*],
                 # [timing|global_volume/*],
+                # [timing|btc_mvrv_z_score/buy_mean|*],
+                # [timing|btc_mvrv_z_score/buy_weighted|*],
+                # [timing|btc_mvrv_z_score/sell_mean|*],
+                # [timing|btc_mvrv_z_score/sell_weighted|*],
+
             #     # [timing|price_sma_2/lag_21/*],
             #     # [timing|price_sma_2/lag_30/*],
             #     # [timing|*/buy_mean*],
