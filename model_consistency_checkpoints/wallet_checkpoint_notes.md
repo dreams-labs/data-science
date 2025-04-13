@@ -1,4 +1,43 @@
 # dda 635 macroeconomic features
+checkpoint 5: DEVw.839 log dev score
+===================================
+Test Samples:             2,066
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.839
+RMSE:                     0.222
+MAE:                      0.120
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.817
+RMSE:                     0.147
+MAE:                      0.085
+
+checkpoint 5: w.839 log dev score
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       124
+Features per Window:      31
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.686
+RMSE:                     0.216
+MAE:                      0.115
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.787
+RMSE:                     0.125
+MAE:                      0.067
+
+
+
 checkpoint 4: w.686 generalizing indicators function
 Model Performance Summary
 ===================================

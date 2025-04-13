@@ -104,7 +104,7 @@ class WalletTrainingDataOrchestrator:
         profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
 
         # Macro trends imputation, cleaning, validation
-        macro_trends_cols = list(self.wallets_metrics_config['macro_trends'].keys())
+        macro_trends_cols = list(self.wallets_metrics_config['time_series']['macro_trends'].keys())
         macro_trends_df = dr.clean_macro_trends(macro_trends_df, macro_trends_cols,
                                         start_date = None,  # historical data is needed for indicators
                                         end_date = period_end_date)
@@ -622,10 +622,7 @@ class WalletTrainingDataOrchestrator:
             group_column = 'coin_id'
 
         # Adds time series ratio metrics that can have additional indicators applied to them
-        if any(k in self.wallets_metrics_config['time_series'][metric_type] for k in ['mfi', 'obv']):
-            if metric_type != 'market_data':
-                raise ValueError("Dual column indicators MFI/OBV are only supported for market data.")
-
+        if metric_type == 'market_data' and any(k in self.wallets_metrics_config['time_series']['market_data'] for k in ['mfi', 'obv']):
             indicators_df = ind.add_market_data_dualcolumn_indicators(training_data_df_full)
         else:
             indicators_df = training_data_df_full
