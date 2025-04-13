@@ -8,15 +8,19 @@ market_timing:
         volume_sma_12:
             offsets: [-80, -21, 21, 100]
             retain_base_columns: False
-        # global_market_cap:
-        #     offsets: [-100, -50, -21, 21, 50, 100]
-        #     retain_base_columns: False
-        # global_volume:
-        #     offsets: [-100, -50, -21, 21, 50, 100]
-        #     retain_base_columns: False
-        # btc_mvrv_z_score:
-        #     offsets: [-100, -50, -21, 21, 50, 100]
-        #     retain_base_columns: False
-        # btc_price:
-        #     offsets: [-100, -50, -21, 21, 50, 100]
-        #     retain_base_columns: False
+        global_market_cap:
+            # offsets: [-100, -50, -21, 21, 50, 100]
+            offsets: []
+            retain_base_columns: True
+        global_volume:
+        #     # offsets: [-100, -50, -21, 21, 50, 100]
+            offsets: []
+            retain_base_columns: True
+        btc_mvrv_z_score:
+            offsets: []
+            # offsets: [-100, -50, -21, 21, 50, 100]
+            retain_base_columns: True
+        btc_price:
+            offsets: []
+            # offsets: [-100, -50, -21, 21, 50, 100]
+            retain_base_columns: True
