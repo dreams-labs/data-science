@@ -142,8 +142,9 @@ class MultiWindowOrchestrator:
                 # 1. Initialize data generator for window with presplit dfs
                 training_profits_df = None
                 training_market_data_df = None
+                training_macro_trends_df = None
                 if self.complete_profits_df is not None:
-                    training_profits_df,training_market_data_df = \
+                    training_profits_df,training_market_data_df,training_macro_trends_df = \
                         self._transform_complete_dfs_for_window(
                             window_config['training_data']['training_period_start'],
                             window_config['training_data']['training_period_end']
@@ -154,7 +155,8 @@ class MultiWindowOrchestrator:
                     self.metrics_config,
                     self.features_config,
                     profits_df = training_profits_df,
-                    market_data_df = training_market_data_df
+                    market_data_df = training_market_data_df,
+                    macro_trends_df = training_macro_trends_df
                 )
 
                 # 2. Generate TRAINING_DATA_DFs
@@ -190,8 +192,9 @@ class MultiWindowOrchestrator:
                 # 3. Generate MODELING_DATA_DFs
                 modeling_profits_df = None
                 modeling_market_data_df = None
+                modeling_macro_trends_df = None
                 if self.complete_profits_df is not None:
-                    modeling_profits_df,modeling_market_data_df = \
+                    modeling_profits_df,modeling_market_data_df,modeling_macro_trends_df = \
                         self._transform_complete_dfs_for_window(
                             window_config['training_data']['modeling_period_start'],
                             window_config['training_data']['modeling_period_end']
@@ -203,8 +206,8 @@ class MultiWindowOrchestrator:
                     self.features_config,
                     training_wallet_cohort = training_generator.training_wallet_cohort,
                     profits_df = modeling_profits_df,
-                    market_data_df = modeling_market_data_df
-
+                    market_data_df = modeling_market_data_df,
+                    macro_trends_df = modeling_macro_trends_df
                 )
 
                 modeling_profits_df_full,_,_,_ = modeling_generator.retrieve_period_datasets(
@@ -321,6 +324,8 @@ class MultiWindowOrchestrator:
                       [self.complete_profits_df.index.get_level_values('date') <= period_end])
         window_market_data_df = (self.complete_market_data_df.copy()
                                  [self.complete_market_data_df.index.get_level_values('date') <= period_end])
+        window_macro_trends_df = (self.complete_macro_trends_df.copy()
+                                 [self.complete_macro_trends_df.index.get_level_values('date') <= period_end])
 
         # Impute profits_df rows as of the period starting balance date and period end
         period_starting_balance_date = (pd.to_datetime(period_start) - timedelta(days=1)).strftime('%Y-%m-%d')
@@ -349,7 +354,7 @@ class MultiWindowOrchestrator:
         # Use the logic for splitting training window profits_dfs to split the complete profits_df
         window_profits_df = complete_df_splitter.split_training_window_dfs(u.ensure_index(window_profits_df))[0]
 
-        return window_profits_df.reset_index(), window_market_data_df.reset_index()
+        return window_profits_df.reset_index(), window_market_data_df.reset_index(), window_macro_trends_df
 
 
     def _merge_window_dfs(self, window_dfs: Dict[datetime, pd.DataFrame]) -> pd.DataFrame:
