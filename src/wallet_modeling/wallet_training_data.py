@@ -28,7 +28,7 @@ class WalletTrainingData:
     """Wrapper for training data preparation functions to store the config state"""
     def __init__(self, wallets_config):
         self.wallets_config = copy.deepcopy(wallets_config)  # store the config at instance-level
-
+        self.epoch_reference_date = wallets_config['training_data']['modeling_period_start'].replace('-','')
 
 # -------------------------------------------
 #      Training Data Preparation Methods
@@ -417,7 +417,11 @@ class WalletTrainingData:
 
 
 
-    def upload_training_cohort(self, cohort_ids: np.array, hybridize_wallet_ids: bool) -> None:
+    def upload_training_cohort(
+            self,
+            cohort_ids: np.array,
+            hybridize_wallet_ids: bool
+        ) -> None:
         """
         Uploads the list of wallet_ids that are used in the model to BigQuery. This
         is used to pull additional metrics while limiting results to only relevant wallets.
@@ -447,7 +451,7 @@ class WalletTrainingData:
         project_id = 'western-verve-411004'
         client = bigquery.Client(project=project_id)
 
-        wallet_ids_table = f"{project_id}.temp.wallet_modeling_training_cohort"
+        wallet_ids_table = f"{project_id}.temp.wallet_modeling_training_cohort_{self.epoch_reference_date}"
         schema = [
             {'name':id_col, 'type': 'int64'},
             {'name':'updated_at', 'type': 'datetime'}

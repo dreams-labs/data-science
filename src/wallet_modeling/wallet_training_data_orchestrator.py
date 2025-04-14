@@ -54,6 +54,7 @@ class WalletTrainingDataOrchestrator:
         # Generated objects
         self.parquet_folder = self.wallets_config['training_data']['parquet_folder']
         self.wtd = WalletTrainingData(wallets_config)  # pass config in
+        self.epoch_reference_date = self.wallets_config['training_data']['modeling_period_start'].replace('-','')
 
         # Preexisting raw dfs if provided
         self.profits_df = profits_df
@@ -244,6 +245,7 @@ class WalletTrainingDataOrchestrator:
             self.wallets_config['features']['timing_metrics_min_transaction_size'],
             self.wallets_config['training_data'][f'{period}_period_end'],
             self.wallets_config['training_data']['hybridize_wallet_ids'],
+            self.epoch_reference_date
         )
 
         if return_files is True:
@@ -302,7 +304,7 @@ class WalletTrainingDataOrchestrator:
 
         # Run full period and window features concurrently
         with concurrent.futures.ThreadPoolExecutor(
-            self.wallets_config['n_threads']['windows_features_generation']
+            self.wallets_config['n_threads']['concurrent_windows']
         ) as executor:
             # Submit full period feature generation
             full_period_future = executor.submit(

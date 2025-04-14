@@ -37,13 +37,15 @@ training_data:
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
 
+# CheckpointValidation
 # WalletModel Multithreading
 # Determines how many workers will be used in multithreading executions
 n_threads:
     raw_data_retrieval: 3  # retrieves raw dfs from bigquery
     profits_row_imputation: 4  # generates imputed rows in profits_df
     training_dfs_preparation: 3  # generates market indicators, macro indicators, cohort profits dfs
-    windows_features_generation: 3  # generates features for each window
+    concurrent_epochs: 1  # how many epochs' training data are processed concurrently
+    concurrent_windows: 8  # how many windows are processed concurrently
 
 
 # CheckpointValidation
