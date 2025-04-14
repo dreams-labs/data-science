@@ -1,3 +1,24 @@
+# dda 661 fix epoch terminology
+checkpoint 1: w.683 epoch terms implemented
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       184
+Features per Window:      46
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.683
+RMSE:                     0.219
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.785
+RMSE:                     0.126
+MAE:                      0.068
+
+
 # dda 649 n_threads consolodation
 checkpoint 1: w.681 n_threads consolidated
 Model Performance Summary
