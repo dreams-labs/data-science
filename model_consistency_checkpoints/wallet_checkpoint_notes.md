@@ -1,3 +1,24 @@
+# dda 660 multithread epochs
+checkpoint 1: w.682 split out single epoch function
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       184
+Features per Window:      46
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.682
+RMSE:                     0.219
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.783
+RMSE:                     0.127
+MAE:                      0.069
+
+
 # dda 661 fix epoch terminology
 checkpoint 1: w.683 epoch terms implemented
 Model Performance Summary
