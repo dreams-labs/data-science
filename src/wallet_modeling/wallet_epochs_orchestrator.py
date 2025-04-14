@@ -71,7 +71,7 @@ class MultiEpochOrchestrator:
         Returns:
         - None
             """
-        # 1. Find earliest and latest boundaries across all epochs
+        # 1. Find earliest and latest window boundaries across all epochs
         all_train_starts = []
         all_validation_ends = []
         for cfg in self.all_epochs_configs:
@@ -110,41 +110,41 @@ class MultiEpochOrchestrator:
 
 
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
-    def generate_windows_training_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def generate_epochs_training_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
-        Generates training data for all window configs in parallel.
+        Generates training data for all epoch configs in parallel.
 
         Returns:
-        - merged_training_df: MultiIndexed on (wallet_address, window_start_date)
-        - merged_modeling_df: MultiIndexed on (wallet_address, window_start_date)
+        - merged_training_df: MultiIndexed on (wallet_address, epoch_start_date)
+        - merged_modeling_df: MultiIndexed on (wallet_address, epoch_start_date)
         """
-        # Ensure the complete dfs encompass the full range of training_window_starts
+        # Ensure the complete dfs encompass the full range of training_epoch_starts
         self._assert_complete_coverage()
 
         logger.milestone(f"Compiling training data for {len(self.all_epochs_configs)} epochs...")
         u.notify('intro_3')
 
-        # Initialize storage for window DataFrames
-        training_window_dfs = {}
-        modeling_window_dfs = {}
+        # Initialize storage for epoch DataFrames
+        training_epoch_dfs = {}
+        modeling_epoch_dfs = {}
 
         for epoch_config in self.all_epochs_configs:
             model_start = epoch_config['training_data']['modeling_period_start']
-            logger.info(f"Generating data for window starting {model_start}")
+            logger.info(f"Generating data for epoch starting {model_start}")
             u.notify('futuristic')
 
             # Generate name of parquet folder and create it if necessary
-            window_parquet_folder = epoch_config['training_data']['parquet_folder']
-            os.makedirs(window_parquet_folder, exist_ok=True)
+            epoch_parquet_folder = epoch_config['training_data']['parquet_folder']
+            os.makedirs(epoch_parquet_folder, exist_ok=True)
 
             try:
-                # 1. Initialize data generator for window with presplit dfs
+                # 1. Initialize data generator for epoch with presplit dfs
                 training_profits_df = None
                 training_market_data_df = None
                 training_macro_trends_df = None
                 if self.complete_profits_df is not None:
                     training_profits_df,training_market_data_df,training_macro_trends_df = \
-                        self._transform_complete_dfs_for_window(
+                        self._transform_complete_dfs_for_epoch(
                             epoch_config['training_data']['training_period_start'],
                             epoch_config['training_data']['training_period_end']
                         )
@@ -175,7 +175,7 @@ class MultiEpochOrchestrator:
                         return_files=True
                     )
 
-                window_training_data_df = training_generator.generate_training_features(
+                epoch_training_data_df = training_generator.generate_training_features(
                     training_profits_df,
                     training_market_indicators_df,
                     training_macro_indicators_df,
@@ -183,10 +183,10 @@ class MultiEpochOrchestrator:
                     return_files=True
                 )
 
-                # Store training df with window date
-                window_date = datetime.strptime(
+                # Store training df with epoch date
+                epoch_date = datetime.strptime(
                     epoch_config['training_data']['modeling_period_start'], '%Y-%m-%d')
-                training_window_dfs[window_date] = window_training_data_df
+                training_epoch_dfs[epoch_date] = epoch_training_data_df
 
                 # 3. Generate MODELING_DATA_DFs
                 modeling_profits_df = None
@@ -194,7 +194,7 @@ class MultiEpochOrchestrator:
                 modeling_macro_trends_df = None
                 if self.complete_profits_df is not None:
                     modeling_profits_df,modeling_market_data_df,modeling_macro_trends_df = \
-                        self._transform_complete_dfs_for_window(
+                        self._transform_complete_dfs_for_epoch(
                             epoch_config['training_data']['modeling_period_start'],
                             epoch_config['training_data']['modeling_period_end']
                         )
@@ -220,27 +220,27 @@ class MultiEpochOrchestrator:
                     hybrid_cw_id_map = pd.read_pickle(
                         f"{epoch_config['training_data']['parquet_folder']}/hybrid_cw_id_map.pkl")
 
-                window_modeling_features_df = modeling_generator.prepare_modeling_features(
+                epoch_modeling_features_df = modeling_generator.prepare_modeling_features(
                     modeling_profits_df_full,
                     hybrid_cw_id_map
                 )
 
-                # Store modeling df with window date
-                modeling_window_dfs[window_date] = window_modeling_features_df
-                logger.milestone(f"Successfully generated data for window {model_start}.")
+                # Store modeling df with epoch date
+                modeling_epoch_dfs[epoch_date] = epoch_modeling_features_df
+                logger.milestone(f"Successfully generated data for epoch {model_start}.")
 
             except Exception as e:
                 logger.error(f"Failed to generate data for {model_start}: {str(e)}")
                 raise
 
-        # Merge window DataFrames
-        wallet_training_data_df = self._merge_window_dfs(training_window_dfs)
-        modeling_wallet_features_df = self._merge_window_dfs(modeling_window_dfs)
+        # Merge epoch DataFrames
+        wallet_training_data_df = self._merge_epoch_dfs(training_epoch_dfs)
+        modeling_wallet_features_df = self._merge_epoch_dfs(modeling_epoch_dfs)
 
         # Confirm indices match
         u.assert_matching_indices(wallet_training_data_df,modeling_wallet_features_df)
 
-        logger.info("Generated multi-window DataFrames with shapes %s and %s",
+        logger.info("Generated multi-epoch DataFrames with shapes %s and %s",
                     wallet_training_data_df.shape, modeling_wallet_features_df.shape)
         u.notify('level_up')
 
@@ -253,10 +253,10 @@ class MultiEpochOrchestrator:
 
     def _generate_epoch_configs(self) -> List[Dict]:
         """
-        Generates config dicts for each offset window.
+        Generates config dicts for each offset epoch.
 
         Returns:
-        - List[Dict]: List of config dicts, one per window.
+        - List[Dict]: List of config dicts, one per epoch.
         """
         all_epochs_configs = []
         base_training_data = self.base_config['training_data']
@@ -291,9 +291,9 @@ class MultiEpochOrchestrator:
             # Use WalletsConfig to add derived values
             epoch_config = wcm.add_derived_values(epoch_config)
 
-            # Log window configuration
+            # Log epoch configuration
             logger.debug(
-                f"Generated config for {offset_days} day offset window: "
+                f"Generated config for {offset_days} day offset epoch: "
                 f"modeling_period={epoch_config['training_data']['modeling_period_start']} "
                 f"to {epoch_config['training_data']['modeling_period_end']}"
             )
@@ -303,84 +303,84 @@ class MultiEpochOrchestrator:
         return all_epochs_configs
 
 
-    def _transform_complete_dfs_for_window(self,
-                                           period_start: str,
-                                           period_end: str) -> pd.DataFrame:
+    def _transform_complete_dfs_for_epoch(self,
+                                           epoch_start: str,
+                                           epoch_end: str) -> pd.DataFrame:
         """
         Impute and filter the complete_profits_df to remove all rows after the period_end
         and impute the starting values as of the period_start starting balance date.
 
-        This function relies on the WalletTrainingData.split_training_window_dfs function
+        This function relies on the WalletTrainingData.split_training_epoch_dfs function
         that is used to generate the profits_dfs for the multiple training period features.
 
         Params:
-        - period_start (str): The training_period_start to use for the filtered df.
-        - period_end (str): The last date to retain in the self.complete_profits_df
+        - epoch_start (str): The training_period_start to use for the filtered df.
+        - epoch_end (str): The last date to retain in the self.complete_profits_df
         """
         # Keep only records up to period_end
-        window_profits_df = (self.complete_profits_df.copy()
-                      [self.complete_profits_df.index.get_level_values('date') <= period_end])
-        window_market_data_df = (self.complete_market_data_df.copy()
-                                 [self.complete_market_data_df.index.get_level_values('date') <= period_end])
-        window_macro_trends_df = (self.complete_macro_trends_df.copy()
-                                 [self.complete_macro_trends_df.index.get_level_values('date') <= period_end])
+        epoch_profits_df = (self.complete_profits_df.copy()
+                      [self.complete_profits_df.index.get_level_values('date') <= epoch_end])
+        epoch_market_data_df = (self.complete_market_data_df.copy()
+                                 [self.complete_market_data_df.index.get_level_values('date') <= epoch_end])
+        epoch_macro_trends_df = (self.complete_macro_trends_df.copy()
+                                 [self.complete_macro_trends_df.index.get_level_values('date') <= epoch_end])
 
         # Impute profits_df rows as of the period starting balance date and period end
-        period_starting_balance_date = (pd.to_datetime(period_start) - timedelta(days=1)).strftime('%Y-%m-%d')
-        window_profits_df = pri.impute_profits_for_multiple_dates(
-            window_profits_df,
-            window_market_data_df,
-            [period_starting_balance_date,period_end],
+        epoch_starting_balance_date = (pd.to_datetime(epoch_start) - timedelta(days=1)).strftime('%Y-%m-%d')
+        epoch_profits_df = pri.impute_profits_for_multiple_dates(
+            epoch_profits_df,
+            epoch_market_data_df,
+            [epoch_starting_balance_date,epoch_end],
             n_threads=4,
             reset_index=False
         )
 
         # Apply min_wallet_inflows filter
-        valid_rows = (window_profits_df.xs(period_end, level='date')
+        valid_rows = (epoch_profits_df.xs(epoch_end, level='date')
                        ['usd_inflows_cumulative'] >= self.base_config['data_cleaning']['min_wallet_inflows'])
         valid_pairs = valid_rows[valid_rows].index
-        window_profits_df = window_profits_df.loc[window_profits_df.index.droplevel('date').isin(valid_pairs)]
+        epoch_profits_df = epoch_profits_df.loc[epoch_profits_df.index.droplevel('date').isin(valid_pairs)]
 
         # Create config with a training period of the param values
         splitter_config = copy.deepcopy(self.base_config)
-        splitter_config['training_data']['training_window_starts'] = [period_start]
-        splitter_config['training_data']['training_period_end'] = period_end
+        splitter_config['training_data']['training_window_starts'] = [epoch_start]
+        splitter_config['training_data']['training_period_end'] = epoch_end
 
-        # Initiate WalletTrainingData with the only window being the training_period_start
+        # Initiate WalletTrainingData with the only window being the training_epoch_start
         complete_df_splitter = wtdo.WalletTrainingData(splitter_config)
 
-        # Use the logic for splitting training window profits_dfs to split the complete profits_df
-        window_profits_df = complete_df_splitter.split_training_window_dfs(u.ensure_index(window_profits_df))[0]
+        # Use the logic for splitting training epoch profits_dfs to split the complete profits_df
+        epoch_profits_df = complete_df_splitter.split_training_window_dfs(u.ensure_index(epoch_profits_df))[0]
 
-        return window_profits_df.reset_index(), window_market_data_df.reset_index(), window_macro_trends_df
+        return epoch_profits_df.reset_index(), epoch_market_data_df.reset_index(), epoch_macro_trends_df
 
 
-    def _merge_window_dfs(self, window_dfs: Dict[datetime, pd.DataFrame]) -> pd.DataFrame:
+    def _merge_epoch_dfs(self, epoch_dfs: Dict[datetime, pd.DataFrame]) -> pd.DataFrame:
         """
-        Merges window DataFrames into a single MultiIndexed DataFrame with non-nullable indices.
+        Merges epoch DataFrames into a single MultiIndexed DataFrame with non-nullable indices.
 
         Params:
-        - window_dfs: Dict mapping window dates to DataFrames
+        - epoch_dfs: Dict mapping epoch dates to DataFrames
 
         Returns:
-        - DataFrame: MultiIndexed on (wallet_address, window_start_date)
+        - DataFrame: MultiIndexed on (wallet_address, epoch_start_date)
         """
         merged_dfs = []
-        for window_date, df in window_dfs.items():
+        for epoch_date, df in epoch_dfs.items():
             # Convert wallet_address index to non-nullable int64
             wallet_index = df.index.astype("int64")
 
-            # Build a MultiIndex from the non-nullable wallet_index and the window_date
+            # Build a MultiIndex from the non-nullable wallet_index and the epoch_date
             multi_idx = pd.MultiIndex.from_product(
-                [wallet_index, [window_date]],
-                names=['wallet_address', 'window_start_date']
+                [wallet_index, [epoch_date]],
+                names=['wallet_address', 'epoch_start_date']
             )
 
             # Use a copy to avoid modifying the original DataFrame
-            window_df = df.copy()
-            window_df.index = multi_idx
+            epoch_df = df.copy()
+            epoch_df.index = multi_idx
 
-            merged_dfs.append(window_df)
+            merged_dfs.append(epoch_df)
 
         full_df = pd.concat(merged_dfs, axis=0).sort_index()
 
@@ -394,7 +394,7 @@ class MultiEpochOrchestrator:
 
     def _assert_complete_coverage(self) -> None:
         """
-        Verify that profits and market data fully cover all training windows.
+        Verify that profits and market data fully cover all training epochs.
 
         Raises:
         - ValueError: If data coverage is incomplete with specific boundary details
@@ -423,7 +423,7 @@ class MultiEpochOrchestrator:
             (market_data_end >= latest_modeling_end)
         ):
             raise ValueError(
-                f"Insufficient data coverage for specified windows.\n"
+                f"Insufficient data coverage for specified epochs.\n"
                 f"Required coverage: {earliest_starting_balance_date.strftime('%Y-%m-%d')}"
                 f" to {latest_modeling_end.strftime('%Y-%m-%d')}\n"
                 f"Actual coverage:\n"
