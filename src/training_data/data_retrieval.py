@@ -378,7 +378,7 @@ def detect_price_data_staleness(market_data_df, config):
             f"Price data freshness issue detected on {latest_date.date()}:\n"
             f"- {count_increase:.0f} records have become stale since {min_date.date()}.\n"
             f"- Imputed records increased from {min_pct*100:.1f}% ({recent_min} coins) on {min_date.date()} to "
-            f"{latest_pct*100:.1f}% ({latest_count:.0f} coins) on {latest_date.date()}\n"
+            f"{latest_pct*100:.1f}% ({latest_count:.0f} coins) on {latest_date.date()}."
         )
         return True
 
