@@ -1,3 +1,24 @@
+# dda 649 n_threads consolodation
+checkpoint 1: w.681 n_threads consolidated
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       184
+Features per Window:      46
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.681
+RMSE:                     0.219
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.782
+RMSE:                     0.127
+MAE:                      0.069
+
+
 # dda 661 macro features
 checkpoint 1: w.683 macro features added
 Model Performance Summary

@@ -52,7 +52,9 @@ class WalletTrainingData:
         starting_balance_date = period_start_date - timedelta(days=1)
 
         # Retrieve all datasets
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        with ThreadPoolExecutor(
+            self.wallets_config['n_threads']['raw_data_retrieval']
+        ) as executor:
 
             # Profits data
             profits_future = executor.submit(
