@@ -1,4 +1,24 @@
 # dda 660 multithread epochs
+checkpoint 3: w.681 ready to merge
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       184
+Features per Window:      46
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.681
+RMSE:                     0.219
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.784
+RMSE:                     0.126
+MAE:                      0.068
+
+
 checkpoint 2: w.683 multithreading implemented
 Model Performance Summary
 ===================================
