@@ -1301,6 +1301,7 @@ def setup_notebook_logger(log_filepath: str = None) -> logging.Logger:
 
     def milestone(self, message, *args, **kwargs):
         if self.isEnabledFor(MILESTONE_LEVEL):
+            kwargs.setdefault("stacklevel", 2)  # point to the caller, not this function
             self._log(MILESTONE_LEVEL, message, args, **kwargs)  # pylint: disable=protected-access
 
     if not hasattr(logging.Logger, "milestone"):

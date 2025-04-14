@@ -8,31 +8,31 @@ training_data:
     training_window_starts: [
         # '2020-01-01',
         # '2021-01-01',
-        # '2022-01-01',
+        '2022-01-01',
         '2023-01-01',
-        # '2023-06-01',
+        '2023-06-01',
         # '2023-09-01',
         '2024-01-01',
-        # '2024-02-01',
+        '2024-02-01',
         # '2024-03-01',
-        '2024-04-01',
+        # '2024-04-01',
         # '2024-05-01',
         # '2024-06-01',
         # '2024-07-01',
         # '2024-08-01',
-        '2024-09-01',
+        # '2024-09-01',
         # '2024-10-01',
     ]
-    modeling_period_start: '2024-10-01'
-    modeling_period_end: '2024-10-31'
-    validation_period_end: '2025-03-20'
+    modeling_period_start: '2024-03-01'
+    modeling_period_end: '2024-03-30'
+    validation_period_end: '2025-03-31'
     # validation_period_end: '2024-10-20'
 
     # Whether to use hybrid coin-wallet ids
     hybridize_wallet_ids: False  # if true, training data will be keyed on wallet-coin pairs
 
     # Local pipeline configs
-    dataset: dev  # Set to prod or dev; determines whether to query core or dev dataset tables
+    dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
     parquet_folder: temp/wallet_modeling_dfs/windowed  # where to store parquet files
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
@@ -44,14 +44,14 @@ training_data:
 data_cleaning:
 
     # Wallet cohort thresholds
-    min_coins_traded: 1  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
+    min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
     max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
 
     min_wallet_investment: 10000 # time weighted average balance filter
     min_wallet_inflows: 10000  # Exclude wallets with inflows below this amount (USD)
     min_wallet_volume: 10000  # Exclude wallets with fewer than this amount of training period USD volume
 
-    max_wallet_investment: 10_000_000 # time weighted average balance filter
+    max_wallet_investment: 15_000_000 # time weighted average balance filter
     max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
     max_wallet_volume: 25_000_000  # Exclude wallets with fewer than this amount of training period USD volume
     max_wallet_profits: 100_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
@@ -138,11 +138,16 @@ features:
 modeling:
 
     # Modeling period filters
-    modeling_min_investment: 100
-    modeling_min_coins_traded: 0
+    modeling_min_investment: 1000
+    modeling_min_coins_traded: 1
 
     # Which wallet performance metric to use as the target variable.
-    target_variable: crypto_net_gain/max_investment/winsorized
+    # target_variable: crypto_net_gain/max_investment/winsorized
+    # target_variable: crypto_net_flows/crypto_inflows/winsorized
+    # target_variable: crypto_net_gain/max_investment/winsorized
+    target_variable: crypto_net_gain/max_investment/ntile_rank
+    # target_variable: crypto_net_gain
+    # target_variable: crypto_net_flows
 
     # Train/Test/Eval split
     test_size: 0.2  # what % of the total population will be used as test
@@ -259,21 +264,21 @@ modeling:
         # -------------------------------
         eval_metric: [rmse]
 
-        max_depth: 15  # how deep the trees can go
+        max_depth: 9  # how deep the trees can go
         # min_child_weight_pct: 0.0001  # what % of rows each tree must have
-        min_child_weight: 25  # what % of rows each tree must have
+        min_child_weight: 15  # what % of rows each tree must have
         subsample: 1.0  # samples rows, e.g. trees use x% of all wallet rows
         colsample_bytree: 0.9  # samples columns, e.g. trees use x% of all column features
 
         # Performance Profiles (Choose One Section)
         # --------------------------------------
-        # CHECKPOINTER
-        n_estimators: 250  # number of trees to train in the model
-        learning_rate: 0.1  # step size for updates to weights during training
+        # # CHECKPOINTER
+        # n_estimators: 250  # number of trees to train in the model
+        # learning_rate: 0.1  # step size for updates to weights during training
 
-        # # PRODUCTION
-        # n_estimators: 500  # number of trees to train in the model
-        # learning_rate: 0.05  # step size for updates to weights during training
+        # PRODUCTION
+        n_estimators: 800  # number of trees to train in the model
+        learning_rate: 0.05  # step size for updates to weights during training
 
         early_stopping_rounds: 25  # stop training if no improvement after x rounds
         gamma: 0.005  # minimum gain required to split further on a leaf node
@@ -291,11 +296,11 @@ modeling:
         enabled: False
         phases:
             - params:
-                max_depth: 9
+                max_depth: 5
                 min_child_weight: 100
                 gamma: 0.02
             - params:
-                max_depth: 15
+                max_depth: 9
                 min_child_weight: 15
                 gamma: 0.005
 

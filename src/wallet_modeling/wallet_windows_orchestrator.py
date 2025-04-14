@@ -225,8 +225,7 @@ class MultiWindowOrchestrator:
 
                 # Store modeling df with window date
                 modeling_window_dfs[window_date] = window_modeling_features_df
-
-                logger.info(f"Successfully generated data for window {model_start}")
+                logger.milestone(f"Successfully generated data for window {model_start}.")
 
             except Exception as e:
                 logger.error(f"Failed to generate data for {model_start}: {str(e)}")
