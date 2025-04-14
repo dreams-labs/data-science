@@ -21,7 +21,8 @@ wallets_config = WalletsConfig()
 
 def retrieve_transfers_sequencing(min_txn_size: int,
                                   training_end: str,
-                                  hybridize_wallet_ids: bool = False) -> pd.DataFrame:
+                                  hybridize_wallet_ids: bool = False,
+                                  epoch_reference_date: str = '') -> pd.DataFrame:
     """
     Returns buyer and seller sequence numbers for each wallet-coin pair, where the first
     buyer/seller receives rank 1. Only includes wallets from wallet_modeling_training_cohort.
@@ -30,6 +31,7 @@ def retrieve_transfers_sequencing(min_txn_size: int,
     - min_txn_size (int): Minimum USD value to filter out dust/airdrops
     - training_end (str): Training period end as YYYY-MM-DD string
     - hybridize_wallet_ids (bool): Whether to use hybrid wallet-coin IDs vs regular wallet IDs
+    - epoch_reference_date (str): Suffix added to table for each epoch
 
     Returns:
     - sequence_df (DataFrame): Columns: wallet_address, coin_id, first_buy, first_sell,
@@ -39,19 +41,19 @@ def retrieve_transfers_sequencing(min_txn_size: int,
     if hybridize_wallet_ids is False:
         # non-hybridized wallet_ids need to be converted to wallet_address
         id_column = 'wallet_id'
-        join_sequence = """
+        join_sequence = f"""
             join (
                 select wc.wallet_id,
                 xw.wallet_address,
-                from temp.wallet_modeling_training_cohort wc
+                from temp.wallet_modeling_training_cohort_{epoch_reference_date} wc
                 join reference.wallet_ids xw on xw.wallet_id = wc.wallet_id
             ) wc using(wallet_address)
             """
     else:
         # hybridized ids already have wallet_address included in their table
         id_column = 'hybrid_id'
-        join_sequence = """
-            join temp.wallet_modeling_training_cohort wc using(wallet_address, coin_id)
+        join_sequence = f"""
+            join temp.wallet_modeling_training_cohort_{epoch_reference_date} wc using(wallet_address, coin_id)
             """
 
     sequencing_sql = f"""

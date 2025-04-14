@@ -5,6 +5,7 @@ from pathlib import Path
 import copy
 from typing import List,Dict,Tuple
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 
 # Local module imports
@@ -112,7 +113,7 @@ class MultiEpochOrchestrator:
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def generate_epochs_training_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
-        Generates training data for all epoch configs in parallel.
+        Generates training data for all epoch configs in parallel using multithreading.
 
         Returns:
         - merged_training_df: MultiIndexed on (wallet_address, epoch_start_date)
@@ -124,18 +125,20 @@ class MultiEpochOrchestrator:
         logger.milestone(f"Compiling training data for {len(self.all_epochs_configs)} epochs...")
         u.notify('intro_3')
 
-        # Initialize storage for epoch DataFrames
         training_epoch_dfs = {}
         modeling_epoch_dfs = {}
 
-        for epoch_config in self.all_epochs_configs:
-            epoch_date, epoch_training_data_df, epoch_modeling_features_df = self._process_single_epoch(epoch_config)
+        # Set a suitable number of threads. You could retrieve this from config; here we use 8 as an example.
+        max_workers = self.base_config['n_threads']['concurrent_epochs']
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit each epoch processing task to the executor
+            futures = {executor.submit(self._process_single_epoch, cfg): cfg for cfg in self.all_epochs_configs}
+            for future in as_completed(futures):
+                epoch_date, epoch_training_data_df, epoch_modeling_features_df = future.result()
+                training_epoch_dfs[epoch_date] = epoch_training_data_df
+                modeling_epoch_dfs[epoch_date] = epoch_modeling_features_df
 
-            # Store results in dictionaries
-            training_epoch_dfs[epoch_date] = epoch_training_data_df
-            modeling_epoch_dfs[epoch_date] = epoch_modeling_features_df
-
-        # Merge epoch DataFrames
+        # Merge the epoch DataFrames into a single DataFrame for training and modeling respectively
         wallet_training_data_df = self._merge_epoch_dfs(training_epoch_dfs)
         modeling_wallet_features_df = self._merge_epoch_dfs(modeling_epoch_dfs)
 
