@@ -1,3 +1,24 @@
+# dda 659 validation date range audit
+checkpoint 1: w.681 validation range implemented
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       140
+Features per Window:      35
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.681
+RMSE:                     0.219
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.784
+RMSE:                     0.126
+MAE:                      0.068
+
+
 # dda 535 logger MILESTONEs
 checkpoint 1: CHECKPOINTERw.680 milestone implemented
 Model Performance Summary
