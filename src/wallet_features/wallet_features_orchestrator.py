@@ -2,6 +2,7 @@
 Calculates metrics aggregated at the wallet level
 """
 import logging
+from typing import List
 import pandas as pd
 
 # Local module imports
@@ -29,14 +30,15 @@ wallets_config = WalletsConfig()
 
 @u.timing_decorator
 def calculate_wallet_features(
-        profits_df,
-        market_indicators_data_df,
-        macro_indicators_df,
-        transfers_sequencing_df,
-        wallet_cohort,
-        period_start_date,
-        period_end_date
-    ):
+        profits_df: pd.DataFrame,
+        market_indicators_data_df: pd.DataFrame,
+        macro_indicators_df: pd.DataFrame,
+        transfers_sequencing_df: pd.DataFrame,
+        wallet_cohort: List[int],
+        period_start_date: str,
+        period_end_date: str
+    ) -> pd.DataFrame:
+
     """
     Calculates all features for the wallet_cohort in a given profits_df, returning a df with a
     row for every wallet in the cohort.
