@@ -126,7 +126,7 @@ class WalletTrainingDataOrchestrator:
         imputed_profits_df = pri.impute_profits_for_multiple_dates(
             profits_df, market_data_df,
             [period_end_date],
-            n_threads=1
+            self.wallets_config['n_threads']['profits_row_imputation']
         )
 
         # 4. Format and optionally save the datasets
@@ -231,7 +231,9 @@ class WalletTrainingDataOrchestrator:
             return cohort_profits_df
 
         # Modified to capture futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        with concurrent.futures.ThreadPoolExecutor(
+            self.wallets_config['n_threads']['training_dfs_preparation']
+        ) as executor:
             market_indicators_df = executor.submit(generate_market_indicators_df).result()
             macro_indicators_df = executor.submit(generate_macro_indicators_df).result()
             cohort_profits_df = executor.submit(generate_cohort_profits_df, profits_df_full).result()
@@ -300,7 +302,7 @@ class WalletTrainingDataOrchestrator:
 
         # Run full period and window features concurrently
         with concurrent.futures.ThreadPoolExecutor(
-                self.wallets_config['features']['max_workers']
+            self.wallets_config['n_threads']['windows_features_generation']
         ) as executor:
             # Submit full period feature generation
             full_period_future = executor.submit(

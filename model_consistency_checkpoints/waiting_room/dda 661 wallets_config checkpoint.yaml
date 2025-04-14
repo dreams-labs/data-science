@@ -32,19 +32,18 @@ training_data:
     hybridize_wallet_ids: False  # if true, training data will be keyed on wallet-coin pairs
 
     # Local pipeline configs
-    dataset: dev  # Set to prod or dev; determines whether to query core or dev dataset tables
+    dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
     parquet_folder: temp/wallet_modeling_dfs/windowed  # where to store parquet files
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
 
-# CheckpointValidation
 # WalletModel Multithreading
 # Determines how many workers will be used in multithreading executions
 n_threads:
     raw_data_retrieval: 3  # retrieves raw dfs from bigquery
-    profits_row_imputation: 8  # generates imputed rows in profits_df
+    profits_row_imputation: 4  # generates imputed rows in profits_df
     training_dfs_preparation: 3  # generates market indicators, macro indicators, cohort profits dfs
-    windows_features_generation: 8  # how many windows are processed concurrently
+    windows_features_generation: 3  # generates features for each window
 
 
 # CheckpointValidation
