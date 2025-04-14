@@ -310,9 +310,10 @@ def retrieve_macro_trends_data(query_sql = None):
     macro_trends_df = dgc().run_sql(query_sql)
     logger.info('Retrieved macro trends data with shape %s',macro_trends_df.shape)
 
-    # Convert the date column to datetime format
+    # Create sorted datetime index
     macro_trends_df['date'] = pd.to_datetime(macro_trends_df['date'])
     macro_trends_df = macro_trends_df.set_index('date')
+    macro_trends_df = macro_trends_df.sort_index()
 
     # Convert all numerical columns to 32 bit, using safe_downcast to avoid overflow
     macro_trends_df = u.df_downcast(macro_trends_df)

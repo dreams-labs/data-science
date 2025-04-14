@@ -3,9 +3,9 @@ functions used to build coin-level features from training data
 """
 import os
 from datetime import datetime
-import numpy as np
 import time
 import copy
+import numpy as np
 import pandas as pd
 import dreams_core.core as dc
 

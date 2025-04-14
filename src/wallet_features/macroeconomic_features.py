@@ -2,6 +2,7 @@ import logging
 import pandas as pd
 
 # Local module imports
+import feature_engineering.flattening as flt
 import utils as u
 
 # set up logger at the module level
@@ -14,11 +15,20 @@ logger = logging.getLogger(__name__)
 # --------------------------------------
 
 @u.timing_decorator
-def calculate_macro_features(macro_indicators_df):
+def calculate_macro_features(
+        training_macro_indicators_df: pd.DataFrame,
+        df_metrics_config: dict
+    ) -> pd.DataFrame:
     """
+    Generates a single row containing all variables specified in the df_metrics_config. The config
+    file structure is defined and documented in src/config_models/metrics_config.py.
+
+    Params
     """
+    # Calculate all specified metrics
+    macro_features_dict = flt.flatten_date_features(training_macro_indicators_df,df_metrics_config)
 
+    # Convert to DataFrame
+    macro_features_df = pd.DataFrame([macro_features_dict])
 
-# --------------------------------------
-#       Features Helper Functions
-# --------------------------------------
+    return macro_features_df
