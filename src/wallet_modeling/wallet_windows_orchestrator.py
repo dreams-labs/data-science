@@ -121,11 +121,13 @@ class MultiWindowOrchestrator:
         # Ensure the complete dfs encompass the full range of training_window_starts
         self._assert_complete_coverage()
 
+        logger.milestone(f"Compiling training data for {len(self.all_windows_configs)} windows...")
+        u.notify('intro_3')
+
         # Initialize storage for window DataFrames
         training_window_dfs = {}
         modeling_window_dfs = {}
 
-        u.notify('intro_3')
         for window_config in self.all_windows_configs:
             model_start = window_config['training_data']['modeling_period_start']
             logger.info(f"Generating data for window starting {model_start}")

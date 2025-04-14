@@ -2,7 +2,9 @@
 Calculates metrics aggregated at the wallet level
 """
 import logging
+from pathlib import Path
 from typing import List
+import yaml
 import pandas as pd
 
 # Local module imports
@@ -14,6 +16,7 @@ import wallet_features.transfers_features as wts
 import wallet_features.market_timing_features as wmt
 import wallet_features.scenario_features as wsc
 import wallet_features.balance_features as wbf
+import wallet_features.macroeconomic_features as wmac
 import utils as u
 
 # Set up logger at the module level
@@ -21,8 +24,7 @@ logger = logging.getLogger(__name__)
 
 # Load wallets_config at the module level
 wallets_config = WalletsConfig.load_from_yaml('../config/wallets_config.yaml')
-wallets_config = WalletsConfig()
-
+wallets_metrics_config = yaml.safe_load(Path('../config/wallets_metrics_config.yaml').read_text(encoding='utf-8')) # pylint:disable=line-too-long
 
 # ------------------------------------------
 #      Primary Orchestration Functions
@@ -98,11 +100,17 @@ def calculate_wallet_features(
     feature_column_names['balance|'] = balance_features_df.columns
     wallet_features_df = wallet_features_df.join(balance_features_df, how='left')
 
+    # Macroeconomic features (cross join)
+    macroeconomic_features_df = wmac.calculate_macro_features(macro_indicators_df,
+                                                            wallets_metrics_config['time_series']['macro_trends'])
+    feature_column_names['macro|'] = macroeconomic_features_df.columns
+    wallet_features_df = (wallet_features_df.reset_index()
+                          .merge(macroeconomic_features_df, how='cross')
+                          .set_index('wallet_address'))
 
     # BELOW FUNCTIONS DO NOT WORK WITH INDICES AND SHOULD BE EVENTUALLY REFACTORED
     profits_df.reset_index(inplace=True)
     market_indicators_data_df.reset_index(inplace=True)
-
 
     # Performance features (left join, do not fill)
     performance_features_df = wpf.calculate_performance_features(wallet_features_df,
