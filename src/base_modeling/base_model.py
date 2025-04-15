@@ -87,7 +87,7 @@ class BaseModel:
             if not self.modeling_config.get('grid_search_params', {}).get('build_post_search_model'):
                 return cv_results
 
-        self._build_pipeline()
+        self.pipeline = self._get_base_pipeline()
         self._fit()
 
         result = {
@@ -115,9 +115,9 @@ class BaseModel:
     #      Pipeline/Modeling Methods
     # -----------------------------------
 
-    def _build_pipeline(self) -> None:
+    def _get_base_pipeline(self) -> Pipeline:
         """
-        Build basic XGBoost pipeline. Override for custom preprocessing.
+        Construct and return the base modeling pipeline (feature selection, dropping columns, and the regressor).
         """
         model_params = self.modeling_config['model_params'].copy()
 
@@ -128,8 +128,7 @@ class BaseModel:
                 model_params.pop('min_child_weight_pct')
             )
 
-        # Pipeline Begins
-        self.pipeline = Pipeline([
+        base_pipeline = Pipeline([
             ('feature_selector', FeatureSelector(
                 variance_threshold=self.modeling_config['feature_selection'].get('variance_threshold'),
                 correlation_threshold=self.modeling_config['feature_selection'].get('correlation_threshold'),
@@ -140,6 +139,8 @@ class BaseModel:
             )),
             ('regressor', XGBRegressor(**model_params))
         ])
+
+        return base_pipeline
 
 
     # Modify _split_data method to do two splits:
