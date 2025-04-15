@@ -1,6 +1,6 @@
 import time
 import logging
-from typing import Dict, Union, List
+from typing import Dict, Union, List, Any
 from itertools import chain,combinations
 import pickle
 import pandas as pd
@@ -256,9 +256,18 @@ class BaseModel:
     #         Grid Search Methods
     # -----------------------------------
 
-    def _run_grid_search(self, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
+    def _run_grid_search(self, X: pd.DataFrame, y: pd.Series, pipeline=None) -> Dict[str, float]:
         """
         Perform grid search with cross validation using configured parameters.
+
+        Params:
+        - X (DataFrame): Feature data
+        - y (Series): Target variable
+        - pipeline (Pipeline, optional): Custom pipeline to use for grid search. If None,
+        a basic pipeline will be created.
+
+        Returns:
+        - Dict: Results containing best parameters, score and CV results
         """
         # If grid search is disabled, return nothing
         if not self.modeling_config.get('grid_search_params', {}).get('enabled'):
@@ -270,11 +279,11 @@ class BaseModel:
         # Get prepared grid search params
         gs_config = self._prepare_grid_search_params(X)
 
-        # Create pipeline for grid search
-        cv_pipeline = Pipeline([
-            ('drop_columns', DropColumnPatterns()),
-            ('regressor', XGBRegressor(**gs_config['base_model_params']))
-        ])
+        # Use provided pipeline or create default pipeline
+        if pipeline is None:
+            cv_pipeline = self._get_model_pipeline(gs_config['base_model_params'])
+        else:
+            cv_pipeline = pipeline
 
         # Store the search object in the instance
         self.random_search = RandomizedSearchCV(
@@ -371,6 +380,25 @@ class BaseModel:
                 'random_state': base_model_params.get('random_state', 42),
             }
         }
+
+
+    def _get_model_pipeline(self, base_model_params: Dict[str, Any]) -> Pipeline:
+        """
+        Create a standard model pipeline with drop columns transformer and XGBoost regressor.
+
+        Params:
+        - base_model_params (Dict, optional): Parameters for the XGBoost regressor.
+        If None, default parameters will be used.
+
+        Returns:
+        - Pipeline: Scikit-learn pipeline with preprocessing and model components
+        """
+        pipeline = Pipeline([
+            ('drop_columns', DropColumnPatterns()),
+            ('regressor', XGBRegressor(**base_model_params))
+        ])
+
+        return pipeline
 
 
     def save_pipeline(self, filepath: str) -> None:
