@@ -4,10 +4,11 @@ import pandas as pd
 import numpy as np
 from sklearn.pipeline import Pipeline
 from sklearn.base import BaseEstimator, TransformerMixin
-
+from sklearn.model_selection import RandomizedSearchCV
+from xgboost import XGBRegressor
 
 # Local modules
-from base_modeling.base_model import BaseModel
+from base_modeling.base_model import BaseModel, DropColumnPatterns
 import utils as u
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
@@ -176,19 +177,19 @@ class WalletModel(BaseModel):
 
     def _get_meta_pipeline(self) -> 'MetaPipeline':
         """
-        Build and return a MetaPipeline that wraps both the x_pipeline (base pipeline)
+        Build and return a MetaPipeline that wraps both the model_pipeline (base pipeline)
         and the y_pipeline.
         """
-        # x_pipeline: your existing base pipeline steps
-        x_pipeline = self._get_base_pipeline()
 
-        # y_pipeline: here we simply select the target column,
-        # but additional steps can be added in the future.
+        # y_pipeline: steps to generate the target variable
         y_pipeline = Pipeline([
             ('target_selector', TargetVarSelector(target_variable=self.modeling_config['target_variable']))
         ])
 
-        return MetaPipeline(x_pipeline=x_pipeline, y_pipeline=y_pipeline)
+        # model_pipeline: steps to construct the model
+        model_pipeline = self._get_base_pipeline()
+
+        return MetaPipeline(y_pipeline=y_pipeline, model_pipeline=model_pipeline)
 
 
     def _get_y_pipeline(self) -> None:
@@ -224,6 +225,7 @@ class WalletModel(BaseModel):
             raise ValueError("Prediction dropped some wallet addresses")
 
         return predictions
+
 
 
 # -----------------------------------
@@ -296,17 +298,17 @@ class CombinedCohortSelector(BaseEstimator, TransformerMixin):
 class MetaPipeline(BaseEstimator, TransformerMixin):
     """Meta-pipeline that applies x and y transformations then fits a regressor."""
 
-    def __init__(self, x_pipeline: Pipeline, y_pipeline: Pipeline):
-        """Initialize MetaPipeline with x_pipeline and y_pipeline."""
-        self.x_pipeline = x_pipeline
+    def __init__(self, y_pipeline: Pipeline, model_pipeline: Pipeline):
+        """Initialize MetaPipeline with y_pipelin and model_pipeline."""
         self.y_pipeline = y_pipeline
+        self.model_pipeline = model_pipeline
         self.regressor = None
         self.x_transformer_ = None  # will store the transformer sub-pipeline for later use
 
         # Create a named_steps attribute that mimics sklearn Pipeline interface
         self.named_steps = {}
-        # Add steps from x_pipeline to named_steps
-        for name, step in x_pipeline.named_steps.items():
+        # Add steps from model_pipeline to named_steps
+        for name, step in model_pipeline.named_steps.items():
             self.named_steps[name] = step
 
     def fit(self, X, y, eval_set=None):
@@ -315,13 +317,13 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
         y_trans = self.y_pipeline.fit_transform(y)
 
         # Create a transformer sub-pipeline (all steps except the final estimator)
-        transformer = Pipeline(self.x_pipeline.steps[:-1])
+        transformer = Pipeline(self.model_pipeline.steps[:-1])
 
         # Transform training data
         X_trans = transformer.fit_transform(X, y_trans)
 
         # Extract the regressor from the pipeline
-        regressor_name, self.regressor = self.x_pipeline.steps[-1]
+        regressor_name, self.regressor = self.model_pipeline.steps[-1]
 
         # If evaluation set is provided, transform it and use for early stopping
         if eval_set is not None:
@@ -366,7 +368,7 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
         """Support indexing like a regular pipeline."""
         if isinstance(key, slice):
             # If it's a slice, return a new Pipeline with the sliced steps
-            return Pipeline(self.x_pipeline.steps[key])
+            return Pipeline(self.model_pipeline.steps[key])
         else:
             # Otherwise return the specific step
-            return self.x_pipeline.steps[key][1]
+            return self.model_pipeline.steps[key][1]
