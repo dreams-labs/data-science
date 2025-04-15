@@ -1,16 +1,14 @@
-# CheckpointValidation
 # WalletModel Config
 
 
-# CheckpointValidation
 # WalletModel Period Boundaries
 training_data:
     training_window_starts: [
         # '2020-01-01',
         # '2021-01-01',
-        # '2022-01-01',
+        '2022-01-01',
         '2023-01-01',
-        # '2023-06-01',
+        '2023-06-01',
         # '2023-09-01',
         '2024-01-01',
         # '2024-02-01',
@@ -18,7 +16,7 @@ training_data:
         '2024-04-01',
         # '2024-05-01',
         # '2024-06-01',
-        # '2024-07-01',
+        '2024-07-01',
         # '2024-08-01',
         '2024-09-01',
         # '2024-10-01',
@@ -37,28 +35,26 @@ training_data:
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
 
-# CheckpointValidation
 # WalletModel Multithreading
 # Determines how many workers will be used in multithreading executions
 n_threads:
     raw_data_retrieval: 3  # retrieves raw dfs from bigquery
     profits_row_imputation: 4  # generates imputed rows in profits_df
     training_dfs_preparation: 3  # generates market indicators, macro indicators, cohort profits dfs
-    concurrent_epochs: 8  # how many epochs' training data are processed concurrently
+    concurrent_epochs: 4  # how many epochs' training data are processed concurrently
     concurrent_windows: 8  # how many windows are processed concurrently
 
 
-# CheckpointValidation
 # WalletModel Cleaning
 data_cleaning:
 
     # Wallet cohort thresholds
-    min_coins_traded: 1  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
+    min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
     max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
 
-    min_wallet_investment: 10000 # time weighted average balance filter
-    min_wallet_inflows: 10000  # Exclude wallets with inflows below this amount (USD)
-    min_wallet_volume: 10000  # Exclude wallets with fewer than this amount of training period USD volume
+    min_wallet_investment: 0 # time weighted average balance filter
+    min_wallet_inflows: 2000  # Exclude wallets with inflows below this amount (USD)
+    min_wallet_volume: 5000  # Exclude wallets with fewer than this amount of training period USD volume
 
     max_wallet_investment: 10_000_000 # time weighted average balance filter
     max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
@@ -83,7 +79,6 @@ data_cleaning:
     market_cap_default_fill:  500000  # coins below the imputation coverage level will have empty values filled with this
 
 
-# CheckpointValidation
 # WalletModel Features
 features:
     # Trading Params
@@ -139,22 +134,27 @@ features:
     clustering_include_pca: False
 
 
-# CheckpointValidation
 # WalletModel Modeling Config
 modeling:
 
     # Modeling period filters
-    modeling_min_investment: 100
+    modeling_min_investment: 500
     modeling_min_coins_traded: 0
 
     # Which wallet performance metric to use as the target variable.
-    target_variable: crypto_net_gain/max_investment/winsorized
+    # target_variable: crypto_net_gain/max_investment/winsorized
+    # target_variable: crypto_net_gain/max_investment/ntile_rank
+    # target_variable: crypto_net_flows
+    target_variable: crypto_net_flows/crypto_inflows/ntile_rank
+
+    # PREDICTABLES
+    # target_variable: unique_coins_traded
+    # target_variable: total_volume
 
     # Train/Test/Eval split
     test_size: 0.2  # what % of the total population will be used as test
     eval_size: 0.05  # what % used for the early stopping eval set
 
-    # CheckpointValidation
     # WalletModel Feature Selection
     feature_selection:
         # Column patterns to remove
@@ -243,6 +243,20 @@ modeling:
             balance|n_coins|*,
             balance|total_usd_balance|*,
 
+
+            # macro|*,
+            macro|btc_price_first|*,
+            macro|btc_price_last|*,
+            # macro|btc_price_std|*,
+            macro|btc_price_rsi_100_last|*,
+            macro|btc_mvrv_z_score_first|*,
+            macro|btc_mvrv_z_score_last|*,
+            macro|global_volume_last|*,
+            macro|global_volume_first|*,
+            # macro|global_market_cap_first|*,
+            # macro|global_market_cap_last|*,
+            macro|global_market_cap_rsi_100_last|*,
+
             cluster|*,
 
             '*|w1',
@@ -255,7 +269,6 @@ modeling:
             cluster|
         ]
 
-    # CheckpointValidation
     # WalletModel Params
     # Model specifics
     model_type: xgb
@@ -267,14 +280,14 @@ modeling:
 
         max_depth: 15  # how deep the trees can go
         # min_child_weight_pct: 0.0001  # what % of rows each tree must have
-        min_child_weight: 25  # what % of rows each tree must have
+        min_child_weight: 15  # what % of rows each tree must have
         subsample: 1.0  # samples rows, e.g. trees use x% of all wallet rows
         colsample_bytree: 0.9  # samples columns, e.g. trees use x% of all column features
 
         # Performance Profiles (Choose One Section)
         # --------------------------------------
         # CHECKPOINTER
-        n_estimators: 250  # number of trees to train in the model
+        n_estimators: 5  # number of trees to train in the model
         learning_rate: 0.1  # step size for updates to weights during training
 
         # # PRODUCTION
@@ -307,7 +320,6 @@ modeling:
 
 
 
-    # CheckpointValidation
     # WalletModel Grid Search
     grid_search_params:
 
@@ -319,20 +331,50 @@ modeling:
         drop_patterns_include_n_features: 1
 
         n_iter: 40  # random search limit
-        n_splits: 3  # cv splits
+        n_splits: 2  # cv splits
         scoring: neg_root_mean_squared_error
 
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # scikit-learn verbosity
 
-        # # Target variables
-        # target_variables: [
-        #     crypto_net_gain/max_investment/winsorized,
-        #     # crypto_net_gain/max_investment/ntile_rank,
-        # ]
-
         # Params
         param_grid:
+
+            # # Target variables
+            # target_selector__target_variable: [
+            #     'average_transaction',
+            #     'crypto_cash_buys',
+            #     # 'crypto_cash_sells',
+            #     # 'crypto_inflows',
+            #     # 'crypto_net_cash_flows',
+            #     # 'crypto_net_flows',
+            #     # 'crypto_net_flows/crypto_inflows/base',
+            #     # 'crypto_net_flows/crypto_inflows/log',
+            #     # 'crypto_net_flows/crypto_inflows/ntile_rank',
+            #     # 'crypto_net_flows/crypto_inflows/rank',
+            #     # 'crypto_net_flows/crypto_inflows/winsorized',
+            #     # 'crypto_net_flows/max_investment/base',
+            #     # 'crypto_net_flows/max_investment/log',
+            #     # 'crypto_net_flows/max_investment/ntile_rank',
+            #     # 'crypto_net_flows/max_investment/rank',
+            #     # 'crypto_net_flows/max_investment/winsorized',
+            #     # 'crypto_net_gain',
+            #     # 'crypto_net_gain/crypto_inflows/base',
+            #     # 'crypto_net_gain/crypto_inflows/log',
+            #     # 'crypto_net_gain/crypto_inflows/ntile_rank',
+            #     # 'crypto_net_gain/crypto_inflows/rank',
+            #     # 'crypto_net_gain/crypto_inflows/winsorized',
+            #     # 'crypto_net_gain/max_investment/base',
+            #     # 'crypto_net_gain/max_investment/log',
+            #     # 'crypto_net_gain/max_investment/ntile_rank',
+            #     # 'crypto_net_gain/max_investment/rank',
+            #     # 'crypto_net_gain/max_investment/winsorized',
+            #     # 'crypto_outflows',
+            #     # 'in_modeling_cohort',
+            #     # 'max_investment',
+            #     # 'total_volume',
+            #     # 'unique_coins_traded'
+            # ]
 
             # # Depth and Child Weight
             # regressor__min_child_weight_pct: [0.00004, 0.00007, 0.0001]
@@ -349,7 +391,9 @@ modeling:
             # regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            regressor__n_estimators: [350]
+            regressor__max_depth: [8]  # basic depth param
+            regressor__min_child_weight: [25]
+            regressor__n_estimators: [5]
             regressor__learning_rate: [0.2]
             # regressor__gamma: [0.01]
 
@@ -361,8 +405,8 @@ modeling:
 
 
             # Column Selection
-            drop_columns__drop_patterns: [
-                [],
+            # drop_columns__drop_patterns: [
+            #     [],
             #     # [],
             #     # [timing|*],
                 # [timing|btc_mvrv_z_score/lag_100/*],
@@ -418,11 +462,25 @@ modeling:
             #     # [balance|n_coins|*],
             #     # [balance|total_usd_balance|*],
 
+                # [macro|*],
+                # [macro|btc_price_first|*],
+                # [macro|btc_price_last|*],
+                # [macro|btc_price_std|*],
+                # [macro|btc_mvrv_z_score_first|*],
+                # [macro|global_market_cap_rsi_100_last|*],
+                # [macro|global_market_cap_first|*],
+                # [macro|global_volume_last|*],
+                # [macro|btc_price_rsi_100_last|*],
+                # [macro|global_volume_first|*],
+                # [macro|btc_mvrv_z_score_last|*],
+                # [macro|global_market_cap_last|*],
+
+
                 # [cluster|*],
 
                 # ['*|w1'],
 
-            ]
+            # ]
 
 
     # Coin model workflow params
