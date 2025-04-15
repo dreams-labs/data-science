@@ -1,4 +1,24 @@
 # dda 664 grid search functionality expansion
+checkpoint 5: w.683 integrate y_pipeline
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       184
+Features per Window:      46
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.683
+RMSE:                     0.219
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.785
+RMSE:                     0.126
+MAE:                      0.067
+
+
 checkpoint 4: w.683 integrate _get_wallet_pipeline()
 Model Performance Summary
 ===================================

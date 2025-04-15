@@ -11,7 +11,8 @@ from base_modeling.base_model import BaseModel
 import utils as u
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
-# pylint: disable=W0201  # Attribute defined outside __init__, false positive due to inheritance
+# pylint:disable=unused-argument  # y param needed for pipeline structure
+# pylint:disable=W0201  # Attribute defined outside __init__, false positive due to inheritance
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -23,6 +24,24 @@ class WalletModel(BaseModel):
     Wallet-specific model implementation.
     Extends BaseModel with wallet-specific data preparation and grid search.
     """
+
+    def __init__(self, modeling_config: dict):
+        """
+        Initialize WalletModel with configuration and wallet features DataFrame.
+
+        Params:
+        - modeling_config (dict): Configuration dictionary for modeling parameters.
+        """
+        # Initialize BaseModel with the given configuration
+        super().__init__(modeling_config)
+
+        # Modeling cohort and target variables
+        self.modeling_wallet_features_df = None
+
+        # Target variable pipeline
+        self.y_pipeline = Pipeline([
+            ('identity_y', IdentityYTransformer())
+        ])
 
     # -----------------------------------
     #           Helper Methods
@@ -51,13 +70,25 @@ class WalletModel(BaseModel):
         cohort_mask = modeling_wallet_features_df['in_modeling_cohort'] == 1
 
         # Define X
-        X = training_data_df[cohort_mask].copy().copy()
+        X = training_data_df[cohort_mask].copy()
 
         # Define y for modeling cohort
         target_var = self.modeling_config['target_variable']
         y = modeling_wallet_features_df[target_var][cohort_mask]
 
         return X, y
+
+    def _get_wallet_pipeline(self) -> None:
+        """
+        Build the wallet-specific pipeline by prepending the wallet cohort selection
+        to the base pipeline steps.
+        """
+        # Create a combined selector that will filter X and y using the cohort DataFrame
+        combined_selector = CombinedCohortSelector(cohort_df=self.modeling_wallet_features_df)
+        base_pipeline = self._get_base_pipeline()
+        # Concatenate the selector with the base pipeline steps
+        # return Pipeline([('combined_selector', combined_selector)] + base_pipeline.steps)
+        return Pipeline(base_pipeline.steps)
 
 
     def _predict_training_cohort(self) -> pd.Series:
@@ -106,11 +137,20 @@ class WalletModel(BaseModel):
         """
         logger.info("Preparing training data for model construction...")
 
-        # Validate indices match
+        # Validate indices match and store DataFrames
         u.assert_matching_indices(training_data_df,modeling_wallet_features_df)
+        self.training_data_df = training_data_df
+        self.modeling_wallet_features_df = modeling_wallet_features_df
 
         # Prepare data (just X, y now)
         X, y = self._prepare_data(training_data_df, modeling_wallet_features_df)
+
+        # Apply the y pipeline (currently an identity transformer)
+        # (In the future, you can add additional steps here.)
+        self.y_pipeline = Pipeline([
+            ('identity_y', IdentityYTransformer())
+        ])
+        y = self.y_pipeline.fit_transform(y)
 
         # Do the actual train/test split in BaseModel
         self._split_data(X, y)
@@ -152,51 +192,88 @@ class WalletModel(BaseModel):
 
 
 
+# -----------------------------------
+#           Pipeline Steps
+# -----------------------------------
 
-    # -----------------------------------
-    #          Pipeline Methods
-    # -----------------------------------
-
-    def _get_wallet_pipeline(self) -> None:
-        """
-        Build the wallet-specific pipeline by prepending the wallet cohort selection
-        to the base pipeline steps.
-        """
-        # wallet_cohort_selector = WalletCohortSelector(
-        #     target_variable=self.modeling_config['target_variable']
-        # )
-        base_pipeline = self._get_base_pipeline()
-
-        # Combine wallet cohort selector with all the base steps
-        # self.pipeline = Pipeline([('wallet_cohort_selector', wallet_cohort_selector)]
-                                #   + base_pipeline.steps)
-        return(Pipeline(base_pipeline.steps))
-
-
-class WalletCohortSelector(BaseEstimator, TransformerMixin):
+class IdentityYTransformer(BaseEstimator, TransformerMixin):
     """
-    Transformer to filter training data for wallets in the modeling cohort
-    and extract the target variable.
+    A simple transformer that passes through the target variable y without modification.
     """
-    def __init__(self, target_variable: str):
-        """Initialize with target variable name."""
-        self.target_variable = target_variable
-
-    def fit(self, X: pd.DataFrame, y=None):
-        """No fitting needed; return self."""
+    def fit(self, y, X=None):
+        """Fit method does nothing and returns self."""
         return self
 
-    def transform(self, X: pd.DataFrame):
+    def transform(self, y, X=None):
+        """Return y unchanged."""
+        return y
+
+
+# class WalletXTransformer(BaseEstimator, TransformerMixin):
+#     """
+#     Transformer that filters rows in X by joining with a cohort dataframe (which contains
+#     the 'in_modeling_cohort' flag) and then drops that flag column.
+#     """
+#     def __init__(self, cohort_df: pd.DataFrame):
+#         """
+#         Parameters:
+#         - cohort_df (pd.DataFrame): DataFrame that must contain the 'in_modeling_cohort' column,
+#           indexed in the same way as X.
+#         """
+#         self.cohort_df = cohort_df
+
+#     def fit(self, X: pd.DataFrame, y=None):
+#         """No fitting necessary; returns self."""
+#         return self
+
+#     def transform(self, X: pd.DataFrame, y=None):
+#         """
+#         Join X with the cohort_df (using the index), filter rows where in_modeling_cohort == 1,
+#         then drop the 'in_modeling_cohort' column.
+#         """
+#         u.assert_matching_indices(X,self.cohort_df)
+
+#         # Filter to only records in the modeling cohort
+#         cohort_mask = self.cohort_df['in_modeling_cohort'] == 1
+#         df_filtered = X[cohort_mask].copy()
+
+#         return df_filtered
+
+
+class CombinedCohortSelector(BaseEstimator, TransformerMixin):
+    """
+    Transformer that filters both X and y based on a cohort DataFrame containing
+    the 'in_modeling_cohort' flag. Assumes X and the cohort DataFrame share the same index.
+    """
+    def __init__(self, cohort_df: pd.DataFrame):
         """
-        Filter rows where 'in_modeling_cohort' equals 1 and split X and y.
-        Assumes X contains both feature data and the 'in_modeling_cohort' flag,
-        as well as the target column.
+        Parameters:
+        - cohort_df (pd.DataFrame): DataFrame with 'in_modeling_cohort' flag; must be indexed like X.
         """
-        # Filter rows for the modeling cohort
-        cohort_mask = X['in_modeling_cohort'] == 1
-        X_cohort = X[cohort_mask].copy()
-        y_cohort = X_cohort.pop(self.target_variable)
-        # Optionally, you might also want to drop the cohort flag column:
-        # X_cohort = X_cohort.drop(columns=['in_modeling_cohort'])
-        # Return as a tuple (this may require custom handling)
-        return X_cohort, y_cohort
+        self.cohort_df = cohort_df
+
+    def fit(self, X: pd.DataFrame, y=None):
+        """No fitting required; returns self."""
+        return self
+
+    def transform(self, X: pd.DataFrame, y=None):
+        """Confirm X’s indices are in cohort_df, join on the index, filter rows where in_modeling_cohort == 1, and return X (and y) with the flag dropped."""
+        # Confirm that every index in X exists in cohort_df
+        if not X.index.isin(self.cohort_df.index).all():
+            raise ValueError("Not all index values in X have a corresponding match in the cohort DataFrame.")
+
+        # Perform an inner join of X with the 'in_modeling_cohort' column
+        X_joined = X.join(self.cohort_df[['in_modeling_cohort']], how='inner')
+
+        # Filter rows where in_modeling_cohort is 1
+        X_filtered = X_joined[X_joined['in_modeling_cohort'] == 1].copy()
+
+        # Drop the in_modeling_cohort column before returning
+        X_filtered.drop(columns=['in_modeling_cohort'], inplace=True, errors='ignore')
+
+        # If y is provided, align y with the filtered X by selecting matching indices
+        if y is not None:
+            y_filtered = y.loc[X_filtered.index].copy()
+            return X_filtered, y_filtered
+
+        return X_filtered
