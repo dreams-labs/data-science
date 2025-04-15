@@ -26,40 +26,6 @@ class WalletModel(BaseModel):
     #           Helper Methods
     # -----------------------------------
 
-    # def _prepare_data(
-    #         self,
-    #         training_data_df: pd.DataFrame,
-    #         modeling_wallet_features_df: pd.DataFrame
-    #     ) -> Tuple[pd.DataFrame, pd.Series]:
-    #     """
-    #     Prepare wallet-specific data for modeling. Returns features and target only.
-
-    #     Params:
-    #     - training_data_df (DataFrame): full training cohort feature data
-    #     - modeling_wallet_features_df (DataFrame): Contains in_modeling_cohort flag and target variable
-
-    #     Returns:
-    #     - X (DataFrame): feature data for modeling cohort
-    #     - y (Series): target variable for modeling cohort
-    #     """
-    #     # Store full training cohort for later scoring
-    #     self.training_data_df = training_data_df.copy()
-
-    #     # Join target data to features
-    #     modeling_df = training_data_df.join(modeling_wallet_features_df, how='left')
-
-    #     # Filter to modeling cohort for training
-    #     cohort_mask = modeling_df['in_modeling_cohort'] == 1
-    #     modeling_df = modeling_df[cohort_mask]
-
-    #     # Separate target variable
-    #     target_var = self.modeling_config['target_variable']
-    #     X = modeling_df.drop([target_var, 'in_modeling_cohort'], axis=1)
-    #     y = modeling_df[target_var]
-
-    #     return X, y
-
-
     def _prepare_data(
             self,
             training_data_df: pd.DataFrame,
