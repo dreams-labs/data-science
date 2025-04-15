@@ -1,4 +1,24 @@
 # dda 664 grid search functionality expansion
+checkpoint 3: w.683 simplify construct_wallet_model()
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       184
+Features per Window:      46
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.683
+RMSE:                     0.219
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.785
+RMSE:                     0.126
+MAE:                      0.067
+
+
 checkpoint 2: w.683 change base model pipeline function
 Model Performance Summary
 ===================================

@@ -3,6 +3,8 @@ from typing import Dict, Union, Tuple
 import pandas as pd
 import numpy as np
 from sklearn.pipeline import Pipeline
+from sklearn.base import BaseEstimator, TransformerMixin
+
 
 # Local modules
 from base_modeling.base_model import BaseModel
@@ -107,19 +109,26 @@ class WalletModel(BaseModel):
         # Validate indices match
         u.assert_matching_indices(training_data_df,modeling_wallet_features_df)
 
-        # Filter target df to only include rows with training data
-        modeling_wallet_features_df = modeling_wallet_features_df[
-            modeling_wallet_features_df.index.isin(training_data_df.index)
-        ]
-
         # Prepare data (just X, y now)
         X, y = self._prepare_data(training_data_df, modeling_wallet_features_df)
 
         # Do the actual train/test split in BaseModel
         self._split_data(X, y)
 
-        # Run base experiment
-        result = super().construct_base_model(return_data=return_data)
+        # Build wallet-specific pipeline (which calls _get_base_pipeline() internally)
+        # self._build_wallet_pipeline()
+        self.pipeline = self._get_base_pipeline()
+
+        # Fit the wallet pipeline (using the same _fit() method as in BaseModel)
+        self._fit()
+        result = {
+            'pipeline': self.pipeline,
+            'X_train': self.X_train,
+            'X_test': self.X_test,
+            'y_train': self.y_train,
+            'y_test': self.y_test,
+            'y_pred': self._predict()
+        }
 
         # If grid search was run and no final model is requested
         if self.modeling_config.get('grid_search_params', {}).get('enabled') is True and \
@@ -140,3 +149,55 @@ class WalletModel(BaseModel):
         u.notify('notify')
 
         return result
+
+
+
+
+    # -----------------------------------
+    #          Pipeline Methods
+    # -----------------------------------
+
+    def _build_wallet_pipeline(self) -> None:
+        """
+        Build the wallet-specific pipeline by prepending wallet cohort selection
+        to the base pipeline.
+        """
+        wallet_cohort_selector = WalletCohortSelector(
+            target_variable=self.modeling_config['target_variable']
+        )
+        base_pipeline = self._get_base_pipeline()  # Reuse DRY base pipeline
+
+        self.pipeline = Pipeline([
+            ('wallet_cohort_selector', wallet_cohort_selector),
+            ('base_modeling', base_pipeline)
+        ])
+
+
+
+class WalletCohortSelector(BaseEstimator, TransformerMixin):
+    """
+    Transformer to filter training data for wallets in the modeling cohort
+    and extract the target variable.
+    """
+    def __init__(self, target_variable: str):
+        """Initialize with target variable name."""
+        self.target_variable = target_variable
+
+    def fit(self, X: pd.DataFrame, y=None):
+        """No fitting needed; return self."""
+        return self
+
+    def transform(self, X: pd.DataFrame):
+        """
+        Filter rows where 'in_modeling_cohort' equals 1 and split X and y.
+        Assumes X contains both feature data and the 'in_modeling_cohort' flag,
+        as well as the target column.
+        """
+        # Filter rows for the modeling cohort
+        cohort_mask = X['in_modeling_cohort'] == 1
+        X_cohort = X[cohort_mask].copy()
+        y_cohort = X_cohort.pop(self.target_variable)
+        # Optionally, you might also want to drop the cohort flag column:
+        # X_cohort = X_cohort.drop(columns=['in_modeling_cohort'])
+        # Return as a tuple (this may require custom handling)
+        return X_cohort, y_cohort
