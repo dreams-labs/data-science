@@ -39,79 +39,7 @@ class WalletModel(BaseModel):
         self.modeling_wallet_features_df = None
 
         # Target variable pipeline
-        self.y_pipeline = Pipeline([
-            ('identity_y', IdentityYTransformer())
-        ])
-
-    # -----------------------------------
-    #           Helper Methods
-    # -----------------------------------
-
-    def _prepare_data(
-            self,
-            training_data_df: pd.DataFrame,
-            modeling_wallet_features_df: pd.DataFrame
-        ) -> Tuple[pd.DataFrame, pd.Series]:
-        """
-        Prepare wallet-specific data for modeling. Returns features and target only.
-
-        Params:
-        - training_data_df (DataFrame): full training cohort feature data
-        - modeling_wallet_features_df (DataFrame): Contains in_modeling_cohort flag and target variable
-
-        Returns:
-        - X (DataFrame): feature data for modeling cohort
-        - y (Series): target variable for modeling cohort
-        """
-        # Store full training cohort for later scoring
-        self.training_data_df = training_data_df.copy()
-
-        # Filter to modeling cohort
-        cohort_mask = modeling_wallet_features_df['in_modeling_cohort'] == 1
-
-        # Define X
-        X = training_data_df[cohort_mask].copy()
-
-        # Define y for modeling cohort
-        target_var = self.modeling_config['target_variable']
-        y = modeling_wallet_features_df[target_var][cohort_mask]
-
-        return X, y
-
-    def _get_wallet_pipeline(self) -> None:
-        """
-        Build the wallet-specific pipeline by prepending the wallet cohort selection
-        to the base pipeline steps.
-        """
-        # Create a combined selector that will filter X and y using the cohort DataFrame
-        combined_selector = CombinedCohortSelector(cohort_df=self.modeling_wallet_features_df)
-        base_pipeline = self._get_base_pipeline()
-        # Concatenate the selector with the base pipeline steps
-        # return Pipeline([('combined_selector', combined_selector)] + base_pipeline.steps)
-        return Pipeline(base_pipeline.steps)
-
-
-    def _predict_training_cohort(self) -> pd.Series:
-        """
-        Make predictions on the full training cohort.
-
-        Returns:
-        - predictions (Series): predicted values for full training cohort
-        - actuals (Series): actual target values for full training cohort
-        """
-        if self.training_data_df is None:
-            raise ValueError("No training cohort data found. Run prepare_data first.")
-
-        predictions = pd.Series(
-            self.pipeline.predict(self.training_data_df),
-            index=self.training_data_df.index
-        )
-
-        # Verify no wallets were dropped during prediction
-        if not predictions.index.equals(self.training_data_df.index):
-            raise ValueError("Prediction dropped some wallet addresses")
-
-        return predictions
+        self.y_pipeline = None
 
 
     # -----------------------------------
@@ -142,14 +70,11 @@ class WalletModel(BaseModel):
         self.training_data_df = training_data_df
         self.modeling_wallet_features_df = modeling_wallet_features_df
 
-        # Prepare data (just X, y now)
+        # Prepare data
         X, y = self._prepare_data(training_data_df, modeling_wallet_features_df)
 
-        # Apply the y pipeline (currently an identity transformer)
-        # (In the future, you can add additional steps here.)
-        self.y_pipeline = Pipeline([
-            ('identity_y', IdentityYTransformer())
-        ])
+        # Apply the y pipeline
+        self.y_pipeline = self._get_y_pipeline()
         y = self.y_pipeline.fit_transform(y)
 
         # Do the actual train/test split in BaseModel
@@ -191,6 +116,87 @@ class WalletModel(BaseModel):
         return result
 
 
+    # -----------------------------------
+    #           Helper Methods
+    # -----------------------------------
+
+    def _prepare_data(
+            self,
+            training_data_df: pd.DataFrame,
+            modeling_wallet_features_df: pd.DataFrame
+        ) -> Tuple[pd.DataFrame, pd.Series]:
+        """
+        Prepare wallet-specific data for modeling. Returns features and target only.
+
+        Params:
+        - training_data_df (DataFrame): full training cohort feature data
+        - modeling_wallet_features_df (DataFrame): Contains in_modeling_cohort flag and target variable
+
+        Returns:
+        - X (DataFrame): feature data for modeling cohort
+        - y (Series): target variable for modeling cohort
+        """
+        # Store full training cohort for later scoring
+        self.training_data_df = training_data_df.copy()
+
+        # Filter to modeling cohort
+        cohort_mask = modeling_wallet_features_df['in_modeling_cohort'] == 1
+
+        # Define X
+        X = training_data_df[cohort_mask].copy()
+
+        # Define y
+        y = modeling_wallet_features_df[cohort_mask].copy()
+
+        return X, y
+
+    def _get_wallet_pipeline(self) -> None:
+        """
+        Build the wallet-specific pipeline by prepending the wallet cohort selection
+        to the base pipeline steps.
+        """
+        # Create a combined selector that will filter X and y using the cohort DataFrame
+        combined_selector = CombinedCohortSelector(cohort_df=self.modeling_wallet_features_df)
+        base_pipeline = self._get_base_pipeline()
+        # Concatenate the selector with the base pipeline steps
+        # return Pipeline([('combined_selector', combined_selector)] + base_pipeline.steps)
+        return Pipeline(base_pipeline.steps)
+
+
+    def _get_y_pipeline(self) -> None:
+        """
+        Build the wallet-specific pipeline by prepending the wallet cohort selection
+        to the base pipeline steps.
+        """
+        y_pipeline = Pipeline([
+            ('target_selector', TargetVarSelector(target_variable=self.modeling_config['target_variable']))
+        ])
+
+        return y_pipeline
+
+
+    def _predict_training_cohort(self) -> pd.Series:
+        """
+        Make predictions on the full training cohort.
+
+        Returns:
+        - predictions (Series): predicted values for full training cohort
+        - actuals (Series): actual target values for full training cohort
+        """
+        if self.training_data_df is None:
+            raise ValueError("No training cohort data found. Run prepare_data first.")
+
+        predictions = pd.Series(
+            self.pipeline.predict(self.training_data_df),
+            index=self.training_data_df.index
+        )
+
+        # Verify no wallets were dropped during prediction
+        if not predictions.index.equals(self.training_data_df.index):
+            raise ValueError("Prediction dropped some wallet addresses")
+
+        return predictions
+
 
 # -----------------------------------
 #           Pipeline Steps
@@ -206,6 +212,27 @@ class IdentityYTransformer(BaseEstimator, TransformerMixin):
 
     def transform(self, y, X=None):
         """Return y unchanged."""
+        return y
+
+
+class TargetVarSelector(BaseEstimator, TransformerMixin):
+    """
+    Transformer that selects the target variable column from a DataFrame.
+    """
+    def __init__(self, target_variable: str):
+        self.target_variable = target_variable
+
+    def fit(self, y, X=None):
+        """No fitting necessary; returns self."""
+        return self
+
+    def transform(self, y, X=None):
+        """
+        If y is a DataFrame, select and return the column specified by target_variable.
+        Otherwise, return y unchanged.
+        """
+        if isinstance(y, pd.DataFrame):
+            return y[self.target_variable]
         return y
 
 
