@@ -323,17 +323,17 @@ modeling:
         drop_patterns_include_n_features: 1
 
         n_iter: 40  # random search limit
-        n_splits: 3  # cv splits
+        n_splits: 2  # cv splits
         scoring: neg_root_mean_squared_error
 
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # scikit-learn verbosity
 
-        # Target variables
-        target_variables: [
-            crypto_net_gain/max_investment/winsorized,
-            crypto_net_gain/max_investment/ntile_rank,
-        ]
+        # # Target variables
+        # target_variables: [
+        #     crypto_net_gain/max_investment/winsorized,
+        #     crypto_net_gain/max_investment/ntile_rank,
+        # ]
 
         # Params
         param_grid:
@@ -341,7 +341,7 @@ modeling:
             # # Depth and Child Weight
             # regressor__min_child_weight_pct: [0.00004, 0.00007, 0.0001]
             # regressor__min_child_weight: [15, 25, 40]
-            # regressor__max_depth: [9,12,15,18]  # basic depth param
+            regressor__max_depth: [9,12] #,15,18]  # basic depth param
 
             # Col/Row Sampling
             # regressor__subsample: [0.8, 0.9, 1.0]   # samples rows, e.g. trees use x% of all wallet rows
@@ -353,9 +353,9 @@ modeling:
             # regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            regressor__n_estimators: [350]
+            regressor__n_estimators: [50]
             regressor__learning_rate: [0.2]
-            # regressor__gamma: [0.01]
+            regressor__gamma: [0.01]
 
             # Optimize for Speed
             # regressor__n_jobs: [4]  # how many models to build at once

@@ -80,24 +80,33 @@ class WalletModel(BaseModel):
         # Split data using your _split_data method
         self._split_data(X, y)
 
-        # Fit the meta pipeline on the training split, passing the eval set for early stopping
-        meta_pipeline.fit(self.X_train, self.y_train, eval_set=(self.X_eval, self.y_eval))  # pylint:disable=access-member-before-definition
-        self.pipeline = meta_pipeline  # store for later use
+        # Extract target variable series
+        target_var = self.modeling_config['target_variable']
+        self.y_train = self.y_train[target_var] if isinstance(self.y_train, pd.DataFrame) else self.y_train
+        self.y_test = self.y_test[target_var] if isinstance(self.y_test, pd.DataFrame) else self.y_test
+        self.y_eval = self.y_eval[target_var] if isinstance(self.y_eval, pd.DataFrame) else self.y_eval
 
-        # Extract the actual target variable that was used in training
-        # This works whether it was specified in config or chosen during grid search
-        if hasattr(self.pipeline, 'y_pipeline') and hasattr(self.pipeline.y_pipeline, 'named_steps'):
-            target_selector = self.pipeline.y_pipeline.named_steps.get('target_selector')
-            if target_selector:
-                actual_target = target_selector.target_variable
-            else:
-                actual_target = self.modeling_config['target_variable']
+        # Run grid search if enabled - NOW AFTER TARGET EXTRACTION
+        if self.modeling_config.get('grid_search_params', {}).get('enabled'):
+            cv_results = self._run_grid_search(self.X_train, self.y_train)
 
-            self.y_train = self.y_train[actual_target]
-            self.y_test = self.y_test[actual_target]
+            if cv_results.get('best_params'):
+                best_params = {
+                    k.replace('regressor__', ''): v
+                    for k, v in cv_results['best_params'].items()
+                }
+                self.modeling_config['model_params'].update(best_params)
+                logger.info(f"Updated model params with CV best params: {best_params}")
 
-        else:
-            actual_target = self.modeling_config['target_variable']
+                # Return the search results without building a model if configured to
+                if not self.modeling_config.get('grid_search_params', {}).get('build_post_search_model'):
+                    return cv_results
+
+        # Rest of the method remains the same
+        meta_pipeline = self._get_meta_pipeline()
+        meta_pipeline.fit(self.X_train, self.y_train, eval_set=(self.X_eval, self.y_eval))
+        self.pipeline = meta_pipeline
+
 
         # Make predictions etc. as before
         self.y_pred = meta_pipeline.predict(self.X_test)
