@@ -516,21 +516,49 @@ class BaseModel:
 #           Pipeline Steps
 # -----------------------------------
 
-class TargetVarSelector(BaseEstimator, TransformerMixin):
-    """Selects a single target variable from a multi-target DataFrame."""
-    def __init__(self, target_variable: str):
-        """Initialize with the target variable name."""
-        self.target_variable = target_variable
+class FeatureSelector(BaseEstimator, TransformerMixin):
+    """Pipeline step for feature selection based on variance and correlation"""
+    __module__ = 'base_modeling.base_model'  # Add this line
 
-    def fit(self, y, **fit_params): # pylint:disable=unused-argument  # y param needed for pipeline structure
-        """Fit method (no fitting necessary, returns self)."""
+    def __init__(self, variance_threshold: float, correlation_threshold: float,
+                 protected_features: List[str]):
+        """
+        Params:
+        - variance_threshold (float): Minimum variance threshold for features
+        - correlation_threshold (float): Maximum correlation threshold between features
+        - protected_features (List[str]): Features to retain regardless of thresholds
+        """
+        self.variance_threshold = variance_threshold
+        self.correlation_threshold = correlation_threshold
+        self.protected_features = protected_features
+        self.selected_features = None
+
+
+    def fit(self, X: pd.DataFrame, y=None):  # pylint:disable=unused-argument  # y param needed for pipeline structure
+        """Identify features to keep based on variance and correlation thresholds"""
+        # Remove low variance features
+        post_variance_df = fs.remove_low_variance_features(
+            X,
+            self.variance_threshold,
+            self.protected_features
+        )
+
+
+        # Remove correlated features
+        post_correlation_df = fs.remove_correlated_features(
+            post_variance_df,
+            self.correlation_threshold,
+            self.protected_features
+        )
+
+        self.selected_features = post_correlation_df.columns.tolist()
         return self
 
-    def transform(self, y):
-        """Transform y by selecting the specified target column if y is a DataFrame."""
-        if isinstance(y, pd.DataFrame):
-            return y[self.target_variable]
-        return y
+
+    def transform(self, X: pd.DataFrame):
+        """Apply feature selection"""
+        return X[self.selected_features]
+
 
 
 class DropColumnPatterns(BaseEstimator, TransformerMixin):
@@ -598,45 +626,3 @@ class DropColumnPatterns(BaseEstimator, TransformerMixin):
         return X.drop(columns=dropped_columns, errors='ignore')
 
 
-
-class FeatureSelector(BaseEstimator, TransformerMixin):
-    """Pipeline step for feature selection based on variance and correlation"""
-    __module__ = 'base_modeling.base_model'  # Add this line
-
-    def __init__(self, variance_threshold: float, correlation_threshold: float,
-                 protected_features: List[str]):
-        """
-        Params:
-        - variance_threshold (float): Minimum variance threshold for features
-        - correlation_threshold (float): Maximum correlation threshold between features
-        - protected_features (List[str]): Features to retain regardless of thresholds
-        """
-        self.variance_threshold = variance_threshold
-        self.correlation_threshold = correlation_threshold
-        self.protected_features = protected_features
-        self.selected_features = None
-
-
-    def fit(self, X: pd.DataFrame, y=None):  # pylint:disable=unused-argument  # y param needed for pipeline structure
-        """Identify features to keep based on variance and correlation thresholds"""
-        # Remove low variance features
-        post_variance_df = fs.remove_low_variance_features(
-            X,
-            self.variance_threshold,
-            self.protected_features
-        )
-
-        # Remove correlated features
-        post_correlation_df = fs.remove_correlated_features(
-            post_variance_df,
-            self.correlation_threshold,
-            self.protected_features
-        )
-
-        self.selected_features = post_correlation_df.columns.tolist()
-        return self
-
-
-    def transform(self, X: pd.DataFrame):
-        """Apply feature selection"""
-        return X[self.selected_features]
