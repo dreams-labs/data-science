@@ -624,5 +624,3 @@ class DropColumnPatterns(BaseEstimator, TransformerMixin):
 
         # Drop columns safely
         return X.drop(columns=dropped_columns, errors='ignore')
-
-

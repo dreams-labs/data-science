@@ -117,7 +117,7 @@ class WalletModel(BaseModel):
 
         # Build wallet-specific pipeline (which calls _get_base_pipeline() internally)
         # self._build_wallet_pipeline()
-        self.pipeline = self._get_base_pipeline()
+        self.pipeline = self._get_wallet_pipeline()
 
         # Fit the wallet pipeline (using the same _fit() method as in BaseModel)
         self._fit()
@@ -157,21 +157,20 @@ class WalletModel(BaseModel):
     #          Pipeline Methods
     # -----------------------------------
 
-    def _build_wallet_pipeline(self) -> None:
+    def _get_wallet_pipeline(self) -> None:
         """
-        Build the wallet-specific pipeline by prepending wallet cohort selection
-        to the base pipeline.
+        Build the wallet-specific pipeline by prepending the wallet cohort selection
+        to the base pipeline steps.
         """
-        wallet_cohort_selector = WalletCohortSelector(
-            target_variable=self.modeling_config['target_variable']
-        )
-        base_pipeline = self._get_base_pipeline()  # Reuse DRY base pipeline
+        # wallet_cohort_selector = WalletCohortSelector(
+        #     target_variable=self.modeling_config['target_variable']
+        # )
+        base_pipeline = self._get_base_pipeline()
 
-        self.pipeline = Pipeline([
-            ('wallet_cohort_selector', wallet_cohort_selector),
-            ('base_modeling', base_pipeline)
-        ])
-
+        # Combine wallet cohort selector with all the base steps
+        # self.pipeline = Pipeline([('wallet_cohort_selector', wallet_cohort_selector)]
+                                #   + base_pipeline.steps)
+        return(Pipeline(base_pipeline.steps))
 
 
 class WalletCohortSelector(BaseEstimator, TransformerMixin):
