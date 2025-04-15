@@ -86,7 +86,7 @@ class WalletModel(BaseModel):
         self.y_test = self.y_test[target_var] if isinstance(self.y_test, pd.DataFrame) else self.y_test
         self.y_eval = self.y_eval[target_var] if isinstance(self.y_eval, pd.DataFrame) else self.y_eval
 
-        # Run grid search if enabled - NOW AFTER TARGET EXTRACTION
+        # Run grid search if enabled
         if self.modeling_config.get('grid_search_params', {}).get('enabled'):
             cv_results = self._run_grid_search(self.X_train, self.y_train)
 
@@ -106,7 +106,6 @@ class WalletModel(BaseModel):
         meta_pipeline = self._get_meta_pipeline()
         meta_pipeline.fit(self.X_train, self.y_train, eval_set=(self.X_eval, self.y_eval))
         self.pipeline = meta_pipeline
-
 
         # Make predictions etc. as before
         self.y_pred = meta_pipeline.predict(self.X_test)
