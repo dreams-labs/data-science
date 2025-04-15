@@ -42,6 +42,7 @@ class WalletModel(BaseModel):
         self.y_pipeline = None
 
 
+
     # -----------------------------------
     #         Primary Interface
     # -----------------------------------
@@ -73,26 +74,40 @@ class WalletModel(BaseModel):
         # Prepare data
         X, y = self._prepare_data(training_data_df, modeling_wallet_features_df)
 
-        # Apply the y pipeline
-        self.y_pipeline = self._get_y_pipeline()
-        y = self.y_pipeline.fit_transform(y)
+        # Build our MetaPipeline that jointly transforms X and y
+        meta_pipeline = self._get_meta_pipeline()
 
-        # Do the actual train/test split in BaseModel
+        # Split data using your _split_data method
         self._split_data(X, y)
 
-        # Build wallet-specific pipeline (which calls _get_base_pipeline() internally)
-        # self._build_wallet_pipeline()
-        self.pipeline = self._get_wallet_pipeline()
+        # Fit the meta pipeline on the training split, passing the eval set for early stopping
+        meta_pipeline.fit(self.X_train, self.y_train, eval_set=(self.X_eval, self.y_eval))  # pylint:disable=access-member-before-definition
+        self.pipeline = meta_pipeline  # store for later use
 
-        # Fit the wallet pipeline (using the same _fit() method as in BaseModel)
-        self._fit()
+        # Extract the actual target variable that was used in training
+        # This works whether it was specified in config or chosen during grid search
+        if hasattr(self.pipeline, 'y_pipeline') and hasattr(self.pipeline.y_pipeline, 'named_steps'):
+            target_selector = self.pipeline.y_pipeline.named_steps.get('target_selector')
+            if target_selector:
+                actual_target = target_selector.target_variable
+            else:
+                actual_target = self.modeling_config['target_variable']
+
+            self.y_train = self.y_train[actual_target]
+            self.y_test = self.y_test[actual_target]
+
+        else:
+            actual_target = self.modeling_config['target_variable']
+
+        # Make predictions etc. as before
+        self.y_pred = meta_pipeline.predict(self.X_test)
         result = {
             'pipeline': self.pipeline,
             'X_train': self.X_train,
             'X_test': self.X_test,
             'y_train': self.y_train,
             'y_test': self.y_test,
-            'y_pred': self._predict()
+            'y_pred': self.y_pred,
         }
 
         # If grid search was run and no final model is requested
@@ -150,17 +165,22 @@ class WalletModel(BaseModel):
 
         return X, y
 
-    def _get_wallet_pipeline(self) -> None:
+
+    def _get_meta_pipeline(self) -> 'MetaPipeline':
         """
-        Build the wallet-specific pipeline by prepending the wallet cohort selection
-        to the base pipeline steps.
+        Build and return a MetaPipeline that wraps both the x_pipeline (base pipeline)
+        and the y_pipeline.
         """
-        # Create a combined selector that will filter X and y using the cohort DataFrame
-        combined_selector = CombinedCohortSelector(cohort_df=self.modeling_wallet_features_df)
-        base_pipeline = self._get_base_pipeline()
-        # Concatenate the selector with the base pipeline steps
-        # return Pipeline([('combined_selector', combined_selector)] + base_pipeline.steps)
-        return Pipeline(base_pipeline.steps)
+        # x_pipeline: your existing base pipeline steps
+        x_pipeline = self._get_base_pipeline()
+
+        # y_pipeline: here we simply select the target column,
+        # but additional steps can be added in the future.
+        y_pipeline = Pipeline([
+            ('target_selector', TargetVarSelector(target_variable=self.modeling_config['target_variable']))
+        ])
+
+        return MetaPipeline(x_pipeline=x_pipeline, y_pipeline=y_pipeline)
 
 
     def _get_y_pipeline(self) -> None:
@@ -202,19 +222,6 @@ class WalletModel(BaseModel):
 #           Pipeline Steps
 # -----------------------------------
 
-class IdentityYTransformer(BaseEstimator, TransformerMixin):
-    """
-    A simple transformer that passes through the target variable y without modification.
-    """
-    def fit(self, y, X=None):
-        """Fit method does nothing and returns self."""
-        return self
-
-    def transform(self, y, X=None):
-        """Return y unchanged."""
-        return y
-
-
 class TargetVarSelector(BaseEstimator, TransformerMixin):
     """
     Transformer that selects the target variable column from a DataFrame.
@@ -234,37 +241,6 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
         if isinstance(y, pd.DataFrame):
             return y[self.target_variable]
         return y
-
-
-# class WalletXTransformer(BaseEstimator, TransformerMixin):
-#     """
-#     Transformer that filters rows in X by joining with a cohort dataframe (which contains
-#     the 'in_modeling_cohort' flag) and then drops that flag column.
-#     """
-#     def __init__(self, cohort_df: pd.DataFrame):
-#         """
-#         Parameters:
-#         - cohort_df (pd.DataFrame): DataFrame that must contain the 'in_modeling_cohort' column,
-#           indexed in the same way as X.
-#         """
-#         self.cohort_df = cohort_df
-
-#     def fit(self, X: pd.DataFrame, y=None):
-#         """No fitting necessary; returns self."""
-#         return self
-
-#     def transform(self, X: pd.DataFrame, y=None):
-#         """
-#         Join X with the cohort_df (using the index), filter rows where in_modeling_cohort == 1,
-#         then drop the 'in_modeling_cohort' column.
-#         """
-#         u.assert_matching_indices(X,self.cohort_df)
-
-#         # Filter to only records in the modeling cohort
-#         cohort_mask = self.cohort_df['in_modeling_cohort'] == 1
-#         df_filtered = X[cohort_mask].copy()
-
-#         return df_filtered
 
 
 class CombinedCohortSelector(BaseEstimator, TransformerMixin):
@@ -304,3 +280,82 @@ class CombinedCohortSelector(BaseEstimator, TransformerMixin):
             return X_filtered, y_filtered
 
         return X_filtered
+
+
+class MetaPipeline(BaseEstimator, TransformerMixin):
+    """Meta-pipeline that applies x and y transformations then fits a regressor."""
+
+    def __init__(self, x_pipeline: Pipeline, y_pipeline: Pipeline):
+        """Initialize MetaPipeline with x_pipeline and y_pipeline."""
+        self.x_pipeline = x_pipeline
+        self.y_pipeline = y_pipeline
+        self.regressor = None
+        self.x_transformer_ = None  # will store the transformer sub-pipeline for later use
+
+        # Create a named_steps attribute that mimics sklearn Pipeline interface
+        self.named_steps = {}
+        # Add steps from x_pipeline to named_steps
+        for name, step in x_pipeline.named_steps.items():
+            self.named_steps[name] = step
+
+    def fit(self, X, y, eval_set=None):
+        """Fit the MetaPipeline on raw X and y data, using an optional eval_set for early stopping."""
+        # First, transform y using the y_pipeline
+        y_trans = self.y_pipeline.fit_transform(y)
+
+        # Create a transformer sub-pipeline (all steps except the final estimator)
+        transformer = Pipeline(self.x_pipeline.steps[:-1])
+
+        # Transform training data
+        X_trans = transformer.fit_transform(X, y_trans)
+
+        # Extract the regressor from the pipeline
+        regressor_name, self.regressor = self.x_pipeline.steps[-1]
+
+        # If evaluation set is provided, transform it and use for early stopping
+        if eval_set is not None:
+            X_eval, y_eval = eval_set
+            y_eval_trans = self.y_pipeline.transform(y_eval)
+            X_eval_trans = transformer.transform(X_eval)
+
+            # Create eval_set in the format expected by XGBoost
+            transformed_eval_set = [(X_trans, y_trans), (X_eval_trans, y_eval_trans)]
+
+            # Fit with early stopping using the transformed eval set
+            self.regressor.fit(
+                X_trans,
+                y_trans,
+                eval_set=transformed_eval_set
+            )
+        else:
+            # Regular fit without early stopping if no eval set provided
+            self.regressor.fit(X_trans, y_trans)
+
+        # Store the transformer sub-pipeline for use during prediction
+        self.x_transformer_ = transformer
+
+        # Update named_steps with the fitted regressor
+        self.named_steps[regressor_name] = self.regressor
+
+        return self
+
+    def predict(self, X):
+        """Predict using the fitted regressor on transformed X."""
+        X_trans = self.x_transformer_.transform(X)
+        return self.regressor.predict(X_trans)
+
+    def score(self, X, y):
+        """Return the regressor's score on transformed X and y."""
+        X_trans = self.x_transformer_.transform(X)
+        y_trans = self.y_pipeline.transform(y)
+        return self.regressor.score(X_trans, y_trans)
+
+    # Add methods to make it behave more like a sklearn Pipeline
+    def __getitem__(self, key):
+        """Support indexing like a regular pipeline."""
+        if isinstance(key, slice):
+            # If it's a slice, return a new Pipeline with the sliced steps
+            return Pipeline(self.x_pipeline.steps[key])
+        else:
+            # Otherwise return the specific step
+            return self.x_pipeline.steps[key][1]

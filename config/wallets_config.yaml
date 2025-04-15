@@ -309,6 +309,10 @@ modeling:
 
     # CheckpointValidation
     # WalletModel Grid Search
+    # Params for y generation
+    grid_search_params_y:
+
+    # Params for model construction
     grid_search_params:
 
         # -------------------------------
@@ -325,11 +329,11 @@ modeling:
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # scikit-learn verbosity
 
-        # # Target variables
-        # target_variables: [
-        #     crypto_net_gain/max_investment/winsorized,
-        #     # crypto_net_gain/max_investment/ntile_rank,
-        # ]
+        # Target variables
+        target_variables: [
+            crypto_net_gain/max_investment/winsorized,
+            crypto_net_gain/max_investment/ntile_rank,
+        ]
 
         # Params
         param_grid:
