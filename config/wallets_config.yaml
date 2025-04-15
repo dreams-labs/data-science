@@ -309,9 +309,6 @@ modeling:
 
     # CheckpointValidation
     # WalletModel Grid Search
-    # Params for y generation
-    grid_search_params_y:
-
     # Params for model construction
     grid_search_params:
 
@@ -329,19 +326,22 @@ modeling:
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # scikit-learn verbosity
 
-        # # Target variables
-        # target_variables: [
-        #     crypto_net_gain/max_investment/winsorized,
-        #     crypto_net_gain/max_investment/ntile_rank,
-        # ]
+        # Params for target variable generation
+        param_grid_y:
 
-        # Params
+            # # Target variables
+            # y_pipeline__target_variables: [
+            #     crypto_net_gain/max_investment/winsorized,
+            #     crypto_net_gain/max_investment/ntile_rank,
+            # ]
+
+        # Params for model construction
         param_grid:
 
             # # Depth and Child Weight
             # regressor__min_child_weight_pct: [0.00004, 0.00007, 0.0001]
             # regressor__min_child_weight: [15, 25, 40]
-            regressor__max_depth: [9,12] #,15,18]  # basic depth param
+            # regressor__max_depth: [9,12] #,15,18]  # basic depth param
 
             # Col/Row Sampling
             # regressor__subsample: [0.8, 0.9, 1.0]   # samples rows, e.g. trees use x% of all wallet rows

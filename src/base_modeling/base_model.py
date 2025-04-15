@@ -349,6 +349,16 @@ class BaseModel:
                 ]
             param_grid['drop_columns__drop_patterns'] = drop_pattern_combinations
 
+        total_configurations = 1
+        for param_values in param_grid.values():
+            if isinstance(param_values, list):
+                total_configurations *= len(param_values)
+
+        if total_configurations < 2:
+            raise ValueError("Grid search requires at least 2 different configurations. "
+                             "Current param_grid generates only 1.")
+
+
         return {
             'base_model_params': base_model_params,
             'param_grid': param_grid,
