@@ -260,10 +260,13 @@ class CombinedCohortSelector(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X: pd.DataFrame, y=None):
-        """Confirm X’s indices are in cohort_df, join on the index, filter rows where in_modeling_cohort == 1, and return X (and y) with the flag dropped."""
+        """
+        Confirm X’s indices are in cohort_df, join on the index, filter rows where
+        in_modeling_cohort == 1, and return X (and y) with the flag dropped.
+        """
         # Confirm that every index in X exists in cohort_df
         if not X.index.isin(self.cohort_df.index).all():
-            raise ValueError("Not all index values in X have a corresponding match in the cohort DataFrame.")
+            raise ValueError("Not all index values in X have a match in the cohort DataFrame.")
 
         # Perform an inner join of X with the 'in_modeling_cohort' column
         X_joined = X.join(self.cohort_df[['in_modeling_cohort']], how='inner')
