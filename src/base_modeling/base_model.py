@@ -515,6 +515,23 @@ class BaseModel:
 #           Pipeline Steps
 # -----------------------------------
 
+class TargetVarSelector(BaseEstimator, TransformerMixin):
+    """Selects a single target variable from a multi-target DataFrame."""
+    def __init__(self, target_variable: str):
+        """Initialize with the target variable name."""
+        self.target_variable = target_variable
+
+    def fit(self, y, **fit_params): # pylint:disable=unused-argument  # y param needed for pipeline structure
+        """Fit method (no fitting necessary, returns self)."""
+        return self
+
+    def transform(self, y):
+        """Transform y by selecting the specified target column if y is a DataFrame."""
+        if isinstance(y, pd.DataFrame):
+            return y[self.target_variable]
+        return y
+
+
 class DropColumnPatterns(BaseEstimator, TransformerMixin):
     """
     Pipeline step that drops columns based on the patterns provided in the config, including
