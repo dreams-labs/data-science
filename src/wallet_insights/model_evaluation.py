@@ -343,34 +343,41 @@ class RegressionEvaluator:
         ax.set_ylabel('Residuals')
         ax.set_title('Residuals vs Predicted Values')
 
-    def _plot_feature_importance(self, ax):
-        """Plot feature importance with inset legend."""
-        if 'importances' in self.metrics:
-            df = pd.DataFrame(self.metrics['importances']).head(20)
-            df['prefix'] = df['feature'].str.split('|').str[0]
+    def _plot_feature_importance(self, ax, levels=0):
+        """
+        Plot prefix-level aggregated feature importance using the existing
+        importance_summary function.
 
-            unique_prefixes = df['prefix'].unique()
-            palette = dict(zip(unique_prefixes,
-                             sns.color_palette("husl", len(unique_prefixes))))
-
-            sns.barplot(
-                data=df,
-                x='importance',
-                y='feature',
-                ax=ax,
-                hue='prefix',
-                palette=palette
-            )
-
-            ax.legend(title='Feature Type', loc='lower right',
-                    bbox_to_anchor=(0.98, 0.02))
-
-            ax.set_xlabel('Importance')
-            ax.set_ylabel('Feature')
-            ax.set_title('Top 20 Feature Importances')
+        Params:
+        - ax: Matplotlib axis to draw on.
+        - levels: Prefix splitting depth (0=top-level, 1=next, etc.)
+        """
+        # Call the already implemented importance_summary method
+        summary_styler = self.importance_summary(levels=levels)
+        # Extract the underlying DataFrame (if a Styler is returned)
+        if hasattr(summary_styler, "data"):
+            summary_df = summary_styler.data.copy()
         else:
+            summary_df = summary_styler.copy()
+
+        # Reset the index so that the prefix becomes a column
+        summary_df = summary_df.reset_index().rename(columns={'prefix': 'Prefix'})
+
+        if summary_df.empty:
             ax.text(0.5, 0.5, 'Feature Importance Not Available',
                     ha='center', va='center')
+            return
+
+        sns.barplot(
+            data=summary_df,
+            x='Total Importance',
+            y='Prefix',
+            ax=ax,
+            color='#145a8d'
+        )
+        ax.set_title(f'Feature Importance by Prefix (levels={levels})')
+        ax.set_xlabel('Total Importance')
+        ax.set_ylabel('Prefix')
 
     def _plot_score_distribution(self, ax):
         """Basic distribution plot of actual vs predicted values."""
@@ -450,25 +457,36 @@ class RegressionEvaluator:
             return None
         return fig
 
-    def plot_wallet_evaluation(self, plot_type='all', display=True):
-        """Generate evaluation plots for wallet models with cohort analysis."""
+    def plot_wallet_evaluation(self, plot_type='all', display=True, levels=0):
+        """
+        Generate evaluation plots for wallet models with cohort analysis.
+
+        Params:
+        - plot_type: 'all' or one of ['actual_vs_predicted', 'residuals', 'cohort_comparison',
+          'feature_importance', 'prefix_importance']
+        - display: If True, show plots directly; if False, return the figure.
+        - levels: Prefix grouping depth (used only if plot_type=='prefix_importance')
+        """
         if not hasattr(self, 'training_cohort_pred'):
             raise ValueError("Wallet evaluation requires training cohort data")
 
         if plot_type == 'all':
+            # 2x2 layout for multiple evaluation plots
             fig = plt.figure(figsize=(15, 12))
             gs = plt.GridSpec(2, 2, height_ratios=[1, 1], width_ratios=[1, 1])
 
             ax1 = fig.add_subplot(gs[0, 0])  # Actual vs Predicted
             ax2 = fig.add_subplot(gs[0, 1])  # Residuals
             ax3 = fig.add_subplot(gs[1, 0])  # Cohort Comparison
-            ax4 = fig.add_subplot(gs[1, 1])  # Feature Importance
+            ax4 = fig.add_subplot(gs[1, 1])  # Prefix-based Importance
 
             self._plot_actual_vs_predicted(ax1)
             self._plot_residuals(ax2)
             self._plot_cohort_comparison(ax3)
-            self._plot_feature_importance(ax4)
+            # Re-use the importance_summary logic via _plot_prefix_importance
+            self._plot_feature_importance(ax4, levels=levels)
         else:
+            # Single plot mode
             fig, ax = plt.subplots(figsize=(8, 6))
             if plot_type == 'actual_vs_predicted':
                 self._plot_actual_vs_predicted(ax)
@@ -478,7 +496,8 @@ class RegressionEvaluator:
                 self._plot_cohort_comparison(ax)
             elif plot_type == 'feature_importance':
                 self._plot_feature_importance(ax)
-
+            elif plot_type == 'prefix_importance':
+                self._plot_feature_importance(ax, levels=levels)
         plt.tight_layout()
         if display:
             plt.show()

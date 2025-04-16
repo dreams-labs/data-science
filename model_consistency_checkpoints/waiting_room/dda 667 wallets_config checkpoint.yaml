@@ -44,7 +44,7 @@ n_threads:
     raw_data_retrieval: 3  # retrieves raw dfs from bigquery
     profits_row_imputation: 4  # generates imputed rows in profits_df
     training_dfs_preparation: 3  # generates market indicators, macro indicators, cohort profits dfs
-    concurrent_epochs: 1  # how many epochs' training data are processed concurrently
+    concurrent_epochs: 8  # how many epochs' training data are processed concurrently
     concurrent_windows: 8  # how many windows are processed concurrently
 
 
@@ -290,6 +290,7 @@ modeling:
         n_jobs: -1
         nthread: -1
 
+        verbosity: 0
         random_state: 42
 
     # Phase training section
@@ -309,6 +310,7 @@ modeling:
 
     # CheckpointValidation
     # WalletModel Grid Search
+    # Params for model construction
     grid_search_params:
 
         # -------------------------------
@@ -319,25 +321,32 @@ modeling:
         drop_patterns_include_n_features: 1
 
         n_iter: 40  # random search limit
-        n_splits: 3  # cv splits
-        scoring: neg_root_mean_squared_error
+        n_splits: 2  # cv splits
+
+        # scoring: neg_root_mean_squared_error
+        # scoring: custom_neg_rmse_scorer
+        scoring: custom_r2_scorer
 
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # scikit-learn verbosity
 
-        # # Target variables
-        # target_variables: [
-        #     crypto_net_gain/max_investment/winsorized,
-        #     # crypto_net_gain/max_investment/ntile_rank,
-        # ]
+        # Params for target variable generation
+        param_grid_y:
 
-        # Params
+            # Target variables
+            target_selector__target_variable: [
+                crypto_net_gain,
+                crypto_net_gain/max_investment/winsorized,
+                crypto_net_gain/max_investment/ntile_rank,
+            ]
+
+        # Params for model construction
         param_grid:
 
             # # Depth and Child Weight
             # regressor__min_child_weight_pct: [0.00004, 0.00007, 0.0001]
             # regressor__min_child_weight: [15, 25, 40]
-            # regressor__max_depth: [9,12,15,18]  # basic depth param
+            # regressor__max_depth: [9,12] #,15,18]  # basic depth param
 
             # Col/Row Sampling
             # regressor__subsample: [0.8, 0.9, 1.0]   # samples rows, e.g. trees use x% of all wallet rows
@@ -349,9 +358,9 @@ modeling:
             # regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            regressor__n_estimators: [350]
+            regressor__n_estimators: [50]
             regressor__learning_rate: [0.2]
-            # regressor__gamma: [0.01]
+            regressor__gamma: [0.01]
 
             # Optimize for Speed
             # regressor__n_jobs: [4]  # how many models to build at once
@@ -360,69 +369,69 @@ modeling:
             # regressor__tree_method: [hist]
 
 
-            # Column Selection
-            drop_columns__drop_patterns: [
-                [],
-            #     # [],
-            #     # [timing|*],
-                # [timing|btc_mvrv_z_score/lag_100/*],
-                # [timing|btc_mvrv_z_score/lag_50/*],
-                # [timing|btc_mvrv_z_score/lag_21/*],
-                # [timing|btc_mvrv_z_score/lead_100/*],
-                # [timing|btc_mvrv_z_score/lead_50/*],
-                # [timing|btc_mvrv_z_score/lead_21/*],
-                # [timing|btc_mvrv_z_score/*],
-                # [timing|global_market_cap/*],
-                # [timing|btc_price/*],
-                # [timing|global_volume/*],
-                # [timing|btc_mvrv_z_score/buy_mean|*],
-                # [timing|btc_mvrv_z_score/buy_weighted|*],
-                # [timing|btc_mvrv_z_score/sell_mean|*],
-                # [timing|btc_mvrv_z_score/sell_weighted|*],
+            # # Column Selection
+            # drop_columns__drop_patterns: [
+            #     [],
+            # #     # [],
+            # #     # [timing|*],
+            #     # [timing|btc_mvrv_z_score/lag_100/*],
+            #     # [timing|btc_mvrv_z_score/lag_50/*],
+            #     # [timing|btc_mvrv_z_score/lag_21/*],
+            #     # [timing|btc_mvrv_z_score/lead_100/*],
+            #     # [timing|btc_mvrv_z_score/lead_50/*],
+            #     # [timing|btc_mvrv_z_score/lead_21/*],
+            #     # [timing|btc_mvrv_z_score/*],
+            #     # [timing|global_market_cap/*],
+            #     # [timing|btc_price/*],
+            #     # [timing|global_volume/*],
+            #     # [timing|btc_mvrv_z_score/buy_mean|*],
+            #     # [timing|btc_mvrv_z_score/buy_weighted|*],
+            #     # [timing|btc_mvrv_z_score/sell_mean|*],
+            #     # [timing|btc_mvrv_z_score/sell_weighted|*],
 
-            #     # [timing|price_sma_2/lag_21/*],
-            #     # [timing|price_sma_2/lag_30/*],
-            #     # [timing|*/buy_mean*],
-
-
-            #     # [performance|*],
-            #     # [performance|crypto_net_gain/*],
-            #     # [performance|*/ntile_rank|*],
-
-            #     # [trading|*],
-            #     # [trading|days_held/min|*],
-            #     # [trading|days_held/max|*],
+            # #     # [timing|price_sma_2/lag_21/*],
+            # #     # [timing|price_sma_2/lag_30/*],
+            # #     # [timing|*/buy_mean*],
 
 
-            #     # [mktcap|*],
-            #     # [mktcap|portfolio_mcap_mean/market_cap_filled|*],
-            #     # [mktcap|portfolio_mcap_median/market_cap_filled|*],
+            # #     # [performance|*],
+            # #     # [performance|crypto_net_gain/*],
+            # #     # [performance|*/ntile_rank|*],
 
-            #     # [transfers|*],
-            #     # [transfers|first_buy/*],
-            #     # [transfers|first_sell/*],
-            #     # [transfers|initial_hold_time/*],
-            #     # [transfers|first_buy/avg_wallet_rank|*],
-            #     # [transfers|first_buy/median_avg_wallet_rank|*],
+            # #     # [trading|*],
+            # #     # [trading|days_held/min|*],
+            # #     # [trading|days_held/max|*],
 
-            #     # [scenario|*],
-            #     # [scenario|buy_delay_wtd_performance|*],
 
-            #     # # [balance|*],
-            #     # [balance|coin_fraction_std|*],
-            #     # [balance|concentration_index|*],
-            #     # # [balance|largest_coin_frac|*],
-            #     # [balance|largest_coin_usd|*],
-            #     # [balance|median_coin_frac|*],
-            #     # [balance|min_coin_frac|*],
-            #     # [balance|n_coins|*],
-            #     # [balance|total_usd_balance|*],
+            # #     # [mktcap|*],
+            # #     # [mktcap|portfolio_mcap_mean/market_cap_filled|*],
+            # #     # [mktcap|portfolio_mcap_median/market_cap_filled|*],
 
-                # [cluster|*],
+            # #     # [transfers|*],
+            # #     # [transfers|first_buy/*],
+            # #     # [transfers|first_sell/*],
+            # #     # [transfers|initial_hold_time/*],
+            # #     # [transfers|first_buy/avg_wallet_rank|*],
+            # #     # [transfers|first_buy/median_avg_wallet_rank|*],
 
-                # ['*|w1'],
+            # #     # [scenario|*],
+            # #     # [scenario|buy_delay_wtd_performance|*],
 
-            ]
+            # #     # # [balance|*],
+            # #     # [balance|coin_fraction_std|*],
+            # #     # [balance|concentration_index|*],
+            # #     # # [balance|largest_coin_frac|*],
+            # #     # [balance|largest_coin_usd|*],
+            # #     # [balance|median_coin_frac|*],
+            # #     # [balance|min_coin_frac|*],
+            # #     # [balance|n_coins|*],
+            # #     # [balance|total_usd_balance|*],
+
+            #     # [cluster|*],
+
+            #     # ['*|w1'],
+
+            # ]
 
 
     # Coin model workflow params
