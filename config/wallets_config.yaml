@@ -314,7 +314,7 @@ modeling:
     grid_search_params:
 
         # -------------------------------
-        enabled: True
+        # enabled: True
         # -------------------------------
 
         # Search Methodology
@@ -322,7 +322,10 @@ modeling:
 
         n_iter: 40  # random search limit
         n_splits: 2  # cv splits
-        scoring: neg_root_mean_squared_error
+
+        # scoring: neg_root_mean_squared_error
+        # scoring: custom_neg_rmse_scorer
+        scoring: custom_r2_scorer
 
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # scikit-learn verbosity
@@ -332,9 +335,9 @@ modeling:
 
             # Target variables
             target_selector__target_variable: [
+                crypto_net_gain,
                 crypto_net_gain/max_investment/winsorized,
                 crypto_net_gain/max_investment/ntile_rank,
-                crypto_net_gain
             ]
 
         # Params for model construction

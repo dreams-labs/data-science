@@ -5,15 +5,17 @@ import numpy as np
 from sklearn.pipeline import Pipeline
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.model_selection import RandomizedSearchCV
-from xgboost import XGBRegressor
+from sklearn.metrics import root_mean_squared_error, make_scorer, r2_score
 
 # Local modules
-from base_modeling.base_model import BaseModel, DropColumnPatterns
+from base_modeling.base_model import BaseModel
 import utils as u
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
 # pylint:disable=unused-argument  # y param needed for pipeline structure
 # pylint:disable=W0201  # Attribute defined outside __init__, false positive due to inheritance
+# pylint:disable=access-member-before-definition  # init params from BaseModel are tripping this
+
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -78,12 +80,6 @@ class WalletModel(BaseModel):
         # Split data
         self._split_data(X, y)
 
-        # Extract target variable series
-        target_var = self.modeling_config['target_variable']
-        self.y_train = self.y_train[target_var] if isinstance(self.y_train, pd.DataFrame) else self.y_train
-        self.y_test = self.y_test[target_var] if isinstance(self.y_test, pd.DataFrame) else self.y_test
-        self.y_eval = self.y_eval[target_var] if isinstance(self.y_eval, pd.DataFrame) else self.y_eval
-
         # Build meta pipeline
         meta_pipeline = self._get_meta_pipeline()
 
@@ -105,6 +101,12 @@ class WalletModel(BaseModel):
 
         meta_pipeline.fit(self.X_train, self.y_train, eval_set=(self.X_eval, self.y_eval))
         self.pipeline = meta_pipeline
+        self.y_pipeline = meta_pipeline.y_pipeline  # <-- add this
+
+        # Update target variables to be 1D Series using the y_pipeline
+        self.y_train = self.y_pipeline.transform(self.y_train)
+        self.y_test = self.y_pipeline.transform(self.y_test)
+        self.y_eval = self.y_pipeline.transform(self.y_eval)
 
         # Prepare result dictionary
         result = {
@@ -195,8 +197,13 @@ class WalletModel(BaseModel):
         Build the wallet-specific pipeline by prepending the wallet cohort selection
         to the base pipeline steps.
         """
+        target_var = self.modeling_config.get('model_params', {}).get(
+            'target_selector__target_variable',
+            self.modeling_config['target_variable']
+        )
+
         y_pipeline = Pipeline([
-            ('target_selector', TargetVarSelector(target_variable=self.modeling_config['target_variable']))
+            ('target_selector', TargetVarSelector(target_variable=target_var))
         ])
 
         return y_pipeline
@@ -232,9 +239,22 @@ class WalletModel(BaseModel):
         logger.info("Initiating grid search with eval set...")
         u.notify('gadget')
 
+        # Set up grid search options as ['param_grid']
         gs_config = self._prepare_grid_search_params(X)
+
+        # Assign custom scorers if applicable
+        custom_scoring_functions = {
+            'custom_r2_scorer': custom_r2_scorer,
+            'custom_neg_rmse_scorer': custom_neg_rmse_scorer,
+        }
+        scoring_param = gs_config['search_config'].get('scoring')
+        if isinstance(scoring_param, str) and scoring_param in custom_scoring_functions:
+            gs_config['search_config']['scoring'] = custom_scoring_functions[scoring_param]
+
+        # Generate pipeline
         cv_pipeline = pipeline if pipeline is not None else self._get_model_pipeline(gs_config['base_model_params'])
 
+        # Random search with pipeline
         self.random_search = RandomizedSearchCV(
             cv_pipeline,
             gs_config['param_grid'],
@@ -287,24 +307,41 @@ class WalletModel(BaseModel):
 
 class TargetVarSelector(BaseEstimator, TransformerMixin):
     """
-    Transformer that selects the target variable column from a DataFrame.
+    Transformer that extracts the target variable from the input.
+
+    If y is a DataFrame, returns the column specified by target_variable as a Series.
+    If y is already a Series, returns it unchanged.
+
+    This centralizes the target extraction logic so that grid search can update the target
+    variable parameter without interference from pre-extraction.
     """
     def __init__(self, target_variable: str):
         self.target_variable = target_variable
 
     def fit(self, y, X=None):
-        """No fitting necessary; returns self."""
+        """
+        Validate that the target column exists in y if it is a DataFrame.
+        """
+        if isinstance(y, pd.DataFrame):
+            if self.target_variable not in y.columns:
+                raise ValueError(
+                    f"Target variable '{self.target_variable}' not found in columns: {y.columns.tolist()}"
+                )
         return self
 
     def transform(self, y, X=None):
         """
-        If y is a DataFrame, select and return the column specified by target_variable.
-        Otherwise, return y unchanged.
+        If y is a DataFrame, extract the target column specified by target_variable.
+        Return a 1D Series even if the extraction yields a single-column DataFrame.
+        If y is already a Series, return it unchanged.
         """
         if isinstance(y, pd.DataFrame):
-            return y[self.target_variable]
+            result = y[self.target_variable]
+            # Ensure result is a Series (squeeze if it is still a DataFrame)
+            if isinstance(result, pd.DataFrame):
+                result = result.squeeze()
+            return result
         return y
-
 
 
 class MetaPipeline(BaseEstimator, TransformerMixin):
@@ -389,3 +426,38 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
         else:
             # Otherwise return the specific step
             return self.model_pipeline.steps[key][1]
+
+
+
+
+# -----------------------------------
+#          Utility Functions
+# -----------------------------------
+
+def custom_neg_rmse_scorer(estimator, X, y):
+    """
+    Custom scorer that transforms y before computing RMSE.
+    Applies the estimator's y_pipeline to extract the proper target.
+    Returns negative RMSE for grid search scoring.
+    """
+    y_trans = estimator.y_pipeline.transform(y)
+    y_pred = estimator.predict(X)
+    rmse = root_mean_squared_error(y_trans, y_pred)
+    return -rmse
+
+
+def custom_r2_scorer(estimator, X, y):
+    """
+    Custom scorer for R² that first applies the pipeline's y transformation.
+
+    Parameters:
+      estimator: The fitted MetaPipeline, which includes a y_pipeline.
+      X (DataFrame or array): Feature data.
+      y (DataFrame or array): The raw target data.
+
+    Returns:
+      R² score computed on the transformed target and predictions.
+    """
+    y_trans = estimator.y_pipeline.transform(y)
+    y_pred = estimator.predict(X)
+    return r2_score(y_trans, y_pred)
