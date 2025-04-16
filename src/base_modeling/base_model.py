@@ -264,7 +264,7 @@ class BaseModel:
         - X (DataFrame): Feature data
         - y (Series): Target variable
         - pipeline (Pipeline, optional): Custom pipeline to use for grid search. If None,
-        a basic pipeline will be created.
+          a basic pipeline will be created.
 
         Returns:
         - Dict: Results containing best parameters, score and CV results
@@ -278,6 +278,15 @@ class BaseModel:
 
         # Get prepared grid search params
         gs_config = self._prepare_grid_search_params(X)
+
+        # Validate that the param_grid has at least 2 configurations
+        total_configurations = 1
+        for param_values in gs_config['param_grid'].values():
+            if isinstance(param_values, list):
+                total_configurations *= len(param_values)
+        if total_configurations < 2:
+            raise ValueError("Grid search requires at least 2 different configurations. "
+                             "Current param_grid generates only 1.")
 
         # Use provided pipeline or create default pipeline
         if pipeline is None:
@@ -309,7 +318,6 @@ class BaseModel:
         }
 
 
-    # Add this to base_model.py as a shared utility method
     def _prepare_grid_search_params(self, X: pd.DataFrame, base_params_override=None) -> dict:
         """
         Prepare grid search parameters that can be used by both BaseModel and WalletModel.
@@ -358,16 +366,6 @@ class BaseModel:
                 ]
             param_grid['drop_columns__drop_patterns'] = drop_pattern_combinations
 
-        total_configurations = 1
-        for param_values in param_grid.values():
-            if isinstance(param_values, list):
-                total_configurations *= len(param_values)
-
-        if total_configurations < 2:
-            raise ValueError("Grid search requires at least 2 different configurations. "
-                             "Current param_grid generates only 1.")
-
-
         return {
             'base_model_params': base_model_params,
             'param_grid': param_grid,
@@ -380,6 +378,7 @@ class BaseModel:
                 'random_state': base_model_params.get('random_state', 42),
             }
         }
+
 
 
     def _get_model_pipeline(self, base_model_params: Dict[str, Any]) -> Pipeline:
