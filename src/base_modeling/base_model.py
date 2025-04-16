@@ -1,6 +1,6 @@
 import time
 import logging
-from typing import Dict, Union, List
+from typing import Dict, Union, List, Any
 from itertools import chain,combinations
 import pickle
 import pandas as pd
@@ -87,7 +87,7 @@ class BaseModel:
             if not self.modeling_config.get('grid_search_params', {}).get('build_post_search_model'):
                 return cv_results
 
-        self._build_pipeline()
+        self.pipeline = self._get_base_pipeline()
         self._fit()
 
         result = {
@@ -115,9 +115,9 @@ class BaseModel:
     #      Pipeline/Modeling Methods
     # -----------------------------------
 
-    def _build_pipeline(self) -> None:
+    def _get_base_pipeline(self) -> Pipeline:
         """
-        Build basic XGBoost pipeline. Override for custom preprocessing.
+        Construct and return the base modeling pipeline (feature selection, dropping columns, and the regressor).
         """
         model_params = self.modeling_config['model_params'].copy()
 
@@ -128,8 +128,7 @@ class BaseModel:
                 model_params.pop('min_child_weight_pct')
             )
 
-        # Pipeline Begins
-        self.pipeline = Pipeline([
+        base_pipeline = Pipeline([
             ('feature_selector', FeatureSelector(
                 variance_threshold=self.modeling_config['feature_selection'].get('variance_threshold'),
                 correlation_threshold=self.modeling_config['feature_selection'].get('correlation_threshold'),
@@ -140,6 +139,8 @@ class BaseModel:
             )),
             ('regressor', XGBRegressor(**model_params))
         ])
+
+        return base_pipeline
 
 
     # Modify _split_data method to do two splits:
@@ -255,16 +256,18 @@ class BaseModel:
     #         Grid Search Methods
     # -----------------------------------
 
-    def _run_grid_search(self, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
+    def _run_grid_search(self, X: pd.DataFrame, y: pd.Series, pipeline=None) -> Dict[str, float]:
         """
         Perform grid search with cross validation using configured parameters.
 
         Params:
-        - X (DataFrame): feature data for modeling cohort
-        - y (Series): target variable for modeling cohort
+        - X (DataFrame): Feature data
+        - y (Series): Target variable
+        - pipeline (Pipeline, optional): Custom pipeline to use for grid search. If None,
+          a basic pipeline will be created.
 
         Returns:
-        - cv_results (dict): Mean and std of CV scores
+        - Dict: Results containing best parameters, score and CV results
         """
         # If grid search is disabled, return nothing
         if not self.modeling_config.get('grid_search_params', {}).get('enabled'):
@@ -273,70 +276,29 @@ class BaseModel:
         logger.info("Initiating grid search...")
         u.notify('gadget')
 
-        # 1. Retrieve and modify base params
-        # -----------------------
-        base_model_params = self.modeling_config['model_params'].copy()
+        # Get prepared grid search params
+        gs_config = self._prepare_grid_search_params(X)
 
-        # Remove params that don't apply to the grid search
-        for param in ['early_stopping_rounds', 'eval_metric', 'verbose']:
-            base_model_params.pop(param, None)
+        # Validate that the param_grid has at least 2 configurations
+        total_configurations = 1
+        for param_values in gs_config['param_grid'].values():
+            if isinstance(param_values, list):
+                total_configurations *= len(param_values)
+        if total_configurations < 2:
+            raise ValueError("Grid search requires at least 2 different configurations. "
+                             "Current param_grid generates only 1.")
 
-        # Handle 'min_child_weight_pct' in base params
-        if base_model_params.get('min_child_weight_pct'):
-            base_model_params['min_child_weight'] = self._convert_min_child_pct_to_weight(
-                self.X_train,
-                base_model_params.pop('min_child_weight_pct')
-            )
-
-
-        # 2. Prepare grid search param options
-        # ------------------------------------
-        grid_search_params = self.modeling_config['grid_search_params']
-
-        # Handle 'min_child_weight_pct' in grid search params
-        if 'regressor__min_child_weight_pct' in grid_search_params['param_grid']:
-            pct_grid = grid_search_params['param_grid'].pop('regressor__min_child_weight_pct')
-            grid_search_params['param_grid']['regressor__min_child_weight'] = [
-                self._convert_min_child_pct_to_weight(X, pct) for pct in pct_grid
-            ]
-
-        # Combine drop patterns in grid search params with base drop patterns
-        if 'drop_columns__drop_patterns' in grid_search_params['param_grid']:
-
-            # if adding features in groups of n, use helper function
-            if self.modeling_config['grid_search_params'].get('drop_patterns_include_n_features'):
-                drop_pattern_combinations = self._create_drop_pattern_combinations()
-
-            # if removing features one by one, generate combinations
-            else:
-                base_drop_patterns = self.modeling_config['feature_selection']['drop_patterns']
-                drop_pattern_combinations = [
-                    base_drop_patterns + grid_pattern
-                    for grid_pattern in grid_search_params['param_grid']['drop_columns__drop_patterns']
-                ]
-
-            # Override config with the merged drop_patterns
-            grid_search_params['param_grid']['drop_columns__drop_patterns'] = drop_pattern_combinations
-
-
-        # 3. Search
-        # ---------
-        # Create pipeline for grid search
-        cv_pipeline = Pipeline([
-            ('drop_columns', DropColumnPatterns()),
-            ('regressor', XGBRegressor(**base_model_params))
-        ])
+        # Use provided pipeline or create default pipeline
+        if pipeline is None:
+            cv_pipeline = self._get_model_pipeline(gs_config['base_model_params'])
+        else:
+            cv_pipeline = pipeline
 
         # Store the search object in the instance
         self.random_search = RandomizedSearchCV(
             cv_pipeline,
-            grid_search_params['param_grid'],
-            n_iter = grid_search_params['n_iter'],
-            cv = grid_search_params['n_splits'],
-            scoring = grid_search_params['scoring'],
-            verbose = grid_search_params.get('verbose_level', 0),
-            n_jobs = base_model_params.get('n_jobs', -1),
-            random_state = base_model_params.get('random_state', 42),
+            gs_config['param_grid'],
+            **gs_config['search_config']
         )
 
         self.random_search.fit(X, y)
@@ -354,6 +316,88 @@ class BaseModel:
             'best_score': -self.random_search.best_score_,
             'cv_results': self.random_search.cv_results_
         }
+
+
+    def _prepare_grid_search_params(self, X: pd.DataFrame, base_params_override=None) -> dict:
+        """
+        Prepare grid search parameters that can be used by both BaseModel and WalletModel.
+
+        Params:
+        - X (DataFrame): Data used for parameter calculations
+        - base_params_override (dict, optional): Override base params if needed
+
+        Returns:
+        - dict: Prepared grid search configuration
+        """
+        # 1. Retrieve and modify base params
+        base_model_params = base_params_override or self.modeling_config['model_params'].copy()
+
+        # Remove params that don't apply to the grid search
+        for param in ['early_stopping_rounds', 'eval_metric', 'verbose']:
+            base_model_params.pop(param, None)
+
+        # Handle 'min_child_weight_pct' in base params
+        if base_model_params.get('min_child_weight_pct'):
+            base_model_params['min_child_weight'] = self._convert_min_child_pct_to_weight(
+                X,
+                base_model_params.pop('min_child_weight_pct')
+            )
+
+        # 2. Prepare grid search param options
+        grid_search_params = self.modeling_config['grid_search_params']
+        param_grid = grid_search_params['param_grid'].copy()
+
+        # Handle 'min_child_weight_pct' in grid search params
+        if 'regressor__min_child_weight_pct' in param_grid:
+            pct_grid = param_grid.pop('regressor__min_child_weight_pct')
+            param_grid['regressor__min_child_weight'] = [
+                self._convert_min_child_pct_to_weight(X, pct) for pct in pct_grid
+            ]
+
+        # Process drop patterns logic
+        if 'drop_columns__drop_patterns' in param_grid:
+            if self.modeling_config['grid_search_params'].get('drop_patterns_include_n_features'):
+                drop_pattern_combinations = self._create_drop_pattern_combinations()
+            else:
+                base_drop_patterns = self.modeling_config['feature_selection']['drop_patterns']
+                drop_pattern_combinations = [
+                    base_drop_patterns + grid_pattern
+                    for grid_pattern in param_grid['drop_columns__drop_patterns']
+                ]
+            param_grid['drop_columns__drop_patterns'] = drop_pattern_combinations
+
+        return {
+            'base_model_params': base_model_params,
+            'param_grid': param_grid,
+            'search_config': {
+                'n_iter': grid_search_params['n_iter'],
+                'cv': grid_search_params['n_splits'],
+                'scoring': grid_search_params['scoring'],
+                'verbose': grid_search_params.get('verbose_level', 0),
+                'n_jobs': base_model_params.get('n_jobs', -1),
+                'random_state': base_model_params.get('random_state', 42),
+            }
+        }
+
+
+
+    def _get_model_pipeline(self, base_model_params: Dict[str, Any]) -> Pipeline:
+        """
+        Create a standard model pipeline with drop columns transformer and XGBoost regressor.
+
+        Params:
+        - base_model_params (Dict, optional): Parameters for the XGBoost regressor.
+        If None, default parameters will be used.
+
+        Returns:
+        - Pipeline: Scikit-learn pipeline with preprocessing and model components
+        """
+        pipeline = Pipeline([
+            ('drop_columns', DropColumnPatterns()),
+            ('regressor', XGBRegressor(**base_model_params))
+        ])
+
+        return pipeline
 
 
     def save_pipeline(self, filepath: str) -> None:
@@ -515,21 +559,49 @@ class BaseModel:
 #           Pipeline Steps
 # -----------------------------------
 
-class TargetVarSelector(BaseEstimator, TransformerMixin):
-    """Selects a single target variable from a multi-target DataFrame."""
-    def __init__(self, target_variable: str):
-        """Initialize with the target variable name."""
-        self.target_variable = target_variable
+class FeatureSelector(BaseEstimator, TransformerMixin):
+    """Pipeline step for feature selection based on variance and correlation"""
+    __module__ = 'base_modeling.base_model'  # Add this line
 
-    def fit(self, y, **fit_params): # pylint:disable=unused-argument  # y param needed for pipeline structure
-        """Fit method (no fitting necessary, returns self)."""
+    def __init__(self, variance_threshold: float, correlation_threshold: float,
+                 protected_features: List[str]):
+        """
+        Params:
+        - variance_threshold (float): Minimum variance threshold for features
+        - correlation_threshold (float): Maximum correlation threshold between features
+        - protected_features (List[str]): Features to retain regardless of thresholds
+        """
+        self.variance_threshold = variance_threshold
+        self.correlation_threshold = correlation_threshold
+        self.protected_features = protected_features
+        self.selected_features = None
+
+
+    def fit(self, X: pd.DataFrame, y=None):  # pylint:disable=unused-argument  # y param needed for pipeline structure
+        """Identify features to keep based on variance and correlation thresholds"""
+        # Remove low variance features
+        post_variance_df = fs.remove_low_variance_features(
+            X,
+            self.variance_threshold,
+            self.protected_features
+        )
+
+
+        # Remove correlated features
+        post_correlation_df = fs.remove_correlated_features(
+            post_variance_df,
+            self.correlation_threshold,
+            self.protected_features
+        )
+
+        self.selected_features = post_correlation_df.columns.tolist()
         return self
 
-    def transform(self, y):
-        """Transform y by selecting the specified target column if y is a DataFrame."""
-        if isinstance(y, pd.DataFrame):
-            return y[self.target_variable]
-        return y
+
+    def transform(self, X: pd.DataFrame):
+        """Apply feature selection"""
+        return X[self.selected_features]
+
 
 
 class DropColumnPatterns(BaseEstimator, TransformerMixin):
@@ -595,47 +667,3 @@ class DropColumnPatterns(BaseEstimator, TransformerMixin):
 
         # Drop columns safely
         return X.drop(columns=dropped_columns, errors='ignore')
-
-
-
-class FeatureSelector(BaseEstimator, TransformerMixin):
-    """Pipeline step for feature selection based on variance and correlation"""
-    __module__ = 'base_modeling.base_model'  # Add this line
-
-    def __init__(self, variance_threshold: float, correlation_threshold: float,
-                 protected_features: List[str]):
-        """
-        Params:
-        - variance_threshold (float): Minimum variance threshold for features
-        - correlation_threshold (float): Maximum correlation threshold between features
-        - protected_features (List[str]): Features to retain regardless of thresholds
-        """
-        self.variance_threshold = variance_threshold
-        self.correlation_threshold = correlation_threshold
-        self.protected_features = protected_features
-        self.selected_features = None
-
-
-    def fit(self, X: pd.DataFrame, y=None):  # pylint:disable=unused-argument  # y param needed for pipeline structure
-        """Identify features to keep based on variance and correlation thresholds"""
-        # Remove low variance features
-        post_variance_df = fs.remove_low_variance_features(
-            X,
-            self.variance_threshold,
-            self.protected_features
-        )
-
-        # Remove correlated features
-        post_correlation_df = fs.remove_correlated_features(
-            post_variance_df,
-            self.correlation_threshold,
-            self.protected_features
-        )
-
-        self.selected_features = post_correlation_df.columns.tolist()
-        return self
-
-
-    def transform(self, X: pd.DataFrame):
-        """Apply feature selection"""
-        return X[self.selected_features]

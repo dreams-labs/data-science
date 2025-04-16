@@ -278,7 +278,7 @@ modeling:
     grid_search_params:
 
         # -------------------------------
-        # enabled: True
+        enabled: True
         # -------------------------------
 
         # Search Methodology
