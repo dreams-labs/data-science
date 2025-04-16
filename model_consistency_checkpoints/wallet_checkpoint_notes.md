@@ -1,4 +1,24 @@
 # dda 664 grid search functionality expansion
+checkpoint 12: w.683 metapipeline integrated
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       184
+Features per Window:      46
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.683
+RMSE:                     0.219
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.785
+RMSE:                     0.126
+MAE:                      0.067
+
+
 checkpoint 11: w.683 modifying wallet_model variables
 Model Performance Summary
 ===================================

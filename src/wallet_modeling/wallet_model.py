@@ -68,17 +68,14 @@ class WalletModel(BaseModel):
         logger.info("Preparing training data for model construction...")
 
         # Validate indices match and store DataFrames
-        u.assert_matching_indices(training_data_df,modeling_wallet_features_df)
+        u.assert_matching_indices(training_data_df, modeling_wallet_features_df)
         self.training_data_df = training_data_df
         self.modeling_wallet_features_df = modeling_wallet_features_df
 
         # Prepare data
         X, y = self._prepare_data(training_data_df, modeling_wallet_features_df)
 
-        # Build our MetaPipeline that jointly transforms X and y
-        meta_pipeline = self._get_meta_pipeline()
-
-        # Split data using your _split_data method
+        # Split data
         self._split_data(X, y)
 
         # Extract target variable series
@@ -87,9 +84,12 @@ class WalletModel(BaseModel):
         self.y_test = self.y_test[target_var] if isinstance(self.y_test, pd.DataFrame) else self.y_test
         self.y_eval = self.y_eval[target_var] if isinstance(self.y_eval, pd.DataFrame) else self.y_eval
 
+        # Build meta pipeline
+        meta_pipeline = self._get_meta_pipeline()
+
         # Run grid search if enabled
         if self.modeling_config.get('grid_search_params', {}).get('enabled'):
-            cv_results = self._run_grid_search(self.X_train, self.y_train)
+            cv_results = self._run_grid_search(self.X_train, self.y_train, pipeline=meta_pipeline)
 
             if cv_results.get('best_params'):
                 best_params = {
@@ -103,29 +103,28 @@ class WalletModel(BaseModel):
                 if not self.modeling_config.get('grid_search_params', {}).get('build_post_search_model'):
                     return cv_results
 
-        # Rest of the method remains the same
-        meta_pipeline = self._get_meta_pipeline()
         meta_pipeline.fit(self.X_train, self.y_train, eval_set=(self.X_eval, self.y_eval))
         self.pipeline = meta_pipeline
 
-        # Make predictions etc. as before
-        self.y_pred = meta_pipeline.predict(self.X_test)
+        # Prepare result dictionary
         result = {
             'pipeline': self.pipeline,
-            'X_train': self.X_train,
-            'X_test': self.X_test,
-            'y_train': self.y_train,
-            'y_test': self.y_test,
-            'y_pred': self.y_pred,
         }
 
-        # If grid search was run and no final model is requested
-        if self.modeling_config.get('grid_search_params', {}).get('enabled') is True and \
-        self.modeling_config.get('grid_search_params', {}).get('build_post_search_model') is False:
-            return result
-
-        # Optionally store predictions for the full training cohort
+        # Add train/test data if requested
         if return_data:
+            # Make predictions on test set
+            self.y_pred = meta_pipeline.predict(self.X_test)
+
+            result.update({
+                'X_train': self.X_train,
+                'X_test': self.X_test,
+                'y_train': self.y_train,
+                'y_test': self.y_test,
+                'y_pred': self.y_pred
+            })
+
+            # Optionally add predictions for full training cohort
             training_cohort_pred = self._predict_training_cohort()
             target_var = self.modeling_config['target_variable']
             full_cohort_actuals = modeling_wallet_features_df[target_var]
@@ -136,7 +135,6 @@ class WalletModel(BaseModel):
             })
 
         u.notify('notify')
-
         return result
 
 
@@ -175,21 +173,21 @@ class WalletModel(BaseModel):
         return X, y
 
 
-    def _get_meta_pipeline(self) -> 'MetaPipeline':
+    def _get_meta_pipeline(self) -> Pipeline:
         """
-        Build and return a MetaPipeline that wraps both the model_pipeline (base pipeline)
-        and the y_pipeline.
+        Return a single Pipeline that first applies y transformations,
+        then the usual feature+regressor steps. Step names remain
+        exactly ['target_selector', 'feature_selector', 'drop_columns', 'regressor'].
         """
+        # Get the steps from the y_pipeline
+        y_steps = self._get_y_pipeline()
+        # Get the steps from the base pipeline (feature_selector, drop_columns, regressor)
+        model_steps = self._get_base_pipeline()
 
-        # y_pipeline: steps to generate the target variable
-        y_pipeline = Pipeline([
-            ('target_selector', TargetVarSelector(target_variable=self.modeling_config['target_variable']))
-        ])
+        # Concatenate them into one pipeline
+        combined_steps = MetaPipeline(y_steps, model_steps)
 
-        # model_pipeline: steps to construct the model
-        model_pipeline = self._get_base_pipeline()
-
-        return MetaPipeline(y_pipeline=y_pipeline, model_pipeline=model_pipeline)
+        return combined_steps
 
 
     def _get_y_pipeline(self) -> None:
@@ -202,6 +200,55 @@ class WalletModel(BaseModel):
         ])
 
         return y_pipeline
+
+
+    def _prepare_grid_search_params(self, X: pd.DataFrame, base_params_override=None) -> dict:
+        """
+        Override to prepend 'model_pipeline__' to all keys in param_grid.
+        """
+        gs_config = super()._prepare_grid_search_params(X, base_params_override)
+        # Prepend "model_pipeline__" to each key if it isn’t already prefixed
+        gs_config['param_grid'] = {
+            f"model_pipeline__{k}" if not k.startswith("model_pipeline__") else k: v
+            for k, v in gs_config['param_grid'].items()
+        }
+        return gs_config
+
+
+    def _run_grid_search(self, X: pd.DataFrame, y: pd.Series, pipeline) -> Dict[str, float]:
+        """
+        Run grid search while always providing an eval set for early stopping.
+        """
+        if not self.modeling_config.get('grid_search_params', {}).get('enabled'):
+            logger.info("Constructing production model with base params...")
+            return {}
+
+        logger.info("Initiating grid search with eval set...")
+        u.notify('gadget')
+
+        gs_config = self._prepare_grid_search_params(X)
+        cv_pipeline = pipeline if pipeline is not None else self._get_model_pipeline(gs_config['base_model_params'])
+
+        self.random_search = RandomizedSearchCV(
+            cv_pipeline,
+            gs_config['param_grid'],
+            **gs_config['search_config']
+        )
+
+        # Always pass the eval_set for early stopping
+        self.random_search.fit(X, y, eval_set=(self.X_eval, self.y_eval))
+
+        logger.info("Grid search complete. Best score: %f", -self.random_search.best_score_)
+        u.notify('synth_magic')
+
+        return {
+            'best_params': {
+                k: (self._convert_min_child_weight_to_pct(X, v) if k == 'regressor__min_child_weight' else v)
+                for k, v in self.random_search.best_params_.items()
+            },
+            'best_score': -self.random_search.best_score_,
+            'cv_results': self.random_search.cv_results_
+        }
 
 
     def _predict_training_cohort(self) -> pd.Series:
@@ -253,47 +300,6 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
         return y
 
 
-class CombinedCohortSelector(BaseEstimator, TransformerMixin):
-    """
-    Transformer that filters both X and y based on a cohort DataFrame containing
-    the 'in_modeling_cohort' flag. Assumes X and the cohort DataFrame share the same index.
-    """
-    def __init__(self, cohort_df: pd.DataFrame):
-        """
-        Parameters:
-        - cohort_df (pd.DataFrame): DataFrame with 'in_modeling_cohort' flag; must be indexed like X.
-        """
-        self.cohort_df = cohort_df
-
-    def fit(self, X: pd.DataFrame, y=None):
-        """No fitting required; returns self."""
-        return self
-
-    def transform(self, X: pd.DataFrame, y=None):
-        """
-        Confirm X’s indices are in cohort_df, join on the index, filter rows where
-        in_modeling_cohort == 1, and return X (and y) with the flag dropped.
-        """
-        # Confirm that every index in X exists in cohort_df
-        if not X.index.isin(self.cohort_df.index).all():
-            raise ValueError("Not all index values in X have a match in the cohort DataFrame.")
-
-        # Perform an inner join of X with the 'in_modeling_cohort' column
-        X_joined = X.join(self.cohort_df[['in_modeling_cohort']], how='inner')
-
-        # Filter rows where in_modeling_cohort is 1
-        X_filtered = X_joined[X_joined['in_modeling_cohort'] == 1].copy()
-
-        # Drop the in_modeling_cohort column before returning
-        X_filtered.drop(columns=['in_modeling_cohort'], inplace=True, errors='ignore')
-
-        # If y is provided, align y with the filtered X by selecting matching indices
-        if y is not None:
-            y_filtered = y.loc[X_filtered.index].copy()
-            return X_filtered, y_filtered
-
-        return X_filtered
-
 
 class MetaPipeline(BaseEstimator, TransformerMixin):
     """Meta-pipeline that applies x and y transformations then fits a regressor."""
@@ -308,8 +314,12 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
         # Create a named_steps attribute that mimics sklearn Pipeline interface
         self.named_steps = {}
         # Add steps from model_pipeline to named_steps
+        for name, step in y_pipeline.named_steps.items():
+            self.named_steps[name] = step
+            self.name = step
         for name, step in model_pipeline.named_steps.items():
             self.named_steps[name] = step
+            self.name = step
 
     def fit(self, X, y, eval_set=None):
         """Fit the MetaPipeline on raw X and y data, using an optional eval_set for early stopping."""
@@ -338,7 +348,8 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
             self.regressor.fit(
                 X_trans,
                 y_trans,
-                eval_set=transformed_eval_set
+                eval_set=transformed_eval_set,
+                verbose=False
             )
         else:
             # Regular fit without early stopping if no eval set provided

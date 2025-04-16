@@ -290,6 +290,7 @@ modeling:
         n_jobs: -1
         nthread: -1
 
+        verbosity: 0
         random_state: 42
 
     # Phase training section
@@ -329,11 +330,11 @@ modeling:
         # Params for target variable generation
         param_grid_y:
 
-            # # Target variables
-            # y_pipeline__target_variables: [
-            #     crypto_net_gain/max_investment/winsorized,
-            #     crypto_net_gain/max_investment/ntile_rank,
-            # ]
+            # Target variables
+            y_pipeline__target_variables: [
+                crypto_net_gain/max_investment/winsorized,
+                crypto_net_gain/max_investment/ntile_rank,
+            ]
 
         # Params for model construction
         param_grid:
