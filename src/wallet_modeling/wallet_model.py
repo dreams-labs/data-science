@@ -212,6 +212,12 @@ class WalletModel(BaseModel):
             f"model_pipeline__{k}" if not k.startswith("model_pipeline__") else k: v
             for k, v in gs_config['param_grid'].items()
         }
+
+        # Add target variable options into the grid search.
+        if 'target_selector__target_variable' in self.modeling_config['grid_search_params']['param_grid_y']:
+            target_variables = self.modeling_config['grid_search_params']['param_grid_y']['target_selector__target_variable']
+            gs_config['param_grid']['y_pipeline__target_selector__target_variable'] = target_variables
+
         return gs_config
 
 
