@@ -6,7 +6,7 @@ training_data:
     training_window_starts: [
         # '2020-01-01',
         # '2021-01-01',
-        '2022-01-01',
+        # '2022-01-01',
         '2023-01-01',
         '2023-06-01',
         # '2023-09-01',
@@ -138,14 +138,14 @@ features:
 modeling:
 
     # Modeling period filters
-    modeling_min_investment: 500
+    modeling_min_investment: 100
     modeling_min_coins_traded: 0
 
     # Which wallet performance metric to use as the target variable.
-    # target_variable: crypto_net_gain/max_investment/winsorized
-    # target_variable: crypto_net_gain/max_investment/ntile_rank
+    # target_variable: crypto_net_flows/max_investment/winsorized
+    target_variable: crypto_net_gain/max_investment/ntile_rank
     # target_variable: crypto_net_flows
-    target_variable: crypto_net_flows/crypto_inflows/ntile_rank
+    # target_variable: crypto_net_flows/crypto_inflows/ntile_rank
 
     # PREDICTABLES
     # target_variable: unique_coins_traded
@@ -243,7 +243,6 @@ modeling:
             balance|n_coins|*,
             balance|total_usd_balance|*,
 
-
             # macro|*,
             macro|btc_price_first|*,
             macro|btc_price_last|*,
@@ -287,7 +286,7 @@ modeling:
         # Performance Profiles (Choose One Section)
         # --------------------------------------
         # CHECKPOINTER
-        n_estimators: 5  # number of trees to train in the model
+        n_estimators: 250  # number of trees to train in the model
         learning_rate: 0.1  # step size for updates to weights during training
 
         # # PRODUCTION
@@ -332,49 +331,56 @@ modeling:
 
         n_iter: 40  # random search limit
         n_splits: 2  # cv splits
-        scoring: neg_root_mean_squared_error
+
+        # scoring: neg_root_mean_squared_error
+        # scoring: custom_neg_rmse_scorer
+        scoring: custom_r2_scorer
 
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # scikit-learn verbosity
 
-        # Params
-        param_grid:
 
-            # # Target variables
-            # target_selector__target_variable: [
-            #     'average_transaction',
-            #     'crypto_cash_buys',
-            #     # 'crypto_cash_sells',
-            #     # 'crypto_inflows',
-            #     # 'crypto_net_cash_flows',
-            #     # 'crypto_net_flows',
-            #     # 'crypto_net_flows/crypto_inflows/base',
-            #     # 'crypto_net_flows/crypto_inflows/log',
-            #     # 'crypto_net_flows/crypto_inflows/ntile_rank',
-            #     # 'crypto_net_flows/crypto_inflows/rank',
-            #     # 'crypto_net_flows/crypto_inflows/winsorized',
-            #     # 'crypto_net_flows/max_investment/base',
-            #     # 'crypto_net_flows/max_investment/log',
-            #     # 'crypto_net_flows/max_investment/ntile_rank',
-            #     # 'crypto_net_flows/max_investment/rank',
-            #     # 'crypto_net_flows/max_investment/winsorized',
-            #     # 'crypto_net_gain',
-            #     # 'crypto_net_gain/crypto_inflows/base',
-            #     # 'crypto_net_gain/crypto_inflows/log',
-            #     # 'crypto_net_gain/crypto_inflows/ntile_rank',
-            #     # 'crypto_net_gain/crypto_inflows/rank',
-            #     # 'crypto_net_gain/crypto_inflows/winsorized',
-            #     # 'crypto_net_gain/max_investment/base',
-            #     # 'crypto_net_gain/max_investment/log',
-            #     # 'crypto_net_gain/max_investment/ntile_rank',
-            #     # 'crypto_net_gain/max_investment/rank',
-            #     # 'crypto_net_gain/max_investment/winsorized',
-            #     # 'crypto_outflows',
-            #     # 'in_modeling_cohort',
-            #     # 'max_investment',
-            #     # 'total_volume',
-            #     # 'unique_coins_traded'
-            # ]
+        # Params for target variable generation
+        param_grid_y:
+
+            # Target variables
+            target_selector__target_variable: [
+                'average_transaction',
+                'crypto_cash_buys',
+                'crypto_cash_sells',
+                'crypto_inflows',
+                'crypto_net_cash_flows',
+                'crypto_net_flows',
+                'crypto_net_flows/crypto_inflows/base',
+                'crypto_net_flows/crypto_inflows/log',
+                'crypto_net_flows/crypto_inflows/ntile_rank',
+                'crypto_net_flows/crypto_inflows/rank',
+                'crypto_net_flows/crypto_inflows/winsorized',
+                'crypto_net_flows/max_investment/base',
+                'crypto_net_flows/max_investment/log',
+                'crypto_net_flows/max_investment/ntile_rank',
+                'crypto_net_flows/max_investment/rank',
+                'crypto_net_flows/max_investment/winsorized',
+                'crypto_net_gain',
+                'crypto_net_gain/crypto_inflows/base',
+                'crypto_net_gain/crypto_inflows/log',
+                'crypto_net_gain/crypto_inflows/ntile_rank',
+                'crypto_net_gain/crypto_inflows/rank',
+                'crypto_net_gain/crypto_inflows/winsorized',
+                'crypto_net_gain/max_investment/base',
+                'crypto_net_gain/max_investment/log',
+                'crypto_net_gain/max_investment/ntile_rank',
+                'crypto_net_gain/max_investment/rank',
+                'crypto_net_gain/max_investment/winsorized',
+                'crypto_outflows',
+                'max_investment',
+                'total_volume',
+                'unique_coins_traded'
+            ]
+
+
+        # Params for model construction
+        param_grid:
 
             # # Depth and Child Weight
             # regressor__min_child_weight_pct: [0.00004, 0.00007, 0.0001]
@@ -391,9 +397,9 @@ modeling:
             # regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            regressor__max_depth: [8]  # basic depth param
+            regressor__max_depth: [12]  # basic depth param
             regressor__min_child_weight: [25]
-            regressor__n_estimators: [5]
+            regressor__n_estimators: [250]
             regressor__learning_rate: [0.2]
             # regressor__gamma: [0.01]
 
