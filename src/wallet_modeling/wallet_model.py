@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.pipeline import Pipeline
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.model_selection import RandomizedSearchCV
-from sklearn.metrics import root_mean_squared_error, make_scorer, r2_score
+from sklearn.metrics import root_mean_squared_error, r2_score
 
 # Local modules
 from base_modeling.base_model import BaseModel
@@ -222,7 +222,7 @@ class WalletModel(BaseModel):
 
         # Add target variable options into the grid search.
         if 'target_selector__target_variable' in self.modeling_config['grid_search_params']['param_grid_y']:
-            target_variables = self.modeling_config['grid_search_params']['param_grid_y']['target_selector__target_variable']
+            target_variables = self.modeling_config['grid_search_params']['param_grid_y']['target_selector__target_variable']  # pylint:disable=line-too-long
             gs_config['param_grid']['y_pipeline__target_selector__target_variable'] = target_variables
 
         return gs_config
