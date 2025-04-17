@@ -921,6 +921,8 @@ def winsorize(data: pd.Series, cutoff: float = 0.01) -> pd.Series:
 
     # Calculate bounds using non-null values
     valid_data = data[~np.isnan(data)]
+    if valid_data.size == 0:
+        raise ValueError("Winsorization error: no valid (non-NaN) data to compute percentiles")
     lower_bound = np.percentile(valid_data, cutoff * 100, method='nearest')
     upper_bound = np.percentile(valid_data, (1 - cutoff) * 100, method='nearest')
 

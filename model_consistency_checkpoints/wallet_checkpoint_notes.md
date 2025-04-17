@@ -1,3 +1,45 @@
+# dda 668 short windows
+checkpoint 2: w.680 remove time boundaries on market indicators
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       184
+Features per Window:      46
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.680
+RMSE:                     0.220
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.781
+RMSE:                     0.127
+MAE:                      0.069
+
+
+
+checkpoint 1: w.682 confirming baseline
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       184
+Features per Window:      46
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.682
+RMSE:                     0.219
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.783
+RMSE:                     0.127
+MAE:                      0.069
+
+
 # dda 667 feature importance reporting
 checkpoint 1: w.682 graph updated
 Model Performance Summary

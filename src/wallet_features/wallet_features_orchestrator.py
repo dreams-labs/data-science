@@ -73,8 +73,9 @@ def calculate_wallet_features(
     - wallet_features_df (df): Wallet-indexed features dataframe with a row for every wallet_cohort
     """
     # Add indices and validate inputs
-    prepare_dataframes(profits_df,market_indicators_data_df,transfers_sequencing_df,
-                       period_start_date,period_end_date)
+    profits_df, market_indicators_data_df, transfers_sequencing_df = prepare_dataframes(
+        profits_df,market_indicators_data_df,transfers_sequencing_df,
+        period_start_date,period_end_date)
 
     # Initialize output dataframe
     wallet_features_df = pd.DataFrame(index=wallet_cohort)
@@ -101,8 +102,10 @@ def calculate_wallet_features(
     wallet_features_df = wallet_features_df.join(balance_features_df, how='left')
 
     # Macroeconomic features (cross join)
-    macroeconomic_features_df = wmac.calculate_macro_features(macro_indicators_df,
-                                                            wallets_metrics_config['time_series']['macro_trends'])
+    macroeconomic_features_df = wmac.calculate_macro_features(
+                                    macro_indicators_df,
+                                    period_start_date,
+                                    wallets_metrics_config['time_series']['macro_trends'])
     feature_column_names['macro|'] = macroeconomic_features_df.columns
     wallet_features_df = (wallet_features_df.reset_index()
                           .merge(macroeconomic_features_df, how='cross')
