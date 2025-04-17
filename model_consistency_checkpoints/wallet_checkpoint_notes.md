@@ -1,3 +1,24 @@
+# dda 665 validation scoring
+checkpoint 1: w.682 update macro drop features
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       152
+Features per Window:      38
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.682
+RMSE:                     0.219
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.784
+RMSE:                     0.126
+MAE:                      0.068
+
+
 # dda 668 short windows
 checkpoint 2: w.680 remove time boundaries on market indicators
 Model Performance Summary
