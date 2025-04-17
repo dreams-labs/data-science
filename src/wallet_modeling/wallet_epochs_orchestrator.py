@@ -169,7 +169,7 @@ class MultiEpochOrchestrator:
         - epoch_modeling_features_df (DataFrame): Modeling features for this epoch
         """
         model_start = epoch_config['training_data']['modeling_period_start']
-        logger.info(f"Generating data for epoch starting {model_start}")
+        logger.info(f"Generating data for epoch starting {model_start}...")
         u.notify('futuristic')
 
         # Generate name of parquet folder and create it if necessary
