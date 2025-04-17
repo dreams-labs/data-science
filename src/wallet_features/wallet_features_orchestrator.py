@@ -73,8 +73,9 @@ def calculate_wallet_features(
     - wallet_features_df (df): Wallet-indexed features dataframe with a row for every wallet_cohort
     """
     # Add indices and validate inputs
-    prepare_dataframes(profits_df,market_indicators_data_df,transfers_sequencing_df,
-                       period_start_date,period_end_date)
+    profits_df, market_indicators_data_df, transfers_sequencing_df = prepare_dataframes(
+        profits_df,market_indicators_data_df,transfers_sequencing_df,
+        period_start_date,period_end_date)
 
     # Initialize output dataframe
     wallet_features_df = pd.DataFrame(index=wallet_cohort)

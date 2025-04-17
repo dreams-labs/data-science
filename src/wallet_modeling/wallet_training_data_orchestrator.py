@@ -669,12 +669,6 @@ class WalletTrainingDataOrchestrator:
             group_column
         )
 
-        # Filters out pre-training period records now that we've computed lookback and rolling metrics
-        indicators_df = indicators_df[
-            indicators_df['date'] >=
-            self.wallets_config['training_data'][f'{period}_starting_balance_date']
-        ]
-
         # Reset OBV to 0 at training start if it exists
         training_start = pd.to_datetime(self.wallets_config['training_data'][f'{period}_starting_balance_date'])
         if 'obv' in indicators_df.columns:
