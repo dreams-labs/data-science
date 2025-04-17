@@ -83,7 +83,7 @@ class MultiEpochOrchestrator:
         latest_validation_end = max(all_validation_ends)
 
         # Retrieve the full data once (BigQuery or otherwise)
-        logger.info("Pulling complete raw datasets from %s through %s...",
+        logger.milestone("Pulling complete raw datasets from %s through %s...",
                     earliest_training_start, latest_validation_end)
         self.complete_profits_df, self.complete_market_data_df, self.complete_macro_trends_df = \
             self.wtd.retrieve_raw_datasets(earliest_training_start, latest_validation_end)
@@ -169,7 +169,7 @@ class MultiEpochOrchestrator:
         - epoch_modeling_features_df (DataFrame): Modeling features for this epoch
         """
         model_start = epoch_config['training_data']['modeling_period_start']
-        logger.info(f"Generating data for epoch starting {model_start}")
+        logger.info(f"Generating data for epoch starting {model_start}...")
         u.notify('futuristic')
 
         # Generate name of parquet folder and create it if necessary
