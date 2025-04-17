@@ -60,8 +60,6 @@ class MultiEpochOrchestrator:
         # Generated objects
         self.output_dfs = {}
 
-        u.notify('wifi_connected')
-
 
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def load_complete_raw_datasets(self) -> None:
