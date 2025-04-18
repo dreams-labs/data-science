@@ -68,7 +68,7 @@ class WalletTrainingDataOrchestrator:
 
 
     @u.timing_decorator
-    def retrieve_period_datasets(
+    def prepare_period_datasets(
         self,
         period_start_date,
         period_end_date,
@@ -198,26 +198,10 @@ class WalletTrainingDataOrchestrator:
                 metric_type = 'macro_trends'
             )
             market_indicators_df = market_indicators_df.set_index('date')
-
             return market_indicators_df
 
         # Define training wallet cohort
         def generate_cohort_profits_df(profits_df_full):
-            # Hybridize wallet IDs if configured and map not yet built
-            if self.wallets_config['training_data']['hybridize_wallet_ids']:
-                if self.hybrid_cw_id_map is None:
-                    # # Build new mapping and apply
-                    # profits_df_full, hybrid_cw_id_map = hybridize_wallet_address(profits_df_full)
-                    # self.hybrid_cw_id_map = hybrid_cw_id_map
-                    # # upload_hybrid_wallet_mapping(hybrid_cw_id_map)
-                    raise ValueError("this should never happen")
-                else:
-                    # Reapply existing mapping
-                    profits_df_full, _ = hybridize_wallet_address(
-                        profits_df_full,
-                        self.hybrid_cw_id_map
-                    )
-
             logger.info("Defining wallet cohort...")
 
             # Apply necessary transformations (row imputation, filtering by date)
@@ -231,7 +215,7 @@ class WalletTrainingDataOrchestrator:
             if self.training_wallet_cohort is None:
                 self._define_training_wallet_cohort(
                     period_profits_df.copy(),
-                    self.wallets_config['training_data']['hybridize_wallet_ids']
+                    # self.wallets_config['training_data']['hybridize_wallet_ids']
                 )
 
             # Filter profits_df to cohort
@@ -253,13 +237,31 @@ class WalletTrainingDataOrchestrator:
         transfers_df = wts.retrieve_transfers_sequencing(
             self.wallets_config['features']['timing_metrics_min_transaction_size'],
             self.wallets_config['training_data'][f'{period}_period_end'],
-            self.wallets_config['training_data']['hybridize_wallet_ids'],
             self.epoch_reference_date
         )
 
-        # Handle hybrid IDs if configured
-        if self.hybrid_cw_id_map is not None:
-            transfers_df, _ = hybridize_wallet_address(transfers_df,self.hybrid_cw_id_map)
+        # # Hybridize wallet IDs if configured
+        # if self.wallets_config['training_data']['hybridize_wallet_ids']:
+        #     cohort_profits_df, _ = hybridize_wallet_address(cohort_profits_df,self.hybrid_cw_id_map)
+        #     transfers_df, _ = hybridize_wallet_address(transfers_df,self.hybrid_cw_id_map)
+
+        # # Confirm every (wallet_address, coin_id) in transfers_df exists in cohort_profits_df
+        # transfers_pairs = transfers_df[['wallet_address', 'coin_id']].drop_duplicates()
+        # profits_pairs   = cohort_profits_df.reset_index()[['wallet_address', 'coin_id']].drop_duplicates()
+        # merged = transfers_pairs.merge(
+        #     profits_pairs,
+        #     on=['wallet_address', 'coin_id'],
+        #     how='left',
+        #     indicator=True
+        # )
+        # missing_transfers = merged[merged['_merge'] == 'left_only']
+        # if not missing_transfers.empty:
+        #     missing_cnt = len(missing_transfers)
+        #     total_cnt = len(transfers_pairs)
+        #     raise ValueError(
+        #         f"transfers_df contains {missing_cnt} wallet/coin pairs not found in profits_df "
+        #         f"({missing_cnt/total_cnt*100:.1f}% of transfers)."
+        #     )
 
         if return_files is True:
             # Return dfs without saving
@@ -403,7 +405,6 @@ class WalletTrainingDataOrchestrator:
     def prepare_modeling_features(
         self,
         modeling_profits_df_full: pd.DataFrame,
-        hybrid_cw_id_map: Optional[Dict] = None,
         period: str = 'modeling'
     ) -> pd.DataFrame:
         """
@@ -413,22 +414,12 @@ class WalletTrainingDataOrchestrator:
         - modeling_market_data_df_full: Full market data DataFrame
         - modeling_profits_df_full: Full profits DataFrame
         - config: Configuration dictionary
-        - hybrid_cw_id_map: Optional mapping for hybrid wallet IDs
         - period: Which period to retrieve dates from
-
 
         Returns:
         - modeling_wallet_features_df: Generated wallet features
         """
         logger.info("Beginning modeling data preparation...")
-
-        # Handle hybridization if configured
-        if self.wallets_config['training_data']['hybridize_wallet_ids'] is True:
-            logger.info("Applying wallet-coin hybridization...")
-            modeling_profits_df_full, _ = hybridize_wallet_address(
-                modeling_profits_df_full,
-                hybrid_cw_id_map
-            )
 
         # Filter profits to training cohort
         if self.training_wallet_cohort is not None:
@@ -532,7 +523,7 @@ class WalletTrainingDataOrchestrator:
     def _define_training_wallet_cohort(
         self,
         training_profits_df: pd.DataFrame,
-        hybridize_wallet_ids: bool
+        # hybridize_wallet_ids: bool
     ) -> Tuple[pd.DataFrame, np.ndarray]:
         """
         Orchestrates the definition of a wallet cohort for model training by:
@@ -565,7 +556,7 @@ class WalletTrainingDataOrchestrator:
             raise ValueError("Cohort does not include any wallets. Cohort must include wallets.")
 
         # Upload the cohort to BigQuery for additional complex feature generation
-        self.wtd.upload_training_cohort(training_wallet_cohort, hybridize_wallet_ids)
+        self.wtd.upload_training_cohort(training_wallet_cohort)#, hybridize_wallet_ids)
         logger.milestone("Training wallet cohort defined as %s wallets after %.2f seconds.",
                     len(training_wallet_cohort), time.time()-start_time)
 

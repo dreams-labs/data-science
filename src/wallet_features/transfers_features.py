@@ -21,7 +21,6 @@ wallets_config = WalletsConfig()
 
 def retrieve_transfers_sequencing(min_txn_size: int,
                                   training_end: str,
-                                  hybridize_wallet_ids: bool = False,
                                   epoch_reference_date: str = '') -> pd.DataFrame:
     """
     Returns buyer and seller sequence numbers for each wallet-coin pair, where the first
@@ -30,7 +29,6 @@ def retrieve_transfers_sequencing(min_txn_size: int,
     Params:
     - min_txn_size (int): Minimum USD value to filter out dust/airdrops
     - training_end (str): Training period end as YYYY-MM-DD string
-    - hybridize_wallet_ids (bool): Whether to use hybrid wallet-coin IDs vs regular wallet IDs
     - epoch_reference_date (str): Suffix added to table for each epoch
 
     Returns:

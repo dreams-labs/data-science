@@ -92,12 +92,13 @@ class MultiEpochOrchestrator:
         self.complete_profits_df, self.complete_market_data_df, self.complete_macro_trends_df = \
             self.wtd.retrieve_raw_datasets(earliest_training_start, latest_validation_end)
 
-        # Handle hybrid IDs if configured
+        # Generate hybrid ID map if configured
         if self.base_config['training_data']['hybridize_wallet_ids']:
-            # Build new mapping and apply
-            profits_df_full, hybrid_cw_id_map = wtdo.hybridize_wallet_address(profits_df_full)
-            self.hybrid_cw_id_map = hybrid_cw_id_map
-            wtdo.upload_hybrid_wallet_mapping(hybrid_cw_id_map)
+            # Generate hybrid IDs for wallet_address-coin_id pairs
+            _, self.hybrid_cw_id_map = wtdo.hybridize_wallet_address(
+                self.complete_profits_df[['wallet_address','coin_id']]
+            )
+            wtdo.upload_hybrid_wallet_mapping(self.hybrid_cw_id_map)
 
         # Set index
         self.complete_profits_df = u.ensure_index(self.complete_profits_df)
@@ -211,7 +212,7 @@ class MultiEpochOrchestrator:
         # 2. Generate TRAINING_DATA_DFs
         training_profits_df_full, training_market_data_df_full, \
         training_macro_trends_df_full, training_coin_cohort = \
-            training_generator.retrieve_period_datasets(
+            training_generator.prepare_period_datasets(
                 epoch_config['training_data']['training_period_start'],
                 epoch_config['training_data']['training_period_end']
             )
@@ -259,7 +260,7 @@ class MultiEpochOrchestrator:
             hybrid_cw_id_map=self.hybrid_cw_id_map
         )
 
-        modeling_profits_df_full, _, _, _ = modeling_generator.retrieve_period_datasets(
+        modeling_profits_df_full, _, _, _ = modeling_generator.prepare_period_datasets(
             epoch_config['training_data']['modeling_period_start'],
             epoch_config['training_data']['modeling_period_end'],
             training_coin_cohort

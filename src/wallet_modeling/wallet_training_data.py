@@ -420,7 +420,7 @@ class WalletTrainingData:
     def upload_training_cohort(
             self,
             cohort_ids: np.array,
-            hybridize_wallet_ids: bool
+            # hybridize_wallet_ids: bool
         ) -> None:
         """
         Uploads the list of wallet_ids that are used in the model to BigQuery. This
@@ -434,7 +434,8 @@ class WalletTrainingData:
         # 1. Generate upload_df from input df
         # -----------------------------------
         upload_df = pd.DataFrame()
-        id_col = 'hybrid_id' if hybridize_wallet_ids else 'wallet_id'
+        # id_col = 'hybrid_id' if hybridize_wallet_ids else 'wallet_id'
+        id_col = 'wallet_id'
         upload_df[id_col] = cohort_ids
         upload_df['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
@@ -468,35 +469,16 @@ class WalletTrainingData:
 
         # 3. Create updated table with full wallet_address values
         # -------------------------------------------------------
-
-        if hybridize_wallet_ids is False:
-            create_query = f"""
-            CREATE OR REPLACE TABLE `{wallet_ids_table}` AS
-            SELECT
-                t.{id_col},
-                w.wallet_address,
-                t.updated_at
-            FROM `{wallet_ids_table}` t
-            LEFT JOIN `reference.wallet_ids` w
-                ON t.wallet_id = w.wallet_id
-            """
-            client.query(create_query).result()
-            logger.info('Uploaded cohort of %s wallets with addresses to %s.',
-                        len(cohort_ids), wallet_ids_table)
-
-        else:
-            create_query = f"""
-            CREATE OR REPLACE TABLE `{wallet_ids_table}` AS
-            SELECT
-                c.hybrid_id,
-                hm.wallet_id,
-                hm.wallet_address,
-                hm.coin_id,
-                c.updated_at
-            FROM `{wallet_ids_table}` c
-            JOIN `temp.wallet_modeling_hybrid_id_mapping` hm
-                ON hm.hybrid_id = c.hybrid_id
-            """
-            client.query(create_query).result()
-            logger.info('Uploaded cohort of %s hybrid_ids %s.',
-                        len(cohort_ids), wallet_ids_table)
+        create_query = f"""
+        CREATE OR REPLACE TABLE `{wallet_ids_table}` AS
+        SELECT
+            t.{id_col},
+            w.wallet_address,
+            t.updated_at
+        FROM `{wallet_ids_table}` t
+        LEFT JOIN `reference.wallet_ids` w
+            ON t.wallet_id = w.wallet_id
+        """
+        client.query(create_query).result()
+        logger.info('Uploaded cohort of %s wallets with addresses to %s.',
+                    len(cohort_ids), wallet_ids_table)

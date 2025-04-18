@@ -193,7 +193,7 @@ def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
 
     # Use pandas' `.intersection()` which is optimized for Index objects
     common_wallets = wallets_in_profits.intersection(wallets_in_transfers)
-    coverage = len(common_wallets) / len(wallets_in_profits)
+    coverage = len(common_wallets) / len(wallets_in_transfers)
 
     if coverage < 0.99:
         raise ValueError(f"Only {coverage:.2%} of wallets in profits_df are in transfers_sequencing_df.")
