@@ -770,17 +770,49 @@ def hybridize_wallet_address(
     - df (DataFrame): input df with hybrid integer keys
     - hybrid_cw_id_map (dict): mapping of (wallet,coin) tuples to integers
     """
-    # Create unique mapping for wallet-coin pairs
-    unique_pairs = list(zip(df['wallet_address'], df['coin_id']))
+    logger.info(f"Applying hybridization to DataFrame with shape {df.shape}...")
 
-    # Generate new mapping if none was provided
+    # Work on a copy to avoid mutating input
+    df_copy = df.copy()
+    original_index = df_copy.index.names
+
+    # Determine where wallet_address and coin_id live
+    if {'wallet_address', 'coin_id'}.issubset(df_copy.columns):
+        wallet_col, coin_col = 'wallet_address', 'coin_id'
+        used_index = False
+    elif set(['wallet_address', 'coin_id']).issubset(df_copy.index.names):
+        # lift them into columns for mapping
+        df_copy = df_copy.reset_index()
+        wallet_col, coin_col = 'wallet_address', 'coin_id'
+        used_index = True
+    else:
+        raise ValueError(
+            "hybridize_wallet_address: 'wallet_address' and 'coin_id' "
+            "must exist as columns or index levels"
+        )
+
+    # Build list of pairs in row order
+    pairs = list(zip(df_copy[wallet_col], df_copy[coin_col]))
+
+    # Initialize mapping if needed
     if hybrid_cw_id_map is None:
-        hybrid_cw_id_map = {pair: idx for idx, pair in enumerate(set(unique_pairs), 1)}
+        hybrid_cw_id_map = {pair: idx for idx, pair in enumerate(set(pairs), 1)}
 
-    # Vectorized mapping of pairs to integers
-    df['wallet_address'] = pd.Series(unique_pairs).map(hybrid_cw_id_map)
+    # Extend mapping for any new pairs not already in the map
+    current_max = max(hybrid_cw_id_map.values()) if hybrid_cw_id_map else 0
+    for pair in pairs:
+        if pair not in hybrid_cw_id_map:
+            current_max += 1
+            hybrid_cw_id_map[pair] = current_max
 
-    return df, hybrid_cw_id_map
+    # Apply mapping without pandas alignment
+    df_copy[wallet_col] = [hybrid_cw_id_map[p] for p in pairs]
+
+    # Restore original index if needed
+    if used_index:
+        df_copy = df_copy.set_index(original_index)
+
+    return df_copy, hybrid_cw_id_map
 
 
 
@@ -810,7 +842,10 @@ def dehybridize_wallet_address(
 
 
 @u.timing_decorator
-def upload_hybrid_wallet_mapping(hybrid_cw_id_map: Dict[Tuple[int, str], int]) -> None:
+def upload_hybrid_wallet_mapping(
+        hybrid_cw_id_map: Dict[Tuple[int, str], int],
+
+    ) -> None:
     """
     Uploads the mapping of hybrid indices to all wallet-coin pairs to BigQuery.
 

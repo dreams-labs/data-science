@@ -1,3 +1,24 @@
+# dda 583 retry hybridization
+checkpoint 1: HDEV.839 update hybridize_wallet_address()
+Model Performance Summary
+===================================
+Test Samples:             2,111
+Number of Features:       152
+Features per Window:      38
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.839
+RMSE:                     0.224
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.831
+RMSE:                     0.136
+MAE:                      0.081
+
+
 # dda 669.2 predictive segments
 checkpoint 1: w.682 tweaked analysis
 Model Performance Summary
