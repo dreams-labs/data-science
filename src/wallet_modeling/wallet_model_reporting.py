@@ -58,7 +58,9 @@ def generate_and_save_wallet_model_artifacts(
         training_cohort_pred=model_results['training_cohort_pred'],
         training_cohort_actuals=model_results['training_cohort_actuals'],
         model=model,
-        feature_names=model_results['pipeline'][:-1].transform(model_results['X_train']).columns.tolist()
+        feature_names=model_results['pipeline'][:-1].transform(model_results['X_train']).columns.tolist(),
+        y_validation=model_results.get('y_validation'),
+        y_validation_pred=model_results.get('y_validation_pred')
     )
 
     # Create evaluation dictionary with the same structure as before

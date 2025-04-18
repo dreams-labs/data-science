@@ -9,7 +9,6 @@ from sklearn.metrics import root_mean_squared_error, r2_score
 
 # Local modules
 from base_modeling.base_model import BaseModel
-import wallet_insights.wallet_validation_analysis as wiva
 import utils as u
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
@@ -115,7 +114,7 @@ class WalletModel(BaseModel):
 
         meta_pipeline.fit(self.X_train, self.y_train, eval_set=(self.X_eval, self.y_eval))
         self.pipeline = meta_pipeline
-        self.y_pipeline = meta_pipeline.y_pipeline  # <-- add this
+        self.y_pipeline = meta_pipeline.y_pipeline
 
         # Update target variables to be 1D Series using the y_pipeline
         self.y_train = self.y_pipeline.transform(self.y_train)
@@ -126,6 +125,13 @@ class WalletModel(BaseModel):
         result = {
             'pipeline': self.pipeline,
         }
+
+        # Store validation datasets and predictions if applicable
+        if self.X_validation is not None:
+            result['X_validation'] = self.X_validation
+            result['validation_wallet_features_df'] = self.validation_wallet_features_df
+            result['y_validation_pred'] = meta_pipeline.predict(self.X_validation)
+            result['y_validation'] = self.y_pipeline.transform(self.validation_wallet_features_df)
 
         # Add train/test data if requested
         if return_data:

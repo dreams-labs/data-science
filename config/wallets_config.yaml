@@ -303,6 +303,7 @@ modeling:
         n_jobs: -1
         nthread: -1
 
+        # Metaparams
         verbosity: 0
         random_state: 42
 
@@ -375,8 +376,8 @@ modeling:
             # regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            regressor__n_estimators: [250]
-            regressor__learning_rate: [0.1]
+            regressor__n_estimators: [100]
+            regressor__learning_rate: [0.2]
             # regressor__gamma: [0.01]
 
             # Optimize for Speed
