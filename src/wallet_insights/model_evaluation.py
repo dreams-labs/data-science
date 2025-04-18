@@ -11,14 +11,10 @@ from sklearn.metrics import (
     explained_variance_score,
 )
 
-# local module imports
-from wallet_modeling.wallets_config_manager import WalletsConfig
+# pylint:disable=invalid-name  # X_test isn't camelcase
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
-
-# Load wallets_config at the module level
-wallets_config = WalletsConfig()
 
 
 class RegressionEvaluator:
@@ -45,7 +41,9 @@ class RegressionEvaluator:
         feature_names=None,
         y_train: np.ndarray = None,
         training_cohort_pred: np.ndarray = None,
-        training_cohort_actuals: np.ndarray = None
+        training_cohort_actuals: np.ndarray = None,
+        y_validation: np.ndarray = None,
+        y_validation_pred: np.ndarray = None
     ):
         """
         Initialize evaluator with prediction data and optional training cohort data.
@@ -73,6 +71,10 @@ class RegressionEvaluator:
                                    if training_cohort_pred is not None else None)
         self.training_cohort_actuals = (np.array(training_cohort_actuals)
                                       if training_cohort_actuals is not None else None)
+
+        # Optional validation set
+        self.y_validation = np.array(y_validation) if y_validation is not None else None
+        self.y_validation_pred = np.array(y_validation_pred) if y_validation_pred is not None else None
 
         # Initialize storage
         self.metrics = {}
@@ -138,6 +140,13 @@ class RegressionEvaluator:
         if self.model is not None and hasattr(self.model, 'feature_importances_'):
             self._calculate_feature_importance()
 
+        # Validation set performance if applicable
+        if self.y_validation is not None and self.y_validation_pred is not None:
+            self.metrics['validation_metrics'] = {
+                'r2': r2_score(self.y_validation, self.y_validation_pred),
+                'rmse': np.sqrt(mean_squared_error(self.y_validation, self.y_validation_pred)),
+                'mae': mean_absolute_error(self.y_validation, self.y_validation_pred)
+            }
 
     def _calculate_cohort_metrics(self):
         """Calculate comparison metrics between modeling and training cohorts."""
@@ -223,6 +232,18 @@ class RegressionEvaluator:
             f"MAE:                      {self.metrics['mae']:.3f}",
             ""
         ])
+
+        # Add validation metrics if we computed them
+        if 'validation_metrics' in self.metrics:
+            vm = self.metrics['validation_metrics']
+            summary.extend([
+                "Validation Set Metrics",
+                "-" * 35,
+                f"R² Score:                 {vm['r2']:.3f}",
+                f"RMSE:                     {vm['rmse']:.3f}",
+                f"MAE:                      {vm['mae']:.3f}",
+                ""
+            ])
 
         # Add training cohort metrics if available
         if 'training_cohort' in self.metrics:

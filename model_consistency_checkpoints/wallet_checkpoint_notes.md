@@ -1,3 +1,58 @@
+# dda 665 validation scoring
+checkpoint 3: w.682 validation reporting working
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       152
+Features per Window:      38
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.682
+RMSE:                     0.219
+MAE:                      0.118
+
+Validation Set Metrics
+-----------------------------------
+R² Score:                 -0.148
+RMSE:                     0.408
+MAE:                      0.222
+
+
+checkpoint 2: w.682 validation grid search working
+Core Metrics
+-----------------------------------
+R² Score:                 0.682
+RMSE:                     0.219
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.784
+RMSE:                     0.126
+MAE:                      0.068
+
+
+checkpoint 1: w.682 update macro drop features
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       152
+Features per Window:      38
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.682
+RMSE:                     0.219
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.784
+RMSE:                     0.126
+MAE:                      0.068
+
+
 # dda 668 short windows
 checkpoint 2: w.680 remove time boundaries on market indicators
 Model Performance Summary

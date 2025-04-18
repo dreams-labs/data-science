@@ -243,6 +243,19 @@ modeling:
             balance|n_coins|*,
             balance|total_usd_balance|*,
 
+            # macro|*,
+            macro|btc_price_first|*,
+            macro|btc_price_last|*,
+            # macro|btc_price_std|*,
+            macro|btc_price_rsi_100_last|*,
+            macro|btc_mvrv_z_score_first|*,
+            macro|btc_mvrv_z_score_last|*,
+            macro|global_volume_last|*,
+            macro|global_volume_first|*,
+            # macro|global_market_cap_first|*,
+            # macro|global_market_cap_last|*,
+            macro|global_market_cap_rsi_100_last|*,
+
             cluster|*,
 
             '*|w1',
@@ -290,6 +303,7 @@ modeling:
         n_jobs: -1
         nthread: -1
 
+        # Metaparams
         verbosity: 0
         random_state: 42
 
@@ -325,7 +339,8 @@ modeling:
 
         # scoring: neg_root_mean_squared_error
         # scoring: custom_neg_rmse_scorer
-        scoring: custom_r2_scorer
+        # scoring: custom_r2_scorer
+        scoring: validation_r2_scorer
 
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # scikit-learn verbosity
@@ -336,8 +351,11 @@ modeling:
             # Target variables
             target_selector__target_variable: [
                 crypto_net_gain,
-                crypto_net_gain/max_investment/winsorized,
-                crypto_net_gain/max_investment/ntile_rank,
+                # crypto_net_gain/max_investment/winsorized,
+                # crypto_net_gain/max_investment/ntile_rank,
+                'max_investment',
+                'total_volume',
+                'unique_coins_traded'
             ]
 
         # Params for model construction
@@ -358,9 +376,9 @@ modeling:
             # regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            regressor__n_estimators: [50]
+            regressor__n_estimators: [100]
             regressor__learning_rate: [0.2]
-            regressor__gamma: [0.01]
+            # regressor__gamma: [0.01]
 
             # Optimize for Speed
             # regressor__n_jobs: [4]  # how many models to build at once

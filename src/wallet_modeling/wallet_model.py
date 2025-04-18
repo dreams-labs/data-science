@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.pipeline import Pipeline
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.model_selection import RandomizedSearchCV
-from sklearn.metrics import root_mean_squared_error, make_scorer, r2_score
+from sklearn.metrics import root_mean_squared_error, r2_score
 
 # Local modules
 from base_modeling.base_model import BaseModel
@@ -38,13 +38,15 @@ class WalletModel(BaseModel):
         # Initialize BaseModel with the given configuration
         super().__init__(modeling_config)
 
-        # Modeling cohort and target variables
+        # y data for modeling period; includes Modeling cohort and target variables
         self.modeling_wallet_features_df = None
 
         # Target variable pipeline
         self.y_pipeline = None
 
-
+        # Validation set objects
+        self.X_validation = None
+        self.validation_wallet_features_df = None
 
     # -----------------------------------
     #         Primary Interface
@@ -54,6 +56,8 @@ class WalletModel(BaseModel):
             self,
             training_data_df: pd.DataFrame,
             modeling_wallet_features_df: pd.DataFrame,
+            validation_data_df: pd.DataFrame = None,
+            validation_wallet_features_df: pd.DataFrame = None,
             return_data: bool = True
         ) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
         """
@@ -62,6 +66,8 @@ class WalletModel(BaseModel):
         Params:
         - training_data_df (DataFrame): full training cohort feature data
         - modeling_wallet_features_df (DataFrame): Contains modeling cohort flag and target
+        - validation_data_df (DataFrame, optional): Feature data for external validation
+        - validation_wallet_features_df (DataFrame, optional): Target data for external validation
         - return_data (bool): Whether to return train/test splits and predictions
 
         Returns:
@@ -73,6 +79,13 @@ class WalletModel(BaseModel):
         u.assert_matching_indices(training_data_df, modeling_wallet_features_df)
         self.training_data_df = training_data_df
         self.modeling_wallet_features_df = modeling_wallet_features_df
+
+        # Store validation data if provided
+        if validation_data_df is not None and validation_wallet_features_df is not None:
+            u.assert_matching_indices(validation_data_df, validation_wallet_features_df)
+            self.X_validation = validation_data_df
+            self.validation_wallet_features_df = validation_wallet_features_df
+            logger.info(f"Validation data set with {len(validation_data_df)} records loaded.")
 
         # Prepare data
         X, y = self._prepare_data(training_data_df, modeling_wallet_features_df)
@@ -101,7 +114,7 @@ class WalletModel(BaseModel):
 
         meta_pipeline.fit(self.X_train, self.y_train, eval_set=(self.X_eval, self.y_eval))
         self.pipeline = meta_pipeline
-        self.y_pipeline = meta_pipeline.y_pipeline  # <-- add this
+        self.y_pipeline = meta_pipeline.y_pipeline
 
         # Update target variables to be 1D Series using the y_pipeline
         self.y_train = self.y_pipeline.transform(self.y_train)
@@ -112,6 +125,13 @@ class WalletModel(BaseModel):
         result = {
             'pipeline': self.pipeline,
         }
+
+        # Store validation datasets and predictions if applicable
+        if self.X_validation is not None:
+            result['X_validation'] = self.X_validation
+            result['validation_wallet_features_df'] = self.validation_wallet_features_df
+            result['y_validation_pred'] = meta_pipeline.predict(self.X_validation)
+            result['y_validation'] = self.y_pipeline.transform(self.validation_wallet_features_df)
 
         # Add train/test data if requested
         if return_data:
@@ -222,7 +242,7 @@ class WalletModel(BaseModel):
 
         # Add target variable options into the grid search.
         if 'target_selector__target_variable' in self.modeling_config['grid_search_params']['param_grid_y']:
-            target_variables = self.modeling_config['grid_search_params']['param_grid_y']['target_selector__target_variable']
+            target_variables = self.modeling_config['grid_search_params']['param_grid_y']['target_selector__target_variable']  # pylint:disable=line-too-long
             gs_config['param_grid']['y_pipeline__target_selector__target_variable'] = target_variables
 
         return gs_config
@@ -243,13 +263,20 @@ class WalletModel(BaseModel):
         gs_config = self._prepare_grid_search_params(X)
 
         # Assign custom scorers if applicable
-        custom_scoring_functions = {
-            'custom_r2_scorer': custom_r2_scorer,
-            'custom_neg_rmse_scorer': custom_neg_rmse_scorer,
-        }
         scoring_param = gs_config['search_config'].get('scoring')
-        if isinstance(scoring_param, str) and scoring_param in custom_scoring_functions:
-            gs_config['search_config']['scoring'] = custom_scoring_functions[scoring_param]
+        if scoring_param == 'custom_r2_scorer':
+            gs_config['search_config']['scoring'] = custom_r2_scorer
+        elif scoring_param == 'custom_neg_rmse_scorer':
+            gs_config['search_config']['scoring'] = custom_neg_rmse_scorer
+        elif scoring_param == 'validation_r2_scorer':
+            # Ensure validation data is available
+            if self.X_validation is None or self.validation_wallet_features_df is None:
+                raise ValueError("Validation data required for validation_r2_scorer")
+
+            # Create the custom scorer with access to validation data
+            gs_config['search_config']['scoring'] = validation_r2_scorer(self)
+        else:
+            raise ValueError(f"Invalid scoring metric '{scoring_param}' found in grid_search_params.")
 
         # Generate pipeline
         cv_pipeline = pipeline if pipeline is not None else self._get_model_pipeline(gs_config['base_model_params'])
@@ -431,7 +458,7 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
 
 
 # -----------------------------------
-#          Utility Functions
+#          Scorer Functions
 # -----------------------------------
 
 def custom_neg_rmse_scorer(estimator, X, y):
@@ -461,3 +488,30 @@ def custom_r2_scorer(estimator, X, y):
     y_trans = estimator.y_pipeline.transform(y)
     y_pred = estimator.predict(X)
     return r2_score(y_trans, y_pred)
+
+
+def validation_r2_scorer(wallet_model):
+    """
+    Factory function that returns a custom scorer using validation data.
+
+    Params:
+    - wallet_model: WalletModel instance containing validation data
+
+    Returns:
+    - scorer function compatible with scikit-learn
+    """
+    def scorer(estimator, X=None, y=None):
+        """Score using the validation data instead of provided X and y"""
+        if wallet_model.X_validation is None or wallet_model.validation_wallet_features_df is None:
+            raise ValueError("Validation data not set in wallet_model")
+
+        # Transform y using the pipeline
+        y_trans = estimator.y_pipeline.transform(wallet_model.validation_wallet_features_df)
+
+        # Get predictions
+        y_pred = estimator.predict(wallet_model.X_validation)
+
+        # Calculate and return R2 score
+        return r2_score(y_trans, y_pred)
+
+    return scorer

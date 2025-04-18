@@ -658,12 +658,12 @@ class DropColumnPatterns(BaseEstimator, TransformerMixin):
         - DataFrame: Data with specified columns dropped.
         """
         if not self.columns_to_drop:
-            logger.info("No columns to drop. Returning data unchanged.")
+            logger.debug("No columns to drop. Returning data unchanged.")
             return X
 
         # Filter columns that exist in the current dataset
         dropped_columns = [col for col in self.columns_to_drop if col in X.columns]
-        logger.info(f"Dropping {len(dropped_columns)} columns based on name pattern params.")
+        logger.debug(f"Dropping {len(dropped_columns)} columns based on name pattern params.")
 
         # Drop columns safely
         return X.drop(columns=dropped_columns, errors='ignore')

@@ -60,7 +60,6 @@ class MultiEpochOrchestrator:
         # Generated objects
         self.output_dfs = {}
 
-        u.notify('wifi_drop')
 
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def load_complete_raw_datasets(self) -> None:
@@ -71,7 +70,9 @@ class MultiEpochOrchestrator:
 
         Returns:
         - None
-            """
+        """
+        u.notify('robotz_windows_exit')
+
         # 1. Find earliest and latest window boundaries across all epochs
         all_train_starts = []
         all_validation_ends = []
