@@ -92,23 +92,6 @@ class MultiEpochOrchestrator:
         self.complete_profits_df, self.complete_market_data_df, self.complete_macro_trends_df = \
             self.wtd.retrieve_raw_datasets(earliest_training_start, latest_validation_end)
 
-        # Apply hybridization if configured
-        if self.base_config['training_data']['hybridize_wallet_ids']:
-            # Generate hybrid IDs for wallet_address-coin_id pairs
-            _, self.hybrid_cw_id_map = wtdo.hybridize_wallet_address(
-                self.complete_profits_df[['wallet_address','coin_id']]
-            )
-            wtdo.upload_hybrid_wallet_mapping(self.hybrid_cw_id_map)
-
-            # Assign hybrid_id column directly without merging
-            pairs = list(zip(
-                self.complete_profits_df['wallet_address'],
-                self.complete_profits_df['coin_id']
-            ))
-            self.complete_profits_df['hybrid_id'] = [
-                self.hybrid_cw_id_map[p] for p in pairs
-            ]
-
         # Set index
         self.complete_profits_df = u.ensure_index(self.complete_profits_df)
         self.complete_market_data_df = u.ensure_index(self.complete_market_data_df)
@@ -197,95 +180,90 @@ class MultiEpochOrchestrator:
         epoch_parquet_folder = epoch_config['training_data']['parquet_folder']
         os.makedirs(epoch_parquet_folder, exist_ok=True)
 
-        try:
-            # 1. Initialize data generator for epoch with presplit dfs
-            training_profits_df = None
-            training_market_data_df = None
-            training_macro_trends_df = None
-            if self.complete_profits_df is not None:
-                training_profits_df, training_market_data_df, training_macro_trends_df = \
-                    self._transform_complete_dfs_for_epoch(
-                        epoch_config['training_data']['training_period_start'],
-                        epoch_config['training_data']['training_period_end']
-                    )
-
-            training_generator = wtdo.WalletTrainingDataOrchestrator(
-                epoch_config,
-                self.metrics_config,
-                self.features_config,
-                profits_df=training_profits_df,
-                market_data_df=training_market_data_df,
-                macro_trends_df=training_macro_trends_df,
-                hybrid_cw_id_map=self.hybrid_cw_id_map
-            )
-
-            # 2. Generate TRAINING_DATA_DFs
-            training_profits_df_full, training_market_data_df_full, \
-            training_macro_trends_df_full, training_coin_cohort = \
-                training_generator.retrieve_period_datasets(
+        # 1. Initialize data generator for epoch with presplit dfs
+        training_profits_df = None
+        training_market_data_df = None
+        training_macro_trends_df = None
+        if self.complete_profits_df is not None:
+            training_profits_df, training_market_data_df, training_macro_trends_df = \
+                self._transform_complete_dfs_for_epoch(
                     epoch_config['training_data']['training_period_start'],
                     epoch_config['training_data']['training_period_end']
                 )
 
-            training_profits_df, training_market_indicators_df, \
-            training_macro_indicators_df, training_transfers_df = \
-                training_generator.prepare_training_data(
-                    training_profits_df_full,
-                    training_market_data_df_full,
-                    training_macro_trends_df_full,
-                    return_files=True
-                )
+        training_generator = wtdo.WalletTrainingDataOrchestrator(
+            epoch_config,
+            self.metrics_config,
+            self.features_config,
+            profits_df=training_profits_df,
+            market_data_df=training_market_data_df,
+            macro_trends_df=training_macro_trends_df
+        )
 
-            epoch_training_data_df = training_generator.generate_training_features(
-                training_profits_df,
-                training_market_indicators_df,
-                training_macro_indicators_df,
-                training_transfers_df,
+        # 2. Generate TRAINING_DATA_DFs
+        training_profits_df_full, training_market_data_df_full, \
+        training_macro_trends_df_full, training_coin_cohort = \
+            training_generator.retrieve_period_datasets(
+                epoch_config['training_data']['training_period_start'],
+                epoch_config['training_data']['training_period_end']
+            )
+
+        training_profits_df, training_market_indicators_df, \
+        training_macro_indicators_df, training_transfers_df = \
+            training_generator.prepare_training_data(
+                training_profits_df_full,
+                training_market_data_df_full,
+                training_macro_trends_df_full,
                 return_files=True
             )
 
-            # Store training df with epoch date
-            epoch_date = datetime.strptime(
-                epoch_config['training_data']['modeling_period_start'], '%Y-%m-%d')
+        epoch_training_data_df = training_generator.generate_training_features(
+            training_profits_df,
+            training_market_indicators_df,
+            training_macro_indicators_df,
+            training_transfers_df,
+            return_files=True
+        )
 
-            # 3. Generate MODELING_DATA_DFs
-            modeling_profits_df = None
-            modeling_market_data_df = None
-            modeling_macro_trends_df = None
-            if self.complete_profits_df is not None:
-                modeling_profits_df, modeling_market_data_df, modeling_macro_trends_df = \
-                    self._transform_complete_dfs_for_epoch(
-                        epoch_config['training_data']['modeling_period_start'],
-                        epoch_config['training_data']['modeling_period_end']
-                    )
+        # Store training df with epoch date
+        epoch_date = datetime.strptime(
+            epoch_config['training_data']['modeling_period_start'], '%Y-%m-%d')
 
-            modeling_generator = wtdo.WalletTrainingDataOrchestrator(
-                epoch_config,
-                self.metrics_config,
-                self.features_config,
-                training_wallet_cohort=training_generator.training_wallet_cohort,
-                profits_df=modeling_profits_df,
-                market_data_df=modeling_market_data_df,
-                macro_trends_df=modeling_macro_trends_df
-            )
+        # 3. Generate MODELING_DATA_DFs
+        modeling_profits_df = None
+        modeling_market_data_df = None
+        modeling_macro_trends_df = None
+        if self.complete_profits_df is not None:
+            modeling_profits_df, modeling_market_data_df, modeling_macro_trends_df = \
+                self._transform_complete_dfs_for_epoch(
+                    epoch_config['training_data']['modeling_period_start'],
+                    epoch_config['training_data']['modeling_period_end']
+                )
 
-            modeling_profits_df_full, _, _, _ = modeling_generator.retrieve_period_datasets(
-                epoch_config['training_data']['modeling_period_start'],
-                epoch_config['training_data']['modeling_period_end'],
-                training_coin_cohort
-            )
+        modeling_generator = wtdo.WalletTrainingDataOrchestrator(
+            epoch_config,
+            self.metrics_config,
+            self.features_config,
+            training_wallet_cohort=training_generator.training_wallet_cohort,
+            profits_df=modeling_profits_df,
+            market_data_df=modeling_market_data_df,
+            macro_trends_df=modeling_macro_trends_df
+        )
 
-            epoch_modeling_features_df = modeling_generator.prepare_modeling_features(
-                modeling_profits_df_full,
-                training_generator.hybrid_cw_id_map
-            )
+        modeling_profits_df_full, _, _, _ = modeling_generator.retrieve_period_datasets(
+            epoch_config['training_data']['modeling_period_start'],
+            epoch_config['training_data']['modeling_period_end'],
+            training_coin_cohort
+        )
 
-            logger.milestone(f"Successfully generated data for epoch {model_start}.")
-            return epoch_date, epoch_training_data_df, epoch_modeling_features_df
+        epoch_modeling_features_df = modeling_generator.prepare_modeling_features(
+            modeling_profits_df_full,
+            training_generator.hybrid_cw_id_map
+        )
 
-        except Exception as e:
-            logger.error(f"Failed to generate data for {model_start}: {str(e)}")
-            raise
+        logger.milestone(f"Successfully generated data for epoch {model_start}.")
+
+        return epoch_date, epoch_training_data_df, epoch_modeling_features_df
 
 
     def _generate_epoch_configs(self) -> List[Dict]:
@@ -354,23 +332,9 @@ class MultiEpochOrchestrator:
         - epoch_start (str): The training_period_start to use for the filtered df.
         - epoch_end (str): The last date to retain in the self.complete_profits_df
         """
-        epoch_profits_df = self.complete_profits_df.copy()
-
-        # Handle hybridized IDs if configured
-        if self.base_config['training_data']['hybridize_wallet_ids']:
-
-            # Set hybrid_id and date as the new MultiIndex
-            epoch_profits_df = epoch_profits_df.reset_index().set_index(['hybrid_id', 'date'])
-
-            # Rename index levels to maintain downstream naming
-            epoch_profits_df.index.set_names(['wallet_address', 'date'], inplace=True)
-            epoch_profits_df = epoch_profits_df.drop(columns=['wallet_address'])
-
-        else:
-            epoch_profits_df = self.complete_profits_df.copy()
-
         # Keep only records up to period_end
-        epoch_profits_df = (epoch_profits_df[epoch_profits_df.index.get_level_values('date') <= epoch_end])
+        epoch_profits_df = (self.complete_profits_df.copy()
+                      [self.complete_profits_df.index.get_level_values('date') <= epoch_end])
         epoch_market_data_df = (self.complete_market_data_df.copy()
                                  [self.complete_market_data_df.index.get_level_values('date') <= epoch_end])
         epoch_macro_trends_df = (self.complete_macro_trends_df.copy()
@@ -379,7 +343,7 @@ class MultiEpochOrchestrator:
         # Impute profits_df rows as of the period starting balance date and period end
         epoch_starting_balance_date = (pd.to_datetime(epoch_start) - timedelta(days=1)).strftime('%Y-%m-%d')
         epoch_profits_df = pri.impute_profits_for_multiple_dates(
-            epoch_profits_df.reset_index(),
+            epoch_profits_df,
             epoch_market_data_df,
             [epoch_starting_balance_date,epoch_end],
             n_threads=4,

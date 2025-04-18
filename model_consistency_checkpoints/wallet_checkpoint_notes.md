@@ -1,4 +1,24 @@
 # dda 583 retry hybridization
+checkpoint 4: HDEV.820 move transfers mapping out of bigquery
+Model Performance Summary
+===================================
+Test Samples:             3,972
+Number of Features:       152
+Features per Window:      38
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.820
+RMSE:                     0.179
+MAE:                      0.095
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.803
+RMSE:                     0.119
+MAE:                      0.066
+
+
 checkpoint 3: HDEV.821 remove pickling logic from functions
 Model Performance Summary
 ===================================

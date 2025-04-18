@@ -256,6 +256,10 @@ class WalletTrainingDataOrchestrator:
             self.epoch_reference_date
         )
 
+        # Handle hybrid IDs if configured
+        if self.hybrid_cw_id_map is not None:
+            transfers_df, _ = hybridize_wallet_address(transfers_df,self.hybrid_cw_id_map)
+
         if return_files is True:
             # Return dfs without saving
             return (cohort_profits_df, market_indicators_df, macro_indicators_df, transfers_df)
