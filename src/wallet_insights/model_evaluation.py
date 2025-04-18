@@ -12,6 +12,7 @@ from sklearn.metrics import (
     r2_score,
     explained_variance_score,
 )
+from dreams_core import core as dc
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
 
@@ -587,31 +588,37 @@ class RegressionEvaluator:
                     if p < 0.05 and abs(lift) > 0.1:
                         vals = seg[feat]
                         contrast_sets.append({
-                            'Feature': feat,
-                            'bin': int(b),
-                            'rule': f"{feat} bin {b}",
-                            'population_pct': support,
-                            'segment_size': size,
-                            'mean_error': mean_err,
-                            'rmse': np.sqrt(seg['sq_err'].mean()),
-                            'overall_mean_error': overall_mean_err,
-                            'overall_median_error': overall_median_err,
-                            'overall_rmse': overall_rmse,
-                            'error_lift': lift,
-                            'p_value': p,
-                            'min_value': vals.min(),
-                            'max_value': vals.max(),
-                            'human_readable_rule': f"{feat} between {vals.min():.2f} and {vals.max():.2f}"
+                            'Feature': feat.replace('|all_windows',''),
+                            'Quantile': int(b),
+                            'Range': f"{dc.human_format(vals.min())}-{dc.human_format(vals.max())}",
+                            'Wallets': size,
+                            'Pop. Pct': f"{support:.3f}",
+                            # 'Error Lift': f"{lift:.3f}",
+                            'Mean Error': f"{mean_err:.3f}",
+                            'ME vs Overall': f"{mean_err-overall_mean_err:.3f}",
+                            'RMSE': f"{np.sqrt(seg['sq_err'].mean()):.3f}",
+                            # 'overall_median_error': f"{overall_median_err:.3f}",
+                            'RMSE vs Overall': f"{np.sqrt(seg['sq_err'].mean()) - overall_rmse:.3f}",
+                            # 'P-Value': f"{p:.3f}",
+                            # 'min_value': f"{vals.min():.3f}",
+                            # 'max_value': f"{vals.max():.3f}",
+                            'abs_error_lift': abs(lift),
+                            # 'human_readable_rule': f"{feat} between {vals.min():.2f} and {vals.max():.2f}"
                         })
 
         if not contrast_sets:
             return pd.DataFrame()
 
-        out = (
+        df = (
             pd.DataFrame(contrast_sets)
-            .assign(abs_lift=lambda d: d['error_lift'].abs())
-            .sort_values('abs_lift', ascending=False)
+            .sort_values('abs_error_lift', ascending=False)
             .head(max_segments)
-            .drop('abs_lift', axis=1)
+            .drop('abs_error_lift', axis=1)
         )
-        return out
+        df['Pop. Pct'] = pd.to_numeric(df['Pop. Pct'])
+        df['Mean Error'] = pd.to_numeric(df['Mean Error'])
+        df['ME vs Overall'] = pd.to_numeric(df['ME vs Overall'])
+        df['RMSE'] = pd.to_numeric(df['RMSE'])
+        df['RMSE vs Overall'] = pd.to_numeric(df['RMSE vs Overall'])
+
+        return df
