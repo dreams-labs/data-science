@@ -206,10 +206,11 @@ class WalletTrainingDataOrchestrator:
             # Hybridize wallet IDs if configured and map not yet built
             if self.wallets_config['training_data']['hybridize_wallet_ids']:
                 if self.hybrid_cw_id_map is None:
-                    # Build new mapping and apply
-                    profits_df_full, hybrid_cw_id_map = hybridize_wallet_address(profits_df_full)
-                    self.hybrid_cw_id_map = hybrid_cw_id_map
-                    upload_hybrid_wallet_mapping(hybrid_cw_id_map)
+                    # # Build new mapping and apply
+                    # profits_df_full, hybrid_cw_id_map = hybridize_wallet_address(profits_df_full)
+                    # self.hybrid_cw_id_map = hybrid_cw_id_map
+                    # # upload_hybrid_wallet_mapping(hybrid_cw_id_map)
+                    raise ValueError("this should never happen")
                 else:
                     # Reapply existing mapping
                     profits_df_full, _ = hybridize_wallet_address(
