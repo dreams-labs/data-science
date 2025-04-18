@@ -92,6 +92,23 @@ class MultiEpochOrchestrator:
         self.complete_profits_df, self.complete_market_data_df, self.complete_macro_trends_df = \
             self.wtd.retrieve_raw_datasets(earliest_training_start, latest_validation_end)
 
+        # Apply hybridization if configured
+        if self.base_config['training_data']['hybridize_wallet_ids']:
+            # Generate hybrid IDs for wallet_address-coin_id pairs
+            _, self.hybrid_cw_id_map = wtdo.hybridize_wallet_address(
+                self.complete_profits_df[['wallet_address','coin_id']]
+            )
+            wtdo.upload_hybrid_wallet_mapping(self.hybrid_cw_id_map)
+
+            # Assign hybrid_id column directly without merging
+            pairs = list(zip(
+                self.complete_profits_df['wallet_address'],
+                self.complete_profits_df['coin_id']
+            ))
+            self.complete_profits_df['hybrid_id'] = [
+                self.hybrid_cw_id_map[p] for p in pairs
+            ]
+
         # Set index
         self.complete_profits_df = u.ensure_index(self.complete_profits_df)
         self.complete_market_data_df = u.ensure_index(self.complete_market_data_df)
@@ -198,7 +215,8 @@ class MultiEpochOrchestrator:
                 self.features_config,
                 profits_df=training_profits_df,
                 market_data_df=training_market_data_df,
-                macro_trends_df=training_macro_trends_df
+                macro_trends_df=training_macro_trends_df,
+                hybrid_cw_id_map=self.hybrid_cw_id_map
             )
 
             # 2. Generate TRAINING_DATA_DFs
@@ -336,9 +354,23 @@ class MultiEpochOrchestrator:
         - epoch_start (str): The training_period_start to use for the filtered df.
         - epoch_end (str): The last date to retain in the self.complete_profits_df
         """
+        epoch_profits_df = self.complete_profits_df.copy()
+
+        # Handle hybridized IDs if configured
+        if self.base_config['training_data']['hybridize_wallet_ids']:
+
+            # Set hybrid_id and date as the new MultiIndex
+            epoch_profits_df = epoch_profits_df.reset_index().set_index(['hybrid_id', 'date'])
+
+            # Rename index levels to maintain downstream naming
+            epoch_profits_df.index.set_names(['wallet_address', 'date'], inplace=True)
+            epoch_profits_df = epoch_profits_df.drop(columns=['wallet_address'])
+
+        else:
+            epoch_profits_df = self.complete_profits_df.copy()
+
         # Keep only records up to period_end
-        epoch_profits_df = (self.complete_profits_df.copy()
-                      [self.complete_profits_df.index.get_level_values('date') <= epoch_end])
+        epoch_profits_df = (epoch_profits_df[epoch_profits_df.index.get_level_values('date') <= epoch_end])
         epoch_market_data_df = (self.complete_market_data_df.copy()
                                  [self.complete_market_data_df.index.get_level_values('date') <= epoch_end])
         epoch_macro_trends_df = (self.complete_macro_trends_df.copy()
@@ -347,7 +379,7 @@ class MultiEpochOrchestrator:
         # Impute profits_df rows as of the period starting balance date and period end
         epoch_starting_balance_date = (pd.to_datetime(epoch_start) - timedelta(days=1)).strftime('%Y-%m-%d')
         epoch_profits_df = pri.impute_profits_for_multiple_dates(
-            epoch_profits_df,
+            epoch_profits_df.reset_index(),
             epoch_market_data_df,
             [epoch_starting_balance_date,epoch_end],
             n_threads=4,
