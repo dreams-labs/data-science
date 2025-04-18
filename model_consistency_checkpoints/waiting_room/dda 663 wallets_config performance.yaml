@@ -277,11 +277,11 @@ modeling:
         # -------------------------------
         eval_metric: [rmse]
 
-        max_depth: 15  # how deep the trees can go
+        max_depth: 21  # how deep the trees can go
         # min_child_weight_pct: 0.0001  # what % of rows each tree must have
-        min_child_weight: 15  # what % of rows each tree must have
-        subsample: 1.0  # samples rows, e.g. trees use x% of all wallet rows
-        colsample_bytree: 0.9  # samples columns, e.g. trees use x% of all column features
+        min_child_weight: 10  # what % of rows each tree must have
+        subsample: 0.9  # samples rows, e.g. trees use x% of all wallet rows
+        colsample_bytree: 1.0  # samples columns, e.g. trees use x% of all column features
 
         # Performance Profiles (Choose One Section)
         # --------------------------------------

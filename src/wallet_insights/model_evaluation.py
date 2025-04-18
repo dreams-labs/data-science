@@ -536,44 +536,44 @@ class RegressionEvaluator:
         self,
         segmentation_features: List[str],
         min_pop_pct: float = 0.05,
-        max_segments: int = 10
+        max_segments: int = 10,
+        n_bins: int = 5
     ) -> pd.DataFrame:
         """
         Params:
-        - segmentation_features (List[str]): list of numeric feature names to segment on
-        - min_pop_pct (float): min pop size as fraction of total
+        - segmentation_features (List[str]): numeric features to segment on
+        - min_pop_pct (float): min segment size as fraction of total
         - max_segments (int): max number of segments to return
+        - n_bins (int): number of quantile bins to cut into
 
         Returns:
         - DataFrame of top segments by error lift
         """
         df = self.X_test.copy()
-        df['pred'] = self.y_pred
-        df['actual'] = self.y_test
+        df['pred'], df['actual'] = self.y_pred, self.y_test
         df['err'] = (df['actual'] - df['pred']).abs()
         df['sq_err'] = df['err'] ** 2
         overall_mean_err = df['err'].mean()
         overall_median_err = df['err'].median()
         overall_rmse = np.sqrt(df['sq_err'].mean())
 
-        # flag for chi2 table
         df['high_perf'] = df['err'] < overall_median_err
 
         contrast_sets = []
         for feat in segmentation_features:
-            if feat not in df or df[feat].nunique() <= 5:
-                continue
-            # 5 quantile bins
-            bin_col = f"{feat}_bin"
-            try:
-                df[bin_col] = pd.qcut(df[feat], 5, labels=False, duplicates='drop')
-            except ValueError:
+            if feat not in df:
                 continue
 
+            bin_col = f"{feat}_bin"
+            # try cutting into n_bins, even if fewer unique values
+            try:
+                df[bin_col] = pd.qcut(df[feat], n_bins, labels=False, duplicates='drop')
+            except ValueError:
+                # e.g. all values identical
+                df[bin_col] = 0  # single bin
             for b in df[bin_col].dropna().unique():
                 mask = df[bin_col] == b
-                support = mask.mean()
-                size = mask.sum()
+                support, size = mask.mean(), mask.sum()
                 if support < min_pop_pct or size < 30:
                     continue
 
@@ -581,44 +581,35 @@ class RegressionEvaluator:
                 mean_err = seg['err'].mean()
                 lift = (overall_mean_err - mean_err) / overall_mean_err
 
-                # build contingency for significance
                 ct = pd.crosstab(mask, df['high_perf'])
                 if ct.shape == (2,2) and ct.values.min() >= 5:
                     p = chi2_contingency(ct)[1]
-                    if p < 0.05 and abs(lift) > 0.1:
-                        vals = seg[feat]
-                        contrast_sets.append({
-                            'Feature': feat.replace('|all_windows',''),
-                            'Quantile': int(b),
-                            'Range': f"{dc.human_format(vals.min())}-{dc.human_format(vals.max())}",
-                            'Wallets': size,
-                            'Pop. Pct': f"{support:.3f}",
-                            # 'Error Lift': f"{lift:.3f}",
-                            'Mean Error': f"{mean_err:.3f}",
-                            'ME vs Overall': f"{mean_err-overall_mean_err:.3f}",
-                            'RMSE': f"{np.sqrt(seg['sq_err'].mean()):.3f}",
-                            # 'overall_median_error': f"{overall_median_err:.3f}",
-                            'RMSE vs Overall': f"{np.sqrt(seg['sq_err'].mean()) - overall_rmse:.3f}",
-                            # 'P-Value': f"{p:.3f}",
-                            # 'min_value': f"{vals.min():.3f}",
-                            # 'max_value': f"{vals.max():.3f}",
-                            'abs_error_lift': abs(lift),
-                            # 'human_readable_rule': f"{feat} between {vals.min():.2f} and {vals.max():.2f}"
-                        })
+                    # if p < 0.05 and abs(lift) > 0.1:
+                    vals = seg[feat]
+                    contrast_sets.append({
+                        'Feature': feat.replace('|all_windows',''),
+                        'Quantile': int(b),
+                        'Range': f"{dc.human_format(vals.min())}-{dc.human_format(vals.max())}",
+                        'Wallets': size,
+                        'Pop. Pct': f"{support:.3f}",
+                        'Mean Error': f"{mean_err:.3f}",
+                        'ME vs Overall': f"{mean_err-overall_mean_err:.3f}",
+                        'RMSE': f"{np.sqrt(seg['sq_err'].mean()):.3f}",
+                        'RMSE vs Overall': f"{np.sqrt(seg['sq_err'].mean()) - overall_rmse:.3f}",
+                        'P-Value': f"{p:.2f}",
+                        'abs_error_lift': abs(lift),
+                    })
 
         if not contrast_sets:
             return pd.DataFrame()
 
-        df = (
+        out = (
             pd.DataFrame(contrast_sets)
             .sort_values('abs_error_lift', ascending=False)
             .head(max_segments)
             .drop('abs_error_lift', axis=1)
         )
-        df['Pop. Pct'] = pd.to_numeric(df['Pop. Pct'])
-        df['Mean Error'] = pd.to_numeric(df['Mean Error'])
-        df['ME vs Overall'] = pd.to_numeric(df['ME vs Overall'])
-        df['RMSE'] = pd.to_numeric(df['RMSE'])
-        df['RMSE vs Overall'] = pd.to_numeric(df['RMSE vs Overall'])
-
-        return df
+        # ensure numeric dtypes
+        for col in ['Pop. Pct','Mean Error','ME vs Overall','RMSE','RMSE vs Overall']:
+            out[col] = pd.to_numeric(out[col])
+        return out

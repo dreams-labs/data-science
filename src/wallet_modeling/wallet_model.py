@@ -241,7 +241,10 @@ class WalletModel(BaseModel):
         }
 
         # Add target variable options into the grid search.
-        if 'target_selector__target_variable' in self.modeling_config['grid_search_params']['param_grid_y']:
+        if 'target_selector__target_variable' in (self.modeling_config
+                                                  .get('grid_search_params', {})
+                                                  .get('param_grid_y') or {}
+                                                  ):
             target_variables = self.modeling_config['grid_search_params']['param_grid_y']['target_selector__target_variable']  # pylint:disable=line-too-long
             gs_config['param_grid']['y_pipeline__target_selector__target_variable'] = target_variables
 
@@ -343,7 +346,7 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
     variable parameter without interference from pre-extraction.
     """
     def __init__(self, target_variable: str):
-        self.target_variable = target_variable
+        self.target_variable = target_variable         
 
     def fit(self, y, X=None):
         """
@@ -419,7 +422,7 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
                 X_trans,
                 y_trans,
                 eval_set=transformed_eval_set,
-                verbose=False
+                # verbose=1
             )
         else:
             # Regular fit without early stopping if no eval set provided
