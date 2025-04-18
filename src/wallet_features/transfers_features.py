@@ -37,24 +37,24 @@ def retrieve_transfers_sequencing(min_txn_size: int,
     - sequence_df (DataFrame): Columns: wallet_address, coin_id, first_buy, first_sell,
         buyer_number, seller_number
     """
-    # Set join table based on ID type
-    if hybridize_wallet_ids is False:
-        # non-hybridized wallet_ids need to be converted to wallet_address
-        id_column = 'wallet_id'
-        join_sequence = f"""
-            join (
-                select wc.wallet_id,
-                xw.wallet_address,
-                from temp.wallet_modeling_training_cohort_{epoch_reference_date} wc
-                join reference.wallet_ids xw on xw.wallet_id = wc.wallet_id
-            ) wc using(wallet_address)
-            """
-    else:
-        # hybridized ids already have wallet_address included in their table
-        id_column = 'hybrid_id'
-        join_sequence = f"""
-            join temp.wallet_modeling_training_cohort_{epoch_reference_date} wc using(wallet_address, coin_id)
-            """
+    # # Set join table based on ID type
+    # if hybridize_wallet_ids is False:
+    #     # non-hybridized wallet_ids need to be converted to wallet_address
+    id_column = 'wallet_id'
+    join_sequence = f"""
+        join (
+            select wc.wallet_id,
+            xw.wallet_address,
+            from temp.wallet_modeling_training_cohort_{epoch_reference_date} wc
+            join reference.wallet_ids xw on xw.wallet_id = wc.wallet_id
+        ) wc using(wallet_address)
+        """
+    # else:
+    #     # hybridized ids already have wallet_address included in their table
+    #     id_column = 'hybrid_id'
+    #     join_sequence = f"""
+    #         join temp.wallet_modeling_training_cohort_{epoch_reference_date} wc using(wallet_address, coin_id)
+    #         """
 
     sequencing_sql = f"""
     with transaction_rank as (

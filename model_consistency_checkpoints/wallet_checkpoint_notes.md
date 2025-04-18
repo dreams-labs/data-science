@@ -1,3 +1,130 @@
+# dda 583 retry hybridization
+checkpoint 4: w.682 basic hybridization working
+Model Performance Summary
+===================================
+Test Samples:             114,621
+Number of Features:       152
+Features per Window:      38
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.678
+RMSE:                     0.193
+MAE:                      0.108
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.770
+RMSE:                     0.119
+MAE:                      0.070
+
+
+checkpoint 4: HDEV.820 move transfers mapping out of bigquery
+Model Performance Summary
+===================================
+Test Samples:             3,972
+Number of Features:       152
+Features per Window:      38
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.820
+RMSE:                     0.179
+MAE:                      0.095
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.803
+RMSE:                     0.119
+MAE:                      0.066
+
+
+checkpoint 3: HDEV.821 remove pickling logic from functions
+Model Performance Summary
+===================================
+Test Samples:             3,972
+Number of Features:       152
+Features per Window:      38
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.821
+RMSE:                     0.185
+MAE:                      0.097
+
+Validation Set Metrics
+-----------------------------------
+R² Score:                 -0.587
+RMSE:                     0.404
+MAE:                      0.227
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.803
+RMSE:                     0.119
+MAE:                      0.067
+
+
+checkpoint 2: HDEV.819  hybridize_wallet_address() working in multiwindow generator
+Model Performance Summary
+===================================
+Test Samples:             70,629
+Number of Features:       152
+Features per Window:      38
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.819
+RMSE:                     0.148
+MAE:                      0.076
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.804
+RMSE:                     0.096
+MAE:                      0.057
+
+
+
+checkpoint 1: HDEV.839 update hybridize_wallet_address()
+Model Performance Summary
+===================================
+Test Samples:             2,111
+Number of Features:       152
+Features per Window:      38
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.839
+RMSE:                     0.224
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.831
+RMSE:                     0.136
+MAE:                      0.081
+
+checkpoint 1: w.682 update hybridize_wallet_address()
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       152
+Features per Window:      38
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.682
+RMSE:                     0.219
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.785
+RMSE:                     0.126
+MAE:                      0.068
+
+
 # dda 669.2 predictive segments
 checkpoint 1: w.682 tweaked analysis
 Model Performance Summary
