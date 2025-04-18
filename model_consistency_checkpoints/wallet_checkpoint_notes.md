@@ -18,6 +18,25 @@ R² Score:                 0.831
 RMSE:                     0.136
 MAE:                      0.081
 
+checkpoint 1: w.682 update hybridize_wallet_address()
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       152
+Features per Window:      38
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.682
+RMSE:                     0.219
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.785
+RMSE:                     0.126
+MAE:                      0.068
+
 
 # dda 669.2 predictive segments
 checkpoint 1: w.682 tweaked analysis
