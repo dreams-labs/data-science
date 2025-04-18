@@ -143,12 +143,13 @@ features:
 # WalletModel Modeling Config
 modeling:
 
+    # Which wallet performance metric to use as the target variable.
+    # target_variable: crypto_net_gain
+    target_variable: crypto_net_gain/max_investment/winsorized
+
     # Modeling period filters
     modeling_min_investment: 100
     modeling_min_coins_traded: 0
-
-    # Which wallet performance metric to use as the target variable.
-    target_variable: crypto_net_gain/max_investment/winsorized
 
     # Train/Test/Eval split
     test_size: 0.2  # what % of the total population will be used as test
@@ -301,10 +302,8 @@ modeling:
 
         # Threading Controls
         n_jobs: -1
-        nthread: -1
 
         # Metaparams
-        verbosity: 0
         random_state: 42
 
     # Phase training section
@@ -335,27 +334,53 @@ modeling:
         drop_patterns_include_n_features: 1
 
         n_iter: 40  # random search limit
-        n_splits: 2  # cv splits
+        n_splits: 3  # cv splits
 
         # scoring: neg_root_mean_squared_error
         # scoring: custom_neg_rmse_scorer
-        # scoring: custom_r2_scorer
-        scoring: validation_r2_scorer
+        scoring: custom_r2_scorer
+        # scoring: validation_r2_scorer
 
         build_post_search_model: False  # whether to build a model after the grid search
-        verbose_level: 3  # scikit-learn verbosity
+        verbose: 0  # scikit-learn verbosity
 
         # Params for target variable generation
         param_grid_y:
 
             # Target variables
             target_selector__target_variable: [
-                crypto_net_gain,
-                # crypto_net_gain/max_investment/winsorized,
-                # crypto_net_gain/max_investment/ntile_rank,
                 'max_investment',
-                'total_volume',
-                'unique_coins_traded'
+                # 'average_transaction',
+                # 'crypto_cash_buys',
+                # 'crypto_cash_sells',
+                # 'crypto_inflows',
+                # 'crypto_net_cash_flows',
+                # 'crypto_net_flows',
+                # 'crypto_net_flows/crypto_inflows/base',
+                # 'crypto_net_flows/crypto_inflows/log',
+                # 'crypto_net_flows/crypto_inflows/ntile_rank',
+                # 'crypto_net_flows/crypto_inflows/rank',
+                'crypto_net_flows/crypto_inflows/winsorized',
+                # 'crypto_net_flows/max_investment/base',
+                # 'crypto_net_flows/max_investment/log',
+                # 'crypto_net_flows/max_investment/ntile_rank',
+                # 'crypto_net_flows/max_investment/rank',
+                'crypto_net_flows/max_investment/winsorized',
+                # 'crypto_net_gain',
+                # 'crypto_net_gain/crypto_inflows/base',
+                # 'crypto_net_gain/crypto_inflows/log',
+                # 'crypto_net_gain/crypto_inflows/ntile_rank',
+                # 'crypto_net_gain/crypto_inflows/rank',
+                'crypto_net_gain/crypto_inflows/winsorized',
+                # 'crypto_net_gain/max_investment/base',
+                # 'crypto_net_gain/max_investment/log',
+                # 'crypto_net_gain/max_investment/ntile_rank',
+                # 'crypto_net_gain/max_investment/rank',
+                'crypto_net_gain/max_investment/winsorized',
+                # 'crypto_outflows',
+                # 'max_investment',
+                # 'total_volume',
+                # 'unique_coins_traded'
             ]
 
         # Params for model construction
@@ -363,11 +388,12 @@ modeling:
 
             # # Depth and Child Weight
             # regressor__min_child_weight_pct: [0.00004, 0.00007, 0.0001]
-            # regressor__min_child_weight: [15, 25, 40]
-            # regressor__max_depth: [9,12] #,15,18]  # basic depth param
+            # regressor__min_child_weight: [8,10,14]
+            # regressor__max_depth: [19,21,23,25]
+            # basic depth param
 
             # Col/Row Sampling
-            # regressor__subsample: [0.8, 0.9, 1.0]   # samples rows, e.g. trees use x% of all wallet rows
+            # regressor__subsample: [0.85, 0.9, 0.95, 1.0]   # samples rows, e.g. trees use x% of all wallet rows
             # regressor__colsample_bytree: [ 0.9, 0.95, 1.0]   # samples columns, e.g. trees use x% of all column features
 
             # # Model Speed
@@ -376,13 +402,12 @@ modeling:
             # regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            regressor__n_estimators: [100]
-            regressor__learning_rate: [0.2]
-            # regressor__gamma: [0.01]
+            regressor__n_estimators: [150]
+            regressor__learning_rate: [0.15]
+            # regressor__gamma: [0, 0.005]
 
             # Optimize for Speed
             # regressor__n_jobs: [4]  # how many models to build at once
-            # regressor__nthread: [8]  # how many threads each model can use
             # regressor__max_bin: [128]
             # regressor__tree_method: [hist]
 
