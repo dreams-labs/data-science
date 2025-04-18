@@ -1,3 +1,24 @@
+# dda 669 predictive segments
+checkpoint 1: w.681 analysis working
+Core Metrics
+-----------------------------------
+R² Score:                 0.681
+RMSE:                     0.219
+MAE:                      0.118
+
+Validation Set Metrics
+-----------------------------------
+R² Score:                 -0.134
+RMSE:                     0.405
+MAE:                      0.220
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.781
+RMSE:                     0.127
+MAE:                      0.069
+
+
 # dda 665 validation scoring
 checkpoint 3: w.682 validation reporting working
 Model Performance Summary
