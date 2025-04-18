@@ -338,7 +338,8 @@ modeling:
 
         # scoring: neg_root_mean_squared_error
         # scoring: custom_neg_rmse_scorer
-        scoring: custom_r2_scorer
+        # scoring: custom_r2_scorer
+        scoring: validation_r2_scorer
 
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # scikit-learn verbosity
@@ -349,8 +350,11 @@ modeling:
             # Target variables
             target_selector__target_variable: [
                 crypto_net_gain,
-                crypto_net_gain/max_investment/winsorized,
-                crypto_net_gain/max_investment/ntile_rank,
+                # crypto_net_gain/max_investment/winsorized,
+                # crypto_net_gain/max_investment/ntile_rank,
+                'max_investment',
+                'total_volume',
+                'unique_coins_traded'
             ]
 
         # Params for model construction
@@ -371,9 +375,9 @@ modeling:
             # regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            regressor__n_estimators: [50]
-            regressor__learning_rate: [0.2]
-            regressor__gamma: [0.01]
+            regressor__n_estimators: [250]
+            regressor__learning_rate: [0.1]
+            # regressor__gamma: [0.01]
 
             # Optimize for Speed
             # regressor__n_jobs: [4]  # how many models to build at once

@@ -1,4 +1,18 @@
 # dda 665 validation scoring
+checkpoint 2: w.682 validation grid search working
+Core Metrics
+-----------------------------------
+R² Score:                 0.682
+RMSE:                     0.219
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.784
+RMSE:                     0.126
+MAE:                      0.068
+
+
 checkpoint 1: w.682 update macro drop features
 Model Performance Summary
 ===================================
