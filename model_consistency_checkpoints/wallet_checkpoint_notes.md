@@ -1,4 +1,51 @@
 # dda 583 retry hybridization
+checkpoint 3: HDEV.821 remove pickling logic from functions
+Model Performance Summary
+===================================
+Test Samples:             3,972
+Number of Features:       152
+Features per Window:      38
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.821
+RMSE:                     0.185
+MAE:                      0.097
+
+Validation Set Metrics
+-----------------------------------
+R² Score:                 -0.587
+RMSE:                     0.404
+MAE:                      0.227
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.803
+RMSE:                     0.119
+MAE:                      0.067
+
+
+checkpoint 2: HDEV.819  hybridize_wallet_address() working in multiwindow generator
+Model Performance Summary
+===================================
+Test Samples:             70,629
+Number of Features:       152
+Features per Window:      38
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.819
+RMSE:                     0.148
+MAE:                      0.076
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.804
+RMSE:                     0.096
+MAE:                      0.057
+
+
+
 checkpoint 1: HDEV.839 update hybridize_wallet_address()
 Model Performance Summary
 ===================================

@@ -37,13 +37,16 @@ class MultiEpochOrchestrator:
         complete_profits_df: pd.DataFrame = None,
         complete_market_data_df: pd.DataFrame = None,
         complete_macro_trends_df: pd.DataFrame = None,
-
+        hybrid_cw_id_map: Dict = None
     ):
         # Param Configs
         self.base_config = base_config
         self.metrics_config = metrics_config
         self.features_config = features_config
         self.epochs_config = epochs_config
+
+        # Hybrid ID mapping
+        self.hybrid_cw_id_map = hybrid_cw_id_map
 
         # Generated configs
         self.all_epochs_configs = self._generate_epoch_configs()
@@ -254,14 +257,9 @@ class MultiEpochOrchestrator:
                 training_coin_cohort
             )
 
-            hybrid_cw_id_map = None
-            if epoch_config['training_data']['hybridize_wallet_ids']:
-                hybrid_cw_id_map = pd.read_pickle(
-                    f"{epoch_config['training_data']['parquet_folder']}/hybrid_cw_id_map.pkl")
-
             epoch_modeling_features_df = modeling_generator.prepare_modeling_features(
                 modeling_profits_df_full,
-                hybrid_cw_id_map
+                training_generator.hybrid_cw_id_map
             )
 
             logger.milestone(f"Successfully generated data for epoch {model_start}.")

@@ -44,6 +44,7 @@ class WalletTrainingDataOrchestrator:
         profits_df = None,
         market_data_df = None,
         macro_trends_df = None,
+        hybrid_cw_id_map: Dict = None
     ):
         # Base configs
         self.wallets_config = copy.deepcopy(wallets_config)
@@ -55,6 +56,9 @@ class WalletTrainingDataOrchestrator:
         self.parquet_folder = self.wallets_config['training_data']['parquet_folder']
         self.wtd = WalletTrainingData(wallets_config)  # pass config in
         self.epoch_reference_date = self.wallets_config['training_data']['modeling_period_start'].replace('-','')
+
+        # Hybrid ID mapping
+        self.hybrid_cw_id_map = hybrid_cw_id_map
 
         # Preexisting raw dfs if provided
         self.profits_df = profits_df
@@ -199,15 +203,19 @@ class WalletTrainingDataOrchestrator:
 
         # Define training wallet cohort
         def generate_cohort_profits_df(profits_df_full):
-            # Hybridize wallet IDs if configured
+            # Hybridize wallet IDs if configured and map not yet built
             if self.wallets_config['training_data']['hybridize_wallet_ids']:
-                profits_df_full, hybrid_cw_id_map = hybridize_wallet_address(profits_df_full)
-                pd.to_pickle(
-                    hybrid_cw_id_map,
-                    f"{self.parquet_folder}/hybrid_cw_id_map.pkl"
-                )
-                upload_hybrid_wallet_mapping(hybrid_cw_id_map)
-                del hybrid_cw_id_map
+                if self.hybrid_cw_id_map is None:
+                    # Build new mapping and apply
+                    profits_df_full, hybrid_cw_id_map = hybridize_wallet_address(profits_df_full)
+                    self.hybrid_cw_id_map = hybrid_cw_id_map
+                    upload_hybrid_wallet_mapping(hybrid_cw_id_map)
+                else:
+                    # Reapply existing mapping
+                    profits_df_full, _ = hybridize_wallet_address(
+                        profits_df_full,
+                        self.hybrid_cw_id_map
+                    )
 
             logger.info("Defining wallet cohort...")
 
