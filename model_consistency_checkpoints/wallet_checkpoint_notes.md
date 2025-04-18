@@ -1,4 +1,24 @@
 # dda 583 retry hybridization
+checkpoint 4: w.682 basic hybridization working
+Model Performance Summary
+===================================
+Test Samples:             114,621
+Number of Features:       152
+Features per Window:      38
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.678
+RMSE:                     0.193
+MAE:                      0.108
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.770
+RMSE:                     0.119
+MAE:                      0.070
+
+
 checkpoint 4: HDEV.820 move transfers mapping out of bigquery
 Model Performance Summary
 ===================================
