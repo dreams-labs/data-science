@@ -18,6 +18,25 @@ R² Score:                 0.785
 RMSE:                     0.126
 MAE:                      0.068
 
+checkpoint 1: HyDev.819 fixed verbosity
+Model Performance Summary
+===================================
+Test Samples:             2,111
+Number of Features:       152
+Features per Window:      38
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.819
+RMSE:                     0.217
+MAE:                      0.115
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.834
+RMSE:                     0.135
+MAE:                      0.079
+
 
 # dda 583 retry hybridization
 checkpoint 4: w.682 basic hybridization working
