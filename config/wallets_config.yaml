@@ -305,6 +305,7 @@ modeling:
 
         # Metaparams
         random_state: 42
+        verbosity: 0
 
     # Phase training section
     phase_training:
@@ -327,22 +328,22 @@ modeling:
     grid_search_params:
 
         # -------------------------------
-        # enabled: True
+        enabled: True
         # -------------------------------
 
         # Search Methodology
         drop_patterns_include_n_features: 1
 
         n_iter: 40  # random search limit
-        n_splits: 3  # cv splits
+        n_splits: 2  # cv splits
 
         # scoring: neg_root_mean_squared_error
         # scoring: custom_neg_rmse_scorer
-        scoring: custom_r2_scorer
-        # scoring: validation_r2_scorer
+        # scoring: custom_r2_scorer
+        scoring: validation_r2_scorer
 
         build_post_search_model: False  # whether to build a model after the grid search
-        verbose: 0  # scikit-learn verbosity
+        verbose_level: 3
 
         # Params for target variable generation
         param_grid_y:
@@ -360,18 +361,18 @@ modeling:
                 # 'crypto_net_flows/crypto_inflows/log',
                 # 'crypto_net_flows/crypto_inflows/ntile_rank',
                 # 'crypto_net_flows/crypto_inflows/rank',
-                'crypto_net_flows/crypto_inflows/winsorized',
+                # 'crypto_net_flows/crypto_inflows/winsorized',
                 # 'crypto_net_flows/max_investment/base',
                 # 'crypto_net_flows/max_investment/log',
                 # 'crypto_net_flows/max_investment/ntile_rank',
                 # 'crypto_net_flows/max_investment/rank',
-                'crypto_net_flows/max_investment/winsorized',
+                # 'crypto_net_flows/max_investment/winsorized',
                 # 'crypto_net_gain',
                 # 'crypto_net_gain/crypto_inflows/base',
                 # 'crypto_net_gain/crypto_inflows/log',
                 # 'crypto_net_gain/crypto_inflows/ntile_rank',
                 # 'crypto_net_gain/crypto_inflows/rank',
-                'crypto_net_gain/crypto_inflows/winsorized',
+                # 'crypto_net_gain/crypto_inflows/winsorized',
                 # 'crypto_net_gain/max_investment/base',
                 # 'crypto_net_gain/max_investment/log',
                 # 'crypto_net_gain/max_investment/ntile_rank',
@@ -402,8 +403,11 @@ modeling:
             # regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            regressor__n_estimators: [150]
-            regressor__learning_rate: [0.15]
+            regressor__n_estimators: [5]
+            regressor__learning_rate: [0.3]
+            regressor__max_depth: [7]
+            regressor__min_child_weight: [30]
+
             # regressor__gamma: [0, 0.005]
 
             # Optimize for Speed

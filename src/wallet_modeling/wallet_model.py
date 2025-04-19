@@ -292,7 +292,10 @@ class WalletModel(BaseModel):
         )
 
         # Always pass the eval_set for early stopping
-        self.random_search.fit(X, y, eval_set=(self.X_eval, self.y_eval))
+        self.random_search.fit(
+            X, y,
+            eval_set=(self.X_eval, self.y_eval)
+        )
 
         logger.info("Grid search complete. Best score: %f", -self.random_search.best_score_)
         u.notify('synth_magic')
@@ -346,7 +349,7 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
     variable parameter without interference from pre-extraction.
     """
     def __init__(self, target_variable: str):
-        self.target_variable = target_variable         
+        self.target_variable = target_variable
 
     def fit(self, y, X=None):
         """
@@ -422,7 +425,7 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
                 X_trans,
                 y_trans,
                 eval_set=transformed_eval_set,
-                # verbose=1
+                verbose=0
             )
         else:
             # Regular fit without early stopping if no eval set provided
