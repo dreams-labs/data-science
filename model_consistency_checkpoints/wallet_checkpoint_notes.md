@@ -1,4 +1,25 @@
 # dda 676 fix verbosity
+checkpoint 1: HyDev.819 split out _process_single_epoch()
+Model Performance Summary
+===================================
+Test Samples:             2,111
+Number of Features:       152
+Features per Window:      38
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.816
+RMSE:                     0.231
+MAE:                      0.120
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.822
+RMSE:                     0.140
+MAE:                      0.077
+
+
+# dda 676 fix verbosity
 checkpoint 1: w.683 fixed verbosity
 Model Performance Summary
 ===================================

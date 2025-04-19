@@ -162,6 +162,30 @@ class MultiEpochOrchestrator:
 
     def _process_single_epoch(self, epoch_config: dict) -> Tuple[datetime, pd.DataFrame, pd.DataFrame]:
         """
+        Process a single epoch configuration to generate training and modeling data, including
+        handling of hybridization features.
+
+        Params:
+        - epoch_config (dict): Configuration for the specific epoch
+
+        Returns:
+        - epoch_date (datetime): The modeling period start date as datetime
+        - epoch_training_data_df (DataFrame): Training features for this epoch
+        - epoch_modeling_features_df (DataFrame): Modeling features for this epoch
+        """
+
+        # Build features with initial data
+        epoch_date, epoch_training_data_df, epoch_modeling_features_df = self._build_epoch_features(epoch_config)
+
+        if epoch_config['training_data']['hybridize_wallet_ids']:
+            print('x')
+
+        return epoch_date, epoch_training_data_df, epoch_modeling_features_df
+
+
+
+    def _build_epoch_features(self, epoch_config: dict) -> Tuple[datetime, pd.DataFrame, pd.DataFrame]:
+        """
         Process a single epoch configuration to generate training and modeling data.
 
         Params:
