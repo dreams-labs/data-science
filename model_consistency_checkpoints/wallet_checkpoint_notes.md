@@ -1283,7 +1283,7 @@ RMSE:                     0.125
 MAE:                      0.066
 
 
-checkpoint 1: w.686 df params for retrieve_period_datasets()
+checkpoint 1: w.686 df params for retrieve_cleaned_period_datasets()
 faster params
 Model Performance Summary
 ===================================
