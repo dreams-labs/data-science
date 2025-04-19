@@ -68,7 +68,7 @@ class WalletTrainingDataOrchestrator:
 
 
     @u.timing_decorator
-    def retrieve_period_datasets(
+    def retrieve_cleaned_period_datasets(
         self,
         period_start_date,
         period_end_date,
