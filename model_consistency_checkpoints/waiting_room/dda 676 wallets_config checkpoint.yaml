@@ -34,7 +34,7 @@ training_data:
     # Local pipeline configs
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
     parquet_folder: temp/wallet_modeling_dfs/windowed  # where to store parquet files
-    model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
+    model_artifacts_folder: ../artifacts/wallet_modeling/hybridized  # where model artifacts are stored
 
 
 # CheckpointValidation
@@ -155,6 +155,10 @@ modeling:
     test_size: 0.2  # what % of the total population will be used as test
     eval_size: 0.05  # what % used for the early stopping eval set
 
+    # Metaparameters
+    verbose_estimators: True  # whether to print each estimator's scores
+
+
     # CheckpointValidation
     # WalletModel Feature Selection
     feature_selection:
@@ -164,27 +168,8 @@ modeling:
             timing|*/buy_mean*,
             timing|*/sell_mean*,
             timing|*/sell_weighted*,
-            # timing|price*/buy_mean*,
-            # timing|price*/sell_mean*,
-            # timing|price*/sell_weighted*,
-            # timing|volume*/buy_mean*,
-            # timing|volume*/sell_mean*,
-            # timing|volume*/sell_weighted*,
-            # timing|btc_mvrv_z_score/*,
-            # timing|global_market_cap/*,
-            # timing|btc_price/*,
-            # timing|global_volume/*,
-            # timing|price_sma_2/lag_200/*,
-            # timing|btc_mvrv_z_score/buy_weighted|*,
-            # timing|btc_mvrv_z_score/buy_mean|*,
-            # timing|btc_mvrv_z_score/sell_mean|*,
-            # timing|btc_mvrv_z_score/sell_weighted|*,
 
             # performance|*,
-            # performance|*/max_investment/*,
-            # performance|*/crypto_inflows/*,
-            # performance|*/twb/*,
-            # performance|*/active_twb/*,
             performance|crypto_net_gain/crypto_inflows/*,
             performance|crypto_net_gain/twb/*,
             performance|crypto_net_gain/active_twb/*,
@@ -192,8 +177,6 @@ modeling:
             performance|*/ntile_rank|*,
 
             # trading|*,
-            # trading|crypto_net_gain|*,
-            # trading|total_volume|*,
             trading|unique_coins_traded|*,
             trading|transaction_days|*,
             trading|average_transaction|*,
@@ -219,25 +202,15 @@ modeling:
             mktcap|portfolio_mcap_std/market_cap_filled|*,
             mktcap|portfolio_mcap_mean/market_cap_unadj|*,
             mktcap|portfolio_mcap_median/market_cap_unadj|*,
-            # mktcap|portfolio_mcap_min/market_cap_unadj|*, #retain
-            # mktcap|portfolio_mcap_max/market_cap_unadj|*, #retain
             mktcap|portfolio_mcap_std/market_cap_unadj|*,
 
             # transfers|*,
-            # transfers|first_sell/*,
-            # transfers|initial_hold_time/*,
-            # transfers|initial_hold_time/avg_wallet_rank|*,
-            # transfers|initial_hold_time/median_avg_wallet_rank|*,
-            # transfers|initial_hold_time/min_avg_wallet_rank|*,
-            # transfers|initial_hold_time/new_coin_transaction_counts|*,
 
             # scenario|*,
-            # scenario|sells_best/*,
 
             # balance|*,
             balance|coin_fraction_std|*,
             balance|concentration_index|*,
-            # balance|largest_coin_frac|*, #retain
             balance|largest_coin_usd|*,
             balance|median_coin_frac|*,
             balance|min_coin_frac|*,
@@ -247,14 +220,11 @@ modeling:
             # macro|*,
             macro|btc_price_first|*,
             macro|btc_price_last|*,
-            # macro|btc_price_std|*,
             macro|btc_price_rsi_100_last|*,
             macro|btc_mvrv_z_score_first|*,
             macro|btc_mvrv_z_score_last|*,
             macro|global_volume_last|*,
             macro|global_volume_first|*,
-            # macro|global_market_cap_first|*,
-            # macro|global_market_cap_last|*,
             macro|global_market_cap_rsi_100_last|*,
 
             cluster|*,
@@ -334,15 +304,17 @@ modeling:
         drop_patterns_include_n_features: 1
 
         n_iter: 40  # random search limit
-        n_splits: 3  # cv splits
+        n_splits: 2  # cv splits
 
         # scoring: neg_root_mean_squared_error
         # scoring: custom_neg_rmse_scorer
-        scoring: custom_r2_scorer
-        # scoring: validation_r2_scorer
+        # scoring: custom_r2_scorer
+        scoring: validation_r2_scorer
 
+        # Metaparameters
         build_post_search_model: False  # whether to build a model after the grid search
-        verbose: 0  # scikit-learn verbosity
+        verbose_level: 3  # 3 outputs model performance but not training scores
+        verbose_estimators: False  # whether to print each estimator's scores
 
         # Params for target variable generation
         param_grid_y:
@@ -350,37 +322,8 @@ modeling:
             # Target variables
             target_selector__target_variable: [
                 'max_investment',
-                # 'average_transaction',
-                # 'crypto_cash_buys',
-                # 'crypto_cash_sells',
-                # 'crypto_inflows',
-                # 'crypto_net_cash_flows',
-                # 'crypto_net_flows',
-                # 'crypto_net_flows/crypto_inflows/base',
-                # 'crypto_net_flows/crypto_inflows/log',
-                # 'crypto_net_flows/crypto_inflows/ntile_rank',
-                # 'crypto_net_flows/crypto_inflows/rank',
-                'crypto_net_flows/crypto_inflows/winsorized',
-                # 'crypto_net_flows/max_investment/base',
-                # 'crypto_net_flows/max_investment/log',
-                # 'crypto_net_flows/max_investment/ntile_rank',
-                # 'crypto_net_flows/max_investment/rank',
-                'crypto_net_flows/max_investment/winsorized',
-                # 'crypto_net_gain',
-                # 'crypto_net_gain/crypto_inflows/base',
-                # 'crypto_net_gain/crypto_inflows/log',
-                # 'crypto_net_gain/crypto_inflows/ntile_rank',
-                # 'crypto_net_gain/crypto_inflows/rank',
-                'crypto_net_gain/crypto_inflows/winsorized',
-                # 'crypto_net_gain/max_investment/base',
-                # 'crypto_net_gain/max_investment/log',
-                # 'crypto_net_gain/max_investment/ntile_rank',
-                # 'crypto_net_gain/max_investment/rank',
                 'crypto_net_gain/max_investment/winsorized',
-                # 'crypto_outflows',
-                # 'max_investment',
-                # 'total_volume',
-                # 'unique_coins_traded'
+
             ]
 
         # Params for model construction
@@ -402,8 +345,11 @@ modeling:
             # regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            regressor__n_estimators: [150]
-            regressor__learning_rate: [0.15]
+            regressor__n_estimators: [5]
+            regressor__learning_rate: [0.3]
+            regressor__max_depth: [7]
+            regressor__min_child_weight: [30]
+
             # regressor__gamma: [0, 0.005]
 
             # Optimize for Speed
@@ -418,24 +364,6 @@ modeling:
             # #     # [],
             # #     # [timing|*],
             #     # [timing|btc_mvrv_z_score/lag_100/*],
-            #     # [timing|btc_mvrv_z_score/lag_50/*],
-            #     # [timing|btc_mvrv_z_score/lag_21/*],
-            #     # [timing|btc_mvrv_z_score/lead_100/*],
-            #     # [timing|btc_mvrv_z_score/lead_50/*],
-            #     # [timing|btc_mvrv_z_score/lead_21/*],
-            #     # [timing|btc_mvrv_z_score/*],
-            #     # [timing|global_market_cap/*],
-            #     # [timing|btc_price/*],
-            #     # [timing|global_volume/*],
-            #     # [timing|btc_mvrv_z_score/buy_mean|*],
-            #     # [timing|btc_mvrv_z_score/buy_weighted|*],
-            #     # [timing|btc_mvrv_z_score/sell_mean|*],
-            #     # [timing|btc_mvrv_z_score/sell_weighted|*],
-
-            # #     # [timing|price_sma_2/lag_21/*],
-            # #     # [timing|price_sma_2/lag_30/*],
-            # #     # [timing|*/buy_mean*],
-
 
             # #     # [performance|*],
             # #     # [performance|crypto_net_gain/*],
@@ -445,16 +373,11 @@ modeling:
             # #     # [trading|days_held/min|*],
             # #     # [trading|days_held/max|*],
 
-
             # #     # [mktcap|*],
             # #     # [mktcap|portfolio_mcap_mean/market_cap_filled|*],
             # #     # [mktcap|portfolio_mcap_median/market_cap_filled|*],
 
             # #     # [transfers|*],
-            # #     # [transfers|first_buy/*],
-            # #     # [transfers|first_sell/*],
-            # #     # [transfers|initial_hold_time/*],
-            # #     # [transfers|first_buy/avg_wallet_rank|*],
             # #     # [transfers|first_buy/median_avg_wallet_rank|*],
 
             # #     # [scenario|*],
@@ -462,13 +385,6 @@ modeling:
 
             # #     # # [balance|*],
             # #     # [balance|coin_fraction_std|*],
-            # #     # [balance|concentration_index|*],
-            # #     # # [balance|largest_coin_frac|*],
-            # #     # [balance|largest_coin_usd|*],
-            # #     # [balance|median_coin_frac|*],
-            # #     # [balance|min_coin_frac|*],
-            # #     # [balance|n_coins|*],
-            # #     # [balance|total_usd_balance|*],
 
             #     # [cluster|*],
 

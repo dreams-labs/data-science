@@ -301,6 +301,7 @@ class BaseModel:
             **gs_config['search_config']
         )
 
+        # Fit without passing verbose flag (XGB verbosity controlled via model_params)
         self.random_search.fit(X, y)
 
         # Log best results

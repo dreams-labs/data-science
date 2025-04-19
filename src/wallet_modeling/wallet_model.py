@@ -112,7 +112,12 @@ class WalletModel(BaseModel):
                 if not self.modeling_config.get('grid_search_params', {}).get('build_post_search_model'):
                     return cv_results
 
-        meta_pipeline.fit(self.X_train, self.y_train, eval_set=(self.X_eval, self.y_eval))
+        meta_pipeline.fit(
+            self.X_train,
+            self.y_train,
+            eval_set=(self.X_eval, self.y_eval),
+            verbose_estimators=self.modeling_config.get('verbose_estimators', False)
+        )
         self.pipeline = meta_pipeline
         self.y_pipeline = meta_pipeline.y_pipeline
 
@@ -283,6 +288,8 @@ class WalletModel(BaseModel):
 
         # Generate pipeline
         cv_pipeline = pipeline if pipeline is not None else self._get_model_pipeline(gs_config['base_model_params'])
+        verbose_estimators = self.modeling_config.get('grid_search_params', {}).get('verbose_estimators')
+
 
         # Random search with pipeline
         self.random_search = RandomizedSearchCV(
@@ -292,7 +299,11 @@ class WalletModel(BaseModel):
         )
 
         # Always pass the eval_set for early stopping
-        self.random_search.fit(X, y, eval_set=(self.X_eval, self.y_eval))
+        self.random_search.fit(
+            X, y,
+            eval_set=(self.X_eval, self.y_eval),
+            verbose_estimators=self.modeling_config['grid_search_params'].get('verbose_estimators',False)
+        )
 
         logger.info("Grid search complete. Best score: %f", -self.random_search.best_score_)
         u.notify('synth_magic')
@@ -346,7 +357,7 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
     variable parameter without interference from pre-extraction.
     """
     def __init__(self, target_variable: str):
-        self.target_variable = target_variable         
+        self.target_variable = target_variable
 
     def fit(self, y, X=None):
         """
@@ -394,7 +405,7 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
             self.named_steps[name] = step
             self.name = step
 
-    def fit(self, X, y, eval_set=None):
+    def fit(self, X, y, eval_set=None, verbose_estimators=False):
         """Fit the MetaPipeline on raw X and y data, using an optional eval_set for early stopping."""
         # First, transform y using the y_pipeline
         y_trans = self.y_pipeline.fit_transform(y)
@@ -422,7 +433,7 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
                 X_trans,
                 y_trans,
                 eval_set=transformed_eval_set,
-                # verbose=1
+                verbose=verbose_estimators  # toggles line by line output logs
             )
         else:
             # Regular fit without early stopping if no eval set provided
