@@ -1,4 +1,24 @@
 # dda 679 toggle transfers features
+checkpoint 2: w.675 var name for toggle_scenario_features
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       136
+Features per Window:      34
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.675
+RMSE:                     0.221
+MAE:                      0.120
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.778
+RMSE:                     0.128
+MAE:                      0.069
+
+
 checkpoint 1: w.677 toggle set to off (2m24s)
 Model Performance Summary
 ===================================

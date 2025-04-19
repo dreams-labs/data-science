@@ -137,7 +137,7 @@ def calculate_wallet_features(
     wallet_features_df = wallet_features_df.join(market_features_df, how='left')
 
     # Scenario transfers features (left join, do not fill)
-    if wallets_config['features']['include_scenario_features']:
+    if wallets_config['features']['toggle_scenario_features']:
         transfers_scenario_features_df = wsc.calculate_scenario_features(profits_df,
                                                                         market_indicators_data_df,
                                                                         period_start_date,period_end_date)
