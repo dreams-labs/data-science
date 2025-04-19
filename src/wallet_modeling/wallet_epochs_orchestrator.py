@@ -203,7 +203,7 @@ class MultiEpochOrchestrator:
         # 2. Generate TRAINING_DATA_DFs
         training_profits_df_full, training_market_data_df_full, \
         training_macro_trends_df_full, training_coin_cohort = \
-            training_generator.retrieve_period_datasets(
+            training_generator.retrieve_cleaned_period_datasets(
                 epoch_config['training_data']['training_period_start'],
                 epoch_config['training_data']['training_period_end']
             )
@@ -250,7 +250,7 @@ class MultiEpochOrchestrator:
             macro_trends_df=modeling_macro_trends_df
         )
 
-        modeling_profits_df_full, _, _, _ = modeling_generator.retrieve_period_datasets(
+        modeling_profits_df_full, _, _, _ = modeling_generator.retrieve_cleaned_period_datasets(
             epoch_config['training_data']['modeling_period_start'],
             epoch_config['training_data']['modeling_period_end'],
             training_coin_cohort
