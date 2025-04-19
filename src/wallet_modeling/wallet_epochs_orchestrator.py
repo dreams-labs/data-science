@@ -397,6 +397,97 @@ class MultiEpochOrchestrator:
         return full_df
 
 
+    # def _merge_hybrid_wallet_features(
+    #     self,
+    #     hybrid_df: pd.DataFrame,
+    #     wallet_df: pd.DataFrame,
+    #     hybrid_cw_id_map: Dict[int, tuple],
+    # ) -> pd.DataFrame:
+    #     """
+    #     For every hybrid wallet‑coin row, append the wallet‑level (/wallet‑suffixed)
+    #     columns that describe the whole portfolio.
+    #     """
+    #     reverse_map = {v: k for k, v in hybrid_cw_id_map.items()}
+    #     wallet_idx = hybrid_df.index.map(lambda h: reverse_map[h][0])
+
+    #     # Ensure wallet-level features exist for all hybrid ID pairs
+    #     missing_wallet_ids = set(wallet_idx) - set(wallet_df.index)
+    #     if missing_wallet_ids:
+    #         raise ValueError(f"Missing wallet-level features for hybrid wallet IDs: {missing_wallet_ids}")
+
+    #     return (
+    #         hybrid_df
+    #         .assign(_wallet_id=wallet_idx)
+    #         .join(wallet_df.add_prefix("wallet_"), on="_wallet_id", how="left")
+    #         .drop(columns="_wallet_id")
+    # )
+
+
+    # def _generate_hybrid_and_wallet_features(
+    #     self,
+    #     epoch_config: dict,
+    #     training_generator: wtdo.WalletTrainingDataOrchestrator,
+    #     hybrid_training_df: pd.DataFrame,
+    #     training_profits_df_full: pd.DataFrame,
+    #     training_market_data_df_full: pd.DataFrame,
+    #     training_macro_trends_df_full: pd.DataFrame,
+    #     modeling_profits_df_full: pd.DataFrame,
+    #     hybrid_modeling_df: pd.DataFrame
+    # ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    #     """
+    #     Runs a second (non‑hybridized) wallet‑level feature pass for the same
+    #     cohort and merges those columns onto the hybrid wallet‑coin rows.
+    #     """
+    #     # ——— wallet cohort from hybrid map ———
+    #     hybrid_map = training_generator.hybrid_cw_id_map
+    #     if hybrid_map is None:
+    #         raise ValueError("Hybrid cw‑id map missing; cannot merge wallet‑level features.")
+
+    #     reverse_map = {v: k for k, v in hybrid_map.items()}
+    #     wallet_cohort = list(set([reverse_map[h][0] for h in training_generator.training_wallet_cohort]))
+
+    #     # ——— wallet‑ID pass config ———
+    #     dehybridized_config = copy.deepcopy(epoch_config)
+    #     dehybridized_config['training_data']['hybridize_wallet_ids'] = False
+    #     dehybridized_config['training_data']['parquet_folder'] = (
+    #         f"{dehybridized_config['training_data']['parquet_folder']}_wallet"
+    #     )
+    #     os.makedirs(dehybridized_config['training_data']['parquet_folder'], exist_ok=True)
+
+    #     wallet_gen = wtdo.WalletTrainingDataOrchestrator(
+    #         dehybridized_config,
+    #         self.metrics_config,
+    #         self.features_config,
+    #         training_wallet_cohort=wallet_cohort,
+    #         profits_df=training_profits_df_full.copy(),
+    #         market_data_df=training_market_data_df_full.copy(),
+    #         macro_trends_df=training_macro_trends_df_full.copy()
+    #     )
+
+    #     # wallet‑level training features
+    #     w_profits, w_mkt_ind, w_macro_ind, w_tx = wallet_gen.prepare_training_data(
+    #         training_profits_df_full,
+    #         training_market_data_df_full,
+    #         training_macro_trends_df_full,
+    #         return_files=True
+    #     )
+    #     wallet_train_df = wallet_gen.generate_training_features(
+    #         w_profits, w_mkt_ind, w_macro_ind, w_tx, return_files=True
+    #     )
+
+    #     # wallet‑level modeling features
+    #     wallet_model_df = wallet_gen.prepare_modeling_features(modeling_profits_df_full)
+
+    #     # ——— merge & return ———
+    #     merged_train = self._merge_hybrid_wallet_features(
+    #         hybrid_training_df, wallet_train_df, hybrid_map
+    #     )
+    #     merged_model = self._merge_hybrid_wallet_features(
+    #         hybrid_modeling_df, wallet_model_df, hybrid_map
+    #     )
+    #     return merged_train, merged_model
+
+
 
     # -----------------------------------
     #           Utility Methods
