@@ -230,21 +230,17 @@ class MultiEpochOrchestrator:
             epoch_config['training_data']['modeling_period_start'], '%Y-%m-%d')
 
         # 3. Generate MODELING_DATA_DFs
-        modeling_profits_df = None
-        modeling_market_data_df = None
-        modeling_macro_trends_df = None
-        if self.complete_profits_df is not None:
-            modeling_profits_df, modeling_market_data_df, modeling_macro_trends_df = \
-                self._transform_complete_dfs_for_epoch(
-                    epoch_config['training_data']['modeling_period_start'],
-                    epoch_config['training_data']['modeling_period_end']
-                )
+        modeling_profits_df, modeling_market_data_df, modeling_macro_trends_df = \
+            self._transform_complete_dfs_for_epoch(
+                epoch_config['training_data']['modeling_period_start'],
+                epoch_config['training_data']['modeling_period_end']
+            )
 
         modeling_generator = wtdo.WalletTrainingDataOrchestrator(
             epoch_config,
             self.metrics_config,
             self.features_config,
-            training_wallet_cohort=training_generator.training_wallet_cohort,
+            training_wallet_cohort=training_generator.training_wallet_cohort,  # add cohort
             profits_df=modeling_profits_df,
             market_data_df=modeling_market_data_df,
             macro_trends_df=modeling_macro_trends_df
@@ -260,8 +256,7 @@ class MultiEpochOrchestrator:
             modeling_profits_df_full,
             training_generator.hybrid_cw_id_map
         )
-
-        logger.milestone(f"Successfully generated data for epoch {model_start}.")
+        logger.milestone(f"Successfully generated features for epoch {model_start}.")
 
         return epoch_date, epoch_training_data_df, epoch_modeling_features_df
 
