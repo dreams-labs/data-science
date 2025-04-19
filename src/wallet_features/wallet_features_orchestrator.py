@@ -91,10 +91,11 @@ def calculate_wallet_features(
     wallet_features_df = wallet_features_df.join(trading_features_df, how='left')\
         .fillna({col: 0 for col in trading_features_df.columns})
 
-    # Transfers features (left join, do not fill)
-    transfers_sequencing_features_df = wts.calculate_transfers_features(profits_df, transfers_sequencing_df)
-    feature_column_names['transfers|'] = transfers_sequencing_features_df.columns
-    wallet_features_df = wallet_features_df.join(transfers_sequencing_features_df, how='left')
+    if wallets_config['features']['toggle_transfers_features']:
+        # Transfers features (left join, do not fill)
+        transfers_sequencing_features_df = wts.calculate_transfers_features(profits_df, transfers_sequencing_df)
+        feature_column_names['transfers|'] = transfers_sequencing_features_df.columns
+        wallet_features_df = wallet_features_df.join(transfers_sequencing_features_df, how='left')
 
     # Balance features (left join, do not fill)
     balance_features_df = wbf.calculate_balance_features(profits_df)
@@ -136,7 +137,7 @@ def calculate_wallet_features(
     wallet_features_df = wallet_features_df.join(market_features_df, how='left')
 
     # Scenario transfers features (left join, do not fill)
-    if wallets_config['features']['include_scenario_features'] is True:
+    if wallets_config['features']['toggle_scenario_features']:
         transfers_scenario_features_df = wsc.calculate_scenario_features(profits_df,
                                                                         market_indicators_data_df,
                                                                         period_start_date,period_end_date)
@@ -195,13 +196,14 @@ def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
     if missing_pairs.size > 0:
         raise AssertionError(f"Found {missing_pairs.size} coin_id-date pairs missing in market_data_df")
 
-    # Wallets in transfers_df exist in profits_df
-    wallets_in_profits = profits_df.index.get_level_values('wallet_address').unique()
-    wallets_in_transfers = transfers_sequencing_df['wallet_address'].unique()
-    common_wallets = wallets_in_profits.intersection(wallets_in_transfers)
-    coverage = len(common_wallets) / len(wallets_in_profits)
-    if coverage < 0.99:
-        raise ValueError(f"Only {coverage:.2%} of wallets in profits_df are in transfers_sequencing_df.")
+    # If transfers features are toggled on, confirm wallets in transfers_df exist in profits_df
+    if not transfers_sequencing_df.empty:
+        wallets_in_profits = profits_df.index.get_level_values('wallet_address').unique()
+        wallets_in_transfers = transfers_sequencing_df['wallet_address'].unique()
+        common_wallets = wallets_in_profits.intersection(wallets_in_transfers)
+        coverage = len(common_wallets) / len(wallets_in_profits)
+        if coverage < 0.99:
+            raise ValueError(f"Only {coverage:.2%} of wallets in profits_df are in transfers_sequencing_df.")
 
     # All done
     logger.debug("All input dataframes passed validation checks.")

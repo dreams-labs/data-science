@@ -1,3 +1,84 @@
+# dda 679 toggle transfers features
+checkpoint 3: w.677 toggle cohort upload to bigquery (2m 13s)
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       136
+Features per Window:      34
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.677
+RMSE:                     0.221
+MAE:                      0.119
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.779
+RMSE:                     0.128
+MAE:                      0.068
+
+
+checkpoint 2: w.675 var name for toggle_scenario_features
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       136
+Features per Window:      34
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.675
+RMSE:                     0.221
+MAE:                      0.120
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.778
+RMSE:                     0.128
+MAE:                      0.069
+
+
+checkpoint 1: w.677 toggle set to off (2m24s)
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       136
+Features per Window:      34
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.677
+RMSE:                     0.221
+MAE:                      0.119
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.779
+RMSE:                     0.128
+MAE:                      0.069
+
+
+checkpoint 1: w.683 toggle set to on (2m55s)
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       152
+Features per Window:      38
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.682
+RMSE:                     0.219
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.785
+RMSE:                     0.126
+MAE:                      0.068
+
+
 # dda 677 hybrid and base features
 checkpoint 1: w.683 features integrated
 Model Performance Summary

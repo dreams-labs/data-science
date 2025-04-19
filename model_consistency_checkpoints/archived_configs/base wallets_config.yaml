@@ -102,7 +102,7 @@ features:
     ]
 
     # Scenarios Params
-    include_scenario_features: False
+    toggle_scenario_features: False
     scenario_performance_features: [
         # crypto_net_flows/crypto_inflows/winsorized,
         crypto_net_flows/max_investment/winsorized,

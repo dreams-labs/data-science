@@ -253,18 +253,21 @@ class WalletTrainingDataOrchestrator:
             macro_indicators_df = executor.submit(generate_macro_indicators_df).result()
             cohort_profits_df = executor.submit(generate_cohort_profits_df, profits_df_full).result()
 
-        # Retrieve transfers after cohort is in BigQuery
-        logger.info("Retrieving transfers sequencing data...")
-        transfers_df = wts.retrieve_transfers_sequencing(
-            self.wallets_config['features']['timing_metrics_min_transaction_size'],
-            self.wallets_config['training_data'][f'{period}_period_end'],
-            self.wallets_config['training_data']['hybridize_wallet_ids'],
-            self.epoch_reference_date
-        )
+        if self.wallets_config['features']['toggle_transfers_features']:
+            # Retrieve transfers after cohort is in BigQuery
+            logger.info("Retrieving transfers sequencing data...")
+            transfers_df = wts.retrieve_transfers_sequencing(
+                self.wallets_config['features']['timing_metrics_min_transaction_size'],
+                self.wallets_config['training_data'][f'{period}_period_end'],
+                self.wallets_config['training_data']['hybridize_wallet_ids'],
+                self.epoch_reference_date
+            )
 
-        # Handle hybrid IDs if configured
-        if self.hybrid_cw_id_map is not None:
-            transfers_df, _ = hybridize_wallet_address(transfers_df,self.hybrid_cw_id_map)
+            # Handle hybrid IDs if configured
+            if self.hybrid_cw_id_map is not None:
+                transfers_df, _ = hybridize_wallet_address(transfers_df,self.hybrid_cw_id_map)
+        else:
+            transfers_df = pd.DataFrame()
 
         if return_files is True:
             # Return dfs without saving
@@ -572,12 +575,14 @@ class WalletTrainingDataOrchestrator:
         # Apply filters based on wallet behavior during the training period
         filtered_training_wallet_metrics_df = self.wtd.apply_wallet_thresholds(training_wallet_metrics_df)
         training_wallet_cohort = filtered_training_wallet_metrics_df.index.values
-
         if len(training_wallet_cohort) == 0:
             raise ValueError("Cohort does not include any wallets. Cohort must include wallets.")
 
-        # Upload the cohort to BigQuery for additional complex feature generation
-        self.wtd.upload_training_cohort(training_wallet_cohort, hybridize_wallet_ids)
+        # Upload the cohort to BigQuery if needed for additional complex feature generation
+        if (self.wallets_config['features']['toggle_transfers_features']
+            or self.wallets_config['features']['toggle_scenario_features']):
+            self.wtd.upload_training_cohort(training_wallet_cohort, hybridize_wallet_ids)
+
         logger.milestone("Training wallet cohort defined as %s wallets after %.2f seconds.",
                     len(training_wallet_cohort), time.time()-start_time)
 
