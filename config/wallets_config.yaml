@@ -155,6 +155,10 @@ modeling:
     test_size: 0.2  # what % of the total population will be used as test
     eval_size: 0.05  # what % used for the early stopping eval set
 
+    # Metaparameters
+    verbose_estimators: True  # whether to print each estimator's scores
+
+
     # CheckpointValidation
     # WalletModel Feature Selection
     feature_selection:
@@ -288,7 +292,7 @@ modeling:
         # Performance Profiles (Choose One Section)
         # --------------------------------------
         # CHECKPOINTER
-        n_estimators: 5  # number of trees to train in the model
+        n_estimators: 250  # number of trees to train in the model
         learning_rate: 0.1  # step size for updates to weights during training
 
         # # PRODUCTION
@@ -327,7 +331,7 @@ modeling:
     grid_search_params:
 
         # -------------------------------
-        enabled: True
+        # enabled: True
         # -------------------------------
 
         # Search Methodology
@@ -341,8 +345,10 @@ modeling:
         # scoring: custom_r2_scorer
         scoring: validation_r2_scorer
 
+        # Metaparameters
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # 3 outputs model performance but not training scores
+        verbose_estimators: False  # whether to print each estimator's scores
 
         # Params for target variable generation
         param_grid_y:
