@@ -107,6 +107,9 @@ class WalletTrainingDataOrchestrator:
 
 
         # 2. Clean raw datasets
+        if not market_data_df.index.is_unique:
+            raise ValueError("market_data_df index has duplicate (coin_id, date) entries.")
+
         # Apply cleaning process including coin cohort filter if specified
         market_data_df = self.wtd.clean_market_dataset(
             market_data_df, profits_df,
@@ -114,6 +117,9 @@ class WalletTrainingDataOrchestrator:
             coin_cohort
         )
         profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
+
+        if not market_data_df.index.is_unique:
+            raise ValueError("market_data_df index has duplicate (coin_id, date) entries.")
 
         # Macro trends imputation, cleaning, validation
         macro_trends_cols = list(self.wallets_metrics_config['time_series']['macro_trends'].keys())
@@ -314,6 +320,9 @@ class WalletTrainingDataOrchestrator:
             (window_df, i + 1) for i, window_df in enumerate(training_windows_profits_dfs)
         ]
 
+        if not market_indicators_df.index.is_unique:
+            raise ValueError("market_data_df index has duplicate (coin_id, date) entries.")
+
         # Run full period and window features concurrently
         with concurrent.futures.ThreadPoolExecutor(
             self.wallets_config['n_threads']['concurrent_windows']
@@ -322,7 +331,7 @@ class WalletTrainingDataOrchestrator:
             full_period_future = executor.submit(
                 wfo.calculate_wallet_features,
                 profits_df.copy(),
-                market_indicators_df.copy(),
+                market_indicators_df.copy(deep=True),
                 macro_indicators_df.copy(),
                 transfers_df.copy(),
                 wallet_cohort,
@@ -335,7 +344,7 @@ class WalletTrainingDataOrchestrator:
                 executor.submit(
                     self._calculate_window_features,
                     profits_tuple,
-                    market_indicators_df,
+                    market_indicators_df.copy(deep=True),
                     macro_indicators_df,
                     transfers_df,
                     wallet_cohort
@@ -510,6 +519,10 @@ class WalletTrainingDataOrchestrator:
         window_opening_balance_date = window_profits_df.index.get_level_values('date').min()
         window_start_date = window_opening_balance_date + timedelta(days=1)
         window_end_date = window_profits_df.index.get_level_values('date').max()
+
+        if not market_indicators_df.index.is_unique:
+            raise ValueError("market_data_df index has duplicate (coin_id, date) entries.")
+
 
         # Calculate features for this window
         window_wallet_features_df = wfo.calculate_wallet_features(

@@ -138,9 +138,9 @@ class MultiEpochOrchestrator:
             # Submit each epoch processing task to the executor
             futures = {executor.submit(self._process_single_epoch, cfg): cfg for cfg in self.all_epochs_configs}
             for future in as_completed(futures):
-                epoch_date, epoch_training_data_df, epoch_modeling_features_df = future.result()
+                epoch_date, epoch_training_data_df, epoch_modeling_data_df = future.result()
                 training_epoch_dfs[epoch_date] = epoch_training_data_df
-                modeling_epoch_dfs[epoch_date] = epoch_modeling_features_df
+                modeling_epoch_dfs[epoch_date] = epoch_modeling_data_df
 
         # Merge the epoch DataFrames into a single DataFrame for training and modeling respectively
         wallet_training_data_df = self._merge_epoch_dfs(training_epoch_dfs)
@@ -171,16 +171,36 @@ class MultiEpochOrchestrator:
         Returns:
         - epoch_date (datetime): The modeling period start date as datetime
         - epoch_training_data_df (DataFrame): Training features for this epoch
-        - epoch_modeling_features_df (DataFrame): Modeling features for this epoch
+        - epoch_modeling_data_df (DataFrame): Modeling features for this epoch
         """
+        model_start = epoch_config['training_data']['modeling_period_start']
+        logger.info(f"Generating data for epoch starting {model_start}...")
+        u.notify('futuristic')
 
         # Build features with initial data
-        epoch_date, epoch_training_data_df, epoch_modeling_features_df = self._build_epoch_features(epoch_config)
+        epoch_date, epoch_training_data_df, epoch_modeling_data_df, hybrid_map = self._build_epoch_features(epoch_config)
+        if hybrid_map is not None:
+            self.hybrid_cw_id_map = hybrid_map
 
         if epoch_config['training_data']['hybridize_wallet_ids']:
-            print('x')
+            dehybridized_config = copy.deepcopy(epoch_config)
+            dehybridized_config['training_data']['hybridize_wallet_ids'] = False
 
-        return epoch_date, epoch_training_data_df, epoch_modeling_features_df
+            # Build features with dehybridized data
+            _, dehybridized_training_data_df, dehybridized_modeling_data_df, _ = self._build_epoch_features(dehybridized_config)
+
+            # Merge hybrid/nonhybrid together
+            epoch_training_data_df = self._merge_hybrid_wallet_features(
+                epoch_training_data_df,
+                dehybridized_training_data_df
+            )
+            epoch_modeling_data_df = self._merge_hybrid_wallet_features(
+                epoch_modeling_data_df,
+                dehybridized_modeling_data_df
+            )
+
+
+        return epoch_date, epoch_training_data_df, epoch_modeling_data_df
 
 
 
@@ -194,11 +214,11 @@ class MultiEpochOrchestrator:
         Returns:
         - epoch_date (datetime): The modeling period start date as datetime
         - epoch_training_data_df (DataFrame): Training features for this epoch
-        - epoch_modeling_features_df (DataFrame): Modeling features for this epoch
+        - epoch_modeling_data_df (DataFrame): Modeling features for this epoch
+        - hybrid_cw_id_map (Dict): mapping for hybrid wallet IDs
+
         """
         model_start = epoch_config['training_data']['modeling_period_start']
-        logger.info(f"Generating data for epoch starting {model_start}...")
-        u.notify('futuristic')
 
         # Generate name of parquet folder and create it if necessary
         epoch_parquet_folder = epoch_config['training_data']['parquet_folder']
@@ -276,13 +296,13 @@ class MultiEpochOrchestrator:
             training_coin_cohort
         )
 
-        epoch_modeling_features_df = modeling_generator.prepare_modeling_features(
+        epoch_modeling_data_df = modeling_generator.prepare_modeling_features(
             modeling_profits_df_full,
             training_generator.hybrid_cw_id_map
         )
         logger.milestone(f"Successfully generated features for epoch {model_start}.")
 
-        return epoch_date, epoch_training_data_df, epoch_modeling_features_df
+        return epoch_date, epoch_training_data_df, epoch_modeling_data_df, training_generator.hybrid_cw_id_map
 
 
     def _generate_epoch_configs(self) -> List[Dict]:
@@ -352,11 +372,11 @@ class MultiEpochOrchestrator:
         - epoch_end (str): The last date to retain in the self.complete_profits_df
         """
         # Keep only records up to period_end
-        epoch_profits_df = (self.complete_profits_df.copy()
+        epoch_profits_df = (self.complete_profits_df.copy(deep=True)
                       [self.complete_profits_df.index.get_level_values('date') <= epoch_end])
-        epoch_market_data_df = (self.complete_market_data_df.copy()
+        epoch_market_data_df = (self.complete_market_data_df.copy(deep=True)
                                  [self.complete_market_data_df.index.get_level_values('date') <= epoch_end])
-        epoch_macro_trends_df = (self.complete_macro_trends_df.copy()
+        epoch_macro_trends_df = (self.complete_macro_trends_df.copy(deep=True)
                                  [self.complete_macro_trends_df.index.get_level_values('date') <= epoch_end])
 
         # Impute profits_df rows as of the period starting balance date and period end
@@ -421,95 +441,30 @@ class MultiEpochOrchestrator:
         return full_df
 
 
-    # def _merge_hybrid_wallet_features(
-    #     self,
-    #     hybrid_df: pd.DataFrame,
-    #     wallet_df: pd.DataFrame,
-    #     hybrid_cw_id_map: Dict[int, tuple],
-    # ) -> pd.DataFrame:
-    #     """
-    #     For every hybrid wallet‑coin row, append the wallet‑level (/wallet‑suffixed)
-    #     columns that describe the whole portfolio.
-    #     """
-    #     reverse_map = {v: k for k, v in hybrid_cw_id_map.items()}
-    #     wallet_idx = hybrid_df.index.map(lambda h: reverse_map[h][0])
+    def _merge_hybrid_wallet_features(
+        self,
+        hybrid_df: pd.DataFrame,
+        wallet_df: pd.DataFrame,
+    ) -> pd.DataFrame:
+        """
+        For every hybrid wallet‑coin row, append the wallet‑level (/wallet‑suffixed)
+        columns that describe the whole portfolio.
+        """
+        reverse_map = {v: k for k, v in self.hybrid_cw_id_map.items()}
+        wallet_idx = hybrid_df.index.map(lambda h: reverse_map[h][0])
 
-    #     # Ensure wallet-level features exist for all hybrid ID pairs
-    #     missing_wallet_ids = set(wallet_idx) - set(wallet_df.index)
-    #     if missing_wallet_ids:
-    #         raise ValueError(f"Missing wallet-level features for hybrid wallet IDs: {missing_wallet_ids}")
+        # Ensure wallet-level features exist for all hybrid ID pairs
+        missing_wallet_ids = set(wallet_idx) - set(wallet_df.index)
+        if missing_wallet_ids:
+            logger.warning(f"Missing wallet-level features for {len(missing_wallet_ids)}/{len(wallet_idx)} "
+                             f"hybrid wallet IDs: {missing_wallet_ids}")
 
-    #     return (
-    #         hybrid_df
-    #         .assign(_wallet_id=wallet_idx)
-    #         .join(wallet_df.add_prefix("wallet_"), on="_wallet_id", how="left")
-    #         .drop(columns="_wallet_id")
-    # )
-
-
-    # def _generate_hybrid_and_wallet_features(
-    #     self,
-    #     epoch_config: dict,
-    #     training_generator: wtdo.WalletTrainingDataOrchestrator,
-    #     hybrid_training_df: pd.DataFrame,
-    #     training_profits_df_full: pd.DataFrame,
-    #     training_market_data_df_full: pd.DataFrame,
-    #     training_macro_trends_df_full: pd.DataFrame,
-    #     modeling_profits_df_full: pd.DataFrame,
-    #     hybrid_modeling_df: pd.DataFrame
-    # ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    #     """
-    #     Runs a second (non‑hybridized) wallet‑level feature pass for the same
-    #     cohort and merges those columns onto the hybrid wallet‑coin rows.
-    #     """
-    #     # ——— wallet cohort from hybrid map ———
-    #     hybrid_map = training_generator.hybrid_cw_id_map
-    #     if hybrid_map is None:
-    #         raise ValueError("Hybrid cw‑id map missing; cannot merge wallet‑level features.")
-
-    #     reverse_map = {v: k for k, v in hybrid_map.items()}
-    #     wallet_cohort = list(set([reverse_map[h][0] for h in training_generator.training_wallet_cohort]))
-
-    #     # ——— wallet‑ID pass config ———
-    #     dehybridized_config = copy.deepcopy(epoch_config)
-    #     dehybridized_config['training_data']['hybridize_wallet_ids'] = False
-    #     dehybridized_config['training_data']['parquet_folder'] = (
-    #         f"{dehybridized_config['training_data']['parquet_folder']}_wallet"
-    #     )
-    #     os.makedirs(dehybridized_config['training_data']['parquet_folder'], exist_ok=True)
-
-    #     wallet_gen = wtdo.WalletTrainingDataOrchestrator(
-    #         dehybridized_config,
-    #         self.metrics_config,
-    #         self.features_config,
-    #         training_wallet_cohort=wallet_cohort,
-    #         profits_df=training_profits_df_full.copy(),
-    #         market_data_df=training_market_data_df_full.copy(),
-    #         macro_trends_df=training_macro_trends_df_full.copy()
-    #     )
-
-    #     # wallet‑level training features
-    #     w_profits, w_mkt_ind, w_macro_ind, w_tx = wallet_gen.prepare_training_data(
-    #         training_profits_df_full,
-    #         training_market_data_df_full,
-    #         training_macro_trends_df_full,
-    #         return_files=True
-    #     )
-    #     wallet_train_df = wallet_gen.generate_training_features(
-    #         w_profits, w_mkt_ind, w_macro_ind, w_tx, return_files=True
-    #     )
-
-    #     # wallet‑level modeling features
-    #     wallet_model_df = wallet_gen.prepare_modeling_features(modeling_profits_df_full)
-
-    #     # ——— merge & return ———
-    #     merged_train = self._merge_hybrid_wallet_features(
-    #         hybrid_training_df, wallet_train_df, hybrid_map
-    #     )
-    #     merged_model = self._merge_hybrid_wallet_features(
-    #         hybrid_modeling_df, wallet_model_df, hybrid_map
-    #     )
-    #     return merged_train, merged_model
+        return (
+            hybrid_df
+            .assign(_wallet_id=wallet_idx)
+            .join(wallet_df.add_prefix("wallet_"), on="_wallet_id", how="left")
+            .drop(columns="_wallet_id")
+        )
 
 
 

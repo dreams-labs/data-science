@@ -1,3 +1,25 @@
+# dda 677 hybrid and base features
+checkpoint 1: w.683 features integrated
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       152
+Features per Window:      38
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.683
+RMSE:                     0.219
+MAE:                      0.118
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.785
+RMSE:                     0.126
+MAE:                      0.068
+
+
+
 # dda 676 fix verbosity
 checkpoint 1: HyDev.819 split out _process_single_epoch()
 Model Performance Summary
