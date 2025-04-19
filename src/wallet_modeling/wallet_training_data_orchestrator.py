@@ -575,12 +575,14 @@ class WalletTrainingDataOrchestrator:
         # Apply filters based on wallet behavior during the training period
         filtered_training_wallet_metrics_df = self.wtd.apply_wallet_thresholds(training_wallet_metrics_df)
         training_wallet_cohort = filtered_training_wallet_metrics_df.index.values
-
         if len(training_wallet_cohort) == 0:
             raise ValueError("Cohort does not include any wallets. Cohort must include wallets.")
 
-        # Upload the cohort to BigQuery for additional complex feature generation
-        self.wtd.upload_training_cohort(training_wallet_cohort, hybridize_wallet_ids)
+        # Upload the cohort to BigQuery if needed for additional complex feature generation
+        if (self.wallets_config['features']['toggle_transfers_features']
+            or self.wallets_config['features']['toggle_scenario_features']):
+            self.wtd.upload_training_cohort(training_wallet_cohort, hybridize_wallet_ids)
+
         logger.milestone("Training wallet cohort defined as %s wallets after %.2f seconds.",
                     len(training_wallet_cohort), time.time()-start_time)
 

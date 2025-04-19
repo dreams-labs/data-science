@@ -1,4 +1,24 @@
 # dda 679 toggle transfers features
+checkpoint 3: w.677 toggle cohort upload to bigquery (2m 13s)
+Model Performance Summary
+===================================
+Test Samples:             57,906
+Number of Features:       136
+Features per Window:      34
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.677
+RMSE:                     0.221
+MAE:                      0.119
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.779
+RMSE:                     0.128
+MAE:                      0.068
+
+
 checkpoint 2: w.675 var name for toggle_scenario_features
 Model Performance Summary
 ===================================
