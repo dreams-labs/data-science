@@ -172,14 +172,22 @@ def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
     - ValueError: For data quality issues
     - AssertionError: For missing market data coverage
     """
-    # NaN checks use index-aware operations
+    #  No nulls
     if profits_df.isnull().any().any():
         raise ValueError("profits_df contains NaN values.")
 
     if market_data_df[['price', 'volume', 'market_cap_filled']].isnull().any().any():
         raise ValueError("market_data_df contains NaN values in critical columns.")
 
-    # Use pandas' optimized Index operations (faster than NumPy for Index objects)
+    # Unique indices
+    if not profits_df.index.is_unique:
+        raise ValueError("profits_df index has duplicate (coin_id, wallet_address, date) entries.")
+    if not market_data_df.index.is_unique:
+        raise ValueError("market_data_df index has duplicate (coin_id, date) entries.")
+    if not transfers_sequencing_df.index.is_unique:
+        raise ValueError("transfers_sequencing_df index has duplicate entries.")
+
+    # Dates overlap
     profits_dates = profits_df.index.droplevel('wallet_address').unique()
     market_dates = market_data_df.index.unique()
     missing_pairs = profits_dates.difference(market_dates)  # Faster than NumPy set operations
@@ -187,17 +195,15 @@ def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
     if missing_pairs.size > 0:
         raise AssertionError(f"Found {missing_pairs.size} coin_id-date pairs missing in market_data_df")
 
-    # Use Index for wallet uniqueness (faster than set operations)
+    # Wallets in transfers_df exist in profits_df
     wallets_in_profits = profits_df.index.get_level_values('wallet_address').unique()
     wallets_in_transfers = transfers_sequencing_df['wallet_address'].unique()
-
-    # Use pandas' `.intersection()` which is optimized for Index objects
     common_wallets = wallets_in_profits.intersection(wallets_in_transfers)
     coverage = len(common_wallets) / len(wallets_in_profits)
-
     if coverage < 0.99:
         raise ValueError(f"Only {coverage:.2%} of wallets in profits_df are in transfers_sequencing_df.")
 
+    # All done
     logger.debug("All input dataframes passed validation checks.")
 
 
