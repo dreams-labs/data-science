@@ -425,7 +425,7 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
                 X_trans,
                 y_trans,
                 eval_set=transformed_eval_set,
-                verbose=0
+                verbose=False  # toggles line by line output logs
             )
         else:
             # Regular fit without early stopping if no eval set provided

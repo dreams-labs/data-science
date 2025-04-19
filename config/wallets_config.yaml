@@ -288,7 +288,7 @@ modeling:
         # Performance Profiles (Choose One Section)
         # --------------------------------------
         # CHECKPOINTER
-        n_estimators: 250  # number of trees to train in the model
+        n_estimators: 5  # number of trees to train in the model
         learning_rate: 0.1  # step size for updates to weights during training
 
         # # PRODUCTION
@@ -305,7 +305,6 @@ modeling:
 
         # Metaparams
         random_state: 42
-        verbosity: 0
 
     # Phase training section
     phase_training:
@@ -343,7 +342,7 @@ modeling:
         scoring: validation_r2_scorer
 
         build_post_search_model: False  # whether to build a model after the grid search
-        verbose_level: 3
+        verbose_level: 3  # 3 outputs model performance but not training scores
 
         # Params for target variable generation
         param_grid_y:
