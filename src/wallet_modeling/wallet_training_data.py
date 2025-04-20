@@ -35,7 +35,7 @@ class WalletTrainingData:
 # -------------------------------------------
 
     @u.timing_decorator
-    def retrieve_raw_datasets(self, period_start_date, period_end_date):
+    def retrieve_raw_datasets(self, period_start_date, period_end_date, include_hybrid_cw_map = False):
         """
         Retrieves raw market and profits data after applying the min_wallet_inflows filter at the
         wallet level. Because the filter is applied cumulatively, later period_end_dates will return
@@ -45,10 +45,11 @@ class WalletTrainingData:
         - period_start_date,period_end_date (YYYY-MM-DD): The data period boundary dates.
 
         Returns:
-        - profits_df, market_data_df, macro_trends_df: raw dataframes
+        - profits_df, market_data_df, macro_trends_df, hybrid_cw_id_df: raw dataframes
         """
         # Identify the date we need ending balances from
         period_start_date = datetime.strptime(period_start_date,'%Y-%m-%d')
+        period_end_date = datetime.strptime(period_end_date,'%Y-%m-%d')
         starting_balance_date = period_start_date - timedelta(days=1)
 
         # Retrieve all datasets
@@ -72,13 +73,20 @@ class WalletTrainingData:
             # Macro trends data
             macro_future = executor.submit(dr.retrieve_macro_trends_data)
 
+            # Hybrid ID mappings
+            if include_hybrid_cw_map:
+                hybrid_cw_future = executor.submit(dr.retrieve_hybrid_cw_id_df,
+                                                   self.wallets_config['features']['usd_materiality'])
+                hybrid_cw_id_df = hybrid_cw_future.result()
+            else:
+                hybrid_cw_id_df = pd.DataFrame()
+
             # Merge all dfs
             profits_df = profits_future.result()
             market_data_df = market_future.result()
             macro_trends_df = macro_future.result()
 
-
-        return profits_df, market_data_df, macro_trends_df
+        return profits_df, market_data_df, macro_trends_df, hybrid_cw_id_df
 
 
     def clean_market_dataset(self, market_data_df, profits_df, period_start_date, period_end_date, coin_cohort=None):

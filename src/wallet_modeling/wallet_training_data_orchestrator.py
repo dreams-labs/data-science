@@ -96,8 +96,8 @@ class WalletTrainingDataOrchestrator:
                 "Missing" if self.market_data_df is None else "Loaded",
                 "Missing" if self.macro_trends_df is None else "Loaded"
             )
-            profits_df, market_data_df, macro_trends_df = self.wtd.retrieve_raw_datasets(
-                period_start_date,period_end_date
+            profits_df, market_data_df, macro_trends_df, hybrid_cw_id_map = self.wtd.retrieve_raw_datasets(
+                period_start_date, period_end_date, self.wallets_config['training_data']['hybridize_wallet_ids']
             )
         else:
             logger.info("Cleaning datasets from provided versions...")

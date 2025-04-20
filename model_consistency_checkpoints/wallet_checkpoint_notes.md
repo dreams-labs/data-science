@@ -1,3 +1,24 @@
+# dda 673 get hybrid id mappings from bigquery
+checkpoint 1: w.676 df retrieved with other datasets
+Model Performance Summary
+===================================
+Test Samples:             57,544
+Number of Features:       136
+Features per Window:      34
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.676
+RMSE:                     0.221
+MAE:                      0.120
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.783
+RMSE:                     0.125
+MAE:                      0.066
+
+
 # dda 679 toggle transfers features
 checkpoint 3: w.677 toggle cohort upload to bigquery (2m 13s)
 Model Performance Summary
