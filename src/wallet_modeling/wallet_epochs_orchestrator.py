@@ -37,7 +37,7 @@ class MultiEpochOrchestrator:
         complete_profits_df: pd.DataFrame = None,
         complete_market_data_df: pd.DataFrame = None,
         complete_macro_trends_df: pd.DataFrame = None,
-        hybrid_cw_id_map: Dict = None
+        complete_hybrid_cw_id_df: Dict = None
     ):
         # Param Configs
         self.base_config = base_config
@@ -46,15 +46,12 @@ class MultiEpochOrchestrator:
         self.epochs_config = epochs_config
 
         # Hybrid ID mapping
-        self.hybrid_cw_id_map = hybrid_cw_id_map
+        self.complete_hybrid_cw_id_df = complete_hybrid_cw_id_df
 
         # Generated configs
         self.all_epochs_configs = self._generate_epoch_configs()
 
         # Complete df objects
-        self.complete_profits_df_file = None
-        self.complete_market_data_df_file = None
-        self.complete_macro_trends_df_file = None
         self.complete_profits_df = complete_profits_df
         self.complete_market_data_df = complete_market_data_df
         self.complete_macro_trends_df = complete_macro_trends_df
@@ -89,8 +86,16 @@ class MultiEpochOrchestrator:
         # Retrieve the full data once (BigQuery or otherwise)
         logger.milestone("Pulling complete raw datasets from %s through %s...",
                     earliest_training_start, latest_validation_end)
-        self.complete_profits_df, self.complete_market_data_df, self.complete_macro_trends_df = \
-            self.wtd.retrieve_raw_datasets(earliest_training_start, latest_validation_end)
+        (
+            self.complete_profits_df,
+            self.complete_market_data_df,
+            self.complete_macro_trends_df,
+            self.complete_hybrid_cw_id_df,
+        ) = self.wtd.retrieve_raw_datasets(
+            earliest_training_start,
+            latest_validation_end,
+            cfg["training_data"]["hybridize_wallet_ids"],
+        )
 
         # Set index
         self.complete_profits_df = u.ensure_index(self.complete_profits_df)
@@ -98,20 +103,23 @@ class MultiEpochOrchestrator:
 
         # Save them to parquet for future reuse
         parquet_folder = self.base_config['training_data']['parquet_folder']
-        self.complete_profits_df_file = f"{parquet_folder}/complete_profits_df.parquet"
-        self.complete_market_data_df_file = f"{parquet_folder}/complete_market_data_df.parquet"
-        self.complete_macro_trends_df_file = f"{parquet_folder}/complete_macro_trends_df.parquet"
+        self.complete_profits_df.to_parquet(f"{parquet_folder}/complete_profits_df.parquet")
+        self.complete_market_data_df.to_parquet(f"{parquet_folder}/complete_market_data_df.parquet")
+        self.complete_macro_trends_df.to_parquet(f"{parquet_folder}/complete_macro_trends_df.parquet")
+        if not self.complete_hybrid_cw_id_df.empty:
+            self.complete_hybrid_cw_id_df.to_parquet(f"{parquet_folder}/complete_hybrid_cw_id_df.parquet")
 
-        self.complete_profits_df.to_parquet(self.complete_profits_df_file)
-        self.complete_market_data_df.to_parquet(self.complete_market_data_df_file)
-        self.complete_macro_trends_df.to_parquet(self.complete_macro_trends_df_file)
+        parts = [
+            f"complete profits ({len(self.complete_profits_df)} rows)",
+            f"market data ({len(self.complete_market_data_df)} rows)",
+            f"macro trends ({len(self.complete_macro_trends_df)} rows)",
+        ]
+        # only log hybrid ID mappings if there's any
+        if not self.complete_hybrid_cw_id_df.empty:
+            parts.append(f"hybrid id mappings ({len(self.complete_hybrid_cw_id_df)} rows)")
 
-        logger.info("Saved complete profits to %s (%s rows), market data to %s (%s rows), " \
-                    " market data to %s (%s rows).",
-                    self.complete_profits_df_file, len(self.complete_profits_df),
-                    self.complete_market_data_df_file, len(self.complete_market_data_df),
-                    self.complete_macro_trends_df_file, len(self.complete_macro_trends_df)
-                    )
+        log_msg = "Saved " + ", ".join(parts) + f" to {parquet_folder}."
+        logger.info(log_msg)
 
 
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
