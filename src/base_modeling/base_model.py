@@ -54,6 +54,20 @@ class BaseModel:
         self.start_time = time.time()
         self.training_time = None
 
+        # Convert drop patterns to a list of lists
+        param_grid = self.modeling_config.get('grid_search_params', {}).get('param_grid', {})
+        if 'drop_columns__drop_patterns' in param_grid:
+            grid_patterns = param_grid['drop_columns__drop_patterns']
+            if grid_patterns and all(isinstance(p, str) for p in grid_patterns):
+                grid_patterns = [[p] for p in grid_patterns]
+            else:
+                raise ValueError(
+                    f"drop_columns__drop_patterns must be a list of strings, got {type(grid_patterns)}"
+                )
+            param_grid['drop_columns__drop_patterns'] = grid_patterns
+            self.modeling_config['grid_search_params']['param_grid']['drop_columns__drop_patterns'] = grid_patterns
+
+
 
 
     # -----------------------------------
@@ -357,17 +371,6 @@ class BaseModel:
 
         # Process drop patterns logic
         if 'drop_columns__drop_patterns' in param_grid:
-
-            # Normalize to list of lists
-            grid_patterns = param_grid['drop_columns__drop_patterns']
-            if grid_patterns and all(isinstance(p, str) for p in grid_patterns):
-                grid_patterns = [[p] for p in grid_patterns]
-            else:
-                raise ValueError(
-                    f"drop_columns__drop_patterns must be a list of strings, got {type(grid_patterns)}"
-                )
-            param_grid['drop_columns__drop_patterns'] = grid_patterns
-            self.modeling_config['grid_search_params']['param_grid']['drop_columns__drop_patterns'] = grid_patterns
 
             # Define drop pattern combinations as selections of columns
             if self.modeling_config['grid_search_params'].get('drop_patterns_include_n_features'):
