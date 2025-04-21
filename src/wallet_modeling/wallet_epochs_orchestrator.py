@@ -3,9 +3,10 @@ import os
 import logging
 from pathlib import Path
 import copy
-from typing import List,Dict,Tuple
+from typing import List,Dict,Tuple,Set,Optional
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import numpy as np
 import pandas as pd
 
 # Local module imports
@@ -37,7 +38,6 @@ class MultiEpochOrchestrator:
         complete_profits_df: pd.DataFrame = None,
         complete_market_data_df: pd.DataFrame = None,
         complete_macro_trends_df: pd.DataFrame = None,
-        complete_hybrid_cw_id_df: Dict = None
     ):
         # Param Configs
         self.base_config = base_config
@@ -45,8 +45,6 @@ class MultiEpochOrchestrator:
         self.features_config = features_config
         self.epochs_config = epochs_config
 
-        # Hybrid ID mapping
-        self.complete_hybrid_cw_id_df = complete_hybrid_cw_id_df
 
         # Generated configs
         self.all_epochs_configs = self._generate_epoch_configs()
@@ -56,6 +54,11 @@ class MultiEpochOrchestrator:
         self.complete_market_data_df = complete_market_data_df
         self.complete_macro_trends_df = complete_macro_trends_df
         self.wtd = WalletTrainingData(self.base_config)  # helper for complete df generation
+
+        # Create hybrid ID mapping if configured and able
+        self.complete_hybrid_cw_id_df = None
+        if self.base_config['training_data']['hybridize_wallet_ids'] and self.complete_profits_df is not None:
+            self.complete_hybrid_cw_id_df = self._create_hybrid_mapping()
 
         # Generated objects
         self.output_dfs = {}
@@ -90,23 +93,25 @@ class MultiEpochOrchestrator:
             self.complete_profits_df,
             self.complete_market_data_df,
             self.complete_macro_trends_df,
-            self.complete_hybrid_cw_id_df,
         ) = self.wtd.retrieve_raw_datasets(
             earliest_training_start,
-            latest_validation_end,
-            cfg["training_data"]["hybridize_wallet_ids"],
+            latest_validation_end
         )
 
         # Set index
         self.complete_profits_df = u.ensure_index(self.complete_profits_df)
         self.complete_market_data_df = u.ensure_index(self.complete_market_data_df)
 
+        # Create hybrid mapping if configured
+        if self.base_config['training_data']['hybridize_wallet_ids']:
+            self.complete_hybrid_cw_id_df = self._create_hybrid_mapping()
+
         # Save them to parquet for future reuse
         parquet_folder = self.base_config['training_data']['parquet_folder']
         self.complete_profits_df.to_parquet(f"{parquet_folder}/complete_profits_df.parquet")
         self.complete_market_data_df.to_parquet(f"{parquet_folder}/complete_market_data_df.parquet")
         self.complete_macro_trends_df.to_parquet(f"{parquet_folder}/complete_macro_trends_df.parquet")
-        if not self.complete_hybrid_cw_id_df.empty:
+        if not getattr(self.complete_hybrid_cw_id_df, "empty", True):
             self.complete_hybrid_cw_id_df.to_parquet(f"{parquet_folder}/complete_hybrid_cw_id_df.parquet")
 
         parts = [
@@ -114,8 +119,8 @@ class MultiEpochOrchestrator:
             f"market data ({len(self.complete_market_data_df)} rows)",
             f"macro trends ({len(self.complete_macro_trends_df)} rows)",
         ]
-        # only log hybrid ID mappings if there's any
-        if not self.complete_hybrid_cw_id_df.empty:
+        # only log hybrid ID mappings if there's rows in the df
+        if not getattr(self.complete_hybrid_cw_id_df, "empty", True):
             parts.append(f"hybrid id mappings ({len(self.complete_hybrid_cw_id_df)} rows)")
 
         log_msg = "Saved " + ", ".join(parts) + f" to {parquet_folder}."
@@ -185,46 +190,58 @@ class MultiEpochOrchestrator:
         logger.info(f"Generating data for epoch starting {model_start}...")
         u.notify('futuristic')
 
+        # If using hybrid IDs, override for a non-hybridized run to define the wallet cohort
+        epoch_config['training_data']['hybridize_wallet_ids'] = False
+
         # Build features with initial data
-        epoch_date, epoch_training_data_df, epoch_modeling_data_df, hybrid_map = self._build_epoch_features(epoch_config)
-        if hybrid_map is not None:
-            self.hybrid_cw_id_map = hybrid_map
+        epoch_date, epoch_training_data_df, epoch_modeling_data_df, cohorts = self._build_epoch_features(epoch_config)
 
-        if epoch_config['training_data']['hybridize_wallet_ids']:
-            dehybridized_config = copy.deepcopy(epoch_config)
-            dehybridized_config['training_data']['hybridize_wallet_ids'] = False
+        # If using hybrid IDs, generate hybridized feature set using IDs from the original cohorts
+        if self.base_config['training_data']['hybridize_wallet_ids']:
+            epoch_config['training_data']['hybridize_wallet_ids'] = True
 
-            # Build features with dehybridized data
-            _, dehybridized_training_data_df, dehybridized_modeling_data_df, _ = self._build_epoch_features(dehybridized_config)
+            # Get the corresponding hybrid IDs for the nonhybridized wallet cohort
+            hybridized_cohort = (self.complete_hybrid_cw_id_df
+                                 [self.complete_hybrid_cw_id_df['wallet_address'].isin(cohorts['wallet_cohort'])]
+                                 ['hybrid_cw_id'])
+            cohorts['wallet_cohort'] = hybridized_cohort
 
-            # Merge hybrid/nonhybrid together
-            epoch_training_data_df = self._merge_hybrid_wallet_features(
-                epoch_training_data_df,
-                dehybridized_training_data_df
-            )
-            epoch_modeling_data_df = self._merge_hybrid_wallet_features(
-                epoch_modeling_data_df,
-                dehybridized_modeling_data_df
-            )
+            # Build features with hybrid IDs
+            _, hybridized_training_data_df, hybridized_modeling_data_df, _ = self._build_epoch_features(epoch_config, cohorts)
 
+            # Merge hybrid/nonhybrid training and modeling dfs
+            epoch_training_data_df = self._merge_hybrid_dfs(epoch_training_data_df,hybridized_training_data_df)
+            epoch_modeling_data_df = self._merge_hybrid_dfs(epoch_modeling_data_df,hybridized_modeling_data_df)
+
+            # Remove modeling-only IDs - these represent wallets in the cohort but
+            # coin-wallet pairs that only became active during the modeling period
+            epoch_modeling_data_df = (epoch_modeling_data_df[
+                epoch_modeling_data_df.index.isin(epoch_training_data_df.index.values)
+            ])
+
+            u.assert_matching_indices(epoch_training_data_df,epoch_modeling_data_df)
 
         return epoch_date, epoch_training_data_df, epoch_modeling_data_df
 
 
 
-    def _build_epoch_features(self, epoch_config: dict) -> Tuple[datetime, pd.DataFrame, pd.DataFrame]:
+    def _build_epoch_features(
+        self,
+        epoch_config: dict,
+        cohorts: Optional[Dict[Set,np.array]] = {}
+    ) -> Tuple[datetime, pd.DataFrame, pd.DataFrame, Dict[Set,np.array]]:
         """
         Process a single epoch configuration to generate training and modeling data.
 
         Params:
         - epoch_config (dict): Configuration for the specific epoch
+        - cohorts (Dict[Set,np.array]): Optional predefinition of coin and wallet cohorts
 
         Returns:
         - epoch_date (datetime): The modeling period start date as datetime
         - epoch_training_data_df (DataFrame): Training features for this epoch
         - epoch_modeling_data_df (DataFrame): Modeling features for this epoch
-        - hybrid_cw_id_map (Dict): mapping for hybrid wallet IDs
-
+        - cohorts (Dict[Set,np.array]): The wallets and coins included in the training data
         """
         model_start = epoch_config['training_data']['modeling_period_start']
 
@@ -247,9 +264,11 @@ class MultiEpochOrchestrator:
             epoch_config,
             self.metrics_config,
             self.features_config,
+            training_wallet_cohort=cohorts.get('wallet_cohort'),  # use predefined cohort if provided
             profits_df=training_profits_df,
             market_data_df=training_market_data_df,
-            macro_trends_df=training_macro_trends_df
+            macro_trends_df=training_macro_trends_df,
+            complete_hybrid_cw_id_df=self.complete_hybrid_cw_id_df
         )
 
         # 2. Generate TRAINING_DATA_DFs
@@ -257,7 +276,8 @@ class MultiEpochOrchestrator:
         training_macro_trends_df_full, training_coin_cohort = \
             training_generator.retrieve_cleaned_period_datasets(
                 epoch_config['training_data']['training_period_start'],
-                epoch_config['training_data']['training_period_end']
+                epoch_config['training_data']['training_period_end'],
+                cohorts.get('coin_cohort')  # use predefined cohort if provided
             )
 
         training_profits_df, training_market_indicators_df, \
@@ -285,7 +305,7 @@ class MultiEpochOrchestrator:
         modeling_profits_df, modeling_market_data_df, modeling_macro_trends_df = \
             self._transform_complete_dfs_for_epoch(
                 epoch_config['training_data']['modeling_period_start'],
-                epoch_config['training_data']['modeling_period_end']
+                epoch_config['training_data']['modeling_period_end'],
             )
 
         modeling_generator = wtdo.WalletTrainingDataOrchestrator(
@@ -295,7 +315,8 @@ class MultiEpochOrchestrator:
             training_wallet_cohort=training_generator.training_wallet_cohort,  # add cohort
             profits_df=modeling_profits_df,
             market_data_df=modeling_market_data_df,
-            macro_trends_df=modeling_macro_trends_df
+            macro_trends_df=modeling_macro_trends_df,
+            complete_hybrid_cw_id_df=self.complete_hybrid_cw_id_df
         )
 
         modeling_profits_df_full, _, _, _ = modeling_generator.retrieve_cleaned_period_datasets(
@@ -306,11 +327,17 @@ class MultiEpochOrchestrator:
 
         epoch_modeling_data_df = modeling_generator.prepare_modeling_features(
             modeling_profits_df_full,
-            training_generator.hybrid_cw_id_map
+            self.complete_hybrid_cw_id_df
         )
+
+        cohorts = {
+            'coin_cohort': training_coin_cohort,
+            'wallet_cohort': training_generator.training_wallet_cohort
+        }
+
         logger.milestone(f"Successfully generated features for epoch {model_start}.")
 
-        return epoch_date, epoch_training_data_df, epoch_modeling_data_df, training_generator.hybrid_cw_id_map
+        return epoch_date, epoch_training_data_df, epoch_modeling_data_df, cohorts
 
 
     def _generate_epoch_configs(self) -> List[Dict]:
@@ -449,30 +476,62 @@ class MultiEpochOrchestrator:
         return full_df
 
 
-    def _merge_hybrid_wallet_features(
+    def _create_hybrid_mapping(self) -> pd.DataFrame:
+        """
+        Create hybrid wallet-coin ID mapping if configured in the base config.
+        """
+        if self.base_config['training_data']['hybridize_wallet_ids']:
+            hybrid_df = (
+                self.complete_profits_df
+                    .reset_index()[['coin_id', 'wallet_address']]
+                    .drop_duplicates()
+            )
+            hybrid_df['hybrid_cw_id'] = hybrid_df.index.values + 3e9
+            if not hybrid_df['hybrid_cw_id'].is_unique:
+                raise ValueError("Duplicate hybrid_cw_ids found, confirm index is not malformed.")
+
+            return hybrid_df
+
+
+    def _merge_hybrid_dfs(
         self,
+        base_df: pd.DataFrame,
         hybrid_df: pd.DataFrame,
-        wallet_df: pd.DataFrame,
     ) -> pd.DataFrame:
         """
-        For every hybrid wallet‑coin row, append the wallet‑level (/wallet‑suffixed)
-        columns that describe the whole portfolio.
+        For every hybrid wallet‑coin row, append the wallet‑level feature
+        columns that describe the full portfolio behavior.
         """
-        reverse_map = {v: k for k, v in self.hybrid_cw_id_map.items()}
-        wallet_idx = hybrid_df.index.map(lambda h: reverse_map[h][0])
+        # Add 'wc_' prefix to differentiate from wallet-level features
+        hybrid_df = hybrid_df.add_prefix('cw_')
 
-        # Ensure wallet-level features exist for all hybrid ID pairs
-        missing_wallet_ids = set(wallet_idx) - set(wallet_df.index)
-        if missing_wallet_ids:
-            logger.warning(f"Missing wallet-level features for {len(missing_wallet_ids)}/{len(wallet_idx)} "
-                             f"hybrid wallet IDs: {missing_wallet_ids}")
-
-        return (
-            hybrid_df
-            .assign(_wallet_id=wallet_idx)
-            .join(wallet_df.add_prefix("wallet_"), on="_wallet_id", how="left")
-            .drop(columns="_wallet_id")
+        # Merge to the base wallet_address value
+        hybrid_df['hybrid_cw_id'] = hybrid_df.index.values
+        hybrid_df = hybrid_df.merge(
+            self.complete_hybrid_cw_id_df[['hybrid_cw_id','wallet_address']]
+            ,how='left'
+            ,on='hybrid_cw_id'
         )
+
+        # Confirm every hybrid_cw_id got a wallet_address
+        missing = hybrid_df['wallet_address'].isna()
+        if missing.any():
+            bad_ids = hybrid_df.loc[missing, 'hybrid_cw_id'].tolist()
+            raise ValueError(f"Missing wallet_address for {len(bad_ids)} hybrid_cw_ids: {bad_ids[:10]}")
+
+
+        # Merge to the base wallet_address features
+        hybrid_df = hybrid_df.merge(
+            base_df.reset_index(),
+            how='left'
+            ,on='wallet_address'
+        )
+
+        # Reapply index and drop helper columns
+        hybrid_df = hybrid_df.set_index(hybrid_df['hybrid_cw_id'])
+        hybrid_df = hybrid_df.drop(['hybrid_cw_id','wallet_address'],axis=1)
+
+        return hybrid_df
 
 
 
@@ -518,3 +577,25 @@ class MultiEpochOrchestrator:
                 f"- Profits data: {profits_start.strftime('%Y-%m-%d')} to {profits_end.strftime('%Y-%m-%d')}\n"
                 f"- Market data: {market_data_start.strftime('%Y-%m-%d')} to {market_data_end.strftime('%Y-%m-%d')}"
             )
+
+        # Confirm we have hybrid mappings for all pairs if applicable
+        if self.base_config['training_data']['hybridize_wallet_ids']:
+            if not isinstance(self.complete_hybrid_cw_id_df, pd.DataFrame):
+                raise TypeError("complete_hybrid_cw_id_df must be a pandas DataFrame")
+            if self.complete_hybrid_cw_id_df.empty:
+                raise ValueError("complete_hybrid_cw_id_df cannot be empty")
+
+            # Extract unique coin-wallet pairs from profits dataframe
+            profits_pairs = set(zip(self.complete_profits_df.reset_index()['coin_id'],
+                                    self.complete_profits_df.reset_index()['wallet_address']))
+
+            # Extract unique coin-wallet pairs from hybrid dataframe
+            hybrid_pairs = set(zip(self.complete_hybrid_cw_id_df['coin_id'],
+                                   self.complete_hybrid_cw_id_df['wallet_address']))
+
+            # Find pairs in profits that are not in hybrid
+            missing_pairs = profits_pairs - hybrid_pairs
+
+            if len(missing_pairs) > 0:
+                raise ValueError(f"Found {len(missing_pairs)} coin-wallet pairs in profits_df "
+                                 "without corresponding hybrid IDs.")

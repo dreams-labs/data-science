@@ -51,13 +51,17 @@ def test_wallet_coin_hybridization():
         'coin_id': ['btc', 'eth', 'sol', 'btc', 'eth', 'btc'],
         'value': [100, 200, 300, 400, 500, 600]
     })
+    hybrid_cw_id_df = pd.DataFrame({
+        'wallet_address': [1001, 1001, 1001, 1002, 1002, 1003],
+        'coin_id': ['btc', 'eth', 'sol', 'btc', 'eth', 'btc'],
+        'hybrid_cw_id': [30001, 30002, 30003, 30004, 30005, 30006]
+    })
     original_df = test_df.copy()
 
     # Test hybridization
-    hybrid_df, hybrid_map = wtdo.hybridize_wallet_address(test_df)
+    hybrid_df = wtdo.hybridize_wallet_address(test_df,hybrid_cw_id_df)
 
     # Validate hybrid keys
-    assert len(hybrid_map) == 6, "Should create exactly 6 unique mappings"
     assert hybrid_df['wallet_address'].nunique() == 6, "Should have 6 unique hybrid keys"
     assert all(isinstance(x, (int, np.integer)) for x in hybrid_df['wallet_address']), \
         "All hybrid keys should be integers"
@@ -65,17 +69,6 @@ def test_wallet_coin_hybridization():
     # Test value preservation
     assert np.allclose(hybrid_df['value'], original_df['value'], equal_nan=True), \
         "Non-key columns should remain unchanged"
-
-    # Test dehybridization
-    restored_df = wtdo.dehybridize_wallet_address(hybrid_df, hybrid_map)
-
-    # Validate restoration
-    assert np.allclose(restored_df['wallet_address'], original_df['wallet_address'], equal_nan=True), \
-        "Wallet addresses should be perfectly restored"
-    assert np.array_equal(restored_df['coin_id'], original_df['coin_id']), \
-        "Coin IDs should be perfectly restored"
-    assert np.allclose(restored_df['value'], original_df['value'], equal_nan=True), \
-        "Values should remain unchanged through entire process"
 
 
 @pytest.mark.unit
@@ -128,31 +121,20 @@ def test_wallet_coin_hybridization_with_temporal_data():
         'usd_net_transfers': [100, -50, 75, 200, -100, 300, -150, 50, 400, -200]
     })
     original_df = test_df.copy()
+    hybrid_cw_id_df = pd.DataFrame({
+        'wallet_address': [1001, 1001, 1001, 1002, 1002, 1003],
+        'coin_id': ['btc', 'eth', 'sol', 'btc', 'sol', 'eth'],
+        'hybrid_cw_id': [30001, 30002, 30003, 30004, 30005, 30006]
+    })
 
     # Test hybridization
-    hybrid_df, hybrid_map = wtdo.hybridize_wallet_address(test_df)
+    hybrid_df = wtdo.hybridize_wallet_address(test_df,hybrid_cw_id_df)
 
     # Validate unique wallet-coin pair mappings
     unique_wallet_coins = len(test_df.groupby(['wallet_address', 'coin_id']))
-    assert len(hybrid_map) == unique_wallet_coins, \
-        "Should create exactly one mapping per unique wallet-coin pair"
 
     # Verify same hybrid key used across dates
     hybrid_keys_by_wallet_coin = hybrid_df.groupby(['coin_id'])['wallet_address'].nunique()
     original_wallets_by_coin = test_df.groupby(['coin_id'])['wallet_address'].nunique()
     assert np.array_equal(hybrid_keys_by_wallet_coin, original_wallets_by_coin), \
         "Should maintain same number of unique wallets per coin"
-
-    # Test dehybridization
-    restored_df = wtdo.dehybridize_wallet_address(hybrid_df, hybrid_map)
-
-    # Validate complete restoration
-    assert np.allclose(restored_df['wallet_address'], original_df['wallet_address'], equal_nan=True), \
-        "Wallet addresses should be perfectly restored"
-    assert np.array_equal(restored_df['coin_id'], original_df['coin_id']), \
-        "Coin IDs should be perfectly restored"
-    assert np.array_equal(restored_df['date'], original_df['date']), \
-        "Dates should remain unchanged"
-    assert np.allclose(restored_df['usd_net_transfers'], original_df['usd_net_transfers'],
-                      equal_nan=True), \
-        "Transfer values should remain unchanged"

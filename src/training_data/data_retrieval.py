@@ -322,46 +322,9 @@ def retrieve_macro_trends_data(query_sql = None):
 
 
 
-def retrieve_hybrid_cw_id_df(usd_materiality: int) -> pd.DataFrame:
-    """
-    Retrieves a mapping of (wallet_id, coin_id) tuples to their hybrid integer IDs.
-    These are used to make tuple-specific features to complement the wallet features.
-
-    Returns:
-    - hybrid_cw_id_map (Dict[(int, int), int]): mapping for wallet‑coin pairs
-    """
-
-    # query to retrieve all mappings
-    query_sql = f"""
-        with lifetime_inflows as (
-            select wallet_address,
-            coin_id,
-            sum(usd_inflows) as total_inflows
-            from `core.coin_wallet_profits`
-            group by 1,2
-        )
-        select wci.wallet_id,
-        wci.coin_id,
-        wci.hybrid_cw_id
-        from reference.wallet_coin_ids wci
-        join lifetime_inflows li using (wallet_address,coin_id)
-        where li.total_inflows > {usd_materiality}
-        """
-
-    # Run the SQL query using dgc's run_sql method
-    logger.info("Retrieving hybrid coin-wallet ID mappings data from prod schema 'reference'...")
-    hybrid_id_mappings_df = dgc().run_sql(query_sql)
-    logger.info('Retrieved hybrid ID df with shape %s', hybrid_id_mappings_df.shape)
-
-    return hybrid_id_mappings_df
-
-
-
-
 # -----------------------------------
 #        Market Data Helpers
 # -----------------------------------
-
 
 def detect_price_data_staleness(market_data_df, config):
     """
