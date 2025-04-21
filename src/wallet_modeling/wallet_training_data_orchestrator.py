@@ -41,10 +41,10 @@ class WalletTrainingDataOrchestrator:
         wallets_metrics_config: dict,
         wallets_features_config: dict,
         training_wallet_cohort: List[int] = None,
-        profits_df = None,
-        market_data_df = None,
-        macro_trends_df = None,
-        hybrid_cw_id_map: Dict = None
+        profits_df: pd.DataFrame = None,
+        market_data_df: pd.DataFrame = None,
+        macro_trends_df: pd.DataFrame = None,
+        complete_hybrid_cw_id_df: pd.DataFrame = None
     ):
         # Base configs
         self.wallets_config = copy.deepcopy(wallets_config)
@@ -58,7 +58,7 @@ class WalletTrainingDataOrchestrator:
         self.epoch_reference_date = self.wallets_config['training_data']['modeling_period_start'].replace('-','')
 
         # Hybrid ID mapping
-        self.hybrid_cw_id_map = hybrid_cw_id_map
+        self.complete_hybrid_cw_id_df = complete_hybrid_cw_id_df
 
         # Preexisting raw dfs if provided
         self.profits_df = profits_df
@@ -96,7 +96,7 @@ class WalletTrainingDataOrchestrator:
                 "Missing" if self.market_data_df is None else "Loaded",
                 "Missing" if self.macro_trends_df is None else "Loaded"
             )
-            profits_df, market_data_df, macro_trends_df, hybrid_cw_id_map = self.wtd.retrieve_raw_datasets(
+            profits_df, market_data_df, macro_trends_df, hybrid_cw_id_df = self.wtd.retrieve_raw_datasets(
                 period_start_date, period_end_date, self.wallets_config['training_data']['hybridize_wallet_ids']
             )
         else:
@@ -209,19 +209,12 @@ class WalletTrainingDataOrchestrator:
 
         # Define training wallet cohort
         def generate_cohort_profits_df(profits_df_full):
-            # Hybridize wallet IDs if configured and map not yet built
+            # Hybridize wallet IDs if configured using existing mapping
             if self.wallets_config['training_data']['hybridize_wallet_ids']:
-                if self.hybrid_cw_id_map is None:
-                    # Build new mapping and apply
-                    profits_df_full, hybrid_cw_id_map = hybridize_wallet_address(profits_df_full)
-                    self.hybrid_cw_id_map = hybrid_cw_id_map
-                    upload_hybrid_wallet_mapping(hybrid_cw_id_map)
-                else:
-                    # Reapply existing mapping
-                    profits_df_full, _ = hybridize_wallet_address(
-                        profits_df_full,
-                        self.hybrid_cw_id_map
-                    )
+                profits_df_full = hybridize_wallet_address(
+                    profits_df_full,
+                    self.complete_hybrid_cw_id_df
+                )
 
             logger.info("Defining wallet cohort...")
 
@@ -265,7 +258,7 @@ class WalletTrainingDataOrchestrator:
 
             # Handle hybrid IDs if configured
             if self.hybrid_cw_id_map is not None:
-                transfers_df, _ = hybridize_wallet_address(transfers_df,self.hybrid_cw_id_map)
+                transfers_df = hybridize_wallet_address(transfers_df, self.complete_hybrid_cw_id_df)
         else:
             transfers_df = pd.DataFrame()
 
@@ -414,7 +407,7 @@ class WalletTrainingDataOrchestrator:
     def prepare_modeling_features(
         self,
         modeling_profits_df_full: pd.DataFrame,
-        hybrid_cw_id_map: Optional[Dict] = None,
+        complete_hybrid_cw_id_df: Optional[pd.DataFrame] = None,
         period: str = 'modeling'
     ) -> pd.DataFrame:
         """
@@ -424,7 +417,7 @@ class WalletTrainingDataOrchestrator:
         - modeling_market_data_df_full: Full market data DataFrame
         - modeling_profits_df_full: Full profits DataFrame
         - config: Configuration dictionary
-        - hybrid_cw_id_map: Optional mapping for hybrid wallet IDs
+        - complete_hybrid_cw_id_df: Optional mapping for hybrid wallet IDs
         - period: Which period to retrieve dates from
 
 
@@ -436,9 +429,9 @@ class WalletTrainingDataOrchestrator:
         # Handle hybridization if configured
         if self.wallets_config['training_data']['hybridize_wallet_ids'] is True:
             logger.info("Applying wallet-coin hybridization...")
-            modeling_profits_df_full, _ = hybridize_wallet_address(
+            modeling_profits_df_full = hybridize_wallet_address(
                 modeling_profits_df_full,
-                hybrid_cw_id_map
+                complete_hybrid_cw_id_df
             )
 
         # Filter profits to training cohort
@@ -787,31 +780,27 @@ class WalletTrainingDataOrchestrator:
 @u.timing_decorator
 def hybridize_wallet_address(
     df: pd.DataFrame,
-    hybrid_cw_id_map: Optional[Dict[Tuple[int, str], int]] = None
-) -> Tuple[pd.DataFrame, Dict[Tuple[int, str], int]]:
+    hybrid_cw_id_df: pd.DataFrame
+) -> pd.DataFrame:
     """
-    Maps wallet_address-coin_id pairs to unique integers for efficient indexing.
+    Maps wallet_address‑coin_id pairs to unique integers for efficient indexing.
 
     Params:
-    - df (DataFrame): dataframe with columns ['coin_id','wallet_address']
-    - hybrid_cw_id_map (dict): mapping of (wallet,coin) tuples to integers
+    - df (DataFrame): dataframe with columns ['coin_id','wallet_address'] or those as index levels
+    - hybrid_cw_id_map (DataFrame): mapping with columns ['hybrid_cw_id','wallet_id','coin_id']
 
     Returns:
-    - df (DataFrame): input df with hybrid integer keys
-    - hybrid_cw_id_map (dict): mapping of (wallet,coin) tuples to integers
+    - df (DataFrame): input df with hybrid integer keys applied in the 'wallet_address' column
     """
     logger.info(f"Applying hybridization to DataFrame with shape {df.shape}...")
-
-    # Work on a copy to avoid mutating input
     df_copy = df.copy()
     original_index = df_copy.index.names
 
-    # Determine where wallet_address and coin_id live
+    # locate wallet & coin columns (or lift from index)
     if {'wallet_address', 'coin_id'}.issubset(df_copy.columns):
         wallet_col, coin_col = 'wallet_address', 'coin_id'
         used_index = False
-    elif set(['wallet_address', 'coin_id']).issubset(df_copy.index.names):
-        # lift them into columns for mapping
+    elif {'wallet_address', 'coin_id'}.issubset(df_copy.index.names):
         df_copy = df_copy.reset_index()
         wallet_col, coin_col = 'wallet_address', 'coin_id'
         used_index = True
@@ -821,172 +810,29 @@ def hybridize_wallet_address(
             "must exist as columns or index levels"
         )
 
-    # Build list of pairs in row order
-    pairs = list(zip(df_copy[wallet_col], df_copy[coin_col]))
+    # Merge to apply existing mapping
+    merge_map = hybrid_cw_id_df.rename(columns={
+        'wallet_id': wallet_col,
+        'coin_id': coin_col
+    })
+    df_copy = df_copy.merge(merge_map, on=[wallet_col, coin_col], how='left')
 
-    # Initialize mapping if needed
-    if hybrid_cw_id_map is None:
-        hybrid_cw_id_map = {pair: idx for idx, pair in enumerate(set(pairs), 1)}
+    # Swap in hybrid IDs, drop helper column
+    df_copy[wallet_col] = df_copy['hybrid_cw_id']
+    df_copy = df_copy.drop(columns=['hybrid_cw_id'])
 
-    # Extend mapping for any new pairs not already in the map
-    current_max = max(hybrid_cw_id_map.values()) if hybrid_cw_id_map else 0
-    for pair in pairs:
-        if pair not in hybrid_cw_id_map:
-            current_max += 1
-            hybrid_cw_id_map[pair] = current_max
-
-    # Apply mapping without pandas alignment
-    df_copy[wallet_col] = [hybrid_cw_id_map[p] for p in pairs]
-
-    # Restore original index if needed
+    # Restore original index if we reset it
     if used_index:
         df_copy = df_copy.set_index(original_index)
 
-    return df_copy, hybrid_cw_id_map
+    # Verify all addresses were successfully mapped
+    if df_copy[wallet_col].isna().any():
+        unmapped_count = df_copy[wallet_col].isna().sum()
+        total_rows = len(df_copy)
+        raise ValueError(
+            f"Failed to map {unmapped_count} of {total_rows} wallet addresses. "
+            f"Missing mappings for {df_copy[df_copy[wallet_col].isna()][[coin_col]].drop_duplicates().shape[0]} "
+            f"unique coin IDs."
+        )
 
-
-
-def dehybridize_wallet_address(
-    df: pd.DataFrame,
-    hybrid_cw_id_map: Dict[Tuple[int, str], int],
-    hybrid_col_name: str = 'wallet_address'
-) -> pd.DataFrame:
-    """
-    Restores original wallet_address-coin_id pairs from hybrid integer keys.
-
-    Params:
-    - df (DataFrame): dataframe with hybrid integer keys in wallet_address
-    - hybrid_cw_id_map (dict): mapping of (wallet,coin) tuples to integers
-    - hybrid_col_name (str): name of the column containing the hybrid key
-
-    Returns:
-    - df (DataFrame): input df with original wallet_address restored
-    """
-    # Create reverse mapping
-    reverse_map = {v: k for k, v in hybrid_cw_id_map.items()}
-
-    # Vectorized mapping back to original tuples
-    df[hybrid_col_name] = df[hybrid_col_name].map(reverse_map).map(lambda x: x[0])
-
-    return df
-
-
-@u.timing_decorator
-def upload_hybrid_wallet_mapping(
-        hybrid_cw_id_map: Dict[Tuple[int, str], int],
-
-    ) -> None:
-    """
-    Uploads the mapping of hybrid indices to all wallet-coin pairs to BigQuery.
-
-    Params:
-        hybrid_cw_id_map (Dict[Tuple[int, str], int]): Mapping of (wallet,coin) tuples to hybrid indices
-    """
-    # 1. Generate upload_df from hybrid map
-    # -------------------------------------
-    upload_df = pd.DataFrame(
-        [(v, k[0], k[1]) for k, v in hybrid_cw_id_map.items()],
-        columns=['hybrid_id', 'wallet_id', 'coin_id']
-    )
-    upload_df['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-    # Set df datatypes
-    dtype_mapping = {
-        'hybrid_id': int,
-        'wallet_id': int,
-        'coin_id': str,
-        'updated_at': 'datetime64[ns, UTC]'
-    }
-    upload_df = upload_df.astype(dtype_mapping)
-
-    # 2. Upload to BigQuery
-    # ---------------------
-    project_id = 'western-verve-411004'
-    client = bigquery.Client(project=project_id)
-
-    hybrid_table = f"{project_id}.temp.wallet_modeling_hybrid_id_mapping"
-    schema = [
-        {'name': 'hybrid_id', 'type': 'int64'},
-        {'name': 'wallet_id', 'type': 'int64'},
-        {'name': 'coin_id', 'type': 'string'},
-        {'name': 'updated_at', 'type': 'datetime'}
-    ]
-
-    pandas_gbq.to_gbq(
-        upload_df,
-        hybrid_table,
-        project_id=project_id,
-        if_exists='replace',
-        table_schema=schema,
-        progress_bar=False
-    )
-
-    # 3. Create final table with resolved wallet addresses
-    # ----------------------------------------------------
-    create_query = f"""
-    CREATE OR REPLACE TABLE `{hybrid_table}` AS
-    SELECT
-        h.hybrid_id,
-        h.coin_id,
-        h.wallet_id,
-        w.wallet_address,
-        CURRENT_TIMESTAMP() as updated_at
-    FROM `{hybrid_table}` h
-    LEFT JOIN `reference.wallet_ids` w
-        ON h.wallet_id = w.wallet_id
-    """
-
-    client.query(create_query).result()
-    logger.info(
-        'Uploaded complete hybrid ID mapping of %s wallet-coin pairs to %s.',
-        len(hybrid_cw_id_map),
-        hybrid_table
-    )
-
-
-def merge_wallet_hybrid_data(
-    hybrid_parquet_path: str,
-    base_parquet_path: str,
-    output_parquet_path: str,
-    hybrid_suffix: str = "/walletcoin",
-    base_suffix: str = "/wallet"
-) -> str:
-    """
-    Merges hybrid and non-hybrid wallet data frames and saves to parquet.
-
-    Params:
-    - hybrid_parquet_path (str): Path to hybrid wallet-coin data parquet
-    - base_parquet_path (str): Path to base wallet data parquet
-    - output_parquet_path (str): Where to save merged result
-    - hybrid_suffix (str): Suffix for hybrid columns
-    - base_suffix (str): Suffix for base columns
-
-    Returns:
-    - str: Path to saved merged parquet file
-    """
-    # Read input files
-    hybrid_df = pd.read_parquet(hybrid_parquet_path)
-    base_df = pd.read_parquet(base_parquet_path)
-
-    # Create temporary base address column for merging
-    hybrid_df['wallet_address_base'] = hybrid_df.index.values
-
-    # Merge the dataframes
-    merged_df = hybrid_df.merge(
-        base_df,
-        left_on='wallet_address_base',
-        right_index=True,
-        suffixes=(hybrid_suffix, base_suffix)
-    )
-
-    # Clean up temporary column
-    merged_df = merged_df.drop('wallet_address_base', axis=1)
-
-    # Save merged result
-    merged_df.to_parquet(output_parquet_path, index=True)
-
-    # Clean up memory
-    del hybrid_df, base_df, merged_df
-    gc.collect()
-
-    return output_parquet_path
+    return df_copy

@@ -1,3 +1,44 @@
+# dda 681 get hybrid ids via dfs
+checkpoint 1: w.676 df logic implemented
+Model Performance Summary
+===================================
+Test Samples:             57,544
+Number of Features:       136
+Features per Window:      34
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.676
+RMSE:                     0.221
+MAE:                      0.120
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.783
+RMSE:                     0.125
+MAE:                      0.066
+
+
+checkpoint 1: HyDev.807 df logic implemented
+Model Performance Summary
+===================================
+Test Samples:             2,324
+Number of Features:       600
+Features per Window:      150
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.807
+RMSE:                     0.227
+MAE:                      0.120
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.845
+RMSE:                     0.135
+MAE:                      0.072
+
+
 # dda 673 get hybrid id mappings from bigquery
 checkpoint 1: w.676 df retrieved with other datasets
 Model Performance Summary
