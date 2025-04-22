@@ -109,6 +109,7 @@ class BaseModel:
         self._fit()
 
         result = {
+            'modeling_config': self.modeling_config,
             'pipeline': self.pipeline,
             'cv_results': cv_results
         }
@@ -396,6 +397,7 @@ class BaseModel:
                 'scoring': grid_search_params['scoring'],
                 'verbose': grid_search_params.get('verbose_level', 0),
                 'n_jobs': base_model_params.get('n_jobs', -1),
+                'pre_dispatch': grid_search_params.get('pre_dispatch', 1),  # <-- limit pre‑dispatch
                 'random_state': base_model_params.get('random_state', 42),
             }
         }
