@@ -619,10 +619,13 @@ class WalletTrainingDataOrchestrator:
 
         # Impute all training window dates
         training_window_boundary_dates = self.wtd.generate_training_window_imputation_dates()
-        training_windows_profits_df = pri.impute_profits_for_multiple_dates(cohort_profits_df,
-                                                                            training_market_data_df,
-                                                                            training_window_boundary_dates,
-                                                                            n_threads=4, reset_index=False)
+        training_windows_profits_df = pri.impute_profits_for_multiple_dates(
+            cohort_profits_df,
+            training_market_data_df,
+            training_window_boundary_dates,
+            n_threads=self.wallets_config['n_threads']['profits_row_imputation'],
+            reset_index=False
+        )
 
         # Split profits_df into training windows
         training_windows_profits_df = u.ensure_index(training_windows_profits_df)

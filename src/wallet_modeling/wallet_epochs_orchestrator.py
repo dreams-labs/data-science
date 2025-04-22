@@ -5,7 +5,7 @@ from pathlib import Path
 import copy
 from typing import List,Dict,Tuple,Set,Optional
 from datetime import datetime, timedelta
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 import numpy as np
 import pandas as pd
 
@@ -316,18 +316,22 @@ class MultiEpochOrchestrator:
         )
 
         # 3. Concurrently generate training and modeling features
-        epoch_training_data_df = training_generator.generate_training_features(
-            training_profits_df,
-            training_market_indicators_df,
-            training_macro_indicators_df,
-            training_transfers_df,
-            return_files=True
-        )
-
-        epoch_modeling_data_df = modeling_generator.prepare_modeling_features(
-            modeling_profits_df_full,
-            self.complete_hybrid_cw_id_df
-        )
+        with ThreadPoolExecutor(max_workers=self.base_config['n_threads']['epoch_tm_features']) as executor:
+            train_future = executor.submit(
+                training_generator.generate_training_features,
+                training_profits_df,
+                training_market_indicators_df,
+                training_macro_indicators_df,
+                training_transfers_df,
+                return_files=True
+            )
+            model_future = executor.submit(
+                modeling_generator.prepare_modeling_features,
+                modeling_profits_df_full,
+                self.complete_hybrid_cw_id_df
+            )
+            epoch_training_data_df = train_future.result()
+            epoch_modeling_data_df = model_future.result()
 
         # Store training df with epoch date
         epoch_date = datetime.strptime(
