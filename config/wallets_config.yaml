@@ -150,10 +150,10 @@ modeling:
     # target_variable: crypto_net_gain/max_investment/winsorized
     # target_variable: max_investment
     # target_variable: cw_crypto_net_gain/max_investment/winsorized
-    target_variable: cw_max_investment
+    # target_variable: cw_max_investment
     # target_variable: cw_crypto_net_gain
     # target_variable: cw_crypto_net_cash_flows
-    # target_variable: cw_crypto_cash_buys
+    target_variable: cw_crypto_cash_buys
     # target_variable: cw_crypto_cash_sells
 
     # Modeling period filters
