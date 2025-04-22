@@ -44,8 +44,8 @@ n_threads:
     raw_data_retrieval: 4  # retrieves raw dfs from bigquery
     profits_row_imputation: 8  # generates imputed rows in profits_df
     training_dfs_preparation: 3  # generates market indicators, macro indicators, cohort profits dfs
-    concurrent_epochs: 8  # how many epochs' training data are processed concurrently
-    concurrent_windows: 8  # how many windows are processed concurrently
+    concurrent_epochs: 1  # how many epochs' training data are processed concurrently
+    concurrent_windows: 1  # how many windows are processed concurrently
 
 
 # CheckpointValidation
@@ -58,7 +58,7 @@ data_cleaning:
 
     min_wallet_investment: 2000 # time weighted average balance filter
     min_wallet_inflows: 2000  # Exclude wallets with inflows below this amount (USD)
-    min_wallet_volume: 10000  # Exclude wallets with fewer than this amount of training period USD volume
+    min_wallet_volume: 2000  # Exclude wallets with fewer than this amount of training period USD volume
 
     max_wallet_investment: 15_000_000 # time weighted average balance filter
     max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
@@ -107,7 +107,7 @@ features:
     ]
 
     # Transfers Params
-    toggle_transfers_features: True
+    toggle_transfers_features: False
     include_transfers_features: [
         first_buy,
         # first_sell,
