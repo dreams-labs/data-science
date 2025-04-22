@@ -275,7 +275,6 @@ class MultiEpochOrchestrator:
             complete_hybrid_cw_id_df=self.complete_hybrid_cw_id_df
         )
 
-        # 2. Generate TRAINING_DATA_DFs
         training_profits_df_full, training_market_data_df_full, \
         training_macro_trends_df_full, training_coin_cohort = \
             training_generator.retrieve_cleaned_period_datasets(
@@ -284,6 +283,7 @@ class MultiEpochOrchestrator:
                 cohorts.get('coin_cohort')  # use predefined cohort if provided
             )
 
+        # 2. Prepare training and modeling feature generation inputs
         training_profits_df, training_market_indicators_df, \
         training_macro_indicators_df, training_transfers_df = \
             training_generator.prepare_training_data(
@@ -292,20 +292,6 @@ class MultiEpochOrchestrator:
                 training_macro_trends_df_full,
                 return_files=True
             )
-
-        epoch_training_data_df = training_generator.generate_training_features(
-            training_profits_df,
-            training_market_indicators_df,
-            training_macro_indicators_df,
-            training_transfers_df,
-            return_files=True
-        )
-
-        # Store training df with epoch date
-        epoch_date = datetime.strptime(
-            epoch_config['training_data']['modeling_period_start'], '%Y-%m-%d')
-
-        # 3. Generate MODELING_DATA_DFs
         modeling_profits_df, modeling_market_data_df, modeling_macro_trends_df = \
             self._transform_complete_dfs_for_epoch(
                 epoch_config['training_data']['modeling_period_start'],
@@ -329,10 +315,23 @@ class MultiEpochOrchestrator:
             training_coin_cohort
         )
 
+        # 3. Concurrently generate training and modeling features
+        epoch_training_data_df = training_generator.generate_training_features(
+            training_profits_df,
+            training_market_indicators_df,
+            training_macro_indicators_df,
+            training_transfers_df,
+            return_files=True
+        )
+
         epoch_modeling_data_df = modeling_generator.prepare_modeling_features(
             modeling_profits_df_full,
             self.complete_hybrid_cw_id_df
         )
+
+        # Store training df with epoch date
+        epoch_date = datetime.strptime(
+            epoch_config['training_data']['modeling_period_start'], '%Y-%m-%d')
 
         cohorts = {
             'coin_cohort': training_coin_cohort,
