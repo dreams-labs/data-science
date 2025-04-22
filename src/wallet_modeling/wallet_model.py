@@ -288,8 +288,6 @@ class WalletModel(BaseModel):
 
         # Generate pipeline
         cv_pipeline = pipeline if pipeline is not None else self._get_model_pipeline(gs_config['base_model_params'])
-        verbose_estimators = self.modeling_config.get('grid_search_params', {}).get('verbose_estimators')
-
 
         # Random search with pipeline
         self.random_search = RandomizedSearchCV(
