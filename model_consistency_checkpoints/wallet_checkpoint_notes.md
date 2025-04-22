@@ -1,3 +1,47 @@
+# dda 675 parallelizing
+checkpoint 2: w.675 parallelize modeling and training features done
+Model Performance Summary
+ID: 18ebc4da-302a-463f-9ea6-f2afe397adfa
+===================================
+Test Samples:             57,544
+Number of Features:       136
+Features per Window:      34
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.675
+RMSE:                     0.221
+MAE:                      0.120
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.784
+RMSE:                     0.125
+MAE:                      0.066
+
+
+
+checkpoint 1: w.674 reorder epoch generator (2m 12s)
+Model Performance Summary
+ID: 53b58dc7-7620-4bbf-bd8a-75ebf7e40afe
+===================================
+Test Samples:             57,544
+Number of Features:       136
+Features per Window:      34
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.674
+RMSE:                     0.221
+MAE:                      0.120
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.784
+RMSE:                     0.125
+MAE:                      0.066
+
+
 # dda 683 hybrid iterations
 checkpoint 1: w.675 small fixes
 Model Performance Summary

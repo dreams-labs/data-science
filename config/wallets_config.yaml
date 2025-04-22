@@ -41,11 +41,12 @@ training_data:
 # WalletModel Multithreading
 # Determines how many workers will be used in multithreading executions
 n_threads:
-    raw_data_retrieval: 4  # retrieves raw dfs from bigquery
-    profits_row_imputation: 8  # generates imputed rows in profits_df
-    training_dfs_preparation: 3  # generates market indicators, macro indicators, cohort profits dfs
-    concurrent_epochs: 10  # how many epochs' training data are processed concurrently
-    concurrent_windows: 10  # how many windows are processed concurrently
+    raw_data_retrieval: 3  # retrieves raw dfs from bigquery
+    profits_row_imputation: 4  # generates imputed rows in profits_df
+    training_dfs_preparation: 4  # generates market indicators, macro indicators, cohort profits dfs
+    epoch_tm_features: 2  # determines whether training and modeling features are generated concurrently or sequentially
+    concurrent_epochs: 8  # how many epochs' training data are processed concurrently
+    concurrent_windows: 8  # how many windows are processed concurrently
 
 
 # CheckpointValidation
@@ -134,7 +135,7 @@ features:
     ]
 
     # Clustering Params
-    # clustering_n_clusters: [2,5]
+    # clustering_n_clusters: [2,4]
     clustering_n_components: 25
     clustering_fill_method: fill_0  # fill_0 or fill_mean
     clustering_include_pca: False
@@ -251,8 +252,6 @@ modeling:
             cluster|*,
 
             '*|w1',
-
-            # cw_*,
         ]
 
         # Correlation/variance-based removal
@@ -327,7 +326,7 @@ modeling:
         drop_patterns_include_n_features: 1
 
         n_iter: 40  # random search limit
-        n_splits: 3  # cv splits
+        n_splits: 2  # cv splits
 
         # scoring: neg_root_mean_squared_error
         # scoring: custom_neg_rmse_scorer
@@ -344,38 +343,9 @@ modeling:
 
             # Target variables
             target_selector__target_variable: [
-                # 'max_investment',
-                # 'average_transaction',
-                # 'crypto_cash_buys',
-                # 'crypto_cash_sells',
-                # 'crypto_inflows',
-                # 'crypto_net_cash_flows',
-                # 'crypto_net_flows',
-                # 'crypto_net_flows/crypto_inflows/base',
-                # 'crypto_net_flows/crypto_inflows/log',
-                # 'crypto_net_flows/crypto_inflows/ntile_rank',
-                # 'crypto_net_flows/crypto_inflows/rank',
-                # 'crypto_net_flows/crypto_inflows/winsorized',
-                # 'crypto_net_flows/max_investment/base',
-                # 'crypto_net_flows/max_investment/log',
-                # 'crypto_net_flows/max_investment/ntile_rank',
-                # 'crypto_net_flows/max_investment/rank',
-                # 'crypto_net_flows/max_investment/winsorized',
-                # 'crypto_net_gain',
-                # 'crypto_net_gain/crypto_inflows/base',
-                # 'crypto_net_gain/crypto_inflows/log',
-                # 'crypto_net_gain/crypto_inflows/ntile_rank',
-                # 'crypto_net_gain/crypto_inflows/rank',
-                # 'crypto_net_gain/crypto_inflows/winsorized',
-                # 'crypto_net_gain/max_investment/base',
-                # 'crypto_net_gain/max_investment/log',
-                # 'crypto_net_gain/max_investment/ntile_rank',
-                # 'crypto_net_gain/max_investment/rank',
+                'max_investment',
                 'crypto_net_gain/max_investment/winsorized',
-                # 'crypto_outflows',
-                # 'max_investment',
-                # 'total_volume',
-                # 'unique_coins_traded'
+
             ]
 
         # Params for model construction
@@ -411,97 +381,38 @@ modeling:
 
 
             # # Column Selection
-            drop_columns__drop_patterns: [
-                feature_retainer,
-                # timing|*,
-                # performance|*,
-                # trading|*,
-                # mktcap|*,
-                # transfers|*,
-                # scenario|*,
-                # balance|*,
-                # macro|*,
-                # cluster|*,
-                # cw_timing|*,
-                cw_performance|*,
-                # cw_trading|*,
-                # cw_mktcap|*,
-                # cw_transfers|*,
-                # cw_scenario|*,
-                # cw_balance|*,
-                # cw_macro|*,
-                # cw_cluster|*,
+            # drop_columns__drop_patterns: [
+            #     [],
+            # #     # [],
+            # #     # [timing|*],
+            #     # [timing|btc_mvrv_z_score/lag_100/*],
 
+            # #     # [performance|*],
+            # #     # [performance|crypto_net_gain/*],
+            # #     # [performance|*/ntile_rank|*],
 
-                # # timing|*,
-                # timing|*/buy_mean*,
-                # timing|*/sell_mean*,
-                # timing|*/sell_weighted*,
+            # #     # [trading|*],
+            # #     # [trading|days_held/min|*],
+            # #     # [trading|days_held/max|*],
 
-                # # performance|*,
-                # performance|crypto_net_gain/crypto_inflows/*,
-                # performance|crypto_net_gain/twb/*,
-                # performance|crypto_net_gain/active_twb/*,
-                # performance|*/log|*,
-                # performance|*/ntile_rank|*,
+            # #     # [mktcap|*],
+            # #     # [mktcap|portfolio_mcap_mean/market_cap_filled|*],
+            # #     # [mktcap|portfolio_mcap_median/market_cap_filled|*],
 
-                # # trading|*,
-                # trading|unique_coins_traded|*,
-                # trading|transaction_days|*,
-                # trading|average_transaction|*,
-                # trading|activity_density|*,
-                # trading|crypto_inflows|*,
-                # trading|max_investment|*,
-                # trading|crypto_net_flows|*,
-                # trading|crypto_outflows|*,
-                # trading|crypto_net_cash_flows|*,
-                # trading|crypto_cash_sells|*,
-                # trading|crypto_cash_buys|*,
-                # trading|time_weighted_balance|*,
-                # trading|active_time_weighted_balance|*,
-                # trading|days_held/*,
-                # trading|time_weighted_return/*,
-                # trading|annualized_twr/*,
+            # #     # [transfers|*],
+            # #     # [transfers|first_buy/median_avg_wallet_rank|*],
 
-                # # mktcap|*,
-                # mktcap|portfolio_mcap_mean/market_cap_filled|*,
-                # mktcap|portfolio_mcap_median/market_cap_filled|*,
-                # mktcap|portfolio_mcap_min/market_cap_filled|*,
-                # mktcap|portfolio_mcap_max/market_cap_filled|*, #retain?
-                # mktcap|portfolio_mcap_std/market_cap_filled|*,
-                # mktcap|portfolio_mcap_mean/market_cap_unadj|*,
-                # mktcap|portfolio_mcap_median/market_cap_unadj|*,
-                # mktcap|portfolio_mcap_std/market_cap_unadj|*,
+            # #     # [scenario|*],
+            # #     # [scenario|buy_delay_wtd_performance|*],
 
-                # # transfers|*,
+            # #     # # [balance|*],
+            # #     # [balance|coin_fraction_std|*],
 
-                # # scenario|*,
+            #     # [cluster|*],
 
-                # # balance|*,
-                # balance|coin_fraction_std|*,
-                # balance|concentration_index|*,
-                # balance|largest_coin_usd|*,
-                # balance|median_coin_frac|*,
-                # balance|min_coin_frac|*,
-                # balance|n_coins|*,
-                # balance|total_usd_balance|*,
+            #     # ['*|w1'],
 
-                # # macro|*,
-                # macro|btc_price_first|*,
-                # macro|btc_price_last|*,
-                # macro|btc_price_rsi_100_last|*,
-                # macro|btc_mvrv_z_score_first|*,
-                # macro|btc_mvrv_z_score_last|*,
-                # macro|global_volume_last|*,
-                # macro|global_volume_first|*,
-                # macro|global_market_cap_rsi_100_last|*,
-
-                # cluster|*,
-
-                # '*|w1',
-
-                # cw_*,
-            ]
+            # ]
 
 
     # Coin model workflow params
