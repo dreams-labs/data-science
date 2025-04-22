@@ -51,6 +51,7 @@ class RegressionEvaluator:
         self.y_validation_pred = wallet_model_results.get('y_validation_pred')
 
         # model + features
+        self.modeling_config = wallet_model_results['modeling_config']
         pipeline = wallet_model_results['pipeline']
         self.model = pipeline.named_steps['regressor']
         self.feature_names = (
@@ -183,6 +184,7 @@ class RegressionEvaluator:
         """Generate formatted summary of model performance."""
         summary = [
             "Model Performance Summary",
+            f"Target: {self.modeling_config['target_variable']}",
             f"ID: {self.model_id}",
             "=" * 35,
         ]
@@ -544,7 +546,7 @@ class RegressionEvaluator:
         overall_r2 = r2_score(df['actual'], df['pred'])
 
         df['high_perf'] = df['err'] < overall_median_err
-
+        logger.warning('1')
         contrast_sets = []
         for feat in segmentation_features:
             if feat not in df:
@@ -557,6 +559,7 @@ class RegressionEvaluator:
             except ValueError:
                 # e.g. all values identical
                 df[bin_col] = 0  # single bin
+            logger.warning('2')
             for b in df[bin_col].dropna().unique():
                 mask = df[bin_col] == b
                 support, size = mask.mean(), mask.sum()
@@ -567,7 +570,7 @@ class RegressionEvaluator:
                 mean_err = seg['err'].mean()
                 seg_r2 = r2_score(seg['actual'], seg['pred'])
 
-                lift = (overall_mean_err - mean_err) / overall_mean_err
+                lift = (overall_r2 - seg_r2) / overall_r2
 
                 ct = pd.crosstab(mask, df['high_perf'])
                 if ct.shape == (2,2) and ct.values.min() >= 5:
@@ -594,6 +597,7 @@ class RegressionEvaluator:
                         'abs_error_lift': abs(lift),
                     })
 
+        logger.warning('3')
         if not contrast_sets:
             return pd.DataFrame()
 
