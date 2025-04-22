@@ -529,7 +529,6 @@ class RegressionEvaluator:
         Returns:
         - DataFrame of top segments by error lift
         """
-        logger.warning('0')
         # require validation data
         if self.X_validation is None or self.y_validation_pred is None or self.y_validation is None:
             raise ValueError("Validation data not set on this evaluator")
