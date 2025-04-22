@@ -28,10 +28,10 @@ class RegressionEvaluator:
         summary_report(): Returns a formatted text summary of model performance
         plot_evaluation(plot_type='all'): Creates visualization plots of model performance
     """
-    def __init__(self, results: dict):
+    def __init__(self, wallet_model_results: dict):
         """
         Params:
-        - results (dict): output of wallet_model.construct_wallet_model
+        - wallet_model_results (dict): output of wallet_model.construct_wallet_model
 
         Required keys:
         'y_train','y_test','y_pred',
@@ -39,26 +39,26 @@ class RegressionEvaluator:
         'pipeline','X_test'
         """
         # core arrays
-        self.y_test  = results['y_test']
-        self.y_pred  = results['y_pred']
-        self.y_train = results['y_train']
-        self.training_cohort_pred     = results['training_cohort_pred']
-        self.training_cohort_actuals  = results['training_cohort_actuals']
+        self.y_test  = wallet_model_results['y_test']
+        self.y_pred  = wallet_model_results['y_pred']
+        self.y_train = wallet_model_results['y_train']
+        self.training_cohort_pred     = wallet_model_results['training_cohort_pred']
+        self.training_cohort_actuals  = wallet_model_results['training_cohort_actuals']
 
         # validation (if present)
-        self.y_validation      = results.get('y_validation')
-        self.y_validation_pred = results.get('y_validation_pred')
+        self.y_validation      = wallet_model_results.get('y_validation')
+        self.y_validation_pred = wallet_model_results.get('y_validation_pred')
 
         # model + features
-        pipeline = results['pipeline']
+        pipeline = wallet_model_results['pipeline']
         self.model = pipeline.named_steps['regressor']
         self.feature_names = (
-            pipeline[:-1].transform(results['X_train']).columns.tolist()
+            pipeline[:-1].transform(wallet_model_results['X_train']).columns.tolist()
             if hasattr(pipeline[:-1], 'transform') else None
         )
 
         # raw X_test for cohort methods
-        self.X_test = results['X_test']
+        self.X_test = wallet_model_results['X_test']
 
         # init metrics & styling
         self.metrics = {}
