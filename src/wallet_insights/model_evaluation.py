@@ -244,7 +244,8 @@ class RegressionEvaluator:
         ])
 
         # Log the message
-        logger.info(f"\n{summary}")
+        report = "\n".join(summary)
+        logger.info("\n%s", report)
 
 
     def importance_summary(self, levels=0):
