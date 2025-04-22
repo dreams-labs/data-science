@@ -65,6 +65,9 @@ class RegressionEvaluator:
         self._calculate_metrics()
         self._setup_plot_style()
 
+        # model id
+        self.model_id = wallet_model_results['model_id']
+
 
     def _calculate_metrics(self):
         """Calculate core regression metrics and optional cohort metrics."""
@@ -179,6 +182,7 @@ class RegressionEvaluator:
         """Generate formatted summary of model performance."""
         summary = [
             "Model Performance Summary",
+            f"ID: {self.model_id}",
             "=" * 35,
         ]
 
