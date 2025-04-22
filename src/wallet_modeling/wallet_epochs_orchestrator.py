@@ -228,7 +228,7 @@ class MultiEpochOrchestrator:
     def _build_epoch_features(
         self,
         epoch_config: dict,
-        cohorts: Optional[Dict[Set,np.array]] = {}
+        cohorts: Optional[Dict[Set,np.array]] = None
     ) -> Tuple[datetime, pd.DataFrame, pd.DataFrame, Dict[Set,np.array]]:
         """
         Process a single epoch configuration to generate training and modeling data.
@@ -244,6 +244,8 @@ class MultiEpochOrchestrator:
         - cohorts (Dict[Set,np.array]): The wallets and coins included in the training data
         """
         model_start = epoch_config['training_data']['modeling_period_start']
+        if cohorts is None:
+            cohorts = {}
 
         # Generate name of parquet folder and create it if necessary
         epoch_parquet_folder = epoch_config['training_data']['parquet_folder']
