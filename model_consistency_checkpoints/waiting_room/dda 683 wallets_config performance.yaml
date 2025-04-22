@@ -15,11 +15,11 @@ training_data:
         '2024-01-01',
         # '2024-02-01',
         # '2024-03-01',
-        '2024-04-01',
+        # '2024-04-01',
         # '2024-05-01',
         # '2024-06-01',
-        # '2024-07-01',
-        # '2024-08-01',
+        '2024-07-01',
+        '2024-08-01',
         '2024-09-01',
         # '2024-10-01',
     ]
@@ -29,7 +29,7 @@ training_data:
     # validation_period_end: '2024-10-20'
 
     # Whether to use hybrid coin-wallet ids
-    hybridize_wallet_ids: False  # if true, training data will be keyed on wallet-coin pairs
+    hybridize_wallet_ids: True  # if true, training data will be keyed on wallet-coin pairs
 
     # Local pipeline configs
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
@@ -53,14 +53,14 @@ n_threads:
 data_cleaning:
 
     # Wallet cohort thresholds
-    min_coins_traded: 1  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
-    max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
+    min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
+    max_coins_traded: 150  # Exclude wallets that have traded more coins than this during the training period
 
-    min_wallet_investment: 10000 # time weighted average balance filter
-    min_wallet_inflows: 10000  # Exclude wallets with inflows below this amount (USD)
-    min_wallet_volume: 10000  # Exclude wallets with fewer than this amount of training period USD volume
+    min_wallet_investment: 2000 # time weighted average balance filter
+    min_wallet_inflows: 2000  # Exclude wallets with inflows below this amount (USD)
+    min_wallet_volume: 2000  # Exclude wallets with fewer than this amount of training period USD volume
 
-    max_wallet_investment: 10_000_000 # time weighted average balance filter
+    max_wallet_investment: 15_000_000 # time weighted average balance filter
     max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
     max_wallet_volume: 25_000_000  # Exclude wallets with fewer than this amount of training period USD volume
     max_wallet_profits: 100_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
@@ -134,7 +134,7 @@ features:
     ]
 
     # Clustering Params
-    # clustering_n_clusters: [2,5]
+    clustering_n_clusters: [2,5]
     clustering_n_components: 25
     clustering_fill_method: fill_0  # fill_0 or fill_mean
     clustering_include_pca: False
@@ -272,17 +272,17 @@ modeling:
         # -------------------------------
         eval_metric: [rmse]
 
-        max_depth: 15  # how deep the trees can go
+        max_depth: 12  # how deep the trees can go
         # min_child_weight_pct: 0.0001  # what % of rows each tree must have
-        min_child_weight: 25  # what % of rows each tree must have
+        min_child_weight: 40  # what % of rows each tree must have
         subsample: 1.0  # samples rows, e.g. trees use x% of all wallet rows
         colsample_bytree: 0.9  # samples columns, e.g. trees use x% of all column features
 
         # Performance Profiles (Choose One Section)
         # --------------------------------------
         # CHECKPOINTER
-        n_estimators: 250  # number of trees to train in the model
-        learning_rate: 0.1  # step size for updates to weights during training
+        n_estimators: 150  # number of trees to train in the model
+        learning_rate: 0.2  # step size for updates to weights during training
 
         # # PRODUCTION
         # n_estimators: 500  # number of trees to train in the model
