@@ -250,7 +250,6 @@ class WalletTrainingDataOrchestrator:
             transfers_df = wts.retrieve_transfers_sequencing(
                 self.wallets_config['features']['timing_metrics_min_transaction_size'],
                 self.wallets_config['training_data'][f'{period}_period_end'],
-                self.wallets_config['training_data']['hybridize_wallet_ids'],
                 self.epoch_reference_date
             )
 
