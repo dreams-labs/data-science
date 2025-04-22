@@ -207,7 +207,9 @@ class MultiEpochOrchestrator:
             cohorts['wallet_cohort'] = hybridized_cohort
 
             # Build features with hybrid IDs
-            _, hybridized_training_data_df, hybridized_modeling_data_df, _ = self._build_epoch_features(epoch_config, cohorts)
+            (
+                _, hybridized_training_data_df, hybridized_modeling_data_df, _
+            ) = self._build_epoch_features(epoch_config, cohorts)
 
             # Merge hybrid/nonhybrid training and modeling dfs
             epoch_training_data_df = self._merge_hybrid_dfs(epoch_training_data_df,hybridized_training_data_df)

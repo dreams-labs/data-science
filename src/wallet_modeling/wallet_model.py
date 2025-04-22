@@ -85,7 +85,7 @@ class WalletModel(BaseModel):
             u.assert_matching_indices(validation_data_df, validation_wallet_features_df)
             self.X_validation = validation_data_df
             self.validation_wallet_features_df = validation_wallet_features_df
-            logger.info(f"Validation data set with {len(validation_data_df)} records loaded.")
+            logger.info(f"Validation data with {len(validation_data_df)} records loaded.")
 
         # Prepare data
         X, y = self._prepare_data(training_data_df, modeling_wallet_features_df)
