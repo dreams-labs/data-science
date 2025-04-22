@@ -128,6 +128,7 @@ class WalletModel(BaseModel):
 
         # Prepare result dictionary
         result = {
+            'model_id': self.model_id,
             'pipeline': self.pipeline,
         }
 

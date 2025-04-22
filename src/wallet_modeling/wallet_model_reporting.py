@@ -3,7 +3,6 @@ Functions for generating and storing model training reports and associated data
 """
 from typing import Dict,Tuple
 import json
-import uuid
 from datetime import datetime
 from pathlib import Path
 import logging
@@ -148,7 +147,7 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path,save
         )
 
     # 1. Generate model metadata
-    model_id = str(uuid.uuid4())
+    model_id = model_results['model_id']
     model_time = datetime.now()
     filename_timestamp = model_time.strftime('%Y%m%d_%Hh%Mm%Ss')
     model_r2 = evaluation_dict['r2']

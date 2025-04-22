@@ -1,5 +1,6 @@
 import time
 import logging
+import uuid
 from typing import Dict, Union, List, Any
 from itertools import chain,combinations
 import pickle
@@ -32,6 +33,9 @@ class BaseModel:
         Params:
         - wallets_config (dict): configuration dictionary for modeling parameters.
         """
+        # Generate ID
+        self.model_id = str(uuid.uuid4())
+
         # Key Params
         self.modeling_config = modeling_config
         self.training_data_df = None
