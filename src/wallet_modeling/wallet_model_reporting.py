@@ -50,18 +50,7 @@ def generate_and_save_wallet_model_artifacts(
         - wallet_scores: DataFrame of wallet-level predictions
     """
     # 1. Generate model evaluation metrics using WalletRegressionEvaluator
-    model = model_results['pipeline'].named_steps['regressor']
-    evaluator = wime.RegressionEvaluator(
-        y_train=model_results['y_train'],
-        y_test=model_results['y_test'],
-        y_pred=model_results['y_pred'],
-        training_cohort_pred=model_results['training_cohort_pred'],
-        training_cohort_actuals=model_results['training_cohort_actuals'],
-        model=model,
-        feature_names=model_results['pipeline'][:-1].transform(model_results['X_train']).columns.tolist(),
-        y_validation=model_results.get('y_validation'),
-        y_validation_pred=model_results.get('y_validation_pred')
-    )
+    evaluator = wime.RegressionEvaluator(model_results)
 
     # Create evaluation dictionary with the same structure as before
     evaluation = {
