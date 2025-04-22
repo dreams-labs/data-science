@@ -151,11 +151,12 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path,save
     model_time = datetime.now()
     filename_timestamp = model_time.strftime('%Y%m%d_%Hh%Mm%Ss')
     model_r2 = evaluation_dict['r2']
-    validation_r2 = evaluation_dict.get('validation_metrics','nan').get('r2')
-    model_report_filename = f"model_report_{filename_timestamp}__" \
-                            f"mr2{model_r2:.3f}__vr2{validation_r2:.3f}" \
-                            f"__id_{model_id}.json"
-
+    validation_r2 = evaluation_dict.get('validation_metrics', {}).get('r2', np.nan)
+    model_report_filename = (
+        f"model_report_{filename_timestamp}__"
+        f"mr{model_r2:.3f}__"
+        f"{f'vr{validation_r2:.3f}' if not np.isnan(validation_r2) else 'vr___'}.json"
+    )
 
     # 2. Save model pipeline
     pipeline_path = base_dir / 'wallet_models' / f"wallet_model_{model_id}.pkl"
