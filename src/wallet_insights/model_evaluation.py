@@ -46,10 +46,12 @@ class RegressionEvaluator:
         self.training_cohort_actuals  = wallet_model_results['training_cohort_actuals']
 
         # validation (if present)
+        self.X_validation      = wallet_model_results.get('X_validation')
         self.y_validation      = wallet_model_results.get('y_validation')
         self.y_validation_pred = wallet_model_results.get('y_validation_pred')
 
         # model + features
+        self.modeling_config = wallet_model_results['modeling_config']
         pipeline = wallet_model_results['pipeline']
         self.model = pipeline.named_steps['regressor']
         self.feature_names = (
@@ -182,6 +184,7 @@ class RegressionEvaluator:
         """Generate formatted summary of model performance."""
         summary = [
             "Model Performance Summary",
+            f"Target: {self.modeling_config['target_variable']}",
             f"ID: {self.model_id}",
             "=" * 35,
         ]
@@ -526,16 +529,25 @@ class RegressionEvaluator:
         Returns:
         - DataFrame of top segments by error lift
         """
-        df = self.X_test.copy()
-        df['pred'], df['actual'] = self.y_pred, self.y_test
+        logger.warning('0')
+        # require validation data
+        if self.X_validation is None or self.y_validation_pred is None or self.y_validation is None:
+            raise ValueError("Validation data not set on this evaluator")
+
+        # build DataFrame from validation features + preds
+        df = self.X_validation.copy()
+        df['pred'], df['actual'] = self.y_validation_pred, self.y_validation
+
+
         df['err'] = (df['actual'] - df['pred']).abs()
         df['sq_err'] = df['err'] ** 2
         overall_mean_err = df['err'].mean()
         overall_median_err = df['err'].median()
         overall_rmse = np.sqrt(df['sq_err'].mean())
+        overall_r2 = r2_score(df['actual'], df['pred'])
 
         df['high_perf'] = df['err'] < overall_median_err
-
+        logger.warning('1')
         contrast_sets = []
         for feat in segmentation_features:
             if feat not in df:
@@ -548,6 +560,7 @@ class RegressionEvaluator:
             except ValueError:
                 # e.g. all values identical
                 df[bin_col] = 0  # single bin
+            logger.warning('2')
             for b in df[bin_col].dropna().unique():
                 mask = df[bin_col] == b
                 support, size = mask.mean(), mask.sum()
@@ -556,7 +569,9 @@ class RegressionEvaluator:
 
                 seg = df[mask]
                 mean_err = seg['err'].mean()
-                lift = (overall_mean_err - mean_err) / overall_mean_err
+                seg_r2 = r2_score(seg['actual'], seg['pred'])
+
+                lift = (overall_r2 - seg_r2) / overall_r2
 
                 ct = pd.crosstab(mask, df['high_perf'])
                 if ct.shape == (2,2) and ct.values.min() >= 5:
@@ -569,14 +584,21 @@ class RegressionEvaluator:
                         'Range': f"{dc.human_format(vals.min())}-{dc.human_format(vals.max())}",
                         'Wallets': size,
                         'Pop. Pct': f"{support:.3f}",
+                        'R2': f"{seg_r2:.3f}",
+                        'R2 Overall': f"{overall_r2:.3f}",
+                        'R2 vs Overall': f"{(seg_r2 - overall_r2):.3f}",
+
                         'Mean Error': f"{mean_err:.3f}",
+                        'Mean Err Overall': f"{overall_mean_err:.3f}",
                         'ME vs Overall': f"{mean_err-overall_mean_err:.3f}",
                         'RMSE': f"{np.sqrt(seg['sq_err'].mean()):.3f}",
+                        'RMSE Overall': f"{overall_rmse:.3f}",
                         'RMSE vs Overall': f"{np.sqrt(seg['sq_err'].mean()) - overall_rmse:.3f}",
                         'P-Value': f"{p:.2f}",
                         'abs_error_lift': abs(lift),
                     })
 
+        logger.warning('3')
         if not contrast_sets:
             return pd.DataFrame()
 
