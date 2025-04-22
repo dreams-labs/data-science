@@ -157,7 +157,7 @@ def multithreaded_impute_profits_rows(profits_df, prices_df, target_date, n_thre
         all_new_rows_df = pd.DataFrame()
     else:
         all_new_rows_df = pd.concat(results, ignore_index=False)
-        logger.info("Generated %s new rows for date %s.",
+        logger.debug("Generated %s new rows for date %s.",
                     len(all_new_rows_df),
                     target_date)
 
@@ -304,7 +304,7 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
                     time.time() - step_time)
     step_time = time.time()
 
-    logger.info("%s Successfully generated new_rows_df with shape %s after %.2f total seconds.",
+    logger.debug("%s Successfully generated new_rows_df with shape %s after %.2f total seconds.",
                 new_rows_df.shape,
                 new_rows_df.shape,
                 time.time() - start_time)

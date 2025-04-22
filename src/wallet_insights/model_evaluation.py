@@ -27,71 +27,42 @@ class RegressionEvaluator:
     Methods:
         summary_report(): Returns a formatted text summary of model performance
         plot_evaluation(plot_type='all'): Creates visualization plots of model performance
-
-    Internal Methods:
-        __init__(y_test, y_pred, model=None, feature_names=None): Initialize with actual and predicted values
-        _calculate_metrics(): Computes regression performance metrics like RMSE, MAE, R2
-        _plot_actual_vs_predicted(ax): Plots actual vs predicted values
-        _plot_residuals(ax): Plots residuals vs predicted values
-        _plot_residuals_distribution(ax): Plots histogram of residuals
-        _plot_feature_importance(ax): Plots feature importance if available from model
     """
-    def __init__(
-        self,
-        y_test: np.ndarray,
-        y_pred: np.ndarray,
-        model=None,
-        feature_names=None,
-        y_train: np.ndarray = None,
-        training_cohort_pred: np.ndarray = None,
-        training_cohort_actuals: np.ndarray = None,
-        y_validation: np.ndarray = None,
-        y_validation_pred: np.ndarray = None,
-        X_test: np.ndarray = None,
-    ):
+    def __init__(self, results: dict):
         """
-        Initialize evaluator with prediction data and optional training cohort data.
-
         Params:
-        - y_test: Test set actual values
-        - y_pred: Test set predicted values
-        - model: Optional fitted model for feature importance
-        - feature_names: Optional feature names for importance plots
-        - y_train: Optional training set values
-        - training_cohort_pred: Optional full training cohort predictions
-        - training_cohort_actuals: Optional full training cohort actual values
+        - results (dict): output of wallet_model.construct_wallet_model
+
+        Required keys:
+        'y_train','y_test','y_pred',
+        'training_cohort_pred','training_cohort_actuals',
+        'pipeline','X_test'
         """
-        # Core prediction data
-        self.y_test = np.array(y_test)
-        self.y_pred = np.array(y_pred)
+        # core arrays
+        self.y_test  = results['y_test']
+        self.y_pred  = results['y_pred']
+        self.y_train = results['y_train']
+        self.training_cohort_pred     = results['training_cohort_pred']
+        self.training_cohort_actuals  = results['training_cohort_actuals']
 
-        # Optional model data for feature importance
-        self.model = model
-        self.feature_names = feature_names
+        # validation (if present)
+        self.y_validation      = results.get('y_validation')
+        self.y_validation_pred = results.get('y_validation_pred')
 
-        # Optional training/cohort data
-        self.y_train = np.array(y_train) if y_train is not None else None
-        self.training_cohort_pred = (np.array(training_cohort_pred)
-                                   if training_cohort_pred is not None else None)
-        self.training_cohort_actuals = (np.array(training_cohort_actuals)
-                                      if training_cohort_actuals is not None else None)
+        # model + features
+        pipeline = results['pipeline']
+        self.model = pipeline.named_steps['regressor']
+        self.feature_names = (
+            pipeline[:-1].transform(results['X_train']).columns.tolist()
+            if hasattr(pipeline[:-1], 'transform') else None
+        )
 
-        # Optional validation set
-        self.y_validation = np.array(y_validation) if y_validation is not None else None
-        self.y_validation_pred = np.array(y_validation_pred) if y_validation_pred is not None else None
+        # raw X_test for cohort methods
+        self.X_test = results['X_test']
 
-        # Optional training data
-        self.X_test = X_test
-
-        # Initialize storage
+        # init metrics & styling
         self.metrics = {}
-        self.residuals = None
-        self.custom_cmap = None
-
-        # Calculate base metrics
         self._calculate_metrics()
-
-        # Set up plot styling
         self._setup_plot_style()
 
 
@@ -272,7 +243,9 @@ class RegressionEvaluator:
             f"95% Prediction Interval:  ±{self.metrics['prediction_interval_95']:.3f}"
         ])
 
-        return "\n".join(summary)
+        # Log the message
+        report = "\n".join(summary)
+        logger.info("\n%s", report)
 
 
     def importance_summary(self, levels=0):

@@ -207,7 +207,9 @@ class MultiEpochOrchestrator:
             cohorts['wallet_cohort'] = hybridized_cohort
 
             # Build features with hybrid IDs
-            _, hybridized_training_data_df, hybridized_modeling_data_df, _ = self._build_epoch_features(epoch_config, cohorts)
+            (
+                _, hybridized_training_data_df, hybridized_modeling_data_df, _
+            ) = self._build_epoch_features(epoch_config, cohorts)
 
             # Merge hybrid/nonhybrid training and modeling dfs
             epoch_training_data_df = self._merge_hybrid_dfs(epoch_training_data_df,hybridized_training_data_df)
@@ -228,7 +230,7 @@ class MultiEpochOrchestrator:
     def _build_epoch_features(
         self,
         epoch_config: dict,
-        cohorts: Optional[Dict[Set,np.array]] = {}
+        cohorts: Optional[Dict[Set,np.array]] = None
     ) -> Tuple[datetime, pd.DataFrame, pd.DataFrame, Dict[Set,np.array]]:
         """
         Process a single epoch configuration to generate training and modeling data.
@@ -244,6 +246,8 @@ class MultiEpochOrchestrator:
         - cohorts (Dict[Set,np.array]): The wallets and coins included in the training data
         """
         model_start = epoch_config['training_data']['modeling_period_start']
+        if cohorts is None:
+            cohorts = {}
 
         # Generate name of parquet folder and create it if necessary
         epoch_parquet_folder = epoch_config['training_data']['parquet_folder']

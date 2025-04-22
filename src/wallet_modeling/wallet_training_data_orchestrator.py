@@ -3,13 +3,11 @@ import time
 import logging
 import copy
 import gc
-from datetime import datetime,timedelta
-from typing import Tuple,Optional,Dict,List,Union
+from datetime import timedelta
+from typing import Tuple,Optional,List,Union
 import concurrent
 import pandas as pd
 import numpy as np
-import pandas_gbq
-from google.cloud import bigquery
 
 # Local module imports
 from wallet_modeling.wallet_training_data import WalletTrainingData
@@ -96,7 +94,7 @@ class WalletTrainingDataOrchestrator:
                 "Missing" if self.market_data_df is None else "Loaded",
                 "Missing" if self.macro_trends_df is None else "Loaded"
             )
-            profits_df, market_data_df, macro_trends_df, hybrid_cw_id_df = self.wtd.retrieve_raw_datasets(
+            profits_df, market_data_df, macro_trends_df = self.wtd.retrieve_raw_datasets(
                 period_start_date, period_end_date, self.wallets_config['training_data']['hybridize_wallet_ids']
             )
         else:
@@ -252,12 +250,11 @@ class WalletTrainingDataOrchestrator:
             transfers_df = wts.retrieve_transfers_sequencing(
                 self.wallets_config['features']['timing_metrics_min_transaction_size'],
                 self.wallets_config['training_data'][f'{period}_period_end'],
-                self.wallets_config['training_data']['hybridize_wallet_ids'],
                 self.epoch_reference_date
             )
 
             # Handle hybrid IDs if configured
-            if self.hybrid_cw_id_map is not None:
+            if self.complete_hybrid_cw_id_df is not None:
                 transfers_df = hybridize_wallet_address(transfers_df, self.complete_hybrid_cw_id_df)
         else:
             transfers_df = pd.DataFrame()

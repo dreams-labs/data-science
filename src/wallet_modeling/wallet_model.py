@@ -85,7 +85,7 @@ class WalletModel(BaseModel):
             u.assert_matching_indices(validation_data_df, validation_wallet_features_df)
             self.X_validation = validation_data_df
             self.validation_wallet_features_df = validation_wallet_features_df
-            logger.info(f"Validation data set with {len(validation_data_df)} records loaded.")
+            logger.info(f"Validation data with {len(validation_data_df)} records loaded.")
 
         # Prepare data
         X, y = self._prepare_data(training_data_df, modeling_wallet_features_df)
@@ -288,8 +288,6 @@ class WalletModel(BaseModel):
 
         # Generate pipeline
         cv_pipeline = pipeline if pipeline is not None else self._get_model_pipeline(gs_config['base_model_params'])
-        verbose_estimators = self.modeling_config.get('grid_search_params', {}).get('verbose_estimators')
-
 
         # Random search with pipeline
         self.random_search = RandomizedSearchCV(

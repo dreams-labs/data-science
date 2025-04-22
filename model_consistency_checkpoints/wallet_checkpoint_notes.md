@@ -1,3 +1,46 @@
+# dda 683 hybrid iterations
+checkpoint 1: w.675 small fixes
+Model Performance Summary
+===================================
+Test Samples:             57,544
+Number of Features:       136
+Features per Window:      34
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.675
+RMSE:                     0.221
+MAE:                      0.120
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.782
+RMSE:                     0.126
+MAE:                      0.066
+
+
+checkpoint 1: wh.899 small fixes
+Model Performance Summary
+===================================
+Test Samples:             117,117
+Number of Features:       136
+Features per Window:      34
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.899
+RMSE:                     0.131
+MAE:                      0.062
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.861
+RMSE:                     0.116
+MAE:                      0.061
+
+checkpoint 1: wh.899 df logic implemented
+
+
 # dda 681 get hybrid ids via dfs
 checkpoint 1: w.676 df logic implemented
 Model Performance Summary
