@@ -21,7 +21,6 @@ wallets_config = WalletsConfig()
 
 def retrieve_transfers_sequencing(min_txn_size: int,
                                   training_end: str,
-                                  hybridize_wallet_ids: bool = False,
                                   epoch_reference_date: str = '') -> pd.DataFrame:
     """
     Returns buyer and seller sequence numbers for each wallet-coin pair, where the first
@@ -37,25 +36,6 @@ def retrieve_transfers_sequencing(min_txn_size: int,
     - sequence_df (DataFrame): Columns: wallet_address, coin_id, first_buy, first_sell,
         buyer_number, seller_number
     """
-    # # Set join table based on ID type
-    # if hybridize_wallet_ids is False:
-    #     # non-hybridized wallet_ids need to be converted to wallet_address
-    id_column = 'wallet_id'
-    join_sequence = f"""
-        join (
-            select wc.wallet_id,
-            xw.wallet_address,
-            from temp.wallet_modeling_training_cohort_{epoch_reference_date} wc
-            join reference.wallet_ids xw on xw.wallet_id = wc.wallet_id
-        ) wc using(wallet_address)
-        """
-    # else:
-    #     # hybridized ids already have wallet_address included in their table
-    #     id_column = 'hybrid_id'
-    #     join_sequence = f"""
-    #         join temp.wallet_modeling_training_cohort_{epoch_reference_date} wc using(wallet_address, coin_id)
-    #         """
-
     sequencing_sql = f"""
     with transaction_rank as (
         select coin_id
@@ -100,9 +80,14 @@ def retrieve_transfers_sequencing(min_txn_size: int,
     base_ordering as (
         select
             so.*,
-            wc.{id_column} as final_wallet_id
+            wc.wallet_id as final_wallet_id
         from sequence_ordering so
-        {join_sequence}
+        join (
+            select wc.wallet_id,
+            xw.wallet_address,
+            from temp.wallet_modeling_training_cohort_{epoch_reference_date} wc
+            join reference.wallet_ids xw on xw.wallet_id = wc.wallet_id
+        ) wc using(wallet_address)
     )
 
     select
