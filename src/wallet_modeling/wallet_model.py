@@ -191,13 +191,19 @@ class WalletModel(BaseModel):
         # Store full training cohort for later scoring
         self.training_data_df = training_data_df.copy()
 
-        # Filter to modeling cohort
-        cohort_mask = modeling_wallet_features_df['in_modeling_cohort'] == 1
+        # Identify modeling cohort
+        cohort_mask = (
+            (modeling_wallet_features_df['max_investment'] >= self.modeling_config['modeling_min_investment']) &
+            (modeling_wallet_features_df['unique_coins_traded'] >= self.modeling_config['modeling_min_coins_traded'])
+        )
+        logger.milestone("Defined modeling cohort as %.1f%% (%s/%s) wallets.",
+            cohort_mask.sum()/len(modeling_wallet_features_df)*100,
+            cohort_mask.sum(),
+            len(modeling_wallet_features_df)
+        )
 
-        # Define X
+        # Define X and y
         X = training_data_df[cohort_mask].copy()
-
-        # Define y
         y = modeling_wallet_features_df[cohort_mask].copy()
 
         return X, y
@@ -256,6 +262,11 @@ class WalletModel(BaseModel):
                                                   ):
             target_variables = self.modeling_config['grid_search_params']['param_grid_y']['target_selector__target_variable']  # pylint:disable=line-too-long
             gs_config['param_grid']['y_pipeline__target_selector__target_variable'] = target_variables
+
+        # Confirm there are multiple configurations
+        if not any(isinstance(value, list) and len(value) > 1 for value in gs_config['param_grid'].values()):
+            raise ValueError("Grid search param grid only contains one scenario. "
+                             "Add more scenarios to run grid search.")
 
         return gs_config
 

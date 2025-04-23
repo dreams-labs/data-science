@@ -1,3 +1,26 @@
+# dda 692 parallelizing
+checkpoint 1: w.676 modeling cohort logic into model
+Model Performance Summary
+Target: crypto_net_gain/max_investment/winsorized
+ID: c3c4b854-7a8b-49bd-8f95-d7c195c8a33d
+===================================
+Test Samples:             57,544
+Number of Features:       136
+Features per Window:      34
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.676
+RMSE:                     0.221
+MAE:                      0.120
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.783
+RMSE:                     0.125
+MAE:                      0.066
+
+
 # dda 683 modeling
 checkpoint 1: whv.327
 Model Performance Summary
