@@ -21,6 +21,34 @@ RMSE:                     0.125
 MAE:                      0.066
 
 
+# dda 683 modeling
+checkpoint 1: whv.327
+Model Performance Summary
+ID: c82f2ea4-fed2-481a-a509-75a42392fee5
+===================================
+Test Samples:             182,779
+Number of Features:       275
+Features per Window:      55
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.363
+RMSE:                     180376.594
+MAE:                      5260.404
+
+Validation Set Metrics
+-----------------------------------
+R² Score:                 0.327
+RMSE:                     74372.711
+MAE:                      3159.549
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.491
+RMSE:                     83309.445
+MAE:                      2752.584
+
+
 # dda 675 parallelizing
 checkpoint 2: w.675 parallelize modeling and training features done
 Model Performance Summary

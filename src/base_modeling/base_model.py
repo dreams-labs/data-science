@@ -162,7 +162,7 @@ class BaseModel:
         return base_pipeline
 
 
-    # Modify _split_data method to do two splits:
+    @u.timing_decorator
     def _split_data(self, X: pd.DataFrame, y: pd.Series) -> None:
         """
         Create train/eval/test splits relative to total population.

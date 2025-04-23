@@ -171,6 +171,7 @@ class WalletModel(BaseModel):
     #           Helper Methods
     # -----------------------------------
 
+    @u.timing_decorator
     def _prepare_data(
             self,
             training_data_df: pd.DataFrame,
@@ -208,6 +209,7 @@ class WalletModel(BaseModel):
         return X, y
 
 
+    @u.timing_decorator
     def _get_meta_pipeline(self) -> Pipeline:
         """
         Return a single Pipeline that first applies y transformations,
