@@ -38,7 +38,9 @@ def calculate_market_timing_features(
 
     This function performs a sequence of transformations to assess wallet timing performance:
     1. Enriches market data with technical indicators (RSIs, SMAs) on price and volume
-    2. Calculates future values of these indicators at different time offsets (e.g., 7, 14, 30 days ahead)
+    2. Calculates relative indicator changes between transaction dates and offset dates:
+        - Lead offsets (positive n): The percentage change in an indicator from transaction date to n days later
+        - Lag offsets (negative n): The percentage change in an indicator from n days before to the transaction date
     3. Computes relative changes between current and future indicator values
     4. For each wallet's transactions, calculates value-weighted and unweighted averages of these future changes,
         treating buys and sells separately
