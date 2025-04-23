@@ -29,7 +29,7 @@ training_data:
     # validation_period_end: '2024-10-20'
 
     #KeyParam Hybrid IDs Toggle
-    hybridize_wallet_ids: False  # if true, training data will be keyed on wallet-coin pairs
+    hybridize_wallet_ids: True  # if true, training data will be keyed on wallet-coin pairs
 
     # Local pipeline configs
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
@@ -170,7 +170,7 @@ modeling:
     feature_selection:
         # Column patterns to remove
         drop_patterns: [
-            timing|*,
+            # timing|*,
             # performance|*,
             # trading|*,
             # mktcap|*,
