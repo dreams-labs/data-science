@@ -5,6 +5,7 @@
 # CheckpointValidation
 # WalletModel Period Boundaries
 training_data:
+    #KeyParam
     training_window_starts: [
         # '2020-01-01',
         # '2021-01-01',
@@ -28,7 +29,7 @@ training_data:
     validation_period_end: '2025-03-20'
     # validation_period_end: '2024-10-20'
 
-    # Whether to use hybrid coin-wallet ids
+    #KeyParam Hybrid IDs Toggle
     hybridize_wallet_ids: False  # if true, training data will be keyed on wallet-coin pairs
 
     # Local pipeline configs
@@ -53,7 +54,7 @@ n_threads:
 # WalletModel Cleaning
 data_cleaning:
 
-    # Wallet cohort thresholds
+    # KeyParam Wallet cohort thresholds
     min_coins_traded: 1  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
     max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
 
@@ -145,11 +146,12 @@ features:
 # WalletModel Modeling Config
 modeling:
 
-    # Which wallet performance metric to use as the target variable.
+    #KeyParam Target Variable
     # target_variable: crypto_net_gain
     target_variable: crypto_net_gain/max_investment/winsorized
 
-    # Modeling cohort filters
+
+    #KeyParam Modeling Cohort Definition
     modeling_min_investment: 100
     modeling_min_coins_traded: 0
 
@@ -269,16 +271,17 @@ modeling:
 
         # Core Tree Params (Always Active)
         # -------------------------------
-        eval_metric: [rmse]
-
+        #KeyParam Tree Depth
         max_depth: 15  # how deep the trees can go
-        # min_child_weight_pct: 0.0001  # what % of rows each tree must have
         min_child_weight: 25  # what % of rows each tree must have
+
         subsample: 1.0  # samples rows, e.g. trees use x% of all wallet rows
         colsample_bytree: 0.9  # samples columns, e.g. trees use x% of all column features
+        eval_metric: [rmse]
 
         # Performance Profiles (Choose One Section)
         # --------------------------------------
+        #KeyParam Estimator Counts
         # CHECKPOINTER
         n_estimators: 250  # number of trees to train in the model
         learning_rate: 0.1  # step size for updates to weights during training
@@ -318,6 +321,7 @@ modeling:
     # Params for model construction
     grid_search_params:
 
+        #KeyParam Grid Search Toggle
         # -------------------------------
         # enabled: True
         # -------------------------------
