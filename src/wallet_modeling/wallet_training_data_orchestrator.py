@@ -453,7 +453,12 @@ class WalletTrainingDataOrchestrator:
         modeling_wallet_features_df.index.name = 'wallet_address'
 
         # Generate trading features and identify modeling cohort
-        modeling_trading_features_df = self._identify_modeling_cohort(modeling_profits_df)
+        # modeling_trading_features_df = self._identify_modeling_cohort(modeling_profits_df)
+        modeling_trading_features_df = wtf.calculate_wallet_trading_features(
+            modeling_profits_df,
+            self.wallets_config['training_data']['modeling_period_start'],
+            self.wallets_config['training_data']['modeling_period_end']
+        )
         modeling_wallet_features_df = modeling_wallet_features_df.join(
             modeling_trading_features_df,
             how='left'

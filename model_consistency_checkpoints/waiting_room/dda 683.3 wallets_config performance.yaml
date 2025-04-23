@@ -18,7 +18,7 @@ training_data:
         '2024-04-01',
         # '2024-05-01',
         # '2024-06-01',
-        # '2024-07-01',
+        '2024-07-01',
         # '2024-08-01',
         '2024-09-01',
         # '2024-10-01',
@@ -29,7 +29,7 @@ training_data:
     # validation_period_end: '2024-10-20'
 
     # Whether to use hybrid coin-wallet ids
-    hybridize_wallet_ids: False  # if true, training data will be keyed on wallet-coin pairs
+    hybridize_wallet_ids: True  # if true, training data will be keyed on wallet-coin pairs
 
     # Local pipeline configs
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
@@ -54,14 +54,14 @@ n_threads:
 data_cleaning:
 
     # Wallet cohort thresholds
-    min_coins_traded: 1  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
-    max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
+    min_coins_traded: 4  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
+    max_coins_traded: 250  # Exclude wallets that have traded more coins than this during the training period
 
-    min_wallet_investment: 10000 # time weighted average balance filter
-    min_wallet_inflows: 10000  # Exclude wallets with inflows below this amount (USD)
-    min_wallet_volume: 10000  # Exclude wallets with fewer than this amount of training period USD volume
+    min_wallet_investment: 2000 # time weighted average balance filter
+    min_wallet_inflows: 2000  # Exclude wallets with inflows below this amount (USD)
+    min_wallet_volume: 2000  # Exclude wallets with fewer than this amount of training period USD volume
 
-    max_wallet_investment: 10_000_000 # time weighted average balance filter
+    max_wallet_investment: 15_000_000 # time weighted average balance filter
     max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
     max_wallet_volume: 25_000_000  # Exclude wallets with fewer than this amount of training period USD volume
     max_wallet_profits: 100_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
@@ -147,10 +147,17 @@ modeling:
 
     # Which wallet performance metric to use as the target variable.
     # target_variable: crypto_net_gain
-    target_variable: crypto_net_gain/max_investment/winsorized
+    # target_variable: crypto_net_gain/max_investment/winsorized
+    # target_variable: max_investment
+    # target_variable: cw_crypto_net_gain/max_investment/winsorized
+    # target_variable: cw_max_investment
+    # target_variable: cw_crypto_net_gain
+    # target_variable: cw_crypto_net_cash_flows
+    target_variable: cw_crypto_cash_buys
+    # target_variable: cw_crypto_cash_sells
 
-    # Modeling cohort filters
-    modeling_min_investment: 100
+    # Modeling period filters
+    modeling_min_investment: 200
     modeling_min_coins_traded: 0
 
     # Train/Test/Eval split
@@ -281,7 +288,7 @@ modeling:
         # --------------------------------------
         # CHECKPOINTER
         n_estimators: 250  # number of trees to train in the model
-        learning_rate: 0.1  # step size for updates to weights during training
+        learning_rate: 0.05  # step size for updates to weights during training
 
         # # PRODUCTION
         # n_estimators: 500  # number of trees to train in the model
@@ -290,7 +297,7 @@ modeling:
         early_stopping_rounds: 25  # stop training if no improvement after x rounds
         gamma: 0.005  # minimum gain required to split further on a leaf node
         tree_method: hist  # method for building trees, e.g., histogram-based
-        max_bin: 256  # how many bins to categorize features into
+        max_bin: 512  # how many bins to categorize features into
 
         # Threading Controls
         n_jobs: -1
@@ -330,11 +337,11 @@ modeling:
 
         # scoring: neg_root_mean_squared_error
         # scoring: custom_neg_rmse_scorer
-        scoring: custom_r2_scorer
-        # scoring: validation_r2_scorer
+        # scoring: custom_r2_scorer
+        scoring: validation_r2_scorer
 
         # Metaparameters
-        # build_post_search_model: False  # whether to build a model after the grid search
+        build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # 3 outputs model performance but not training scores
         verbose_estimators: False  # whether to print each estimator's scores
         n_jobs: -1
@@ -345,9 +352,39 @@ modeling:
 
             # Target variables
             # target_selector__target_variable: [
-            #     'max_investment',
-            #     'crypto_net_gain/max_investment/winsorized',
-
+            #     # # 'max_investment',
+            #     # # 'crypto_net_gain/max_investment/winsorized',
+            #     # 'cw_max_investment',
+            #     'cw_crypto_inflows',
+            #     'cw_crypto_outflows',
+            #     'cw_crypto_net_flows',
+            #     # 'cw_crypto_net_gain',
+            #     # 'cw_total_volume',
+            #     # 'cw_average_transaction',
+            #     'cw_crypto_cash_buys',
+            #     'cw_crypto_cash_sells',
+            #     'cw_crypto_net_cash_flows',
+            #     # 'cw_unique_coins_traded',
+            #     # # 'cw_crypto_net_gain/max_investment/base',
+            #     # 'cw_crypto_net_gain/max_investment/rank',
+            #     # # 'cw_crypto_net_gain/max_investment/log',
+            #     # 'cw_crypto_net_gain/max_investment/winsorized',
+            #     # # 'cw_crypto_net_gain/max_investment/ntile_rank',
+            #     # # 'cw_crypto_net_gain/crypto_inflows/base',
+            #     # 'cw_crypto_net_gain/crypto_inflows/rank',
+            #     # # 'cw_crypto_net_gain/crypto_inflows/log',
+            #     # 'cw_crypto_net_gain/crypto_inflows/winsorized',
+            #     # # 'cw_crypto_net_gain/crypto_inflows/ntile_rank',
+            #     # # 'cw_crypto_net_flows/max_investment/base',
+            #     # # 'cw_crypto_net_flows/max_investment/rank',
+            #     # # 'cw_crypto_net_flows/max_investment/log',
+            #     # 'cw_crypto_net_flows/max_investment/winsorized',
+            #     # # 'cw_crypto_net_flows/max_investment/ntile_rank',
+            #     # # 'cw_crypto_net_flows/crypto_inflows/base',
+            #     # # 'cw_crypto_net_flows/crypto_inflows/rank',
+            #     # # 'cw_crypto_net_flows/crypto_inflows/log',
+            #     # 'cw_crypto_net_flows/crypto_inflows/winsorized',
+            #     # # 'cw_crypto_net_flows/crypto_inflows/ntile_rank',
             # ]
 
         # Params for model construction
@@ -356,7 +393,7 @@ modeling:
             # # Depth and Child Weight
             # regressor__min_child_weight_pct: [0.00004, 0.00007, 0.0001]
             # regressor__min_child_weight: [8,10,14]
-            # regressor__max_depth: [19,21,23,25]
+            regressor__max_depth: [7,9,12,15]
             # basic depth param
 
             # Col/Row Sampling
@@ -369,7 +406,7 @@ modeling:
             # regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            regressor__n_estimators: [5]
+            regressor__n_estimators: [150]
             regressor__learning_rate: [0.3]
             regressor__max_depth: [7]
             regressor__min_child_weight: [30]
@@ -377,7 +414,7 @@ modeling:
             # regressor__gamma: [0, 0.005]
 
             # Optimize for Speed
-            # regressor__n_jobs: [4]  # how many models to build at once
+            # regressor__n_jobs: [1]  # how many models to build at once
             # regressor__max_bin: [128]
             # regressor__tree_method: [hist]
 
