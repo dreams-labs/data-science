@@ -4,7 +4,6 @@ which is needed because rows at the period start and end dates are required for
 many calculations.
 """
 import time
-import logging
 from datetime import timedelta
 import warnings
 import threading
@@ -54,7 +53,7 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads, r
         raise TypeError(f"dates parameter '{dates}' must be a list.")
 
     start_time = time.time()
-    logger.info("Starting profits_df imputation for %s dates...", len(dates))
+    logger.debug("Starting profits_df imputation for %s dates...", len(dates))
 
     # Create indices for vectorized operations
     profits_df = u.ensure_index(profits_df)
@@ -72,7 +71,7 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads, r
 
     # If no new rows were generated, return original DataFrame
     if not new_rows_list:
-        logger.info("No new rows generated during imputation. Returning original DataFrame.")
+        logger.debug("No new rows generated during imputation. Returning original DataFrame.")
         return profits_df.reset_index() if reset_index else profits_df
 
     # Concatenate and append new rows
@@ -126,10 +125,6 @@ def multithreaded_impute_profits_rows(profits_df, prices_df, target_date, n_thre
     # Create and start a thread for each partition
     logger.debug("Initiating multithreading calculations for date %s...",target_date)
 
-    # Temporarily increase the log level to suppress most logs from multithread workers
-    original_level = logger.level
-    logger.setLevel(logging.ERROR)
-
     for partition in profits_df_partitions:
         thread = threading.Thread(
             target=worker,
@@ -141,9 +136,6 @@ def multithreaded_impute_profits_rows(profits_df, prices_df, target_date, n_thre
     # Wait for all threads to complete
     for thread in threads:
         thread.join()
-
-    # Restore the original log level
-    logger.setLevel(original_level)
 
     # Collect results
     results = []
@@ -192,7 +184,7 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
         ValueError: If joining prices_df removes rows from profits_df
     """
     start_time = time.time()
-    logger.info('%s Imputing rows for all coin-wallet pairs in profits_df on %s...',
+    logger.debug('%s Imputing rows for all coin-wallet pairs in profits_df on %s...',
                 profits_df.shape,
                 target_date)
 

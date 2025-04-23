@@ -54,7 +54,6 @@ def generate_and_save_wallet_model_artifacts(
     # Create evaluation dictionary with the same structure as before
     evaluation = {
         **evaluator.metrics,
-        'summary_report': evaluator.summary_report(),
         'cohort_sizes': {
             'training_cohort': len(model_results['training_cohort_pred']),
             'modeling_cohort': len(model_results['y_pred']),
