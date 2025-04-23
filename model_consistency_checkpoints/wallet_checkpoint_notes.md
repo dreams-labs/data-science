@@ -1,3 +1,32 @@
+# dda 694 epoch assignments
+checkpoint 1: w.659 assignment logic completed
+Model Performance Summary
+Target: crypto_net_gain/max_investment/winsorized
+ID: dd6e0209-1f31-41d2-9f0a-b3547e190784
+===================================
+Test Samples:             57,544
+Number of Features:       84
+Features per Window:      21
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.659
+RMSE:                     0.226
+MAE:                      0.119
+
+Validation Set Metrics
+-----------------------------------
+R² Score:                 -0.171
+RMSE:                     0.451
+MAE:                      0.230
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.759
+RMSE:                     0.132
+MAE:                      0.064
+
+
 # dda 692 parallelizing
 checkpoint 1: w.676 modeling cohort logic into model
 Model Performance Summary

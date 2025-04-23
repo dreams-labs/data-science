@@ -188,6 +188,14 @@ class WalletModel(BaseModel):
         - X (DataFrame): feature data for modeling cohort
         - y (Series): target variable for modeling cohort
         """
+        if self.modeling_config['assign_epochs_to_addresses']:
+            # Select 1 epoch for each wallet address
+            training_data_df, modeling_wallet_features_df = self._assign_epoch_to_wallets(
+                training_data_df,
+                modeling_wallet_features_df,
+                random_state = self.modeling_config['model_params']['random_state']
+            )
+
         # Store full training cohort for later scoring
         self.training_data_df = training_data_df.copy()
 
@@ -207,6 +215,42 @@ class WalletModel(BaseModel):
         y = modeling_wallet_features_df[cohort_mask].copy()
 
         return X, y
+
+    def _assign_epoch_to_wallets(
+        self,
+        training_data_df: pd.DataFrame,
+        modeling_wallet_features_df: pd.DataFrame,
+        random_state: int = None
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Selects a single epoch for any given wallet address. This avoids data leakage
+        when the target variable for one time window is exposed as a feature for another.
+
+        Params:
+        - training_data_df (DataFrame): multiindexed by ['wallet_address','epoch_start_date']
+        - modeling_wallet_features_df  (DataFrame): same index as training_data_df
+
+        Returns:
+        - sampled_training_data_df: one random epoch per wallet
+        - sampled_modeling_wallet_features_df:   matching rows from modeling_wallet_features_df
+        """
+        wallet_addresses = training_data_df.index.get_level_values('wallet_address').to_numpy()
+        random_generator = np.random.default_rng(random_state)
+        random_scores = random_generator.random(len(wallet_addresses))
+
+        # Sort by wallets then random scores to group addresses while preserving randomization
+        sorted_indices = np.lexsort((random_scores, wallet_addresses))
+        _, unique_wallet_positions = np.unique(wallet_addresses[sorted_indices], return_index=True)
+        # Select exactly one random epoch per wallet address
+        selected_positions = sorted_indices[unique_wallet_positions]
+        selected_multiindices = training_data_df.index[selected_positions]
+
+        # Create df of sampled records
+        sampled_training_data_df = training_data_df.loc[selected_multiindices]
+        sampled_modeling_wallet_features_df = modeling_wallet_features_df.loc[selected_multiindices]
+        u.assert_matching_indices(sampled_training_data_df,sampled_modeling_wallet_features_df)
+
+        return sampled_training_data_df,sampled_modeling_wallet_features_df
 
 
     @u.timing_decorator
