@@ -283,9 +283,13 @@ class WalletModel(BaseModel):
             'target_selector__target_variable',
             self.modeling_config['target_variable']
         )
+        target_var_class_threshold = (self.modeling_config.get('model_params', {}).get(
+            'target_selector__target_var_class_threshold',
+            self.modeling_config.get('target_var_class_threshold', None)
+        ))
 
         y_pipeline = Pipeline([
-            ('target_selector', TargetVarSelector(target_variable=target_var))
+            ('target_selector', TargetVarSelector(target_var, target_var_class_threshold))
         ])
 
         return y_pipeline
@@ -416,8 +420,13 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
     This centralizes the target extraction logic so that grid search can update the target
     variable parameter without interference from pre-extraction.
     """
-    def __init__(self, target_variable: str):
+    def __init__(
+            self,
+            target_variable: str,
+            target_var_class_threshold: float
+        ):
         self.target_variable = target_variable
+        self.target_var_class_threshold = target_var_class_threshold
 
     def fit(self, y, X=None):
         """
@@ -432,17 +441,17 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
 
     def transform(self, y, X=None):
         """
-        If y is a DataFrame, extract the target column specified by target_variable.
-        Return a 1D Series even if the extraction yields a single-column DataFrame.
-        If y is already a Series, return it unchanged.
+        Extract the target column specified by target_variable and return a 1D Series.
+        If the model is classification,
         """
-        if isinstance(y, pd.DataFrame):
-            result = y[self.target_variable]
-            # Ensure result is a Series (squeeze if it is still a DataFrame)
-            if isinstance(result, pd.DataFrame):
-                result = result.squeeze()
-            return result
-        return y
+        # Extract target variable
+        result = y[self.target_variable]
+
+        # Convert to boolean if a threhsold is provided
+        if self.target_var_class_threshold is not None:
+            result = (result >= self.target_var_class_threshold).astype(int)
+
+        return result
 
 
 class MetaPipeline(BaseEstimator, TransformerMixin):

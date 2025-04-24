@@ -146,12 +146,13 @@ features:
 modeling:
 
     #KeyParam Model Type
-    model_type: regression  # "regression" or "classification"
-    # model_type: classification  # "regression" or "classification"
+    # model_type: regression  # "regression" or "classification"
+    model_type: classification  # "regression" or "classification"
 
     #KeyParam Target Variable
     # target_variable: crypto_net_gain
     target_variable: crypto_net_gain/max_investment/winsorized
+    target_var_class_threshold: 0.5  # a classification model will try to predict the target var above this value
 
 
     #KeyParam Modeling Cohort Definition
@@ -348,7 +349,6 @@ modeling:
 
         subsample: 1.0  # samples rows, e.g. trees use x% of all wallet rows
         colsample_bytree: 0.9  # samples columns, e.g. trees use x% of all column features
-        eval_metric: [rmse]
 
         # Performance Profiles (Choose One Section)
         # --------------------------------------
@@ -440,7 +440,7 @@ modeling:
 
             # # Model Speed
             # regressor__tree_method: [hist, approx, auto]
-            # regressor__max_bin: [64, 128, 256]
+            regressor__max_bin: [64, 128, 256]
             # regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
