@@ -157,10 +157,13 @@ class WalletModel(BaseModel):
             training_cohort_pred = self._predict_training_cohort()
             target_var = self.modeling_config['target_variable']
             full_cohort_actuals = modeling_wallet_features_df[target_var]
+            training_cohort_actuals = full_cohort_actuals.loc[training_cohort_pred.index]
 
+            # update the result with all three series
             result.update({
-                'training_cohort_pred': training_cohort_pred,
-                'training_cohort_actuals': full_cohort_actuals
+                'training_cohort_pred':     training_cohort_pred,      # your preds for the training cohort
+                'training_cohort_actuals':  training_cohort_actuals,   # matching actuals
+                'full_cohort_actuals':      full_cohort_actuals        # unfiltered full‐cohort actuals
             })
 
         u.notify('notify')
