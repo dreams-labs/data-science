@@ -9,7 +9,7 @@ import numpy as np
 from sklearn.model_selection import RandomizedSearchCV, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.base import BaseEstimator, TransformerMixin
-from xgboost import XGBRegressor
+from xgboost import XGBRegressor, XGBClassifier
 
 # Local modules
 import base_modeling.feature_selection as fs
@@ -140,6 +140,14 @@ class BaseModel:
         """
         model_params = self.modeling_config['model_params'].copy()
 
+        if self.modeling_config['model_type']=='classification':
+            model = XGBClassifier
+        elif self.modeling_config['model_type']=='regression':
+            model = XGBRegressor
+        else:
+            raise ValueError(f"Invalid model type '{self.modeling_config['model_type']}' found in config. "
+                             "Model type must be 'regression' or 'classification")
+
         # Update min_child_weight if percentage is specified
         if model_params.get('min_child_weight_pct'):
             model_params['min_child_weight'] = self._convert_min_child_pct_to_weight(
@@ -156,7 +164,7 @@ class BaseModel:
             ('drop_columns', DropColumnPatterns(
                 drop_patterns=self.modeling_config['feature_selection']['drop_patterns']
             )),
-            ('regressor', XGBRegressor(**model_params))
+            ('regressor', model(**model_params))
         ])
 
         return base_pipeline
