@@ -301,7 +301,7 @@ class BaseModel:
     #         Grid Search Methods
     # -----------------------------------
 
-    def _run_grid_search(self, X: pd.DataFrame, y: pd.Series, pipeline=None) -> Dict[str, float]:
+    def _run_grid_search(self, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
         """
         Perform grid search with cross validation using configured parameters.
 
