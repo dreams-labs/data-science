@@ -1,3 +1,31 @@
+# dda 685 training and val set concurrently
+checkpoint 1: auc.561 concurrent is working
+Model Performance Summary
+Target: crypto_net_gain/max_investment/winsorized
+ID: afc9dfbc-bd19-42a6-8b4d-601f096dcd50
+===================================
+Test Samples:             1,368
+Number of Features:       268
+Features per Window:      67
+
+Classification Metrics
+-----------------------------------
+ROC AUC:                  0.964
+Log Loss:                 0.159
+Accuracy:                 0.935
+Precision:                0.769
+Recall:                   0.673
+F1 Score:                 0.717
+
+Validation Set Metrics
+-----------------------------------
+Val ROC AUC:              0.561
+Val Accuracy:             0.938
+Val Precision:            0.000
+Val Recall:               0.000
+Val F1 Score:             0.000
+
+
 # dda 696 classification evaluator
 checkpoint 1: auc.70 summary report working
 Model Performance Summary
