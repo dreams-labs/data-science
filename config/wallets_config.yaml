@@ -153,7 +153,7 @@ modeling:
     # target_variable: crypto_net_gain
     # target_variable: cw_crypto_net_gain/max_investment/winsorized
     target_variable: crypto_net_gain/max_investment/winsorized
-    target_var_class_threshold: 0.5  # a classification model will try to predict the target var above this value
+    target_var_class_threshold: 0.7  # a classification model will try to predict the target var above this value
 
     #KeyParam Modeling Cohort Definition
     modeling_min_investment: 300
@@ -414,7 +414,7 @@ modeling:
         verbose_level: 3  # 3 outputs model performance but not training scores
         verbose_estimators: False  # whether to print each estimator's scores
         n_jobs: -1
-        # pre_dispatch: 2
+        pre_dispatch: 1
 
         # Params for target variable generation
         param_grid_y:
@@ -425,33 +425,33 @@ modeling:
             #     'crypto_net_gain/max_investment/winsorized',
 
             # ]
-            target_selector__target_var_class_threshold: [
-                0.2,0.4,0.6,0.8,1.0
-            ]
+            # target_selector__target_var_class_threshold: [
+            #     0.3, 0.4, 0.5, 0.6, 0.7, 0.8
+            # ]
 
         # Params for model construction
         param_grid:
 
             # # Depth and Child Weight
             # regressor__min_child_weight_pct: [0.00004, 0.00007, 0.0001]
-            # regressor__min_child_weight: [8,10,14]
-            # regressor__max_depth: [19,21,23,25]
+            regressor__min_child_weight: [15,25,40]
+            regressor__max_depth: [7,9,12,15]
             # basic depth param
 
-            # Col/Row Sampling
+            # # Col/Row Sampling
             # regressor__subsample: [0.85, 0.9, 0.95, 1.0]   # samples rows, e.g. trees use x% of all wallet rows
             # regressor__colsample_bytree: [ 0.9, 0.95, 1.0]   # samples columns, e.g. trees use x% of all column features
 
             # # Model Speed
             # regressor__tree_method: [hist, approx, auto]
             # regressor__max_bin: [64, 128, 256]
-            # regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
+            # regressor__gamma: [0.005, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            regressor__n_estimators: [5]
+            regressor__n_estimators: [120]
             regressor__learning_rate: [0.3]
-            regressor__max_depth: [7]
-            regressor__min_child_weight: [30]
+            # regressor__max_depth: [7]
+            # regressor__min_child_weight: [30]
 
             # regressor__gamma: [0, 0.005]
 
