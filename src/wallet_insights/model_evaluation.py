@@ -625,6 +625,8 @@ class RegressionEvaluator:
         return out
 
 
+
+
 class ClassifierEvaluator(RegressionEvaluator):
     """
     Same interface as RegressionEvaluator but for classification models.
@@ -640,6 +642,7 @@ class ClassifierEvaluator(RegressionEvaluator):
 
         # super() creates metrics and
         super().__init__(wallet_model_results)
+
 
     def _calculate_metrics(self):
         """
@@ -667,6 +670,10 @@ class ClassifierEvaluator(RegressionEvaluator):
             self.metrics['val_recall'] = recall_score(self.y_validation, val_pred, zero_division=0)
             self.metrics['val_f1'] = f1_score(self.y_validation, val_pred, zero_division=0)
             self.metrics['val_roc_auc'] = roc_auc_score(self.y_validation, self.y_validation_pred_proba)
+
+        # Feature importance if available
+        if self.model is not None and hasattr(self.model, 'feature_importances_'):
+            self._calculate_feature_importance()
 
 
     def summary_report(self):
@@ -704,3 +711,59 @@ class ClassifierEvaluator(RegressionEvaluator):
 
         report = "\n".join(summary)
         logger.info("\n%s", report)
+
+
+    def plot_wallet_evaluation(
+        self,
+        plot_type: str = "all",
+        display: bool = True,
+        levels: int = 0,
+    ):
+        """
+        Skeleton wallet-level evaluation plot for classification models.
+
+        Current layout (2 × 2):
+        • Chart 1  – placeholder for ROC / PR curves
+        • Chart 2  – placeholder for calibration or return-vs-rank
+        • Chart 3  – placeholder for cohort comparison
+        • Chart 4  – feature-importance bar (re-uses parent helper)
+
+        Parameters
+        ----------
+        plot_type : str, default "all"
+            Only 'all' is supported in this skeleton.
+        display : bool, default True
+            If True, shows the figure; otherwise returns the Matplotlib figure.
+        levels : int, default 0
+            Grouping depth passed to `_plot_feature_importance`.
+        """
+        if plot_type != "all":
+            raise NotImplementedError("This skeleton only supports plot_type='all'.")
+
+        # --- build 2×2 canvas
+        fig = plt.figure(figsize=(15, 12))
+        gs = plt.GridSpec(2, 2, height_ratios=[1, 1], width_ratios=[1, 1])
+
+        ax1 = fig.add_subplot(gs[0, 0])  # Chart 1 placeholder
+        ax2 = fig.add_subplot(gs[0, 1])  # Chart 2 placeholder
+        ax3 = fig.add_subplot(gs[1, 0])  # Chart 3 placeholder
+        ax4 = fig.add_subplot(gs[1, 1])  # Feature importance
+
+        # --- placeholder content ------------------------------------------------
+        ax1.set_title("Chart 1 – placeholder")
+        ax1.text(0.5, 0.5, "TBD", ha="center", va="center", fontsize=12)
+
+        ax2.set_title("Chart 2 – placeholder")
+        ax2.text(0.5, 0.5, "TBD", ha="center", va="center", fontsize=12)
+
+        ax3.set_title("Chart 3 – placeholder")
+        ax3.text(0.5, 0.5, "TBD", ha="center", va="center", fontsize=12)
+
+        # --- feature importance -------------------------------------------------
+        self._plot_feature_importance(ax4, levels=levels)
+
+        plt.tight_layout()
+        if display:
+            plt.show()
+            return None
+        return fig
