@@ -71,6 +71,14 @@ class BaseModel:
             param_grid['drop_columns__drop_patterns'] = grid_patterns
             self.modeling_config['grid_search_params']['param_grid']['drop_columns__drop_patterns'] = grid_patterns
 
+        # Assign scorer based on model type
+        if self.modeling_config['model_type'] == 'regression':
+            scorer = modeling_config['grid_search_params'].get('regressor_scoring')
+        elif self.modeling_config['model_type'] == 'classification':
+            scorer = modeling_config['grid_search_params'].get('classifier_scoring')
+        else:
+            raise ValueError(f"Invalid model type '{self.modeling_config['model_type']}' found in modeling config.")
+        self.modeling_config['grid_search_params']['scorer'] = scorer
 
 
 
@@ -411,13 +419,19 @@ class BaseModel:
                 ]
             param_grid['drop_columns__drop_patterns'] = drop_pattern_combinations
 
+        if self.modeling_config['model_type'] == 'regression':
+            scorer = grid_search_params['regressor_scoring']
+        else:
+            scorer = grid_search_params['classifier_scoring']
+
+
         return {
             'base_model_params': base_model_params,
             'param_grid': param_grid,
             'search_config': {
                 'n_iter': grid_search_params['n_iter'],
                 'cv': grid_search_params['n_splits'],
-                'scoring': grid_search_params['scoring'],
+                'scoring': scorer,
                 'verbose': grid_search_params.get('verbose_level', 0),
                 'n_jobs': base_model_params.get('n_jobs', -1),
                 'pre_dispatch': grid_search_params.get('pre_dispatch', 1),  # <-- limit pre‑dispatch

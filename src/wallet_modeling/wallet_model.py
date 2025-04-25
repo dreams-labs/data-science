@@ -48,6 +48,7 @@ class WalletModel(BaseModel):
         self.X_validation = None
         self.validation_wallet_features_df = None
 
+
     # -----------------------------------
     #         Primary Interface
     # -----------------------------------
@@ -325,14 +326,12 @@ class WalletModel(BaseModel):
         }
 
         # Add target variable options into the grid search.
-        if 'target_selector__target_variable' in (
-            self.modeling_config.get('grid_search_params', {}).get('param_grid_y') or {}
-        ):
-            target_variables = self.modeling_config['grid_search_params']['param_grid_y']['target_selector__target_variable']  # pylint:disable=line-too-long
+        param_grid_y = self.modeling_config.get('grid_search_params', {}).get('param_grid_y') or {}
+        if 'target_selector__target_variable' in param_grid_y:
+            target_variables = param_grid_y['target_selector__target_variable']
             gs_config['param_grid']['y_pipeline__target_selector__target_variable'] = target_variables
 
         # Add target variable classification threshold options
-        param_grid_y = self.modeling_config.get('grid_search_params', {}).get('param_grid_y', {})
         if 'target_selector__target_var_class_threshold' in param_grid_y:
             thresholds = param_grid_y['target_selector__target_var_class_threshold']
             gs_config['param_grid']['y_pipeline__target_selector__target_var_class_threshold'] = thresholds
@@ -361,6 +360,7 @@ class WalletModel(BaseModel):
 
         # Assign custom scorers if applicable
         scoring_param = gs_config['search_config'].get('scoring')
+        
         if scoring_param == 'custom_r2_scorer':
             gs_config['search_config']['scoring'] = custom_r2_scorer
 
@@ -378,6 +378,11 @@ class WalletModel(BaseModel):
             if self.X_validation is None or self.validation_wallet_features_df is None:
                 raise ValueError("Validation data required for validation_auc_scorer")
             gs_config['search_config']['scoring'] = validation_auc_scorer(self)
+
+        elif scoring_param == 'validation_top_return_scorer':
+            # read your desired top_pct from config, e.g. self.modeling_config['grid_search_params']['top_pct']
+            top_pct = self.modeling_config['grid_search_params'].get('top_pct', 0.05)
+            gs_config['search_config']['scoring'] = validation_top_return_scorer(self, top_pct)
 
         else:
             raise ValueError(f"Invalid scoring metric '{scoring_param}' found in grid_search_params.")
@@ -656,5 +661,45 @@ def validation_auc_scorer(wallet_model):
 
         # Compute and return ROC AUC
         return roc_auc_score(y_true, probas[:, pos_idx])
+
+    return scorer
+
+
+def validation_top_return_scorer(wallet_model, top_pct: float):
+    """
+    Factory function that returns a custom scorer computing the mean actual return
+    of the top n% of wallets by predicted probability on the validation set.
+
+    Params:
+    - wallet_model: WalletModel instance containing validation data
+    - top_pct (float): Fraction (0 < top_pct <= 1) representing the top n% to evaluate
+
+    Returns:
+    - scorer function compatible with scikit-learn that computes mean return.
+    """
+    def scorer(estimator, X=None, y=None):
+        # Ensure validation data is available
+        if wallet_model.X_validation is None or wallet_model.validation_wallet_features_df is None:
+            raise ValueError("Validation data not set in wallet_model")
+
+        # Get actual returns
+        target_var = wallet_model.modeling_config['target_variable']
+        returns = wallet_model.validation_wallet_features_df[target_var].reindex(wallet_model.X_validation.index)
+
+        # Predict class probabilities for positive class
+        X_val_trans = estimator.x_transformer_.transform(wallet_model.X_validation)
+        probas = estimator.regressor.predict_proba(X_val_trans)
+        pos_idx = list(estimator.regressor.classes_).index(1)
+        probs = probas[:, pos_idx]
+
+        # Combine into DataFrame and drop NaNs
+        df = pd.DataFrame({'proba': probs, 'ret': returns}).dropna()
+
+        # Compute cutoff for top_pct
+        cutoff = np.percentile(df['proba'], 100 * (1 - top_pct))
+        top_df = df[df['proba'] >= cutoff]
+
+        # Return mean actual return of top slice; if empty, return nan
+        return top_df['ret'].mean() if not top_df.empty else float('nan')
 
     return scorer
