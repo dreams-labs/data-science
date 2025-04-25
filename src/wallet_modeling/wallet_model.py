@@ -325,12 +325,17 @@ class WalletModel(BaseModel):
         }
 
         # Add target variable options into the grid search.
-        if 'target_selector__target_variable' in (self.modeling_config
-                                                  .get('grid_search_params', {})
-                                                  .get('param_grid_y') or {}
-                                                  ):
+        if 'target_selector__target_variable' in (
+            self.modeling_config.get('grid_search_params', {}).get('param_grid_y') or {}
+        ):
             target_variables = self.modeling_config['grid_search_params']['param_grid_y']['target_selector__target_variable']  # pylint:disable=line-too-long
             gs_config['param_grid']['y_pipeline__target_selector__target_variable'] = target_variables
+
+        # Add target variable classification threshold options
+        param_grid_y = self.modeling_config.get('grid_search_params', {}).get('param_grid_y', {})
+        if 'target_selector__target_var_class_threshold' in param_grid_y:
+            thresholds = param_grid_y['target_selector__target_var_class_threshold']
+            gs_config['param_grid']['y_pipeline__target_selector__target_var_class_threshold'] = thresholds
 
         # Confirm there are multiple configurations
         if not any(isinstance(value, list) and len(value) > 1 for value in gs_config['param_grid'].values()):
@@ -358,15 +363,22 @@ class WalletModel(BaseModel):
         scoring_param = gs_config['search_config'].get('scoring')
         if scoring_param == 'custom_r2_scorer':
             gs_config['search_config']['scoring'] = custom_r2_scorer
+
         elif scoring_param == 'custom_neg_rmse_scorer':
             gs_config['search_config']['scoring'] = custom_neg_rmse_scorer
+
         elif scoring_param == 'validation_r2_scorer':
             # Ensure validation data is available
             if self.X_validation is None or self.validation_wallet_features_df is None:
                 raise ValueError("Validation data required for validation_r2_scorer")
-
-            # Create the custom scorer with access to validation data
             gs_config['search_config']['scoring'] = validation_r2_scorer(self)
+
+        elif scoring_param == 'validation_auc_scorer':
+            # Ensure validation data is available
+            if self.X_validation is None or self.validation_wallet_features_df is None:
+                raise ValueError("Validation data required for validation_auc_scorer")
+            gs_config['search_config']['scoring'] = validation_auc_scorer(self)
+
         else:
             raise ValueError(f"Invalid scoring metric '{scoring_param}' found in grid_search_params.")
 

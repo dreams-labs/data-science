@@ -29,10 +29,10 @@ training_data:
     # validation_period_end: '2024-10-20'
 
     #KeyParam Hybrid IDs Toggle
-    hybridize_wallet_ids: True  # if true, training data will be keyed on wallet-coin pairs
+    hybridize_wallet_ids: False  # if true, training data will be keyed on wallet-coin pairs
 
     # Local pipeline configs
-    dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
+    dataset: dev  # Set to prod or dev; determines whether to query core or dev dataset tables
     parquet_folder: temp/wallet_modeling_dfs/windowed  # where to store parquet files
     model_artifacts_folder: ../artifacts/wallet_modeling/hybridized  # where model artifacts are stored
 
@@ -53,15 +53,15 @@ n_threads:
 # WalletModel Cleaning
 data_cleaning:
 
-    # Wallet cohort thresholds
-    min_coins_traded: 4  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
-    max_coins_traded: 250  # Exclude wallets that have traded more coins than this during the training period
+    # KeyParam Wallet cohort thresholds
+    min_coins_traded: 1  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
+    max_coins_traded: 50  # Exclude wallets that have traded more coins than this during the training period
 
-    min_wallet_investment: 2000 # time weighted average balance filter
-    min_wallet_inflows: 2000  # Exclude wallets with inflows below this amount (USD)
-    min_wallet_volume: 2000  # Exclude wallets with fewer than this amount of training period USD volume
+    min_wallet_investment: 10000 # time weighted average balance filter
+    min_wallet_inflows: 10000  # Exclude wallets with inflows below this amount (USD)
+    min_wallet_volume: 10000  # Exclude wallets with fewer than this amount of training period USD volume
 
-    max_wallet_investment: 15_000_000 # time weighted average balance filter
+    max_wallet_investment: 10_000_000 # time weighted average balance filter
     max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
     max_wallet_volume: 25_000_000  # Exclude wallets with fewer than this amount of training period USD volume
     max_wallet_profits: 100_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
@@ -151,7 +151,8 @@ modeling:
 
     #KeyParam Target Variable
     # target_variable: crypto_net_gain
-    target_variable: cw_crypto_net_gain/max_investment/winsorized
+    # target_variable: cw_crypto_net_gain/max_investment/winsorized
+    target_variable: crypto_net_gain/max_investment/winsorized
     target_var_class_threshold: 0.5  # a classification model will try to predict the target var above this value
 
     #KeyParam Modeling Cohort Definition
@@ -393,7 +394,7 @@ modeling:
 
         #KeyParam Grid Search Toggle
         # -------------------------------
-        # enabled: True
+        enabled: True
         # -------------------------------
 
         # Search Methodology
@@ -405,8 +406,8 @@ modeling:
         # scoring: neg_root_mean_squared_error
         # scoring: custom_neg_rmse_scorer
         # scoring: custom_r2_scorer
-        scoring: validation_r2_scorer
-        # scoring: validation_auc_scorer
+        # scoring: validation_r2_scorer
+        scoring: validation_auc_scorer
 
         # Metaparameters
         # build_post_search_model: False  # whether to build a model after the grid search
@@ -424,6 +425,9 @@ modeling:
             #     'crypto_net_gain/max_investment/winsorized',
 
             # ]
+            target_selector__target_var_class_threshold: [
+                0.2,0.4,0.6,0.8,1.0
+            ]
 
         # Params for model construction
         param_grid:
@@ -440,7 +444,7 @@ modeling:
 
             # # Model Speed
             # regressor__tree_method: [hist, approx, auto]
-            regressor__max_bin: [64, 128, 256]
+            # regressor__max_bin: [64, 128, 256]
             # regressor__gamma: [0.007, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
