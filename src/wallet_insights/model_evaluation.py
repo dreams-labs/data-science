@@ -11,6 +11,15 @@ from sklearn.metrics import (
     mean_absolute_error,
     r2_score,
     explained_variance_score,
+    precision_recall_curve,
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    roc_auc_score,
+    log_loss,
+    RocCurveDisplay,
+    PrecisionRecallDisplay
 )
 from dreams_core import core as dc
 
@@ -49,6 +58,7 @@ class RegressionEvaluator:
         self.X_validation      = wallet_model_results.get('X_validation')
         self.y_validation      = wallet_model_results.get('y_validation')
         self.y_validation_pred = wallet_model_results.get('y_validation_pred')
+        self.validation_wallet_features_df = wallet_model_results.get('validation_wallet_features_df')
 
         # model + features
         self.modeling_config = wallet_model_results['modeling_config']
@@ -179,36 +189,42 @@ class RegressionEvaluator:
         )
 
 
-
-    def summary_report(self):
-        """Generate formatted summary of model performance."""
-        summary = [
+    def _get_summary_header(self) -> list[str]:
+        """
+        Build header lines including title, target, ID, samples and feature counts.
+        """
+        header = [
             "Model Performance Summary",
             f"Target: {self.modeling_config['target_variable']}",
             f"ID: {self.model_id}",
             "=" * 35,
         ]
-
-        # Add sample sizes and feature count
+        # feature counts
         n_features = len(self.feature_names) if self.feature_names is not None else 0
-        n_all_windows = sum(1 for feature in self.feature_names if '|all_windows' in feature)
-
-        if hasattr(self.metrics, 'total_cohort_samples'):
-            summary.extend([
+        n_all_windows = sum(1 for f in self.feature_names if "|all_windows" in f)
+        if "total_cohort_samples" in self.metrics:
+            header.extend([
                 f"Training Cohort:          {self.metrics['total_cohort_samples']:,d}",
                 f"Modeling Cohort Train:    {self.metrics['train_samples']:,d}",
                 f"Modeling Cohort Test:     {self.metrics['test_samples']:,d}",
                 ""
             ])
         else:
-            summary.extend([
+            header.extend([
                 f"Test Samples:             {self.metrics['test_samples']:,d}",
                 f"Number of Features:       {n_features:,d}",
                 f"Features per Window:      {n_all_windows:,d}",
                 ""
             ])
+        return header
 
-        # Add core metrics
+
+    def summary_report(self):
+        """Generate formatted summary of model performance."""
+        # now just grab the header + samples
+        summary = self._get_summary_header()
+
+        # Add core regression metrics
         summary.extend([
             "Core Metrics",
             "-" * 35,
@@ -218,9 +234,9 @@ class RegressionEvaluator:
             ""
         ])
 
-        # Add validation metrics if we computed them
-        if 'validation_metrics' in self.metrics:
-            vm = self.metrics['validation_metrics']
+        # Validation metrics
+        if "validation_metrics" in self.metrics:
+            vm = self.metrics["validation_metrics"]
             summary.extend([
                 "Validation Set Metrics",
                 "-" * 35,
@@ -230,27 +246,27 @@ class RegressionEvaluator:
                 ""
             ])
 
-        # Add training cohort metrics if available
-        if 'training_cohort' in self.metrics:
+        # Training-cohort metrics
+        if "training_cohort" in self.metrics:
+            tc = self.metrics["training_cohort"]
             summary.extend([
                 "Inactive Wallets Cohort Metrics",
                 "-" * 35,
-                f"R² Score:                 {self.metrics['training_cohort']['r2']:.3f}",
-                f"RMSE:                     {self.metrics['training_cohort']['rmse']:.3f}",
-                f"MAE:                      {self.metrics['training_cohort']['mae']:.3f}",
+                f"R² Score:                 {tc['r2']:.3f}",
+                f"RMSE:                     {tc['rmse']:.3f}",
+                f"MAE:                      {tc['mae']:.3f}",
                 ""
             ])
 
-        # Add residuals analysis
+        # Residuals
         summary.extend([
             "Residuals Analysis",
             "-" * 35,
             f"Mean of Residuals:        {self.metrics['residuals_mean']:.3f}",
-            f"Standard Dev of Residuals:{self.metrics['residuals_std']:.3f}",
+            f"Std of Residuals:         {self.metrics['residuals_std']:.3f}",
             f"95% Prediction Interval:  ±{self.metrics['prediction_interval_95']:.3f}"
         ])
 
-        # Log the message
         report = "\n".join(summary)
         logger.info("\n%s", report)
 
@@ -611,3 +627,270 @@ class RegressionEvaluator:
         for col in ['Pop. Pct','Mean Error','ME vs Overall','RMSE','RMSE vs Overall']:
             out[col] = pd.to_numeric(out[col])
         return out
+
+
+
+
+class ClassifierEvaluator(RegressionEvaluator):
+    """
+    Same interface as RegressionEvaluator but for classification models.
+    Expects keys:
+    """
+
+
+    def __init__(self, wallet_model_results: dict):
+
+        # Extract probability predictions
+        self.y_pred_proba = wallet_model_results['y_pred_proba']
+        self.y_validation_pred_proba = wallet_model_results.get('y_validation_pred_proba')
+
+        # super() creates metrics and
+        super().__init__(wallet_model_results)
+
+
+    def _calculate_metrics(self):
+        """
+        Calculate core classification metrics for test and validation sets.
+        """
+        # Sample size tracking
+        self.metrics['test_samples'] = len(self.y_pred)
+        if self.y_train is not None:
+            self.metrics['train_samples'] = len(self.y_train)
+
+        # Test set metrics
+        self.metrics['accuracy'] = accuracy_score(self.y_test, self.y_pred)
+        self.metrics['precision'] = precision_score(self.y_test, self.y_pred, zero_division=0)
+        self.metrics['recall'] = recall_score(self.y_test, self.y_pred, zero_division=0)
+        self.metrics['f1'] = f1_score(self.y_test, self.y_pred, zero_division=0)
+        self.metrics['roc_auc'] = roc_auc_score(self.y_test, self.y_pred_proba)
+        self.metrics['log_loss'] = log_loss(self.y_test, self.y_pred_proba)
+
+        # Validation set metrics if available
+        if getattr(self, 'y_validation', None) is not None and hasattr(self, 'y_validation_pred_proba'):
+            threshold = self.modeling_config.get('target_var_class_threshold', 0.5)
+            val_pred = (self.y_validation_pred_proba >= threshold).astype(int)
+            self.metrics['val_accuracy'] = accuracy_score(self.y_validation, val_pred)
+            self.metrics['val_precision'] = precision_score(self.y_validation, val_pred, zero_division=0)
+            self.metrics['val_recall'] = recall_score(self.y_validation, val_pred, zero_division=0)
+            self.metrics['val_f1'] = f1_score(self.y_validation, val_pred, zero_division=0)
+            self.metrics['val_roc_auc'] = roc_auc_score(self.y_validation, self.y_validation_pred_proba)
+
+        # Feature importance if available
+        if self.model is not None and hasattr(self.model, 'feature_importances_'):
+            self._calculate_feature_importance()
+
+
+    def summary_report(self):
+        """
+        Generate formatted summary of classification model performance.
+        """
+        # Header and sample info
+        summary = self._get_summary_header()
+
+        # Classification metrics
+        summary.extend([
+            "Classification Metrics",
+            "-" * 35,
+            f"ROC AUC:                  {self.metrics['roc_auc']:.3f}",
+            f"Log Loss:                 {self.metrics['log_loss']:.3f}",
+            f"Accuracy:                 {self.metrics['accuracy']:.3f}",
+            f"Precision:                {self.metrics['precision']:.3f}",
+            f"Recall:                   {self.metrics['recall']:.3f}",
+            f"F1 Score:                 {self.metrics['f1']:.3f}",
+            ""
+        ])
+
+        # Validation classification metrics if available
+        if "val_accuracy" in self.metrics:
+            summary.extend([
+                "Validation Set Metrics",
+                "-" * 35,
+                f"Val ROC AUC:              {self.metrics['val_roc_auc']:.3f}",
+                f"Val Accuracy:             {self.metrics['val_accuracy']:.3f}",
+                f"Val Precision:            {self.metrics['val_precision']:.3f}",
+                f"Val Recall:               {self.metrics['val_recall']:.3f}",
+                f"Val F1 Score:             {self.metrics['val_f1']:.3f}",
+                ""
+            ])
+
+        report = "\n".join(summary)
+        logger.info("\n%s", report)
+
+
+    def plot_wallet_evaluation(
+        self,
+        plot_type: str = "all",
+        display: bool = True,
+        levels: int = 0,
+    ):
+        """
+        Skeleton wallet-level evaluation plot for classification models.
+
+        Current layout (2 × 2):
+        • Chart 1  – placeholder for ROC / PR curves
+        • Chart 2  – placeholder for calibration or return-vs-rank
+        • Chart 3  – placeholder for cohort comparison
+        • Chart 4  – feature-importance bar (re-uses parent helper)
+
+        Parameters
+        ----------
+        plot_type : str, default "all"
+            Only 'all' is supported in this skeleton.
+        display : bool, default True
+            If True, shows the figure; otherwise returns the Matplotlib figure.
+        levels : int, default 0
+            Grouping depth passed to `_plot_feature_importance`.
+        """
+        if plot_type != "all":
+            raise NotImplementedError("This skeleton only supports plot_type='all'.")
+
+        # --- build 2×2 canvas
+        fig = plt.figure(figsize=(15, 12))
+        gs = plt.GridSpec(2, 2, height_ratios=[1, 1], width_ratios=[1, 1])
+
+        ax1 = fig.add_subplot(gs[0, 0])  # Chart 1 placeholder
+        ax2 = fig.add_subplot(gs[0, 1])  # Chart 2 placeholder
+        ax3 = fig.add_subplot(gs[1, 0])  # Chart 3 placeholder
+        ax4 = fig.add_subplot(gs[1, 1])  # Feature importance
+
+        self._plot_roc_curves(ax1)
+        self._plot_pr_curves(ax2)
+        self._plot_return_vs_rank(ax3, n_buckets=100)
+        self._plot_feature_importance(ax4, levels=levels)
+
+
+        plt.tight_layout()
+        if display:
+            plt.show()
+            return None
+        return fig
+
+
+    # ------------------------------------------------------------------
+    #                Chart-building helpers
+    # ------------------------------------------------------------------
+    def _plot_roc_curves(self, ax):
+        """
+        ROC curves for test & validation.
+        Validation line: thick green (#22DD22)
+        Random-guess diagonal: grey dashed.
+        """
+        # --- Test ROC (thin, default blue)
+        RocCurveDisplay.from_predictions(
+            self.y_test,
+            self.y_pred_proba,
+            ax=ax,
+            name="Test",
+            linewidth=1.5,
+        )
+
+        # --- Validation ROC (thick green) ------------------------------------
+        if getattr(self, "y_validation_pred_proba", None) is not None \
+        and getattr(self, "y_validation", None) is not None:
+            RocCurveDisplay.from_predictions(
+                self.y_validation,
+                self.y_validation_pred_proba,
+                ax=ax,
+                name="Validation",
+                linewidth=2.5,
+                color="#22DD22",
+            )
+
+        # --- 45° reference line ---------------------------------------------
+        ax.plot(
+            [0, 1], [0, 1],
+            linestyle="--",
+            linewidth=1,
+            color="#afc6ba",
+            label="Random"
+        )
+
+        ax.set_title("ROC Curve – Test vs Validation")
+        ax.grid(True, linestyle=":", alpha=0.3)
+        ax.legend()
+
+
+    def _plot_pr_curves(self, ax):
+        """
+        Precision‑Recall curves for test & validation.
+
+        We manually draw the validation curve to omit the (recall=0, precision=1)
+        anchor point that creates a misleading vertical spike when only a handful
+        top‑score wallets exist.  The validation line is thick green (#22DD22).
+        """
+        # --- Test PR curve (default colour, thin line) --------------------
+        PrecisionRecallDisplay.from_predictions(
+            self.y_test,
+            self.y_pred_proba,
+            ax=ax,
+            name="Test",
+            linewidth=1.5,
+        )
+
+        # --- Validation PR curve (if available) ---------------------------
+        if getattr(self, "y_validation_pred_proba", None) is not None \
+           and getattr(self, "y_validation", None) is not None:
+            # Compute precision‑recall pairs
+            prec, rec, _ = precision_recall_curve(
+                self.y_validation,
+                self.y_validation_pred_proba,
+                pos_label=1
+            )
+            # Skip the first point (precision=1 at recall=0)
+            ax.plot(
+                rec[1:], prec[1:],
+                linewidth=2.5,
+                color="#22DD22",
+                label="Validation"
+            )
+
+        ax.set_title("Precision‑Recall Curve – Test vs Validation")
+        ax.grid(True, linestyle=":", alpha=0.3)
+        ax.legend()
+
+
+    def _plot_return_vs_rank(self, ax, n_buckets: int = 25):
+        """
+        Bucket 1 = top-score wallets (left), bucket n = lowest (right).
+        Y-axis shows mean actual return in each bucket (validation set).
+        """
+        # need validation preds + raw returns
+        if self.y_validation_pred_proba is None or self.validation_wallet_features_df is None:
+            ax.text(0.5, 0.5, "Validation data not available",
+                    ha="center", va="center")
+            return
+
+        target_var = self.modeling_config["target_variable"]
+        returns = self.validation_wallet_features_df[target_var].reindex(
+            self.y_validation_pred_proba.index
+        )
+
+        df = pd.DataFrame({"proba": self.y_validation_pred_proba, "ret": returns}).dropna()
+
+        # Equal-count buckets on probabilities
+        try:
+            df["bucket_raw"] = pd.qcut(df["proba"], n_buckets, labels=False, duplicates="drop")
+        except ValueError:                     # very few unique probs → fall back
+            n_unique = df["proba"].nunique()
+            nb = max(2, min(n_buckets, n_unique))
+            df["bucket_raw"] = pd.qcut(df["proba"], nb, labels=False, duplicates="drop")
+            n_buckets = nb
+
+        # Re-index so bucket 1 = highest scores
+        df["bucket"] = n_buckets - df["bucket_raw"]
+
+        bucket_mean = (
+            df.groupby("bucket")["ret"]
+            .mean()
+            .reindex(range(1, n_buckets + 1))   # ensure missing buckets appear as NaN
+        )
+        overall_mean = df["ret"].mean()
+
+        ax.bar(bucket_mean.index, bucket_mean.values, color="#145a8d")
+        ax.axhline(overall_mean, linestyle="--", color="#afc6ba", linewidth=1, label="Overall mean")
+
+        ax.set_xlabel("Probability-rank bucket (1 = top scores)")
+        ax.set_ylabel(f"Mean {target_var} during validation")
+        ax.set_title("Return vs Rank – Validation")
+        ax.grid(True, linestyle=":", alpha=0.3)
+        ax.legend()

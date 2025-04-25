@@ -1,3 +1,32 @@
+# dda 696 classification evaluator
+checkpoint 1: auc.70 summary report working
+Model Performance Summary
+Target: cw_crypto_net_gain/max_investment/winsorized
+ID: 857fd0c4-2bfd-4817-a1f1-543757ec693f
+===================================
+Test Samples:             181,792
+Number of Features:       280
+Features per Window:      70
+
+Classification Metrics
+-----------------------------------
+Accuracy:                 0.986
+Precision:                0.845
+Recall:                   0.432
+F1 Score:                 0.572
+ROC AUC:                  0.979
+Log Loss:                 0.041
+
+Validation Set Metrics
+-----------------------------------
+Val Accuracy:             0.934
+Val Precision:            0.000
+Val Recall:               0.000
+Val F1 Score:             0.000
+Val ROC AUC:              0.698
+
+
+
 # dda 472 classification model
 checkpoint 2: auc.69 viable predictions?
 Model Performance Summary
