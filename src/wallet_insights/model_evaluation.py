@@ -29,7 +29,7 @@ from dreams_core import core as dc
 logger = logging.getLogger(__name__)
 
 
-class RegressionEvaluator:
+class RegressorEvaluator:
     """
     A utility class for evaluating and visualizing regression model performance.
 
@@ -631,9 +631,9 @@ class RegressionEvaluator:
 
 
 
-class ClassifierEvaluator(RegressionEvaluator):
+class ClassifierEvaluator(RegressorEvaluator):
     """
-    Same interface as RegressionEvaluator but for classification models.
+    Same interface as RegressorEvaluator but for classification models.
     Expects keys:
     """
 
