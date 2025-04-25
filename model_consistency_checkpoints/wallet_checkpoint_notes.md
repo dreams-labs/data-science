@@ -1,4 +1,27 @@
 # dda 472 classification model
+checkpoint 2: auc.69 viable predictions?
+Model Performance Summary
+Target: cw_crypto_net_gain/max_investment/winsorized
+ID: ed358ac1-78e2-4dfd-a338-132f844623aa
+===================================
+Test Samples:             181,792
+Number of Features:       280
+Features per Window:      70
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.334
+RMSE:                     0.118
+MAE:                      0.014
+
+Validation Set Metrics
+-----------------------------------
+R² Score:                 -0.070
+RMSE:                     0.256
+MAE:                      0.066
+
+
+
 checkpoint 1: w.653 basic classification model working
 Model Performance Summary
 Target: crypto_net_gain/max_investment/winsorized

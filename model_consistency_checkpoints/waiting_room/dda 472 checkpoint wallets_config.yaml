@@ -18,7 +18,7 @@ training_data:
         '2024-04-01',
         # '2024-05-01',
         # '2024-06-01',
-        # '2024-07-01',
+        '2024-07-01',
         # '2024-08-01',
         '2024-09-01',
         # '2024-10-01',
@@ -151,12 +151,13 @@ modeling:
 
     #KeyParam Target Variable
     # target_variable: crypto_net_gain
-    target_variable: cw_crypto_net_gain/max_investment/winsorized
+    target_variable: crypto_net_gain/max_investment/winsorized
     target_var_class_threshold: 0.5  # a classification model will try to predict the target var above this value
 
+
     #KeyParam Modeling Cohort Definition
-    modeling_min_investment: 300
-    modeling_min_coins_traded: 1
+    modeling_min_investment: 100
+    modeling_min_coins_traded: 0
 
     # Epoch Assignment Toggle
     assign_epochs_to_addresses: True  # whether a given wallet has data for 1 or multiple epochs included in training data
