@@ -129,6 +129,7 @@ class WalletModel(BaseModel):
         # Prepare result dictionary
         result = {
             'modeling_config': self.modeling_config,
+            'model_type': self.modeling_config['model_type'],
             'model_id': self.model_id,
             'pipeline': self.pipeline,
         }
