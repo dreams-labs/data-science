@@ -98,7 +98,7 @@ def generate_and_save_coin_model_artifacts(
     - object: model evaluator
     - DataFrame: score results
     """
-    evaluator = wime.RegressionEvaluator(
+    evaluator = wime.RegressorEvaluator(
         y_train=model_results['y_train'],
         y_test=model_results['y_test'],
         y_pred=model_results['y_pred'],

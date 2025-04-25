@@ -29,7 +29,7 @@ def generate_and_save_wallet_model_artifacts(
 ) -> Tuple[str, object, pd.DataFrame]:
     """
     Wrapper function to generate evaluations, metrics, and save all model artifacts.
-    Uses WalletRegressionEvaluator for model evaluation.
+    Uses WalletRegressorEvaluator for model evaluation.
 
     Parameters:
     - model_results (dict): Output from WalletModel.run_experiment containing:
@@ -48,11 +48,13 @@ def generate_and_save_wallet_model_artifacts(
         - evaluation: Model evaluation metrics
         - wallet_scores: DataFrame of wallet-level predictions
     """
-    # 1. Generate model evaluation metrics using WalletRegressionEvaluator
+    # 1. Generate model evaluation metrics using WalletRegressorEvaluator
     if model_results['model_type'] == 'regression':
-        evaluator = wime.RegressionEvaluator(model_results)
+        evaluator = wime.RegressorEvaluator(model_results)
     elif model_results['model_type'] == 'classification':
         evaluator = wime.ClassifierEvaluator(model_results)
+    else:
+        raise ValueError(f"Invalid model type {model_results['model_type']} found in results.")
 
     # Create evaluation dictionary with the same structure as before
     evaluation = {
