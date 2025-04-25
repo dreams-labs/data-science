@@ -140,10 +140,13 @@ class BaseModel:
         """
         model_params = self.modeling_config['model_params'].copy()
 
+        # Select model type and eval method
         if self.modeling_config['model_type']=='classification':
             model = XGBClassifier
+            model_params.setdefault('eval_metric', 'logloss')
         elif self.modeling_config['model_type']=='regression':
             model = XGBRegressor
+            model_params.setdefault('eval_metric', 'rmse')
         else:
             raise ValueError(f"Invalid model type '{self.modeling_config['model_type']}' found in config. "
                              "Model type must be 'regression' or 'classification")
@@ -274,6 +277,21 @@ class BaseModel:
 
         # Convert to Series with same index as test data
         self.y_pred = pd.Series(raw_predictions, index=self.X_test.index)
+
+        # Predict probabilities
+        if self.modeling_config['model_type'] == 'classification':
+            raw_probs = self.pipeline.predict_proba(self.X_test)
+
+            # pick the “positive” class index (typically 1)
+            pos_idx = list(self.pipeline.named_steps['regressor'].classes_).index(1)
+
+            # build a Series of just the positive‐class probability
+            self.y_pred = pd.Series(
+                raw_probs[:, pos_idx],
+                index=self.X_test.index,
+                name='probability_of_1'
+            )
+
         return self.y_pred
 
 
@@ -283,7 +301,7 @@ class BaseModel:
     #         Grid Search Methods
     # -----------------------------------
 
-    def _run_grid_search(self, X: pd.DataFrame, y: pd.Series, pipeline=None) -> Dict[str, float]:
+    def _run_grid_search(self, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
         """
         Perform grid search with cross validation using configured parameters.
 
@@ -315,11 +333,8 @@ class BaseModel:
             raise ValueError("Grid search requires at least 2 different configurations. "
                              "Current param_grid generates only 1.")
 
-        # Use provided pipeline or create default pipeline
-        if pipeline is None:
-            cv_pipeline = self._get_model_pipeline(gs_config['base_model_params'])
-        else:
-            cv_pipeline = pipeline
+        # Create pipeline
+        cv_pipeline = self._get_model_pipeline(gs_config['base_model_params'])
 
         # Store the search object in the instance
         self.random_search = RandomizedSearchCV(

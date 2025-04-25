@@ -1,3 +1,50 @@
+# dda 472 classification model
+checkpoint 2: auc.69 viable predictions?
+Model Performance Summary
+Target: cw_crypto_net_gain/max_investment/winsorized
+ID: ed358ac1-78e2-4dfd-a338-132f844623aa
+===================================
+Test Samples:             181,792
+Number of Features:       280
+Features per Window:      70
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.334
+RMSE:                     0.118
+MAE:                      0.014
+
+Validation Set Metrics
+-----------------------------------
+R² Score:                 -0.070
+RMSE:                     0.256
+MAE:                      0.066
+
+
+
+checkpoint 1: w.653 basic classification model working
+Model Performance Summary
+Target: crypto_net_gain/max_investment/winsorized
+ID: 787ab9b0-7609-458e-b817-2ed09a288d78
+===================================
+Test Samples:             57,544
+Number of Features:       140
+Features per Window:      35
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.653
+RMSE:                     0.167
+MAE:                      0.068
+
+Inactive Wallets Cohort Metrics
+-----------------------------------
+R² Score:                 0.292
+RMSE:                     0.227
+MAE:                      0.155
+
+
+
 # dda 694 epoch assignments
 checkpoint 1: w.659 assignment logic completed
 Model Performance Summary

@@ -162,7 +162,7 @@ class MultiEpochOrchestrator:
         # Confirm indices match
         u.assert_matching_indices(wallet_training_data_df, modeling_wallet_features_df)
 
-        logger.info("Generated multi-epoch DataFrames with shapes %s and %s",
+        logger.milestone("Generated multi-epoch DataFrames with shapes %s and %s",
                     wallet_training_data_df.shape, modeling_wallet_features_df.shape)
         u.notify('level_up')
 

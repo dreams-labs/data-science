@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.pipeline import Pipeline
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.model_selection import RandomizedSearchCV
-from sklearn.metrics import root_mean_squared_error, r2_score
+from sklearn.metrics import root_mean_squared_error, r2_score, roc_auc_score
 
 # Local modules
 from base_modeling.base_model import BaseModel
@@ -137,8 +137,16 @@ class WalletModel(BaseModel):
         if self.X_validation is not None:
             result['X_validation'] = self.X_validation
             result['validation_wallet_features_df'] = self.validation_wallet_features_df
-            result['y_validation_pred'] = meta_pipeline.predict(self.X_validation)
             result['y_validation'] = self.y_pipeline.transform(self.validation_wallet_features_df)
+
+        if self.modeling_config['model_type'] == 'regression':
+            result['y_validation_pred'] = meta_pipeline.predict(self.X_validation)
+        else:
+            # probability for positive class (1) on validation set
+            X_val_trans = meta_pipeline.x_transformer_.transform(self.X_validation)
+            probas = meta_pipeline.regressor.predict_proba(X_val_trans)
+            pos_idx = list(meta_pipeline.regressor.classes_).index(1)
+            result['y_validation_pred'] = pd.Series(probas[:, pos_idx], index=self.X_validation.index)
 
         # Add train/test data if requested
         if return_data:
@@ -283,9 +291,13 @@ class WalletModel(BaseModel):
             'target_selector__target_variable',
             self.modeling_config['target_variable']
         )
+        target_var_class_threshold = (self.modeling_config.get('model_params', {}).get(
+            'target_selector__target_var_class_threshold',
+            self.modeling_config.get('target_var_class_threshold', None)
+        ))
 
         y_pipeline = Pipeline([
-            ('target_selector', TargetVarSelector(target_variable=target_var))
+            ('target_selector', TargetVarSelector(target_var, target_var_class_threshold))
         ])
 
         return y_pipeline
@@ -416,8 +428,13 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
     This centralizes the target extraction logic so that grid search can update the target
     variable parameter without interference from pre-extraction.
     """
-    def __init__(self, target_variable: str):
+    def __init__(
+            self,
+            target_variable: str,
+            target_var_class_threshold: float
+        ):
         self.target_variable = target_variable
+        self.target_var_class_threshold = target_var_class_threshold
 
     def fit(self, y, X=None):
         """
@@ -432,17 +449,17 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
 
     def transform(self, y, X=None):
         """
-        If y is a DataFrame, extract the target column specified by target_variable.
-        Return a 1D Series even if the extraction yields a single-column DataFrame.
-        If y is already a Series, return it unchanged.
+        Extract the target column specified by target_variable and return a 1D Series.
+        If the model is classification,
         """
-        if isinstance(y, pd.DataFrame):
-            result = y[self.target_variable]
-            # Ensure result is a Series (squeeze if it is still a DataFrame)
-            if isinstance(result, pd.DataFrame):
-                result = result.squeeze()
-            return result
-        return y
+        # Extract target variable
+        result = y[self.target_variable]
+
+        # Convert to boolean if a threhsold is provided
+        if self.target_var_class_threshold is not None:
+            result = (result >= self.target_var_class_threshold).astype(int)
+
+        return result
 
 
 class MetaPipeline(BaseEstimator, TransformerMixin):
@@ -587,5 +604,35 @@ def validation_r2_scorer(wallet_model):
 
         # Calculate and return R2 score
         return r2_score(y_trans, y_pred)
+
+    return scorer
+
+
+def validation_auc_scorer(wallet_model):
+    """
+    Factory function that returns a custom scorer using validation data and ROC AUC.
+
+    Params:
+    - wallet_model: WalletModel instance containing validation data
+
+    Returns:
+    - scorer function compatible with scikit-learn that computes ROC AUC.
+    """
+    def scorer(estimator, X=None, y=None):
+        if wallet_model.X_validation is None or wallet_model.validation_wallet_features_df is None:
+            raise ValueError("Validation data not set in wallet_model")
+
+        # Transform true labels using the y_pipeline
+        y_true = estimator.y_pipeline.transform(wallet_model.validation_wallet_features_df)
+
+        # Transform validation features for probability prediction
+        X_val_trans = estimator.x_transformer_.transform(wallet_model.X_validation)
+
+        # Predict class probabilities and select the positive class index
+        probas = estimator.regressor.predict_proba(X_val_trans)
+        pos_idx = list(estimator.regressor.classes_).index(1)
+
+        # Compute and return ROC AUC
+        return roc_auc_score(y_true, probas[:, pos_idx])
 
     return scorer
