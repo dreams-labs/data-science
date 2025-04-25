@@ -325,14 +325,12 @@ class WalletModel(BaseModel):
         }
 
         # Add target variable options into the grid search.
-        if 'target_selector__target_variable' in (
-            self.modeling_config.get('grid_search_params', {}).get('param_grid_y') or {}
-        ):
-            target_variables = self.modeling_config['grid_search_params']['param_grid_y']['target_selector__target_variable']  # pylint:disable=line-too-long
+        param_grid_y = self.modeling_config.get('grid_search_params', {}).get('param_grid_y') or {}
+        if 'target_selector__target_variable' in param_grid_y:
+            target_variables = param_grid_y['target_selector__target_variable']
             gs_config['param_grid']['y_pipeline__target_selector__target_variable'] = target_variables
 
         # Add target variable classification threshold options
-        param_grid_y = self.modeling_config.get('grid_search_params', {}).get('param_grid_y', {})
         if 'target_selector__target_var_class_threshold' in param_grid_y:
             thresholds = param_grid_y['target_selector__target_var_class_threshold']
             gs_config['param_grid']['y_pipeline__target_selector__target_var_class_threshold'] = thresholds
