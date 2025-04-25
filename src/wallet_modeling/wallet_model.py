@@ -139,14 +139,13 @@ class WalletModel(BaseModel):
             result['validation_wallet_features_df'] = self.validation_wallet_features_df
             result['y_validation'] = self.y_pipeline.transform(self.validation_wallet_features_df)
 
-        if self.modeling_config['model_type'] == 'regression':
-            result['y_validation_pred'] = meta_pipeline.predict(self.X_validation)
-        else:
+        result['y_validation_pred'] = meta_pipeline.predict(self.X_validation)
+        if self.modeling_config['model_type'] == 'classification':
             # probability for positive class (1) on validation set
             X_val_trans = meta_pipeline.x_transformer_.transform(self.X_validation)
             probas = meta_pipeline.regressor.predict_proba(X_val_trans)
             pos_idx = list(meta_pipeline.regressor.classes_).index(1)
-            result['y_validation_pred'] = pd.Series(probas[:, pos_idx], index=self.X_validation.index)
+            result['y_validation_pred_proba'] = pd.Series(probas[:, pos_idx], index=self.X_validation.index)
 
         # Add train/test data if requested
         if return_data:
@@ -160,6 +159,14 @@ class WalletModel(BaseModel):
                 'y_test': self.y_test,
                 'y_pred': self.y_pred
             })
+
+            # Include prediction probabilities for classification models
+            if self.modeling_config['model_type'] == 'classification':
+                # Transform test features for probability prediction
+                X_test_trans = self.pipeline.x_transformer_.transform(self.X_test)
+                probas = self.pipeline.regressor.predict_proba(X_test_trans)
+                pos_idx = list(self.pipeline.regressor.classes_).index(1)
+                result['y_pred_proba'] = pd.Series(probas[:, pos_idx], index=self.X_test.index)
 
             # Optionally add predictions for full training cohort
             training_cohort_pred = self._predict_training_cohort()
@@ -291,10 +298,12 @@ class WalletModel(BaseModel):
             'target_selector__target_variable',
             self.modeling_config['target_variable']
         )
-        target_var_class_threshold = (self.modeling_config.get('model_params', {}).get(
-            'target_selector__target_var_class_threshold',
-            self.modeling_config.get('target_var_class_threshold', None)
-        ))
+        target_var_class_threshold = None
+        if self.modeling_config['model_type'] == 'classification':
+            target_var_class_threshold = (self.modeling_config.get('model_params', {}).get(
+                'target_selector__target_var_class_threshold',
+                self.modeling_config['target_var_class_threshold']
+            ))
 
         y_pipeline = Pipeline([
             ('target_selector', TargetVarSelector(target_var, target_var_class_threshold))
