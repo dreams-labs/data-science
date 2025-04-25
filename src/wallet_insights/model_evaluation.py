@@ -675,6 +675,20 @@ class ClassifierEvaluator(RegressorEvaluator):
             self.metrics['val_f1'] = f1_score(self.y_validation, val_pred, zero_division=0)
             self.metrics['val_roc_auc'] = roc_auc_score(self.y_validation, self.y_validation_pred_proba)
 
+        # Validation return-based metrics
+        if getattr(self, 'y_validation_pred_proba', None) is not None and hasattr(self, 'validation_wallet_features_df'):
+            target = self.modeling_config['target_variable']
+            returns = self.validation_wallet_features_df[target].reindex(self.y_validation_pred_proba.index)
+            df_val = pd.DataFrame({
+                'proba': self.y_validation_pred_proba,
+                'ret': returns
+            }).dropna()
+            pct1 = np.percentile(df_val['proba'], 99)
+            pct5 = np.percentile(df_val['proba'], 95)
+            self.metrics['val_return_top1'] = df_val.loc[df_val['proba'] >= pct1, 'ret'].mean()
+            self.metrics['val_return_top5'] = df_val.loc[df_val['proba'] >= pct5, 'ret'].mean()
+            self.metrics['val_return_overall'] = df_val['ret'].mean()
+
         # Feature importance if available
         if self.model is not None and hasattr(self.model, 'feature_importances_'):
             self._calculate_feature_importance()
@@ -700,16 +714,15 @@ class ClassifierEvaluator(RegressorEvaluator):
             ""
         ])
 
-        # Validation classification metrics if available
-        if "val_accuracy" in self.metrics:
+        # Validation return metrics
+        if 'val_return_top1' in self.metrics:
             summary.extend([
-                "Validation Set Metrics",
+                "Validation Return Metrics",
                 "-" * 35,
                 f"Val ROC AUC:              {self.metrics['val_roc_auc']:.3f}",
-                f"Val Accuracy:             {self.metrics['val_accuracy']:.3f}",
-                f"Val Precision:            {self.metrics['val_precision']:.3f}",
-                f"Val Recall:               {self.metrics['val_recall']:.3f}",
-                f"Val F1 Score:             {self.metrics['val_f1']:.3f}",
+                f"Top 1% Avg Return:        {self.metrics['val_return_top1']:.3f}",
+                f"Top 5% Avg Return:        {self.metrics['val_return_top5']:.3f}",
+                f"Overall Avg Return:       {self.metrics['val_return_overall']:.3f}",
                 ""
             ])
 

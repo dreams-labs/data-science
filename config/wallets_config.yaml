@@ -393,7 +393,7 @@ modeling:
 
         #KeyParam Grid Search Toggle
         # -------------------------------
-        enabled: True
+        # enabled: True
         # -------------------------------
 
         # Search Methodology

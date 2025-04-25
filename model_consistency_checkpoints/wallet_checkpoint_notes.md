@@ -1,3 +1,22 @@
+# dda 703 financial metrics in summary
+checkpoint 1: aucprod.868 concurrent
+Classification Metrics
+-----------------------------------
+ROC AUC:                  0.985
+Log Loss:                 0.027
+Accuracy:                 0.991
+Precision:                0.822
+Recall:                   0.415
+F1 Score:                 0.552
+
+Validation Return Metrics
+-----------------------------------
+Val ROC AUC:              0.868
+Top 1% Avg Return:        0.411
+Top 5% Avg Return:        0.381
+Overall Avg Return:       -0.024
+
+
 # dda 685 training and val set concurrently
 checkpoint 2: aucprod.640 concurrent
 Model Performance Summary
