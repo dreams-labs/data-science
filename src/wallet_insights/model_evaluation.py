@@ -11,6 +11,12 @@ from sklearn.metrics import (
     mean_absolute_error,
     r2_score,
     explained_variance_score,
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    roc_auc_score,
+    log_loss
 )
 from dreams_core import core as dc
 
@@ -179,36 +185,42 @@ class RegressionEvaluator:
         )
 
 
-
-    def summary_report(self):
-        """Generate formatted summary of model performance."""
-        summary = [
+    def _get_summary_header(self) -> list[str]:
+        """
+        Build header lines including title, target, ID, samples and feature counts.
+        """
+        header = [
             "Model Performance Summary",
             f"Target: {self.modeling_config['target_variable']}",
             f"ID: {self.model_id}",
             "=" * 35,
         ]
-
-        # Add sample sizes and feature count
+        # feature counts
         n_features = len(self.feature_names) if self.feature_names is not None else 0
-        n_all_windows = sum(1 for feature in self.feature_names if '|all_windows' in feature)
-
-        if hasattr(self.metrics, 'total_cohort_samples'):
-            summary.extend([
+        n_all_windows = sum(1 for f in self.feature_names if "|all_windows" in f)
+        if "total_cohort_samples" in self.metrics:
+            header.extend([
                 f"Training Cohort:          {self.metrics['total_cohort_samples']:,d}",
                 f"Modeling Cohort Train:    {self.metrics['train_samples']:,d}",
                 f"Modeling Cohort Test:     {self.metrics['test_samples']:,d}",
                 ""
             ])
         else:
-            summary.extend([
+            header.extend([
                 f"Test Samples:             {self.metrics['test_samples']:,d}",
                 f"Number of Features:       {n_features:,d}",
                 f"Features per Window:      {n_all_windows:,d}",
                 ""
             ])
+        return header
 
-        # Add core metrics
+
+    def summary_report(self):
+        """Generate formatted summary of model performance."""
+        # now just grab the header + samples
+        summary = self._get_summary_header()
+
+        # Add core regression metrics
         summary.extend([
             "Core Metrics",
             "-" * 35,
@@ -218,9 +230,9 @@ class RegressionEvaluator:
             ""
         ])
 
-        # Add validation metrics if we computed them
-        if 'validation_metrics' in self.metrics:
-            vm = self.metrics['validation_metrics']
+        # Validation metrics
+        if "validation_metrics" in self.metrics:
+            vm = self.metrics["validation_metrics"]
             summary.extend([
                 "Validation Set Metrics",
                 "-" * 35,
@@ -230,27 +242,27 @@ class RegressionEvaluator:
                 ""
             ])
 
-        # Add training cohort metrics if available
-        if 'training_cohort' in self.metrics:
+        # Training-cohort metrics
+        if "training_cohort" in self.metrics:
+            tc = self.metrics["training_cohort"]
             summary.extend([
                 "Inactive Wallets Cohort Metrics",
                 "-" * 35,
-                f"R² Score:                 {self.metrics['training_cohort']['r2']:.3f}",
-                f"RMSE:                     {self.metrics['training_cohort']['rmse']:.3f}",
-                f"MAE:                      {self.metrics['training_cohort']['mae']:.3f}",
+                f"R² Score:                 {tc['r2']:.3f}",
+                f"RMSE:                     {tc['rmse']:.3f}",
+                f"MAE:                      {tc['mae']:.3f}",
                 ""
             ])
 
-        # Add residuals analysis
+        # Residuals
         summary.extend([
             "Residuals Analysis",
             "-" * 35,
             f"Mean of Residuals:        {self.metrics['residuals_mean']:.3f}",
-            f"Standard Dev of Residuals:{self.metrics['residuals_std']:.3f}",
+            f"Std of Residuals:         {self.metrics['residuals_std']:.3f}",
             f"95% Prediction Interval:  ±{self.metrics['prediction_interval_95']:.3f}"
         ])
 
-        # Log the message
         report = "\n".join(summary)
         logger.info("\n%s", report)
 
@@ -611,3 +623,43 @@ class RegressionEvaluator:
         for col in ['Pop. Pct','Mean Error','ME vs Overall','RMSE','RMSE vs Overall']:
             out[col] = pd.to_numeric(out[col])
         return out
+
+
+class ClassifierEvaluator(RegressionEvaluator):
+    """
+    Same interface as RegressionEvaluator but for classification models.
+    Expects keys:
+    """
+
+
+    def __init__(self, wallet_model_results: dict):
+
+        # Extract probability predictions
+        self.y_pred_proba = wallet_model_results['y_pred_proba']
+        self.y_validation_pred_proba = wallet_model_results.get('y_validation_pred_proba')
+
+        # super() creates metrics and
+        super().__init__(wallet_model_results)
+
+    def _calculate_metrics(self):
+        """
+        Calculate core classification metrics for test and validation sets.
+        """
+
+        # Test set metrics
+        self.metrics['accuracy'] = accuracy_score(self.y_test, self.y_pred)
+        self.metrics['precision'] = precision_score(self.y_test, self.y_pred, zero_division=0)
+        self.metrics['recall'] = recall_score(self.y_test, self.y_pred, zero_division=0)
+        self.metrics['f1'] = f1_score(self.y_test, self.y_pred, zero_division=0)
+        self.metrics['roc_auc'] = roc_auc_score(self.y_test, self.y_pred_proba)
+        self.metrics['log_loss'] = log_loss(self.y_test, self.y_pred_proba)
+
+        # Validation set metrics if available
+        if getattr(self, 'y_validation', None) is not None and hasattr(self, 'y_validation_pred_proba'):
+            threshold = self.modeling_config.get('target_var_class_threshold', 0.5)
+            val_pred = (self.y_validation_pred_proba >= threshold).astype(int)
+            self.metrics['val_accuracy'] = accuracy_score(self.y_validation, val_pred)
+            self.metrics['val_precision'] = precision_score(self.y_validation, val_pred, zero_division=0)
+            self.metrics['val_recall'] = recall_score(self.y_validation, val_pred, zero_division=0)
+            self.metrics['val_f1'] = f1_score(self.y_validation, val_pred, zero_division=0)
+            self.metrics['val_roc_auc'] = roc_auc_score(self.y_validation, self.y_validation_pred_proba)
