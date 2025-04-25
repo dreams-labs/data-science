@@ -49,7 +49,10 @@ def generate_and_save_wallet_model_artifacts(
         - wallet_scores: DataFrame of wallet-level predictions
     """
     # 1. Generate model evaluation metrics using WalletRegressionEvaluator
-    evaluator = wime.RegressionEvaluator(model_results)
+    if model_results['model_type'] == 'regression':
+        evaluator = wime.RegressionEvaluator(model_results)
+    elif model_results['model_type'] == 'classification':
+        evaluator = wime.ClassifierEvaluator(model_results)
 
     # Create evaluation dictionary with the same structure as before
     evaluation = {
@@ -149,13 +152,26 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path,save
     model_id = model_results['model_id']
     model_time = datetime.now()
     filename_timestamp = model_time.strftime('%Y%m%d_%Hh%Mm%Ss')
-    model_r2 = evaluation_dict['r2']
-    validation_r2 = evaluation_dict.get('validation_metrics', {}).get('r2', np.nan)
-    model_report_filename = (
-        f"model_report_{filename_timestamp}__"
-        f"mr{model_r2:.3f}__"
-        f"{f'vr{validation_r2:.3f}' if not np.isnan(validation_r2) else 'vr___'}.json"
-    )
+
+    if model_results['model_type'] == 'regression':
+        model_r2 = evaluation_dict['r2']
+        validation_r2 = evaluation_dict.get('validation_metrics', {}).get('r2', np.nan)
+        model_report_filename = (
+            f"model_report_{filename_timestamp}__"
+            f"mr{model_r2:.3f}__"
+            f"{f'vr{validation_r2:.3f}' if not np.isnan(validation_r2) else 'vr___'}.json"
+        )
+    elif model_results['model_type'] == 'classification':
+        model_auc = evaluation_dict['roc_auc']
+        validation_auc = evaluation_dict.get('val_roc_auc', np.nan)
+        model_report_filename = (
+            f"model_report_{filename_timestamp}__"
+            f"mauc{model_auc:.3f}__"
+            f"{f'vauc{validation_auc:.3f}' if not np.isnan(validation_auc) else 'vauc___'}.json"
+        )
+    else:
+        raise ValueError(f"Invalid model type {model_results['model_type']} found in results object.")
+
 
     # 2. Save model pipeline
     pipeline_path = base_dir / 'wallet_models' / f"wallet_model_{model_id}.pkl"
