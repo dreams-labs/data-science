@@ -25,8 +25,7 @@ training_data:
     ]
     modeling_period_start: '2024-10-01'
     modeling_period_end: '2024-10-31'
-    validation_period_end: '2025-03-20'
-    # validation_period_end: '2024-10-20'
+    validation_period_end: '2025-03-20'  # toggle to activate/deactivate validation data
 
     # Whether to use hybrid coin-wallet ids
     hybridize_wallet_ids: True  # if true, training data will be keyed on wallet-coin pairs
@@ -344,8 +343,8 @@ modeling:
         # Core Tree Params (Always Active)
         # -------------------------------
         #KeyParam Tree Depth
-        max_depth: 15  # how deep the trees can go
-        min_child_weight: 25  # what % of rows each tree must have
+        max_depth: 7  # how deep the trees can go
+        min_child_weight: 40  # what % of rows each tree must have
 
         subsample: 1.0  # samples rows, e.g. trees use x% of all wallet rows
         colsample_bytree: 0.9  # samples columns, e.g. trees use x% of all column features
@@ -394,7 +393,7 @@ modeling:
 
         #KeyParam Grid Search Toggle
         # -------------------------------
-        enabled: True
+        # enabled: True
         # -------------------------------
 
         # Search Methodology

@@ -108,6 +108,7 @@ class MultiEpochOrchestrator:
 
         # Save them to parquet for future reuse
         parquet_folder = self.base_config['training_data']['parquet_folder']
+        os.makedirs(parquet_folder, exist_ok=True)
         self.complete_profits_df.to_parquet(f"{parquet_folder}/complete_profits_df.parquet")
         self.complete_market_data_df.to_parquet(f"{parquet_folder}/complete_market_data_df.parquet")
         self.complete_macro_trends_df.to_parquet(f"{parquet_folder}/complete_macro_trends_df.parquet")
@@ -128,13 +129,15 @@ class MultiEpochOrchestrator:
 
 
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
-    def generate_epochs_training_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def generate_epochs_training_data(self) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         Generates training data for all epoch configs in parallel using multithreading.
 
         Returns:
-        - merged_training_df: MultiIndexed on (wallet_address, epoch_start_date)
-        - merged_modeling_df: MultiIndexed on (wallet_address, epoch_start_date)
+        - wallet_training_data_df: MultiIndexed on (wallet_address, epoch_start_date) for modeling epochs
+        - modeling_wallet_features_df: MultiIndexed on (wallet_address, epoch_start_date) for modeling epochs
+        - validation_training_data_df: MultiIndexed on (wallet_address, epoch_start_date) for validation epochs
+        - validation_wallet_features_df: MultiIndexed on (wallet_address, epoch_start_date) for validation epochs
         """
         # Ensure the complete dfs encompass the full range of training_epoch_starts
         self._assert_complete_coverage()
@@ -142,8 +145,10 @@ class MultiEpochOrchestrator:
         logger.milestone(f"Compiling training data for {len(self.all_epochs_configs)} epochs...")
         u.notify('intro_3')
 
-        training_epoch_dfs = {}
-        modeling_epoch_dfs = {}
+        training_modeling_dfs = {}
+        modeling_modeling_dfs = {}
+        training_validation_dfs = {}
+        modeling_validation_dfs = {}
 
         # Set a suitable number of threads. You could retrieve this from config; here we use 8 as an example.
         max_workers = self.base_config['n_threads']['concurrent_epochs']
@@ -151,23 +156,38 @@ class MultiEpochOrchestrator:
             # Submit each epoch processing task to the executor
             futures = {executor.submit(self._process_single_epoch, cfg): cfg for cfg in self.all_epochs_configs}
             for future in as_completed(futures):
-                epoch_date, epoch_training_data_df, epoch_modeling_data_df = future.result()
-                training_epoch_dfs[epoch_date] = epoch_training_data_df
-                modeling_epoch_dfs[epoch_date] = epoch_modeling_data_df
+                cfg = futures[future]
+                epoch_date, epoch_training_df, epoch_modeling_df = future.result()
+                if cfg.get('epoch_type') == 'validation':
+                    training_validation_dfs[epoch_date] = epoch_training_df
+                    modeling_validation_dfs[epoch_date] = epoch_modeling_df
+                else:
+                    training_modeling_dfs[epoch_date] = epoch_training_df
+                    modeling_modeling_dfs[epoch_date] = epoch_modeling_df
 
         # Merge the epoch DataFrames into a single DataFrame for training and modeling respectively
-        wallet_training_data_df = self._merge_epoch_dfs(training_epoch_dfs)
-        modeling_wallet_features_df = self._merge_epoch_dfs(modeling_epoch_dfs)
+        wallet_training_data_df       = self._merge_epoch_dfs(training_modeling_dfs)
+        modeling_wallet_features_df   = self._merge_epoch_dfs(modeling_modeling_dfs)
+        validation_training_data_df   = self._merge_epoch_dfs(training_validation_dfs)
+        validation_wallet_features_df = self._merge_epoch_dfs(modeling_validation_dfs)
 
         # Confirm indices match
         u.assert_matching_indices(wallet_training_data_df, modeling_wallet_features_df)
 
-        logger.milestone("Generated multi-epoch DataFrames with shapes %s and %s",
-                    wallet_training_data_df.shape, modeling_wallet_features_df.shape)
+        logger.milestone(
+            "Generated multi-epoch DataFrames with shapes %s (modeling train), %s (modeling model), "
+            "%s (validation train), %s (validation model)",
+            wallet_training_data_df.shape, modeling_wallet_features_df.shape,
+            validation_training_data_df.shape, validation_wallet_features_df.shape
+        )
         u.notify('level_up')
 
-        return wallet_training_data_df, modeling_wallet_features_df
-
+        return (
+            wallet_training_data_df,
+            modeling_wallet_features_df,
+            validation_training_data_df,
+            validation_wallet_features_df
+        )
 
     # -----------------------------------
     #           Helper Methods
@@ -349,7 +369,7 @@ class MultiEpochOrchestrator:
 
     def _generate_epoch_configs(self) -> List[Dict]:
         """
-        Generates config dicts for each offset epoch.
+        Generates config dicts for each offset epoch, including modeling and validation epochs.
 
         Returns:
         - List[Dict]: List of config dicts, one per epoch.
@@ -361,6 +381,7 @@ class MultiEpochOrchestrator:
         for offset_days in offsets:
             # Deep copy base config to prevent mutations
             epoch_config = copy.deepcopy(self.base_config)
+            epoch_config['epoch_type'] = 'modeling'
 
             # Offset key dates
             for date_key in [
@@ -395,6 +416,29 @@ class MultiEpochOrchestrator:
             )
 
             all_epochs_configs.append(epoch_config)
+
+        # Add validation epochs if present
+        if self.epochs_config['training_data'].get('validation_period_end') is not None:
+            validation_offsets = self.epochs_config['offset_epochs'].get('validation_offsets', [])
+            for offset_days in validation_offsets:
+                epoch_config = copy.deepcopy(self.base_config)
+                # Offset key dates
+                for date_key in ['modeling_period_start','modeling_period_end']:
+                    base_date = datetime.strptime(self.base_config['training_data'][date_key], '%Y-%m-%d')
+                    new_date = base_date + timedelta(days=offset_days)
+                    epoch_config['training_data'][date_key] = new_date.strftime('%Y-%m-%d')
+                epoch_config['training_data']['training_window_starts'] = [
+                    (datetime.strptime(dt, '%Y-%m-%d') + timedelta(days=offset_days)).strftime('%Y-%m-%d')
+                    for dt in self.base_config['training_data']['training_window_starts']
+                ]
+                folder_suffix = (datetime.strptime(epoch_config['training_data']['modeling_period_start'], '%Y-%m-%d')
+                                .strftime('%y%m%d'))
+                base_folder = Path(self.base_config['training_data']['parquet_folder'])
+                epoch_config['training_data']['parquet_folder'] = str(base_folder / folder_suffix)
+                epoch_config = wcm.add_derived_values(epoch_config)
+                epoch_config['epoch_type'] = 'validation'
+                all_epochs_configs.append(epoch_config)
+
 
         return all_epochs_configs
 
