@@ -11,12 +11,15 @@ from sklearn.metrics import (
     mean_absolute_error,
     r2_score,
     explained_variance_score,
+    precision_recall_curve,
     accuracy_score,
     precision_score,
     recall_score,
     f1_score,
     roc_auc_score,
-    log_loss
+    log_loss,
+    RocCurveDisplay,
+    PrecisionRecallDisplay
 )
 from dreams_core import core as dc
 
@@ -55,6 +58,7 @@ class RegressionEvaluator:
         self.X_validation      = wallet_model_results.get('X_validation')
         self.y_validation      = wallet_model_results.get('y_validation')
         self.y_validation_pred = wallet_model_results.get('y_validation_pred')
+        self.validation_wallet_features_df = wallet_model_results.get('validation_wallet_features_df')
 
         # model + features
         self.modeling_config = wallet_model_results['modeling_config']
@@ -749,21 +753,144 @@ class ClassifierEvaluator(RegressionEvaluator):
         ax3 = fig.add_subplot(gs[1, 0])  # Chart 3 placeholder
         ax4 = fig.add_subplot(gs[1, 1])  # Feature importance
 
-        # --- placeholder content ------------------------------------------------
-        ax1.set_title("Chart 1 – placeholder")
-        ax1.text(0.5, 0.5, "TBD", ha="center", va="center", fontsize=12)
-
-        ax2.set_title("Chart 2 – placeholder")
-        ax2.text(0.5, 0.5, "TBD", ha="center", va="center", fontsize=12)
-
-        ax3.set_title("Chart 3 – placeholder")
-        ax3.text(0.5, 0.5, "TBD", ha="center", va="center", fontsize=12)
-
-        # --- feature importance -------------------------------------------------
+        self._plot_roc_curves(ax1)
+        self._plot_pr_curves(ax2)
+        self._plot_return_vs_rank(ax3, n_buckets=100)
         self._plot_feature_importance(ax4, levels=levels)
+
 
         plt.tight_layout()
         if display:
             plt.show()
             return None
         return fig
+
+
+    # ------------------------------------------------------------------
+    #                Chart-building helpers
+    # ------------------------------------------------------------------
+    def _plot_roc_curves(self, ax):
+        """
+        ROC curves for test & validation.
+        Validation line: thick green (#22DD22)
+        Random-guess diagonal: grey dashed.
+        """
+        # --- Test ROC (thin, default blue)
+        RocCurveDisplay.from_predictions(
+            self.y_test,
+            self.y_pred_proba,
+            ax=ax,
+            name="Test",
+            linewidth=1.5,
+        )
+
+        # --- Validation ROC (thick green) ------------------------------------
+        if getattr(self, "y_validation_pred_proba", None) is not None \
+        and getattr(self, "y_validation", None) is not None:
+            RocCurveDisplay.from_predictions(
+                self.y_validation,
+                self.y_validation_pred_proba,
+                ax=ax,
+                name="Validation",
+                linewidth=2.5,
+                color="#22DD22",
+            )
+
+        # --- 45° reference line ---------------------------------------------
+        ax.plot(
+            [0, 1], [0, 1],
+            linestyle="--",
+            linewidth=1,
+            color="#afc6ba",
+            label="Random"
+        )
+
+        ax.set_title("ROC Curve – Test vs Validation")
+        ax.grid(True, linestyle=":", alpha=0.3)
+        ax.legend()
+
+
+    def _plot_pr_curves(self, ax):
+        """
+        Precision‑Recall curves for test & validation.
+
+        We manually draw the validation curve to omit the (recall=0, precision=1)
+        anchor point that creates a misleading vertical spike when only a handful
+        top‑score wallets exist.  The validation line is thick green (#22DD22).
+        """
+        # --- Test PR curve (default colour, thin line) --------------------
+        PrecisionRecallDisplay.from_predictions(
+            self.y_test,
+            self.y_pred_proba,
+            ax=ax,
+            name="Test",
+            linewidth=1.5,
+        )
+
+        # --- Validation PR curve (if available) ---------------------------
+        if getattr(self, "y_validation_pred_proba", None) is not None \
+           and getattr(self, "y_validation", None) is not None:
+            # Compute precision‑recall pairs
+            prec, rec, _ = precision_recall_curve(
+                self.y_validation,
+                self.y_validation_pred_proba,
+                pos_label=1
+            )
+            # Skip the first point (precision=1 at recall=0)
+            ax.plot(
+                rec[1:], prec[1:],
+                linewidth=2.5,
+                color="#22DD22",
+                label="Validation"
+            )
+
+        ax.set_title("Precision‑Recall Curve – Test vs Validation")
+        ax.grid(True, linestyle=":", alpha=0.3)
+        ax.legend()
+
+
+    def _plot_return_vs_rank(self, ax, n_buckets: int = 25):
+        """
+        Bucket 1 = top-score wallets (left), bucket n = lowest (right).
+        Y-axis shows mean actual return in each bucket (validation set).
+        """
+        # need validation preds + raw returns
+        if self.y_validation_pred_proba is None or self.validation_wallet_features_df is None:
+            ax.text(0.5, 0.5, "Validation data not available",
+                    ha="center", va="center")
+            return
+
+        target_var = self.modeling_config["target_variable"]
+        returns = self.validation_wallet_features_df[target_var].reindex(
+            self.y_validation_pred_proba.index
+        )
+
+        df = pd.DataFrame({"proba": self.y_validation_pred_proba, "ret": returns}).dropna()
+
+        # Equal-count buckets on probabilities
+        try:
+            df["bucket_raw"] = pd.qcut(df["proba"], n_buckets, labels=False, duplicates="drop")
+        except ValueError:                     # very few unique probs → fall back
+            n_unique = df["proba"].nunique()
+            nb = max(2, min(n_buckets, n_unique))
+            df["bucket_raw"] = pd.qcut(df["proba"], nb, labels=False, duplicates="drop")
+            n_buckets = nb
+
+        # Re-index so bucket 1 = highest scores
+        df["bucket"] = n_buckets - df["bucket_raw"]
+
+        bucket_mean = (
+            df.groupby("bucket")["ret"]
+            .mean()
+            .reindex(range(1, n_buckets + 1))   # ensure missing buckets appear as NaN
+        )
+        overall_mean = df["ret"].mean()
+
+        ax.bar(bucket_mean.index, bucket_mean.values, color="#145a8d")
+        ax.axhline(overall_mean, linestyle="--", color="#afc6ba", linewidth=1, label="Overall mean")
+
+        ax.set_xlabel("Probability-rank bucket (1 = top scores)")
+        ax.set_ylabel(f"Mean {target_var} during validation")
+        ax.set_title("Return vs Rank – Validation")
+        ax.grid(True, linestyle=":", alpha=0.3)
+        ax.legend()
