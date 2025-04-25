@@ -158,6 +158,12 @@ class MultiEpochOrchestrator:
             for future in as_completed(futures):
                 cfg = futures[future]
                 epoch_date, epoch_training_df, epoch_modeling_df = future.result()
+
+                # Downcast dtypes
+                epoch_training_df = u.df_downcast(epoch_training_df)
+                epoch_modeling_df = u.df_downcast(epoch_modeling_df)
+
+                # Store data in dicts
                 if cfg.get('epoch_type') == 'validation':
                     training_validation_dfs[epoch_date] = epoch_training_df
                     modeling_validation_dfs[epoch_date] = epoch_modeling_df
@@ -181,6 +187,14 @@ class MultiEpochOrchestrator:
             validation_training_data_df.shape, validation_wallet_features_df.shape
         )
         u.notify('level_up')
+
+        # Save files
+        parquet_folder = self.base_config['training_data']['parquet_folder']
+        wallet_training_data_df.to_parquet(f"{parquet_folder}/multiwindow_wallet_training_data_df.parquet",index=True)
+        modeling_wallet_features_df.to_parquet(f"{parquet_folder}/multiwindow_modeling_wallet_features_df.parquet",index=True)
+        validation_training_data_df.to_parquet(f"{parquet_folder}/multiwindow_validation_training_data_df.parquet",index=True)
+        validation_wallet_features_df.to_parquet(f"{parquet_folder}/multiwindow_validation_wallet_features_df.parquet",index=True)
+        logger.info("Successfully saved modeling and validation period datasets.")
 
         return (
             wallet_training_data_df,
@@ -219,6 +233,7 @@ class MultiEpochOrchestrator:
         # If using hybrid IDs, generate hybridized feature set using IDs from the original cohorts
         if self.base_config['training_data']['hybridize_wallet_ids']:
             epoch_config['training_data']['hybridize_wallet_ids'] = True
+            logger.info(f"Generating hybridized data for epoch starting {model_start}...")
 
             # Get the corresponding hybrid IDs for the nonhybridized wallet cohort
             hybridized_cohort = (self.complete_hybrid_cw_id_df
@@ -418,7 +433,7 @@ class MultiEpochOrchestrator:
             all_epochs_configs.append(epoch_config)
 
         # Add validation epochs if present
-        if self.epochs_config['training_data'].get('validation_period_end') is not None:
+        if self.base_config['training_data'].get('validation_period_end') is not None:
             validation_offsets = self.epochs_config['offset_epochs'].get('validation_offsets', [])
             for offset_days in validation_offsets:
                 epoch_config = copy.deepcopy(self.base_config)
