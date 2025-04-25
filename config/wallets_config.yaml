@@ -190,7 +190,7 @@ modeling:
             # cw_transfers|*,
             # cw_scenario|*,
             # cw_balance|*,
-            # cw_macro|*,
+            cw_macro|*,
             # cw_cluster|*,
 
 
