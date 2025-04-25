@@ -645,6 +645,10 @@ class ClassifierEvaluator(RegressionEvaluator):
         """
         Calculate core classification metrics for test and validation sets.
         """
+        # Sample size tracking
+        self.metrics['test_samples'] = len(self.y_pred)
+        if self.y_train is not None:
+            self.metrics['train_samples'] = len(self.y_train)
 
         # Test set metrics
         self.metrics['accuracy'] = accuracy_score(self.y_test, self.y_pred)
@@ -663,3 +667,40 @@ class ClassifierEvaluator(RegressionEvaluator):
             self.metrics['val_recall'] = recall_score(self.y_validation, val_pred, zero_division=0)
             self.metrics['val_f1'] = f1_score(self.y_validation, val_pred, zero_division=0)
             self.metrics['val_roc_auc'] = roc_auc_score(self.y_validation, self.y_validation_pred_proba)
+
+
+    def summary_report(self):
+        """
+        Generate formatted summary of classification model performance.
+        """
+        # Header and sample info
+        summary = self._get_summary_header()
+
+        # Classification metrics
+        summary.extend([
+            "Classification Metrics",
+            "-" * 35,
+            f"ROC AUC:                  {self.metrics['roc_auc']:.3f}",
+            f"Log Loss:                 {self.metrics['log_loss']:.3f}",
+            f"Accuracy:                 {self.metrics['accuracy']:.3f}",
+            f"Precision:                {self.metrics['precision']:.3f}",
+            f"Recall:                   {self.metrics['recall']:.3f}",
+            f"F1 Score:                 {self.metrics['f1']:.3f}",
+            ""
+        ])
+
+        # Validation classification metrics if available
+        if "val_accuracy" in self.metrics:
+            summary.extend([
+                "Validation Set Metrics",
+                "-" * 35,
+                f"Val ROC AUC:              {self.metrics['val_roc_auc']:.3f}",
+                f"Val Accuracy:             {self.metrics['val_accuracy']:.3f}",
+                f"Val Precision:            {self.metrics['val_precision']:.3f}",
+                f"Val Recall:               {self.metrics['val_recall']:.3f}",
+                f"Val F1 Score:             {self.metrics['val_f1']:.3f}",
+                ""
+            ])
+
+        report = "\n".join(summary)
+        logger.info("\n%s", report)

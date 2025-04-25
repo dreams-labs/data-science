@@ -405,8 +405,8 @@ modeling:
         # scoring: neg_root_mean_squared_error
         # scoring: custom_neg_rmse_scorer
         # scoring: custom_r2_scorer
-        # scoring: validation_r2_scorer
-        scoring: validation_auc_scorer
+        scoring: validation_r2_scorer
+        # scoring: validation_auc_scorer
 
         # Metaparameters
         # build_post_search_model: False  # whether to build a model after the grid search
