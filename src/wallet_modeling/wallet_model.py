@@ -53,6 +53,7 @@ class WalletModel(BaseModel):
     #         Primary Interface
     # -----------------------------------
 
+    @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def construct_wallet_model(
             self,
             training_data_df: pd.DataFrame,
@@ -360,7 +361,7 @@ class WalletModel(BaseModel):
 
         # Assign custom scorers if applicable
         scoring_param = gs_config['search_config'].get('scoring')
-        
+
         if scoring_param == 'custom_r2_scorer':
             gs_config['search_config']['scoring'] = custom_r2_scorer
 
