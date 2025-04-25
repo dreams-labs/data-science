@@ -1,4 +1,85 @@
 # dda 685 training and val set concurrently
+checkpoint 2: aucprod.640 concurrent
+Model Performance Summary
+Target: crypto_net_gain/max_investment/winsorized
+ID: 6e8c9d89-4920-41df-8392-e71916dbe582
+===================================
+Test Samples:             6,763
+Number of Features:       140
+Features per Window:      35
+
+Classification Metrics
+-----------------------------------
+ROC AUC:                  0.802
+Log Loss:                 0.239
+Accuracy:                 0.915
+Precision:                0.463
+Recall:                   0.065
+F1 Score:                 0.114
+
+Validation Set Metrics
+-----------------------------------
+Val ROC AUC:              0.640
+Val Accuracy:             0.916
+Val Precision:            0.000
+Val Recall:               0.000
+Val F1 Score:             0.000
+
+
+checkpoint 2: aucprod.666 baseline
+Model Performance Summary
+Target: crypto_net_gain/max_investment/winsorized
+ID: 868ac354-d820-4eaf-8fec-7da2106e5b75
+===================================
+Test Samples:             6,763
+Number of Features:       140
+Features per Window:      35
+
+Classification Metrics
+-----------------------------------
+ROC AUC:                  0.799
+Log Loss:                 0.241
+Accuracy:                 0.915
+Precision:                0.457
+Recall:                   0.056
+F1 Score:                 0.100
+
+Validation Set Metrics
+-----------------------------------
+Val ROC AUC:              0.666
+Val Accuracy:             0.916
+Val Precision:            0.000
+Val Recall:               0.000
+Val F1 Score:             0.000
+
+
+checkpoint 1: aucdev.590 baseline
+Model Performance Summary
+Target: crypto_net_gain/max_investment/winsorized
+ID: 529710d5-aa7f-44d6-b503-b1c674b3ac00
+===================================
+Test Samples:             1,368
+Number of Features:       268
+Features per Window:      67
+
+Classification Metrics
+-----------------------------------
+ROC AUC:                  0.965
+Log Loss:                 0.153
+Accuracy:                 0.941
+Precision:                0.788
+Recall:                   0.708
+F1 Score:                 0.746
+
+Validation Set Metrics
+-----------------------------------
+Val ROC AUC:              0.590
+Val Accuracy:             0.961
+Val Precision:            0.000
+Val Recall:               0.000
+Val F1 Score:             0.000
+
+
 checkpoint 1: auc.561 concurrent is working
 Model Performance Summary
 Target: crypto_net_gain/max_investment/winsorized
