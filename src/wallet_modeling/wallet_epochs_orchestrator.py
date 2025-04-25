@@ -108,6 +108,7 @@ class MultiEpochOrchestrator:
 
         # Save them to parquet for future reuse
         parquet_folder = self.base_config['training_data']['parquet_folder']
+        os.makedirs(parquet_folder, exist_ok=True)
         self.complete_profits_df.to_parquet(f"{parquet_folder}/complete_profits_df.parquet")
         self.complete_market_data_df.to_parquet(f"{parquet_folder}/complete_market_data_df.parquet")
         self.complete_macro_trends_df.to_parquet(f"{parquet_folder}/complete_macro_trends_df.parquet")
