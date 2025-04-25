@@ -7,7 +7,7 @@ import pandas as pd
 
 # Local module imports
 import wallet_insights.model_evaluation as wime
-import wallet_modeling.wallet_model_reporting as wmr
+import wallet_insights.wallet_model_reporting as wmr
 
 
 # Set up logger at the module level

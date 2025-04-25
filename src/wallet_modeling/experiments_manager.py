@@ -7,7 +7,7 @@ import pandas as pd
 # Local module imports
 import wallet_modeling.wallet_training_data_orchestrator as wtdo
 import wallet_modeling.wallet_model as wm
-import wallet_modeling.wallet_model_reporting as wmr
+import wallet_insights.wallet_model_reporting as wmr
 import wallet_features.performance_features as wpf
 
 logger = logging.getLogger(__name__)
