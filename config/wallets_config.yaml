@@ -343,8 +343,8 @@ modeling:
         # Core Tree Params (Always Active)
         # -------------------------------
         #KeyParam Tree Depth
-        max_depth: 4  # how deep the trees can go
-        min_child_weight: 25  # what % of rows each tree must have
+        max_depth: 7  # how deep the trees can go
+        min_child_weight: 40  # what % of rows each tree must have
 
         subsample: 1.0  # samples rows, e.g. trees use x% of all wallet rows
         colsample_bytree: 0.9  # samples columns, e.g. trees use x% of all column features
@@ -353,8 +353,8 @@ modeling:
         # --------------------------------------
         #KeyParam Estimator Counts
         # CHECKPOINTER
-        n_estimators: 350  # number of trees to train in the model
-        learning_rate: 0.15  # step size for updates to weights during training
+        n_estimators: 250  # number of trees to train in the model
+        learning_rate: 0.1  # step size for updates to weights during training
 
         # # PRODUCTION
         # n_estimators: 500  # number of trees to train in the model
@@ -363,10 +363,10 @@ modeling:
         early_stopping_rounds: 10  # stop training if no improvement after x rounds
         gamma: 0.005  # minimum gain required to split further on a leaf node
         tree_method: hist  # method for building trees, e.g., histogram-based
-        max_bin: 128  # how many bins to categorize features into
+        max_bin: 256  # how many bins to categorize features into
 
         # Threading Controls
-        n_jobs: 12
+        n_jobs: -1
 
         # Metaparams
         random_state: 42
@@ -416,8 +416,8 @@ modeling:
         # build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # 3 outputs model performance but not training scores
         verbose_estimators: False  # whether to print each estimator's scores
-        # n_jobs: 2
-        pre_dispatch: 1
+        n_jobs: -1
+        # pre_dispatch: -1
 
         # Params for target variable generation
         param_grid_y:
@@ -437,8 +437,8 @@ modeling:
 
             # # Depth and Child Weight
             # regressor__min_child_weight_pct: [0.00004, 0.00007, 0.0001]
-            regressor__min_child_weight: [15,20,25]
-            regressor__max_depth: [3,4,5]
+            regressor__min_child_weight: [40,60,80]
+            # regressor__max_depth: [4,5,6,7,8]
             # basic depth param
 
             # # Col/Row Sampling

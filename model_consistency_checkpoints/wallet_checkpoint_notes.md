@@ -1,30 +1,4 @@
 # dda 703 financial metrics in summary
-checkpoint 2: auc.867 financial metrics working
-Model Performance Summary
-Target: cw_crypto_net_gain/max_investment/winsorized
-ID: 7d356e75-c371-40eb-80ee-344dcf730cd9
-===================================
-Test Samples:             181,792
-Number of Features:       335
-Features per Window:      67
-
-Classification Metrics
------------------------------------
-ROC AUC:                  0.984
-Log Loss:                 0.028
-Accuracy:                 0.990
-Precision:                0.806
-Recall:                   0.407
-F1 Score:                 0.541
-
-Validation Return Metrics
------------------------------------
-Val ROC AUC:              0.867
-Top 1% Avg Return:        0.409
-Top 5% Avg Return:        0.378
-Overall Avg Return:       -0.024
-
-
 checkpoint 1: aucprod.868 concurrent
 Classification Metrics
 -----------------------------------
