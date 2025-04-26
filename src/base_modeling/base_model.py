@@ -1,3 +1,10 @@
+# Multithreading configurations for grid search
+import os
+os.environ['OMP_NUM_THREADS'] = '12'
+os.environ['XGBOOST_OMP_NUM_THREADS'] = '12'
+os.environ['MKL_NUM_THREADS'] = '12'
+
+# pylint:disable=wrong-import-position
 import time
 import logging
 import uuid
@@ -433,8 +440,9 @@ class BaseModel:
                 'cv': grid_search_params['n_splits'],
                 'scoring': scorer,
                 'verbose': grid_search_params.get('verbose_level', 0),
-                'n_jobs': base_model_params.get('n_jobs', -1),
-                'pre_dispatch': grid_search_params.get('pre_dispatch', 1),  # <-- limit pre‑dispatch
+                'n_jobs': grid_search_params.get('n_jobs',
+                              base_model_params.get('n_jobs', -1)),
+                'pre_dispatch': grid_search_params.get('pre_dispatch', 4),  # <-- limit pre‑dispatch
                 'random_state': base_model_params.get('random_state', 42),
             }
         }
