@@ -5,7 +5,6 @@ from typing import Dict,Tuple
 from pathlib import Path
 import logging
 from datetime import datetime
-import uuid
 import json
 import pandas as pd
 import numpy as np
@@ -28,19 +27,20 @@ def save_coin_model_artifacts(model_results, evaluation_dict, configs, base_path
     - str: The UUID used for this model's artifacts
     """
     def numpy_type_converter(obj):
-        """Convert numpy types to Python native types"""
+        """Convert numpy and datetime types to JSON-friendly types"""
         if isinstance(obj, np.integer):
             return int(obj)
         elif isinstance(obj, np.floating):
             return float(obj)
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
-        return obj
-
-    # Generate single UUID for all artifacts
-    model_id = str(uuid.uuid4())
+        elif isinstance(obj, datetime):  # handle datetime
+            return obj.isoformat()
+        # Surface non-serializable types explicitly
+        raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
     # Generate additional metadata for the filename
+    model_id = model_results['model_id']
     model_time = datetime.now()
     filename_timestamp = model_time.strftime('%Y%m%d_%Hh%Mm%Ss')
     model_r2 = evaluation_dict['r2']
@@ -98,13 +98,7 @@ def generate_and_save_coin_model_artifacts(
     - object: model evaluator
     - DataFrame: score results
     """
-    evaluator = wime.RegressorEvaluator(
-        y_train=model_results['y_train'],
-        y_test=model_results['y_test'],
-        y_pred=model_results['y_pred'],
-        model=model_results['pipeline'].named_steps['regressor'],
-        feature_names=model_results['pipeline'][:-1].transform(model_results['X_train']).columns.tolist()
-    )
+    evaluator = wime.RegressorEvaluator(model_results)
 
     evaluation = {
         **evaluator.metrics,

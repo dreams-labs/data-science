@@ -248,7 +248,6 @@ def flatten_cw_to_coin_features(
     # Join segmentation data using index
     analysis_df = wallet_metric_df.join(
         wallet_segmentation_df[[segment_family] + score_columns],
-        on='wallet_address',
         how='left'
     )
 

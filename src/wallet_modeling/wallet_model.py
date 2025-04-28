@@ -76,6 +76,7 @@ class WalletModel(BaseModel):
         - result (dict): Contains fitted pipeline, predictions, and optional train/test data
         """
         logger.info("Preparing training data for model construction...")
+        u.notify('click_1')
 
         # Validate indices match and store DataFrames
         u.assert_matching_indices(training_data_df, modeling_wallet_features_df)

@@ -51,8 +51,8 @@ class RegressorEvaluator:
         self.y_test  = wallet_model_results['y_test']
         self.y_pred  = wallet_model_results['y_pred']
         self.y_train = wallet_model_results['y_train']
-        self.training_cohort_pred     = wallet_model_results['training_cohort_pred']
-        self.training_cohort_actuals  = wallet_model_results['training_cohort_actuals']
+        self.training_cohort_pred     = wallet_model_results.get('training_cohort_pred')
+        self.training_cohort_actuals  = wallet_model_results.get('training_cohort_actuals')
 
         # validation (if present)
         self.X_validation      = wallet_model_results.get('X_validation')

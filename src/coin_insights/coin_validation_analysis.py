@@ -179,6 +179,7 @@ def calculate_coin_performance(market_data_df, start_date, end_date):
     end_date = pd.to_datetime(end_date)
 
     # Get all required data for start date in one operation
+    market_data_df = market_data_df.reset_index()
     start_data = market_data_df[market_data_df['date'] == start_date].set_index('coin_id')[['price']]
     end_data = market_data_df[market_data_df['date'] == end_date].set_index('coin_id')[['price']]
 
