@@ -8,16 +8,8 @@ data_cleaning:
 
     # Market data filters
     max_initial_market_cap: 999150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
-    max_gap_days: 50  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
+    max_gap_days: 30  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
     min_daily_volume: 500 # Minimum average daily volume the coin must have
-
-
-# Variables used for comnverting the wallet scores into coin forecasts
-coin_validation_analysis:
-
-    # Forecasting methods
-    top_n: 5  # how many of the top coins of a given sort method will be included in performance assessments
-    sort_method: top_wallet_balance_pct  # which coin wallet metric to use for coin forecast rankings
 
 
 # CheckpointValidation
@@ -27,17 +19,14 @@ wallet_segments:
     # Scores to include as segments + metrics
     wallet_scores_path: temp/wallet_modeling_score_dfs
     wallet_scores: [
-        net_gain_max_investment_winsorized_base
-        # net_gain_winsorized_dda619_grid,
-        # net_flows_max_investment_dda619_grid,
-        # net_gain_dda619_grid,
+        dda_698_coin_model_revival
     ]
     wallet_scores_residuals_segments: False
     wallet_scores_confidence_segments: False
 
     # score_segment_quantiles: [0.15, 0.85]  # higher is better; how to assign wallet a score segment
     score_segment_quantiles: [0.05, 0.15, 0.5, 0.85, 0.95]  # higher is better; how to assign wallet a score segment
-    training_period_cluster_groups: [4]  # which n clusters assignment from the training period to segment by
+    # training_period_cluster_groups: [4]  # which n clusters assignment from the training period to segment by
 
     # where to save local files
     parquet_folder: temp/coin_modeling_dfs
