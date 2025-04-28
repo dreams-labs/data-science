@@ -147,8 +147,8 @@ class WalletModel(BaseModel):
         if self.modeling_config['model_type'] == 'classification':
             # probability for positive class (1) on validation set
             X_val_trans = meta_pipeline.x_transformer_.transform(self.X_validation)
-            probas = meta_pipeline.regressor.predict_proba(X_val_trans)
-            pos_idx = list(meta_pipeline.regressor.classes_).index(1)
+            probas = meta_pipeline.estimator.predict_proba(X_val_trans)
+            pos_idx = list(meta_pipeline.estimator.classes_).index(1)
             result['y_validation_pred_proba'] = pd.Series(probas[:, pos_idx], index=self.X_validation.index)
 
         # Add train/test data if requested
@@ -168,8 +168,8 @@ class WalletModel(BaseModel):
             if self.modeling_config['model_type'] == 'classification':
                 # Transform test features for probability prediction
                 X_test_trans = self.pipeline.x_transformer_.transform(self.X_test)
-                probas = self.pipeline.regressor.predict_proba(X_test_trans)
-                pos_idx = list(self.pipeline.regressor.classes_).index(1)
+                probas = self.pipeline.estimator.predict_proba(X_test_trans)
+                pos_idx = list(self.pipeline.estimator.classes_).index(1)
                 result['y_pred_proba'] = pd.Series(probas[:, pos_idx], index=self.X_test.index)
 
             # Optionally add predictions for full training cohort
@@ -280,11 +280,11 @@ class WalletModel(BaseModel):
         """
         Return a single Pipeline that first applies y transformations,
         then the usual feature+regressor steps. Step names remain
-        exactly ['target_selector', 'feature_selector', 'drop_columns', 'regressor'].
+        exactly ['target_selector', 'feature_selector', 'drop_columns', 'estimator'].
         """
         # Get the steps from the y_pipeline
         y_steps = self._get_y_pipeline()
-        # Get the steps from the base pipeline (feature_selector, drop_columns, regressor)
+        # Get the steps from the base pipeline (feature_selector, drop_columns, estimator)
         model_steps = self._get_base_pipeline()
 
         # Concatenate them into one pipeline
@@ -498,7 +498,7 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
         """Initialize MetaPipeline with y_pipelin and model_pipeline."""
         self.y_pipeline = y_pipeline
         self.model_pipeline = model_pipeline
-        self.regressor = None
+        self.estimator = None
         self.x_transformer_ = None  # will store the transformer sub-pipeline for later use
 
         # Create a named_steps attribute that mimics sklearn Pipeline interface
@@ -523,7 +523,7 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
         X_trans = transformer.fit_transform(X, y_trans)
 
         # Extract the regressor from the pipeline
-        regressor_name, self.regressor = self.model_pipeline.steps[-1]
+        regressor_name, self.estimator = self.model_pipeline.steps[-1]
 
         # If evaluation set is provided, transform it and use for early stopping
         if eval_set is not None:
@@ -535,7 +535,7 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
             transformed_eval_set = [(X_trans, y_trans), (X_eval_trans, y_eval_trans)]
 
             # Fit with early stopping using the transformed eval set
-            self.regressor.fit(
+            self.estimator.fit(
                 X_trans,
                 y_trans,
                 eval_set=transformed_eval_set,
@@ -543,26 +543,26 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
             )
         else:
             # Regular fit without early stopping if no eval set provided
-            self.regressor.fit(X_trans, y_trans)
+            self.estimator.fit(X_trans, y_trans)
 
         # Store the transformer sub-pipeline for use during prediction
         self.x_transformer_ = transformer
 
         # Update named_steps with the fitted regressor
-        self.named_steps[regressor_name] = self.regressor
+        self.named_steps[regressor_name] = self.estimator
 
         return self
 
     def predict(self, X):
         """Predict using the fitted regressor on transformed X."""
         X_trans = self.x_transformer_.transform(X)
-        return self.regressor.predict(X_trans)
+        return self.estimator.predict(X_trans)
 
     def score(self, X, y):
         """Return the regressor's score on transformed X and y."""
         X_trans = self.x_transformer_.transform(X)
         y_trans = self.y_pipeline.transform(y)
-        return self.regressor.score(X_trans, y_trans)
+        return self.estimator.score(X_trans, y_trans)
 
     # Add methods to make it behave more like a sklearn Pipeline
     def __getitem__(self, key):

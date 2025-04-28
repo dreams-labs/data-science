@@ -183,7 +183,7 @@ class BaseModel:
             ('drop_columns', DropColumnPatterns(
                 drop_patterns=self.modeling_config['feature_selection']['drop_patterns']
             )),
-            ('regressor', model(**model_params))
+            ('estimator', model(**model_params))
         ])
 
         return base_pipeline
@@ -463,7 +463,7 @@ class BaseModel:
         """
         pipeline = Pipeline([
             ('drop_columns', DropColumnPatterns()),
-            ('regressor', XGBRegressor(**base_model_params))
+            ('estimator', XGBRegressor(**base_model_params))
         ])
 
         return pipeline
