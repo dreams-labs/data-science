@@ -23,7 +23,7 @@ import utils as u
 import training_data.data_retrieval as dr
 import training_data.profits_row_imputation as pri
 import coin_wallet_metrics.coin_wallet_metrics as cwm
-import modeling as m
+import insights.modeling as m
 
 # set up logger at the module level
 logger = dc.setup_logger()

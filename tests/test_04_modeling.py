@@ -24,7 +24,7 @@
 
 # # pyright: reportMissingImports=false
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
-# import modeling as m
+# import insights.modeling as m
 # from utils import load_config
 
 # load_dotenv()
