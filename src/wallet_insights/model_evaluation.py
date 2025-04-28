@@ -63,7 +63,7 @@ class RegressorEvaluator:
         # model + features
         self.modeling_config = wallet_model_results['modeling_config']
         pipeline = wallet_model_results['pipeline']
-        self.model = pipeline.named_steps['regressor']
+        self.model = pipeline.named_steps['estimator']
         self.feature_names = (
             pipeline[:-1].transform(wallet_model_results['X_train']).columns.tolist()
             if hasattr(pipeline[:-1], 'transform') else None
