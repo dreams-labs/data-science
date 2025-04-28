@@ -29,33 +29,34 @@ wallets_config = WalletsConfig()
 #      Validation Period Predictions
 # ----------------------------------------
 
-def load_and_predict(model_id: str, new_data: pd.DataFrame, base_path: str) -> pd.Series:
+def load_and_predict(
+    model_id: str,
+    training_data_df: pd.DataFrame,
+    base_path: str
+) -> pd.Series:
     """
-    Load a saved pipeline by UUID and generate predictions for new data.
-
     Params:
     - model_id (str): UUID of the saved model
-    - new_data (pd.DataFrame): New feature data for predictions
-    - base_path (str): Base path where model artifacts are stored
+    - training_data_df (DataFrame): new feature data
+    - base_path (str): path where model artifacts live
 
     Returns:
-    - pd.Series: Predictions indexed by new_data index
+    - Series: class-1 probabilities for classifiers, else raw preds
     """
     pipeline_path = Path(base_path) / 'wallet_models' / f"wallet_model_{model_id}.pkl"
-
     if not pipeline_path.exists():
-        raise FileNotFoundError(f"No pipeline found at {pipeline_path}")
+        raise FileNotFoundError(f"No pipeline at {pipeline_path}")
 
     with open(pipeline_path, 'rb') as f:
         pipeline = pickle.load(f)
 
-    predictions = pd.Series(
-        pipeline.predict(new_data),
-        index=new_data.index
-    )
+    # classifiers live under .model_pipeline, use its predict_proba if available
+    if hasattr(pipeline, "model_pipeline") and hasattr(pipeline.model_pipeline, "predict_proba"):
+        raw_preds = pipeline.model_pipeline.predict_proba(training_data_df)[:, 1]
+    else:
+        raw_preds = pipeline.predict(training_data_df)
 
-    return predictions
-
+    return pd.Series(raw_preds, index=training_data_df.index)
 
 
 def evaluate_predictions(y_true: pd.Series, y_pred: pd.Series) -> dict:
