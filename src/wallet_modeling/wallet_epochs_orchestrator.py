@@ -174,8 +174,10 @@ class MultiEpochOrchestrator:
         # Merge the epoch DataFrames into a single DataFrame for training and modeling respectively
         wallet_training_data_df       = self._merge_epoch_dfs(training_modeling_dfs)
         modeling_wallet_features_df   = self._merge_epoch_dfs(modeling_modeling_dfs)
-        validation_training_data_df   = self._merge_epoch_dfs(training_validation_dfs)
-        validation_wallet_features_df = self._merge_epoch_dfs(modeling_validation_dfs)
+        validation_training_data_df   = (self._merge_epoch_dfs(training_validation_dfs)
+                                         if training_validation_dfs else pd.DataFrame())
+        validation_wallet_features_df = (self._merge_epoch_dfs(modeling_validation_dfs)
+                                         if modeling_validation_dfs else pd.DataFrame())
 
         # Confirm indices match
         u.assert_matching_indices(wallet_training_data_df, modeling_wallet_features_df)
