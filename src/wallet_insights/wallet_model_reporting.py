@@ -130,14 +130,17 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path,save
     - str: The UUID used for this model's artifacts
     """
     def numpy_type_converter(obj):
-        """Convert numpy types to Python native types"""
+        """Convert numpy and datetime types to JSON-friendly types"""
         if isinstance(obj, np.integer):
             return int(obj)
         elif isinstance(obj, np.floating):
             return float(obj)
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
-        return obj
+        elif isinstance(obj, datetime):  # handle datetime
+            return obj.isoformat()
+        # Surface non-serializable types explicitly
+        raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
     # Validate required directories exist
     base_dir = Path(base_path)

@@ -21,6 +21,17 @@ class CoinModel(BaseModel):
     Extends BaseModel with coin-specific data preparation.
     """
 
+    def __init__(self, modeling_config: dict):  # pylint:disable=useless-parent-delegation
+        """
+        Initialize WalletModel with configuration and wallet features DataFrame.
+
+        Params:
+        - modeling_config (dict): Configuration dictionary for modeling parameters.
+        """
+        # Initialize BaseModel with the given configuration
+        super().__init__(modeling_config)
+
+
     def _prepare_data(self, feature_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
         """
         Params:

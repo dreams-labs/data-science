@@ -124,6 +124,7 @@ class BaseModel:
         self._fit()
 
         result = {
+            'model_id': self.model_id,
             'modeling_config': self.modeling_config,
             'pipeline': self.pipeline,
             'cv_results': cv_results
