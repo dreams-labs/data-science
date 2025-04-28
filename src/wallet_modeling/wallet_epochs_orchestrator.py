@@ -183,14 +183,19 @@ class MultiEpochOrchestrator:
         u.assert_matching_indices(wallet_training_data_df, modeling_wallet_features_df)
 
         logger.milestone(
-            "Generated multi-epoch DataFrames with shapes %s (modeling train), %s (modeling model), "
-            "%s (validation train), %s (validation model)",
-            wallet_training_data_df.shape, modeling_wallet_features_df.shape,
-            validation_training_data_df.shape, validation_wallet_features_df.shape
+            "Generated multi-epoch DataFrames with shapes:\n"
+            " - modeling train: %s\n"
+            " - modeling model: %s\n"
+            " - validation train: %s\n"
+            " - validation model: %s",
+            wallet_training_data_df.shape,
+            modeling_wallet_features_df.shape,
+            validation_training_data_df.shape,
+            validation_wallet_features_df.shape
         )
         u.notify('level_up')
 
-        # Save files
+        # Save files  # pylint:disable=line-too-long
         parquet_folder = self.base_config['training_data']['parquet_folder']
         wallet_training_data_df.to_parquet(f"{parquet_folder}/multiwindow_wallet_training_data_df.parquet",index=True)
         modeling_wallet_features_df.to_parquet(f"{parquet_folder}/multiwindow_modeling_wallet_features_df.parquet",index=True)
@@ -223,7 +228,7 @@ class MultiEpochOrchestrator:
         - epoch_modeling_data_df (DataFrame): Modeling features for this epoch
         """
         model_start = epoch_config['training_data']['modeling_period_start']
-        logger.info(f"Generating data for epoch starting {model_start}...")
+        logger.info(f"Generating data for epoch with modeling_period_start of {model_start}...")
         u.notify('futuristic')
 
         # If using hybrid IDs, override for a non-hybridized run to define the wallet cohort
