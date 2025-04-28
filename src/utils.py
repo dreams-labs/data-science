@@ -178,6 +178,12 @@ def calculate_period_dates(config):
     # Calculate training_period_start (inclusive of the start date)
     training_period_start = training_period_end - timedelta(days=training_period_duration - 1)
 
+    # Coin Modeling Dates
+    # -------------------
+    coin_modeling_period_start = modeling_period_end + timedelta(days=1)
+    coin_modeling_period_end = modeling_period_end + timedelta(days=modeling_period_duration)
+
+
     # Lookback Dates
     # --------------
     # Calculate the start date of the earliest window
@@ -205,6 +211,8 @@ def calculate_period_dates(config):
         'training_period_start': training_period_start.strftime('%Y-%m-%d'),
         'training_period_end': training_period_end.strftime('%Y-%m-%d'),
         'modeling_period_end': modeling_period_end.strftime('%Y-%m-%d'),
+        'coin_modeling_period_start': coin_modeling_period_start.strftime('%Y-%m-%d'),
+        'coin_modeling_period_end': coin_modeling_period_end.strftime('%Y-%m-%d'),
         'earliest_window_start': earliest_window_start.strftime('%Y-%m-%d'),
         'earliest_cohort_lookback_start': earliest_cohort_lookback_start.strftime('%Y-%m-%d')
     }
