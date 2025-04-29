@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 import logging
-import pickle
+import cloudpickle
 import pandas as pd
 import numpy as np
 from dreams_core.googlecloud import GoogleCloud as dgc
@@ -181,7 +181,7 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path,save
     # 2. Save model pipeline
     pipeline_path = base_dir / 'wallet_models' / f"wallet_model_{model_id}.pkl"
     with open(pipeline_path, 'wb') as f:
-        pickle.dump(model_results['pipeline'], f)
+        cloudpickle.dump(model_results['pipeline'], f)
     logger.info(f"Saved pipeline to {pipeline_path}")
 
 
