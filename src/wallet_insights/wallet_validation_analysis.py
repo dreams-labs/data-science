@@ -1,7 +1,7 @@
 import logging
 from typing import List, Dict
 from pathlib import Path
-import pickle
+import cloudpickle
 import pandas as pd
 import numpy as np
 from sklearn.metrics import (
@@ -48,7 +48,7 @@ def load_and_predict(
         raise FileNotFoundError(f"No pipeline at {pipeline_path}")
 
     with open(pipeline_path, 'rb') as f:
-        pipeline = pickle.load(f)
+        pipeline = cloudpickle.load(f)
 
     # classifiers live under .model_pipeline, use its predict_proba if available
     if hasattr(pipeline, "model_pipeline") and hasattr(pipeline.model_pipeline, "predict_proba"):

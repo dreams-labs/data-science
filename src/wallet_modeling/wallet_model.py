@@ -3,17 +3,16 @@ from typing import Dict, Union, Tuple
 import pandas as pd
 import numpy as np
 from sklearn.pipeline import Pipeline
-from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.model_selection import RandomizedSearchCV
-from sklearn.metrics import root_mean_squared_error, r2_score, roc_auc_score
 
 # Local modules
 from base_modeling.base_model import BaseModel
+import base_modeling.scorers as sco
 import utils as u
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
-# pylint:disable=unused-argument  # y param needed for pipeline structure
-# pylint:disable=W0201  # Attribute defined outside __init__, false positive due to inheritance
+# pylint:disable=unused-argument  # X and y params are always needed for pipeline structure
+# pylint:disable=attribute-defined-outside-init  # false positive due to inheritance
 # pylint:disable=access-member-before-definition  # init params from BaseModel are tripping this
 
 
@@ -40,9 +39,6 @@ class WalletModel(BaseModel):
 
         # y data for modeling period; includes Modeling cohort and target variables
         self.modeling_wallet_features_df = None
-
-        # Target variable pipeline
-        self.y_pipeline = None
 
         # Validation set objects
         self.X_validation = None
@@ -105,7 +101,7 @@ class WalletModel(BaseModel):
 
             if cv_results.get('best_params'):
                 best_params = {
-                    k.replace('regressor__', ''): v
+                    k.replace('estimator__', ''): v
                     for k, v in cv_results['best_params'].items()
                 }
                 self.modeling_config['model_params'].update(best_params)
@@ -275,47 +271,6 @@ class WalletModel(BaseModel):
         return sampled_training_data_df,sampled_modeling_wallet_features_df
 
 
-    @u.timing_decorator
-    def _get_meta_pipeline(self) -> Pipeline:
-        """
-        Return a single Pipeline that first applies y transformations,
-        then the usual feature+regressor steps. Step names remain
-        exactly ['target_selector', 'feature_selector', 'drop_columns', 'estimator'].
-        """
-        # Get the steps from the y_pipeline
-        y_steps = self._get_y_pipeline()
-        # Get the steps from the base pipeline (feature_selector, drop_columns, estimator)
-        model_steps = self._get_base_pipeline()
-
-        # Concatenate them into one pipeline
-        combined_steps = MetaPipeline(y_steps, model_steps)
-
-        return combined_steps
-
-
-    def _get_y_pipeline(self) -> None:
-        """
-        Build the wallet-specific pipeline by prepending the wallet cohort selection
-        to the base pipeline steps.
-        """
-        target_var = self.modeling_config.get('model_params', {}).get(
-            'target_selector__target_variable',
-            self.modeling_config['target_variable']
-        )
-        target_var_class_threshold = None
-        if self.modeling_config['model_type'] == 'classification':
-            target_var_class_threshold = (self.modeling_config.get('model_params', {}).get(
-                'target_selector__target_var_class_threshold',
-                self.modeling_config['target_var_class_threshold']
-            ))
-
-        y_pipeline = Pipeline([
-            ('target_selector', TargetVarSelector(target_var, target_var_class_threshold))
-        ])
-
-        return y_pipeline
-
-
     def _prepare_grid_search_params(self, X: pd.DataFrame, base_params_override=None) -> dict:
         """
         Override to prepend 'model_pipeline__' to all keys in param_grid.
@@ -364,27 +319,27 @@ class WalletModel(BaseModel):
         scoring_param = gs_config['search_config'].get('scoring')
 
         if scoring_param == 'custom_r2_scorer':
-            gs_config['search_config']['scoring'] = custom_r2_scorer
+            gs_config['search_config']['scoring'] = sco.custom_r2_scorer
 
         elif scoring_param == 'custom_neg_rmse_scorer':
-            gs_config['search_config']['scoring'] = custom_neg_rmse_scorer
+            gs_config['search_config']['scoring'] = sco.custom_neg_rmse_scorer
 
         elif scoring_param == 'validation_r2_scorer':
             # Ensure validation data is available
             if self.X_validation is None or self.validation_wallet_features_df is None:
                 raise ValueError("Validation data required for validation_r2_scorer")
-            gs_config['search_config']['scoring'] = validation_r2_scorer(self)
+            gs_config['search_config']['scoring'] = sco.validation_r2_scorer(self)
 
         elif scoring_param == 'validation_auc_scorer':
             # Ensure validation data is available
             if self.X_validation is None or self.validation_wallet_features_df is None:
                 raise ValueError("Validation data required for validation_auc_scorer")
-            gs_config['search_config']['scoring'] = validation_auc_scorer(self)
+            gs_config['search_config']['scoring'] = sco.validation_auc_scorer(self)
 
         elif scoring_param == 'validation_top_return_scorer':
             # read your desired top_pct from config, e.g. self.modeling_config['grid_search_params']['top_pct']
             top_pct = self.modeling_config['grid_search_params'].get('top_pct', 0.05)
-            gs_config['search_config']['scoring'] = validation_top_return_scorer(self, top_pct)
+            gs_config['search_config']['scoring'] = sco.validation_top_return_scorer(self, top_pct)
 
         else:
             raise ValueError(f"Invalid scoring metric '{scoring_param}' found in grid_search_params.")
@@ -411,7 +366,7 @@ class WalletModel(BaseModel):
 
         return {
             'best_params': {
-                k: (self._convert_min_child_weight_to_pct(X, v) if k == 'regressor__min_child_weight' else v)
+                k: (self._convert_min_child_weight_to_pct(X, v) if k == 'estimator__min_child_weight' else v)
                 for k, v in self.random_search.best_params_.items()
             },
             'best_score': -self.random_search.best_score_,
@@ -440,268 +395,3 @@ class WalletModel(BaseModel):
             raise ValueError("Prediction dropped some wallet addresses")
 
         return predictions
-
-
-
-# -----------------------------------
-#           Pipeline Steps
-# -----------------------------------
-
-class TargetVarSelector(BaseEstimator, TransformerMixin):
-    """
-    Transformer that extracts the target variable from the input.
-
-    If y is a DataFrame, returns the column specified by target_variable as a Series.
-    If y is already a Series, returns it unchanged.
-
-    This centralizes the target extraction logic so that grid search can update the target
-    variable parameter without interference from pre-extraction.
-    """
-    def __init__(
-            self,
-            target_variable: str,
-            target_var_class_threshold: float
-        ):
-        self.target_variable = target_variable
-        self.target_var_class_threshold = target_var_class_threshold
-
-    def fit(self, y, X=None):
-        """
-        Validate that the target column exists in y if it is a DataFrame.
-        """
-        if isinstance(y, pd.DataFrame):
-            if self.target_variable not in y.columns:
-                raise ValueError(
-                    f"Target variable '{self.target_variable}' not found in columns: {y.columns.tolist()}"
-                )
-        return self
-
-    def transform(self, y, X=None):
-        """
-        Extract the target column specified by target_variable and return a 1D Series.
-        If the model is classification,
-        """
-        # Extract target variable
-        result = y[self.target_variable]
-
-        # Convert to boolean if a threhsold is provided
-        if self.target_var_class_threshold is not None:
-            result = (result >= self.target_var_class_threshold).astype(int)
-
-        return result
-
-
-class MetaPipeline(BaseEstimator, TransformerMixin):
-    """Meta-pipeline that applies x and y transformations then fits a regressor."""
-
-    def __init__(self, y_pipeline: Pipeline, model_pipeline: Pipeline):
-        """Initialize MetaPipeline with y_pipelin and model_pipeline."""
-        self.y_pipeline = y_pipeline
-        self.model_pipeline = model_pipeline
-        self.estimator = None
-        self.x_transformer_ = None  # will store the transformer sub-pipeline for later use
-
-        # Create a named_steps attribute that mimics sklearn Pipeline interface
-        self.named_steps = {}
-        # Add steps from model_pipeline to named_steps
-        for name, step in y_pipeline.named_steps.items():
-            self.named_steps[name] = step
-            self.name = step
-        for name, step in model_pipeline.named_steps.items():
-            self.named_steps[name] = step
-            self.name = step
-
-    def fit(self, X, y, eval_set=None, verbose_estimators=False):
-        """Fit the MetaPipeline on raw X and y data, using an optional eval_set for early stopping."""
-        # First, transform y using the y_pipeline
-        y_trans = self.y_pipeline.fit_transform(y)
-
-        # Create a transformer sub-pipeline (all steps except the final estimator)
-        transformer = Pipeline(self.model_pipeline.steps[:-1])
-
-        # Transform training data
-        X_trans = transformer.fit_transform(X, y_trans)
-
-        # Extract the regressor from the pipeline
-        regressor_name, self.estimator = self.model_pipeline.steps[-1]
-
-        # If evaluation set is provided, transform it and use for early stopping
-        if eval_set is not None:
-            X_eval, y_eval = eval_set
-            y_eval_trans = self.y_pipeline.transform(y_eval)
-            X_eval_trans = transformer.transform(X_eval)
-
-            # Create eval_set in the format expected by XGBoost
-            transformed_eval_set = [(X_trans, y_trans), (X_eval_trans, y_eval_trans)]
-
-            # Fit with early stopping using the transformed eval set
-            self.estimator.fit(
-                X_trans,
-                y_trans,
-                eval_set=transformed_eval_set,
-                verbose=verbose_estimators  # toggles line by line output logs
-            )
-        else:
-            # Regular fit without early stopping if no eval set provided
-            self.estimator.fit(X_trans, y_trans)
-
-        # Store the transformer sub-pipeline for use during prediction
-        self.x_transformer_ = transformer
-
-        # Update named_steps with the fitted regressor
-        self.named_steps[regressor_name] = self.estimator
-
-        return self
-
-    def predict(self, X):
-        """Predict using the fitted regressor on transformed X."""
-        X_trans = self.x_transformer_.transform(X)
-        return self.estimator.predict(X_trans)
-
-    def score(self, X, y):
-        """Return the regressor's score on transformed X and y."""
-        X_trans = self.x_transformer_.transform(X)
-        y_trans = self.y_pipeline.transform(y)
-        return self.estimator.score(X_trans, y_trans)
-
-    # Add methods to make it behave more like a sklearn Pipeline
-    def __getitem__(self, key):
-        """Support indexing like a regular pipeline."""
-        if isinstance(key, slice):
-            # If it's a slice, return a new Pipeline with the sliced steps
-            return Pipeline(self.model_pipeline.steps[key])
-        else:
-            # Otherwise return the specific step
-            return self.model_pipeline.steps[key][1]
-
-
-
-
-# -----------------------------------
-#          Scorer Functions
-# -----------------------------------
-
-def custom_neg_rmse_scorer(estimator, X, y):
-    """
-    Custom scorer that transforms y before computing RMSE.
-    Applies the estimator's y_pipeline to extract the proper target.
-    Returns negative RMSE for grid search scoring.
-    """
-    y_trans = estimator.y_pipeline.transform(y)
-    y_pred = estimator.predict(X)
-    rmse = root_mean_squared_error(y_trans, y_pred)
-    return -rmse
-
-
-def custom_r2_scorer(estimator, X, y):
-    """
-    Custom scorer for R² that first applies the pipeline's y transformation.
-
-    Parameters:
-      estimator: The fitted MetaPipeline, which includes a y_pipeline.
-      X (DataFrame or array): Feature data.
-      y (DataFrame or array): The raw target data.
-
-    Returns:
-      R² score computed on the transformed target and predictions.
-    """
-    y_trans = estimator.y_pipeline.transform(y)
-    y_pred = estimator.predict(X)
-    return r2_score(y_trans, y_pred)
-
-
-def validation_r2_scorer(wallet_model):
-    """
-    Factory function that returns a custom scorer using validation data.
-
-    Params:
-    - wallet_model: WalletModel instance containing validation data
-
-    Returns:
-    - scorer function compatible with scikit-learn
-    """
-    def scorer(estimator, X=None, y=None):
-        """Score using the validation data instead of provided X and y"""
-        if wallet_model.X_validation is None or wallet_model.validation_wallet_features_df is None:
-            raise ValueError("Validation data not set in wallet_model")
-
-        # Transform y using the pipeline
-        y_trans = estimator.y_pipeline.transform(wallet_model.validation_wallet_features_df)
-
-        # Get predictions
-        y_pred = estimator.predict(wallet_model.X_validation)
-
-        # Calculate and return R2 score
-        return r2_score(y_trans, y_pred)
-
-    return scorer
-
-
-def validation_auc_scorer(wallet_model):
-    """
-    Factory function that returns a custom scorer using validation data and ROC AUC.
-
-    Params:
-    - wallet_model: WalletModel instance containing validation data
-
-    Returns:
-    - scorer function compatible with scikit-learn that computes ROC AUC.
-    """
-    def scorer(estimator, X=None, y=None):
-        if wallet_model.X_validation is None or wallet_model.validation_wallet_features_df is None:
-            raise ValueError("Validation data not set in wallet_model")
-
-        # Transform true labels using the y_pipeline
-        y_true = estimator.y_pipeline.transform(wallet_model.validation_wallet_features_df)
-
-        # Transform validation features for probability prediction
-        X_val_trans = estimator.x_transformer_.transform(wallet_model.X_validation)
-
-        # Predict class probabilities and select the positive class index
-        probas = estimator.regressor.predict_proba(X_val_trans)
-        pos_idx = list(estimator.regressor.classes_).index(1)
-
-        # Compute and return ROC AUC
-        return roc_auc_score(y_true, probas[:, pos_idx])
-
-    return scorer
-
-
-def validation_top_return_scorer(wallet_model, top_pct: float):
-    """
-    Factory function that returns a custom scorer computing the mean actual return
-    of the top n% of wallets by predicted probability on the validation set.
-
-    Params:
-    - wallet_model: WalletModel instance containing validation data
-    - top_pct (float): Fraction (0 < top_pct <= 1) representing the top n% to evaluate
-
-    Returns:
-    - scorer function compatible with scikit-learn that computes mean return.
-    """
-    def scorer(estimator, X=None, y=None):
-        # Ensure validation data is available
-        if wallet_model.X_validation is None or wallet_model.validation_wallet_features_df is None:
-            raise ValueError("Validation data not set in wallet_model")
-
-        # Get actual returns
-        target_var = wallet_model.modeling_config['target_variable']
-        returns = wallet_model.validation_wallet_features_df[target_var].reindex(wallet_model.X_validation.index)
-
-        # Predict class probabilities for positive class
-        X_val_trans = estimator.x_transformer_.transform(wallet_model.X_validation)
-        probas = estimator.regressor.predict_proba(X_val_trans)
-        pos_idx = list(estimator.regressor.classes_).index(1)
-        probs = probas[:, pos_idx]
-
-        # Combine into DataFrame and drop NaNs
-        df = pd.DataFrame({'proba': probs, 'ret': returns}).dropna()
-
-        # Compute cutoff for top_pct
-        cutoff = np.percentile(df['proba'], 100 * (1 - top_pct))
-        top_df = df[df['proba'] >= cutoff]
-
-        # Return mean actual return of top slice; if empty, return nan
-        return top_df['ret'].mean() if not top_df.empty else float('nan')
-
-    return scorer

@@ -10,20 +10,21 @@ import logging
 import uuid
 from typing import Dict, Union, List, Any
 from itertools import chain,combinations
-import pickle
+import cloudpickle
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import RandomizedSearchCV, train_test_split
 from sklearn.pipeline import Pipeline
-from sklearn.base import BaseEstimator, TransformerMixin
 from xgboost import XGBRegressor, XGBClassifier
 
 # Local modules
 import base_modeling.feature_selection as fs
+import base_modeling.pipeline as bmp
 import utils as u
 
-
 # pylint:disable=invalid-name  # X_test isn't camelcase
+# pylint:disable=unused-argument  # X and y params are always needed for pipeline structure
+
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -49,6 +50,7 @@ class BaseModel:
 
         # Pipeline Steps
         self.pipeline = None
+        self.y_pipeline = None
         self.columns_to_drop = None
         self.random_search = None
 
@@ -147,47 +149,8 @@ class BaseModel:
 
 
     # -----------------------------------
-    #      Pipeline/Modeling Methods
+    #          Modeling Methods
     # -----------------------------------
-
-    def _get_base_pipeline(self) -> Pipeline:
-        """
-        Construct and return the base modeling pipeline (feature selection, dropping columns, and the regressor).
-        """
-        model_params = self.modeling_config['model_params'].copy()
-
-        # Select model type and eval method
-        if self.modeling_config['model_type']=='classification':
-            model = XGBClassifier
-            model_params.setdefault('eval_metric', 'logloss')
-        elif self.modeling_config['model_type']=='regression':
-            model = XGBRegressor
-            model_params.setdefault('eval_metric', 'rmse')
-        else:
-            raise ValueError(f"Invalid model type '{self.modeling_config['model_type']}' found in config. "
-                             "Model type must be 'regression' or 'classification")
-
-        # Update min_child_weight if percentage is specified
-        if model_params.get('min_child_weight_pct'):
-            model_params['min_child_weight'] = self._convert_min_child_pct_to_weight(
-                self.X_train,
-                model_params.pop('min_child_weight_pct')
-            )
-
-        base_pipeline = Pipeline([
-            ('feature_selector', FeatureSelector(
-                variance_threshold=self.modeling_config['feature_selection'].get('variance_threshold'),
-                correlation_threshold=self.modeling_config['feature_selection'].get('correlation_threshold'),
-                protected_features=self.modeling_config['feature_selection']['protected_features']
-            )),
-            ('drop_columns', DropColumnPatterns(
-                drop_patterns=self.modeling_config['feature_selection']['drop_patterns']
-            )),
-            ('estimator', model(**model_params))
-        ])
-
-        return base_pipeline
-
 
     @u.timing_decorator
     def _split_data(self, X: pd.DataFrame, y: pd.Series) -> None:
@@ -449,7 +412,6 @@ class BaseModel:
         }
 
 
-
     def _get_model_pipeline(self, base_model_params: Dict[str, Any]) -> Pipeline:
         """
         Create a standard model pipeline with drop columns transformer and XGBoost regressor.
@@ -462,16 +424,96 @@ class BaseModel:
         - Pipeline: Scikit-learn pipeline with preprocessing and model components
         """
         pipeline = Pipeline([
-            ('drop_columns', DropColumnPatterns()),
+            ('drop_columns', bmp.DropColumnPatterns()),
             ('estimator', XGBRegressor(**base_model_params))
         ])
 
         return pipeline
 
 
+    def _get_base_pipeline(self) -> Pipeline:
+        """
+        Construct and return the base modeling pipeline (feature selection, dropping columns, and the regressor).
+        """
+        model_params = self.modeling_config['model_params'].copy()
+
+        # Select model type and eval method
+        if self.modeling_config['model_type']=='classification':
+            model = XGBClassifier
+            model_params.setdefault('eval_metric', 'logloss')
+        elif self.modeling_config['model_type']=='regression':
+            model = XGBRegressor
+            model_params.setdefault('eval_metric', 'rmse')
+        else:
+            raise ValueError(f"Invalid model type '{self.modeling_config['model_type']}' found in config. "
+                             "Model type must be 'regression' or 'classification")
+
+        # Update min_child_weight if percentage is specified
+        if model_params.get('min_child_weight_pct'):
+            model_params['min_child_weight'] = self._convert_min_child_pct_to_weight(
+                self.X_train,
+                model_params.pop('min_child_weight_pct')
+            )
+
+        base_pipeline = Pipeline([
+            ('feature_selector', bmp.FeatureSelector(
+                variance_threshold=self.modeling_config['feature_selection'].get('variance_threshold'),
+                correlation_threshold=self.modeling_config['feature_selection'].get('correlation_threshold'),
+                protected_features=self.modeling_config['feature_selection']['protected_features']
+            )),
+            ('drop_columns', bmp.DropColumnPatterns(
+                drop_patterns=self.modeling_config['feature_selection']['drop_patterns']
+            )),
+            ('estimator', model(**model_params))
+        ])
+
+        return base_pipeline
+
+
+    @u.timing_decorator
+    def _get_meta_pipeline(self) -> Pipeline:
+        """
+        Return a single Pipeline that first applies y transformations,
+        then the usual feature+estimator steps. Step names remain
+        exactly ['target_selector', 'feature_selector', 'drop_columns', 'estimator'].
+        """
+        # Get the steps from the y_pipeline
+        y_steps = self._get_y_pipeline()
+        # Get the steps from the base pipeline (feature_selector, drop_columns, estimator)
+        model_steps = self._get_base_pipeline()
+
+        # Concatenate them into one pipeline
+        combined_steps = bmp.MetaPipeline(y_steps, model_steps)
+
+        return combined_steps
+
+
+    def _get_y_pipeline(self) -> None:
+        """
+        Build the wallet-specific pipeline by prepending the wallet cohort selection
+        to the base pipeline steps.
+        """
+        target_var = self.modeling_config.get('model_params', {}).get(
+            'target_selector__target_variable',
+            self.modeling_config['target_variable']
+        )
+        target_var_class_threshold = None
+        if self.modeling_config['model_type'] == 'classification':
+            target_var_class_threshold = (self.modeling_config.get('model_params', {}).get(
+                'target_selector__target_var_class_threshold',
+                self.modeling_config['target_var_class_threshold']
+            ))
+
+        y_pipeline = Pipeline([
+            ('target_selector', bmp.TargetVarSelector(target_var, target_var_class_threshold))
+        ])
+
+        return y_pipeline
+
+
     def save_pipeline(self, filepath: str) -> None:
         """
-        Save the fitted pipeline to disk using pickle.
+        Save the fitted pipeline to disk using cloudpickle.
 
         Params:
         - filepath (str): Path where pipeline should be saved, should end in .pkl
@@ -481,7 +523,7 @@ class BaseModel:
 
         # Save pipeline which contains both model and column transformers
         with open(filepath, 'wb') as f:
-            pickle.dump(self.pipeline, f)
+            cloudpickle.dump(self.pipeline, f)
 
         logger.info(f"Pipeline saved to {filepath}")
 
@@ -618,121 +660,3 @@ class BaseModel:
         """
         n_samples = X.shape[0]
         return min_child_weight / n_samples
-
-
-
-
-
-
-# -----------------------------------
-#           Pipeline Steps
-# -----------------------------------
-
-class FeatureSelector(BaseEstimator, TransformerMixin):
-    """Pipeline step for feature selection based on variance and correlation"""
-    __module__ = 'base_modeling.base_model'  # Add this line
-
-    def __init__(self, variance_threshold: float, correlation_threshold: float,
-                 protected_features: List[str]):
-        """
-        Params:
-        - variance_threshold (float): Minimum variance threshold for features
-        - correlation_threshold (float): Maximum correlation threshold between features
-        - protected_features (List[str]): Features to retain regardless of thresholds
-        """
-        self.variance_threshold = variance_threshold
-        self.correlation_threshold = correlation_threshold
-        self.protected_features = protected_features
-        self.selected_features = None
-
-
-    def fit(self, X: pd.DataFrame, y=None):  # pylint:disable=unused-argument  # y param needed for pipeline structure
-        """Identify features to keep based on variance and correlation thresholds"""
-        # Remove low variance features
-        post_variance_df = fs.remove_low_variance_features(
-            X,
-            self.variance_threshold,
-            self.protected_features
-        )
-
-
-        # Remove correlated features
-        post_correlation_df = fs.remove_correlated_features(
-            post_variance_df,
-            self.correlation_threshold,
-            self.protected_features
-        )
-
-        self.selected_features = post_correlation_df.columns.tolist()
-        return self
-
-
-    def transform(self, X: pd.DataFrame):
-        """Apply feature selection"""
-        return X[self.selected_features]
-
-
-
-class DropColumnPatterns(BaseEstimator, TransformerMixin):
-    """
-    Pipeline step that drops columns based on the patterns provided in the config, including
-    support for * wildcards.
-
-    Valid format example: 'training_clusters|k2_cluster/*|trading/*'
-    """
-    def __init__(self, drop_patterns=None):
-        """
-        Transformer for dropping columns based on patterns.
-
-        Params:
-        - drop_patterns (list): List of patterns to match columns for dropping.
-        """
-        self.drop_patterns = drop_patterns
-        self.columns_to_drop = None  # Persist calculated columns to drop
-
-
-    def fit(self, X, y=None): # pylint:disable=unused-argument  # y param needed for pipeline structure
-        """
-        Identify columns to drop based on the given patterns.
-
-        Params:
-        - X (DataFrame): Input training data.
-        - y (Series): Target variable (ignored but required for pipeline format).
-
-        Returns:
-        - self: Fitted transformer.
-        """
-        # Only update columns_to_drop if drop_patterns is explicitly set
-        if self.drop_patterns is not None:
-            all_columns = X.columns.tolist()
-            self.columns_to_drop = fs.identify_matching_columns(
-                self.drop_patterns, all_columns
-            )
-            logger.info(f"Identified {len(self.columns_to_drop)} columns to drop")
-        else:
-            # If no patterns are provided, log and leave columns_to_drop unchanged
-            logger.info("No drop_patterns provided. Keeping columns_to_drop unchanged.")
-
-        return self
-
-
-    def transform(self, X):
-        """
-        Drop the identified columns from the input data.
-
-        Params:
-        - X (DataFrame): Input data.
-
-        Returns:
-        - DataFrame: Data with specified columns dropped.
-        """
-        if not self.columns_to_drop:
-            logger.debug("No columns to drop. Returning data unchanged.")
-            return X
-
-        # Filter columns that exist in the current dataset
-        dropped_columns = [col for col in self.columns_to_drop if col in X.columns]
-        logger.debug(f"Dropping {len(dropped_columns)} columns based on name pattern params.")
-
-        # Drop columns safely
-        return X.drop(columns=dropped_columns, errors='ignore')

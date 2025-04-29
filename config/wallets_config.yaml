@@ -32,7 +32,7 @@ training_data:
 
     # Local pipeline configs
     dataset: dev  # Set to prod or dev; determines whether to query core or dev dataset tables
-    parquet_folder: temp/wallet_modeling_dfs/windowed  # where to store parquet files
+    parquet_folder: temp/wallet_modeling_dfs/dev  # where to store parquet files
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
 
@@ -412,17 +412,17 @@ modeling:
         verbose_level: 3  # 3 outputs model performance but not training scores
         verbose_estimators: False  # whether to print each estimator's scores
         # n_jobs: 2
-        pre_dispatch: 1
+        pre_dispatch: 2
 
         # Params for target variable generation
         param_grid_y:
 
             # Target variables
-            # target_selector__target_variable: [
-            #     'max_investment',
-            #     'crypto_net_gain/max_investment/winsorized',
+            target_selector__target_variable: [
+                'crypto_net_gain',
+                'crypto_net_gain/max_investment/winsorized',
 
-            # ]
+            ]
             # target_selector__target_var_class_threshold: [
             #     0.3, 0.4, 0.5, 0.6, 0.7, 0.8
             # ]
@@ -431,32 +431,32 @@ modeling:
         param_grid:
 
             # # Depth and Child Weight
-            # regressor__min_child_weight_pct: [0.00004, 0.00007, 0.0001]
-            regressor__min_child_weight: [15,20,25]
-            regressor__max_depth: [3,4,5]
+            # estimator__min_child_weight_pct: [0.00004, 0.00007, 0.0001]
+            # estimator__min_child_weight: [15,20,25]
+            # estimator__max_depth: [3,4,5]
             # basic depth param
 
             # # Col/Row Sampling
-            # regressor__subsample: [0.85, 0.9, 0.95, 1.0]   # samples rows, e.g. trees use x% of all wallet rows
-            # regressor__colsample_bytree: [ 0.9, 0.95, 1.0]   # samples columns, e.g. trees use x% of all column features
+            # estimator__subsample: [0.85, 0.9, 0.95, 1.0]   # samples rows, e.g. trees use x% of all wallet rows
+            # estimator__colsample_bytree: [ 0.9, 0.95, 1.0]   # samples columns, e.g. trees use x% of all column features
 
             # # Model Speed
-            # regressor__tree_method: [hist, approx, auto]
-            # regressor__max_bin: [64, 128, 256]
-            # regressor__gamma: [0.005, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
+            # estimator__tree_method: [hist, approx, auto]
+            # estimator__max_bin: [64, 128, 256]
+            # estimator__gamma: [0.005, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            regressor__n_estimators: [120]
-            regressor__learning_rate: [0.3]
-            # regressor__max_depth: [7]
-            # regressor__min_child_weight: [30]
+            estimator__n_estimators: [120]
+            estimator__learning_rate: [0.3]
+            # estimator__max_depth: [7]
+            # estimator__min_child_weight: [30]
 
-            # regressor__gamma: [0, 0.005]
+            # estimator__gamma: [0, 0.005]
 
             # Optimize for Speed
-            # regressor__n_jobs: [4]  # how many models to build at once
-            # regressor__max_bin: [128]
-            # regressor__tree_method: [hist]
+            # estimator__n_jobs: [4]  # how many models to build at once
+            # estimator__max_bin: [128]
+            # estimator__tree_method: [hist]
 
 
             # # Column Selection
