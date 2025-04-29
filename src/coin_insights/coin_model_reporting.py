@@ -13,6 +13,74 @@ import wallet_insights.model_evaluation as wime
 logger = logging.getLogger(__name__)
 
 
+# -----------------------------------
+#       Main Interface Function
+# -----------------------------------
+
+def generate_and_save_coin_model_artifacts(
+    model_results: Dict,
+    base_path: str,
+    configs: Dict[str, Dict]
+) -> Tuple[str, object, pd.DataFrame]:
+    """
+    Wrapper to generate evaluations and save model artifacts.
+
+    Params:
+    - model_results (Dict): Output from model.run_experiment containing pipeline and data
+    - base_path (str): Base path for saving artifacts
+    - configs (Dict[str, Dict]): Dictionary of named config objects
+
+    Returns:
+    - str: model_id used for artifacts
+    - object: model evaluator
+    - DataFrame: score results
+    """
+    # 1. Generate model evaluation metrics using WalletRegressorEvaluator
+    if model_results['model_type'] == 'regression':
+        evaluator = wime.RegressorEvaluator(model_results)
+    elif model_results['model_type'] == 'classification':
+        evaluator = wime.ClassifierEvaluator(model_results)
+    else:
+        raise ValueError(f"Invalid model type {model_results['model_type']} found in results.")
+
+
+    evaluation = {
+        **evaluator.metrics,
+        'summary_report': evaluator.summary_report(),
+        'cohort_sizes': {
+            'total_rows': len(model_results['X_train']) + len(model_results['X_test'])
+        }
+    }
+
+    coin_scores_df = pd.DataFrame({
+        'score': model_results['y_pred'],
+        'actual': model_results['y_test']
+    })
+
+    model_results_artifacts={
+        **model_results,
+        'training_data': {
+            'n_samples': len(model_results['y_train']) + len(model_results['y_test']),
+            'n_features': len(model_results['X_train'].columns)
+        },
+    }
+
+    # 5. Save all artifacts
+    model_id = save_coin_model_artifacts(
+        model_results=model_results_artifacts,
+        evaluation_dict=evaluation,
+        configs=configs,
+        base_path=base_path
+    )
+
+    return model_id, evaluator, coin_scores_df
+
+
+
+# ---------------------------------
+#         Helper Functions
+# ---------------------------------
+
 def save_coin_model_artifacts(model_results, evaluation_dict, configs, base_path):
     """
     Saves all model-related artifacts with a consistent UUID across files.
@@ -80,53 +148,3 @@ def save_coin_model_artifacts(model_results, evaluation_dict, configs, base_path
 
 
 
-def generate_and_save_coin_model_artifacts(
-    model_results: Dict,
-    base_path: str,
-    configs: Dict[str, Dict]
-) -> Tuple[str, object, pd.DataFrame]:
-    """
-    Wrapper to generate evaluations and save model artifacts.
-
-    Params:
-    - model_results (Dict): Output from model.run_experiment containing pipeline and data
-    - base_path (str): Base path for saving artifacts
-    - configs (Dict[str, Dict]): Dictionary of named config objects
-
-    Returns:
-    - str: model_id used for artifacts
-    - object: model evaluator
-    - DataFrame: score results
-    """
-    evaluator = wime.RegressorEvaluator(model_results)
-
-    evaluation = {
-        **evaluator.metrics,
-        'summary_report': evaluator.summary_report(),
-        'cohort_sizes': {
-            'total_rows': len(model_results['X_train']) + len(model_results['X_test'])
-        }
-    }
-
-    coin_scores_df = pd.DataFrame({
-        'score': model_results['y_pred'],
-        'actual': model_results['y_test']
-    })
-
-    model_results_artifacts={
-        **model_results,
-        'training_data': {
-            'n_samples': len(model_results['y_train']) + len(model_results['y_test']),
-            'n_features': len(model_results['X_train'].columns)
-        },
-    }
-
-    # 5. Save all artifacts
-    model_id = save_coin_model_artifacts(
-        model_results=model_results_artifacts,
-        evaluation_dict=evaluation,
-        configs=configs,
-        base_path=base_path
-    )
-
-    return model_id, evaluator, coin_scores_df
