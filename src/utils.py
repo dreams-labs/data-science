@@ -883,6 +883,18 @@ def log_nan_counts(df):
     logger.critical(log_message)
 
 
+def numpy_type_converter(obj):
+    """Convert numpy and datetime types to JSON-friendly types"""
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, datetime):  # handle datetime
+        return obj.isoformat()
+    # Surface non-serializable types explicitly
+    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
 
 

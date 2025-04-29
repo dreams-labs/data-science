@@ -1,7 +1,6 @@
-# CheckpointValidation
 # CoinModel Config
 
-# CheckpointValidation
+
 # CoinModel Cleaning
 # Variables used to clean and filter raw data before training data is built
 data_cleaning:
@@ -12,7 +11,6 @@ data_cleaning:
     min_daily_volume: 500 # Minimum average daily volume the coin must have
 
 
-# CheckpointValidation
 # CoinModel Segments
 wallet_segments:
 
@@ -32,7 +30,6 @@ wallet_segments:
     parquet_folder: temp/coin_modeling_dfs
 
 
-# CheckpointValidation
 # CoinModel Features
 wallet_features:
 
@@ -51,11 +48,25 @@ wallet_features:
     ]
 
 
-# CheckpointValidation
 # CoinModel Modeling Config
 # Variables used in the generation of the validation period coin model
 coin_modeling:
 
+    #KeyParam Model Type
+    # Target variable parameters
+    # model_type: regression  # "regression" or "classification"
+    model_type: classification  # "regression" or "classification"
+
+    #KeyParam Target Variable
+    target_variable: coin_return_winsorized
+    # target_variable: coin_return_pctile_full
+    # target_variable: coin_return_pctile
+    target_var_class_threshold: 0.4  # a classification model will try to predict the target var above this value
+
+    returns_winsorization: 0.03
+
+
+    #KeyParam Modeling Cohort Definition
     # Thresholds for coin inclusion in training data
     min_cohort_wallets: 25  # how many wallets must hold a coin for the coin to be elegible for forecasting
     min_cohort_balance: 10  # how much USD all wallets must hold for the coin to be elegible for forecasting
@@ -64,19 +75,12 @@ coin_modeling:
     min_market_cap: 000_000  # coins below this market cap will not be included in performance assessments
     max_market_cap: 999150_000_000  # coins above this market cap will not be included in performance assessments
 
-    # Target variable parameters
-    target_variable: coin_return_winsorized
-    # target_variable: coin_return_pctile_full
-    # target_variable: coin_return_pctile
-    returns_winsorization: 0.1
-
     # Train/Test/Eval split
     test_size: 0.1  # what % of the total population will be used as test
     eval_size: 0.05  # what % used for the early stopping eval set
 
 
 
-    # CheckpointValidation
     # CoinModel Feature Selection
     # Params used to remove unnecessary features
     feature_selection:
@@ -189,9 +193,7 @@ coin_modeling:
         correlation_threshold: 1.999 # features above this correlation coefficient will be removed
         protected_features: []
 
-    # CheckpointValidation
     # CoinModel Params
-    model_type: regression
     model_params:
         n_estimators: 400
         max_depth: 3
@@ -208,7 +210,6 @@ coin_modeling:
         random_state: 42
         n_jobs: -1
 
-    # CheckpointValidation
     # CoinModel Grid Search
     grid_search_params:
 

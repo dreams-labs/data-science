@@ -11,7 +11,6 @@ import base_modeling.scorers as sco
 import utils as u
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
-# pylint:disable=unused-argument  # X and y params are always needed for pipeline structure
 # pylint:disable=attribute-defined-outside-init  # false positive due to inheritance
 # pylint:disable=access-member-before-definition  # init params from BaseModel are tripping this
 
@@ -233,6 +232,7 @@ class WalletModel(BaseModel):
         y = modeling_wallet_features_df[cohort_mask].copy()
 
         return X, y
+
 
     def _assign_epoch_to_wallets(
         self,

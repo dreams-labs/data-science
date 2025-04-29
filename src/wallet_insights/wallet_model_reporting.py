@@ -12,6 +12,9 @@ import numpy as np
 from dreams_core.googlecloud import GoogleCloud as dgc
 import wallet_insights.model_evaluation as wime
 
+# Local modules
+import utils as u
+
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
 
@@ -115,7 +118,7 @@ def get_training_cohort_addresses():
 
 
 
-def save_model_artifacts(model_results, evaluation_dict, configs, base_path,save_scores):
+def save_model_artifacts(model_results, evaluation_dict, configs, base_path, save_scores):
     """
     Saves all model-related artifacts with a consistent UUID across files.
 
@@ -129,19 +132,6 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path,save
     Returns:
     - str: The UUID used for this model's artifacts
     """
-    def numpy_type_converter(obj):
-        """Convert numpy and datetime types to JSON-friendly types"""
-        if isinstance(obj, np.integer):
-            return int(obj)
-        elif isinstance(obj, np.floating):
-            return float(obj)
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
-        elif isinstance(obj, datetime):  # handle datetime
-            return obj.isoformat()
-        # Surface non-serializable types explicitly
-        raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
-
     # Validate required directories exist
     base_dir = Path(base_path)
     required_dirs = ['model_reports', 'wallet_scores', 'wallet_models']
@@ -197,7 +187,7 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path,save
 
     report_path = base_dir / 'model_reports' / model_report_filename
     with open(report_path, 'w', encoding='utf-8') as f:
-        json.dump(report, f, indent=2, default=numpy_type_converter)
+        json.dump(report, f, indent=2, default=u.numpy_type_converter)
     logger.info(f"Saved model report to {report_path}")
 
 
