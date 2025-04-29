@@ -135,6 +135,3 @@ def save_coin_model_artifacts(model_results, evaluation_dict, configs, base_path
     logger.info(f"Saved coin scores and addresses to {coin_scores_path}")
 
     return model_id
-
-
-
