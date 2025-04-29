@@ -7,6 +7,7 @@ import logging
 from datetime import datetime
 import json
 import pandas as pd
+import numpy as np
 import wallet_insights.model_evaluation as wime
 
 # Local modules
@@ -97,13 +98,41 @@ def save_coin_model_artifacts(model_results, evaluation_dict, configs, base_path
     Returns:
     - str: The UUID used for this model's artifacts
     """
+    # Validate required directories exist
+    base_dir = Path(base_path)
+    required_dirs = ['model_reports', 'scores', 'models']
+    missing_dirs = [dir_name for dir_name in required_dirs
+                    if not (base_dir / dir_name).exists()]
+    if missing_dirs:
+        raise FileNotFoundError(
+            f"Required directories {missing_dirs} not found in {base_dir}. "
+            "Please create them before saving model artifacts."
+        )
+
     # Generate additional metadata for the filename
     model_id = model_results['model_id']
     model_time = datetime.now()
     filename_timestamp = model_time.strftime('%Y%m%d_%Hh%Mm%Ss')
-    model_r2 = evaluation_dict['r2']
-    model_report_filename = f"coin_model_report_{filename_timestamp}_{model_r2:.3f}_{model_id}.json"
-    base_dir = Path(base_path)
+
+    if model_results['model_type'] == 'regression':
+        model_r2 = evaluation_dict['r2']
+        validation_r2 = evaluation_dict.get('validation_metrics', {}).get('r2', np.nan)
+        model_report_filename = (
+            f"model_report_{filename_timestamp}__"
+            f"mr{model_r2:.3f}__"
+            f"{f'vr{validation_r2:.3f}' if not np.isnan(validation_r2) else 'vr___'}.json"
+        )
+        base_dir = Path(base_path)
+    elif model_results['model_type'] == 'classification':
+        model_auc = evaluation_dict['roc_auc']
+        validation_auc = evaluation_dict.get('val_roc_auc', np.nan)
+        model_report_filename = (
+            f"model_report_{filename_timestamp}__"
+            f"mauc{model_auc:.3f}__"
+            f"{f'vauc{validation_auc:.3f}' if not np.isnan(validation_auc) else 'vauc___'}.json"
+        )
+    else:
+        raise ValueError(f"Invalid model type {model_results['model_type']} found in results object.")
 
     if not base_dir.exists():
         raise FileNotFoundError(f"Base directory {base_dir} does not exist")
