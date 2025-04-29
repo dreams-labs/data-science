@@ -7,9 +7,12 @@ import logging
 from datetime import datetime
 import json
 import pandas as pd
-import numpy as np
 import wallet_insights.model_evaluation as wime
 
+# Local modules
+import utils as u
+
+# Set up logger at the module level
 logger = logging.getLogger(__name__)
 
 
@@ -94,19 +97,6 @@ def save_coin_model_artifacts(model_results, evaluation_dict, configs, base_path
     Returns:
     - str: The UUID used for this model's artifacts
     """
-    def numpy_type_converter(obj):
-        """Convert numpy and datetime types to JSON-friendly types"""
-        if isinstance(obj, np.integer):
-            return int(obj)
-        elif isinstance(obj, np.floating):
-            return float(obj)
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
-        elif isinstance(obj, datetime):  # handle datetime
-            return obj.isoformat()
-        # Surface non-serializable types explicitly
-        raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
-
     # Generate additional metadata for the filename
     model_id = model_results['model_id']
     model_time = datetime.now()
@@ -134,7 +124,7 @@ def save_coin_model_artifacts(model_results, evaluation_dict, configs, base_path
 
     report_path = base_dir / 'model_reports' / model_report_filename
     with open(report_path, 'w', encoding='utf-8') as f:
-        json.dump(report, f, indent=2, default=numpy_type_converter)
+        json.dump(report, f, indent=2, default=u.numpy_type_converter)
     logger.info(f"Saved model report to {report_path}")
 
     # Save scores
