@@ -115,7 +115,7 @@ def get_training_cohort_addresses():
 
 
 
-def save_model_artifacts(model_results, evaluation_dict, configs, base_path,save_scores):
+def save_model_artifacts(model_results, evaluation_dict, configs, base_path, save_scores):
     """
     Saves all model-related artifacts with a consistent UUID across files.
 
