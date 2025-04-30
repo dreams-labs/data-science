@@ -78,22 +78,18 @@ class CoinTrainingDataOrchestrator:
             )
 
         # Generate features based on the coin config files
-        coin_features_training_data_df, _, _ = tw.generate_all_time_windows_model_inputs(
+        coin_features_df, _, _ = tw.generate_all_time_windows_model_inputs(
             self.coins_config,
             self.metrics_config,
             self.coins_modeling_config
         )
 
         # Remove time window index since we aren't using that for now
-        coin_features_training_data_df = coin_features_training_data_df.reset_index(level='time_window', drop=True)
-
-        # Save to parquet
-        coin_features_training_data_df.to_parquet(
-            f"{self.wallets_coin_config['training_data']['parquet_folder']}"
-            "/coin_non_wallet_features_training_data_df.parquet",index=True
-        )
+        coin_features_df = coin_features_df.reset_index(level='time_window', drop=True)
 
         u.notify('ui_1')
+
+        return coin_features_df
 
 
     def build_wallet_segmentation(self) -> pd.DataFrame:
@@ -250,3 +246,43 @@ class CoinTrainingDataOrchestrator:
             coin_wallet_features_df.shape
         )
         return coin_wallet_features_df
+
+
+    def merge_all_features(
+        self,
+        coin_wallet_features_df: pd.DataFrame,
+        prior_coin_model_features_df: pd.DataFrame = None
+    ) -> pd.DataFrame:
+        """
+        Inner-join wallet_df & non_wallet_df into final coin-level feature set.
+
+        Params:
+        - wallet_df (DataFrame): coin-level features derived from wallet segments.
+        - non_wallet_df (DataFrame): coin-level features from time-window engine.
+
+        Returns:
+        - merged_df (DataFrame): inner-joined on coin_id, only coins present in both.
+        """
+        if prior_coin_model_features_df is not None:
+            # Confirm overlap
+            coin_features_ids = prior_coin_model_features_df.index
+            coin_wallet_features_ids = coin_wallet_features_df.index
+            wallet_features_only_ids = set(coin_wallet_features_ids) - set(coin_features_ids)
+
+            if len(wallet_features_only_ids) == 0:
+                logger.info("All %s coins with wallet features were found in the non wallet coin features set.",
+                            len(coin_wallet_features_ids))
+            else:
+                logger.warning(f"Wallet features contain {len(wallet_features_only_ids)} coins "
+                            "not in the non wallet coin features")
+
+            # Join together
+            coin_training_data_df_full = coin_wallet_features_df.join(prior_coin_model_features_df,how='inner')
+
+        else:
+            # Just return base features if prior model features aren't input
+            coin_training_data_df_full = coin_wallet_features_df
+
+        logger.info("Final features shape: %s",coin_training_data_df_full.shape)
+
+        return coin_training_data_df_full
