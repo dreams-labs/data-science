@@ -153,6 +153,13 @@ class CoinTrainingDataOrchestrator:
         - cw_metrics_df (DataFrame): MultiIndex [coin_id, wallet_address] with
           'balances/...’ and 'trading/...’ feature columns.
         """
+        # Confirm time period is correct
+        u.assert_period(
+            modeling_profits_df,
+            self.wallets_config['training_data']['modeling_period_start'],
+            self.wallets_config['training_data']['modeling_period_end']
+        )
+
         # 1) Build base index of all (coin, wallet) pairs
         idx = (
             modeling_profits_df[['coin_id', 'wallet_address']]
