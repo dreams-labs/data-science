@@ -1,11 +1,14 @@
 """
 Orchestrates groups of functions to generate wallet model pipeline
 """
+import gc
 import logging
 import pandas as pd
 
 # Local module imports
 import feature_engineering.time_windows_orchestration as tw
+import coin_wallet_features.coin_features_orchestrator as cfo
+import coin_wallet_features.wallet_segmentation as cws
 import utils as u
 
 # Set up logger at the module level
@@ -84,3 +87,53 @@ class CoinTrainingDataOrchestrator:
         )
 
         u.notify('ui_1')
+
+
+    def build_wallet_segmentation(self) -> pd.DataFrame:
+        """
+        Build wallet segmentation DataFrame with score quantiles and optional clusters.
+        """
+        # Load wallet scores
+        wallet_scores_df = cfo.load_wallet_scores(
+            self.wallets_coin_config['wallet_segments']['wallet_scores'],
+            self.wallets_coin_config['wallet_segments']['wallet_scores_path']
+        )
+        wallet_segmentation_df = wallet_scores_df.copy()
+
+        # Add "all" segment for full-population aggregations
+        wallet_segmentation_df['all_wallets|all'] = 'all'
+        wallet_segmentation_df['all_wallets|all'] = wallet_segmentation_df['all_wallets|all'].astype('category')
+
+        # Assign score quantiles
+        wallet_segmentation_df = cws.assign_wallet_score_quantiles(
+            wallet_segmentation_df,
+            self.wallets_coin_config['wallet_segments']['wallet_scores'],
+            self.wallets_coin_config['wallet_segments']['score_segment_quantiles']
+        )
+
+        # If configured, add training-period cluster labels
+        cluster_groups = self.wallets_coin_config['wallet_segments'].get('training_period_cluster_groups')
+        if cluster_groups:
+            # Load full-window wallet features to generate clusters
+            training_df_path = (
+                f"{self.wallets_config['training_data']['parquet_folder']}"
+                "/wallet_training_data_df_full.parquet"
+            )
+            training_data_df = pd.read_parquet(training_df_path)
+            wallet_clusters_df = cws.assign_cluster_labels(
+                training_data_df,
+                cluster_groups
+            )
+            # Join and verify no rows dropped
+            orig_len = len(wallet_segmentation_df)
+            wallet_segmentation_df = wallet_segmentation_df.join(wallet_clusters_df, how='inner')
+            joined_len = len(wallet_segmentation_df)
+            if joined_len < orig_len:
+                raise ValueError(
+                    f"Join dropped {orig_len - joined_len} rows from original {orig_len} rows"
+                )
+            # Clean up
+            del training_data_df
+            gc.collect()
+
+        return wallet_segmentation_df
