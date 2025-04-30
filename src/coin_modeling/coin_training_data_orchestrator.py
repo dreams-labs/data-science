@@ -9,6 +9,7 @@ import pandas as pd
 import feature_engineering.time_windows_orchestration as tw
 import coin_wallet_features.coin_features_orchestrator as cfo
 import coin_wallet_features.wallet_segmentation as cws
+import coin_wallet_features.wallet_base_metrics as cwbm
 import utils as u
 
 # Set up logger at the module level
@@ -137,3 +138,61 @@ class CoinTrainingDataOrchestrator:
             gc.collect()
 
         return wallet_segmentation_df
+
+
+    def compute_coin_wallet_metrics(self, modeling_profits_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Compute coin-wallet–level metrics: balances and trading metrics.
+
+        Params:
+        - modeling_profits_df (DataFrame): must include columns ['coin_id','wallet_address',…].
+
+        Returns:
+        - cw_metrics_df (DataFrame): MultiIndex [coin_id, wallet_address] with
+          'balances/...’ and 'trading/...’ feature columns.
+        """
+        # 1) Build base index of all (coin, wallet) pairs
+        idx = (
+            modeling_profits_df[['coin_id', 'wallet_address']]
+            .drop_duplicates()
+            .set_index(['coin_id', 'wallet_address'])
+            .index
+        )
+        cw_metrics_df = pd.DataFrame(index=idx)
+
+        # 2) Validate configured balance dates
+        valid_balance_dates = [
+            self.wallets_config['training_data']['modeling_starting_balance_date'],
+            self.wallets_config['training_data']['modeling_period_end']
+        ]
+        bd = self.wallets_coin_config['wallet_features']['wallet_balance_dates']
+        if not all(d in valid_balance_dates for d in bd):
+            raise ValueError(
+                f"wallet_balance_dates {bd} must be one of {valid_balance_dates}"
+            )
+
+        # 3) Calculate balances
+        balances_df = cwbm.calculate_coin_wallet_balances(
+            modeling_profits_df,
+            bd
+        ).add_prefix('balances/')
+        cw_metrics_df = (
+            cw_metrics_df
+            .join(balances_df, how='left')
+            .fillna({col: 0 for col in balances_df.columns})
+        )
+
+        # 4) Calculate trading metrics
+        trading_df = cwbm.calculate_coin_wallet_trading_metrics(
+            modeling_profits_df,
+            self.wallets_config['training_data']['modeling_period_start'],
+            self.wallets_config['training_data']['modeling_period_end'],
+            self.wallets_coin_config['wallet_features']['drop_trading_metrics']
+        ).add_prefix('trading/')
+        cw_metrics_df = (
+            cw_metrics_df
+            .join(trading_df, how='left')
+            .fillna({col: 0 for col in trading_df.columns})
+        )
+
+        return cw_metrics_df
