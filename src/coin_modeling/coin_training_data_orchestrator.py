@@ -92,14 +92,15 @@ class CoinTrainingDataOrchestrator:
         return coin_features_df
 
 
-    def build_wallet_segmentation(self) -> pd.DataFrame:
+    def build_wallet_segmentation(self, score_suffix: str = None) -> pd.DataFrame:
         """
         Build wallet segmentation DataFrame with score quantiles and optional clusters.
         """
         # Load wallet scores
         wallet_scores_df = cfo.load_wallet_scores(
             self.wallets_coin_config['wallet_segments']['wallet_scores'],
-            self.wallets_coin_config['wallet_segments']['wallet_scores_path']
+            self.wallets_coin_config['wallet_segments']['wallet_scores_path'],
+            score_suffix
         )
         wallet_segmentation_df = wallet_scores_df.copy()
 

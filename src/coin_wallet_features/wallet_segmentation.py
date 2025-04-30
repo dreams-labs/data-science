@@ -42,10 +42,14 @@ def calculate_wallet_quantiles(score_series: pd.Series, quantiles: list[float]) 
 
     # Create labels for each bin (e.g. '0_40pct', '40_60pct', etc)
     bin_labels = []
+
     for i in range(len(bin_edges) - 1):
         start_pct = int(quantiles[i-1] * 100) if i > 0 else 0
         end_pct = int(quantiles[i] * 100) if i < len(quantiles) else 100
         bin_labels.append(f'{start_pct}_{end_pct}pct')
+
+    # Merge if any boundaries are duplicated
+    bin_edges, bin_labels = consolidate_duplicate_bins(bin_edges, bin_labels)
 
     # Create result DataFrame with quantile assignments
     result_df = pd.DataFrame(index=score_series.index)
@@ -54,18 +58,64 @@ def calculate_wallet_quantiles(score_series: pd.Series, quantiles: list[float]) 
         score_series,
         bins=bin_edges,
         labels=bin_labels,
-        include_lowest=True
+        include_lowest=True,
+        duplicates='drop'
     ).astype('category')
 
     # Validate all wallets have segments and segment count is correct
     unique_segments = result_df[column_name].unique()
     if result_df[column_name].isna().any():
         raise ValueError("Some wallets are missing segment assignments")
-    if len(unique_segments) != len(quantiles) + 1:
-        raise ValueError(f"Expected {len(quantiles) + 1} segments but found {len(unique_segments)}: {unique_segments}")
+    if len(bin_edges) != len(bin_labels) + 1:
+        raise ValueError(f"Expected {len(bin_edges) + 1} segments but found {len(unique_segments)}: {unique_segments}")
 
     return result_df
 
+
+def consolidate_duplicate_bins(bin_edges, bin_labels):
+    """
+    Consolidate duplicate bin edges by merging their corresponding labels.
+
+    Params:
+    - bin_edges (list): List of bin edges with possible duplicates
+    - bin_labels (list): List of bin labels corresponding to bin_edges
+
+    Returns:
+    - tuple: (new_bin_edges, new_bin_labels) with duplicates resolved
+    """
+    # 1) Build the ordered list of unique edges
+    unique_edges = [bin_edges[0]]
+    for edge in bin_edges[1:]:
+        if edge != unique_edges[-1]:
+            unique_edges.append(edge)
+
+    # 2) For each new interval, merge original labels that fall within it
+    new_labels = []
+    for i in range(len(unique_edges) - 1):
+        left, right = unique_edges[i], unique_edges[i + 1]
+        # indices of original intervals fully within [left, right]
+        overlap_idxs = [
+            j for j, (l, r) in enumerate(zip(bin_edges[:-1], bin_edges[1:]))
+            if l >= left and r <= right
+        ]
+        grp = [bin_labels[j] for j in overlap_idxs]
+        if len(grp) == 1:
+            new_labels.append(grp[0])
+        else:
+            # pick prefix from the first non-zero-width interval
+            non_zero = [
+                j for j in overlap_idxs
+                if bin_edges[j] != bin_edges[j + 1]
+            ]
+            if non_zero:
+                prefix = bin_labels[non_zero[0]].split('_')[0]
+            else:
+                prefix = grp[0].split('_')[0]
+            # suffix from the last original label
+            suffix = grp[-1].split('_')[-1]
+            new_labels.append(f"{prefix}_{suffix}")
+
+    return unique_edges, new_labels
 
 
 def assign_wallet_score_quantiles(wallet_segmentation_df, wallet_scores, score_segment_quantiles):

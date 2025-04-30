@@ -19,7 +19,7 @@ wallets_coin_config = yaml.safe_load(Path('../config/wallets_coin_config.yaml').
 
 
 
-def load_wallet_scores(wallet_scores: list, wallet_scores_path: str) -> pd.DataFrame:
+def load_wallet_scores(wallet_scores: list, wallet_scores_path: str, score_suffix: str = None) -> pd.DataFrame:
     """
     Params:
     - wallet_scores (list): List of score names to merge
@@ -34,7 +34,7 @@ def load_wallet_scores(wallet_scores: list, wallet_scores_path: str) -> pd.DataF
     wallet_scores_df = pd.DataFrame()
 
     for score_name in wallet_scores:
-        score_df = pd.read_parquet(f"{wallet_scores_path}/{score_name}.parquet")
+        score_df = pd.read_parquet(f"{wallet_scores_path}/{score_name}{score_suffix}.parquet")
         feature_cols = []
 
         # Add scores column
