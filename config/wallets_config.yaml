@@ -31,8 +31,8 @@ training_data:
     hybridize_wallet_ids: True  # if true, training data will be keyed on wallet-coin pairs
 
     # Local pipeline configs
-    dataset: dev  # Set to prod or dev; determines whether to query core or dev dataset tables
-    parquet_folder: temp/wallet_modeling_dfs/dev  # where to store parquet files
+    dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
+    parquet_folder: temp/wallet_modeling_dfs/dda699  # where to store parquet files
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
 
