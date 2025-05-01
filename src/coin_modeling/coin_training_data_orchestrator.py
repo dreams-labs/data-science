@@ -4,6 +4,7 @@ Orchestrates groups of functions to generate wallet model pipeline
 import gc
 import logging
 import importlib
+from datetime import timedelta
 import pandas as pd
 
 # Local module imports
@@ -48,11 +49,69 @@ class CoinTrainingDataOrchestrator:
         self.como_market_data_df = None
 
 
+    # ----------------------------------------
+    #       Primary Orchestration Method
+    # ----------------------------------------
+
+    def generate_coin_features_for_period(
+        self,
+        profits_df: pd.DataFrame,
+        period: str,
+        prd: str
+    ) -> pd.DataFrame:
+        """
+        Compute coin-wallet metrics for a specific period and build coin features.
+
+        Params:
+        - profits_df (DataFrame): profits data for the specified period
+        - period (str): period identifier (e.g., 'coin_modeling')
+        - prd (str): abbreviated prefix for saved files (e.g., 'como')
+
+        Returns:
+        - coin_training_data_df_full (DataFrame): full coin-level feature set
+        """
+        # Generate metrics for coin-wallet pairs
+        cw_metrics_df = self._compute_coin_wallet_metrics(
+            profits_df,
+            self.wallets_config['training_data'][f'{period}_period_start'],
+            self.wallets_config['training_data'][f'{period}_period_end']
+        )
+
+        # Assign wallets to segments
+        wallet_segmentation_df = self._build_wallet_segmentation(score_suffix=f'|{prd}')
+
+        # Flatten cw_metrics into single values for each coin-segment pair
+        coin_wallet_features_df = self._flatten_cw_to_coin_segment_features(
+            cw_metrics_df,
+            wallet_segmentation_df
+        )
+
+        # Generate and merge prior model features if configured
+        if self.wallets_coin_config['wallet_features']['toggle_prior_model_features']:
+            prior_coin_model_features_df = self._generate_prior_coin_model_features()
+            prior_coin_model_features_df.to_parquet(
+                f"{self.wallets_coin_config['training_data']['parquet_folder']}"
+                f"/{prd}_prior_coin_model_features_df.parquet",
+                index=True
+            )
+            coin_training_data_df_full = self._merge_all_features(
+                coin_wallet_features_df,
+                prior_coin_model_features_df
+            )
+        else:
+            coin_training_data_df_full = coin_wallet_features_df
+
+        return coin_training_data_df_full
+
+
+
+
+
     # ----------------------------------
     #           Helper Methods
     # ----------------------------------
 
-    def generate_prior_coin_model_features(
+    def _generate_prior_coin_model_features(
         self,
     ) -> pd.DataFrame:
         """
@@ -92,7 +151,7 @@ class CoinTrainingDataOrchestrator:
         return coin_features_df
 
 
-    def build_wallet_segmentation(self, score_suffix: str = None) -> pd.DataFrame:
+    def _build_wallet_segmentation(self, score_suffix: str = None) -> pd.DataFrame:
         """
         Build wallet segmentation DataFrame with score quantiles and optional clusters.
         """
@@ -143,27 +202,30 @@ class CoinTrainingDataOrchestrator:
         return wallet_segmentation_df
 
 
-    def compute_coin_wallet_metrics(self, modeling_profits_df: pd.DataFrame) -> pd.DataFrame:
+    def _compute_coin_wallet_metrics(
+            self,
+            profits_df: pd.DataFrame,
+            period_start: str,
+            period_end: str
+            ) -> pd.DataFrame:
         """
         Compute coin-wallet–level metrics: balances and trading metrics.
 
         Params:
-        - modeling_profits_df (DataFrame): must include columns ['coin_id','wallet_address',…].
+        - profits_df (DataFrame): must include columns ['coin_id','wallet_address',…].
+        - period_start,period_end str(YYYY-MM-DD): period start and end dates
 
         Returns:
         - cw_metrics_df (DataFrame): MultiIndex [coin_id, wallet_address] with
           'balances/...’ and 'trading/...’ feature columns.
         """
         # Confirm time period is correct
-        u.assert_period(
-            modeling_profits_df,
-            self.wallets_config['training_data']['modeling_period_start'],
-            self.wallets_config['training_data']['modeling_period_end']
-        )
+        u.assert_period(profits_df, period_start, period_end)
+        starting_balance_date = (pd.to_datetime(period_start) - timedelta(days=1)).strftime('%Y-%m-%d')
 
         # 1) Build base index of all (coin, wallet) pairs
         idx = (
-            modeling_profits_df[['coin_id', 'wallet_address']]
+            profits_df[['coin_id', 'wallet_address']]
             .drop_duplicates()
             .set_index(['coin_id', 'wallet_address'])
             .index
@@ -172,19 +234,19 @@ class CoinTrainingDataOrchestrator:
 
         # 2) Validate configured balance dates
         valid_balance_dates = [
-            self.wallets_config['training_data']['modeling_starting_balance_date'],
-            self.wallets_config['training_data']['modeling_period_end']
+            starting_balance_date,
+            period_end
         ]
-        bd = self.wallets_coin_config['wallet_features']['wallet_balance_dates']
-        if not all(d in valid_balance_dates for d in bd):
+        balance_dates = self.wallets_coin_config['wallet_features']['wallet_balance_dates']
+        if not all(date in valid_balance_dates for date in balance_dates):
             raise ValueError(
-                f"wallet_balance_dates {bd} must be one of {valid_balance_dates}"
+                f"wallet_balance_dates {balance_dates} must be one of {valid_balance_dates}"
             )
 
         # 3) Calculate balances
         balances_df = cwbm.calculate_coin_wallet_balances(
-            modeling_profits_df,
-            bd
+            profits_df,
+            balance_dates
         ).add_prefix('balances/')
         cw_metrics_df = (
             cw_metrics_df
@@ -194,9 +256,9 @@ class CoinTrainingDataOrchestrator:
 
         # 4) Calculate trading metrics
         trading_df = cwbm.calculate_coin_wallet_trading_metrics(
-            modeling_profits_df,
-            self.wallets_config['training_data']['modeling_period_start'],
-            self.wallets_config['training_data']['modeling_period_end'],
+            profits_df,
+            period_start,
+            period_end,
             self.wallets_coin_config['wallet_features']['drop_trading_metrics']
         ).add_prefix('trading/')
         cw_metrics_df = (
@@ -208,7 +270,7 @@ class CoinTrainingDataOrchestrator:
         return cw_metrics_df
 
 
-    def flatten_cw_to_coin_segment_features(
+    def _flatten_cw_to_coin_segment_features(
         self,
         cw_metrics_df: pd.DataFrame,
         wallet_segmentation_df: pd.DataFrame
@@ -256,7 +318,7 @@ class CoinTrainingDataOrchestrator:
         return coin_wallet_features_df
 
 
-    def merge_all_features(
+    def _merge_all_features(
         self,
         coin_wallet_features_df: pd.DataFrame,
         prior_coin_model_features_df: pd.DataFrame = None

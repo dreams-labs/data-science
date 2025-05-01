@@ -50,6 +50,9 @@ wallet_features:
         average_transaction
     ]
 
+    # Features from the feature_engineering directory
+    toggle_prior_model_features: False
+
 
 # CoinModel Modeling Config
 # Variables used in the generation of the validation period coin model
