@@ -150,6 +150,10 @@ class MultiEpochOrchestrator:
         training_validation_dfs = {}
         modeling_validation_dfs = {}
 
+        # Track progress of epoch completions
+        total_epochs = len(self.all_epochs_configs)
+        completed_epochs = 0
+
         # Set a suitable number of threads. You could retrieve this from config; here we use 8 as an example.
         max_workers = self.base_config['n_threads']['concurrent_epochs']
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -158,6 +162,11 @@ class MultiEpochOrchestrator:
             for future in as_completed(futures):
                 cfg = futures[future]
                 epoch_date, epoch_training_df, epoch_modeling_df = future.result()
+
+                # Log progress
+                completed_epochs += 1
+                logger.milestone(f"Epoch {completed_epochs}/{total_epochs} completed for modeling_period_start "
+                                 "{cfg['training_data']['modeling_period_start']}")
 
                 # Downcast dtypes
                 epoch_training_df = u.df_downcast(epoch_training_df)
@@ -265,7 +274,7 @@ class MultiEpochOrchestrator:
 
             u.assert_matching_indices(epoch_training_data_df,epoch_modeling_data_df)
 
-        logger.milestone(f"Successfully generated features for epoch {model_start}.")
+        logger.info(f"Successfully generated features for epoch {model_start}.")
 
         return epoch_date, epoch_training_data_df, epoch_modeling_data_df
 
@@ -289,7 +298,6 @@ class MultiEpochOrchestrator:
         - epoch_modeling_data_df (DataFrame): Modeling features for this epoch
         - cohorts (Dict[Set,np.array]): The wallets and coins included in the training data
         """
-        model_start = epoch_config['training_data']['modeling_period_start']
         if cohorts is None:
             cohorts = {}
 
