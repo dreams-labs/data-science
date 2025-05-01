@@ -153,4 +153,12 @@ def add_derived_values(config_dict: dict) -> dict:
     td['coin_modeling_period_start'] = (modeling_end + timedelta(days=1)).strftime("%Y-%m-%d")
     td['coin_modeling_period_end'] = (modeling_end + timedelta(days=modeling_duration)).strftime("%Y-%m-%d")
 
+    # Investing Period Boundaries
+    td['investing_period_start'] = (
+        modeling_end + timedelta(days=modeling_duration + 1)
+    ).strftime("%Y-%m-%d")
+    td['investing_period_end'] = (
+        modeling_end + timedelta(days=2 * modeling_duration)
+    ).strftime("%Y-%m-%d")
+
     return cfg
