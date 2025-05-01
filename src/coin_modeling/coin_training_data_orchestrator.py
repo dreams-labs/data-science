@@ -109,7 +109,8 @@ class CoinTrainingDataOrchestrator:
         self,
         market_data_df: pd.DataFrame,
         period_start: str,
-        period_end: str
+        period_end: str,
+        coin_cohort: pd.Series
     ) -> pd.DataFrame:
         """
         Params:
@@ -121,6 +122,9 @@ class CoinTrainingDataOrchestrator:
         - coin_performance_df (DataFrame): Coin performance metrics with target variables.
         """
         u.assert_period(market_data_df, period_start, period_end)
+
+        # Filter to cohort
+        market_data_df = market_data_df[market_data_df.index.get_level_values('coin_id').isin(coin_cohort)]
 
         # Calculate coin return performance during validation period
         coin_performance_df = civa.calculate_coin_performance(
@@ -144,13 +148,13 @@ class CoinTrainingDataOrchestrator:
         )
 
         # Validation: check if any coin_ids missing from final features
-        missing_coins = set(self.training_coin_cohort) - set(coin_performance_df.index)
+        missing_coins = coin_cohort - set(coin_performance_df.index)
         if missing_coins:
             raise ValueError(
                 f"Found {len(missing_coins)} coin_ids in training_data_df without validation period target variables."
             )
 
-        return coin_performance_df
+        return coin_performance_df.sort_index()
 
 
 

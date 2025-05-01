@@ -228,7 +228,8 @@ coin_modeling:
 
         n_iter: 400  # random search limit
         n_splits: 4  # cv splits
-        scoring: neg_root_mean_squared_error
+        regressor_scoring: neg_root_mean_squared_error
+        classifier_scoring: coin_validation_auc_scorer
 
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # scikit-learn verbosity
@@ -238,27 +239,27 @@ coin_modeling:
         param_grid:
 
             # # Depth and Child Weight
-            regressor__max_depth: [3,4,5,6]
-            regressor__min_child_weight: [10,15,20,25]
+            estimator__max_depth: [3,4,5,6]
+            # estimator__min_child_weight: [10,15,20,25]
 
             # Col/Row Sampling
-            # regressor__subsample: [0.5, .6, .7, .8, .9, 1.0]
-            # regressor__colsample_bytree: [0.9, 1.0]
+            # estimator__subsample: [0.5, .6, .7, .8, .9, 1.0]
+            # estimator__colsample_bytree: [0.9, 1.0]
 
             # # Model Speed
-            # regressor__tree_method: [hist, approx, auto]
-            # regressor__max_bin: [64, 128, 256]
-            # regressor__gamma: [0.0, 0.1, 1.0]  # controls the minimum loss reduction needed to split a node
+            # estimator__tree_method: [hist, approx, auto]
+            # estimator__max_bin: [64, 128, 256]
+            # estimator__gamma: [0.0, 0.1, 1.0]  # controls the minimum loss reduction needed to split a node
 
             # # Tree Training Speed Overrides
-            # regressor__n_estimators: [150]
-            # regressor__learning_rate: [0.02]
+            # estimator__n_estimators: [150]
+            # estimator__learning_rate: [0.02]
 
             # Optimize for Speed
-            regressor__n_jobs: [4]  # how many models to build at once
-            regressor__nthread: [4]  # how many threads each model can use
-            # regressor__max_bin: [128]
-            # regressor__tree_method: [hist]
+            estimator__n_jobs: [4]  # how many models to build at once
+            estimator__nthread: [4]  # how many threads each model can use
+            # estimator__max_bin: [128]
+            # estimator__tree_method: [hist]
 
             # drop_columns__drop_patterns: [
                 # [],
