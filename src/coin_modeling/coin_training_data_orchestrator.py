@@ -12,6 +12,7 @@ import feature_engineering.time_windows_orchestration as tw
 import coin_wallet_features.coin_features_orchestrator as cfo
 import coin_wallet_features.wallet_segmentation as cws
 import coin_wallet_features.wallet_base_metrics as cwbm
+import coin_insights.coin_validation_analysis as civa
 import utils as u
 importlib.reload(cfo)
 
@@ -49,9 +50,9 @@ class CoinTrainingDataOrchestrator:
         self.como_market_data_df = None
 
 
-    # ----------------------------------------
-    #       Primary Orchestration Method
-    # ----------------------------------------
+    # -----------------------------------------
+    #       Primary Orchestration Methods
+    # -----------------------------------------
 
     def generate_coin_features_for_period(
         self,
@@ -103,6 +104,57 @@ class CoinTrainingDataOrchestrator:
 
         return coin_training_data_df_full
 
+
+    def calculate_target_variables(
+        self,
+        market_data_df: pd.DataFrame,
+        period_start: str,
+        period_end: str,
+        coin_cohort: pd.Series
+    ) -> pd.DataFrame:
+        """
+        Params:
+        - market_data_df (DataFrame): Market data for target variable period.
+        - period_start (str): Period start date (YYYY-MM-DD).
+        - period_end (str): Period end date (YYYY-MM-DD).
+
+        Returns:
+        - coin_performance_df (DataFrame): Coin performance metrics with target variables.
+        """
+        u.assert_period(market_data_df, period_start, period_end)
+
+        # Filter to cohort
+        market_data_df = market_data_df[market_data_df.index.get_level_values('coin_id').isin(coin_cohort)]
+
+        # Calculate coin return performance during validation period
+        coin_performance_df = civa.calculate_coin_performance(
+            market_data_df,
+            period_start,
+            period_end
+        )
+
+        # Drop columns with np.nan coin_return values, which indicate a 0 starting price
+        coin_performance_df = coin_performance_df.dropna()
+
+        # Add winsorized return
+        coin_performance_df['coin_return_winsorized'] = u.winsorize(
+            coin_performance_df['coin_return'],
+            self.wallets_coin_config['coin_modeling']['returns_winsorization']
+        )
+
+        # Add full percentile (meaning it's a percentile of all coins prior to any population filtering)
+        coin_performance_df['coin_return_pctile_full'] = (
+            coin_performance_df['coin_return'].rank(pct=True, ascending=True)
+        )
+
+        # Validation: check if any coin_ids missing from final features
+        missing_coins = coin_cohort - set(coin_performance_df.index)
+        if missing_coins:
+            raise ValueError(
+                f"Found {len(missing_coins)} coin_ids in training_data_df without validation period target variables."
+            )
+
+        return coin_performance_df.sort_index()
 
 
 

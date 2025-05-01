@@ -6,6 +6,7 @@ from sklearn.pipeline import Pipeline
 
 # Local module imports
 from base_modeling.base_model import BaseModel
+import base_modeling.scorers as sco
 import utils as u
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
@@ -38,6 +39,10 @@ class CoinModel(BaseModel):
         self.validation_coin_df = None
 
 
+    # -----------------------------------
+    #         Primary Interface
+    # -----------------------------------
+
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def construct_coin_model(
             self,
@@ -63,17 +68,19 @@ class CoinModel(BaseModel):
         logger.info("Preparing training data for coin model construction...")
         u.notify('click_coin_model')
 
-        # # Validate indices and store DataFrames
-        # u.assert_matching_indices(training_df, modeling_coin_df)
-        # self.training_data_df = training_df
-        # self.modeling_coin_df = modeling_coin_df
+        # Store validation data if provided
+        if validation_df is not None and validation_coin_df is not None:
 
-        # # Store validation data if provided
-        # if validation_df is not None and validation_coin_df is not None:
-        #     u.assert_matching_indices(validation_df, validation_coin_df)
-        #     self.X_validation = validation_df
-        #     self.validation_coin_df = validation_coin_df
-        #     logger.info(f"Validation data with {len(validation_df)} records loaded.")
+            # Prepare and store validation datasets
+            self.X_validation, self.validation_wallet_features_df = self._prepare_data(
+                validation_df,
+                validation_coin_df
+            )
+
+            # Confirm aligned indices
+            u.assert_matching_indices(validation_df, validation_coin_df)
+
+            logger.info(f"Validation data with {len(self.X_validation)} records loaded.")
 
         # Prepare and split data
         X, y = self._prepare_data(training_df, modeling_coin_df)
@@ -84,6 +91,16 @@ class CoinModel(BaseModel):
 
         # Run grid search if enabled
         if self.modeling_config.get('grid_search_params', {}).get('enabled'):
+
+            # Use validation_auc_scorer if configured
+            if (self.modeling_config['model_type']=='classification'
+                and self.modeling_config['grid_search_params']['classifier_scoring']
+                == 'coin_validation_auc_scorer'):
+
+                self.modeling_config['grid_search_params']['scoring'] = \
+                    sco.coin_validation_auc_scorer(self)
+
+            # Grid search
             cv_results = self._run_grid_search(self.X_train, self.y_train, pipeline=meta_pipeline)
             if cv_results.get('best_params'):
                 best_params = {
@@ -121,8 +138,8 @@ class CoinModel(BaseModel):
         # Validation predictions
         if self.X_validation is not None:
             result['X_validation'] = self.X_validation
-            result['validation_coin_df'] = self.validation_coin_df
-            result['y_validation'] = self.y_pipeline.transform(self.validation_coin_df)
+            result['validation_wallet_features_df'] = self.validation_wallet_features_df
+            result['y_validation'] = self.y_pipeline.transform(self.validation_wallet_features_df)
             result['y_validation_pred'] = meta_pipeline.predict(self.X_validation)
             if self.modeling_config['model_type'] == 'classification':
                 X_val_trans = meta_pipeline.x_transformer_.transform(self.X_validation)
@@ -160,13 +177,6 @@ class CoinModel(BaseModel):
         training_data_df: pd.DataFrame,
         target_vars_df: pd.DataFrame
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-
-        # Remove target var records for out of population coins
-        missing_coins = set(training_data_df.index) - set(target_vars_df.index)
-        if missing_coins:
-            raise ValueError(f"Found {len(missing_coins)} coin_ids in training_data_df without "
-                             "target variables.")
-        target_vars_df = target_vars_df.loc[target_vars_df.index.isin(training_data_df.index)]
 
         # Convert index to str (from categorical) and sort
         training_data_df.index = training_data_df.index.astype(str)
