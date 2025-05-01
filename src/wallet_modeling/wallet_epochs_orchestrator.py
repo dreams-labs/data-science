@@ -265,6 +265,8 @@ class MultiEpochOrchestrator:
 
             u.assert_matching_indices(epoch_training_data_df,epoch_modeling_data_df)
 
+        logger.milestone(f"Successfully generated features for epoch {model_start}.")
+
         return epoch_date, epoch_training_data_df, epoch_modeling_data_df
 
 
@@ -383,8 +385,6 @@ class MultiEpochOrchestrator:
             'coin_cohort': training_coin_cohort,
             'wallet_cohort': training_generator.training_wallet_cohort
         }
-
-        logger.milestone(f"Successfully generated features for epoch {model_start}.")
 
         return epoch_date, epoch_training_data_df, epoch_modeling_data_df, cohorts
 
