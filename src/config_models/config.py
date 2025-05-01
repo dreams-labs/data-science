@@ -41,6 +41,8 @@ class TrainingDataConfig(NoExtrasBaseModel):
     modeling_period_end: date = Field(...)
     coin_modeling_period_start: date = Field(...)
     coin_modeling_period_end: date = Field(...)
+    investing_period_start: date = Field(...)
+    investing_period_end: date = Field(...)
     additional_windows: int = Field(..., ge=0)
     time_window_frequency: int = Field(..., gt=0)
     earliest_window_start: date = Field(...)

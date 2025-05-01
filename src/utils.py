@@ -184,6 +184,12 @@ def calculate_period_dates(config):
     coin_modeling_period_end = modeling_period_end + timedelta(days=modeling_period_duration)
 
 
+    # Investing Period Dates
+    # -------------------
+    investing_period_start = coin_modeling_period_end + timedelta(days=1)
+    investing_period_end = coin_modeling_period_end + timedelta(days=modeling_period_duration)
+
+
     # Lookback Dates
     # --------------
     # Calculate the start date of the earliest window
@@ -213,6 +219,8 @@ def calculate_period_dates(config):
         'modeling_period_end': modeling_period_end.strftime('%Y-%m-%d'),
         'coin_modeling_period_start': coin_modeling_period_start.strftime('%Y-%m-%d'),
         'coin_modeling_period_end': coin_modeling_period_end.strftime('%Y-%m-%d'),
+        'investing_period_start': investing_period_start.strftime('%Y-%m-%d'),
+        'investing_period_end': investing_period_end.strftime('%Y-%m-%d'),
         'earliest_window_start': earliest_window_start.strftime('%Y-%m-%d'),
         'earliest_cohort_lookback_start': earliest_cohort_lookback_start.strftime('%Y-%m-%d')
     }

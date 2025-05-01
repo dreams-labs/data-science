@@ -22,7 +22,7 @@ wallet_segments:
     # Scores to include as segments + metrics
     wallet_scores_path: temp/wallet_modeling_score_dfs
     wallet_scores: [
-        dda_698_coin_model_revival
+        dda_698_coin_model_revival_dev
     ]
     wallet_scores_residuals_segments: False
     wallet_scores_confidence_segments: False
@@ -49,6 +49,9 @@ wallet_features:
     drop_trading_metrics: [
         average_transaction
     ]
+
+    # Features from the feature_engineering directory
+    toggle_prior_model_features: False
 
 
 # CoinModel Modeling Config
