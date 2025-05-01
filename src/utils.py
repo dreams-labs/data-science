@@ -186,7 +186,7 @@ def calculate_period_dates(config):
 
     # Investing Period Dates
     # -------------------
-    investing_period_start = coin_modeling_period_start + timedelta(days=1)
+    investing_period_start = coin_modeling_period_end + timedelta(days=1)
     investing_period_end = coin_modeling_period_end + timedelta(days=modeling_period_duration)
 
 
