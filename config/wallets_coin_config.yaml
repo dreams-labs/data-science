@@ -22,7 +22,7 @@ wallet_segments:
     # Scores to include as segments + metrics
     wallet_scores_path: temp/wallet_modeling_score_dfs
     wallet_scores: [
-        dda_698_coin_model_revival_dev
+        dda_719_net_gain_max_investment
     ]
     wallet_scores_residuals_segments: False
     wallet_scores_confidence_segments: False
@@ -67,7 +67,7 @@ coin_modeling:
     target_variable: coin_return_winsorized
     # target_variable: coin_return_pctile_full
     # target_variable: coin_return_pctile
-    target_var_class_threshold: 0.4  # a classification model will try to predict the target var above this value
+    target_var_class_threshold: 0.3  # a classification model will try to predict the target var above this value
 
     returns_winsorization: 0.03
 
