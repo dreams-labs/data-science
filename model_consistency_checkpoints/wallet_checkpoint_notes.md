@@ -1,4 +1,30 @@
 # dda 719 reversed AUC investigation
+checkpoint 2: wval.870 dda719 data dda699 configs
+Model Performance Summary
+Target: cw_crypto_net_gain/max_investment/winsorized
+ID: 3908d7c0-b87a-497f-a71d-8b4ed3c52c41
+===================================
+Test Samples:             181,792
+Number of Features:       335
+Features per Window:      67
+
+Classification Metrics
+-----------------------------------
+ROC AUC:                  0.985
+Log Loss:                 0.028
+Accuracy:                 0.990
+Precision:                0.815
+Recall:                   0.403
+F1 Score:                 0.540
+
+Validation Return Metrics
+-----------------------------------
+Val ROC AUC:              0.870
+Top 1% Avg Return:        0.382
+Top 5% Avg Return:        0.390
+Overall Avg Return:       -0.024
+
+
 checkpoint 1: wval.871 dda699 data works fine
 Model Performance Summary
 Target: cw_crypto_net_gain/max_investment/winsorized
