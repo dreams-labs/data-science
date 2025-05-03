@@ -22,6 +22,7 @@ from sklearn.metrics import (
     PrecisionRecallDisplay
 )
 from dreams_core import core as dc
+import utils as u
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
 
@@ -449,6 +450,184 @@ class RegressorEvaluator:
         ax.set_ylabel('Density')
         ax.legend()
 
+
+    def _plot_return_vs_rank(self, ax, n_buckets: int = 100):
+        """
+        Create a line chart showing mean returns by prediction-rank bucket.
+        Bucket 1 = top-score wallets (left), bucket n = lowest (right).
+        Y-axis shows mean actual return in each bucket (validation set).
+        """
+        # need validation preds + raw returns
+        if self.y_validation_pred is None or self.validation_wallet_features_df is None:
+            ax.text(0.5, 0.5, "Validation data not available",
+                    ha="center", va="center")
+            return
+
+        target_var = self.modeling_config["target_variable"]
+
+        # Create a DataFrame with predictions and target values
+        # Handle both NumPy arrays and pandas Series/DataFrames
+        if hasattr(self.y_validation_pred, 'index'):  # pandas Series/DataFrame
+            # Use pandas index for alignment
+            returns = self.validation_wallet_features_df[target_var].reindex(
+                self.y_validation_pred.index
+            )
+            df = pd.DataFrame({"pred": self.y_validation_pred, "ret": returns}).dropna()
+        else:  # NumPy array
+            # Since we don't have index, use positions - assumes validation_wallet_features_df is aligned
+            returns = self.validation_wallet_features_df[target_var].values
+            df = pd.DataFrame({
+                "pred": self.y_validation_pred,
+                "ret": returns
+            }).dropna()
+
+        # Equal-count buckets on predictions
+        try:
+            df["bucket_raw"] = pd.qcut(df["pred"], n_buckets, labels=False, duplicates="drop")
+        except ValueError:  # very few unique preds → fall back
+            n_unique = df["pred"].nunique()
+            nb = max(2, min(n_buckets, n_unique))
+            df["bucket_raw"] = pd.qcut(df["pred"], nb, labels=False, duplicates="drop")
+            n_buckets = nb
+
+        # Re-index so bucket 1 = highest scores
+        df["bucket"] = n_buckets - df["bucket_raw"]
+
+        bucket_mean = (
+            df.groupby("bucket")["ret"]
+            .mean()
+            .reindex(range(1, n_buckets + 1))   # ensure missing buckets appear as NaN
+        )
+        overall_mean = df["ret"].mean()
+
+        # Calculate y-axis limits with buffer
+        min_val = min(bucket_mean.min(), overall_mean)
+        max_val = max(bucket_mean.max(), overall_mean)
+        y_range = max_val - min_val
+
+        # Add buffer (20% on each side)
+        buffer = y_range * 0.2
+        y_min = min_val - buffer
+        y_max = max_val + buffer
+
+        # Plot as line chart with markers
+        ax.plot(bucket_mean.index, bucket_mean.values,
+                marker='o', markersize=5, linewidth=2, color="#145a8d")
+
+        # Add overall mean reference line
+        ax.axhline(overall_mean, linestyle="--", color="#afc6ba",
+                linewidth=1, label="Overall mean")
+
+        # Set axis limits with buffer
+        ax.set_ylim(y_min, y_max)
+
+        # Add grid for better readability
+        ax.grid(True, linestyle=":", alpha=0.3)
+
+        # Labels and title
+        ax.set_xlabel("Prediction-rank bucket (1 = top scores)")
+        ax.set_ylabel(f"Mean {target_var} during validation")
+        ax.set_title("Return vs Rank – Validation")
+        ax.legend()
+
+
+    def _plot_combined_score_return(self, ax, n_buckets: int = 25):
+        """
+        Combined visualization showing both:
+        1. Score distribution (KDE plot on left Y-axis)
+        2. Average return by score bucket (line plot on right Y-axis)
+
+        X-axis shows the actual prediction scores rather than percentiles.
+        """
+        # Check if validation data is available
+        if self.y_validation_pred is None or self.validation_wallet_features_df is None:
+            # Fall back to just showing score distribution without returns
+            self._plot_score_distribution(ax)
+            ax.text(0.5, 0.1, "Return data not available (validation set missing)",
+                    ha="center", va="center", alpha=0.7, transform=ax.transAxes)
+            return
+
+        # Create a twin axis for the return line
+        ax_ret = ax.twinx()
+
+        # 1. Plot score distribution on primary Y-axis (left)
+        sns.kdeplot(data=self.y_test, ax=ax, label='Actual', color='#69c4ff')
+        sns.kdeplot(data=self.y_pred, ax=ax, label='Predicted', color='#ff6969')
+
+        ax.axvline(np.mean(self.y_test), color='#69c4ff', linestyle='--', alpha=0.5)
+        ax.axvline(np.mean(self.y_pred), color='#ff6969', linestyle='--', alpha=0.5)
+
+        ax.set_title('Score Distribution & Returns by Score')
+        ax.set_xlabel('Prediction Score')
+        ax.set_ylabel('Density', color='#afc6ba')
+        ax.tick_params(axis='y', colors='#afc6ba')
+        ax.legend(loc='upper left')
+
+        # 2. Prepare return data by score buckets
+        target_var = self.modeling_config["target_variable"]
+
+        # Extract validation data for returns
+        if hasattr(self.y_validation_pred, 'index'):  # pandas Series/DataFrame
+            returns = self.validation_wallet_features_df[target_var].reindex(
+                self.y_validation_pred.index
+            )
+            df = pd.DataFrame({"pred": self.y_validation_pred, "ret": returns}).dropna()
+        else:  # NumPy array
+            returns = self.validation_wallet_features_df[target_var].values
+            df = pd.DataFrame({
+                "pred": self.y_validation_pred,
+                "ret": returns
+            }).dropna()
+
+        # Create score buckets based on actual score values, not percentiles
+        score_min = df["pred"].min()
+        score_max = df["pred"].max()
+        bucket_edges = np.linspace(score_min, score_max, n_buckets + 1)
+
+        # Calculate mean return for each score bucket
+        buckets = []
+        for i in range(len(bucket_edges) - 1):
+            low = bucket_edges[i]
+            high = bucket_edges[i + 1]
+            mask = (df["pred"] >= low) & (df["pred"] <= high)
+
+            if mask.sum() > 0:  # Only include if there are samples
+                mean_return = df.loc[mask, "ret"].mean()
+                buckets.append({
+                    "score_mid": (low + high) / 2,
+                    "mean_return": mean_return,
+                    "count": mask.sum()
+                })
+
+        bucket_df = pd.DataFrame(buckets)
+
+        if not bucket_df.empty:
+            # 3. Plot return line on secondary Y-axis (right)
+            # Use a single fixed marker size instead of variable sizes
+            ax_ret.plot(bucket_df["score_mid"], bucket_df["mean_return"],
+                    marker='o', markersize=6, linewidth=2,
+                    color='#22DD22', label='Mean Return')
+
+            # Add horizontal line for overall mean return
+            overall_mean = df["ret"].mean()
+            ax_ret.axhline(overall_mean, linestyle=":", color='#22DD22',
+                        linewidth=1, label='Overall Mean Return')
+
+            # Set Y-axis label and color for return axis
+            ax_ret.set_ylabel(f'Mean {target_var}', color='#22DD22')
+            ax_ret.tick_params(axis='y', colors='#22DD22')
+            ax_ret.legend(loc='upper right')
+
+            # Add some buffer to the return y-axis
+            y_min, y_max = ax_ret.get_ylim()
+            y_range = y_max - y_min
+            buffer = y_range * 0.2
+            ax_ret.set_ylim(y_min - buffer, y_max + buffer)
+
+        # Add grid for better readability
+        ax.grid(True, linestyle=":", alpha=0.3)
+
+
     def plot_coin_evaluation(self, plot_type='all', display=True):
         """Generate evaluation plots for coin models."""
         if plot_type == 'all':
@@ -460,8 +639,8 @@ class RegressorEvaluator:
             ax3 = fig.add_subplot(gs[1, 0])  # Score Distribution
             ax4 = fig.add_subplot(gs[1, 1])  # Feature Importance
 
-            self._plot_actual_vs_predicted(ax1)
-            self._plot_residuals(ax2)
+            self._plot_return_vs_rank(ax1)
+            self._plot_actual_vs_predicted(ax2)
             self._plot_score_distribution(ax3)
             self._plot_feature_importance(ax4)
         else:
@@ -481,13 +660,14 @@ class RegressorEvaluator:
             return None
         return fig
 
+
     def plot_wallet_evaluation(self, plot_type='all', display=True, levels=0):
         """
         Generate evaluation plots for wallet models with cohort analysis.
 
         Params:
-        - plot_type: 'all' or one of ['actual_vs_predicted', 'residuals', 'cohort_comparison',
-          'feature_importance', 'prefix_importance']
+        - plot_type: 'all' or one of ['actual_vs_predicted', 'residuals', 'combined_score_return',
+        'feature_importance', 'prefix_importance', 'cohort_comparison']
         - display: If True, show plots directly; if False, return the figure.
         - levels: Prefix grouping depth (used only if plot_type=='prefix_importance')
         """
@@ -501,13 +681,12 @@ class RegressorEvaluator:
 
             ax1 = fig.add_subplot(gs[0, 0])  # Actual vs Predicted
             ax2 = fig.add_subplot(gs[0, 1])  # Residuals
-            ax3 = fig.add_subplot(gs[1, 0])  # Cohort Comparison
+            ax3 = fig.add_subplot(gs[1, 0])  # Combined Score & Return
             ax4 = fig.add_subplot(gs[1, 1])  # Prefix-based Importance
 
             self._plot_actual_vs_predicted(ax1)
             self._plot_residuals(ax2)
-            self._plot_cohort_comparison(ax3)
-            # Re-use the importance_summary logic via _plot_prefix_importance
+            self._plot_combined_score_return(ax3, n_buckets=50)  # New combined method
             self._plot_feature_importance(ax4, levels=levels)
         else:
             # Single plot mode
@@ -516,7 +695,9 @@ class RegressorEvaluator:
                 self._plot_actual_vs_predicted(ax)
             elif plot_type == 'residuals':
                 self._plot_residuals(ax)
-            elif plot_type == 'cohort_comparison':
+            elif plot_type == 'combined_score_return':  # New option
+                self._plot_combined_score_return(ax, n_buckets=25)
+            elif plot_type == 'cohort_comparison':  # Keep old option for backward compatibility
                 self._plot_cohort_comparison(ax)
             elif plot_type == 'feature_importance':
                 self._plot_feature_importance(ax)
@@ -527,6 +708,7 @@ class RegressorEvaluator:
             plt.show()
             return None
         return fig
+
 
     def identify_predictive_populations(
         self,
@@ -673,10 +855,15 @@ class ClassifierEvaluator(RegressorEvaluator):
             self.metrics['val_precision'] = precision_score(self.y_validation, val_pred, zero_division=0)
             self.metrics['val_recall'] = recall_score(self.y_validation, val_pred, zero_division=0)
             self.metrics['val_f1'] = f1_score(self.y_validation, val_pred, zero_division=0)
-            self.metrics['val_roc_auc'] = roc_auc_score(self.y_validation, self.y_validation_pred_proba)
+            try:
+                self.metrics['val_roc_auc'] = roc_auc_score(self.y_validation, self.y_validation_pred_proba)
+            except ValueError:
+                logger.warning("ROC AUC score failed to generate. Only like class is likely predicted.")
+                self.metrics['val_roc_auc'] = np.nan
 
         # Validation return-based metrics
-        if getattr(self, 'y_validation_pred_proba', None) is not None and hasattr(self, 'validation_wallet_features_df'):
+        if (getattr(self, 'y_validation_pred_proba', None) is not None
+            and hasattr(self, 'validation_wallet_features_df')):
             target = self.modeling_config['target_variable']
             returns = self.validation_wallet_features_df[target].reindex(self.y_validation_pred_proba.index)
             df_val = pd.DataFrame({
@@ -685,9 +872,9 @@ class ClassifierEvaluator(RegressorEvaluator):
             }).dropna()
             pct1 = np.percentile(df_val['proba'], 99)
             pct5 = np.percentile(df_val['proba'], 95)
-            self.metrics['val_return_top1'] = df_val.loc[df_val['proba'] >= pct1, 'ret'].mean()
-            self.metrics['val_return_top5'] = df_val.loc[df_val['proba'] >= pct5, 'ret'].mean()
-            self.metrics['val_return_overall'] = df_val['ret'].mean()
+            self.metrics['val_return_top1'] = df_val.loc[df_val['proba'] >= pct1, 'ret'].median()
+            self.metrics['val_return_top5'] = df_val.loc[df_val['proba'] >= pct5, 'ret'].median()
+            self.metrics['val_return_overall'] = df_val['ret'].median()
 
         # Feature importance if available
         if self.model is not None and hasattr(self.model, 'feature_importances_'):
@@ -720,9 +907,9 @@ class ClassifierEvaluator(RegressorEvaluator):
                 "Validation Return Metrics",
                 "-" * 35,
                 f"Val ROC AUC:              {self.metrics['val_roc_auc']:.3f}",
-                f"Top 1% Avg Return:        {self.metrics['val_return_top1']:.3f}",
-                f"Top 5% Avg Return:        {self.metrics['val_return_top5']:.3f}",
-                f"Overall Avg Return:       {self.metrics['val_return_overall']:.3f}",
+                f"Top 1% Median Return:        {self.metrics['val_return_top1']:.3f}",
+                f"Top 5% Median Return:        {self.metrics['val_return_top5']:.3f}",
+                f"Overall Median Return:       {self.metrics['val_return_overall']:.3f}",
                 ""
             ])
 
@@ -761,14 +948,14 @@ class ClassifierEvaluator(RegressorEvaluator):
         fig = plt.figure(figsize=(15, 12))
         gs = plt.GridSpec(2, 2, height_ratios=[1, 1], width_ratios=[1, 1])
 
-        ax1 = fig.add_subplot(gs[0, 0])  # Chart 1 placeholder
-        ax2 = fig.add_subplot(gs[0, 1])  # Chart 2 placeholder
-        ax3 = fig.add_subplot(gs[1, 0])  # Chart 3 placeholder
-        ax4 = fig.add_subplot(gs[1, 1])  # Feature importance
+        ax1 = fig.add_subplot(gs[0, 0])
+        ax2 = fig.add_subplot(gs[0, 1])
+        ax3 = fig.add_subplot(gs[1, 0])
+        ax4 = fig.add_subplot(gs[1, 1])
 
         self._plot_roc_curves(ax1)
         self._plot_pr_curves(ax2)
-        self._plot_return_vs_rank(ax3, n_buckets=100)
+        self._plot_return_vs_rank_classifier(ax3, n_buckets=50)
         self._plot_feature_importance(ax4, levels=levels)
 
 
@@ -862,12 +1049,14 @@ class ClassifierEvaluator(RegressorEvaluator):
         ax.legend()
 
 
-    def _plot_return_vs_rank(self, ax, n_buckets: int = 25):
+    def _plot_return_vs_rank_classifier(self, ax, n_buckets: int = 25):
         """
-        Bucket 1 = top-score wallets (left), bucket n = lowest (right).
-        Y-axis shows mean actual return in each bucket (validation set).
+        Plot histogram of prediction probabilities and returns by probability bins.
+        X-axis is actual prediction score.
+        Primary Y-axis: count histogram of wallets per score bin.
+        Secondary Y-axis: mean return per score bin.
         """
-        # need validation preds + raw returns
+        # Check for validation data
         if self.y_validation_pred_proba is None or self.validation_wallet_features_df is None:
             ax.text(0.5, 0.5, "Validation data not available",
                     ha="center", va="center")
@@ -877,33 +1066,66 @@ class ClassifierEvaluator(RegressorEvaluator):
         returns = self.validation_wallet_features_df[target_var].reindex(
             self.y_validation_pred_proba.index
         )
+        returns = u.winsorize(returns, 0.01)
 
         df = pd.DataFrame({"proba": self.y_validation_pred_proba, "ret": returns}).dropna()
 
-        # Equal-count buckets on probabilities
-        try:
-            df["bucket_raw"] = pd.qcut(df["proba"], n_buckets, labels=False, duplicates="drop")
-        except ValueError:                     # very few unique probs → fall back
-            n_unique = df["proba"].nunique()
-            nb = max(2, min(n_buckets, n_unique))
-            df["bucket_raw"] = pd.qcut(df["proba"], nb, labels=False, duplicates="drop")
-            n_buckets = nb
+        # Define score bins
+        score_min, score_max = df["proba"].min(), df["proba"].max()
+        bin_edges = np.linspace(score_min, score_max, n_buckets + 1)
+        df["score_bin"] = pd.cut(df["proba"], bins=bin_edges, include_lowest=True)
 
-        # Re-index so bucket 1 = highest scores
-        df["bucket"] = n_buckets - df["bucket_raw"]
+        # Compute counts and mean returns per bin
+        bin_counts = df.groupby("score_bin", observed=True).size()
+        bin_mean_ret = df.groupby("score_bin", observed=True)["ret"].median()
 
-        bucket_mean = (
-            df.groupby("bucket")["ret"]
-            .mean()
-            .reindex(range(1, n_buckets + 1))   # ensure missing buckets appear as NaN
+        # Drop bins with zero count
+        valid_bins = bin_counts[bin_counts > 0]
+        valid_centers = [
+            interval.left + (interval.right - interval.left) / 2
+            for interval in valid_bins.index
+        ]
+        valid_counts = valid_bins.values
+        valid_mean_ret = bin_mean_ret.reindex(valid_bins.index).values
+        width = bin_edges[1] - bin_edges[0]
+
+        # Primary axis: histogram of counts
+        ax.bar(valid_centers, valid_counts, width=width, alpha=0.6, label="Count")
+
+        # Use log scale for wallet counts
+        ax.set_yscale('log')
+        ax.figure.canvas.draw()
+
+        # Secondary axis: mean return line
+        ax2 = ax.twinx()
+        ax2.plot(
+            valid_centers,
+            valid_mean_ret,
+            marker='o',
+            linestyle='-',
+            linewidth=2,
+            label="Median Return",
+            color="#22DD22"
         )
-        overall_mean = df["ret"].mean()
 
-        ax.bar(bucket_mean.index, bucket_mean.values, color="#145a8d")
-        ax.axhline(overall_mean, linestyle="--", color="#afc6ba", linewidth=1, label="Overall mean")
+        # Overall mean return line
+        overall_mean = df["ret"].median()
+        ax2.axhline(
+            overall_mean,
+            linestyle="--",
+            color="#afc6ba",
+            linewidth=1,
+            label="Overall mean return"
+        )
 
-        ax.set_xlabel("Probability-rank bucket (1 = top scores)")
-        ax.set_ylabel(f"Mean {target_var} during validation")
-        ax.set_title("Return vs Rank – Validation")
+        # Labels and title
+        ax.set_xlabel("Prediction Score")
+        ax.set_ylabel("Number of Wallets")
+        ax2.set_ylabel(f"Mean {target_var} during validation")
+        ax.set_title("Prediction Score Distribution and Returns")
         ax.grid(True, linestyle=":", alpha=0.3)
-        ax.legend()
+
+        # Combine legends from both axes
+        lines, labels = ax.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax.legend(lines + lines2, labels + labels2, loc="upper left")
