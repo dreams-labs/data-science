@@ -71,7 +71,7 @@ class WalletModel(BaseModel):
         - result (dict): Contains fitted pipeline, predictions, and optional train/test data
         """
         logger.info("Preparing training data for model construction...")
-        u.notify('click_1')
+        u.notify('intro_2')
 
         # Validate indices match and store DataFrames
         u.assert_matching_indices(training_data_df, modeling_wallet_features_df)
@@ -137,14 +137,14 @@ class WalletModel(BaseModel):
             result['X_validation'] = self.X_validation
             result['validation_wallet_features_df'] = self.validation_wallet_features_df
             result['y_validation'] = self.y_pipeline.transform(self.validation_wallet_features_df)
+            result['y_validation_pred'] = meta_pipeline.predict(self.X_validation)
 
-        result['y_validation_pred'] = meta_pipeline.predict(self.X_validation)
-        if self.modeling_config['model_type'] == 'classification':
-            # probability for positive class (1) on validation set
-            X_val_trans = meta_pipeline.x_transformer_.transform(self.X_validation)
-            probas = meta_pipeline.estimator.predict_proba(X_val_trans)
-            pos_idx = list(meta_pipeline.estimator.classes_).index(1)
-            result['y_validation_pred_proba'] = pd.Series(probas[:, pos_idx], index=self.X_validation.index)
+            if self.modeling_config['model_type'] == 'classification':
+                # probability for positive class (1) on validation set
+                X_val_trans = meta_pipeline.x_transformer_.transform(self.X_validation)
+                probas = meta_pipeline.estimator.predict_proba(X_val_trans)
+                pos_idx = list(meta_pipeline.estimator.classes_).index(1)
+                result['y_validation_pred_proba'] = pd.Series(probas[:, pos_idx], index=self.X_validation.index)
 
         # Add train/test data if requested
         if return_data:
