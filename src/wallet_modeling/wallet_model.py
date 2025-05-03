@@ -110,12 +110,17 @@ class WalletModel(BaseModel):
                 if not self.modeling_config.get('grid_search_params', {}).get('build_post_search_model'):
                     return cv_results
 
+        # Log training start and play startup notification
+        logger.info(f"Training wallet model using data with shape: {self.X_train.shape}...")
+        u.notify('startup')
         meta_pipeline.fit(
             self.X_train,
             self.y_train,
             eval_set=(self.X_eval, self.y_eval),
             verbose_estimators=self.modeling_config.get('verbose_estimators', False)
         )
+        # Log training completion
+        logger.info("Wallet model training completed.")
         self.pipeline = meta_pipeline
         self.y_pipeline = meta_pipeline.y_pipeline
 
