@@ -276,12 +276,14 @@ def calculate_relative_changes(
 
 
 
-def calculate_timing_features_for_column(df: pd.DataFrame, metric_column: str) -> pd.DataFrame:
+def calculate_timing_features_for_column(df: pd.DataFrame, metric_column: str, wallet_addresses) -> pd.DataFrame:
     """
     Calculate timing features (mean, weighted mean) for a single metric column in a single pass.
     Result columns: {metric_column}/buy_mean, {metric_column}/buy_weighted,
                     {metric_column}/sell_mean, {metric_column}/sell_weighted.
     """
+    if df.empty:
+        return pd.DataFrame(index=pd.Index(wallet_addresses, name='wallet_address')).fillna(0)
     # Filter out rows with zero net transfers
     df = df[df['usd_net_transfers'] != 0].copy()
 
@@ -361,7 +363,8 @@ def generate_all_timing_features(
         logger.debug("Generating timing performance features for %s...", col)
         col_features = calculate_timing_features_for_column(
             timing_profits_df,
-            col
+            col,
+            wallet_addresses
         )
         all_features.append(col_features)
 
