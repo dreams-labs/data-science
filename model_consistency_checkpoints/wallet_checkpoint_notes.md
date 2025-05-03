@@ -1,3 +1,24 @@
+# dda 721 predict outside of db
+checkpoint 1: w.978 predict with db up to 2/26/25
+Model Performance Summary
+Target: cw_crypto_net_gain/max_investment/winsorized
+ID: bfa55a33-712e-4d82-bb5c-11fc942bcb62
+===================================
+Test Samples:             231,803
+Number of Features:       335
+Features per Window:      67
+
+Classification Metrics
+-----------------------------------
+ROC AUC:                  0.978
+Log Loss:                 0.060
+Accuracy:                 0.977
+Precision:                0.811
+Recall:                   0.402
+F1 Score:                 0.538
+
+
+
 # dda 719 reversed AUC investigation
 checkpoint 2: wval.870 dda719 data dda699 configs
 Model Performance Summary

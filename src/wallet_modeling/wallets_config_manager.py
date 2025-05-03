@@ -87,6 +87,13 @@ class WalletsConfig:
         raw_config = yaml.safe_load(self._yaml_path.read_text(encoding='utf-8'))
         self.config = add_derived_values(raw_config)
 
+        # Confirm modeling period is later than all windows
+        first_window_start = self.config['training_data']['training_window_starts'][-1]
+        modeling_period_start = self.config['training_data']['modeling_period_start']
+        if first_window_start > modeling_period_start:
+            raise ValueError(f"First window start date of {first_window_start} is later "
+                             f"than modeling period start of {modeling_period_start}.")
+
     def __getitem__(self, key):
         # Enable dictionary-style access with square brackets (config['key'])
         return self.config[key]
