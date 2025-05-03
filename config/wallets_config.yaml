@@ -5,34 +5,18 @@
 # CheckpointValidation
 # WalletModel Period Boundaries
 training_data:
-    training_window_starts: [
-        # '2020-01-01',
-        # '2021-01-01',
-        # '2022-01-01',
-        # '2022-09-01',
-        '2023-01-01',
-        # '2023-02-01',
-        # '2023-03-01',
-        # '2023-04-01',
-        # '2023-06-01',
-        # '2023-09-01',
-        '2024-01-01',
-        # '2024-02-01',
-        # '2024-03-01',
-        '2024-04-01',
-        # '2024-05-01',
-        # '2024-06-01',
-        '2024-07-01',
-        # '2024-08-01',
-        '2024-09-01',
-        # '2024-10-01',
-        # '2024-11-01',
-        # '2024-12-01',
-        # '2025-01-01',
-        # '2025-02-01',
+
+    # How many days prior to the modeling period each window begins
+    training_window_lookbacks: [
+        600,
+        270,
+        150,
+        90,
+        30
     ]
+
     modeling_period_start: '2024-10-01'
-    modeling_period_end: '2024-10-31'
+    modeling_period_duration: 30
     validation_period_end: '2025-04-30'  # toggle to activate/deactivate validation data
 
     # Whether to use hybrid coin-wallet ids
