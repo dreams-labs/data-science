@@ -137,35 +137,23 @@ def add_derived_values(config_dict: dict) -> dict:
 
     # Modeling Period Boundaries
     modeling_start = datetime.strptime(td['modeling_period_start'], "%Y-%m-%d")
+    modeling_end = datetime.strptime(td['modeling_period_end'], "%Y-%m-%d")
+    modeling_duration = (modeling_end - modeling_start).days + 1  # period is inclusive of start/end dates
     td['training_period_end'] = (modeling_start - timedelta(days=1)).strftime("%Y-%m-%d")
     td['modeling_starting_balance_date'] = td['training_period_end']
 
     # Validation Period Boundaries
-    # 1. Calculate the modeling period duration in days.
-    modeling_end = datetime.strptime(td['modeling_period_end'], "%Y-%m-%d")
-    modeling_duration = (modeling_end - modeling_start).days + 1  # period is inclusive of start/end dates
-
-    # 2. Extract the raw validation_period_end from td.
     validation_period_end = datetime.strptime(td['validation_period_end'], "%Y-%m-%d")
-
-    # 3. Create validation_period_start by subtracting the modeling duration from validation_period_end.
     validation_period_start_dt = validation_period_end - timedelta(days=modeling_duration)
     td['validation_period_start'] = validation_period_start_dt
-
-    # 4. Calculate the starting balance date (one day before the period start).
     td['validation_starting_balance_date'] = (validation_period_start_dt - timedelta(days=1)).strftime("%Y-%m-%d")
 
     # Coin Modeling Period Boundaries
-    # -------------------------------
     td['coin_modeling_period_start'] = (modeling_end + timedelta(days=1)).strftime("%Y-%m-%d")
     td['coin_modeling_period_end'] = (modeling_end + timedelta(days=modeling_duration)).strftime("%Y-%m-%d")
 
     # Investing Period Boundaries
-    td['investing_period_start'] = (
-        modeling_end + timedelta(days=modeling_duration + 1)
-    ).strftime("%Y-%m-%d")
-    td['investing_period_end'] = (
-        modeling_end + timedelta(days=2 * modeling_duration)
-    ).strftime("%Y-%m-%d")
+    td['investing_period_start'] = (modeling_end + timedelta(days=modeling_duration + 1)).strftime("%Y-%m-%d")
+    td['investing_period_end'] = (modeling_end + timedelta(days=2 * modeling_duration)).strftime("%Y-%m-%d")
 
     return cfg
