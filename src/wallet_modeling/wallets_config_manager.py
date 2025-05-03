@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta
 from pathlib import Path
 import yaml
-
+import pandas as pd
 
 
 # -------------------------
@@ -129,17 +129,22 @@ def add_derived_values(config_dict: dict) -> dict:
     cfg = {k: v.copy() if isinstance(v, dict) else v for k, v in config_dict.items()}
     td = cfg['training_data']
 
-    # Training Period Boundaries
+    # Convert training lookbacks to dates
+    modeling_start = datetime.strptime(td['modeling_period_start'], "%Y-%m-%d")
+    lookbacks = td['training_window_lookbacks']
+    td['training_window_starts'] = (modeling_start - pd.to_timedelta(lookbacks, unit='d')).strftime('%Y-%m-%d').tolist()
     first_window = min(td['training_window_starts'])
-    td['training_period_start'] = first_window
+
+    # Training Period Boundaries
     training_start = datetime.strptime(first_window, "%Y-%m-%d")
+    td['training_period_start'] = first_window
     td['training_starting_balance_date'] = (training_start - timedelta(days=1)).strftime("%Y-%m-%d")
+    td['training_period_end'] = (modeling_start - timedelta(days=1)).strftime("%Y-%m-%d")
 
     # Modeling Period Boundaries
-    modeling_start = datetime.strptime(td['modeling_period_start'], "%Y-%m-%d")
-    modeling_end = datetime.strptime(td['modeling_period_end'], "%Y-%m-%d")
-    modeling_duration = (modeling_end - modeling_start).days + 1  # period is inclusive of start/end dates
-    td['training_period_end'] = (modeling_start - timedelta(days=1)).strftime("%Y-%m-%d")
+    modeling_duration = td['modeling_period_duration']
+    modeling_end = modeling_start + timedelta(days=modeling_duration - 1) # -1 as period is inclusive of start/end dates
+    td['modeling_period_end'] = modeling_end.strftime("%Y-%m-%d")
     td['modeling_starting_balance_date'] = td['training_period_end']
 
     # Validation Period Boundaries
