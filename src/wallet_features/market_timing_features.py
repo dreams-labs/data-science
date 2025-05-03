@@ -361,8 +361,7 @@ def generate_all_timing_features(
         logger.debug("Generating timing performance features for %s...", col)
         col_features = calculate_timing_features_for_column(
             timing_profits_df,
-            col,
-            wallet_addresses
+            col
         )
         all_features.append(col_features)
 
