@@ -866,15 +866,16 @@ class ClassifierEvaluator(RegressorEvaluator):
             and hasattr(self, 'validation_wallet_features_df')):
             target = self.modeling_config['target_variable']
             returns = self.validation_wallet_features_df[target].reindex(self.y_validation_pred_proba.index)
+            returns = u.winsorize(returns, 0.01)
             df_val = pd.DataFrame({
                 'proba': self.y_validation_pred_proba,
                 'ret': returns
             }).dropna()
             pct1 = np.percentile(df_val['proba'], 99)
             pct5 = np.percentile(df_val['proba'], 95)
-            self.metrics['val_return_top1'] = df_val.loc[df_val['proba'] >= pct1, 'ret'].median()
-            self.metrics['val_return_top5'] = df_val.loc[df_val['proba'] >= pct5, 'ret'].median()
-            self.metrics['val_return_overall'] = df_val['ret'].median()
+            self.metrics['val_return_top1'] = df_val.loc[df_val['proba'] >= pct1, 'ret'].mean()
+            self.metrics['val_return_top5'] = df_val.loc[df_val['proba'] >= pct5, 'ret'].mean()
+            self.metrics['val_return_overall'] = df_val['ret'].mean()
 
         # Feature importance if available
         if self.model is not None and hasattr(self.model, 'feature_importances_'):
@@ -907,9 +908,9 @@ class ClassifierEvaluator(RegressorEvaluator):
                 "Validation Return Metrics",
                 "-" * 35,
                 f"Val ROC AUC:              {self.metrics['val_roc_auc']:.3f}",
-                f"Top 1% Median Return:        {self.metrics['val_return_top1']:.3f}",
-                f"Top 5% Median Return:        {self.metrics['val_return_top5']:.3f}",
-                f"Overall Median Return:       {self.metrics['val_return_overall']:.3f}",
+                f"Top 1% Mean Return:       {self.metrics['val_return_top1']:.3f}",
+                f"Top 5% Mean Return:       {self.metrics['val_return_top5']:.3f}",
+                f"Overall Mean Return:      {self.metrics['val_return_overall']:.3f}",
                 ""
             ])
 
@@ -1077,7 +1078,7 @@ class ClassifierEvaluator(RegressorEvaluator):
 
         # Compute counts and mean returns per bin
         bin_counts = df.groupby("score_bin", observed=True).size()
-        bin_mean_ret = df.groupby("score_bin", observed=True)["ret"].median()
+        bin_mean_ret = df.groupby("score_bin", observed=True)["ret"].mean()
 
         # Drop bins with zero count
         valid_bins = bin_counts[bin_counts > 0]
@@ -1104,12 +1105,12 @@ class ClassifierEvaluator(RegressorEvaluator):
             marker='o',
             linestyle='-',
             linewidth=2,
-            label="Median Return",
+            label="Mean Return",
             color="#22DD22"
         )
 
         # Overall mean return line
-        overall_mean = df["ret"].median()
+        overall_mean = df["ret"].mean()
         ax2.axhline(
             overall_mean,
             linestyle="--",

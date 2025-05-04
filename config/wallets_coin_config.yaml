@@ -22,7 +22,8 @@ wallet_segments:
     # Scores to include as segments + metrics
     wallet_scores_path: temp/wallet_modeling_score_dfs
     wallet_scores: [
-        dda_721_net_gain_max_investment
+        dda_712_net_gain_max_investment_classifier,
+        dda_712_net_gain_max_investment_regressor,
     ]
     wallet_scores_residuals_segments: False
     wallet_scores_confidence_segments: False
