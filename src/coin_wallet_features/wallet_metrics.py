@@ -92,19 +92,23 @@ def calculate_coin_wallet_ending_balances(profits_df: pd.DataFrame) -> pd.DataFr
     # Create a DataFrame with coin_id and wallet_address as indices
     balances_df = profits_df[['coin_id', 'wallet_address']].drop_duplicates().set_index(['coin_id', 'wallet_address'])
 
-    # Add a column for the balance date
-    balance_date = profits_df['date'].max()
-    balance_date_str = balance_date.strftime('%y%m%d')
-    col_name = f'usd_balance_{balance_date_str}'
+    # Starting Balance
+    period_starting_balance = profits_df['date'].min()
+    starting_balances = profits_df.loc[
+        profits_df['date'] == period_starting_balance,
+        ['coin_id', 'wallet_address', 'usd_balance']
+    ].set_index(['coin_id', 'wallet_address'])
 
-    # Filter for the specific date and map the balances
-    date_balances = profits_df.loc[
-        profits_df['date'] == balance_date,
+    # Ending Balance
+    period_end = profits_df['date'].max()
+    ending_balances = profits_df.loc[
+        profits_df['date'] == period_end,
         ['coin_id', 'wallet_address', 'usd_balance']
     ].set_index(['coin_id', 'wallet_address'])
 
     # Add the balance column to balances_df
-    balances_df[col_name] = date_balances['usd_balance']
+    balances_df['usd_balance_starting'] = starting_balances['usd_balance']
+    balances_df['usd_balance_ending'] = ending_balances['usd_balance']
 
     return balances_df
 
