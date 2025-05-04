@@ -85,7 +85,18 @@ class WalletsConfig:
         if self._yaml_path is None:
             raise FileNotFoundError("No config file path specified. Call load_from_yaml first.")
         raw_config = yaml.safe_load(self._yaml_path.read_text(encoding='utf-8'))
+
+        # Append _dev suffix to folder if applicable
+        if (
+            raw_config['training_data']['dataset'] == 'dev' and
+            raw_config['training_data']['parquet_folder'][-4:] != '_dev'
+        ):
+            dev_folder = f"{raw_config['training_data']['parquet_folder']}_dev"
+            raw_config['training_data']['parquet_folder'] = dev_folder
+
+        # Add derived values
         self.config = add_derived_values(raw_config)
+
 
         # Confirm modeling period is later than all windows
         first_window_start = self.config['training_data']['training_window_starts'][-1]
@@ -160,9 +171,5 @@ def add_derived_values(config_dict: dict) -> dict:
     # Investing Period Boundaries
     td['investing_period_start'] = (modeling_end + timedelta(days=modeling_duration + 1)).strftime("%Y-%m-%d")
     td['investing_period_end'] = (modeling_end + timedelta(days=2 * modeling_duration)).strftime("%Y-%m-%d")
-
-    # Append _dev suffix to folder if applicable
-    if td['dataset'] == 'dev' and td['parquet_folder'][-4:] != '_dev':
-        td['parquet_folder'] = str(f"{td['parquet_folder']}_dev")
 
     return cfg
