@@ -1,7 +1,6 @@
 """
 Orchestrates groups of functions to generate wallet model pipeline
 """
-import gc
 import logging
 import importlib
 import pandas as pd
