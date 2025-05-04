@@ -367,7 +367,7 @@ class WalletTrainingDataOrchestrator:
         # Generate clusters if configured
         if 'clustering_n_clusters' in self.wallets_config.get('features', {}):
             training_cluster_features_df = wcl.create_kmeans_cluster_features(
-                wallet_training_data_df_full
+                self.wallets_config, wallet_training_data_df_full
             )
             training_cluster_features_df = training_cluster_features_df.add_prefix('cluster|')
             wallet_training_data_df_full = wallet_training_data_df_full.join(

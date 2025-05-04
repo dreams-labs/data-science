@@ -12,15 +12,10 @@ import matplotlib.pyplot as plt
 from kneed import KneeLocator
 
 # Local module imports
-from wallet_modeling.wallets_config_manager import WalletsConfig
 import utils as u
 
 # set up logger at the module level
 logger = logging.getLogger(__name__)
-
-# Load wallets_config at the module level
-wallets_config = WalletsConfig()
-
 
 
 # -----------------------------------
@@ -28,11 +23,17 @@ wallets_config = WalletsConfig()
 # -----------------------------------
 
 @u.timing_decorator
-def create_kmeans_cluster_features(training_data_df, include_pca=False, include_categorical=False):
+def create_kmeans_cluster_features(
+        wallets_config,
+        training_data_df,
+        include_pca=False,
+        include_categorical=False
+    ) -> pd.DataFrame:
     """
     Add cluster-related features to the original dataframe.
 
     Parameters:
+    - wallets_config (dict): dict from .yaml file
     - training_data_df (df): DataFrame keyed on wallet_address
     - include_pca (bool): whether to include PCA component features in the output
     - include_categorical (bool): whether to include the cluster number as categorical feature
@@ -47,7 +48,7 @@ def create_kmeans_cluster_features(training_data_df, include_pca=False, include_
 
     # Get preprocessed data using helper
     logger.info("Preprocessing training data for clustering...")
-    scaled_data = preprocess_clustering_data(training_data_df)
+    scaled_data = preprocess_clustering_data(wallets_config,training_data_df)
 
     # Apply PCA
     logger.info("Reducing to %s PCA components...", n_components)
@@ -86,11 +87,12 @@ def create_kmeans_cluster_features(training_data_df, include_pca=False, include_
 #          Helper Functions
 # -----------------------------------
 
-def preprocess_clustering_data(training_data_df: pd.DataFrame) -> np.ndarray:
+def preprocess_clustering_data(wallets_config: dict, training_data_df: pd.DataFrame) -> np.ndarray:
     """
     Preprocesses data for clustering analysis with consistent scaling.
 
     Params:
+    - wallets_config (dict): dict from .yaml file
     - training_data_df (DataFrame): Input features DataFrame
 
     Returns:
@@ -168,6 +170,7 @@ def assign_clusters_from_distances(modeling_df: pd.DataFrame, cluster_counts: Li
 
 
 def optimize_cluster_parameters(
+        wallets_config: dict,
         training_data_df: pd.DataFrame,
         max_components: int = 120,
         max_clusters: int = 20,
@@ -177,6 +180,7 @@ def optimize_cluster_parameters(
     Analyze optimal number of components and clusters using multiple methods.
 
     Parameters:
+    - wallets_config (dict): dict from .yaml file
     - training_data_df: DataFrame with features
     - max_components: maximum number of PCA components to consider
     - max_clusters: maximum number of clusters to consider
@@ -191,7 +195,7 @@ def optimize_cluster_parameters(
     """
     # Filter to numeric, scale, and fill data
     logger.info("Preprocessing training data for PCA analysis...")
-    scaled_data = preprocess_clustering_data(training_data_df)
+    scaled_data = preprocess_clustering_data(wallets_config, training_data_df)
 
     # Analyze PCA components
     logger.info("Computing PCA with %s components...", max_components)
