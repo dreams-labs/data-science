@@ -263,6 +263,13 @@ class MultiEpochOrchestrator:
 
             u.assert_matching_indices(epoch_training_data_df,epoch_modeling_data_df)
 
+            # Save features
+            output_folder = f"{epoch_config['training_data']['parquet_folder']}/"
+            epoch_training_data_df.to_parquet(f"{output_folder}/training_data_df.parquet", index=True)
+            epoch_modeling_data_df.to_parquet(f"{output_folder}/modeling_data_df.parquet", index=True)
+            logger.info(f"Saved {model_start} features to %s.", output_folder)
+
+
         return epoch_date, epoch_training_data_df, epoch_modeling_data_df
 
 
@@ -362,8 +369,7 @@ class MultiEpochOrchestrator:
                 training_profits_df,
                 training_market_indicators_df,
                 training_macro_indicators_df,
-                training_transfers_df,
-                return_files=True
+                training_transfers_df
             )
             model_future = executor.submit(
                 modeling_generator.prepare_modeling_features,

@@ -281,15 +281,15 @@ class WalletTrainingDataOrchestrator:
         market_indicators_df: pd.DataFrame,
         macro_indicators_df: pd.DataFrame,
         transfers_df: pd.DataFrame,
-        return_files: bool = False,
         period: str = 'training'
-    ) -> Union[None, pd.DataFrame]:
+    ) -> pd.DataFrame:
         """
         Generates full period and window features concurrently.
 
         Params:
         - profits_df (DataFrame): Training profits data.
         - market_indicators_df (DataFrame): Market data with indicators.
+        - macro_indicators_df (DataFrame): Macro trends data with indicators.
         - transfers_df (DataFrame): Transfers data.
         - period (str): Period identifier.
 
@@ -349,9 +349,6 @@ class WalletTrainingDataOrchestrator:
             training_wallet_features_df = full_period_future.result()
             # Initialize full features DataFrame
             wallet_training_data_df_full = training_wallet_features_df.add_suffix("|all_windows").copy()
-            wallet_training_data_df_full.to_parquet(
-                f"{self.parquet_folder}/wallet_training_data_df_full.parquet", index=True
-            )
             del training_wallet_features_df
             gc.collect()
 
@@ -385,14 +382,7 @@ class WalletTrainingDataOrchestrator:
         # Convert index to int64
         wallet_training_data_df_full.index = wallet_training_data_df_full.index.astype('int64')
 
-        # Return file if configured, else save final version
-        if return_files is True:
-            return wallet_training_data_df_full
-        else:
-            wallet_training_data_df_full.to_parquet(
-                f"{self.parquet_folder}/wallet_training_data_df_full.parquet", index=True
-            )
-
+        return wallet_training_data_df_full
 
 
 
@@ -444,8 +434,6 @@ class WalletTrainingDataOrchestrator:
         u.assert_period(modeling_profits_df,
                         self.wallets_config['training_data'][f'{period}_period_start'],
                         self.wallets_config['training_data'][f'{period}_period_end'])
-        output_path = f"{self.wallets_config['training_data']['parquet_folder']}/{period}_profits_df.parquet"
-        modeling_profits_df.to_parquet(output_path, index=False)
 
         # Initialize features DataFrame
         logger.info("Generating modeling features...")
@@ -473,11 +461,6 @@ class WalletTrainingDataOrchestrator:
             modeling_performance_features_df,
             how='left'
         ).fillna({col: 0 for col in modeling_performance_features_df.columns})
-
-        # Save features
-        output_path = f"{self.wallets_config['training_data']['parquet_folder']}/{period}_wallet_features_df.parquet"
-        modeling_wallet_features_df.to_parquet(output_path, index=True)
-        logger.info(f"Saved {period} features to %s", output_path)
 
         # Clean up memory
         del modeling_trading_features_df, modeling_performance_features_df, modeling_profits_df
