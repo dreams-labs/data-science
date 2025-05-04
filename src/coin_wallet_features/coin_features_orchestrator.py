@@ -296,3 +296,4 @@ def flatten_cw_to_coin_features(
         raise ValueError(f"Found {len(missing_coins)} coin_ids missing from analysis")
 
     return result_df
+

@@ -4,14 +4,13 @@ Orchestrates groups of functions to generate wallet model pipeline
 import gc
 import logging
 import importlib
-from datetime import timedelta
 import pandas as pd
 
 # Local module imports
 import feature_engineering.time_windows_orchestration as tw
 import coin_wallet_features.coin_features_orchestrator as cfo
 import coin_wallet_features.wallet_segmentation as cws
-import coin_wallet_features.wallet_base_metrics as cwbm
+import coin_wallet_features.wallet_metrics as cwwm
 import coin_insights.coin_validation_analysis as civa
 import utils as u
 importlib.reload(cfo)
@@ -273,7 +272,6 @@ class CoinTrainingDataOrchestrator:
         """
         # Confirm time period is correct
         u.assert_period(profits_df, period_start, period_end)
-        starting_balance_date = (pd.to_datetime(period_start) - timedelta(days=1)).strftime('%Y-%m-%d')
 
         # 1) Build base index of all (coin, wallet) pairs
         idx = (
@@ -284,19 +282,8 @@ class CoinTrainingDataOrchestrator:
         )
         cw_metrics_df = pd.DataFrame(index=idx)
 
-        # 2) Validate configured balance dates
-        valid_balance_dates = [
-            starting_balance_date,
-            period_end
-        ]
-        balance_dates = self.wallets_coin_config['wallet_features']['wallet_balance_dates']
-        if not all(date in valid_balance_dates for date in balance_dates):
-            raise ValueError(
-                f"wallet_balance_dates {balance_dates} must be one of {valid_balance_dates}"
-            )
-
-        # 3) Calculate balances
-        balances_df = cwbm.calculate_coin_wallet_ending_balances(
+        # 2) Calculate balances
+        balances_df = cwwm.calculate_coin_wallet_ending_balances(
             profits_df
         ).add_prefix('balances/')
         cw_metrics_df = (
@@ -305,8 +292,8 @@ class CoinTrainingDataOrchestrator:
             .fillna({col: 0 for col in balances_df.columns})
         )
 
-        # 4) Calculate trading metrics
-        trading_df = cwbm.calculate_coin_wallet_trading_metrics(
+        # 3) Calculate trading metrics
+        trading_df = cwwm.calculate_coin_wallet_trading_metrics(
             profits_df,
             period_start,
             period_end,
