@@ -1167,6 +1167,36 @@ def obj_mem(return_details=False) -> pd.DataFrame:
         return mem_df[cols]
 
 
+def purge_dict_dfs(epoch_dfs: Dict[datetime, pd.DataFrame]) -> None:
+    """
+    Wipe every DataFrame in the dict **and** any stray references in the
+    current frame / interactive namespace, then run the GC.
+
+    Params
+    ------
+    epoch_dfs : dict[datetime, DataFrame]
+    """
+    frame = inspect.currentframe().f_back            # calling frame
+
+    # 1. break refs inside the dict
+    for k in list(epoch_dfs):
+        df = epoch_dfs.pop(k)
+        df.drop(df.index, inplace=True)              # release BlockManager arrays
+        del df                                       # delete local pointer
+
+    epoch_dfs.clear()                                # just in case
+    del epoch_dfs                                    # delete the dict itself
+
+    # 2. nuke stray refs in locals / globals (REPL convenience vars, etc.)
+    for scope in (frame.f_locals, frame.f_globals):
+        for name, value in list(scope.items()):
+            if isinstance(value, pd.DataFrame):
+                scope[name] = None
+
+    # 3. run the collector
+    gc.collect()
+
+
 # pylint: disable=dangerous-default-value
 def export_code(
     code_directories=[],

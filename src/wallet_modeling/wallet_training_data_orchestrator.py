@@ -195,26 +195,25 @@ class WalletTrainingDataOrchestrator:
         # Generate macro indicators
         def generate_macro_indicators_df():
             logger.info("Generating macro trends indicators...")
-            market_indicators_df = self._generate_indicators_df(
+            macro_indicators_df = self._generate_indicators_df(
                 macro_trends_df_full.reset_index(),
                 parquet_filename = None,
                 period = period,
                 metric_type = 'macro_trends'
             )
-            market_indicators_df = market_indicators_df.set_index('date')
-
-            return market_indicators_df
+            macro_indicators_df = macro_indicators_df.set_index('date')
+            return macro_indicators_df
 
         # Define training wallet cohort
         def generate_cohort_profits_df(profits_df_full):
+            logger.info("Defining wallet cohort...")
+
             # Hybridize wallet IDs if configured using existing mapping
             if self.wallets_config['training_data']['hybridize_wallet_ids']:
                 profits_df_full = hybridize_wallet_address(
                     profits_df_full,
                     self.complete_hybrid_cw_id_df
                 )
-
-            logger.info("Defining wallet cohort...")
 
             # Apply necessary transformations (row imputation, filtering by date)
             period_profits_df = self._transform_profits_for_period(
