@@ -161,4 +161,8 @@ def add_derived_values(config_dict: dict) -> dict:
     td['investing_period_start'] = (modeling_end + timedelta(days=modeling_duration + 1)).strftime("%Y-%m-%d")
     td['investing_period_end'] = (modeling_end + timedelta(days=2 * modeling_duration)).strftime("%Y-%m-%d")
 
+    # Append _dev suffix to folder if applicable
+    if td['dataset'] == 'dev' and td['parquet_folder'][-4:] != '_dev':
+        td['parquet_folder'] = str(f"{td['parquet_folder']}_dev")
+
     return cfg
