@@ -18,7 +18,7 @@ importlib.reload(cfo)
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
 
-class CoinTrainingDataOrchestrator:
+class CoinFeaturesOrchestrator:
     """
     Orchestrates coin-model pipeline: data loading, feature engineering,
     target computation, modeling, and artifact saving.
@@ -250,14 +250,14 @@ class CoinTrainingDataOrchestrator:
 
 
 # ------------------------------
-#         Helper Functions
+#         Utility Functions
 # ------------------------------
 
-def load_wallet_scores(wallet_scores: list, wallet_scores_path: str, score_suffix: str = None) -> pd.DataFrame:
+def load_wallet_scores(wallets_coin_config: dict, score_suffix: str = None) -> pd.DataFrame:
     """
     Params:
-    - wallet_scores (list): List of score names to merge
-    - wallet_scores_path (str): Base path for score parquet files
+    - wallets_coin_config (dict): config from .yaml file
+    - score_suffix (str): specifies which score column to load (if applicable)
 
     Returns:
     - wallet_scores_df (DataFrame):
@@ -265,6 +265,8 @@ def load_wallet_scores(wallet_scores: list, wallet_scores_path: str, score_suffi
         score|{score_name} (float): the predicted score
         residual|{score_name} (float): the residual of the score
     """
+    wallet_scores = wallets_coin_config['wallet_segments']['wallet_scores']
+    wallet_scores_path = wallets_coin_config['wallet_segments']['wallet_scores_path']
     wallet_scores_df = pd.DataFrame()
 
     for score_name in wallet_scores:

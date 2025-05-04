@@ -35,8 +35,7 @@ def build_wallet_segmentation(
     """
     # Load wallet scores
     wallet_scores_df = cfo.load_wallet_scores(
-        wallets_coin_config['wallet_segments']['wallet_scores'],
-        wallets_coin_config['wallet_segments']['wallet_scores_path'],
+        wallets_coin_config,
         score_suffix
     )
     wallet_segmentation_df = wallet_scores_df.copy()
