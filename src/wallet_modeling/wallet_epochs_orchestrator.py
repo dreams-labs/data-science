@@ -2,6 +2,7 @@
 import os
 import time
 import logging
+import gc
 from pathlib import Path
 import copy
 from typing import List,Dict,Tuple,Set,Optional
@@ -160,14 +161,6 @@ class MultiEpochOrchestrator:
                 cfg = futures[future]
                 epoch_date, epoch_training_df, epoch_modeling_df = future.result()
 
-                # Downcast dtypes
-                epoch_training_df = u.df_downcast(epoch_training_df)
-                epoch_modeling_df = u.df_downcast(epoch_modeling_df)
-
-                # inline: log completion before storing data
-                i += 1
-                logger.milestone(f"Epoch {i}/{len(self.all_epochs_configs)} completed (date: {epoch_date})")
-
                 # Store data in dicts
                 if cfg.get('epoch_type') == 'validation':
                     training_validation_dfs[epoch_date] = epoch_training_df
@@ -175,14 +168,21 @@ class MultiEpochOrchestrator:
                 else:
                     training_modeling_dfs[epoch_date] = epoch_training_df
                     modeling_modeling_dfs[epoch_date] = epoch_modeling_df
+                # inline: log completion before storing data
+
+                i += 1
+                logger.milestone(f"Epoch {i}/{len(self.all_epochs_configs)} completed (date: {epoch_date})")
+
+        del epoch_training_df, epoch_modeling_df
+        gc.collect()
 
         # Merge the epoch DataFrames into a single DataFrame for training and modeling respectively
-        wallet_training_data_df       = self._merge_epoch_dfs(training_modeling_dfs)
+        validation_wallet_features_df = (self._merge_epoch_dfs(modeling_validation_dfs)
+                                         if modeling_validation_dfs else pd.DataFrame())
         modeling_wallet_features_df   = self._merge_epoch_dfs(modeling_modeling_dfs)
         validation_training_data_df   = (self._merge_epoch_dfs(training_validation_dfs)
                                          if training_validation_dfs else pd.DataFrame())
-        validation_wallet_features_df = (self._merge_epoch_dfs(modeling_validation_dfs)
-                                         if modeling_validation_dfs else pd.DataFrame())
+        wallet_training_data_df       = self._merge_epoch_dfs(training_modeling_dfs)
 
         # Confirm indices match
         u.assert_matching_indices(wallet_training_data_df, modeling_wallet_features_df)
@@ -274,12 +274,16 @@ class MultiEpochOrchestrator:
             epoch_modeling_data_df = self._merge_hybrid_dfs(epoch_modeling_data_df,hybridized_modeling_data_df)
 
             # Remove modeling-only IDs - these represent wallets in the cohort but
-            # coin-wallet pairs that only became active during the modeling period
+            #  coin-wallet pairs that only became active during the modeling period
             epoch_modeling_data_df = (epoch_modeling_data_df[
                 epoch_modeling_data_df.index.isin(epoch_training_data_df.index.values)
             ])
 
             u.assert_matching_indices(epoch_training_data_df,epoch_modeling_data_df)
+
+            # Downcast all features
+            epoch_training_data_df = u.df_downcast(epoch_training_data_df)
+            epoch_modeling_data_df = u.df_downcast(epoch_modeling_data_df)
 
             # Save features
             output_folder = f"{epoch_config['training_data']['parquet_folder']}/"
@@ -545,6 +549,7 @@ class MultiEpochOrchestrator:
         return epoch_profits_df.reset_index(), epoch_market_data_df.reset_index(), epoch_macro_trends_df
 
 
+    @u.timing_decorator
     def _merge_epoch_dfs(self, epoch_dfs: Dict[datetime, pd.DataFrame]) -> pd.DataFrame:
         """
         Merges epoch DataFrames into a single MultiIndexed DataFrame with non-nullable indices.
