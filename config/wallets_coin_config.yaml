@@ -22,7 +22,7 @@ wallet_segments:
     # Scores to include as segments + metrics
     wallet_scores_path: temp/wallet_modeling_score_dfs
     wallet_scores: [
-        dda_712_ngmi_classifier_20_days,
+        dda724_20250101,
     ]
     wallet_scores_residuals_segments: False
     wallet_scores_confidence_segments: False
