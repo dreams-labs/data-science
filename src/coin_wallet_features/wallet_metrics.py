@@ -21,7 +21,7 @@ def compute_coin_wallet_metrics(
         profits_df: pd.DataFrame,
         period_start: str,
         period_end: str
-        ) -> pd.DataFrame:
+    ) -> pd.DataFrame:
     """
     Compute coin-wallet–level metrics: balances and trading metrics.
 
