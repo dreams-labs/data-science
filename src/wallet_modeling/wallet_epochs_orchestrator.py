@@ -195,14 +195,6 @@ class MultiEpochOrchestrator:
         )
         u.notify('level_up')
 
-        # Save files  # pylint:disable=line-too-long
-        parquet_folder = self.base_config['training_data']['parquet_folder']
-        wallet_training_data_df.to_parquet(f"{parquet_folder}/multiwindow_wallet_training_data_df.parquet",index=True)
-        modeling_wallet_features_df.to_parquet(f"{parquet_folder}/multiwindow_modeling_wallet_features_df.parquet",index=True)
-        validation_training_data_df.to_parquet(f"{parquet_folder}/multiwindow_validation_training_data_df.parquet",index=True)
-        validation_wallet_features_df.to_parquet(f"{parquet_folder}/multiwindow_validation_wallet_features_df.parquet",index=True)
-        logger.info("Successfully saved modeling and validation period datasets.")
-
         return (
             wallet_training_data_df,
             modeling_wallet_features_df,
