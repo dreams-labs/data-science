@@ -45,6 +45,15 @@ class MultiEpochOrchestrator:
         self.features_config = features_config
         self.epochs_config = epochs_config
 
+        # Confirm the validation_period_end is after the latest modeling_period_end
+        modeling_end = pd.to_datetime(self.base_config['training_data']['modeling_period_end'])
+        validation_end = pd.to_datetime(self.base_config['training_data']['validation_period_end'])
+        latest_offset = pd.Series(self.epochs_config['offset_epochs'].get('validation_offsets')).max()
+        latest_modeling_end = modeling_end + timedelta(days = int(latest_offset))
+        if latest_modeling_end > validation_end:
+            raise ValueError(f"Invalid config settings: latest epoch's modeling end of {latest_modeling_end} "
+                             f"is later than the validation end of {validation_end}.")
+
 
         # Generated configs
         self.all_epochs_configs = self._generate_epoch_configs()
