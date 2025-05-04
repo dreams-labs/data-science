@@ -68,4 +68,3 @@ def load_wallet_scores(wallet_scores: list, wallet_scores_path: str, score_suffi
         )
 
     return wallet_scores_df
-
