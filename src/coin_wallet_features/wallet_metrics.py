@@ -8,6 +8,76 @@ logger = logging.getLogger(__name__)
 
 
 
+
+
+
+
+# -----------------------------------
+#       Main Interface Function
+# -----------------------------------
+
+def compute_coin_wallet_metrics(
+        wallets_coin_config: dict,
+        profits_df: pd.DataFrame,
+        period_start: str,
+        period_end: str
+        ) -> pd.DataFrame:
+    """
+    Compute coin-wallet–level metrics: balances and trading metrics.
+
+    Params:
+    - wallets_coin_config (dict): dict from .yaml file
+    - profits_df (DataFrame): must include columns ['coin_id','wallet_address',…].
+    - period_start,period_end str(YYYY-MM-DD): period start and end dates
+
+    Returns:
+    - cw_metrics_df (DataFrame): MultiIndex [coin_id, wallet_address] with
+        'balances/...’ and 'trading/...’ feature columns.
+    """
+    # Confirm time period is correct
+    u.assert_period(profits_df, period_start, period_end)
+
+    # 1) Build base index of all (coin, wallet) pairs
+    idx = (
+        profits_df[['coin_id', 'wallet_address']]
+        .drop_duplicates()
+        .set_index(['coin_id', 'wallet_address'])
+        .index
+    )
+    cw_metrics_df = pd.DataFrame(index=idx)
+
+    # 2) Calculate balances
+    balances_df = calculate_coin_wallet_ending_balances(
+        profits_df
+    ).add_prefix('balances/')
+    cw_metrics_df = (
+        cw_metrics_df
+        .join(balances_df, how='left')
+        .fillna({col: 0 for col in balances_df.columns})
+    )
+
+    # 3) Calculate trading metrics
+    trading_df = calculate_coin_wallet_trading_metrics(
+        profits_df,
+        period_start,
+        period_end,
+        wallets_coin_config['wallet_features']['drop_trading_metrics']
+    ).add_prefix('trading/')
+    cw_metrics_df = (
+        cw_metrics_df
+        .join(trading_df, how='left')
+        .fillna({col: 0 for col in trading_df.columns})
+    )
+
+    return cw_metrics_df
+
+
+
+
+# ------------------------------
+#         Helper Functions
+# ------------------------------
+
 def calculate_coin_wallet_ending_balances(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
     Calculate metric value for each wallet-coin pair on specified dates.
@@ -22,19 +92,23 @@ def calculate_coin_wallet_ending_balances(profits_df: pd.DataFrame) -> pd.DataFr
     # Create a DataFrame with coin_id and wallet_address as indices
     balances_df = profits_df[['coin_id', 'wallet_address']].drop_duplicates().set_index(['coin_id', 'wallet_address'])
 
-    # Add a column for the balance date
-    balance_date = profits_df.index.get_level_values('date').max()
-    balance_date_str = balance_date.strftime('%y%m%d')
-    col_name = f'usd_balance_{balance_date_str}'
+    # Starting Balance
+    period_starting_balance = profits_df['date'].min()
+    starting_balances = profits_df.loc[
+        profits_df['date'] == period_starting_balance,
+        ['coin_id', 'wallet_address', 'usd_balance']
+    ].set_index(['coin_id', 'wallet_address'])
 
-    # Filter for the specific date and map the balances
-    date_balances = profits_df.loc[
-        profits_df['date'] == balance_date,
+    # Ending Balance
+    period_end = profits_df['date'].max()
+    ending_balances = profits_df.loc[
+        profits_df['date'] == period_end,
         ['coin_id', 'wallet_address', 'usd_balance']
     ].set_index(['coin_id', 'wallet_address'])
 
     # Add the balance column to balances_df
-    balances_df[col_name] = date_balances['usd_balance']
+    balances_df['usd_balance_starting'] = starting_balances['usd_balance']
+    balances_df['usd_balance_ending'] = ending_balances['usd_balance']
 
     return balances_df
 

@@ -3,17 +3,127 @@ Functions for assigning wallets to different segments or cohorts, which can then
 used to compare metrics between the features.
 """
 import logging
-from pathlib import Path
-import yaml
 import pandas as pd
 import numpy as np
 
 # local module imports
 import wallet_features.clustering_features as wcl
 
+
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
-wallets_coin_config = yaml.safe_load(Path('../config/wallets_coin_config.yaml').read_text(encoding='utf-8'))
+
+
+# -----------------------------------
+#       Main Interface Function
+# -----------------------------------
+
+def build_wallet_segmentation(
+        wallets_coin_config: dict,
+        wallets_config: dict,
+        score_suffix: str = None) -> pd.DataFrame:
+    """
+    Build wallet segmentation DataFrame with score quantiles and optional clusters.
+
+    Params:
+    - wallets_coin_config, wallets_config (dicts): dicts from .yaml file
+    - score_suffix (str): specifies which score column to load (if applicable)
+
+    Returns:
+    - wallet_segmentation_df (pd.DataFrame): df containing segment categories for each wallet
+    """
+    # Load wallet scores
+    wallet_scores_df = load_wallet_scores(
+        wallets_coin_config,
+        score_suffix
+    )
+    wallet_segmentation_df = wallet_scores_df.copy()
+
+    # Add "all" segment for full-population aggregations
+    wallet_segmentation_df['all_wallets|all'] = 'all'
+    wallet_segmentation_df['all_wallets|all'] = wallet_segmentation_df['all_wallets|all'].astype('category')
+
+    # Assign score quantiles
+    wallet_segmentation_df = assign_wallet_score_quantiles(
+        wallets_coin_config,
+        wallet_segmentation_df
+    )
+
+    # If configured, add training-period cluster labels
+    cluster_groups = wallets_coin_config['wallet_segments'].get('training_period_cluster_groups')
+    if cluster_groups:
+        # Load full-window wallet features to generate clusters
+        training_df_path = (
+            f"{wallets_config['training_data']['parquet_folder']}"
+            "/wallet_training_data_df_full.parquet"
+        )
+        training_data_df = pd.read_parquet(training_df_path)
+        wallet_clusters_df = assign_cluster_labels(
+            training_data_df,
+            cluster_groups
+        )
+        # Join and verify no rows dropped
+        orig_len = len(wallet_segmentation_df)
+        wallet_segmentation_df = wallet_segmentation_df.join(wallet_clusters_df, how='inner')
+        joined_len = len(wallet_segmentation_df)
+        if joined_len < orig_len:
+            raise ValueError(
+                f"Join dropped {orig_len - joined_len} rows from original {orig_len} rows"
+            )
+
+    return wallet_segmentation_df
+
+
+
+# ------------------------------
+#         Helper Functions
+# ------------------------------
+
+def load_wallet_scores(wallets_coin_config: dict, score_suffix: str = None) -> pd.DataFrame:
+    """
+    Params:
+    - wallets_coin_config (dict): config from .yaml file
+    - score_suffix (str): specifies which score column to load (if applicable)
+
+    Returns:
+    - wallet_scores_df (DataFrame):
+        wallet_address (index): contains all wallet addresses included in any score
+        score|{score_name} (float): the predicted score
+        residual|{score_name} (float): the residual of the score
+    """
+    wallet_scores = wallets_coin_config['wallet_segments']['wallet_scores']
+    wallet_scores_path = wallets_coin_config['wallet_segments']['wallet_scores_path']
+    wallet_scores_df = pd.DataFrame()
+
+    for score_name in wallet_scores:
+        score_df = pd.read_parquet(f"{wallet_scores_path}/{score_name}{score_suffix}.parquet")
+        feature_cols = []
+
+        # Add scores column
+        score_df[f'scores|{score_name}_score'] = score_df[f'score|{score_name}']
+        feature_cols.append(f'scores|{score_name}_score')
+
+        # Add residuals column
+        if wallets_coin_config['wallet_segments']['wallet_scores_residuals_segments'] is True:
+            score_df[f'scores|{score_name}_residual'] = (
+                score_df[f'score|{score_name}'] - score_df[f'actual|{score_name}']
+            )
+            feature_cols.append(f'scores|{score_name}_residual')
+
+        # Add confidence if provided
+        if ((wallets_coin_config['wallet_segments']['wallet_scores_confidence_segments'] is True)
+            & (f'confidence|{score_name}' in score_df.columns)
+            ):
+            score_df[f'scores|{score_name}_confidence'] = score_df[f'confidence|{score_name}']
+            feature_cols.append(f'scores|{score_name}_confidence')
+
+        # Full outer join with existing results
+        wallet_scores_df = (
+            score_df[feature_cols] if wallet_scores_df.empty
+            else wallet_scores_df.join(score_df[feature_cols], how='outer')
+        )
+
+    return wallet_scores_df
 
 
 def calculate_wallet_quantiles(score_series: pd.Series, quantiles: list[float]) -> pd.DataFrame:
@@ -118,20 +228,21 @@ def consolidate_duplicate_bins(bin_edges, bin_labels):
     return unique_edges, new_labels
 
 
-def assign_wallet_score_quantiles(wallet_segmentation_df, wallet_scores, score_segment_quantiles):
+def assign_wallet_score_quantiles(wallets_coin_config, wallet_segmentation_df):
     """
     Generates categorical quantiles for each wallet across each score and residual.
 
     Params:
+    - wallets_coin_config (dict): dict from .yaml file
     - wallet_segmentation_df (df): index wallet_address with columns score|{} and residual|{}
         for all scores in wallet_scores param
-    - wallet_scores (list of strings): the names of the scores and residuals to quantized
-    - score_segment_quantiles (list of floats): the percentiles to use as quantile boundaries
 
     Returns:
     - wallet_segmentation_df (df): the param df but with added score_quantile|{} columns
         for each score and residual
     """
+    wallet_scores = wallets_coin_config['wallet_segments']['wallet_scores']
+    score_segment_quantiles = wallets_coin_config['wallet_segments']['score_segment_quantiles']
     for score_name in wallet_scores:
 
         # Append score quantiles
@@ -154,7 +265,6 @@ def assign_wallet_score_quantiles(wallet_segmentation_df, wallet_scores, score_s
             wallet_segmentation_df = wallet_segmentation_df.join(wallet_quantiles,how='inner')
 
     return wallet_segmentation_df
-
 
 
 def assign_cluster_labels(training_data_df: pd.DataFrame, cluster_groups: list) -> pd.DataFrame:
@@ -180,8 +290,6 @@ def assign_cluster_labels(training_data_df: pd.DataFrame, cluster_groups: list) 
     combined_clusters_df = pd.concat(cluster_dfs, axis=1)
 
     return combined_clusters_df
-
-
 
 
 def add_feature_quantile_columns(validation_coin_wallet_features_df: pd.DataFrame, n_quantiles: int) -> pd.DataFrame:

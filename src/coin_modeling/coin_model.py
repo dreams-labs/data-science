@@ -190,9 +190,9 @@ class CoinModel(BaseModel):
         logger.info("Starting coins: %s", len(training_data_df))
 
         coin_training_data_df = training_data_df[
-            (training_data_df['all_wallets|all/all|balances/usd_balance_241031|aggregations/count']
+            (training_data_df['all_wallets|all/all|balances/usd_balance_ending|aggregations/count']
                 >= self.modeling_config['min_cohort_wallets'])
-            & (training_data_df['all_wallets|all/all|balances/usd_balance_241031|aggregations/sum']
+            & (training_data_df['all_wallets|all/all|balances/usd_balance_ending|aggregations/sum']
                  >= self.modeling_config['min_cohort_balance'])
         ]
         logger.info("Coins after balance filters: %s", len(coin_training_data_df))
