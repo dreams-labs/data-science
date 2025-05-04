@@ -2,15 +2,10 @@ import logging
 import pandas as pd
 
 # Local module imports
-from wallet_modeling.wallets_config_manager import WalletsConfig
 import utils as u
 
 # set up logger at the module level
 logger = logging.getLogger(__name__)
-
-# Load wallets_config at the module level
-wallets_config = WalletsConfig()
-
 
 
 # ------------------------------
@@ -19,6 +14,7 @@ wallets_config = WalletsConfig()
 
 @u.timing_decorator
 def calculate_balance_features(
+    wallets_config: dict,
     profits_df: pd.DataFrame) -> pd.DataFrame:
     """
     Generate wallet-level distribution features, given a profits_df with a multiindex of
@@ -26,10 +22,9 @@ def calculate_balance_features(
     each (coin_id, wallet_address)'s final balance.
 
     Params:
+    - wallets_config (dict): dict from yaml file
     - profits_df (DataFrame): MultiIndex on (coin_id, wallet_address, date). Must include
       'usd_balance'. Rows are sorted by date, or at least groupable by date.
-    - balance_features_min_balance (float): Filter out wallets whose total_usd_balance
-      is <= this threshold before aggregating features.
 
     Returns:
     - distribution_features_df (DataFrame): Wallet-indexed distribution features:
