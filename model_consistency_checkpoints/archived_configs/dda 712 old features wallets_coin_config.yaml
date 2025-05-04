@@ -58,8 +58,7 @@ coin_modeling:
     model_type: classification  # "regression" or "classification"
 
     #KeyParam Target Variable
-    # target_variable: coin_return_winsorized
-    target_variable: coin_return
+    target_variable: coin_return_winsorized
     # target_variable: coin_return_pctile_full
     # target_variable: coin_return_pctile
     target_var_class_threshold: 0.3  # a classification model will try to predict the target var above this value
@@ -69,7 +68,7 @@ coin_modeling:
 
     #KeyParam Modeling Cohort Definition
     # Thresholds for coin inclusion in training data
-    min_cohort_wallets: 10  # how many wallets must hold a coin for the coin to be elegible for forecasting
+    min_cohort_wallets: 25  # how many wallets must hold a coin for the coin to be elegible for forecasting
     min_cohort_balance: 10  # how much USD all wallets must hold for the coin to be elegible for forecasting
 
     # Thresholds for coin inclusion in training data
@@ -90,43 +89,102 @@ coin_modeling:
         drop_patterns: [
             # Facts
             # -----
-            # all_wallets*,
+            all_wallets*,
 
-            score_quantile|*,
-            # score_quantile|net_gain_max_investment_winsorized_base_score/50_85pct|*,
+            # score_quantile|*,
+            score_quantile|*_residual*,
+            # net_flows_max_investment_dda619_grid_residual*,
+            # net_flows_max_investment_dda619_grid_residual*,
+            # score_quantile|net_gain_max_investment_winsorized_base_score/15_85pct|*,
+            # score_quantile|net_gain_max_investment_winsorized_base_score/0_5pct|*,
+            # score_quantile|net_gain_max_investment_winsorized_base_score/5_15pct|*,
+            score_quantile|net_gain_max_investment_winsorized_base_score/15_50pct|*,
+            score_quantile|net_gain_max_investment_winsorized_base_score/50_85pct|*,
+            score_quantile|net_gain_max_investment_winsorized_base_score/85_95pct|*,
+            # score_quantile|net_gain_max_investment_winsorized_base_score/95_100pct|*,
 
+
+            # training_clusters|*,
+            training_clusters|k2_cluster/cluster_0|*,
+            training_clusters|k2_cluster/cluster_1|*,
+            training_clusters|k4_cluster/cluster_0|*,
+            training_clusters|k4_cluster/cluster_1|*,
+            # training_clusters|k4_cluster/cluster_2|*,
+            # training_clusters|k4_cluster/cluster_3|*,
+
+            # time_series|*,
+            time_series|market_data|market_cap_last,
+            time_series|market_data|mfi_first,
+            time_series|market_data|mfi_last,
+            time_series|market_data|obv_last,
+            time_series|market_data|price_rsi_14_first,
+            # time_series|market_data|price_rsi_14_last,
+            time_series|market_data|price_sma_5_pct_change_15d_period_1,
+            time_series|market_data|price_sma_5_pct_change_15d_period_2,
+            time_series|market_data|price_sma_5_pct_change_15d_period_3,
+            time_series|market_data|price_sma_5_pct_change_15d_period_4,
+            time_series|market_data|volume_pct_change_15d_period_1,
+            time_series|market_data|volume_pct_change_15d_period_2,
+            # time_series|market_data|volume_pct_change_15d_period_3,
+            # time_series|market_data|volume_pct_change_15d_period_4,
+            time_series|market_data|volume_sum_15d_period_1,
+            time_series|market_data|volume_sum_15d_period_2,
+            time_series|market_data|volume_sum_15d_period_3,
+            time_series|market_data|volume_sum_15d_period_4,
+
+            # wallet_cohorts|*,
+            wallet_cohorts|normies|buyers_new_sum_15d_period_1,
+            wallet_cohorts|normies|buyers_new_sum_15d_period_2,
+            wallet_cohorts|normies|total_balance_last_15d_period_1,
+            wallet_cohorts|normies|total_balance_last_15d_period_2,
+            wallet_cohorts|normies|total_bought_sum_15d_period_1,
+            wallet_cohorts|normies|total_bought_sum_15d_period_2,
+            wallet_cohorts|normies|total_holders_last_15d_period_1,
+            wallet_cohorts|normies|total_holders_last_15d_period_2,
+            wallet_cohorts|normies|total_sold_sum_15d_period_1,
+            wallet_cohorts|normies|total_sold_sum_15d_period_2,
+            wallet_cohorts|whales|buyers_new_sum,
+            # wallet_cohorts|whales|buyers_repeat_sum_15d_period_1,
+            # wallet_cohorts|whales|buyers_repeat_sum_15d_period_2,
+            wallet_cohorts|whales|total_balance_last_15d_period_1,
+            wallet_cohorts|whales|total_balance_last_15d_period_2,
+            wallet_cohorts|whales|total_bought_sum_15d_period_1,
+            wallet_cohorts|whales|total_bought_sum_15d_period_2,
 
             # Metrics
             # -------
-            # '*|trading/crypto_cash_buys|*',
-            # '*|trading/crypto_cash_sells|*',
+            '*|trading/crypto_cash_buys|*',
+            '*|trading/crypto_cash_sells|*',
             # '*|trading/crypto_inflows|*',
-            # '*|trading/crypto_net_cash_flows|*',
+            '*|trading/crypto_net_cash_flows|*',
             # '*|trading/crypto_net_flows|*',
             # '*|trading/crypto_net_gain|*',
-            # '*|trading/crypto_outflows|*',
-            # '*|trading/max_investment|*',
-            # '*|trading/total_volume|*',
+            '*|trading/crypto_outflows|*',
+            '*|trading/max_investment|*',
+            '*|trading/total_volume|*',
             # '*|trading/unique_coins_traded|*',
-            # '*|balances/usd_balance_starting*|*',
-            # '*|balances/usd_balance_ending*|*',
+            # '*|balances/usd_balance_241031|*',
 
 
             # Transformations
             # ---------------
-            # '*|aggregations/sum',
-            # '*|aggregations/sum_pct',
-            # '*|aggregations/count_pct',
-            # '*|aggregations/count',
+            '*|aggregations/sum',
+            '*|aggregations/sum_pct',
+            '*|aggregations/count_pct',
+            '*|aggregations/count',
 
             # '*|score_dist/*',
-            # '*|score_dist/*_median',
-            # '*|score_dist/*_p10',
-            # '*|score_dist/*_p90',
-            # '*|score_dist/*_std',
-
+            # '*|score_dist/net_gain_winsorized_dda619_grid_score_median',
+            '*|score_dist/net_gain_winsorized_dda619_grid_score_p10',
+            # '*|score_dist/net_gain_winsorized_dda619_grid_score_p90',
+            # '*|score_dist/net_gain_winsorized_dda619_grid_score_std',
+            # '*|score_dist/net_gain_winsorized_dda619_grid_residual_median',
+            # '*|score_dist/net_gain_winsorized_dda619_grid_residual_p10',
+            # '*|score_dist/net_gain_winsorized_dda619_grid_residual_p90',
+            # '*|score_dist/net_gain_winsorized_dda619_grid_residual_std',
             # '*|score_wtd/*',
-
+            '*_score_median',
+            # '*_score_p90'
         ]
 
         # Correlation/variance-based removal
