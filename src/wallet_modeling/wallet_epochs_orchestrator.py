@@ -151,6 +151,7 @@ class MultiEpochOrchestrator:
 
         # Set a suitable number of threads. You could retrieve this from config; here we use 8 as an example.
         max_workers = self.base_config['n_threads']['concurrent_epochs']
+        i = 0
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Submit each epoch processing task to the executor
             futures = {executor.submit(self._process_single_epoch, cfg): cfg for cfg in self.all_epochs_configs}
@@ -161,6 +162,10 @@ class MultiEpochOrchestrator:
                 # Downcast dtypes
                 epoch_training_df = u.df_downcast(epoch_training_df)
                 epoch_modeling_df = u.df_downcast(epoch_modeling_df)
+
+                # inline: log completion before storing data
+                i += 1
+                logger.milestone(f"Epoch {i}/{len(self.all_epochs_configs)} completed (date: {epoch_date})")
 
                 # Store data in dicts
                 if cfg.get('epoch_type') == 'validation':
@@ -200,6 +205,8 @@ class MultiEpochOrchestrator:
             validation_training_data_df,
             validation_wallet_features_df
         )
+
+
 
     # -----------------------------------
     #           Helper Methods
@@ -375,7 +382,7 @@ class MultiEpochOrchestrator:
             'wallet_cohort': training_generator.training_wallet_cohort
         }
 
-        logger.milestone(f"Successfully generated features for epoch {model_start}.")
+        logger.info(f"Successfully generated features for epoch {model_start}.")
 
         return epoch_date, epoch_training_data_df, epoch_modeling_data_df, cohorts
 
