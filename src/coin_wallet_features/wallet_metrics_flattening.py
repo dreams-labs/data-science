@@ -2,11 +2,9 @@
 Functions to flatten wallet-coin features to coin-only
 """
 import logging
-from pathlib import Path
 from typing import List
 import pandas as pd
 import numpy as np
-import yaml
 
 # Local module imports
 # import coin_wallet_features.wallet_balance_features as cwb
@@ -14,15 +12,63 @@ import yaml
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
 
-# Load wallets_config at the module level
-wallets_coin_config = yaml.safe_load(Path('../config/wallets_coin_config.yaml').read_text(encoding='utf-8'))
-
-
 
 
 # -----------------------------------
 #       Main Interface Function
 # -----------------------------------
+
+
+
+def flatten_cw_to_coin_segment_features(
+    cw_metrics_df: pd.DataFrame,
+    wallet_segmentation_df: pd.DataFrame,
+    training_coin_cohort: list
+) -> pd.DataFrame:
+    """
+    Flatten coin-wallet metrics into coin-level features across segments.
+
+    Params:
+    - cw_metrics_df (DataFrame): indexed by (coin_id, wallet_address) with 'balances/...'
+        and 'trading/...' columns.
+    - wallet_segmentation_df (DataFrame): indexed by wallet_address with segment assignments.
+    - training_coin_cohort (list): list of coin_ids to include
+
+    Returns:
+    - coin_wallet_features_df (DataFrame): indexed by coin_id, joined features for each
+        metric × segment family.
+    """
+    # start with an empty coin-level df
+    coin_wallet_features_df = pd.DataFrame(index=training_coin_cohort)
+    coin_wallet_features_df.index.name = 'coin_id'
+
+    # identify which segmentation columns to use
+    segmentation_families = wallet_segmentation_df.columns[
+        ~wallet_segmentation_df.columns.str.startswith('scores|')
+    ]
+
+    # loop through each metric × segment and join
+    total_metrics = len(cw_metrics_df.columns)
+    for i, metric_column in enumerate(cw_metrics_df.columns, start=1):
+        for segment_family in segmentation_families:
+            # generate coin-level features for this metric & segment
+            segment_df = flatten_cw_to_coin_features(
+                cw_metrics_df,
+                metric_column,
+                wallet_segmentation_df,
+                segment_family,
+                training_coin_cohort
+            )
+            coin_wallet_features_df = coin_wallet_features_df.join(segment_df, how='inner')
+        logger.info("Flattened metric %s/%s: %s", i, total_metrics, metric_column)
+
+    logger.info(
+        "All wallet-based features flattened. Final shape: %s",
+        coin_wallet_features_df.shape
+    )
+    return coin_wallet_features_df
+
+
 
 def flatten_cw_to_coin_features(
     wallet_metric_df: pd.DataFrame,
