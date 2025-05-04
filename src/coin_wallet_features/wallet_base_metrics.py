@@ -1,5 +1,4 @@
 import logging
-from typing import List
 import pandas as pd
 import wallet_features.trading_features as wtf
 import utils as u
@@ -9,40 +8,33 @@ logger = logging.getLogger(__name__)
 
 
 
-def calculate_coin_wallet_balances(
-    profits_df: pd.DataFrame,
-    balance_dates: List[str]
-) -> pd.DataFrame:
+def calculate_coin_wallet_ending_balances(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
     Calculate metric value for each wallet-coin pair on specified dates.
 
     Params:
     - profits_df (DataFrame): Input profits data
-    - balance_dates (List[str]): List of dates for metric calculation
 
     Returns:
     - balances_df (DataFrame): Wallet-coin level data with metric values for each specified date
         with indices ('coin_id', 'wallet_address').
     """
-    # Convert balance_dates to datetime for consistency
-    balance_dates = pd.to_datetime(balance_dates)
-
     # Create a DataFrame with coin_id and wallet_address as indices
     balances_df = profits_df[['coin_id', 'wallet_address']].drop_duplicates().set_index(['coin_id', 'wallet_address'])
 
-    # Loop through balance_dates and add a column for each date
-    for balance_date in balance_dates:
-        balance_date_str = balance_date.strftime('%y%m%d')
-        col_name = f'usd_balance_{balance_date_str}'
+    # Add a column for the balance date
+    balance_date = profits_df.index.get_level_values('date').max()
+    balance_date_str = balance_date.strftime('%y%m%d')
+    col_name = f'usd_balance_{balance_date_str}'
 
-        # Filter for the specific date and map the balances
-        date_balances = profits_df.loc[
-            profits_df['date'] == balance_date,
-            ['coin_id', 'wallet_address', 'usd_balance']
-        ].set_index(['coin_id', 'wallet_address'])
+    # Filter for the specific date and map the balances
+    date_balances = profits_df.loc[
+        profits_df['date'] == balance_date,
+        ['coin_id', 'wallet_address', 'usd_balance']
+    ].set_index(['coin_id', 'wallet_address'])
 
-        # Add the balance column to balances_df
-        balances_df[col_name] = date_balances['usd_balance']
+    # Add the balance column to balances_df
+    balances_df[col_name] = date_balances['usd_balance']
 
     return balances_df
 

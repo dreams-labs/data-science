@@ -296,9 +296,8 @@ class CoinTrainingDataOrchestrator:
             )
 
         # 3) Calculate balances
-        balances_df = cwbm.calculate_coin_wallet_balances(
-            profits_df,
-            balance_dates
+        balances_df = cwbm.calculate_coin_wallet_ending_balances(
+            profits_df
         ).add_prefix('balances/')
         cw_metrics_df = (
             cw_metrics_df
