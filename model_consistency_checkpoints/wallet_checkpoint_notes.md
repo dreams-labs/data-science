@@ -1,3 +1,30 @@
+# dda 706 refactor coin model
+checkpoint 1: cauc.597 features refactored
+Model Performance Summary
+Target: coin_return
+ID: b81a7dc3-faf5-428d-936a-fd22e54b7878
+===================================
+Test Samples:             423
+Number of Features:       104
+Features per Window:      0
+
+Classification Metrics
+-----------------------------------
+ROC AUC:                  0.671
+Log Loss:                 0.445
+Accuracy:                 0.823
+Precision:                0.571
+Recall:                   0.104
+F1 Score:                 0.176
+
+Validation Return Metrics
+-----------------------------------
+Val ROC AUC:              0.597
+Top 1% Mean Return:       0.053
+Top 5% Mean Return:       0.068
+Overall Mean Return:      0.023
+
+
 # dda 721 predict outside of db
 checkpoint 1: w.978 predict with db up to 2/26/25
 Model Performance Summary
