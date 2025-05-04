@@ -8,7 +8,6 @@ import numpy as np
 
 # local module imports
 import wallet_features.clustering_features as wcl
-import coin_wallet_features.coin_features_orchestrator as cfo
 
 
 # Set up logger at the module level
