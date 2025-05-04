@@ -1,5 +1,5 @@
 """
-Calculates metrics aggregated at the coin level
+Functions to flatten wallet-coin features to coin-only
 """
 import logging
 from pathlib import Path
@@ -19,55 +19,94 @@ wallets_coin_config = yaml.safe_load(Path('../config/wallets_coin_config.yaml').
 
 
 
-def load_wallet_scores(wallet_scores: list, wallet_scores_path: str, score_suffix: str = None) -> pd.DataFrame:
-    """
+
+# -----------------------------------
+#       Main Interface Function
+# -----------------------------------
+
+def flatten_cw_to_coin_features(
+    wallet_metric_df: pd.DataFrame,
+    metric_column: str,
+    wallet_segmentation_df: pd.DataFrame,
+    segment_family: str,
+    all_coin_ids: List[str],
+    usd_materiality: float = 20.0
+) -> pd.DataFrame:
+    """Generate coin-level features from wallet-level metric.
+
     Params:
-    - wallet_scores (list): List of score names to merge
-    - wallet_scores_path (str): Base path for score parquet files
+    - wallet_metric_df (DataFrame): MultiIndexed (coin_id, wallet_address) metrics
+    - metric_column (str): Name of metric column without date suffix
+    - wallet_segmentation_df (DataFrame): Segment labels and scores
+    - segment_family (str): Column name for segment labels
+    - all_coin_ids (List[str]): Complete list of coins
+    - usd_materiality (float): USD threshold for including wallets in distribution metrics
 
     Returns:
-    - wallet_scores_df (DataFrame):
-        wallet_address (index): contains all wallet addresses included in any score
-        score|{score_name} (float): the predicted score
-        residual|{score_name} (float): the residual of the score
+    - DataFrame: Coin-level features with segment metrics
     """
-    wallet_scores_df = pd.DataFrame()
+    # Get score columns
+    score_columns = [col for col in wallet_segmentation_df.columns
+                    if col.startswith('scores|')]
 
-    for score_name in wallet_scores:
-        score_df = pd.read_parquet(f"{wallet_scores_path}/{score_name}{score_suffix}.parquet")
-        feature_cols = []
+    # Join segmentation data using index
+    analysis_df = wallet_metric_df.join(
+        wallet_segmentation_df[[segment_family] + score_columns],
+        how='left'
+    )
 
-        # Add scores column
-        score_df[f'scores|{score_name}_score'] = score_df[f'score|{score_name}']
-        feature_cols.append(f'scores|{score_name}_score')
+    # Initialize results with MultiIndex aware groupby
+    totals_df = analysis_df.groupby(level='coin_id', observed=True).agg({
+        f'{metric_column}': 'sum',
+        segment_family: 'count'
+    }).rename(columns={
+        f'{metric_column}': f'{segment_family}/total|{metric_column}|aggregations/sum',
+        segment_family: f'{segment_family}/total|{metric_column}|aggregations/count'
+    })
 
-        # Add residuals column
-        if wallets_coin_config['wallet_segments']['wallet_scores_residuals_segments'] is True:
-            score_df[f'scores|{score_name}_residual'] = (
-                score_df[f'score|{score_name}'] - score_df[f'actual|{score_name}']
-            )
-            feature_cols.append(f'scores|{score_name}_residual')
+    result_df = pd.DataFrame(index=pd.Index(all_coin_ids, name='coin_id'))
 
-        # Add confidence if provided
-        if ((wallets_coin_config['wallet_segments']['wallet_scores_confidence_segments'] is True)
-            & (f'confidence|{score_name}' in score_df.columns)
-            ):
-            score_df[f'scores|{score_name}_confidence'] = score_df[f'confidence|{score_name}']
-            feature_cols.append(f'scores|{score_name}_confidence')
-
-        # Full outer join with existing results
-        wallet_scores_df = (
-            score_df[feature_cols] if wallet_scores_df.empty
-            else wallet_scores_df.join(score_df[feature_cols], how='outer')
+    for segment_value in wallet_segmentation_df[segment_family].unique():
+        # Computes basic aggregations
+        aggregation_metrics_df = calculate_aggregation_metrics(
+            analysis_df, segment_family, segment_value,
+            metric_column, totals_df
         )
+        result_df = result_df.join(aggregation_metrics_df,how='left')\
+            .fillna({col: 0 for col in aggregation_metrics_df.columns})
 
-    return wallet_scores_df
+
+        # Computes weighted balance scores
+        score_metrics_df = calculate_score_weighted_metrics(
+            analysis_df, segment_family, segment_value,
+            metric_column, score_columns
+        )
+        result_df = result_df.join(score_metrics_df,how='left') # leave nulls as null
 
 
-# ------------------------------------------------------- #
-# Functions to flatten wallet-coin features to coin-only
-# ------------------------------------------------------- #
+        # Checks if the column is includes material usd values
+        if wallet_metric_df[metric_column].abs().mean() > (10 * usd_materiality):
 
+            # Add new distribution metrics
+            score_dist_metrics_df = calculate_score_distribution_metrics(
+                analysis_df, segment_family, segment_value,
+                metric_column, score_columns, usd_materiality
+            )
+            result_df = result_df.join(score_dist_metrics_df,how='left') # leave nulls as null
+
+    # Validation
+    missing_coins = set(all_coin_ids) - set(result_df.index)
+    if missing_coins:
+        raise ValueError(f"Found {len(missing_coins)} coin_ids missing from analysis")
+
+    return result_df
+
+
+
+
+# ------------------------------
+#         Helper Functions
+# ------------------------------
 
 def calculate_aggregation_metrics(
     analysis_df: pd.DataFrame,
@@ -218,82 +257,3 @@ def calculate_score_distribution_metrics(
     metrics_df = median_df.join([p10_df, p90_df, std_df], how='outer').fillna(0)
 
     return metrics_df
-
-
-def flatten_cw_to_coin_features(
-    wallet_metric_df: pd.DataFrame,
-    metric_column: str,
-    wallet_segmentation_df: pd.DataFrame,
-    segment_family: str,
-    all_coin_ids: List[str],
-    usd_materiality: float = 20.0
-) -> pd.DataFrame:
-    """Generate coin-level features from wallet-level metric.
-
-    Params:
-    - wallet_metric_df (DataFrame): MultiIndexed (coin_id, wallet_address) metrics
-    - metric_column (str): Name of metric column without date suffix
-    - wallet_segmentation_df (DataFrame): Segment labels and scores
-    - segment_family (str): Column name for segment labels
-    - all_coin_ids (List[str]): Complete list of coins
-    - usd_materiality (float): USD threshold for including wallets in distribution metrics
-
-    Returns:
-    - DataFrame: Coin-level features with segment metrics
-    """
-    # Get score columns
-    score_columns = [col for col in wallet_segmentation_df.columns
-                    if col.startswith('scores|')]
-
-    # Join segmentation data using index
-    analysis_df = wallet_metric_df.join(
-        wallet_segmentation_df[[segment_family] + score_columns],
-        how='left'
-    )
-
-    # Initialize results with MultiIndex aware groupby
-    totals_df = analysis_df.groupby(level='coin_id', observed=True).agg({
-        f'{metric_column}': 'sum',
-        segment_family: 'count'
-    }).rename(columns={
-        f'{metric_column}': f'{segment_family}/total|{metric_column}|aggregations/sum',
-        segment_family: f'{segment_family}/total|{metric_column}|aggregations/count'
-    })
-
-    result_df = pd.DataFrame(index=pd.Index(all_coin_ids, name='coin_id'))
-
-    for segment_value in wallet_segmentation_df[segment_family].unique():
-        # Computes basic aggregations
-        aggregation_metrics_df = calculate_aggregation_metrics(
-            analysis_df, segment_family, segment_value,
-            metric_column, totals_df
-        )
-        result_df = result_df.join(aggregation_metrics_df,how='left')\
-            .fillna({col: 0 for col in aggregation_metrics_df.columns})
-
-
-        # Computes weighted balance scores
-        score_metrics_df = calculate_score_weighted_metrics(
-            analysis_df, segment_family, segment_value,
-            metric_column, score_columns
-        )
-        result_df = result_df.join(score_metrics_df,how='left') # leave nulls as null
-
-
-        # Checks if the column is includes material usd values
-        if wallet_metric_df[metric_column].abs().mean() > (10 * usd_materiality):
-
-            # Add new distribution metrics
-            score_dist_metrics_df = calculate_score_distribution_metrics(
-                analysis_df, segment_family, segment_value,
-                metric_column, score_columns, usd_materiality
-            )
-            result_df = result_df.join(score_dist_metrics_df,how='left') # leave nulls as null
-
-    # Validation
-    missing_coins = set(all_coin_ids) - set(result_df.index)
-    if missing_coins:
-        raise ValueError(f"Found {len(missing_coins)} coin_ids missing from analysis")
-
-    return result_df
-
