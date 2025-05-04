@@ -871,8 +871,10 @@ class ClassifierEvaluator(RegressorEvaluator):
                 'proba': self.y_validation_pred_proba,
                 'ret': returns
             }).dropna()
+            pct01 = np.percentile(df_val['proba'], 99.9)
             pct1 = np.percentile(df_val['proba'], 99)
             pct5 = np.percentile(df_val['proba'], 95)
+            self.metrics['val_return_top01'] = df_val.loc[df_val['proba'] >= pct01, 'ret'].mean()
             self.metrics['val_return_top1'] = df_val.loc[df_val['proba'] >= pct1, 'ret'].mean()
             self.metrics['val_return_top5'] = df_val.loc[df_val['proba'] >= pct5, 'ret'].mean()
             self.metrics['val_return_overall'] = df_val['ret'].mean()
@@ -908,6 +910,7 @@ class ClassifierEvaluator(RegressorEvaluator):
                 "Validation Return Metrics",
                 "-" * 35,
                 f"Val ROC AUC:              {self.metrics['val_roc_auc']:.3f}",
+                f"Top 0.1% Mean Return:     {self.metrics['val_return_top01']:.3f}",
                 f"Top 1% Mean Return:       {self.metrics['val_return_top1']:.3f}",
                 f"Top 5% Mean Return:       {self.metrics['val_return_top5']:.3f}",
                 f"Overall Mean Return:      {self.metrics['val_return_overall']:.3f}",

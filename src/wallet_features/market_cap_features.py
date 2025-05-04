@@ -3,14 +3,10 @@ import numpy as np
 import pandas as pd
 
 # Local module imports
-from wallet_modeling.wallets_config_manager import WalletsConfig
 import utils as u
 
 # set up logger at the module level
 logger = logging.getLogger(__name__)
-
-# Load wallets_config at the module level
-wallets_config = WalletsConfig()
 
 
 
@@ -19,13 +15,14 @@ wallets_config = WalletsConfig()
 # ------------------------------
 
 @u.timing_decorator
-def calculate_market_cap_features(profits_df, market_data_df):
+def calculate_market_cap_features(wallets_config, profits_df, market_data_df):
     """
     Calculates metrics about each wallet's interaction with coins of different market caps:
     1. Volume-weighted average market cap (uses only real transfers)
     2. Ending balance-weighted market cap (uses final period balances)
 
     Params:
+    - wallets_config (dict): dict from .yaml file
     - profits_df (DataFrame): Daily profits with both real transfers and imputed period boundary rows
     - market_data_df (DataFrame): Price and market cap data
 

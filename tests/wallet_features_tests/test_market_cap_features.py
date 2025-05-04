@@ -374,7 +374,8 @@ def test_market_cap_features_df(test_profits_df, test_market_cap_data):
     """
     Returns the full market_cap_features_df for testing
     """
-    market_cap_features_df = wmc.calculate_market_cap_features(test_profits_df,
+    market_cap_features_df = wmc.calculate_market_cap_features(wallets_config,
+                                                               test_profits_df,
                                                                test_market_cap_data)
 
     return market_cap_features_df

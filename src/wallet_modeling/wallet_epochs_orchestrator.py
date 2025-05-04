@@ -45,7 +45,6 @@ class MultiEpochOrchestrator:
         self.features_config = features_config
         self.epochs_config = epochs_config
 
-
         # Generated configs
         self.all_epochs_configs = self._generate_epoch_configs()
 
@@ -152,6 +151,7 @@ class MultiEpochOrchestrator:
 
         # Set a suitable number of threads. You could retrieve this from config; here we use 8 as an example.
         max_workers = self.base_config['n_threads']['concurrent_epochs']
+        i = 0
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Submit each epoch processing task to the executor
             futures = {executor.submit(self._process_single_epoch, cfg): cfg for cfg in self.all_epochs_configs}
@@ -162,6 +162,10 @@ class MultiEpochOrchestrator:
                 # Downcast dtypes
                 epoch_training_df = u.df_downcast(epoch_training_df)
                 epoch_modeling_df = u.df_downcast(epoch_modeling_df)
+
+                # inline: log completion before storing data
+                i += 1
+                logger.milestone(f"Epoch {i}/{len(self.all_epochs_configs)} completed (date: {epoch_date})")
 
                 # Store data in dicts
                 if cfg.get('epoch_type') == 'validation':
@@ -201,6 +205,8 @@ class MultiEpochOrchestrator:
             validation_training_data_df,
             validation_wallet_features_df
         )
+
+
 
     # -----------------------------------
     #           Helper Methods
@@ -376,7 +382,7 @@ class MultiEpochOrchestrator:
             'wallet_cohort': training_generator.training_wallet_cohort
         }
 
-        logger.milestone(f"Successfully generated features for epoch {model_start}.")
+        logger.info(f"Successfully generated features for epoch {model_start}.")
 
         return epoch_date, epoch_training_data_df, epoch_modeling_data_df, cohorts
 
@@ -627,20 +633,26 @@ class MultiEpochOrchestrator:
         profits_end = self.complete_profits_df.index.get_level_values('date').max()
         market_data_start = self.complete_market_data_df.index.get_level_values('date').min()
         market_data_end = self.complete_market_data_df.index.get_level_values('date').max()
+        macro_trends_start = self.complete_macro_trends_df.index.get_level_values('date').min()
+        macro_trends_end = self.complete_macro_trends_df.index.get_level_values('date').max()
 
         if not (
             (profits_start <= earliest_starting_balance_date) and
             (profits_end >= latest_modeling_end) and
             (market_data_start <= earliest_starting_balance_date) and
-            (market_data_end >= latest_modeling_end)
+            (market_data_end >= latest_modeling_end) and
+            (macro_trends_start <= earliest_starting_balance_date) and
+            (macro_trends_end >= latest_modeling_end)
         ):
             raise ValueError(
                 f"Insufficient data coverage for specified epochs.\n"
                 f"Required coverage: {earliest_starting_balance_date.strftime('%Y-%m-%d')}"
-                f" to {latest_modeling_end.strftime('%Y-%m-%d')}\n"
+                    f" to {latest_modeling_end.strftime('%Y-%m-%d')}\n"
                 f"Actual coverage:\n"
                 f"- Profits data: {profits_start.strftime('%Y-%m-%d')} to {profits_end.strftime('%Y-%m-%d')}\n"
-                f"- Market data: {market_data_start.strftime('%Y-%m-%d')} to {market_data_end.strftime('%Y-%m-%d')}"
+                f"- Market data: {market_data_start.strftime('%Y-%m-%d')} to {market_data_end.strftime('%Y-%m-%d')}\n"
+                f"- Macro trends data: {macro_trends_start.strftime('%Y-%m-%d')} "
+                    f"to {macro_trends_end.strftime('%Y-%m-%d')}"
             )
 
         # Confirm we have hybrid mappings for all pairs if applicable
