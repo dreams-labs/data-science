@@ -132,7 +132,7 @@ def calculate_wallet_features(
         .fillna({col: 0 for col in timing_features_df.columns})
 
     # Market cap features (left join, do not full)
-    market_features_df = wmc.calculate_market_cap_features(profits_df, market_indicators_data_df)
+    market_features_df = wmc.calculate_market_cap_features(wallets_config, profits_df, market_indicators_data_df)
     feature_column_names['mktcap|'] = market_features_df.columns
     wallet_features_df = wallet_features_df.join(market_features_df, how='left')
 
