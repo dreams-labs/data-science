@@ -18,8 +18,6 @@ logger = logging.getLogger(__name__)
 #       Main Interface Function
 # -----------------------------------
 
-
-
 def flatten_cw_to_coin_segment_features(
     cw_metrics_df: pd.DataFrame,
     wallet_segmentation_df: pd.DataFrame,
