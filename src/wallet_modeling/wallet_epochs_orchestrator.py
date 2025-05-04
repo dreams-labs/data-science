@@ -225,6 +225,23 @@ class MultiEpochOrchestrator:
         - epoch_training_data_df (DataFrame): Training features for this epoch
         - epoch_modeling_data_df (DataFrame): Modeling features for this epoch
         """
+        # Short-circuit: if dfs are already saved, just load them
+        output_folder = epoch_config['training_data']['parquet_folder']
+        training_path = f"{output_folder}/training_data_df.parquet"
+        modeling_path = f"{output_folder}/modeling_data_df.parquet"
+        if os.path.exists(training_path) and os.path.exists(modeling_path):
+            logger.info(
+                f"Loading precomputed features for epoch starting "
+                f"{epoch_config['training_data']['modeling_period_start']} from {output_folder}"
+            )
+            epoch_date = datetime.strptime(
+                epoch_config['training_data']['modeling_period_start'], '%Y-%m-%d'
+            )
+            epoch_training_data_df = pd.read_parquet(training_path)
+            epoch_modeling_data_df = pd.read_parquet(modeling_path)
+            return epoch_date, epoch_training_data_df, epoch_modeling_data_df
+
+        # Begin generation of dfs
         model_start = epoch_config['training_data']['modeling_period_start']
         logger.info(f"Generating data for epoch with modeling_period_start of {model_start}...")
         u.notify('futuristic')
@@ -262,6 +279,13 @@ class MultiEpochOrchestrator:
             ])
 
             u.assert_matching_indices(epoch_training_data_df,epoch_modeling_data_df)
+
+            # Save features
+            output_folder = f"{epoch_config['training_data']['parquet_folder']}/"
+            epoch_training_data_df.to_parquet(f"{output_folder}/training_data_df.parquet", index=True)
+            epoch_modeling_data_df.to_parquet(f"{output_folder}/modeling_data_df.parquet", index=True)
+            logger.info(f"Saved {model_start} features to %s.", output_folder)
+
 
         return epoch_date, epoch_training_data_df, epoch_modeling_data_df
 
@@ -362,8 +386,7 @@ class MultiEpochOrchestrator:
                 training_profits_df,
                 training_market_indicators_df,
                 training_macro_indicators_df,
-                training_transfers_df,
-                return_files=True
+                training_transfers_df
             )
             model_future = executor.submit(
                 modeling_generator.prepare_modeling_features,
