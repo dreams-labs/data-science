@@ -245,3 +245,49 @@ class CoinFeaturesOrchestrator:
         logger.info("Final features shape: %s",coin_training_data_df_full.shape)
 
         return coin_training_data_df_full
+
+
+
+
+# ----------------------------------
+#         Utility Functions
+# ----------------------------------
+
+def parse_feature_names(coin_training_data_df: pd.DataFrame) -> pd.DataFrame:
+    """Parse feature names from training dataframe into structured components.
+
+    Params:
+    - coin_training_data_df (DataFrame): DataFrame containing features to parse
+
+    Returns:
+    - feature_details_df (DataFrame): DataFrame with parsed feature components
+    """
+    # Create dataframe of column names
+    df = pd.DataFrame(coin_training_data_df.columns)
+    df.columns = ['feature']
+
+    # Split on pipe delimiters
+    split_df = df['feature'].str.split('|', expand=True)
+    split_df.columns = ['segment_category', 'segment_family', 'metric', 'transformation']
+
+    # Split nested components
+    segment_families = split_df['segment_family'].str.split('/', expand=True)
+    segment_families.columns = ['segment_family', 'segment_value']
+
+    metrics = split_df['metric'].str.split('/', expand=True)
+    metrics.columns = ['metric', 'metric_detail']
+
+    transformations = split_df['transformation'].str.split('/', expand=True)
+    transformations.columns = ['transformation', 'transformation_method']
+
+    # Combine all components
+    feature_details_df = pd.concat([
+        split_df['segment_category'],
+        segment_families,
+        metrics,
+        transformations,
+    ], axis=1)
+
+    feature_details_df['feature_full'] = df['feature']
+
+    return feature_details_df
