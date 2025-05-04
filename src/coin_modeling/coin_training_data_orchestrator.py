@@ -71,14 +71,19 @@ class CoinTrainingDataOrchestrator:
         - coin_training_data_df_full (DataFrame): full coin-level feature set
         """
         # Generate metrics for coin-wallet pairs
-        cw_metrics_df = self._compute_coin_wallet_metrics(
+        cw_metrics_df = cwwm.compute_coin_wallet_metrics(
+            self.wallets_coin_config,
             profits_df,
             self.wallets_config['training_data'][f'{period}_period_start'],
             self.wallets_config['training_data'][f'{period}_period_end']
         )
 
         # Assign wallets to segments
-        wallet_segmentation_df = self._build_wallet_segmentation(score_suffix=f'|{prd}')
+        wallet_segmentation_df = cws.build_wallet_segmentation(
+            self.wallets_coin_config,
+            self.wallets_config,
+            score_suffix=f'|{prd}'
+        )
 
         # Flatten cw_metrics into single values for each coin-segment pair
         coin_wallet_features_df = self._flatten_cw_to_coin_segment_features(
@@ -200,112 +205,6 @@ class CoinTrainingDataOrchestrator:
         u.notify('ui_1')
 
         return coin_features_df
-
-
-    def _build_wallet_segmentation(self, score_suffix: str = None) -> pd.DataFrame:
-        """
-        Build wallet segmentation DataFrame with score quantiles and optional clusters.
-        """
-        # Load wallet scores
-        wallet_scores_df = cfo.load_wallet_scores(
-            self.wallets_coin_config['wallet_segments']['wallet_scores'],
-            self.wallets_coin_config['wallet_segments']['wallet_scores_path'],
-            score_suffix
-        )
-        wallet_segmentation_df = wallet_scores_df.copy()
-
-        # Add "all" segment for full-population aggregations
-        wallet_segmentation_df['all_wallets|all'] = 'all'
-        wallet_segmentation_df['all_wallets|all'] = wallet_segmentation_df['all_wallets|all'].astype('category')
-
-        # Assign score quantiles
-        wallet_segmentation_df = cws.assign_wallet_score_quantiles(
-            wallet_segmentation_df,
-            self.wallets_coin_config['wallet_segments']['wallet_scores'],
-            self.wallets_coin_config['wallet_segments']['score_segment_quantiles']
-        )
-
-        # If configured, add training-period cluster labels
-        cluster_groups = self.wallets_coin_config['wallet_segments'].get('training_period_cluster_groups')
-        if cluster_groups:
-            # Load full-window wallet features to generate clusters
-            training_df_path = (
-                f"{self.wallets_config['training_data']['parquet_folder']}"
-                "/wallet_training_data_df_full.parquet"
-            )
-            training_data_df = pd.read_parquet(training_df_path)
-            wallet_clusters_df = cws.assign_cluster_labels(
-                training_data_df,
-                cluster_groups
-            )
-            # Join and verify no rows dropped
-            orig_len = len(wallet_segmentation_df)
-            wallet_segmentation_df = wallet_segmentation_df.join(wallet_clusters_df, how='inner')
-            joined_len = len(wallet_segmentation_df)
-            if joined_len < orig_len:
-                raise ValueError(
-                    f"Join dropped {orig_len - joined_len} rows from original {orig_len} rows"
-                )
-            # Clean up
-            del training_data_df
-            gc.collect()
-
-        return wallet_segmentation_df
-
-
-    def _compute_coin_wallet_metrics(
-            self,
-            profits_df: pd.DataFrame,
-            period_start: str,
-            period_end: str
-            ) -> pd.DataFrame:
-        """
-        Compute coin-wallet–level metrics: balances and trading metrics.
-
-        Params:
-        - profits_df (DataFrame): must include columns ['coin_id','wallet_address',…].
-        - period_start,period_end str(YYYY-MM-DD): period start and end dates
-
-        Returns:
-        - cw_metrics_df (DataFrame): MultiIndex [coin_id, wallet_address] with
-          'balances/...’ and 'trading/...’ feature columns.
-        """
-        # Confirm time period is correct
-        u.assert_period(profits_df, period_start, period_end)
-
-        # 1) Build base index of all (coin, wallet) pairs
-        idx = (
-            profits_df[['coin_id', 'wallet_address']]
-            .drop_duplicates()
-            .set_index(['coin_id', 'wallet_address'])
-            .index
-        )
-        cw_metrics_df = pd.DataFrame(index=idx)
-
-        # 2) Calculate balances
-        balances_df = cwwm.calculate_coin_wallet_ending_balances(
-            profits_df
-        ).add_prefix('balances/')
-        cw_metrics_df = (
-            cw_metrics_df
-            .join(balances_df, how='left')
-            .fillna({col: 0 for col in balances_df.columns})
-        )
-
-        # 3) Calculate trading metrics
-        trading_df = cwwm.calculate_coin_wallet_trading_metrics(
-            profits_df,
-            period_start,
-            period_end,
-            self.wallets_coin_config['wallet_features']['drop_trading_metrics']
-        ).add_prefix('trading/')
-        cw_metrics_df = (
-            cw_metrics_df
-            .join(trading_df, how='left')
-            .fillna({col: 0 for col in trading_df.columns})
-        )
-
-        return cw_metrics_df
 
 
     def _flatten_cw_to_coin_segment_features(
