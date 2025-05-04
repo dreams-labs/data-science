@@ -45,16 +45,6 @@ class MultiEpochOrchestrator:
         self.features_config = features_config
         self.epochs_config = epochs_config
 
-        # Confirm the validation_period_end is after the latest modeling_period_end
-        modeling_end = pd.to_datetime(self.base_config['training_data']['modeling_period_end'])
-        validation_end = pd.to_datetime(self.base_config['training_data']['validation_period_end'])
-        latest_offset = pd.Series(self.epochs_config['offset_epochs'].get('validation_offsets')).max()
-        latest_modeling_end = modeling_end + timedelta(days = int(latest_offset))
-        if latest_modeling_end > validation_end:
-            raise ValueError(f"Invalid config settings: latest epoch's modeling end of {latest_modeling_end} "
-                             f"is later than the validation end of {validation_end}.")
-
-
         # Generated configs
         self.all_epochs_configs = self._generate_epoch_configs()
 
@@ -636,20 +626,26 @@ class MultiEpochOrchestrator:
         profits_end = self.complete_profits_df.index.get_level_values('date').max()
         market_data_start = self.complete_market_data_df.index.get_level_values('date').min()
         market_data_end = self.complete_market_data_df.index.get_level_values('date').max()
+        macro_trends_start = self.complete_macro_trends_df.index.get_level_values('date').min()
+        macro_trends_end = self.complete_macro_trends_df.index.get_level_values('date').max()
 
         if not (
             (profits_start <= earliest_starting_balance_date) and
             (profits_end >= latest_modeling_end) and
             (market_data_start <= earliest_starting_balance_date) and
-            (market_data_end >= latest_modeling_end)
+            (market_data_end >= latest_modeling_end) and
+            (macro_trends_start <= earliest_starting_balance_date) and
+            (macro_trends_end >= latest_modeling_end)
         ):
             raise ValueError(
                 f"Insufficient data coverage for specified epochs.\n"
                 f"Required coverage: {earliest_starting_balance_date.strftime('%Y-%m-%d')}"
-                f" to {latest_modeling_end.strftime('%Y-%m-%d')}\n"
+                    f" to {latest_modeling_end.strftime('%Y-%m-%d')}\n"
                 f"Actual coverage:\n"
                 f"- Profits data: {profits_start.strftime('%Y-%m-%d')} to {profits_end.strftime('%Y-%m-%d')}\n"
-                f"- Market data: {market_data_start.strftime('%Y-%m-%d')} to {market_data_end.strftime('%Y-%m-%d')}"
+                f"- Market data: {market_data_start.strftime('%Y-%m-%d')} to {market_data_end.strftime('%Y-%m-%d')}\n"
+                f"- Macro trends data: {macro_trends_start.strftime('%Y-%m-%d')} "
+                    f"to {macro_trends_end.strftime('%Y-%m-%d')}"
             )
 
         # Confirm we have hybrid mappings for all pairs if applicable
