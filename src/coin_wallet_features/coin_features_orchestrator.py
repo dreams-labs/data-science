@@ -2,18 +2,17 @@
 Orchestrates groups of functions to generate wallet model pipeline
 """
 import logging
-import importlib
+from datetime import datetime
 import pandas as pd
 
 # Local module imports
 import feature_engineering.time_windows_orchestration as tw
-import coin_wallet_features.coin_features_orchestrator as cfo
+import wallet_modeling.wallet_training_data_orchestrator as wtdo
 import coin_wallet_features.wallet_segmentation as cws
 import coin_wallet_features.wallet_metrics as cwwm
 import coin_wallet_features.wallet_metrics_flattening as cwwmf
 import coin_insights.coin_validation_analysis as civa
 import utils as u
-importlib.reload(cfo)
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -291,3 +290,76 @@ def parse_feature_names(coin_training_data_df: pd.DataFrame) -> pd.DataFrame:
     feature_details_df['feature_full'] = df['feature']
 
     return feature_details_df
+
+
+def load_wallet_data_for_coin_features(wallets_config) -> None:
+    """
+    Reload modules, load configs and profits/market data, hybridize IDs,
+    filter market data slices, assert periods, and save parquet outputs.
+    """
+    pf = wallets_config['training_data']['parquet_folder']
+    # load profits DataFrames
+    wamo_date = datetime.strptime(
+        wallets_config['training_data']['modeling_period_start'],
+        '%Y-%m-%d'
+    ).strftime('%y%m%d')
+    wamo_profits_df = pd.read_parquet(f"{pf}/{wamo_date}/modeling_profits_df.parquet")
+    como_date = datetime.strptime(
+        wallets_config['training_data']['coin_modeling_period_start'],
+        '%Y-%m-%d'
+    ).strftime('%y%m%d')
+    como_profits_df = pd.read_parquet(f"{pf}/{como_date}/modeling_profits_df.parquet")
+    # hybridize wallet IDs if configured
+    if wallets_config['training_data']['hybridize_wallet_ids']:
+        hybrid_map = pd.read_parquet(f"{pf}/complete_hybrid_cw_id_df.parquet")
+        wamo_profits_df = wtdo.hybridize_wallet_address(
+            wamo_profits_df, hybrid_map
+        )
+        como_profits_df = wtdo.hybridize_wallet_address(
+            como_profits_df, hybrid_map
+        )
+    # filter market data
+    complete_md = pd.read_parquet(f"{pf}/complete_market_data_df.parquet")
+    como_market_data_df = complete_md.loc[
+        (complete_md.index.get_level_values('date') >=
+            wallets_config['training_data']['modeling_period_end']) &
+        (complete_md.index.get_level_values('date') <=
+            wallets_config['training_data']['coin_modeling_period_end'])
+    ]
+    investing_market_data_df = complete_md.loc[
+        (complete_md.index.get_level_values('date') >=
+            wallets_config['training_data']['coin_modeling_period_end']) &
+        (complete_md.index.get_level_values('date') <=
+            wallets_config['training_data']['investing_period_end'])
+    ]
+    # coin cohort
+    training_coin_cohort = (
+        wamo_profits_df['coin_id'].drop_duplicates()
+    )
+    # assertions
+    u.assert_period(
+        wamo_profits_df,
+        wallets_config['training_data']['modeling_period_start'],
+        wallets_config['training_data']['modeling_period_end']
+    )
+    u.assert_period(
+        como_profits_df,
+        wallets_config['training_data']['coin_modeling_period_start'],
+        wallets_config['training_data']['coin_modeling_period_end']
+    )
+    u.assert_period(
+        como_market_data_df,
+        wallets_config['training_data']['coin_modeling_period_start'],
+        wallets_config['training_data']['coin_modeling_period_end']
+    )
+    u.assert_period(
+        investing_market_data_df,
+        wallets_config['training_data']['investing_period_start'],
+        wallets_config['training_data']['investing_period_end']
+    )
+    # save parquet outputs
+    return (
+        training_coin_cohort,
+        wamo_profits_df, como_market_data_df,
+        como_profits_df, investing_market_data_df
+    )
