@@ -1,5 +1,6 @@
 """Orchestrates the creation of training_data_dfs for multiple training epochs"""
 import os
+import time
 import logging
 from pathlib import Path
 import copy
@@ -405,7 +406,13 @@ class MultiEpochOrchestrator:
             'wallet_cohort': training_generator.training_wallet_cohort
         }
 
-        logger.info(f"Successfully generated features for epoch {model_start}.")
+        # Save profits_dfs
+        start_time = time.time()
+        output_folder = f"{epoch_config['training_data']['parquet_folder']}/"
+        training_profits_df.to_parquet(f"{output_folder}/training_profits_df.parquet", index=True)
+        modeling_profits_df.to_parquet(f"{output_folder}/modeling_profits_df.parquet", index=True)
+        logger.info("(%.1fs) Saved %s profits_df files to %s.",
+            time.time() - start_time, model_start, output_folder)
 
         return epoch_date, epoch_training_data_df, epoch_modeling_data_df, cohorts
 
