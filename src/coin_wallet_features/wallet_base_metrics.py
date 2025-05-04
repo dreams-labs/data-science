@@ -23,7 +23,7 @@ def calculate_coin_wallet_ending_balances(profits_df: pd.DataFrame) -> pd.DataFr
     balances_df = profits_df[['coin_id', 'wallet_address']].drop_duplicates().set_index(['coin_id', 'wallet_address'])
 
     # Add a column for the balance date
-    balance_date = profits_df.index.get_level_values('date').max()
+    balance_date = profits_df['date'].max()
     balance_date_str = balance_date.strftime('%y%m%d')
     col_name = f'usd_balance_{balance_date_str}'
 
