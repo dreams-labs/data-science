@@ -46,17 +46,17 @@ modeling:
     score_name: dda528_20250226_crypto_net_gain_1000
 
     #KeyParam Target Variable
-    # Net Gain
-    # target_variable: crypto_net_gain
-    target_variable: crypto_net_flows
-    target_variable: crypto_net_cash_flows
+    # # Net Gain
+    target_variable: crypto_net_gain
+    # target_variable: cw_crypto_net_flows
+    # # target_variable: crypto_net_cash_flows
     target_var_class_threshold: 1000  # a classification model will try to predict the target var above this value
     y_pred_threshold: 0.7  # scores above this probability threshold are positive predictions
 
     # # Return Rate
-    # target_variable: cw_crypto_net_gain/max_investment/base
-    # # target_var_class_threshold: 0.25  # a classification model will try to predict the target var above this value
-    # target_var_class_threshold: 0.05  # a classification model will try to predict the target var above this value
+    # # target_variable: cw_crypto_net_gain/max_investment/base
+    # target_var_class_threshold: 0.25  # a classification model will try to predict the target var above this value
+    # # target_var_class_threshold: 0.05  # a classification model will try to predict the target var above this value
     # y_pred_threshold: 0.6  # scores above this probability threshold are positive predictions
 
     # target_variable: crypto_net_gain/max_investment/winsorized
@@ -97,7 +97,7 @@ modeling:
         #KeyParam Estimator Counts
         # CHECKPOINTER
         n_estimators: 350  # number of trees to train in the model
-        learning_rate: 0.4  # step size for updates to weights during training
+        learning_rate: 0.5  # step size for updates to weights during training
 
         # # PRODUCTION
         # n_estimators: 500  # number of trees to train in the model
