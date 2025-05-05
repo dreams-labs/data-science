@@ -493,16 +493,14 @@ class RegressorEvaluator:
         # Re-index so bucket 1 = highest scores
         df["bucket"] = n_buckets - df["bucket_raw"]
 
-        bucket_mean = (
-            df.groupby("bucket")["ret"]
-            .mean()
-            .reindex(range(1, n_buckets + 1))   # ensure missing buckets appear as NaN
-        )
+        bucket_mean = df.groupby("bucket")["ret"].mean().reindex(range(1, n_buckets + 1))
+        bucket_median = df.groupby("bucket")["ret"].median().reindex(range(1, n_buckets + 1))
         overall_mean = df["ret"].mean()
+        overall_median = df["ret"].median()
 
         # Calculate y-axis limits with buffer
-        min_val = min(bucket_mean.min(), overall_mean)
-        max_val = max(bucket_mean.max(), overall_mean)
+        min_val = min(bucket_mean.min(), overall_mean, overall_median)
+        max_val = max(bucket_mean.max(), overall_mean, overall_median)
         y_range = max_val - min_val
 
         # Add buffer (20% on each side)
@@ -513,10 +511,16 @@ class RegressorEvaluator:
         # Plot as line chart with markers
         ax.plot(bucket_mean.index, bucket_mean.values,
                 marker='o', markersize=5, linewidth=2, color="#145a8d")
+        # Plot as line chart with markers
+        ax.plot(bucket_median.index, bucket_median.values,
+                marker='o', markersize=5, linewidth=2, color="#5D3FD3")
 
         # Add overall mean reference line
         ax.axhline(overall_mean, linestyle="--", color="#afc6ba",
                 linewidth=1, label="Overall mean")
+        # Add overall mean reference line
+        ax.axhline(overall_median, linestyle="--", color="#5D3FD3",
+                linewidth=1, label="Overall median")
 
         # Set axis limits with buffer
         ax.set_ylim(y_min, y_max)
@@ -866,7 +870,6 @@ class ClassifierEvaluator(RegressorEvaluator):
             and hasattr(self, 'validation_wallet_features_df')):
             target = self.modeling_config['target_variable']
             returns = self.validation_wallet_features_df[target].reindex(self.y_validation_pred_proba.index)
-            returns = u.winsorize(returns, 0.01)
             df_val = pd.DataFrame({
                 'proba': self.y_validation_pred_proba,
                 'ret': returns
@@ -910,7 +913,6 @@ class ClassifierEvaluator(RegressorEvaluator):
                 "Validation Return Metrics",
                 "-" * 35,
                 f"Val ROC AUC:              {self.metrics['val_roc_auc']:.3f}",
-                f"Top 0.1% Mean Return:     {self.metrics['val_return_top01']:.3f}",
                 f"Top 1% Mean Return:       {self.metrics['val_return_top1']:.3f}",
                 f"Top 5% Mean Return:       {self.metrics['val_return_top5']:.3f}",
                 f"Overall Mean Return:      {self.metrics['val_return_overall']:.3f}",
@@ -1070,9 +1072,13 @@ class ClassifierEvaluator(RegressorEvaluator):
         returns = self.validation_wallet_features_df[target_var].reindex(
             self.y_validation_pred_proba.index
         )
-        returns = u.winsorize(returns, 0.01)
+        returns_winsorized = u.winsorize(returns, 0.005)
 
-        df = pd.DataFrame({"proba": self.y_validation_pred_proba, "ret": returns}).dropna()
+        df = pd.DataFrame({
+            "proba": self.y_validation_pred_proba,
+            "ret": returns,
+            "ret_win": returns_winsorized
+        }).dropna()
 
         # Define score bins
         score_min, score_max = df["proba"].min(), df["proba"].max()
@@ -1082,6 +1088,8 @@ class ClassifierEvaluator(RegressorEvaluator):
         # Compute counts and mean returns per bin
         bin_counts = df.groupby("score_bin", observed=True).size()
         bin_mean_ret = df.groupby("score_bin", observed=True)["ret"].mean()
+        bin_median_ret = df.groupby("score_bin", observed=True)["ret"].median()
+        bin_winsorized_ret = df.groupby("score_bin", observed=True)["ret_win"].mean()
 
         # Drop bins with zero count
         valid_bins = bin_counts[bin_counts > 0]
@@ -1091,6 +1099,8 @@ class ClassifierEvaluator(RegressorEvaluator):
         ]
         valid_counts = valid_bins.values
         valid_mean_ret = bin_mean_ret.reindex(valid_bins.index).values
+        valid_median_ret = bin_median_ret.reindex(valid_bins.index).values
+        valid_winsorized_ret = bin_winsorized_ret.reindex(valid_bins.index).values
         width = bin_edges[1] - bin_edges[0]
 
         # Primary axis: histogram of counts
@@ -1102,6 +1112,28 @@ class ClassifierEvaluator(RegressorEvaluator):
 
         # Secondary axis: mean return line
         ax2 = ax.twinx()
+        # Compress extreme return outliers for better visibility
+        # Use the 95th percentile of raw returns as linear threshold
+        y_thresh = np.percentile(df["ret"], 95)
+        ax2.set_yscale("symlog", linthresh=y_thresh)
+        ax2.plot(
+            valid_centers,
+            valid_median_ret,
+            marker='o',
+            linestyle='-',
+            linewidth=2,
+            label="Median Return",
+            color="#8000ff"
+        )
+        ax2.plot(
+            valid_centers,
+            valid_winsorized_ret,
+            marker='o',
+            linestyle='-',
+            linewidth=2,
+            label="Winsorized Return",
+            color="#ffe000"
+        )
         ax2.plot(
             valid_centers,
             valid_mean_ret,
