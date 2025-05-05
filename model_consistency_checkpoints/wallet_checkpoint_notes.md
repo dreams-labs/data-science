@@ -1,3 +1,30 @@
+# DDA 528 investing period validation
+checkpoint 1: is that life?
+Model Performance Summary
+Target: coin_return
+ID: 421ab86f-2ad6-4631-a69c-e1104b9eb82e
+===================================
+Test Samples:             1,262
+Number of Features:       180
+Features per Window:      0
+
+Classification Metrics
+-----------------------------------
+ROC AUC:                  0.594
+Log Loss:                 0.218
+Accuracy:                 0.942
+Precision:                0.000
+Recall:                   0.000
+F1 Score:                 0.000
+
+Validation Return Metrics
+-----------------------------------
+Val ROC AUC:              0.588
+Top 1% Mean Return:       0.173
+Top 5% Mean Return:       -0.115
+Overall Mean Return:      106691.453
+
+
 # dda 706 refactor coin model
 checkpoint 1: cauc.597 features refactored
 Model Performance Summary
