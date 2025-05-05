@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 
 # Local module imports
-# import coin_wallet_features.wallet_balance_features as cwb
+import utils as u
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 #       Main Interface Function
 # -----------------------------------
 
+@u.timing_decorator
 def flatten_cw_to_coin_segment_features(
     cw_metrics_df: pd.DataFrame,
     wallet_segmentation_df: pd.DataFrame,
@@ -104,8 +105,8 @@ def flatten_cw_to_coin_features(
         f'{metric_column}': 'sum',
         segment_family: 'count'
     }).rename(columns={
-        f'{metric_column}': f'{segment_family}/total|{metric_column}|aggregations/sum',
-        segment_family: f'{segment_family}/total|{metric_column}|aggregations/count'
+        f'{metric_column}': f'{segment_family}/total|{metric_column}|aggregations/aggregations/sum',
+        segment_family: f'{segment_family}/total|{metric_column}|aggregations/aggregations/count'
     })
 
     result_df = pd.DataFrame(index=pd.Index(all_coin_ids, name='coin_id'))
@@ -178,16 +179,16 @@ def calculate_aggregation_metrics(
         metric_column: 'sum',
         segment_family: 'count'
     }).rename(columns={
-        metric_column: f'{segment_family}/{segment_value}|{metric_column}|aggregations/sum',
-        segment_family: f'{segment_family}/{segment_value}|{metric_column}|aggregations/count'
+        metric_column: f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/sum',
+        segment_family: f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/count'
     })
 
     # Calculate percentages using Series division with fill_value=np.nan
-    sum_col = f'{segment_family}/{segment_value}|{metric_column}|aggregations/sum'
-    count_col = f'{segment_family}/{segment_value}|{metric_column}|aggregations/count'
+    sum_col = f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/sum'
+    count_col = f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/count'
 
-    total_sum = totals_df[f'{segment_family}/total|{metric_column}|aggregations/sum']
-    total_count = totals_df[f'{segment_family}/total|{metric_column}|aggregations/count']
+    total_sum = totals_df[f'{segment_family}/total|{metric_column}|aggregations/aggregations/sum']
+    total_count = totals_df[f'{segment_family}/total|{metric_column}|aggregations/aggregations/count']
 
     # Handle division with explicit zero check
     metrics[f'{sum_col}_pct'] = (metrics[sum_col] / total_sum).replace([np.inf, -np.inf], np.nan)
@@ -269,14 +270,12 @@ def calculate_score_distribution_metrics(
         (analysis_df[metric_column] >= usd_materiality)
     ].copy()
 
-    # 1) median
+    # median
     median_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].median()
-
-    # 2) p10
+    p05_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.05)
     p10_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.1)
-
-    # 3) p90
     p90_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.9)
+    p95_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.95)
 
     # 4) std
     std_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].std()
@@ -289,15 +288,17 @@ def calculate_score_distribution_metrics(
         new_cols = {}
         for c in df.columns:
             score_name = c.split('|')[1]  # e.g. "score|xxx" -> "xxx"
-            new_cols[c] = f'{segment_family}/{segment_value}|{metric_column}|score_dist/{score_name}_{suffix}'
+            new_cols[c] = f'{segment_family}/{segment_value}|{metric_column}|score_dist/{score_name}/{suffix}'
         return df.rename(columns=new_cols)
 
     median_df = rename_cols(median_df, 'median')
+    p05_df = rename_cols(p05_df, 'p05')
     p10_df = rename_cols(p10_df, 'p10')
     p90_df = rename_cols(p90_df, 'p90')
+    p95_df = rename_cols(p95_df, 'p95')
     std_df = rename_cols(std_df, 'std')
 
     # merge all results horizontally
-    metrics_df = median_df.join([p10_df, p90_df, std_df], how='outer').fillna(0)
+    metrics_df = median_df.join([p05_df, p10_df, p90_df, p95_df, std_df], how='outer').fillna(0)
 
     return metrics_df

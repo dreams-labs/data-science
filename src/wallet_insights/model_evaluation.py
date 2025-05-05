@@ -874,14 +874,13 @@ class ClassifierEvaluator(RegressorEvaluator):
             and hasattr(self, 'validation_wallet_features_df')):
             target = self.modeling_config['target_variable']
             returns = self.validation_wallet_features_df[target].reindex(self.y_validation_pred_proba.index)
+            returns = u.winsorize(returns,0.005)
             df_val = pd.DataFrame({
                 'proba': self.y_validation_pred_proba,
                 'ret': returns
             }).dropna()
-            pct01 = np.percentile(df_val['proba'], 99.9)
             pct1 = np.percentile(df_val['proba'], 99)
             pct5 = np.percentile(df_val['proba'], 95)
-            self.metrics['val_return_top01'] = df_val.loc[df_val['proba'] >= pct01, 'ret'].mean()
             self.metrics['val_return_top1'] = df_val.loc[df_val['proba'] >= pct1, 'ret'].mean()
             self.metrics['val_return_top5'] = df_val.loc[df_val['proba'] >= pct5, 'ret'].mean()
             self.metrics['val_return_overall'] = df_val['ret'].mean()
@@ -1085,7 +1084,7 @@ class ClassifierEvaluator(RegressorEvaluator):
         }).dropna()
 
         # Define score bins
-        n_buckets = 20
+        n_buckets = 5
         score_min, score_max = df["proba"].min(), df["proba"].max()
         bin_edges = np.linspace(score_min, score_max, n_buckets + 1)
         df["score_bin"] = pd.cut(df["proba"], bins=bin_edges, include_lowest=True)
