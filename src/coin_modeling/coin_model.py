@@ -66,7 +66,7 @@ class CoinModel(BaseModel):
         - result (dict): Contains fitted pipeline, predictions, and optional train/test data
         """
         logger.info("Preparing training data for coin model construction...")
-        u.notify('click_coin_model')
+        u.notify('intro_2')
 
         # Store validation data if provided
         if validation_df is not None and validation_coin_df is not None:
