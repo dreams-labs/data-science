@@ -16,6 +16,7 @@ import training_data.profits_row_imputation as pri
 from wallet_modeling.wallet_training_data import WalletTrainingData
 import wallet_modeling.wallets_config_manager as wcm
 import wallet_modeling.wallet_training_data_orchestrator as wtdo
+import base_modeling.pipeline as bp
 import utils as u
 
 # Set up logger at the module level
@@ -177,12 +178,12 @@ class MultiEpochOrchestrator:
         gc.collect()
 
         # Merge the epoch DataFrames into a single DataFrame for training and modeling respectively
-        validation_wallet_features_df = (self._merge_epoch_dfs(modeling_validation_dfs)
-                                         if modeling_validation_dfs else pd.DataFrame())
-        modeling_wallet_features_df   = self._merge_epoch_dfs(modeling_modeling_dfs)
+        wallet_training_data_df       = self._merge_epoch_dfs(training_modeling_dfs)
         validation_training_data_df   = (self._merge_epoch_dfs(training_validation_dfs)
                                          if training_validation_dfs else pd.DataFrame())
-        wallet_training_data_df       = self._merge_epoch_dfs(training_modeling_dfs)
+        modeling_wallet_features_df   = self._merge_epoch_dfs(modeling_modeling_dfs)
+        validation_wallet_features_df = (self._merge_epoch_dfs(modeling_validation_dfs)
+                                         if modeling_validation_dfs else pd.DataFrame())
 
         # Confirm indices match
         u.assert_matching_indices(wallet_training_data_df, modeling_wallet_features_df)
@@ -240,6 +241,13 @@ class MultiEpochOrchestrator:
             )
             epoch_training_data_df = pd.read_parquet(training_path)
             epoch_modeling_data_df = pd.read_parquet(modeling_path)
+
+            # Drop columns before returning if configured
+            if epoch_config['training_data']['predrop_features']:
+                drop_patterns=epoch_config['modeling']['feature_selection']['drop_patterns']
+                col_dropper = bp.DropColumnPatterns(drop_patterns)
+                epoch_training_data_df = col_dropper.fit_transform(epoch_training_data_df)
+
             return epoch_date, epoch_training_data_df, epoch_modeling_data_df
 
         # Begin generation of dfs
@@ -291,6 +299,11 @@ class MultiEpochOrchestrator:
             epoch_modeling_data_df.to_parquet(f"{output_folder}/modeling_data_df.parquet", index=True)
             logger.info(f"Saved {model_start} features to %s.", output_folder)
 
+        # Drop columns before returning if configured
+        if epoch_config['training_data']['predrop_features']:
+            drop_patterns=epoch_config['modeling']['feature_selection']['drop_patterns']
+            col_dropper = bp.DropColumnPatterns(drop_patterns)
+            epoch_training_data_df = col_dropper.fit_transform(epoch_training_data_df)
 
         return epoch_date, epoch_training_data_df, epoch_modeling_data_df
 
