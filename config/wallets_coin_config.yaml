@@ -19,7 +19,7 @@ data_cleaning:
 # CoinModel Segments
 wallet_segments:
 
-    # Scores to include as segments + metrics
+    #KeyParam Scores to include as segments + metrics
     wallet_scores_path: temp/wallet_modeling_score_dfs
     wallet_scores: [
         dda528_net_gain_1k,
@@ -28,8 +28,8 @@ wallet_segments:
     wallet_scores_residuals_segments: False
     wallet_scores_confidence_segments: False
 
+    # score_segment_quantiles: [0.05]  # higher is better; how to assign wallet a score segment
     # score_segment_quantiles: [0.15, 0.85]  # higher is better; how to assign wallet a score segment
-    score_segment_quantiles: [0.05]  # higher is better; how to assign wallet a score segment
     # training_period_cluster_groups: [4]  # which n clusters assignment from the training period to segment by
 
 
