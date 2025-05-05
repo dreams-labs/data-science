@@ -142,12 +142,13 @@ modeling:
     score_name: dda724_20250101_dev
 
     #KeyParam Target Variable
-    # target_variable: crypto_net_gain
+    target_variable: crypto_net_gain
+    target_variable: cw_crypto_net_gain/max_investment/base
+    # target_variable: crypto_net_gain/max_investment/winsorized
     # target_variable: cw_crypto_net_gain/max_investment/rank
     # target_variable: cw_crypto_net_gain/max_investment/ntile_rank
-    # target_variable: crypto_net_gain/max_investment/winsorized
-    target_variable: cw_crypto_net_gain/max_investment/base
     target_var_class_threshold: 0.25  # a classification model will try to predict the target var above this value
+    # target_var_class_threshold: 1000  # a classification model will try to predict the target var above this value
 
     #KeyParam Modeling Cohort Definition
     modeling_min_investment: 1000
@@ -342,8 +343,8 @@ modeling:
         # --------------------------------------
         #KeyParam Estimator Counts
         # CHECKPOINTER
-        n_estimators: 250  # number of trees to train in the model
-        learning_rate: 0.15  # step size for updates to weights during training
+        n_estimators: 350  # number of trees to train in the model
+        learning_rate: 0.2  # step size for updates to weights during training
 
         # # PRODUCTION
         # n_estimators: 500  # number of trees to train in the model

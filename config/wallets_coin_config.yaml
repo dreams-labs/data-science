@@ -22,7 +22,8 @@ wallet_segments:
     # Scores to include as segments + metrics
     wallet_scores_path: temp/wallet_modeling_score_dfs
     wallet_scores: [
-        dda724_20250101_dev,
+        dda528_net_gain_1k,
+        dda528_net_gain_max_inv_025,
     ]
     wallet_scores_residuals_segments: False
     wallet_scores_confidence_segments: False
