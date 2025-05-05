@@ -142,19 +142,35 @@ class WalletModel(BaseModel):
             result['X_validation'] = self.X_validation
             result['validation_wallet_features_df'] = self.validation_wallet_features_df
             result['y_validation'] = self.y_pipeline.transform(self.validation_wallet_features_df)
-            result['y_validation_pred'] = meta_pipeline.predict(self.X_validation)
 
             if self.modeling_config['model_type'] == 'classification':
-                # probability for positive class (1) on validation set
-                X_val_trans = meta_pipeline.x_transformer_.transform(self.X_validation)
-                probas = meta_pipeline.estimator.predict_proba(X_val_trans)
-                pos_idx = list(meta_pipeline.estimator.classes_).index(1)
-                result['y_validation_pred_proba'] = pd.Series(probas[:, pos_idx], index=self.X_validation.index)
+                # get positive-class probabilities directly from pipeline
+                proba = meta_pipeline.predict_proba(self.X_validation)
+                pos_idx = list(meta_pipeline.named_steps['estimator'].classes_).index(1)
+                proba_series = pd.Series(proba[:, pos_idx], index=self.X_validation.index)
+
+                # Apply configurable threshold for class prediction
+                threshold = self.modeling_config.get('y_pred_threshold', 0.5)
+                result['y_validation_pred_proba'] = proba_series
+                result['y_validation_pred']       = (proba_series >= threshold).astype(int)
+            else:
+                result['y_validation_pred'] = meta_pipeline.predict(self.X_validation)
 
         # Add train/test data if requested
         if return_data:
             # Make predictions on test set
-            self.y_pred = meta_pipeline.predict(self.X_test)
+            if self.modeling_config['model_type'] == 'classification':
+                # get positive-class probabilities and apply threshold
+                proba = meta_pipeline.predict_proba(self.X_test)
+                pos_idx = list(meta_pipeline.named_steps['estimator'].classes_).index(1)
+                proba_series = pd.Series(proba[:, pos_idx], index=self.X_test.index)
+
+                # Apply configurable threshold for class prediction
+                threshold = self.modeling_config.get('y_pred_threshold', 0.5)
+                self.y_pred = (proba_series >= threshold).astype(int)
+            else:
+                self.y_pred = meta_pipeline.predict(self.X_test)
+
 
             result.update({
                 'X_train': self.X_train,
