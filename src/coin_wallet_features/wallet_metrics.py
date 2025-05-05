@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 #       Main Interface Function
 # -----------------------------------
 
+@u.timing_decorator
 def compute_coin_wallet_metrics(
         wallets_coin_config: dict,
         profits_df: pd.DataFrame,
@@ -78,6 +79,7 @@ def compute_coin_wallet_metrics(
 #         Helper Functions
 # ------------------------------
 
+@u.timing_decorator
 def calculate_coin_wallet_ending_balances(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
     Calculate metric value for each wallet-coin pair on specified dates.
@@ -113,7 +115,7 @@ def calculate_coin_wallet_ending_balances(profits_df: pd.DataFrame) -> pd.DataFr
     return balances_df
 
 
-
+@u.timing_decorator
 def calculate_coin_wallet_trading_metrics(profits_df, start_date, end_date, drop_trading_metrics):
     """
     Creates a coin-wallet multiindexed df with trading metrics for each pair.
