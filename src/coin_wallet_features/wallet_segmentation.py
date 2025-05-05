@@ -43,13 +43,15 @@ def build_wallet_segmentation(
     wallet_segmentation_df['all_wallets|all'] = 'all'
     wallet_segmentation_df['all_wallets|all'] = wallet_segmentation_df['all_wallets|all'].astype('category')
 
-    # Assign score quantiles
-    wallet_segmentation_df = assign_wallet_score_quantiles(
-        wallets_coin_config,
-        wallet_segmentation_df
-    )
+    # Assign score quantiles if configured
+    score_quantiles = wallets_coin_config['wallet_segments'].get('score_segment_quantiles')
+    if score_quantiles:
+        wallet_segmentation_df = assign_wallet_score_quantiles(
+            wallets_coin_config,
+            wallet_segmentation_df
+        )
 
-    # If configured, add training-period cluster labels
+    # Add training period cluster labels if configured
     cluster_groups = wallets_coin_config['wallet_segments'].get('training_period_cluster_groups')
     if cluster_groups:
         # Load full-window wallet features to generate clusters
