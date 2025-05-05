@@ -297,6 +297,8 @@ def load_wallet_data_for_coin_features(wallets_config) -> None:
     Reload modules, load configs and profits/market data, hybridize IDs,
     filter market data slices, assert periods, and save parquet outputs.
     """
+    logger.info("Loading profits and market data for post-wallet model analysis...")
+
     pf = wallets_config['training_data']['parquet_folder']
     # load profits DataFrames
     wamo_date = datetime.strptime(
@@ -357,7 +359,9 @@ def load_wallet_data_for_coin_features(wallets_config) -> None:
         wallets_config['training_data']['investing_period_start'],
         wallets_config['training_data']['investing_period_end']
     )
-    # save parquet outputs
+
+    logger.info("Successfully loaded base data for coin_modeling and investing predictions.")
+
     return (
         training_coin_cohort,
         wamo_profits_df, como_market_data_df,
