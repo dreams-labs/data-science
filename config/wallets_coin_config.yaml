@@ -19,7 +19,7 @@ data_cleaning:
 # CoinModel Segments
 wallet_segments:
 
-    # Scores to include as segments + metrics
+    #KeyParam Scores to include as segments + metrics
     wallet_scores_path: temp/wallet_modeling_score_dfs
     wallet_scores: [
         dda528_net_gain_1k,
@@ -28,8 +28,8 @@ wallet_segments:
     wallet_scores_residuals_segments: False
     wallet_scores_confidence_segments: False
 
+    # score_segment_quantiles: [0.05]  # higher is better; how to assign wallet a score segment
     # score_segment_quantiles: [0.15, 0.85]  # higher is better; how to assign wallet a score segment
-    score_segment_quantiles: [0.05]  # higher is better; how to assign wallet a score segment
     # training_period_cluster_groups: [4]  # which n clusters assignment from the training period to segment by
 
 
@@ -42,7 +42,7 @@ wallet_features:
 
     # Metrics to drop based on low observed importance
     drop_trading_metrics: [
-        average_transaction
+        # average_transaction
     ]
 
     # Features from the feature_engineering directory
@@ -63,7 +63,8 @@ coin_modeling:
     target_variable: coin_return
     # target_variable: coin_return_pctile_full
     # target_variable: coin_return_pctile
-    target_var_class_threshold: 0.4  # a classification model will try to predict the target var above this value
+    target_var_class_threshold: 0.1  # a classification model will try to predict the target var above this value
+    y_pred_threshold: 0.2  # scores above this probability threshold are positive predictions
 
     returns_winsorization: 0.03
 
@@ -78,8 +79,8 @@ coin_modeling:
     max_market_cap: 999150_000_000  # coins above this market cap will not be included in performance assessments
 
     # Train/Test/Eval split
-    test_size: 0.1  # what % of the total population will be used as test
-    eval_size: 0.05  # what % used for the early stopping eval set
+    test_size: 0.2  # what % of the total population will be used as test
+    eval_size: 0.1  # what % used for the early stopping eval set
 
 
 
@@ -99,32 +100,37 @@ coin_modeling:
 
             # Metrics
             # -------
-            '*|trading/crypto_cash_buys|*',
-            '*|trading/crypto_cash_sells|*',
-            '*|trading/crypto_inflows|*',
-            '*|trading/crypto_net_cash_flows|*',
-            '*|trading/crypto_net_flows|*',
-            '*|trading/crypto_net_gain|*',
-            '*|trading/crypto_outflows|*',
-            '*|trading/max_investment|*',
-            '*|trading/total_volume|*',
-            '*|trading/unique_coins_traded|*',
+            # '*|trading/crypto_cash_buys|*',
+            # '*|trading/crypto_cash_sells|*',
+            # '*|trading/crypto_inflows|*',
+            # '*|trading/crypto_net_cash_flows|*',
+            # '*|trading/crypto_net_flows|*',
+            # '*|trading/crypto_net_gain|*',
+            # '*|trading/crypto_outflows|*',
+            # '*|trading/max_investment|*',
+            # '*|trading/total_volume|*',
+            # '*|trading/unique_coins_traded|*',
+            # '*|trading/average_transaction|*',
             # '*|balances/usd_balance_starting*|*',
             # '*|balances/usd_balance_ending*|*',
 
 
             # Transformations
             # ---------------
-            '*|aggregations/sum',
-            # '*|aggregations/sum_pct',
-            '*|aggregations/count_pct',
-            '*|aggregations/count',
+            # '*|*/dda528_net_gain_max_inv_025_score/*',
+            # '*|*/dda528_net_gain_1k_score/*',
+            # '*|aggregations/aggregations/sum',
+            # '*|aggregations/aggregations/sum_pct',
+            # '*|aggregations/aggregations/count_pct',
+            # '*|aggregations/aggregations/count',
 
             # '*|score_dist/*',
-            '*|score_dist/*_median',
+            # '*|score_dist/*_median',
+            # '*|score_dist/*_p05',
             # '*|score_dist/*_p10',
             # '*|score_dist/*_p90',
-            '*|score_dist/*_std',
+            # '*|score_dist/*_p95',
+            # '*|score_dist/*_std',
 
             '*|score_wtd/*',
 
@@ -157,7 +163,7 @@ coin_modeling:
     grid_search_params:
 
         # -------------------------------
-        # enabled: True
+        # enabled: True  # DDA718
         # -------------------------------
 
         # Search Methodology

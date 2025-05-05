@@ -8,6 +8,7 @@ import numpy as np
 
 # local module imports
 import wallet_features.clustering_features as wcl
+import utils as u
 
 
 # Set up logger at the module level
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 #       Main Interface Function
 # -----------------------------------
 
+@u.timing_decorator
 def build_wallet_segmentation(
         wallets_coin_config: dict,
         wallets_config: dict,

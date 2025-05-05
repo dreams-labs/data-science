@@ -52,6 +52,7 @@ class CoinFeaturesOrchestrator:
     #       Primary Orchestration Methods
     # -----------------------------------------
 
+    @u.timing_decorator
     def generate_coin_features_for_period(
         self,
         profits_df: pd.DataFrame,
@@ -69,6 +70,8 @@ class CoinFeaturesOrchestrator:
         Returns:
         - coin_training_data_df_full (DataFrame): full coin-level feature set
         """
+        logger.info("Beginning coin feature generation...")
+
         # Generate metrics for coin-wallet pairs
         cw_metrics_df = cwwm.compute_coin_wallet_metrics(
             self.wallets_coin_config,
@@ -105,6 +108,9 @@ class CoinFeaturesOrchestrator:
             )
         else:
             coin_training_data_df_full = coin_wallet_features_df
+
+        logger.info("Successfully generated coin_training_data_df with shape "
+                    f"({coin_training_data_df_full.shape}).")
 
         return coin_training_data_df_full
 
@@ -277,7 +283,7 @@ def parse_feature_names(coin_training_data_df: pd.DataFrame) -> pd.DataFrame:
     metrics.columns = ['metric', 'metric_detail']
 
     transformations = split_df['transformation'].str.split('/', expand=True)
-    transformations.columns = ['transformation', 'transformation_method']
+    transformations.columns = ['transformation_category', 'transformation_base', 'transformation_method']
 
     # Combine all components
     feature_details_df = pd.concat([
@@ -297,6 +303,8 @@ def load_wallet_data_for_coin_features(wallets_config) -> None:
     Reload modules, load configs and profits/market data, hybridize IDs,
     filter market data slices, assert periods, and save parquet outputs.
     """
+    logger.info("Loading profits and market data for post-wallet model analysis...")
+
     pf = wallets_config['training_data']['parquet_folder']
     # load profits DataFrames
     wamo_date = datetime.strptime(
@@ -357,7 +365,9 @@ def load_wallet_data_for_coin_features(wallets_config) -> None:
         wallets_config['training_data']['investing_period_start'],
         wallets_config['training_data']['investing_period_end']
     )
-    # save parquet outputs
+
+    logger.info("Successfully loaded base data for coin_modeling and investing predictions.")
+
     return (
         training_coin_cohort,
         wamo_profits_df, como_market_data_df,

@@ -152,12 +152,23 @@ class CoinModel(BaseModel):
             result['X_validation'] = self.X_validation
             result['validation_wallet_features_df'] = self.validation_wallet_features_df
             result['y_validation'] = self.y_pipeline.transform(self.validation_wallet_features_df)
-            result['y_validation_pred'] = meta_pipeline.predict(self.X_validation)
+
+            # Classification predictions
             if self.modeling_config['model_type'] == 'classification':
+                # Generate probabilities for the positive class
                 X_val_trans = meta_pipeline.x_transformer_.transform(self.X_validation)
                 probas = meta_pipeline.estimator.predict_proba(X_val_trans)
                 pos_idx = list(meta_pipeline.estimator.classes_).index(1)
-                result['y_validation_pred_proba'] = pd.Series(probas[:, pos_idx], index=self.X_validation.index)
+                proba_series = pd.Series(probas[:, pos_idx], index=self.X_validation.index)
+                result['y_validation_pred_proba'] = proba_series
+
+                # Apply configurable threshold for class prediction
+                threshold = self.modeling_config.get('y_pred_threshold', 0.5)
+                result['y_validation_pred'] = (proba_series >= threshold).astype(int)
+            # Regression predictions
+            else:
+                result['y_validation_pred'] = meta_pipeline.predict(self.X_validation)
+
 
         # Test set predictions and data
         if return_data:
@@ -202,9 +213,9 @@ class CoinModel(BaseModel):
         logger.info("Starting coins: %s", len(training_data_df))
 
         coin_training_data_df = training_data_df[
-            (training_data_df['all_wallets|all/all|balances/usd_balance_ending|aggregations/count']
+            (training_data_df['all_wallets|all/all|balances/usd_balance_ending|aggregations/aggregations/count']
                 >= self.modeling_config['min_cohort_wallets'])
-            & (training_data_df['all_wallets|all/all|balances/usd_balance_ending|aggregations/sum']
+            & (training_data_df['all_wallets|all/all|balances/usd_balance_ending|aggregations/aggregations/sum']
                  >= self.modeling_config['min_cohort_balance'])
         ]
         logger.info("Coins after balance filters: %s", len(coin_training_data_df))
