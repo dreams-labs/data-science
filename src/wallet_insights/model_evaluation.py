@@ -833,6 +833,9 @@ class ClassifierEvaluator(RegressorEvaluator):
         # Extract probability predictions
         self.y_pred_proba = wallet_model_results['y_pred_proba']
         self.y_validation_pred_proba = wallet_model_results.get('y_validation_pred_proba')
+        self.y_validation_pred = wallet_model_results['y_validation_pred']
+        self.y_pred_threshold = wallet_model_results['modeling_config']['y_pred_threshold']
+
 
         # super() creates metrics and
         super().__init__(wallet_model_results)
@@ -857,12 +860,11 @@ class ClassifierEvaluator(RegressorEvaluator):
 
         # Validation set metrics if available
         if getattr(self, 'y_validation', None) is not None and hasattr(self, 'y_validation_pred_proba'):
-            threshold = self.modeling_config.get('target_var_class_threshold', 0.5)
-            val_pred = (self.y_validation_pred_proba >= threshold).astype(int)
-            self.metrics['val_accuracy'] = accuracy_score(self.y_validation, val_pred)
-            self.metrics['val_precision'] = precision_score(self.y_validation, val_pred, zero_division=0)
-            self.metrics['val_recall'] = recall_score(self.y_validation, val_pred, zero_division=0)
-            self.metrics['val_f1'] = f1_score(self.y_validation, val_pred, zero_division=0)
+            self.metrics['positive_predictions'] = self.y_validation_pred.sum()
+            self.metrics['val_accuracy'] = accuracy_score(self.y_validation, self.y_validation_pred)
+            self.metrics['val_precision'] = precision_score(self.y_validation, self.y_validation_pred, zero_division=0)
+            self.metrics['val_recall'] = recall_score(self.y_validation, self.y_validation_pred, zero_division=0)
+            self.metrics['val_f1'] = f1_score(self.y_validation, self.y_validation_pred, zero_division=0)
             try:
                 self.metrics['val_roc_auc'] = roc_auc_score(self.y_validation, self.y_validation_pred_proba)
             except ValueError:
@@ -874,16 +876,19 @@ class ClassifierEvaluator(RegressorEvaluator):
             and hasattr(self, 'validation_wallet_features_df')):
             target = self.modeling_config['target_variable']
             returns = self.validation_wallet_features_df[target].reindex(self.y_validation_pred_proba.index)
-            returns = u.winsorize(returns,0.005)
             df_val = pd.DataFrame({
+                'pred' :self.y_validation_pred,
                 'proba': self.y_validation_pred_proba,
-                'ret': returns
+                'ret': returns,
+                'ret_wins': u.winsorize(returns,0.005)
             }).dropna()
             pct1 = np.percentile(df_val['proba'], 99)
             pct5 = np.percentile(df_val['proba'], 95)
-            self.metrics['val_return_top1'] = df_val.loc[df_val['proba'] >= pct1, 'ret'].mean()
-            self.metrics['val_return_top5'] = df_val.loc[df_val['proba'] >= pct5, 'ret'].mean()
-            self.metrics['val_return_overall'] = df_val['ret'].mean()
+            self.metrics['positive_pred_return'] = df_val.loc[df_val['pred'] == 1, 'ret'].mean()
+            self.metrics['positive_pred_wins_return'] = df_val.loc[df_val['pred'] == 1, 'ret_wins'].mean()
+            self.metrics['val_wins_return_top1'] = df_val.loc[df_val['proba'] >= pct1, 'ret_wins'].mean()
+            self.metrics['val_wins_return_top5'] = df_val.loc[df_val['proba'] >= pct5, 'ret_wins'].mean()
+            self.metrics['val_wins_return_overall'] = df_val['ret_wins'].mean()
 
         # Feature importance if available
         if self.model is not None and hasattr(self.model, 'feature_importances_'):
@@ -899,26 +904,37 @@ class ClassifierEvaluator(RegressorEvaluator):
 
         # Classification metrics
         summary.extend([
-            "Classification Metrics",
-            "-" * 35,
-            f"ROC AUC:                  {self.metrics['roc_auc']:.3f}",
-            f"Log Loss:                 {self.metrics['log_loss']:.3f}",
-            f"Accuracy:                 {self.metrics['accuracy']:.3f}",
-            f"Precision:                {self.metrics['precision']:.3f}",
-            f"Recall:                   {self.metrics['recall']:.3f}",
-            f"F1 Score:                 {self.metrics['f1']:.3f}",
-            ""
+                "Classification Metrics",
+                "-" * 35,
+                f"ROC AUC:                    {self.metrics['roc_auc']:.3f}",
+                f"Log Loss:                   {self.metrics['log_loss']:.3f}",
+                f"Accuracy:                   {self.metrics['accuracy']:.3f}",
+                f"Precision:                  {self.metrics['precision']:.3f}",
+                f"Recall:                     {self.metrics['recall']:.3f}",
+                f"F1 Score:                   {self.metrics['f1']:.3f}",
+                ""
         ])
 
         # Validation return metrics
-        if 'val_return_top1' in self.metrics:
+        if 'val_roc_auc' in self.metrics:
             summary.extend([
+                "Validation Metrics",
+                "-" * 35,
+                f"Val ROC AUC:                {self.metrics['val_roc_auc']:.3f}",
+                f"Val Accuracy:               {self.metrics['val_accuracy']:.3f}",
+                f"Val Precision:              {self.metrics['val_precision']:.3f}",
+                f"Val Recall:                 {self.metrics['val_recall']:.3f}",
+                f"Val F1 Score:               {self.metrics['val_f1']:.3f}",
+                "",
                 "Validation Return Metrics",
                 "-" * 35,
-                f"Val ROC AUC:              {self.metrics['val_roc_auc']:.3f}",
-                f"Top 1% Mean Return:       {self.metrics['val_return_top1']:.3f}",
-                f"Top 5% Mean Return:       {self.metrics['val_return_top5']:.3f}",
-                f"Overall Mean Return:      {self.metrics['val_return_overall']:.3f}",
+                f"Positive Threshold:         {self.y_pred_threshold:.2f}",
+                f"Positive Predictions:       {self.metrics['positive_predictions']:.0f}",
+                f"Positive Mean Outcome:      {self.metrics['positive_pred_return']:.3f}",
+                f"Positive W-Mean Outcome:    {self.metrics['positive_pred_wins_return']:.3f}",
+                f"Top 1% W-Mean Outcome:      {self.metrics['val_wins_return_top1']:.3f}",
+                f"Top 5% W-Mean Outcome:      {self.metrics['val_wins_return_top5']:.3f}",
+                f"Overall W-Mean Outcome:     {self.metrics['val_wins_return_overall']:.3f}",
                 ""
             ])
 
@@ -964,7 +980,7 @@ class ClassifierEvaluator(RegressorEvaluator):
 
         self._plot_roc_curves(ax1)
         self._plot_pr_curves(ax2)
-        self._plot_return_vs_rank_classifier(ax3, n_buckets=50)
+        self._plot_return_vs_rank_classifier(ax3, n_buckets=30)
         self._plot_feature_importance(ax4, levels=levels)
 
 
@@ -1075,7 +1091,7 @@ class ClassifierEvaluator(RegressorEvaluator):
         returns = self.validation_wallet_features_df[target_var].reindex(
             self.y_validation_pred_proba.index
         )
-        returns_winsorized = u.winsorize(returns, 0.005)
+        returns_winsorized = u.winsorize(returns, 0.01)
 
         df = pd.DataFrame({
             "proba": self.y_validation_pred_proba,
@@ -1084,7 +1100,7 @@ class ClassifierEvaluator(RegressorEvaluator):
         }).dropna()
 
         # Define score bins
-        n_buckets = 5
+        # n_buckets = 5
         score_min, score_max = df["proba"].min(), df["proba"].max()
         bin_edges = np.linspace(score_min, score_max, n_buckets + 1)
         df["score_bin"] = pd.cut(df["proba"], bins=bin_edges, include_lowest=True)
