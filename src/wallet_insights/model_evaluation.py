@@ -964,7 +964,7 @@ class ClassifierEvaluator(RegressorEvaluator):
 
         self._plot_roc_curves(ax1)
         self._plot_pr_curves(ax2)
-        self._plot_return_vs_rank_classifier(ax3, n_buckets=50)
+        self._plot_return_vs_rank_classifier(ax3, n_buckets=30)
         self._plot_feature_importance(ax4, levels=levels)
 
 
@@ -1075,7 +1075,7 @@ class ClassifierEvaluator(RegressorEvaluator):
         returns = self.validation_wallet_features_df[target_var].reindex(
             self.y_validation_pred_proba.index
         )
-        returns_winsorized = u.winsorize(returns, 0.005)
+        returns_winsorized = u.winsorize(returns, 0.01)
 
         df = pd.DataFrame({
             "proba": self.y_validation_pred_proba,
@@ -1084,7 +1084,7 @@ class ClassifierEvaluator(RegressorEvaluator):
         }).dropna()
 
         # Define score bins
-        n_buckets = 5
+        # n_buckets = 5
         score_min, score_max = df["proba"].min(), df["proba"].max()
         bin_edges = np.linspace(score_min, score_max, n_buckets + 1)
         df["score_bin"] = pd.cut(df["proba"], bins=bin_edges, include_lowest=True)
