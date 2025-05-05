@@ -196,7 +196,7 @@ class RegressorEvaluator:
         """
         header = [
             "Model Performance Summary",
-            f"Target: {self.modeling_config['target_variable']}",
+            f"Target: {self.modeling_config['target_variable']} {self.modeling_config.get('target_var_class_threshold', '')}",
             f"ID: {self.model_id}",
             "=" * 35,
         ]
@@ -817,13 +817,17 @@ class RegressorEvaluator:
 
 
 
+
+
+
+# -----------------------------------
+#          Classifier Class
+# -----------------------------------
+
 class ClassifierEvaluator(RegressorEvaluator):
     """
     Same interface as RegressorEvaluator but for classification models.
-    Expects keys:
     """
-
-
     def __init__(self, wallet_model_results: dict):
 
         # Extract probability predictions
@@ -1055,7 +1059,7 @@ class ClassifierEvaluator(RegressorEvaluator):
         ax.legend()
 
 
-    def _plot_return_vs_rank_classifier(self, ax, n_buckets: int = 25):
+    def _plot_return_vs_rank_classifier(self, ax, n_buckets: int = 10):
         """
         Plot histogram of prediction probabilities and returns by probability bins.
         X-axis is actual prediction score.
@@ -1081,6 +1085,7 @@ class ClassifierEvaluator(RegressorEvaluator):
         }).dropna()
 
         # Define score bins
+        n_buckets = 20
         score_min, score_max = df["proba"].min(), df["proba"].max()
         bin_edges = np.linspace(score_min, score_max, n_buckets + 1)
         df["score_bin"] = pd.cut(df["proba"], bins=bin_edges, include_lowest=True)
