@@ -81,6 +81,13 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
         # Update named_steps with the fitted regressor
         self.named_steps[regressor_name] = self.estimator
 
+    def predict_proba(self, X):
+        """
+        Transform input features and delegate to the underlying estimator’s predict_proba.
+        """
+        X_trans = self.x_transformer_.transform(X)
+        return self.estimator.predict_proba(X_trans)
+
         return self
 
     def predict(self, X):
