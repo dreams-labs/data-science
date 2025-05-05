@@ -1,13 +1,11 @@
-# CheckpointValidation
 # WalletModel Config
 
 
-# CheckpointValidation
 # WalletModel Period Boundaries
 training_data:
 
     #KeyParam Period Dates
-    modeling_period_start: '2025-02-26'
+    modeling_period_start: '2025-01-27'
     modeling_period_duration: 30
     training_window_lookbacks: [  # How many days prior to the modeling period each window begins
         600,
@@ -18,17 +16,16 @@ training_data:
     ]
     validation_period_end: '2025-04-30'  # toggle to activate/deactivate validation data
 
-    #KeyParam Training Data Toggles
+    # Training Data Toggles
     hybridize_wallet_ids: True  # if true, training data will be keyed on wallet-coin pairs
-    predrop_features: True  # if true, the feature_selection.drop_patterns will be applied early to save memory
 
     # Local pipeline configs
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
     parquet_folder: temp/wallet_modeling_dfs/dda528_modeling  # where to store parquet files
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
+    predrop_features: True  # if true, the feature_selection.drop_patterns will be applied early to save memory
 
 
-# CheckpointValidation
 # WalletModel Multithreading
 # Determines how many workers will be used in multithreading executions
 n_threads:
@@ -40,115 +37,26 @@ n_threads:
     concurrent_windows: 8  # how many windows are processed concurrently
 
 
-# CheckpointValidation
-# WalletModel Cleaning
-data_cleaning:
-
-    # Wallet cohort thresholds
-    min_coins_traded: 4  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
-    max_coins_traded: 250  # Exclude wallets that have traded more coins than this during the training period
-
-    min_wallet_investment: 2000 # time weighted average balance filter
-    min_wallet_inflows: 2000  # Exclude wallets with inflows below this amount (USD)
-    min_wallet_volume: 2000  # Exclude wallets with fewer than this amount of training period USD volume
-
-    max_wallet_investment: 15_000_000 # time weighted average balance filter
-    max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
-    max_wallet_volume: 25_000_000  # Exclude wallets with fewer than this amount of training period USD volume
-    max_wallet_profits: 100_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
-
-    # Market data filters
-    max_initial_market_cap: 999150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
-    max_gap_days: 30  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
-    min_daily_volume: 500 # Minimum average daily volume the coin must have
-
-    # Warnings about potential data gaps in profits_df or market_data_df
-    coverage_decrease_audit_window: 10  # how far to look back to assess decreases in coverage
-    price_coverage_warning_min_coin_increase: 100  # if this many coin prices has recently become imputed...
-    price_coverage_warning_min_pct_increase: 0.03  # ...and the % of imputed coin prices has increased by this value, issue a warning
-    transfers_coverage_warning_min_coin_increase: 150  # if this many coins have lost transfers data...
-    transfers_coverage_warning_min_pct_increase: 0.05  # ...and the % of coin without transfers data has increased by this value, issue a warning
-
-    # Market cap imputation filters
-    min_mc_imputation_coverage: 0.1  # coins with market cap coverage below this level will have hardcoded market cap values filled
-    max_mc_imputation_multiple: 3.0  # will not impute dates where the imputed market cap exceeds the max known market cap * this ratio
-    market_cap_default_fill:  500000  # coins below the imputation coverage level will have empty values filled with this
-
-
-# CheckpointValidation
-# WalletModel Features
-features:
-    # Trading Params
-    include_twb_metrics: False  # whether to calculate time weighted balances
-    include_twr_metrics: False  # whether to calculate time weighted returns
-    usd_materiality: 5  # dates with both transfers and balances below this level will be ignored for time weighted returns
-    twr_max_annual_return: 100.0  # caps the max annual return at this percent (100.0 is a 100x return)
-
-    # Performance Params
-    returns_winsorization: 0.01
-    ranking_ntiles: 2
-
-    # Market Timing Params
-    offset_winsorization: 0.02 # comparisons between metrics and their offset values will be winsorized by this amount
-    timing_metrics_min_transaction_size: 20  # trades below this USD threshold will not be evaluated for market timing peformance or transfers buyer sequencing
-
-    # Market Cap Params
-    market_cap_feature_columns: [  # which columns to generate market cap features with
-        market_cap_filled,
-        market_cap_unadj
-    ]
-
-    # Transfers Params
-    toggle_transfers_features: False
-    include_transfers_features: [
-        first_buy,
-        # first_sell,
-        # initial_hold_time,
-    ]
-
-    # Scenarios Params
-    toggle_scenario_features: False
-    scenario_performance_features: [
-        # crypto_net_flows/crypto_inflows/winsorized,
-        crypto_net_flows/max_investment/winsorized,
-        # crypto_net_gain/max_investment/winsorized,
-    ]
-
-    # Balance Params
-    balance_features_min_balance: 20  # determines
-
-    # Macroeconomic Params
-    macroeconomic_features: [
-        btc_price,
-        btc_mvrv_z_score,
-        global_market_cap,
-        global_volume
-    ]
-
-    # Clustering Params
-    # clustering_n_clusters: [2,4]
-    clustering_n_components: 25
-    clustering_fill_method: fill_0  # fill_0 or fill_mean
-    clustering_include_pca: False
-
-
-# CheckpointValidation
 # WalletModel Modeling Config
 modeling:
 
     #KeyParam Model Type
     # model_type: regression  # "regression" or "classification"
     model_type: classification  # "regression" or "classification"
-    score_name: dda724_20250101_dev
+    score_name: dda528_20250226_crypto_net_gain_1000
 
     #KeyParam Target Variable
     target_variable: crypto_net_gain
-    # target_variable: cw_crypto_net_gain/max_investment/base
+    target_var_class_threshold: 1000  # a classification model will try to predict the target var above this value
+    y_pred_threshold: 0.7  # scores above this probability threshold are positive predictions
+
+    target_variable: cw_crypto_net_gain/max_investment/base
     # target_variable: crypto_net_gain/max_investment/winsorized
     # target_variable: cw_crypto_net_gain/max_investment/rank
     # target_variable: cw_crypto_net_gain/max_investment/ntile_rank
-    # target_var_class_threshold: 0.25  # a classification model will try to predict the target var above this value
-    target_var_class_threshold: 1000  # a classification model will try to predict the target var above this value
+    target_var_class_threshold: 0.25  # a classification model will try to predict the target var above this value
+    y_pred_threshold: 0.4  # scores above this probability threshold are positive predictions
+
 
     #KeyParam Modeling Cohort Definition
     modeling_min_investment: 1000
@@ -165,167 +73,6 @@ modeling:
     verbose_estimators: True  # whether to print each estimator's scores
 
 
-    # CheckpointValidation
-    # WalletModel Feature Selection
-    feature_selection:
-        # Column patterns to remove
-        drop_patterns: [
-            # timing|*,
-            # performance|*,
-            # trading|*,
-            # mktcap|*,
-            # transfers|*,
-            # scenario|*,
-            # balance|*,
-            # macro|*,
-            # cluster|*,
-            # cw_timing|*,
-            # cw_performance|*,
-            # cw_trading|*,
-            # cw_mktcap|*,
-            # cw_transfers|*,
-            # cw_scenario|*,
-            # cw_balance|*,
-            cw_macro|*,
-            # cw_cluster|*,
-
-
-            # timing|*,
-            timing|*/buy_mean*,
-            timing|*/sell_mean*,
-            timing|*/sell_weighted*,
-
-            # performance|*,
-            performance|crypto_net_gain/crypto_inflows/*,
-            performance|crypto_net_gain/twb/*,
-            performance|crypto_net_gain/active_twb/*,
-            performance|*/log|*,
-            performance|*/ntile_rank|*,
-
-            # trading|*,
-            trading|unique_coins_traded|*,
-            trading|transaction_days|*,
-            trading|average_transaction|*,
-            trading|activity_density|*,
-            trading|crypto_inflows|*,
-            trading|max_investment|*,
-            trading|crypto_net_flows|*,
-            trading|crypto_outflows|*,
-            trading|crypto_net_cash_flows|*,
-            trading|crypto_cash_sells|*,
-            trading|crypto_cash_buys|*,
-            trading|time_weighted_balance|*,
-            trading|active_time_weighted_balance|*,
-            trading|days_held/*,
-            trading|time_weighted_return/*,
-            trading|annualized_twr/*,
-
-            # mktcap|*,
-            mktcap|portfolio_mcap_mean/market_cap_filled|*,
-            mktcap|portfolio_mcap_median/market_cap_filled|*,
-            mktcap|portfolio_mcap_min/market_cap_filled|*,
-            mktcap|portfolio_mcap_max/market_cap_filled|*, #retain?
-            mktcap|portfolio_mcap_std/market_cap_filled|*,
-            mktcap|portfolio_mcap_mean/market_cap_unadj|*,
-            mktcap|portfolio_mcap_median/market_cap_unadj|*,
-            mktcap|portfolio_mcap_std/market_cap_unadj|*,
-
-            # transfers|*,
-
-            # scenario|*,
-
-            # balance|*,
-            balance|coin_fraction_std|*,
-            balance|concentration_index|*,
-            balance|largest_coin_usd|*,
-            balance|median_coin_frac|*,
-            balance|min_coin_frac|*,
-            balance|n_coins|*,
-            balance|total_usd_balance|*,
-
-            # macro|*,
-            # macro|btc_mvrv_z_score_first|*,
-            # macro|btc_mvrv_z_score_last|*,
-            macro|btc_price_first|*,
-            macro|btc_price_last|*,
-            macro|btc_price_rsi_100_last|*,
-            # macro|btc_price_std|*,
-            macro|global_market_cap_first|*,
-            macro|global_market_cap_last|*,
-            macro|global_volume_last|*,
-            macro|global_volume_first|*,
-
-            cluster|*,
-
-            '*|w1',
-
-            # cw_timing|*,
-            cw_timing|*/buy_mean*,
-            cw_timing|*/sell_mean*,
-            cw_timing|*/sell_weighted*,
-
-            # cw_performance|*,
-            cw_performance|crypto_net_gain/crypto_inflows/*,
-            cw_performance|crypto_net_gain/twb/*,
-            cw_performance|crypto_net_gain/active_twb/*,
-            cw_performance|*/log|*,
-            cw_performance|*/ntile_rank|*,
-
-            # cw_trading|*,
-            cw_trading|unique_coins_traded|*,
-            cw_trading|transaction_days|*,
-            cw_trading|average_transaction|*,
-            cw_trading|activity_density|*,
-            cw_trading|crypto_inflows|*,
-            cw_trading|max_investment|*,
-            cw_trading|crypto_net_flows|*,
-            cw_trading|crypto_outflows|*,
-            cw_trading|crypto_net_cash_flows|*,
-            cw_trading|crypto_cash_sells|*,
-            cw_trading|crypto_cash_buys|*,
-            cw_trading|time_weighted_balance|*,
-            cw_trading|active_time_weighted_balance|*,
-            cw_trading|days_held/*,
-            cw_trading|time_weighted_return/*,
-            cw_trading|annualized_twr/*,
-
-            # cw_mktcap|*,
-            cw_mktcap|portfolio_mcap_mean/market_cap_filled|*,
-            cw_mktcap|portfolio_mcap_median/market_cap_filled|*,
-            cw_mktcap|portfolio_mcap_min/market_cap_filled|*,
-            cw_mktcap|portfolio_mcap_max/market_cap_filled|*, #retain?
-            cw_mktcap|portfolio_mcap_std/market_cap_filled|*,
-            cw_mktcap|portfolio_mcap_mean/market_cap_unadj|*,
-            cw_mktcap|portfolio_mcap_median/market_cap_unadj|*,
-            cw_mktcap|portfolio_mcap_std/market_cap_unadj|*,
-
-            # cw_transfers|*,
-
-            # cw_scenario|*,
-
-            # cw_balance|*,
-            cw_balance|coin_fraction_std|*,
-            cw_balance|concentration_index|*,
-            cw_balance|largest_coin_usd|*,
-            cw_balance|median_coin_frac|*,
-            cw_balance|min_coin_frac|*,
-            cw_balance|n_coins|*,
-            cw_balance|total_usd_balance|*,
-
-            cw_macro|*,
-
-            cw_cluster|*,
-
-        ]
-
-        # Correlation/variance-based removal
-        # variance_threshold: 0.00 # features with this level of variance or less will be removed
-        # correlation_threshold: 2.0 # features above this correlation coefficient will be removed
-        protected_features: [
-            cluster|
-        ]
-
-    # CheckpointValidation
     # WalletModel Params
     # Model specifics
     model_params:
@@ -361,22 +108,7 @@ modeling:
         # Metaparams
         random_state: 42
 
-    # Phase training section
-    phase_training:
-        enabled: False
-        phases:
-            - params:
-                max_depth: 9
-                min_child_weight: 100
-                gamma: 0.02
-            - params:
-                max_depth: 15
-                min_child_weight: 15
-                gamma: 0.005
 
-
-
-    # CheckpointValidation
     # WalletModel Grid Search
     # Params for model construction
     grid_search_params:
@@ -546,3 +278,269 @@ modeling:
             #     # '*|w1',
 
             # ]
+
+
+    # WalletModel Feature Selection
+    feature_selection:
+        # Column patterns to remove
+        drop_patterns: [
+            # timing|*,
+            # performance|*,
+            # trading|*,
+            # mktcap|*,
+            # transfers|*,
+            # scenario|*,
+            # balance|*,
+            # macro|*,
+            # cluster|*,
+            # cw_timing|*,
+            # cw_performance|*,
+            # cw_trading|*,
+            # cw_mktcap|*,
+            # cw_transfers|*,
+            # cw_scenario|*,
+            # cw_balance|*,
+            cw_macro|*,
+            # cw_cluster|*,
+
+
+            # timing|*,
+            timing|*/buy_mean*,
+            timing|*/sell_mean*,
+            timing|*/sell_weighted*,
+
+            # performance|*,
+            performance|crypto_net_gain/crypto_inflows/*,
+            performance|crypto_net_gain/twb/*,
+            performance|crypto_net_gain/active_twb/*,
+            performance|*/log|*,
+            performance|*/ntile_rank|*,
+
+            # trading|*,
+            trading|unique_coins_traded|*,
+            trading|transaction_days|*,
+            trading|average_transaction|*,
+            trading|activity_density|*,
+            trading|crypto_inflows|*,
+            trading|max_investment|*,
+            trading|crypto_net_flows|*,
+            trading|crypto_outflows|*,
+            trading|crypto_net_cash_flows|*,
+            trading|crypto_cash_sells|*,
+            trading|crypto_cash_buys|*,
+            trading|time_weighted_balance|*,
+            trading|active_time_weighted_balance|*,
+            trading|days_held/*,
+            trading|time_weighted_return/*,
+            trading|annualized_twr/*,
+
+            # mktcap|*,
+            mktcap|portfolio_mcap_mean/market_cap_filled|*,
+            mktcap|portfolio_mcap_median/market_cap_filled|*,
+            mktcap|portfolio_mcap_min/market_cap_filled|*,
+            mktcap|portfolio_mcap_max/market_cap_filled|*, #retain?
+            mktcap|portfolio_mcap_std/market_cap_filled|*,
+            mktcap|portfolio_mcap_mean/market_cap_unadj|*,
+            mktcap|portfolio_mcap_median/market_cap_unadj|*,
+            mktcap|portfolio_mcap_std/market_cap_unadj|*,
+
+            # transfers|*,
+
+            # scenario|*,
+
+            # balance|*,
+            balance|coin_fraction_std|*,
+            balance|concentration_index|*,
+            balance|largest_coin_usd|*,
+            balance|median_coin_frac|*,
+            balance|min_coin_frac|*,
+            balance|n_coins|*,
+            balance|total_usd_balance|*,
+
+            # macro|*,
+            # macro|btc_mvrv_z_score_first|*,
+            # macro|btc_mvrv_z_score_last|*,
+            macro|btc_price_first|*,
+            macro|btc_price_last|*,
+            macro|btc_price_rsi_100_last|*,
+            # macro|btc_price_std|*,
+            macro|global_market_cap_first|*,
+            macro|global_market_cap_last|*,
+            macro|global_volume_last|*,
+            macro|global_volume_first|*,
+
+            cluster|*,
+
+            '*|w1',
+
+            # cw_timing|*,
+            cw_timing|*/buy_mean*,
+            cw_timing|*/sell_mean*,
+            cw_timing|*/sell_weighted*,
+
+            # cw_performance|*,
+            cw_performance|crypto_net_gain/crypto_inflows/*,
+            cw_performance|crypto_net_gain/twb/*,
+            cw_performance|crypto_net_gain/active_twb/*,
+            cw_performance|*/log|*,
+            cw_performance|*/ntile_rank|*,
+
+            # cw_trading|*,
+            cw_trading|unique_coins_traded|*,
+            cw_trading|transaction_days|*,
+            cw_trading|average_transaction|*,
+            cw_trading|activity_density|*,
+            cw_trading|crypto_inflows|*,
+            cw_trading|max_investment|*,
+            cw_trading|crypto_net_flows|*,
+            cw_trading|crypto_outflows|*,
+            cw_trading|crypto_net_cash_flows|*,
+            cw_trading|crypto_cash_sells|*,
+            cw_trading|crypto_cash_buys|*,
+            cw_trading|time_weighted_balance|*,
+            cw_trading|active_time_weighted_balance|*,
+            cw_trading|days_held/*,
+            cw_trading|time_weighted_return/*,
+            cw_trading|annualized_twr/*,
+
+            # cw_mktcap|*,
+            cw_mktcap|portfolio_mcap_mean/market_cap_filled|*,
+            cw_mktcap|portfolio_mcap_median/market_cap_filled|*,
+            cw_mktcap|portfolio_mcap_min/market_cap_filled|*,
+            cw_mktcap|portfolio_mcap_max/market_cap_filled|*, #retain?
+            cw_mktcap|portfolio_mcap_std/market_cap_filled|*,
+            cw_mktcap|portfolio_mcap_mean/market_cap_unadj|*,
+            cw_mktcap|portfolio_mcap_median/market_cap_unadj|*,
+            cw_mktcap|portfolio_mcap_std/market_cap_unadj|*,
+
+            # cw_transfers|*,
+
+            # cw_scenario|*,
+
+            # cw_balance|*,
+            cw_balance|coin_fraction_std|*,
+            cw_balance|concentration_index|*,
+            cw_balance|largest_coin_usd|*,
+            cw_balance|median_coin_frac|*,
+            cw_balance|min_coin_frac|*,
+            cw_balance|n_coins|*,
+            cw_balance|total_usd_balance|*,
+
+            cw_macro|*,
+
+            cw_cluster|*,
+
+        ]
+
+        # Correlation/variance-based removal
+        # variance_threshold: 0.00 # features with this level of variance or less will be removed
+        # correlation_threshold: 2.0 # features above this correlation coefficient will be removed
+        protected_features: [
+            cluster|
+        ]
+
+    # Phase training section
+    phase_training:
+        enabled: False
+        phases:
+            - params:
+                max_depth: 9
+                min_child_weight: 100
+                gamma: 0.02
+            - params:
+                max_depth: 15
+                min_child_weight: 15
+                gamma: 0.005
+
+
+
+
+# WalletModel Cleaning
+data_cleaning:
+
+    #KeyParam Wallet cohort thresholds
+    min_coins_traded: 4  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
+    max_coins_traded: 250  # Exclude wallets that have traded more coins than this during the training period
+
+    min_wallet_investment: 2000 # time weighted average balance filter
+    min_wallet_inflows: 2000  # Exclude wallets with inflows below this amount (USD)
+    min_wallet_volume: 2000  # Exclude wallets with fewer than this amount of training period USD volume
+
+    max_wallet_investment: 15_000_000 # time weighted average balance filter
+    max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
+    max_wallet_volume: 25_000_000  # Exclude wallets with fewer than this amount of training period USD volume
+    max_wallet_profits: 100_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
+
+    # Market data filters
+    max_initial_market_cap: 999150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
+    max_gap_days: 30  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
+    min_daily_volume: 500 # Minimum average daily volume the coin must have
+
+    # Warnings about potential data gaps in profits_df or market_data_df
+    coverage_decrease_audit_window: 10  # how far to look back to assess decreases in coverage
+    price_coverage_warning_min_coin_increase: 100  # if this many coin prices has recently become imputed...
+    price_coverage_warning_min_pct_increase: 0.03  # ...and the % of imputed coin prices has increased by this value, issue a warning
+    transfers_coverage_warning_min_coin_increase: 150  # if this many coins have lost transfers data...
+    transfers_coverage_warning_min_pct_increase: 0.05  # ...and the % of coin without transfers data has increased by this value, issue a warning
+
+    # Market cap imputation filters
+    min_mc_imputation_coverage: 0.1  # coins with market cap coverage below this level will have hardcoded market cap values filled
+    max_mc_imputation_multiple: 3.0  # will not impute dates where the imputed market cap exceeds the max known market cap * this ratio
+    market_cap_default_fill:  500000  # coins below the imputation coverage level will have empty values filled with this
+
+
+# WalletModel Features
+features:
+    # Trading Params
+    include_twb_metrics: False  # whether to calculate time weighted balances
+    include_twr_metrics: False  # whether to calculate time weighted returns
+    usd_materiality: 5  # dates with both transfers and balances below this level will be ignored for time weighted returns
+    twr_max_annual_return: 100.0  # caps the max annual return at this percent (100.0 is a 100x return)
+
+    # Performance Params
+    returns_winsorization: 0.01
+    ranking_ntiles: 2
+
+    # Market Timing Params
+    offset_winsorization: 0.02 # comparisons between metrics and their offset values will be winsorized by this amount
+    timing_metrics_min_transaction_size: 20  # trades below this USD threshold will not be evaluated for market timing peformance or transfers buyer sequencing
+
+    # Market Cap Params
+    market_cap_feature_columns: [  # which columns to generate market cap features with
+        market_cap_filled,
+        market_cap_unadj
+    ]
+
+    # Transfers Params
+    toggle_transfers_features: False
+    include_transfers_features: [
+        first_buy,
+        # first_sell,
+        # initial_hold_time,
+    ]
+
+    # Scenarios Params
+    toggle_scenario_features: False
+    scenario_performance_features: [
+        # crypto_net_flows/crypto_inflows/winsorized,
+        crypto_net_flows/max_investment/winsorized,
+        # crypto_net_gain/max_investment/winsorized,
+    ]
+
+    # Balance Params
+    balance_features_min_balance: 20  # determines
+
+    # Macroeconomic Params
+    macroeconomic_features: [
+        btc_price,
+        btc_mvrv_z_score,
+        global_market_cap,
+        global_volume
+    ]
+
+    # Clustering Params
+    # clustering_n_clusters: [2,4]
+    clustering_n_components: 25
+    clustering_fill_method: fill_0  # fill_0 or fill_mean
+    clustering_include_pca: False
+
