@@ -5,7 +5,7 @@
 training_data:
 
     #KeyParam Period Dates
-    modeling_period_start: '2025-01-27'
+    modeling_period_start: '2024-12-28'
     modeling_period_duration: 30
     training_window_lookbacks: [  # How many days prior to the modeling period each window begins
         600,
@@ -20,9 +20,10 @@ training_data:
     hybridize_wallet_ids: True  # if true, training data will be keyed on wallet-coin pairs
 
     # Local pipeline configs
-    dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
+    dataset: dev  # Set to prod or dev; determines whether to query core or dev dataset tables
     parquet_folder: temp/wallet_modeling_dfs/dda528_modeling  # where to store parquet files
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
+    model_scores_folder: temp/wallet_modeling_score_dfs  # where model scores are stored
     predrop_features: True  # if true, the feature_selection.drop_patterns will be applied early to save memory
 
 
@@ -40,26 +41,31 @@ n_threads:
 # WalletModel Modeling Config
 modeling:
 
+    score_name: dda528_20250226_crypto_net_gain_1000
+
     #KeyParam Model Type
     # model_type: regression  # "regression" or "classification"
     model_type: classification  # "regression" or "classification"
-    score_name: dda528_20250226_crypto_net_gain_1000
 
     #KeyParam Target Variable
-    # # Net Gain
-    target_variable: crypto_net_gain
+    # Net Gain
+    target_variable: cw_crypto_net_gain
+    # target_variable: crypto_net_gain
     # target_variable: cw_crypto_net_flows
     # # target_variable: crypto_net_cash_flows
     target_var_class_threshold: 1000  # a classification model will try to predict the target var above this value
     y_pred_threshold: 0.7  # scores above this probability threshold are positive predictions
 
     # # Return Rate
-    # # target_variable: cw_crypto_net_gain/max_investment/base
-    # target_var_class_threshold: 0.25  # a classification model will try to predict the target var above this value
-    # # target_var_class_threshold: 0.05  # a classification model will try to predict the target var above this value
+    # target_variable: cw_crypto_net_gain/max_investment/base
+    # # target_variable: crypto_net_gain/max_investment/base
+    # # target_var_class_threshold: 0.25  # a classification model will try to predict the target var above this value
+    # target_var_class_threshold: 0.05  # a classification model will try to predict the target var above this value
+    # # target_var_class_threshold: 0.00  # a classification model will try to predict the target var above this value
     # y_pred_threshold: 0.6  # scores above this probability threshold are positive predictions
 
     # target_variable: crypto_net_gain/max_investment/winsorized
+    # target_variable: cw_crypto_net_gain/max_investment/winsorized
     # target_variable: cw_crypto_net_gain/max_investment/rank
     # target_variable: cw_crypto_net_gain/max_investment/ntile_rank
 
@@ -97,7 +103,7 @@ modeling:
         #KeyParam Estimator Counts
         # CHECKPOINTER
         n_estimators: 350  # number of trees to train in the model
-        learning_rate: 0.5  # step size for updates to weights during training
+        learning_rate: 0.7  # step size for updates to weights during training
 
         # # PRODUCTION
         # n_estimators: 500  # number of trees to train in the model
