@@ -1,0 +1,192 @@
+import logging
+import copy
+import json
+import pandas as pd
+
+# Local modules
+from wallet_modeling.wallet_model import WalletModel
+import wallet_insights.wallet_model_reporting as wimr
+import wallet_insights.wallet_validation_analysis as wiva
+import utils as u
+
+# Set up logger at the module level
+logger = logging.getLogger(__name__)
+
+
+class WalletModelOrchestrator:
+    """
+    Trainer for wallet scoring models that handles multiple parameter configurations.
+    """
+
+    def __init__(
+        self,
+        wallets_config,
+        wallets_metrics_config,
+        wallets_features_config,
+        wallets_epochs_config,
+        wallets_coin_config,
+    ):
+        """
+        Initialize the wallet model trainer.
+
+        Params:
+        - wallets_config: Main configuration object
+        - wallets_metrics_config: Metrics configuration
+        - wallets_features_config: Features configuration
+        - wallets_epochs_config: Epochs configuration
+        - wallets_coin_config: Coin-specific configuration
+        """
+        self.wallets_config = wallets_config
+        self.wallets_metrics_config = wallets_metrics_config
+        self.wallets_features_config = wallets_features_config
+        self.wallets_epochs_config = wallets_epochs_config
+        self.wallets_coin_config = wallets_coin_config
+
+        # Extract parameters from configs
+        self.score_params = wallets_coin_config['wallet_scores']['score_params']
+        self.base_path = self.wallets_config['training_data']['model_artifacts_folder']
+
+        # Dict to store model IDs
+        self.models_dict = None
+
+
+
+    # -----------------------------------
+    #         Primary Interface
+    # -----------------------------------
+
+    def train_wallet_models(
+        self,
+        wallet_training_data_df,
+        modeling_wallet_features_df,
+        validation_training_data_df,
+        validation_wallet_features_df
+    ) -> dict:
+        """
+        Train multiple wallet scoring models with different parameter configurations.
+
+        Params:
+        - wallet_training_data_df: Training data DataFrame
+        - modeling_wallet_features_df: Features for modeling
+        - validation_training_data_df: Validation training data
+        - validation_wallet_features_df: Validation features
+
+        Returns:
+        - models_dict: Dictionary mapping score names to model IDs
+        """
+        models_dict = {}
+
+        for score_name in self.score_params:
+            # Create a deep copy of the configuration to avoid modifying the original
+            score_wallets_config = copy.deepcopy(self.wallets_config.config)
+
+            # Override score name and model params in base config
+            score_wallets_config['modeling']['score_name'] = score_name
+            for param_name in self.score_params[score_name]:
+                score_wallets_config['modeling'][param_name] = self.score_params[score_name][param_name]
+
+            # Train and evaluate the model
+            model_id = self._train_and_evaluate(
+                score_wallets_config,
+                wallet_training_data_df,
+                modeling_wallet_features_df,
+                validation_training_data_df,
+                validation_wallet_features_df
+            )
+
+            # Store model ID in dictionary for later use
+            models_dict[score_name] = model_id
+
+        # Store and save models_dict
+        self.models_dict = models_dict
+        save_location = f"{self.wallets_coin_config['training_data']['parquet_folder']}/wallet_model_ids.json"
+        with open(save_location, 'w', encoding='utf-8') as f:
+            json.dump(models_dict, f, indent=4, default=u.numpy_type_converter)
+
+        return models_dict
+
+
+    def predict_and_store(self, models_dict, training_data_df):
+        """
+        Generate predictions for each model and store them as parquet files.
+
+        Params:
+        - models_dict: Dictionary mapping score names to model IDs
+        - training_data_df: Training data DataFrame containing epoch information
+
+        Returns:
+        - None: Files are saved to the temp_path directory
+        """
+        # Extract epoch start date from training data
+        epoch_start = training_data_df.reset_index()['epoch_start_date'][0].strftime('%Y%m%d')
+
+        # Process each model in the dictionary
+        for score_name in models_dict.keys():
+            model_id = models_dict[score_name]
+
+            # Load model and generate predictions
+            y_pred = wiva.load_and_predict(
+                model_id,
+                training_data_df,
+                self.base_path
+            )
+
+            # Save predictions to parquet file
+            scores_folder = self.wallets_config['training_data']['model_scores_folder']
+            output_path = f"{scores_folder}/{score_name}|{epoch_start}.parquet"
+            wallet_scores_df = pd.DataFrame({f'score|{score_name}': y_pred})
+            wallet_scores_df.to_parquet(output_path, index=True)
+
+            logger.info(f"Saved predictions for {score_name} to {output_path}")
+
+
+
+    # -----------------------------------
+    #           Helper Methods
+    # -----------------------------------
+
+    def _train_and_evaluate(
+        self,
+        score_wallets_config,
+        wallet_training_data_df,
+        modeling_wallet_features_df,
+        validation_training_data_df,
+        validation_wallet_features_df
+    ) -> str:
+        """
+        Train and evaluate a single model with given configuration.
+
+        Params:
+        - score_wallets_config: Configuration specific to this score
+        - wallet_training_data_df: Training data DataFrame
+        - modeling_wallet_features_df: Features for modeling
+        - validation_training_data_df: Validation training data
+        - validation_wallet_features_df: Validation features
+
+        Returns:
+        - model_id: ID of the trained model
+        """
+        # Construct model
+        wallet_model = WalletModel(score_wallets_config['modeling'])
+        wallet_model_results = wallet_model.construct_wallet_model(
+            wallet_training_data_df, modeling_wallet_features_df,
+            validation_training_data_df, validation_wallet_features_df
+        )
+
+        # Generate and save all model artifacts
+        model_id, wallet_evaluator, _ = wimr.generate_and_save_wallet_model_artifacts(
+            model_results=wallet_model_results,
+            base_path=self.base_path,
+            configs={
+                'wallets_config': self.wallets_config.config,
+                'wallets_metrics_config': self.wallets_metrics_config,
+                'wallets_features_config': self.wallets_features_config,
+                'wallets_epochs_config': self.wallets_epochs_config,
+                'wallets_coin_config': self.wallets_coin_config
+            }
+        )
+
+        # Display model evaluation summary
+        wallet_evaluator.summary_report()
+
+        return model_id
