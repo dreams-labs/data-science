@@ -131,6 +131,13 @@ class WalletModelOrchestrator:
                 training_data_df,
                 self.base_path
             )
+            wallet_scores_df = pd.DataFrame({f'score|{score_name}': y_pred})
+
+            # Calculate binary predictions if applicable
+            y_pred_threshold = self.score_params[score_name].get('y_pred_threshold')
+            if y_pred_threshold is not None:
+                y_pred_binary = (y_pred >= y_pred_threshold).astype(int)
+                wallet_scores_df[f'binary|{score_name}'] = y_pred_binary
 
             # Identify scores folder
             scores_folder = self.wallets_config['training_data']['model_scores_folder']
@@ -138,7 +145,6 @@ class WalletModelOrchestrator:
 
             # Save predictions to parquet file
             output_path = f"{scores_folder}/{score_name}|{epoch_start}.parquet"
-            wallet_scores_df = pd.DataFrame({f'score|{score_name}': y_pred})
             wallet_scores_df.to_parquet(output_path, index=True)
 
             logger.info(f"Saved predictions for {score_name} to {output_path}")
