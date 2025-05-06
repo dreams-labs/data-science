@@ -7,7 +7,7 @@ import pandas as pd
 # Local module imports
 import wallet_modeling.wallet_training_data_orchestrator as wtdo
 import wallet_modeling.wallet_model as wm
-import wallet_insights.wallet_model_reporting as wmr
+import wallet_insights.wallet_model_reporting as wimr
 import wallet_features.performance_features as wpf
 
 logger = logging.getLogger(__name__)
@@ -91,7 +91,7 @@ class ExperimentsManager:
 
         # Save model artifacts
         logger.info(f"Saving artifacts for experiment: {experiment_name}")
-        model_id, evaluator, wallet_scores_df = wmr.generate_and_save_model_artifacts(
+        model_id, evaluator, wallet_scores_df = wimr.generate_and_save_model_artifacts(
             model_results=results,
             validation_profits_df=self.validation_profits_df,
             base_path=self.base_path
