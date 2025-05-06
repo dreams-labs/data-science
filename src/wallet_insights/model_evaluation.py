@@ -846,7 +846,7 @@ class ClassifierEvaluator(RegressorEvaluator):
         # Extract probability predictions
         self.y_pred_proba = wallet_model_results['y_pred_proba']
         self.y_validation_pred_proba = wallet_model_results.get('y_validation_pred_proba')
-        self.y_validation_pred = wallet_model_results['y_validation_pred']
+        self.y_validation_pred = wallet_model_results.get('y_validation_pred')
         self.y_pred_threshold = wallet_model_results['modeling_config']['y_pred_threshold']
 
 
