@@ -1,6 +1,7 @@
 import logging
 import copy
 import json
+from pathlib import Path
 import pandas as pd
 
 # Local modules
@@ -131,8 +132,11 @@ class WalletModelOrchestrator:
                 self.base_path
             )
 
-            # Save predictions to parquet file
+            # Identify scores folder
             scores_folder = self.wallets_config['training_data']['model_scores_folder']
+            Path(scores_folder).mkdir(parents=True, exist_ok=True)
+
+            # Save predictions to parquet file
             output_path = f"{scores_folder}/{score_name}|{epoch_start}.parquet"
             wallet_scores_df = pd.DataFrame({f'score|{score_name}': y_pred})
             wallet_scores_df.to_parquet(output_path, index=True)
