@@ -868,8 +868,13 @@ class ClassifierEvaluator(RegressorEvaluator):
         self.metrics['precision'] = precision_score(self.y_test, self.y_pred, zero_division=0)
         self.metrics['recall'] = recall_score(self.y_test, self.y_pred, zero_division=0)
         self.metrics['f1'] = f1_score(self.y_test, self.y_pred, zero_division=0)
-        self.metrics['roc_auc'] = roc_auc_score(self.y_test, self.y_pred_proba)
-        self.metrics['log_loss'] = log_loss(self.y_test, self.y_pred_proba)
+        try:
+            self.metrics['roc_auc'] = roc_auc_score(self.y_test, self.y_pred_proba)
+            self.metrics['log_loss'] = log_loss(self.y_test, self.y_pred_proba)
+        except ValueError:
+            logger.warning("Only one class found in classifier predictions.")
+            self.metrics['roc_auc'] = np.nan
+            self.metrics['log_loss'] = np.nan
 
         # Validation set metrics if available
         if getattr(self, 'y_validation', None) is not None and hasattr(self, 'y_validation_pred_proba'):
