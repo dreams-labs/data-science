@@ -16,15 +16,61 @@ data_cleaning:
     min_daily_volume: 500 # Minimum average daily volume the coin must have
 
 
-# CoinModel Segments
-wallet_segments:
+# CoinModel Wallet Scores
+wallet_scores:
 
     #KeyParam Scores to include as segments + metrics
     wallet_scores_path: temp/wallet_modeling_score_dfs
-    wallet_scores: [
-        dda528_net_gain_1k,
-        dda528_net_gain_max_inv_025,
-    ]
+    # wallet_scores: [
+    #     dda528_net_gain_1k,
+    #     dda528_net_gain_max_inv_025,
+    # ]
+    score_params:
+        # Return Rate
+        cw_return_rate_000:
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_class_threshold: 0.00
+            y_pred_threshold: 0.4
+
+        cw_return_rate_005:
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_class_threshold: 0.05
+            y_pred_threshold: 0.6
+
+        cw_return_rate_025:
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_class_threshold: .25
+            y_pred_threshold: 0.6
+
+        cw_return_rate_040:
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_class_threshold: .40
+            y_pred_threshold: 0.6
+
+        cw_return_rate_regression:
+            model_type: regression
+            target_variable: cw_crypto_net_gain/max_investment/winsorized
+
+        return_rate_regression:
+            model_type: regression
+            target_variable: crypto_net_gain/max_investment/winsorized
+
+        # USD Metrics
+        net_gain_1000:
+            target_variable: crypto_net_gain
+            target_var_class_threshold: 1000
+            y_pred_threshold: 0.7
+
+        cw_net_flows_1000:
+            target_variable: cw_crypto_net_flows
+            target_var_class_threshold: 1000
+            y_pred_threshold: 0.7
+
+
+# CoinModel Segments
+wallet_segments:
+
+
     wallet_scores_residuals_segments: False
     wallet_scores_confidence_segments: False
 

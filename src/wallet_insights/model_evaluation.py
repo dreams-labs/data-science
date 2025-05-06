@@ -580,7 +580,8 @@ class RegressorEvaluator:
             returns = self.validation_wallet_features_df[target_var].values
             df = pd.DataFrame({
                 "pred": self.y_validation_pred,
-                "ret": returns
+                "ret": returns,
+                "ret_wins": u.winsorize(returns, 0.005)
             }).dropna()
 
         # Create score buckets based on actual score values, not percentiles
@@ -597,9 +598,13 @@ class RegressorEvaluator:
 
             if mask.sum() > 0:  # Only include if there are samples
                 mean_return = df.loc[mask, "ret"].mean()
+                median_return = df.loc[mask, "ret"].median()
+                wins_return = df.loc[mask, "ret_wins"].mean()
                 buckets.append({
                     "score_mid": (low + high) / 2,
                     "mean_return": mean_return,
+                    "median_return": median_return,
+                    "wins_return": wins_return,
                     "count": mask.sum()
                 })
 
@@ -608,6 +613,12 @@ class RegressorEvaluator:
         if not bucket_df.empty:
             # 3. Plot return line on secondary Y-axis (right)
             # Use a single fixed marker size instead of variable sizes
+            # ax_ret.plot(bucket_df["score_mid"], bucket_df["wins_return"],
+            #         marker='o', markersize=6, linewidth=2,
+            #         color='#ffe000', label='Winsorized Return')
+            ax_ret.plot(bucket_df["score_mid"], bucket_df["median_return"],
+                    marker='o', markersize=6, linewidth=2,
+                    color='#8000ff', label='Median Return')
             ax_ret.plot(bucket_df["score_mid"], bucket_df["mean_return"],
                     marker='o', markersize=6, linewidth=2,
                     color='#22DD22', label='Mean Return')
@@ -707,6 +718,8 @@ class RegressorEvaluator:
                 self._plot_feature_importance(ax)
             elif plot_type == 'prefix_importance':
                 self._plot_feature_importance(ax, levels=levels)
+            elif plot_type == 'return_vs_rank':
+                self._plot_return_vs_rank(ax, levels=levels)
         plt.tight_layout()
         if display:
             plt.show()
@@ -861,6 +874,7 @@ class ClassifierEvaluator(RegressorEvaluator):
         # Validation set metrics if available
         if getattr(self, 'y_validation', None) is not None and hasattr(self, 'y_validation_pred_proba'):
             self.metrics['positive_predictions'] = self.y_validation_pred.sum()
+            self.metrics['positive_pct'] = (self.y_validation_pred.sum()/len(self.y_validation_pred))*100
             self.metrics['val_accuracy'] = accuracy_score(self.y_validation, self.y_validation_pred)
             self.metrics['val_precision'] = precision_score(self.y_validation, self.y_validation_pred, zero_division=0)
             self.metrics['val_recall'] = recall_score(self.y_validation, self.y_validation_pred, zero_division=0)
@@ -929,7 +943,7 @@ class ClassifierEvaluator(RegressorEvaluator):
                 "Validation Return Metrics",
                 "-" * 35,
                 f"Positive Threshold:         {self.y_pred_threshold:.2f}",
-                f"Positive Predictions:       {self.metrics['positive_predictions']:.0f}",
+                f"Positive Predictions:       {self.metrics['positive_predictions']:.0f}/{len(self.y_validation_pred)} ({self.metrics['positive_pct']:.2f}%)",
                 f"Positive Mean Outcome:      {self.metrics['positive_pred_return']:.3f}",
                 f"Positive W-Mean Outcome:    {self.metrics['positive_pred_wins_return']:.3f}",
                 f"Top 1% W-Mean Outcome:      {self.metrics['val_wins_return_top1']:.3f}",
@@ -1132,10 +1146,14 @@ class ClassifierEvaluator(RegressorEvaluator):
 
         # Secondary axis: mean return line
         ax2 = ax.twinx()
-        # Compress extreme return outliers for better visibility
-        # Use the 95th percentile of raw returns as linear threshold
-        y_thresh = np.percentile(df["ret"], 95)
-        ax2.set_yscale("symlog", linthresh=y_thresh)
+        # Compute threshold on absolute returns to ensure a positive linthresh
+        abs_returns = np.abs(df["ret"])
+        linthresh = np.percentile(abs_returns, 95)
+        # Fallback to a small positive value if the threshold isn't positive
+        if linthresh <= 0:
+            max_abs = abs_returns.max()
+            linthresh = max_abs * 0.05 if max_abs > 0 else 1.0
+        ax2.set_yscale("symlog", linthresh=linthresh)
         ax2.plot(
             valid_centers,
             valid_median_ret,
