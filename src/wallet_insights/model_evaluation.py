@@ -194,9 +194,15 @@ class RegressorEvaluator:
         """
         Build header lines including title, target, ID, samples and feature counts.
         """
+        # Include class threshold if it's a classification model
+        if self.modeling_config['modeling']['model_type'] == 'classification':
+            class_threshold_str = self.modeling_config.get('target_var_class_threshold', '')
+        else:
+            class_threshold_str = ''
+
         header = [
             "Model Performance Summary",
-            f"Target: {self.modeling_config['target_variable']} {self.modeling_config.get('target_var_class_threshold', '')}",
+            f"Target: {self.modeling_config['target_variable']} {class_threshold_str}",
             f"ID: {self.model_id}",
             "=" * 35,
         ]
@@ -999,7 +1005,7 @@ class ClassifierEvaluator(RegressorEvaluator):
 
         self._plot_roc_curves(ax1)
         self._plot_pr_curves(ax2)
-        self._plot_return_vs_rank_classifier(ax3, n_buckets=30)
+        self._plot_return_vs_rank_classifier(ax3, n_buckets=10)
         self._plot_feature_importance(ax4, levels=levels)
 
 
