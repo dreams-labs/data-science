@@ -8,7 +8,6 @@ import numpy as np
 
 # local module imports
 import wallet_features.clustering_features as wcl
-import utils as u
 
 
 # Set up logger at the module level
@@ -21,13 +20,15 @@ logger = logging.getLogger(__name__)
 
 def build_wallet_segmentation(
         wallets_coin_config: dict,
-        wallets_config: dict,
+        training_data_df: pd.DataFrame,
         score_suffix: str = None) -> pd.DataFrame:
     """
     Build wallet segmentation DataFrame with score quantiles and optional clusters.
 
     Params:
-    - wallets_coin_config, wallets_config (dicts): dicts from .yaml file
+    - wallets_coin_config (dict): dicts from .yaml file
+    - training_data_df (DataFrame): wallet training features for the specified period
+        including cluster labels
     - score_suffix (str): specifies which score column to load (if applicable)
 
     Returns:
@@ -59,23 +60,22 @@ def build_wallet_segmentation(
     # Add training period cluster labels if configured
     cluster_groups = wallets_coin_config['wallet_segments'].get('training_period_cluster_groups')
     if cluster_groups:
-        # Load full-window wallet features to generate clusters
-        training_df_path = (
-            f"{wallets_config['training_data']['parquet_folder']}"
-            "/wallet_training_data_df_full.parquet"
-        )
-        training_data_df = pd.read_parquet(training_df_path)
+        # Use full-window wallet features to generate clusters
         wallet_clusters_df = assign_cluster_labels(
             training_data_df,
             cluster_groups
         )
+
         # Join and verify no rows dropped
         orig_len = len(wallet_segmentation_df)
         wallet_segmentation_df = wallet_segmentation_df.join(wallet_clusters_df, how='inner')
         joined_len = len(wallet_segmentation_df)
-        if joined_len < orig_len:
+        if abs(joined_len - orig_len)/orig_len > .10:
+            # If more than 10% of the wallets didn't match, raise a ValueError.
+            #  Note that there will be valid differences because there isn't complete overlap
+            #  between the training period wallet cohort and the subsequent period cohorts.
             raise ValueError(
-                f"Join dropped {orig_len - joined_len} rows from original {orig_len} rows"
+                f"Cluster label join dropped {orig_len - joined_len} rows from original {orig_len} rows."
             )
 
     return wallet_segmentation_df
@@ -99,11 +99,12 @@ def load_wallet_scores(wallets_coin_config: dict, score_suffix: str = None) -> p
         residual|{score_name} (float): the residual of the score
     """
     wallet_scores = list(wallets_coin_config['wallet_scores']['score_params'].keys())
-    wallet_scores_path = wallets_coin_config['wallet_scores']['coins_wallet_scores_folder']
+    wallet_scores_path = wallets_coin_config['training_data']['coins_wallet_scores_folder']
     wallet_scores_df = pd.DataFrame()
 
     for score_name in wallet_scores:
         score_df = pd.read_parquet(f"{wallet_scores_path}/{score_name}|{score_suffix}.parquet")
+
         feature_cols = []
 
         # Add scores column
@@ -137,6 +138,11 @@ def load_wallet_scores(wallets_coin_config: dict, score_suffix: str = None) -> p
             score_df[feature_cols] if wallet_scores_df.empty
             else wallet_scores_df.join(score_df[feature_cols], how='outer')
         )
+
+    # Drop epoch date multiindex level
+    wallet_scores_df = (wallet_scores_df.reset_index()
+                .drop(['epoch_start_date'],axis=1)
+                .set_index('wallet_address'))
 
     return wallet_scores_df
 
@@ -335,6 +341,11 @@ def assign_cluster_labels(training_data_df: pd.DataFrame, cluster_groups: list) 
 
     # Single join operation
     combined_clusters_df = pd.concat(cluster_dfs, axis=1)
+
+    # Drop epoch date multiindex level
+    combined_clusters_df = (combined_clusters_df.reset_index()
+                .drop(['epoch_start_date'],axis=1)
+                .set_index('wallet_address'))
 
     return combined_clusters_df
 
