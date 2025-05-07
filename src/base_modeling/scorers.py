@@ -102,14 +102,6 @@ def validation_auc_scorer(wallet_model):
 
     return scorer
 
-# --- CoinModel-specific scorer (alias for config consistency) ---
-def coin_validation_auc_scorer(wallet_model):
-    """
-    Convenience alias for CoinModel – simply delegates to validation_auc_scorer
-    to keep the config naming consistent.
-    """
-    return validation_auc_scorer(wallet_model)
-
 
 def validation_top_return_scorer(wallet_model, top_pct: float):
     """
