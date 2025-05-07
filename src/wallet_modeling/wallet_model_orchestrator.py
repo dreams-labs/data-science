@@ -86,6 +86,9 @@ class WalletModelOrchestrator:
             for param_name in self.score_params[score_name]:
                 score_wallets_config['modeling'][param_name] = self.score_params[score_name][param_name]
 
+            # Don't output the scores from every tree
+            score_wallets_config['modeling']['verbose_estimators'] = False
+
             # Train and evaluate the model
             model_id = self._train_and_evaluate(
                 score_wallets_config,
