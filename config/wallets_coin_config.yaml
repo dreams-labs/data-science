@@ -2,9 +2,8 @@
 
 training_data: #CoinModel
 
-    # where to save local files
-    parquet_folder: temp/coin_modeling_dfs
-
+    dataset: dev  # Set to prod or dev; determines whether to query core or dev dataset tables
+    parquet_folder: temp/coin_modeling_dfs/dda749_clusters_v2
 
 # CoinModel Cleaning
 # Variables used to clean and filter raw data before training data is built
@@ -20,11 +19,6 @@ data_cleaning: #CoinModel
 wallet_scores: #CoinModel
 
     #KeyParam Scores to include as segments + metrics
-    coins_wallet_scores_folder: temp/coin_modeling_dfs/wallet_scores_dda744
-    # wallet_scores: [
-    #     dda528_net_gain_1k,
-    #     dda528_net_gain_max_inv_025,
-    # ]
     score_params:
         # Return Rate
         cw_return_rate_000:
@@ -77,23 +71,33 @@ wallet_segments: #CoinModel
 
     # score_segment_quantiles: [0.95]  # higher is better; how to assign wallet a score segment
     # score_segment_quantiles: [0.15, 0.85]  # higher is better; how to assign wallet a score segment
-    # training_period_cluster_groups: [4]  # which n clusters assignment from the training period to segment by
 
+    training_period_cluster_groups: [5]  # which n clusters assignment from the training period to segment by
 
 
 # CoinModel Features
 wallet_features: #CoinModel
+
+    # Features from the feature_engineering directory
+    toggle_prior_model_features: False
 
     # Score features params
     usd_materiality: 20 # Wallets with volume/balances below this won't be counted in medians/distributions/etc
 
     # Metrics to drop based on low observed importance
     drop_trading_metrics: [
-        # average_transaction
+        crypto_cash_buys,
+        crypto_cash_sells,
+        crypto_inflows,
+        crypto_net_cash_flows,
+        crypto_net_flows,
+        crypto_net_gain,
+        crypto_outflows,
+        max_investment,
+        # total_volume,
+        unique_coins_traded,
+        # average_transaction,
     ]
-
-    # Features from the feature_engineering directory
-    toggle_prior_model_features: False
 
 
 # CoinModel Modeling Config
@@ -119,7 +123,7 @@ coin_modeling: #CoinModel
     #KeyParam Modeling Cohort Definition
     # Thresholds for coin inclusion in training data
     min_cohort_wallets: 15  # how many wallets must hold a coin for the coin to be elegible for forecasting
-    min_cohort_balance: 10000  # how much USD all wallets must hold for the coin to be elegible for forecasting
+    min_cohort_balance: 1000  # how much USD all wallets must hold for the coin to be elegible for forecasting
 
     # Thresholds for coin inclusion in training data
     min_market_cap: 000_000  # coins below this market cap will not be included in performance assessments
@@ -127,7 +131,7 @@ coin_modeling: #CoinModel
 
     # Train/Test/Eval split
     test_size: 0.2  # what % of the total population will be used as test
-    eval_size: 0.1  # what % used for the early stopping eval set
+    eval_size: 0.05  # what % used for the early stopping eval set
 
 
 
@@ -359,4 +363,4 @@ coin_modeling: #CoinModel
 # CoinModel Multithreading
 # Determines how many workers will be used in multithreading executions
 n_threads: #CoinModel
-    cw_flattening_threads: 15  # multithreads flattening in wallet_metrics_flattening.py
+    cw_flattening_threads: 24  # multithreads flattening in wallet_metrics_flattening.py

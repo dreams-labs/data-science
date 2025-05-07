@@ -143,9 +143,7 @@ class WalletModelOrchestrator:
                 wallet_scores_df[f'binary|{score_name}'] = y_pred_binary
 
             # Identify scores folder
-            scores_folder = self.wallets_coin_config['wallet_scores']['coins_wallet_scores_folder']
-            if self.wallets_config['training_data']['dataset'] == 'dev':
-                scores_folder = f"{scores_folder}_dev"
+            scores_folder = self.wallets_coin_config['training_data']['coins_wallet_scores_folder']
             Path(scores_folder).mkdir(parents=True, exist_ok=True)
 
             # Save predictions to parquet file
