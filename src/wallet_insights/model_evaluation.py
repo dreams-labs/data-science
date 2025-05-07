@@ -1127,10 +1127,15 @@ class ClassifierEvaluator(RegressorEvaluator):
         }).dropna()
 
         # Define score bins
-        # n_buckets = 5
-        score_min, score_max = df["proba"].min(), df["proba"].max()
-        bin_edges = np.linspace(score_min, score_max, n_buckets + 1)
-        df["score_bin"] = pd.cut(df["proba"], bins=bin_edges, include_lowest=True)
+        try:
+            score_min, score_max = df["proba"].min(), df["proba"].max()
+            bin_edges = np.linspace(score_min, score_max, n_buckets + 1)
+            df["score_bin"] = pd.cut(df["proba"], bins=bin_edges, include_lowest=True)
+        except ValueError:
+            ax.text(0.5, 0.5, 'Insufficient score spread to generate bins.',
+                    ha='center', va='center')
+            return
+
 
         # Compute counts and mean returns per bin
         bin_counts = df.groupby("score_bin", observed=True).size()
