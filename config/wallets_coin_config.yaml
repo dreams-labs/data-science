@@ -238,7 +238,7 @@ coin_modeling: #CoinModel
     grid_search_params:
 
         # -------------------------------
-        # enabled: True  # DDA718
+        enabled: True  # DDA718
         # -------------------------------
 
         # Search Methodology
@@ -247,7 +247,7 @@ coin_modeling: #CoinModel
         n_iter: 400  # random search limit
         n_splits: 4  # cv splits
         regressor_scoring: neg_root_mean_squared_error
-        classifier_scoring: coin_validation_auc_scorer
+        classifier_scoring: validation_auc_scorer
 
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # scikit-learn verbosity

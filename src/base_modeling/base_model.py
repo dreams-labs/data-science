@@ -20,6 +20,7 @@ from xgboost import XGBRegressor, XGBClassifier
 # Local modules
 import base_modeling.feature_selection as fs
 import base_modeling.pipeline as bmp
+import base_modeling.scorers as sco
 import utils as u
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
@@ -280,59 +281,77 @@ class BaseModel:
     #         Grid Search Methods
     # -----------------------------------
 
-    def _run_grid_search(self, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
+    def _run_grid_search(self, X: pd.DataFrame, y: pd.Series, pipeline) -> Dict[str, float]:
         """
-        Perform grid search with cross validation using configured parameters.
-
-        Params:
-        - X (DataFrame): Feature data
-        - y (Series): Target variable
-        - pipeline (Pipeline, optional): Custom pipeline to use for grid search. If None,
-          a basic pipeline will be created.
-
-        Returns:
-        - Dict: Results containing best parameters, score and CV results
+        Run grid search while always providing an eval set for early stopping.
         """
-        # If grid search is disabled, return nothing
         if not self.modeling_config.get('grid_search_params', {}).get('enabled'):
             logger.info("Constructing production model with base params...")
             return {}
-        logger.info("Initiating grid search...")
+
+        logger.info("Initiating grid search with eval set...")
         u.notify('gadget')
 
-        # Get prepared grid search params
+        # Set up grid search options as ['param_grid']
         gs_config = self._prepare_grid_search_params(X)
 
-        # Validate that the param_grid has at least 2 configurations
-        total_configurations = 1
-        for param_values in gs_config['param_grid'].values():
-            if isinstance(param_values, list):
-                total_configurations *= len(param_values)
-        if total_configurations < 2:
-            raise ValueError("Grid search requires at least 2 different configurations. "
-                             "Current param_grid generates only 1.")
+        # Assign custom scorers if applicable
+        scoring_param = gs_config['search_config'].get('scoring')
 
-        # Create pipeline
-        cv_pipeline = self._get_model_pipeline(gs_config['base_model_params'])
+        if scoring_param == 'custom_r2_scorer':
+            gs_config['search_config']['scoring'] = sco.custom_r2_scorer
 
-        # Store the search object in the instance
+        elif scoring_param == 'custom_neg_rmse_scorer':
+            gs_config['search_config']['scoring'] = sco.custom_neg_rmse_scorer
+
+        elif scoring_param == 'validation_r2_scorer':
+            # Ensure validation data is available
+            if self.X_validation is None or self.validation_wallet_features_df is None:
+                raise ValueError("Validation data required for validation_r2_scorer")
+            gs_config['search_config']['scoring'] = sco.validation_r2_scorer(self)
+
+        elif scoring_param == 'validation_auc_scorer':
+            # Ensure validation data is available
+            if self.X_validation is None or self.validation_wallet_features_df is None:
+                raise ValueError("Validation data required for validation_auc_scorer")
+            gs_config['search_config']['scoring'] = sco.validation_auc_scorer(self)
+
+        elif scoring_param == 'validation_top_return_scorer':
+            # read your desired top_pct from config, e.g. self.modeling_config['grid_search_params']['top_pct']
+            top_pct = self.modeling_config['grid_search_params'].get('top_pct', 0.05)
+            gs_config['search_config']['scoring'] = sco.validation_top_return_scorer(self, top_pct)
+
+        elif scoring_param == 'validation_top_return_scorer':
+            # read your desired top_pct from config, e.g. self.modeling_config['grid_search_params']['top_pct']
+            top_pct = self.modeling_config['grid_search_params'].get('top_pct', 0.05)
+            gs_config['search_config']['scoring'] = sco.validation_top_return_scorer(self, top_pct)
+
+        else:
+            raise ValueError(f"Invalid scoring metric '{scoring_param}' found in grid_search_params.")
+
+        # Generate pipeline
+        cv_pipeline = pipeline if pipeline is not None else self._get_model_pipeline(gs_config['base_model_params'])
+
+        # Random search with pipeline
         self.random_search = RandomizedSearchCV(
             cv_pipeline,
             gs_config['param_grid'],
             **gs_config['search_config']
         )
 
-        # Fit without passing verbose flag (XGB verbosity controlled via model_params)
-        self.random_search.fit(X, y)
+        # Always pass the eval_set for early stopping
+        self.random_search.fit(
+            X, y,
+            eval_set=(self.X_eval, self.y_eval),
+            verbose_estimators=self.modeling_config['grid_search_params'].get('verbose_estimators',False)
+        )
 
-        # Log best results
-        logger.info("Grid search complete. Best score: %f",
-                    -self.random_search.best_score_)
+        logger.info("Grid search complete. Best score: %f", -self.random_search.best_score_)
         u.notify('synth_magic')
 
         return {
             'best_params': {
-                k: (self._convert_min_child_weight_to_pct(X, v) if k == 'regressor__min_child_weight' else v)
+                k: (self._convert_min_child_weight_to_pct(X, v) if k == 'estimator__min_child_weight' else v)
                 for k, v in self.random_search.best_params_.items()
             },
             'best_score': -self.random_search.best_score_,
