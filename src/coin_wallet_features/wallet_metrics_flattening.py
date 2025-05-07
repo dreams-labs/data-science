@@ -68,7 +68,7 @@ def flatten_cw_to_coin_segment_features(
     return coin_wallet_features_df
 
 
-
+@u.timing_decorator
 def flatten_cw_to_coin_features(
     wallet_metric_df: pd.DataFrame,
     metric_column: str,
@@ -158,6 +158,7 @@ def flatten_cw_to_coin_features(
 #         Helper Functions
 # ------------------------------
 
+@u.timing_decorator
 def calculate_aggregation_metrics(
     analysis_df: pd.DataFrame,
     segment_family: str,
@@ -202,7 +203,7 @@ def calculate_aggregation_metrics(
     return metrics
 
 
-
+@u.timing_decorator
 def calculate_score_weighted_metrics(
     analysis_df: pd.DataFrame,
     segment_family: str,

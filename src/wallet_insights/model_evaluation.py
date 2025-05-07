@@ -195,7 +195,7 @@ class RegressorEvaluator:
         Build header lines including title, target, ID, samples and feature counts.
         """
         # Include class threshold if it's a classification model
-        if self.modeling_config['modeling']['model_type'] == 'classification':
+        if self.modeling_config['model_type'] == 'classification':
             class_threshold_str = self.modeling_config.get('target_var_class_threshold', '')
         else:
             class_threshold_str = ''

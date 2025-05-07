@@ -144,7 +144,9 @@ coin_modeling:
 
             # Segment Family
             score_binary|cw_return_rate_000*,
+            score_binary|cw_return_rate_005*,
             score_binary|cw_return_rate_025*,
+            score_binary|cw_return_rate_040*,
             score_binary|cw_net_flows_1000*,
             score_binary|net_gain_1000*,
 
@@ -174,7 +176,7 @@ coin_modeling:
             '*|*/cw_return_rate_005_score/*',
             '*|*/cw_return_rate_000_score/*',
             '*|*/cw_net_flows_1000_score/*',
-            # '*|*/return_rate_regression_score/*',
+            '*|*/return_rate_regression_score/*',
             # '*|aggregations/aggregations/sum',
             # '*|aggregations/aggregations/sum_pct',
             # '*|aggregations/aggregations/count_pct',
