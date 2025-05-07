@@ -56,16 +56,17 @@ class WalletsCoinConfig:
                 "No config file path specified. Call load_from_yaml first."
             )
         raw_config = yaml.safe_load(self._yaml_path.read_text(encoding='utf-8'))
-        # Append _dev suffix to folder if applicable
-        if raw_config['training_data']['dataset'] == 'dev':
 
+        # Append _dev suffix to parquet folder if applicable
+        if raw_config['training_data']['dataset'] == 'dev':
             parquet_folder = f"{raw_config['training_data']['parquet_folder']}_dev"
             Path(parquet_folder).mkdir(parents=True, exist_ok=True)
             raw_config['training_data']['parquet_folder'] = parquet_folder
 
-            coins_wallet_scores_folder = f"{parquet_folder}/scores"
-            Path(coins_wallet_scores_folder).mkdir(parents=True, exist_ok=True)
-            raw_config['training_data']['coins_wallet_scores_folder'] = coins_wallet_scores_folder
+        # Create coins_wallet_scores_folder
+        coins_wallet_scores_folder = f"{raw_config['training_data']['parquet_folder']}/scores"
+        Path(coins_wallet_scores_folder).mkdir(parents=True, exist_ok=True)
+        raw_config['training_data']['coins_wallet_scores_folder'] = coins_wallet_scores_folder
 
         self.config = raw_config
 
