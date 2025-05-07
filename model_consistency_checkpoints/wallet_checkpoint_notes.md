@@ -1,3 +1,41 @@
+# DDA 718 coin model grid search
+checkpoint 1: seems alive
+Model Performance Summary
+Target: coin_return_winsorized 0.3
+ID: 93eac06a-bf0f-409b-8853-6523b66342da
+===================================
+Test Samples:             1,116
+Number of Features:       18
+Features per Window:      0
+
+Classification Metrics
+-----------------------------------
+ROC AUC:                    0.574
+Log Loss:                   0.346
+Accuracy:                   0.890
+Precision:                  0.000
+Recall:                     0.000
+F1 Score:                   0.000
+
+Validation Metrics
+-----------------------------------
+Val ROC AUC:                0.523
+Val Accuracy:               0.689
+Val Precision:              0.652
+Val Recall:                 0.009
+Val F1 Score:               0.017
+
+Validation Return Metrics
+-----------------------------------
+Positive Threshold:         0.20
+Positive Predictions:       23/5577 (0.41%)
+Positive Mean Outcome:      0.788
+Positive W-Mean Outcome:    0.788
+Top 1% W-Mean Outcome:      0.551
+Top 5% W-Mean Outcome:      0.410
+Overall W-Mean Outcome:     0.260
+
+
 # DDA 528 investing period validation
 checkpoint 1: is that life?
 Model Performance Summary

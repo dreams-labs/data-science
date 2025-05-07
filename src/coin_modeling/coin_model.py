@@ -66,7 +66,6 @@ class CoinModel(BaseModel):
         - result (dict): Contains fitted pipeline, predictions, and optional train/test data
         """
         logger.info("Preparing training data for coin model construction...")
-        u.notify('intro_2')
 
         # Store validation data if provided
         if validation_df is not None and validation_coin_df is not None:
@@ -238,3 +237,14 @@ class CoinModel(BaseModel):
         y = target_vars_df.copy()
 
         return X, y
+
+    def _prepare_grid_search_params(self, X: pd.DataFrame, base_params_override=None) -> dict:
+        """
+        Override to prepend 'model_pipeline__' to all keys in param_grid for CoinModel.
+        """
+        gs_config = super()._prepare_grid_search_params(X, base_params_override)
+        gs_config['param_grid'] = {
+            f"model_pipeline__{k}" if not k.startswith("model_pipeline__") else k: v
+            for k, v in gs_config['param_grid'].items()
+        }
+        return gs_config

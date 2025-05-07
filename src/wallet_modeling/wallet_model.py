@@ -3,11 +3,9 @@ from typing import Dict, Union, Tuple
 import pandas as pd
 import numpy as np
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import RandomizedSearchCV
 
 # Local modules
 from base_modeling.base_model import BaseModel
-import base_modeling.scorers as sco
 import utils as u
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
@@ -320,79 +318,6 @@ class WalletModel(BaseModel):
                              "Add more scenarios to run grid search.")
 
         return gs_config
-
-
-    def _run_grid_search(self, X: pd.DataFrame, y: pd.Series, pipeline) -> Dict[str, float]:
-        """
-        Run grid search while always providing an eval set for early stopping.
-        """
-        if not self.modeling_config.get('grid_search_params', {}).get('enabled'):
-            logger.info("Constructing production model with base params...")
-            return {}
-
-        logger.info("Initiating grid search with eval set...")
-        u.notify('gadget')
-
-        # Set up grid search options as ['param_grid']
-        gs_config = self._prepare_grid_search_params(X)
-
-        # Assign custom scorers if applicable
-        scoring_param = gs_config['search_config'].get('scoring')
-
-        if scoring_param == 'custom_r2_scorer':
-            gs_config['search_config']['scoring'] = sco.custom_r2_scorer
-
-        elif scoring_param == 'custom_neg_rmse_scorer':
-            gs_config['search_config']['scoring'] = sco.custom_neg_rmse_scorer
-
-        elif scoring_param == 'validation_r2_scorer':
-            # Ensure validation data is available
-            if self.X_validation is None or self.validation_wallet_features_df is None:
-                raise ValueError("Validation data required for validation_r2_scorer")
-            gs_config['search_config']['scoring'] = sco.validation_r2_scorer(self)
-
-        elif scoring_param == 'validation_auc_scorer':
-            # Ensure validation data is available
-            if self.X_validation is None or self.validation_wallet_features_df is None:
-                raise ValueError("Validation data required for validation_auc_scorer")
-            gs_config['search_config']['scoring'] = sco.validation_auc_scorer(self)
-
-        elif scoring_param == 'validation_top_return_scorer':
-            # read your desired top_pct from config, e.g. self.modeling_config['grid_search_params']['top_pct']
-            top_pct = self.modeling_config['grid_search_params'].get('top_pct', 0.05)
-            gs_config['search_config']['scoring'] = sco.validation_top_return_scorer(self, top_pct)
-
-        else:
-            raise ValueError(f"Invalid scoring metric '{scoring_param}' found in grid_search_params.")
-
-        # Generate pipeline
-        cv_pipeline = pipeline if pipeline is not None else self._get_model_pipeline(gs_config['base_model_params'])
-
-        # Random search with pipeline
-        self.random_search = RandomizedSearchCV(
-            cv_pipeline,
-            gs_config['param_grid'],
-            **gs_config['search_config']
-        )
-
-        # Always pass the eval_set for early stopping
-        self.random_search.fit(
-            X, y,
-            eval_set=(self.X_eval, self.y_eval),
-            verbose_estimators=self.modeling_config['grid_search_params'].get('verbose_estimators',False)
-        )
-
-        logger.info("Grid search complete. Best score: %f", -self.random_search.best_score_)
-        u.notify('synth_magic')
-
-        return {
-            'best_params': {
-                k: (self._convert_min_child_weight_to_pct(X, v) if k == 'estimator__min_child_weight' else v)
-                for k, v in self.random_search.best_params_.items()
-            },
-            'best_score': -self.random_search.best_score_,
-            'cv_results': self.random_search.cv_results_
-        }
 
 
     def _predict_training_cohort(self) -> pd.Series:
