@@ -71,7 +71,6 @@ def flatten_cw_to_coin_segment_features(
     return coin_wallet_features_df
 
 
-@u.timing_decorator
 def flatten_cw_to_coin_features(
     wallet_metric_df: pd.DataFrame,
     metric_column: str,
