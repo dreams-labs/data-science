@@ -20,7 +20,7 @@ data_cleaning:
 wallet_scores:
 
     #KeyParam Scores to include as segments + metrics
-    wallet_scores_path: temp/wallet_modeling_score_dfs
+    coins_wallet_scores_folder: temp/coin_modeling_dfs/wallet_scores_dda744
     # wallet_scores: [
     #     dda528_net_gain_1k,
     #     dda528_net_gain_max_inv_025,
@@ -32,28 +32,28 @@ wallet_scores:
             target_var_class_threshold: 0.00
             y_pred_threshold: 0.4
 
-        cw_return_rate_005:
-            target_variable: cw_crypto_net_gain/max_investment/base
-            target_var_class_threshold: 0.05
-            y_pred_threshold: 0.6
+        # cw_return_rate_005:
+        #     target_variable: cw_crypto_net_gain/max_investment/base
+        #     target_var_class_threshold: 0.05
+        #     y_pred_threshold: 0.6
 
         cw_return_rate_025:
             target_variable: cw_crypto_net_gain/max_investment/base
             target_var_class_threshold: .25
             y_pred_threshold: 0.6
 
-        cw_return_rate_040:
-            target_variable: cw_crypto_net_gain/max_investment/base
-            target_var_class_threshold: .40
-            y_pred_threshold: 0.6
+        # cw_return_rate_040:
+        #     target_variable: cw_crypto_net_gain/max_investment/base
+        #     target_var_class_threshold: .40
+        #     y_pred_threshold: 0.6
 
         cw_return_rate_regression:
             model_type: regression
             target_variable: cw_crypto_net_gain/max_investment/winsorized
 
-        return_rate_regression:
-            model_type: regression
-            target_variable: crypto_net_gain/max_investment/winsorized
+        # return_rate_regression:
+        #     model_type: regression
+        #     target_variable: crypto_net_gain/max_investment/winsorized
 
         # USD Metrics
         net_gain_1000:
@@ -71,10 +71,11 @@ wallet_scores:
 wallet_segments:
 
 
+    wallet_scores_binary_segments: True
     wallet_scores_residuals_segments: False
     wallet_scores_confidence_segments: False
 
-    # score_segment_quantiles: [0.05]  # higher is better; how to assign wallet a score segment
+    # score_segment_quantiles: [0.95]  # higher is better; how to assign wallet a score segment
     # score_segment_quantiles: [0.15, 0.85]  # higher is better; how to assign wallet a score segment
     # training_period_cluster_groups: [4]  # which n clusters assignment from the training period to segment by
 
@@ -109,8 +110,8 @@ coin_modeling:
     target_variable: coin_return
     # target_variable: coin_return_pctile_full
     # target_variable: coin_return_pctile
-    target_var_class_threshold: 0.1  # a classification model will try to predict the target var above this value
-    y_pred_threshold: 0.2  # scores above this probability threshold are positive predictions
+    target_var_class_threshold: 0.4  # a classification model will try to predict the target var above this value
+    y_pred_threshold: 0.4  # scores above this probability threshold are positive predictions
 
     returns_winsorization: 0.03
 
@@ -163,8 +164,14 @@ coin_modeling:
 
             # Transformations
             # ---------------
-            # '*|*/dda528_net_gain_max_inv_025_score/*',
-            # '*|*/dda528_net_gain_1k_score/*',
+            '*|*/net_gain_1000_score/*',
+            '*|*/cw_return_rate_regression_score/*',
+            '*|*/cw_return_rate_040_score/*',
+            '*|*/cw_return_rate_025_score/*',
+            '*|*/cw_return_rate_005_score/*',
+            '*|*/cw_return_rate_000_score/*',
+            '*|*/cw_net_flows_1000_score/*',
+            '*|*/return_rate_regression_score/*',
             # '*|aggregations/aggregations/sum',
             # '*|aggregations/aggregations/sum_pct',
             # '*|aggregations/aggregations/count_pct',

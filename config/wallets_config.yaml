@@ -5,7 +5,7 @@
 training_data:
 
     #KeyParam Period Dates
-    modeling_period_start: '2024-12-28'
+    modeling_period_start: '2024-10-29'
     modeling_period_duration: 30
     training_window_lookbacks: [  # How many days prior to the modeling period each window begins
         600,
