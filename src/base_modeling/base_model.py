@@ -74,6 +74,8 @@ class BaseModel:
             grid_patterns = param_grid['drop_columns__drop_patterns']
             if grid_patterns and all(isinstance(p, str) for p in grid_patterns):
                 grid_patterns = [[p] for p in grid_patterns]
+            elif grid_patterns == []:
+                pass
             else:
                 raise ValueError(
                     f"drop_columns__drop_patterns must be a list of strings, got {type(grid_patterns)}"

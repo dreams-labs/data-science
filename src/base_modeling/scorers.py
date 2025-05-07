@@ -125,6 +125,7 @@ def validation_top_percentile_returns_scorer(wallet_model, top_pct: float):
         # Get actual returns
         target_var = wallet_model.modeling_config['target_variable']
         returns = wallet_model.validation_wallet_features_df[target_var].reindex(wallet_model.X_validation.index)
+        returns = u.winsorize(returns,0.001)
 
         # Predict class probabilities for positive class
         X_val_trans = estimator.x_transformer_.transform(wallet_model.X_validation)
@@ -132,8 +133,9 @@ def validation_top_percentile_returns_scorer(wallet_model, top_pct: float):
         pos_idx = list(estimator.estimator.classes_).index(1)
         probs = probas[:, pos_idx]
 
-        # Combine into DataFrame and drop NaNs
-        df = pd.DataFrame({'proba': probs, 'ret': returns}).dropna()
+        # Align probabilities and returns on the same index before combining
+        proba_series = pd.Series(probs, index=wallet_model.X_validation.index, name='proba')
+        df = pd.concat([proba_series, returns.rename('ret')], axis=1).dropna()
 
         # Compute cutoff for top_pct
         cutoff = np.percentile(df['proba'], 100 * (1 - top_pct))

@@ -110,10 +110,10 @@ coin_modeling: #CoinModel
     # target_variable: coin_return
     # target_variable: coin_return_pctile_full
     # target_variable: coin_return_pctile
-    target_var_class_threshold: 0.5  # a classification model will try to predict the target var above this value
+    target_var_class_threshold: 0.3  # a classification model will try to predict the target var above this value
     y_pred_threshold: 0.2  # scores above this probability threshold are positive predictions
 
-    returns_winsorization: 0.00
+    returns_winsorization: 0.005
 
 
     #KeyParam Modeling Cohort Definition
@@ -135,7 +135,6 @@ coin_modeling: #CoinModel
     # Params used to remove unnecessary features
     feature_selection:
 
-        # Column patterns to remove
         drop_patterns: [
             # Segment Category
             # all_wallets*,
@@ -143,70 +142,66 @@ coin_modeling: #CoinModel
             # score_binary|*
 
             # Segment Family
-            score_binary|cw_return_rate_000*,
+            # score_binary|cw_return_rate_000*,
             # score_binary|cw_return_rate_005*,
             score_binary|cw_return_rate_025*,
             score_binary|cw_return_rate_040*,
-            score_binary|cw_net_flows_1000*,
-            score_binary|net_gain_1000*,
 
-            # Metrics
-            # -------
-            # '*|trading/crypto_cash_buys|*',
-            # '*|trading/crypto_cash_sells|*',
-            # '*|trading/crypto_inflows|*',
-            # '*|trading/crypto_net_cash_flows|*',
-            # '*|trading/crypto_net_flows|*',
-            # '*|trading/crypto_net_gain|*',
-            # '*|trading/crypto_outflows|*',
-            # '*|trading/max_investment|*',
+            # score_binary|cw_net_flows_1000*,
+            # score_binary|net_gain_1000*,
+
+            # Metric Detail
+            '*|trading/crypto_cash_buys|*',
+            '*|trading/crypto_cash_sells|*',
+            '*|trading/crypto_inflows|*',
+            '*|trading/crypto_net_cash_flows|*',
+            '*|trading/crypto_net_flows|*',
+            '*|trading/crypto_net_gain|*',
+            '*|trading/crypto_outflows|*',
+            '*|trading/max_investment|*',
             # '*|trading/total_volume|*',
-            # '*|trading/unique_coins_traded|*',
+            '*|trading/unique_coins_traded|*',
             # '*|trading/average_transaction|*',
-            # '*|balances/usd_balance_starting*|*',
+            '*|balances/usd_balance_starting*|*',
             # '*|balances/usd_balance_ending*|*',
 
 
             # Transformation Base
-            # -------------------
-            '*|*/net_gain_1000_score/*',
-            '*|*/cw_return_rate_regression_score/*',
-            '*|*/cw_return_rate_040_score/*',
-            '*|*/cw_return_rate_025_score/*',
-            '*|*/cw_return_rate_005_score/*',
-            '*|*/cw_return_rate_000_score/*',
-            '*|*/cw_net_flows_1000_score/*',
-            '*|*/return_rate_regression_score/*',
-            # '*|aggregations/aggregations/sum',
-            # '*|aggregations/aggregations/sum_pct',
-            # '*|aggregations/aggregations/count_pct',
-            # '*|aggregations/aggregations/count',
+            '*|*/cw_return_rate_regression_score*',
+            '*|*/return_rate_regression_score*',
+            '*|*/cw_return_rate_040_score*',
+            '*|*/cw_return_rate_025_score*',
+            '*|*/cw_return_rate_005_score*',
+            '*|*/cw_return_rate_000_score*',
 
             # '*|score_dist/*',
             # '*|score_dist/*_median',
             # '*|score_dist/*_p05',
-            '*|score_dist/*_p10',
-            '*|score_dist/*_p90',
+            # '*|score_dist/*_p10',
+            # '*|score_dist/*_p90',
             # '*|score_dist/*_p95',
             # '*|score_dist/*_std',
 
             '*|score_wtd/*',
 
+            # Transformation Method
             # '*/sum',
             # '*/sum_pct',
             '*/count',
             '*/count_pct',
 
-            '*|*/*_p002',
-            '*|*/*_p01',
-            # '*|*/*_p05',
-            # '*|*/*_p10',
-            # '*|*/*_median',
-            # '*|*/*_p90',
-            # '*|*/*_p95',
-            '*|*/*_p99',
-            '*|*/*_p998',
-            # '*|*/*_std',
+            '*|*/*/kurt',
+            '*|*/*/median',
+            '*|*/*/p002',
+            '*|*/*/p01',
+            '*|*/*/p05',
+            '*|*/*/p10',
+            '*|*/*/p90',
+            '*|*/*/p95',
+            '*|*/*/p99',
+            # '*|*/*/p998',
+            '*|*/*/skew',
+            '*|*/*/std',
 
 
         ]
@@ -220,7 +215,7 @@ coin_modeling: #CoinModel
     # CoinModel Params
     model_params:
         n_estimators: 400
-        max_depth: 3
+        max_depth: 4
         min_child_weight: 10
         learning_rate: 0.02
         colsample_bytree: 1.0
@@ -237,17 +232,20 @@ coin_modeling: #CoinModel
     # CoinModel Grid Search
     grid_search_params:
 
+        #KeyParam Grid Search
         # -------------------------------
-        enabled: True  # DDA718
+        # enabled: True
         # -------------------------------
 
         # Search Methodology
         drop_patterns_include_n_features: 1
 
         n_iter: 400  # random search limit
-        n_splits: 4  # cv splits
+        n_splits: 5  # cv splits
         regressor_scoring: neg_root_mean_squared_error
-        classifier_scoring: validation_auc_scorer
+        # classifier_scoring: validation_auc_scorer
+        classifier_scoring: validation_top_percentile_returns_scorer
+        percentile_threshold: 0.005
 
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # scikit-learn verbosity
@@ -257,7 +255,7 @@ coin_modeling: #CoinModel
         param_grid:
 
             # # Depth and Child Weight
-            estimator__max_depth: [3,4,5,6]
+            # estimator__max_depth: [3,4,5,6]
             # estimator__min_child_weight: [10,15,20,25]
 
             # Col/Row Sampling
@@ -279,82 +277,73 @@ coin_modeling: #CoinModel
             # estimator__max_bin: [128]
             # estimator__tree_method: [hist]
 
-            # drop_columns__drop_patterns: [
-                # [],
-                # [time_series|market_data|market_cap_last],
-                # [time_series|market_data|mfi_first],
-                # [time_series|market_data|mfi_last],
-                # [time_series|market_data|obv_last],
-                # [time_series|market_data|price_rsi_14_first],
-                # [time_series|market_data|price_rsi_14_last],
-                # [time_series|market_data|price_sma_5_pct_change_15d_period_1],
-                # [time_series|market_data|price_sma_5_pct_change_15d_period_2],
-                # [time_series|market_data|price_sma_5_pct_change_15d_period_3],
-                # [time_series|market_data|price_sma_5_pct_change_15d_period_4],
-                # [time_series|market_data|volume_pct_change_15d_period_1],
-                # [time_series|market_data|volume_pct_change_15d_period_2],
-                # [time_series|market_data|volume_pct_change_15d_period_3],
-                # [time_series|market_data|volume_pct_change_15d_period_4],
-                # [time_series|market_data|volume_sum_15d_period_1],
-                # [time_series|market_data|volume_sum_15d_period_2],
-                # [time_series|market_data|volume_sum_15d_period_3],
-                # [time_series|market_data|volume_sum_15d_period_4],
-                # [wallet_cohorts|normies|buyers_new_sum_15d_period_1],
-                # [wallet_cohorts|normies|buyers_new_sum_15d_period_2],
-                # # [wallet_cohorts|normies|total_balance_last_15d_period_1],
-                # [wallet_cohorts|normies|total_balance_last_15d_period_2],
-                # [wallet_cohorts|normies|total_bought_sum_15d_period_1],
-                # [wallet_cohorts|normies|total_bought_sum_15d_period_2],
-                # [wallet_cohorts|normies|total_holders_last_15d_period_1],
-                # [wallet_cohorts|normies|total_holders_last_15d_period_2],
-                # [wallet_cohorts|normies|total_sold_sum_15d_period_1],
-                # [wallet_cohorts|normies|total_sold_sum_15d_period_2],
-                # [wallet_cohorts|whales|buyers_new_sum],
-                # [wallet_cohorts|whales|buyers_repeat_sum_15d_period_1],
-                # [wallet_cohorts|whales|buyers_repeat_sum_15d_period_2],
-                # [wallet_cohorts|whales|total_balance_last_15d_period_1],
-                # [wallet_cohorts|whales|total_balance_last_15d_period_2],
-                # [wallet_cohorts|whales|total_bought_sum_15d_period_1],
-                # [wallet_cohorts|whales|total_bought_sum_15d_period_2],
+            drop_columns__drop_patterns: [
+                # Segment Category
+                # all_wallets*,
+                # score_quantile|*,
+                # score_binary|*
+
+                # Segment Family
+                # score_binary|cw_return_rate_000*,
+                # # score_binary|cw_return_rate_005*,
+                # score_binary|cw_return_rate_025*,
+                # # score_binary|cw_return_rate_040*,
+
+                # Metrics
+                # -------
+                # '*|trading/average_transaction|*',
+                # '*|trading/crypto_cash_buys|*',
+                # '*|trading/crypto_cash_sells|*',
+                # '*|trading/crypto_inflows|*',
+                # '*|trading/crypto_net_cash_flows|*',
+                # '*|trading/crypto_net_flows|*',
+                # '*|trading/crypto_net_gain|*',
+                # '*|trading/crypto_outflows|*',
+                # '*|trading/max_investment|*',
+                # # '*|trading/total_volume|*',
+                # '*|trading/unique_coins_traded|*',
+                # # '*|trading/average_transaction|*',
+                # '*|balances/usd_balance_starting*|*',
+                # # '*|balances/usd_balance_ending*|*',
 
 
-                # [score_quantile|net_gain_max_investment_winsorized_base_score/0_5pct|*],
-                # [score_quantile|net_gain_max_investment_winsorized_base_score/5_15pct|*],
-                # [score_quantile|net_gain_max_investment_winsorized_base_score/15_50pct|*],
-                # [score_quantile|net_gain_max_investment_winsorized_base_score/50_85pct|*],
-                # [score_quantile|net_gain_max_investment_winsorized_base_score/85_95pct|*],
-                # [score_quantile|net_gain_max_investment_winsorized_base_score/95_100pct|*],
+                # # Transformation Base
+                # '*|*/cw_return_rate_regression_score*',
+                # '*|*/return_rate_regression_score*',
+                # # '*|*/cw_return_rate_040_score*',
+                # '*|*/cw_return_rate_025_score*',
+                # '*|*/cw_return_rate_005_score*',
+                # '*|*/cw_return_rate_000_score*',
 
-            #     # [],
-            #     ['*|trading/crypto_cash_buys|*'],
-            #     ['*|trading/crypto_cash_sells|*'],
-            #     # ['*|trading/crypto_inflows|*'],
-            #     ['*|trading/crypto_net_cash_flows|*'],
-            #     ['*|trading/crypto_net_flows|*'],
-                # ['*|trading/crypto_net_gain|*'],
-            #     ['*|trading/crypto_outflows|*'],
-            #     ['*|trading/max_investment|*'],
-            #     ['*|trading/total_volume|*'],
-            #     # ['*|trading/unique_coins_traded|*'],
-            #     ['*|balance/usd_balance_241031|*'],
+                # # '*|score_dist/*',
+                # # '*|score_dist/*_median',
+                # # '*|score_dist/*_p05',
+                # '*|score_dist/*_p10',
+                # '*|score_dist/*_p90',
+                # # '*|score_dist/*_p95',
+                # # '*|score_dist/*_std',
 
-                # # ['*|score_dist/*'],
-                # ['*|score_dist/net_gain_winsorized_dda619_grid_score_median'],
-                # # ['*|score_dist/net_gain_winsorized_dda619_grid_score_p10'],
-                # ['*|score_dist/net_gain_winsorized_dda619_grid_score_p90'],
-                # ['*|score_dist/net_gain_winsorized_dda619_grid_score_std'],
-                # ['*|score_dist/net_gain_winsorized_dda619_grid_residual_median'],
-                # ['*|score_dist/net_gain_winsorized_dda619_grid_residual_p10'],
-                # ['*|score_dist/net_gain_winsorized_dda619_grid_residual_p90'],
-                # ['*|score_dist/net_gain_winsorized_dda619_grid_residual_std'],
+                # '*|score_wtd/*',
 
-                # ['training_clusters|k2_cluster/cluster_0|*'],
-                # ['training_clusters|k2_cluster/cluster_1|*'],
-                # ['training_clusters|k4_cluster/cluster_0|*'],
-                # ['training_clusters|k4_cluster/cluster_1|*'],
-                # ['training_clusters|k4_cluster/cluster_2|*'],
-                # ['training_clusters|k4_cluster/cluster_3|*'],
-            # ]
+                # '*/sum',
+                # '*/sum_pct',
+                # '*/count',
+                # '*/count_pct',
+
+                '*|score_dist/*/kurt',
+                '*|score_dist/*/median',
+                '*|score_dist/*/p002',
+                '*|score_dist/*/p01',
+                '*|score_dist/*/p05',
+                '*|score_dist/*/p10',
+                # '*|score_dist/*/p90',
+                '*|score_dist/*/p95',
+                # '*|score_dist/*/p99',
+                # '*|score_dist/*/p998',
+                '*|score_dist/*/skew',
+                '*|score_dist/*/std',
+
+            ]
 
 
 
