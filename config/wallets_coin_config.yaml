@@ -20,7 +20,7 @@ data_cleaning:
 wallet_scores:
 
     #KeyParam Scores to include as segments + metrics
-    wallet_scores_path: temp/wallet_modeling_score_dfs
+    coins_wallet_scores_folder: temp/coin_modeling_dfs/wallet_scores_dda744
     # wallet_scores: [
     #     dda528_net_gain_1k,
     #     dda528_net_gain_max_inv_025,
@@ -55,26 +55,27 @@ wallet_scores:
             model_type: regression
             target_variable: crypto_net_gain/max_investment/winsorized
 
-        # USD Metrics
-        net_gain_1000:
-            target_variable: crypto_net_gain
-            target_var_class_threshold: 1000
-            y_pred_threshold: 0.7
+        # # USD Metrics
+        # net_gain_1000:
+        #     target_variable: crypto_net_gain
+        #     target_var_class_threshold: 1000
+        #     y_pred_threshold: 0.7
 
-        cw_net_flows_1000:
-            target_variable: cw_crypto_net_flows
-            target_var_class_threshold: 1000
-            y_pred_threshold: 0.7
+        # cw_net_flows_1000:
+        #     target_variable: cw_crypto_net_flows
+        #     target_var_class_threshold: 1000
+        #     y_pred_threshold: 0.7
 
 
 # CoinModel Segments
 wallet_segments:
 
 
+    wallet_scores_binary_segments: True
     wallet_scores_residuals_segments: False
     wallet_scores_confidence_segments: False
 
-    # score_segment_quantiles: [0.05]  # higher is better; how to assign wallet a score segment
+    # score_segment_quantiles: [0.95]  # higher is better; how to assign wallet a score segment
     # score_segment_quantiles: [0.15, 0.85]  # higher is better; how to assign wallet a score segment
     # training_period_cluster_groups: [4]  # which n clusters assignment from the training period to segment by
 
@@ -105,20 +106,20 @@ coin_modeling:
     model_type: classification  # "regression" or "classification"
 
     #KeyParam Target Variable
-    # target_variable: coin_return_winsorized
-    target_variable: coin_return
+    target_variable: coin_return_winsorized
+    # target_variable: coin_return
     # target_variable: coin_return_pctile_full
     # target_variable: coin_return_pctile
-    target_var_class_threshold: 0.1  # a classification model will try to predict the target var above this value
+    target_var_class_threshold: 0.5  # a classification model will try to predict the target var above this value
     y_pred_threshold: 0.2  # scores above this probability threshold are positive predictions
 
-    returns_winsorization: 0.03
+    returns_winsorization: 0.00
 
 
     #KeyParam Modeling Cohort Definition
     # Thresholds for coin inclusion in training data
-    min_cohort_wallets: 10  # how many wallets must hold a coin for the coin to be elegible for forecasting
-    min_cohort_balance: 10  # how much USD all wallets must hold for the coin to be elegible for forecasting
+    min_cohort_wallets: 15  # how many wallets must hold a coin for the coin to be elegible for forecasting
+    min_cohort_balance: 10000  # how much USD all wallets must hold for the coin to be elegible for forecasting
 
     # Thresholds for coin inclusion in training data
     min_market_cap: 000_000  # coins below this market cap will not be included in performance assessments
@@ -136,13 +137,18 @@ coin_modeling:
 
         # Column patterns to remove
         drop_patterns: [
-            # Facts
-            # -----
+            # Segment Category
             # all_wallets*,
+            # score_quantile|*,
+            # score_binary|*
 
-            score_quantile|*,
-            # score_quantile|net_gain_max_investment_winsorized_base_score/50_85pct|*,
-
+            # Segment Family
+            score_binary|cw_return_rate_000*,
+            score_binary|cw_return_rate_005*,
+            score_binary|cw_return_rate_025*,
+            score_binary|cw_return_rate_040*,
+            score_binary|cw_net_flows_1000*,
+            score_binary|net_gain_1000*,
 
             # Metrics
             # -------
@@ -161,10 +167,16 @@ coin_modeling:
             # '*|balances/usd_balance_ending*|*',
 
 
-            # Transformations
-            # ---------------
-            # '*|*/dda528_net_gain_max_inv_025_score/*',
-            # '*|*/dda528_net_gain_1k_score/*',
+            # Transformation Base
+            # -------------------
+            '*|*/net_gain_1000_score/*',
+            '*|*/cw_return_rate_regression_score/*',
+            '*|*/cw_return_rate_040_score/*',
+            '*|*/cw_return_rate_025_score/*',
+            '*|*/cw_return_rate_005_score/*',
+            '*|*/cw_return_rate_000_score/*',
+            '*|*/cw_net_flows_1000_score/*',
+            '*|*/return_rate_regression_score/*',
             # '*|aggregations/aggregations/sum',
             # '*|aggregations/aggregations/sum_pct',
             # '*|aggregations/aggregations/count_pct',
@@ -173,12 +185,29 @@ coin_modeling:
             # '*|score_dist/*',
             # '*|score_dist/*_median',
             # '*|score_dist/*_p05',
-            # '*|score_dist/*_p10',
-            # '*|score_dist/*_p90',
+            '*|score_dist/*_p10',
+            '*|score_dist/*_p90',
             # '*|score_dist/*_p95',
             # '*|score_dist/*_std',
 
             '*|score_wtd/*',
+
+            # '*/sum',
+            # '*/sum_pct',
+            '*/count',
+            '*/count_pct',
+
+            '*|*/*_p002',
+            '*|*/*_p01',
+            # '*|*/*_p05',
+            # '*|*/*_p10',
+            # '*|*/*_median',
+            # '*|*/*_p90',
+            # '*|*/*_p95',
+            '*|*/*_p99',
+            '*|*/*_p998',
+            # '*|*/*_std',
+
 
         ]
 

@@ -194,9 +194,15 @@ class RegressorEvaluator:
         """
         Build header lines including title, target, ID, samples and feature counts.
         """
+        # Include class threshold if it's a classification model
+        if self.modeling_config['model_type'] == 'classification':
+            class_threshold_str = self.modeling_config.get('target_var_class_threshold', '')
+        else:
+            class_threshold_str = ''
+
         header = [
             "Model Performance Summary",
-            f"Target: {self.modeling_config['target_variable']} {self.modeling_config.get('target_var_class_threshold', '')}",
+            f"Target: {self.modeling_config['target_variable']} {class_threshold_str}",
             f"ID: {self.model_id}",
             "=" * 35,
         ]
@@ -846,7 +852,7 @@ class ClassifierEvaluator(RegressorEvaluator):
         # Extract probability predictions
         self.y_pred_proba = wallet_model_results['y_pred_proba']
         self.y_validation_pred_proba = wallet_model_results.get('y_validation_pred_proba')
-        self.y_validation_pred = wallet_model_results['y_validation_pred']
+        self.y_validation_pred = wallet_model_results.get('y_validation_pred')
         self.y_pred_threshold = wallet_model_results['modeling_config']['y_pred_threshold']
 
 
@@ -868,8 +874,13 @@ class ClassifierEvaluator(RegressorEvaluator):
         self.metrics['precision'] = precision_score(self.y_test, self.y_pred, zero_division=0)
         self.metrics['recall'] = recall_score(self.y_test, self.y_pred, zero_division=0)
         self.metrics['f1'] = f1_score(self.y_test, self.y_pred, zero_division=0)
-        self.metrics['roc_auc'] = roc_auc_score(self.y_test, self.y_pred_proba)
-        self.metrics['log_loss'] = log_loss(self.y_test, self.y_pred_proba)
+        try:
+            self.metrics['roc_auc'] = roc_auc_score(self.y_test, self.y_pred_proba)
+            self.metrics['log_loss'] = log_loss(self.y_test, self.y_pred_proba)
+        except ValueError:
+            logger.warning("Only one class found in classifier predictions.")
+            self.metrics['roc_auc'] = np.nan
+            self.metrics['log_loss'] = np.nan
 
         # Validation set metrics if available
         if getattr(self, 'y_validation', None) is not None and hasattr(self, 'y_validation_pred_proba'):
@@ -994,7 +1005,7 @@ class ClassifierEvaluator(RegressorEvaluator):
 
         self._plot_roc_curves(ax1)
         self._plot_pr_curves(ax2)
-        self._plot_return_vs_rank_classifier(ax3, n_buckets=30)
+        self._plot_return_vs_rank_classifier(ax3, n_buckets=10)
         self._plot_feature_importance(ax4, levels=levels)
 
 

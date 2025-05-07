@@ -71,6 +71,7 @@ class CoinFeaturesOrchestrator:
         - coin_training_data_df_full (DataFrame): full coin-level feature set
         """
         logger.info("Beginning coin feature generation...")
+        u.notify('intro_4')
 
         # Generate metrics for coin-wallet pairs
         cw_metrics_df = cwwm.compute_coin_wallet_metrics(
@@ -84,7 +85,7 @@ class CoinFeaturesOrchestrator:
         wallet_segmentation_df = cws.build_wallet_segmentation(
             self.wallets_coin_config,
             self.wallets_config,
-            score_suffix=f'|{prd}'
+            score_suffix=prd
         )
 
         # Flatten cw_metrics into single values for each coin-segment pair
@@ -109,6 +110,7 @@ class CoinFeaturesOrchestrator:
         else:
             coin_training_data_df_full = coin_wallet_features_df
 
+        u.notify('level_up')
         logger.info("Successfully generated coin_training_data_df with shape "
                     f"({coin_training_data_df_full.shape}).")
 
@@ -258,18 +260,22 @@ class CoinFeaturesOrchestrator:
 #         Utility Functions
 # ----------------------------------
 
-def parse_feature_names(coin_training_data_df: pd.DataFrame) -> pd.DataFrame:
+def parse_feature_names(
+        coin_training_data_df: pd.DataFrame,
+        retain_col: str = None
+    ) -> pd.DataFrame:
     """Parse feature names from training dataframe into structured components.
 
     Params:
     - coin_training_data_df (DataFrame): DataFrame containing features to parse
+    - retain_col (str): The column in coin_training_data_df with this name is
+        appended to the output. e.g. used to retain Importances
 
     Returns:
     - feature_details_df (DataFrame): DataFrame with parsed feature components
     """
     # Create dataframe of column names
-    df = pd.DataFrame(coin_training_data_df.columns)
-    df.columns = ['feature']
+    df = pd.DataFrame(coin_training_data_df)
 
     # Split on pipe delimiters
     split_df = df['feature'].str.split('|', expand=True)
@@ -292,8 +298,11 @@ def parse_feature_names(coin_training_data_df: pd.DataFrame) -> pd.DataFrame:
         metrics,
         transformations,
     ], axis=1)
-
     feature_details_df['feature_full'] = df['feature']
+
+    # Add retain cols if configured
+    if retain_col is not None:
+        feature_details_df[retain_col] = coin_training_data_df[retain_col]
 
     return feature_details_df
 
@@ -306,17 +315,20 @@ def load_wallet_data_for_coin_features(wallets_config) -> None:
     logger.info("Loading profits and market data for post-wallet model analysis...")
 
     pf = wallets_config['training_data']['parquet_folder']
+
     # load profits DataFrames
     wamo_date = datetime.strptime(
         wallets_config['training_data']['modeling_period_start'],
         '%Y-%m-%d'
     ).strftime('%y%m%d')
     wamo_profits_df = pd.read_parquet(f"{pf}/{wamo_date}/modeling_profits_df.parquet")
+
     como_date = datetime.strptime(
         wallets_config['training_data']['coin_modeling_period_start'],
         '%Y-%m-%d'
     ).strftime('%y%m%d')
     como_profits_df = pd.read_parquet(f"{pf}/{como_date}/modeling_profits_df.parquet")
+
     # hybridize wallet IDs if configured
     if wallets_config['training_data']['hybridize_wallet_ids']:
         hybrid_map = pd.read_parquet(f"{pf}/complete_hybrid_cw_id_df.parquet")
@@ -326,6 +338,7 @@ def load_wallet_data_for_coin_features(wallets_config) -> None:
         como_profits_df = wtdo.hybridize_wallet_address(
             como_profits_df, hybrid_map
         )
+
     # filter market data
     complete_md = pd.read_parquet(f"{pf}/complete_market_data_df.parquet")
     como_market_data_df = complete_md.loc[
