@@ -2,8 +2,8 @@
 
 training_data: #CoinModel
 
-    dataset: dev  # Set to prod or dev; determines whether to query core or dev dataset tables
-    parquet_folder: temp/coin_modeling_dfs/dda749_clusters_v2
+    dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
+    parquet_folder: temp/coin_modeling_dfs/dda718_modeling
 
 # CoinModel Cleaning
 # Variables used to clean and filter raw data before training data is built
@@ -144,6 +144,7 @@ coin_modeling: #CoinModel
             # all_wallets*,
             # score_quantile|*,
             # score_binary|*
+            # training_clusters|*,
 
             # Segment Family
             # score_binary|cw_return_rate_000*,
@@ -152,9 +153,16 @@ coin_modeling: #CoinModel
             score_binary|cw_return_rate_040*,
             score_binary|net_gain_1000*,
             score_binary|cw_net_flows_1000*,
-
             # score_binary|cw_net_flows_1000*,
             # score_binary|net_gain_1000*,
+
+            # # Segment Value
+            # 'training_clusters|k5_cluster/cluster_0|*',
+            'training_clusters|k5_cluster/cluster_1|*',
+            'training_clusters|k5_cluster/cluster_2|*',
+            'training_clusters|k5_cluster/cluster_3|*',
+            'training_clusters|k5_cluster/cluster_4|*',
+
 
             # Metric Detail
             '*|trading/crypto_cash_buys|*',
@@ -170,6 +178,14 @@ coin_modeling: #CoinModel
             # '*|trading/average_transaction|*',
             '*|balances/usd_balance_starting*|*',
             # '*|balances/usd_balance_ending*|*',
+
+
+            # Transformation Category
+            # '*|aggregations/*',
+            # '*|score_dist/*',
+            # '*|score_wtd/*',
+            'training_clusters|*|score_dist/*',
+            'training_clusters|*|score_wtd/*',
 
 
             # Transformation Base
@@ -290,12 +306,25 @@ coin_modeling: #CoinModel
                 # all_wallets*,
                 # score_quantile|*,
                 # score_binary|*
+                # training_clusters|*,
 
                 # Segment Family
-                # score_binary|cw_return_rate_000*,
+                # # score_binary|cw_return_rate_000*,
                 # # score_binary|cw_return_rate_005*,
                 # score_binary|cw_return_rate_025*,
-                # # score_binary|cw_return_rate_040*,
+                # score_binary|cw_return_rate_040*,
+                # score_binary|net_gain_1000*,
+                # score_binary|cw_net_flows_1000*,
+                # # score_binary|cw_net_flows_1000*,
+                # # score_binary|net_gain_1000*,
+
+                # Segment Value
+                'training_clusters|k5_cluster/cluster_0|*',
+                'training_clusters|k5_cluster/cluster_1|*',
+                'training_clusters|k5_cluster/cluster_2|*',
+                'training_clusters|k5_cluster/cluster_3|*',
+                'training_clusters|k5_cluster/cluster_4|*',
+
 
                 # Metrics
                 # -------
@@ -338,18 +367,18 @@ coin_modeling: #CoinModel
                 # '*/count',
                 # '*/count_pct',
 
-                '*|score_dist/*/kurt',
-                '*|score_dist/*/median',
-                '*|score_dist/*/p002',
-                '*|score_dist/*/p01',
-                '*|score_dist/*/p05',
-                '*|score_dist/*/p10',
-                # '*|score_dist/*/p90',
-                '*|score_dist/*/p95',
-                # '*|score_dist/*/p99',
-                # '*|score_dist/*/p998',
-                '*|score_dist/*/skew',
-                '*|score_dist/*/std',
+                # '*|score_dist/*/kurt',
+                # '*|score_dist/*/median',
+                # '*|score_dist/*/p002',
+                # '*|score_dist/*/p01',
+                # '*|score_dist/*/p05',
+                # '*|score_dist/*/p10',
+                # # '*|score_dist/*/p90',
+                # '*|score_dist/*/p95',
+                # # '*|score_dist/*/p99',
+                # # '*|score_dist/*/p998',
+                # '*|score_dist/*/skew',
+                # '*|score_dist/*/std',
 
             ]
 

@@ -56,6 +56,7 @@ class CoinFeaturesOrchestrator:
     def generate_coin_features_for_period(
         self,
         profits_df: pd.DataFrame,
+        training_data_df: pd.DataFrame,
         period: str,
         prd: str
     ) -> pd.DataFrame:
@@ -64,6 +65,8 @@ class CoinFeaturesOrchestrator:
 
         Params:
         - profits_df (DataFrame): profits data for the specified period
+        - training_data_df (DataFrame): wallet training features for the specified period
+            including cluster labels
         - period (str): period identifier (e.g., 'coin_modeling')
         - prd (str): abbreviated prefix for saved files (e.g., 'como')
 
@@ -84,7 +87,7 @@ class CoinFeaturesOrchestrator:
         # Assign wallets to segments
         wallet_segmentation_df = cws.build_wallet_segmentation(
             self.wallets_coin_config,
-            self.wallets_config,
+            training_data_df,
             score_suffix=prd
         )
 

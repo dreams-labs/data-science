@@ -232,8 +232,11 @@ class CoinModel(BaseModel):
         # ]
         # logger.info("Coins after market cap filters: %s", len(coin_training_data_df))
 
+        # Align target_vars_df index with filtered coin_training_data_df
+        target_vars_df = target_vars_df.reindex(coin_training_data_df.index)
+        u.assert_matching_indices(coin_training_data_df, target_vars_df)
 
-        X = training_data_df.copy()
+        X = coin_training_data_df.copy()
         y = target_vars_df.copy()
 
         return X, y
