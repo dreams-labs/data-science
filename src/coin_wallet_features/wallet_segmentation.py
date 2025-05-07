@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 #       Main Interface Function
 # -----------------------------------
 
-@u.timing_decorator
 def build_wallet_segmentation(
         wallets_coin_config: dict,
         wallets_config: dict,
