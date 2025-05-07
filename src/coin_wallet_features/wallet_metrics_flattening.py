@@ -46,13 +46,16 @@ def flatten_cw_to_coin_segment_features(
         ~wallet_segmentation_df.columns.str.startswith('scores|')
     ]
 
+    # Pre‑join segmentation data once to avoid repeating the join inside
+    joined_metrics_df = cw_metrics_df.join(wallet_segmentation_df, how='left')
+
     # loop through each metric × segment and join
     total_metrics = len(cw_metrics_df.columns)
     for i, metric_column in enumerate(cw_metrics_df.columns, start=1):
         for segment_family in segmentation_families:
             # generate coin-level features for this metric & segment
             segment_df = flatten_cw_to_coin_features(
-                cw_metrics_df,
+                joined_metrics_df,
                 metric_column,
                 wallet_segmentation_df,
                 segment_family,
@@ -92,13 +95,17 @@ def flatten_cw_to_coin_features(
     """
     # Get score columns
     score_columns = [col for col in wallet_segmentation_df.columns
-                    if col.startswith('scores|')]
+                     if col.startswith('scores|')]
 
-    # Join segmentation data using index
-    analysis_df = wallet_metric_df.join(
-        wallet_segmentation_df[[segment_family] + score_columns],
-        how='left'
-    )
+    # If segmentation columns are already present (pre‑joined), skip the join
+    if segment_family in wallet_metric_df.columns:
+        analysis_df = wallet_metric_df
+        logger.debug("Using pre‑joined dataframe; join skipped.")
+    else:
+        analysis_df = wallet_metric_df.join(
+            wallet_segmentation_df[[segment_family] + score_columns],
+            how='left'
+        )
 
     # Initialize results with MultiIndex aware groupby
     totals_df = analysis_df.groupby(level='coin_id', observed=True).agg({
@@ -158,7 +165,6 @@ def flatten_cw_to_coin_features(
 #         Helper Functions
 # ------------------------------
 
-@u.timing_decorator
 def calculate_aggregation_metrics(
     analysis_df: pd.DataFrame,
     segment_family: str,
@@ -203,7 +209,6 @@ def calculate_aggregation_metrics(
     return metrics
 
 
-@u.timing_decorator
 def calculate_score_weighted_metrics(
     analysis_df: pd.DataFrame,
     segment_family: str,
@@ -247,7 +252,6 @@ def calculate_score_weighted_metrics(
     return weighted_scores
 
 
-@u.timing_decorator
 def calculate_score_distribution_metrics(
     analysis_df: pd.DataFrame,
     segment_family: str,
