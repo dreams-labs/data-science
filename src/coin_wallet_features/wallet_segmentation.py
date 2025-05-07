@@ -53,6 +53,10 @@ def build_wallet_segmentation(
             wallet_segmentation_df
         )
 
+    # Binary scores are already categorical so no logic is needed
+    if wallets_coin_config['wallet_segments']['wallet_scores_binary_segments']:
+        wallet_segmentation_df = transform_binary_columns(wallet_segmentation_df)
+
     # Add training period cluster labels if configured
     cluster_groups = wallets_coin_config['wallet_segments'].get('training_period_cluster_groups')
     if cluster_groups:
@@ -95,26 +99,34 @@ def load_wallet_scores(wallets_coin_config: dict, score_suffix: str = None) -> p
         score|{score_name} (float): the predicted score
         residual|{score_name} (float): the residual of the score
     """
-    wallet_scores = wallets_coin_config['wallet_segments']['wallet_scores']
-    wallet_scores_path = wallets_coin_config['wallet_segments']['wallet_scores_path']
+    wallet_scores = list(wallets_coin_config['wallet_scores']['score_params'].keys())
+    wallet_scores_path = wallets_coin_config['wallet_scores']['coins_wallet_scores_folder']
     wallet_scores_df = pd.DataFrame()
 
     for score_name in wallet_scores:
-        score_df = pd.read_parquet(f"{wallet_scores_path}/{score_name}{score_suffix}.parquet")
+        score_df = pd.read_parquet(f"{wallet_scores_path}/{score_name}|{score_suffix}.parquet")
         feature_cols = []
 
         # Add scores column
         score_df[f'scores|{score_name}_score'] = score_df[f'score|{score_name}']
         feature_cols.append(f'scores|{score_name}_score')
 
-        # Add residuals column
+        # Add binary column if configured and provided
+        if (
+            wallets_coin_config['wallet_segments']['wallet_scores_binary_segments'] is True
+            and f'binary|{score_name}' in score_df.columns
+        ):
+            score_df[f'scores|{score_name}_binary'] = score_df[f'binary|{score_name}']
+            feature_cols.append(f'scores|{score_name}_binary')
+
+        # Add residuals column if configured
         if wallets_coin_config['wallet_segments']['wallet_scores_residuals_segments'] is True:
             score_df[f'scores|{score_name}_residual'] = (
                 score_df[f'score|{score_name}'] - score_df[f'actual|{score_name}']
             )
             feature_cols.append(f'scores|{score_name}_residual')
 
-        # Add confidence if provided
+        # Add confidence if configured
         if ((wallets_coin_config['wallet_segments']['wallet_scores_confidence_segments'] is True)
             & (f'confidence|{score_name}' in score_df.columns)
             ):
@@ -245,7 +257,7 @@ def assign_wallet_score_quantiles(wallets_coin_config, wallet_segmentation_df):
     - wallet_segmentation_df (df): the param df but with added score_quantile|{} columns
         for each score and residual
     """
-    wallet_scores = wallets_coin_config['wallet_segments']['wallet_scores']
+    wallet_scores = list(wallets_coin_config['wallet_scores']['score_params'].keys())
     score_segment_quantiles = wallets_coin_config['wallet_segments']['score_segment_quantiles']
     for score_name in wallet_scores:
 
@@ -268,7 +280,39 @@ def assign_wallet_score_quantiles(wallets_coin_config, wallet_segmentation_df):
                                                     score_segment_quantiles)
             wallet_segmentation_df = wallet_segmentation_df.join(wallet_quantiles,how='inner')
 
+    # Remove "_score" suffixes for readability
+    wallet_segmentation_df.rename(columns=lambda x: x.replace('_score', '') if x.endswith('_score') else x,
+                                   inplace=True)
+
     return wallet_segmentation_df
+
+
+def transform_binary_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Transform binary columns by changing prefix and converting to string type.
+
+    Params:
+    - df (DataFrame): input dataframe with binary columns
+
+    Returns:
+    - df (DataFrame): dataframe with transformed binary columns
+    """
+    # Find all binary columns
+    binary_cols = [col for col in df.columns if col.endswith('_binary')]
+
+    # Create new columns with transformed names and convert to string
+    for col in binary_cols:
+        # Remove 'scores|' prefix and add 'score_binary|' prefix
+        # Also remove the '_binary' suffix
+        base_name = col.split('|')[1].replace('_binary', '')
+        new_col = f'score_binary|{base_name}'
+        # Convert to string and add to dataframe
+        df[new_col] = df[col].astype(str)
+
+    # Drop original binary columns
+    df = df.drop(columns=binary_cols)
+
+    return df
 
 
 def assign_cluster_labels(training_data_df: pd.DataFrame, cluster_groups: list) -> pd.DataFrame:

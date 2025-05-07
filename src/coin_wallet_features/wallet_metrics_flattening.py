@@ -112,6 +112,11 @@ def flatten_cw_to_coin_features(
     result_df = pd.DataFrame(index=pd.Index(all_coin_ids, name='coin_id'))
 
     for segment_value in wallet_segmentation_df[segment_family].unique():
+
+        # Don't break out 0 values of classification binaries
+        if segment_family.startswith('score_binary') and segment_value == '0':
+            continue
+
         # Computes basic aggregations
         aggregation_metrics_df = calculate_aggregation_metrics(
             analysis_df, segment_family, segment_value,
