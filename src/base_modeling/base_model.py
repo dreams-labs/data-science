@@ -111,7 +111,7 @@ class BaseModel:
         if self.X_train is None or self.y_train is None:
             raise ValueError("Data must be prepared before running experiment")
 
-        cv_results = self._run_grid_search(self.X_train, self.y_train)
+        cv_results = self._run_grid_search(self.X_train, self.y_train, self.pipeline)
 
         if cv_results.get('best_params'):
             best_params = {
