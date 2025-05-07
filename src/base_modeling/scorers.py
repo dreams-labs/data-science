@@ -7,6 +7,8 @@ from sklearn.metrics import root_mean_squared_error, r2_score, roc_auc_score
 # pylint:disable=invalid-name  # X_test isn't camelcase
 # pylint:disable=unused-argument  # X and y params are always needed for pipeline structure
 
+# Local module imports
+import utils as u
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -103,7 +105,7 @@ def validation_auc_scorer(wallet_model):
     return scorer
 
 
-def validation_top_return_scorer(wallet_model, top_pct: float):
+def validation_top_percentile_returns_scorer(wallet_model, top_pct: float):
     """
     Factory function that returns a custom scorer computing the mean actual return
     of the top n% of wallets by predicted probability on the validation set.
@@ -139,5 +141,49 @@ def validation_top_return_scorer(wallet_model, top_pct: float):
 
         # Return mean actual return of top slice; if empty, return nan
         return top_df['ret'].mean() if not top_df.empty else float('nan')
+
+    return scorer
+
+
+def validation_top_scores_returns_scorer(wallet_model):
+    """
+    Factory function returning a scorer that computes the mean actual return
+    of wallets with predicted probability above the model's y_pred_threshold.
+
+    Params:
+    - wallet_model: WalletModel instance containing validation data
+
+    Returns:
+    - scorer function for sklearn, computing mean return for predictions >= threshold.
+    """
+    def scorer(estimator, X=None, y=None):
+        # Ensure validation data is available
+        if wallet_model.X_validation is None or wallet_model.validation_wallet_features_df is None:
+            raise ValueError("Validation data not set in wallet_model")
+
+        # Get actual returns aligned to validation index
+        target_var = wallet_model.modeling_config['target_variable']
+        returns = wallet_model.validation_wallet_features_df[target_var].reindex(wallet_model.X_validation.index)
+        returns = u.winsorize(returns,0.005)
+
+        # Predict class probabilities for positive class
+        X_val_trans = estimator.x_transformer_.transform(wallet_model.X_validation)
+        probas = estimator.estimator.predict_proba(X_val_trans)
+        pos_idx = list(estimator.estimator.classes_).index(1)
+        probs = probas[:, pos_idx]
+
+        # Combine into DataFrame and drop missing
+        df = pd.DataFrame({'proba': probs, 'ret': returns}).dropna()
+
+        # Retrieve threshold from model config
+        threshold = wallet_model.modeling_config.get('y_pred_threshold')
+        if threshold is None:
+            raise ValueError("y_pred_threshold not set in modeling_config")
+
+        # Select all records with probability >= threshold
+        selected = df[df['proba'] >= threshold]
+
+        # Return mean actual return; nan if none meet threshold
+        return selected['ret'].mean() if not selected.empty else float('nan')
 
     return scorer

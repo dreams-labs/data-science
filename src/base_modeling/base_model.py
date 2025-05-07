@@ -316,15 +316,14 @@ class BaseModel:
                 raise ValueError("Validation data required for validation_auc_scorer")
             gs_config['search_config']['scoring'] = sco.validation_auc_scorer(self)
 
-        elif scoring_param == 'validation_top_return_scorer':
+        elif scoring_param == 'validation_top_percentile_returns_scorer':
             # read your desired top_pct from config, e.g. self.modeling_config['grid_search_params']['top_pct']
-            top_pct = self.modeling_config['grid_search_params'].get('top_pct', 0.05)
-            gs_config['search_config']['scoring'] = sco.validation_top_return_scorer(self, top_pct)
+            threshold = self.modeling_config['grid_search_params']['percentile_threshold']
+            gs_config['search_config']['scoring'] = sco.validation_top_percentile_returns_scorer(self, threshold)
 
-        elif scoring_param == 'validation_top_return_scorer':
+        elif scoring_param == 'validation_top_scores_returns_scorer':
             # read your desired top_pct from config, e.g. self.modeling_config['grid_search_params']['top_pct']
-            top_pct = self.modeling_config['grid_search_params'].get('top_pct', 0.05)
-            gs_config['search_config']['scoring'] = sco.validation_top_return_scorer(self, top_pct)
+            gs_config['search_config']['scoring'] = sco.validation_top_scores_returns_scorer(self)
 
         else:
             raise ValueError(f"Invalid scoring metric '{scoring_param}' found in grid_search_params.")

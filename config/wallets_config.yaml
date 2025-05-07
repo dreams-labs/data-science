@@ -37,21 +37,21 @@ modeling: #WalletModel
     model_type: classification  # "regression" or "classification"
 
     #KeyParam Target Variable
-    # Net Gain
-    target_variable: cw_crypto_net_gain
-    # target_variable: crypto_net_gain
-    # target_variable: cw_crypto_net_flows
-    # # target_variable: crypto_net_cash_flows
-    target_var_class_threshold: 1000  # a classification model will try to predict the target var above this value
-    y_pred_threshold: 0.7  # scores above this probability threshold are positive predictions
+    # # Net Gain
+    # target_variable: cw_crypto_net_gain
+    # # target_variable: crypto_net_gain
+    # # target_variable: cw_crypto_net_flows
+    # # # target_variable: crypto_net_cash_flows
+    # target_var_class_threshold: 1000  # a classification model will try to predict the target var above this value
+    # y_pred_threshold: 0.7  # scores above this probability threshold are positive predictions
 
-    # # Return Rate
-    # target_variable: cw_crypto_net_gain/max_investment/base
-    # # target_variable: crypto_net_gain/max_investment/base
-    # # target_var_class_threshold: 0.25  # a classification model will try to predict the target var above this value
+    # Return Rate
+    target_variable: cw_crypto_net_gain/max_investment/base
+    # target_variable: crypto_net_gain/max_investment/base
+    target_var_class_threshold: 0.25  # a classification model will try to predict the target var above this value
     # target_var_class_threshold: 0.05  # a classification model will try to predict the target var above this value
-    # # target_var_class_threshold: 0.00  # a classification model will try to predict the target var above this value
-    # y_pred_threshold: 0.6  # scores above this probability threshold are positive predictions
+    # target_var_class_threshold: 0.00  # a classification model will try to predict the target var above this value
+    y_pred_threshold: 0.6  # scores above this probability threshold are positive predictions
 
     # target_variable: crypto_net_gain/max_investment/winsorized
     # target_variable: cw_crypto_net_gain/max_investment/winsorized
@@ -116,14 +116,14 @@ modeling: #WalletModel
 
         #KeyParam Grid Search Toggle
         # -------------------------------
-        # enabled: True
+        enabled: True
         # -------------------------------
 
         # Search Methodology
         drop_patterns_include_n_features: 1
 
         n_iter: 40  # random search limit
-        n_splits: 2  # cv splits
+        n_splits: 4  # cv splits
 
         # regressor_scoring: neg_root_mean_squared_error
         # regressor_scoring: custom_neg_rmse_scorer
@@ -131,9 +131,9 @@ modeling: #WalletModel
         regressor_scoring: validation_r2_scorer
 
         # classifier_scoring: validation_auc_scorer
-        classifier_scoring: validation_top_return_scorer
-
-        validation_top_return_scorer_pct: 0.01
+        classifier_scoring: validation_top_scores_returns_scorer
+        # classifier_scoring: validation_top_percentile_returns_scorer
+        # percentile_threshold: 0.01  # cutoff for validation_top_percentile_returns_scorer
 
         # Metaparameters
         # build_post_search_model: False  # whether to build a model after the grid search
@@ -143,7 +143,7 @@ modeling: #WalletModel
         # pre_dispatch: -1
 
         # Params for target variable generation
-        param_grid_y:
+        # param_grid_y:
 
             # Target variables
             # target_selector__target_variable: [
@@ -151,16 +151,16 @@ modeling: #WalletModel
             #     'crypto_net_gain/max_investment/winsorized',
 
             # ]
-            target_selector__target_var_class_threshold: [
-                0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7
-            ]
+            # target_selector__target_var_class_threshold: [
+            #     0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7
+            # ]
 
         # Params for model construction
         param_grid:
 
             # # Depth and Child Weight
             # estimator__min_child_weight_pct: [0.00004, 0.00007, 0.0001]
-            # estimator__min_child_weight: [40,60,80]
+            estimator__min_child_weight: [25,40,60,80]
             # estimator__max_depth: [4,5,6,7,8]
             # basic depth param
 
@@ -175,7 +175,7 @@ modeling: #WalletModel
 
             # Tree Training Speed Overrides
             estimator__n_estimators: [120]
-            estimator__learning_rate: [0.3]
+            estimator__learning_rate: [0.8]
             # estimator__max_depth: [7]
             # estimator__min_child_weight: [30]
 
