@@ -92,7 +92,8 @@ class CoinFeaturesOrchestrator:
         coin_wallet_features_df = cwwmf.flatten_cw_to_coin_segment_features(
             cw_metrics_df,
             wallet_segmentation_df,
-            self.training_coin_cohort
+            self.training_coin_cohort,
+            self.wallets_coin_config['n_threads']['cw_flattening_threads']
         )
 
         # Generate and merge prior model features if configured

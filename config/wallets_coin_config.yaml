@@ -1,6 +1,6 @@
 # CoinModel Config
 
-training_data:
+training_data: #CoinModel
 
     # where to save local files
     parquet_folder: temp/coin_modeling_dfs
@@ -8,7 +8,7 @@ training_data:
 
 # CoinModel Cleaning
 # Variables used to clean and filter raw data before training data is built
-data_cleaning:
+data_cleaning: #CoinModel
 
     # Market data filters
     max_initial_market_cap: 999150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
@@ -17,7 +17,7 @@ data_cleaning:
 
 
 # CoinModel Wallet Scores
-wallet_scores:
+wallet_scores: #CoinModel
 
     #KeyParam Scores to include as segments + metrics
     coins_wallet_scores_folder: temp/coin_modeling_dfs/wallet_scores_dda744
@@ -68,7 +68,7 @@ wallet_scores:
 
 
 # CoinModel Segments
-wallet_segments:
+wallet_segments: #CoinModel
 
 
     wallet_scores_binary_segments: True
@@ -82,7 +82,7 @@ wallet_segments:
 
 
 # CoinModel Features
-wallet_features:
+wallet_features: #CoinModel
 
     # Score features params
     usd_materiality: 20 # Wallets with volume/balances below this won't be counted in medians/distributions/etc
@@ -98,7 +98,7 @@ wallet_features:
 
 # CoinModel Modeling Config
 # Variables used in the generation of the validation period coin model
-coin_modeling:
+coin_modeling: #CoinModel
 
     #KeyParam Model Type
     # Target variable parameters
@@ -144,7 +144,7 @@ coin_modeling:
 
             # Segment Family
             score_binary|cw_return_rate_000*,
-            score_binary|cw_return_rate_005*,
+            # score_binary|cw_return_rate_005*,
             score_binary|cw_return_rate_025*,
             score_binary|cw_return_rate_040*,
             score_binary|cw_net_flows_1000*,
@@ -361,3 +361,9 @@ coin_modeling:
 
     # Coin model workflow params
     score_name: net_gain_max_investment_winsorized_base  # reference name for feature columns etc
+
+
+# CoinModel Multithreading
+# Determines how many workers will be used in multithreading executions
+n_threads: #CoinModel
+    cw_flattening_threads: 15  # multithreads flattening in wallet_metrics_flattening.py
