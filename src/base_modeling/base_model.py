@@ -283,6 +283,7 @@ class BaseModel:
     #         Grid Search Methods
     # -----------------------------------
 
+    # pylint:disable=no-member  # some objects are from WalletModel or CoinModel
     def _run_grid_search(self, X: pd.DataFrame, y: pd.Series, pipeline) -> Dict[str, float]:
         """
         Run grid search while always providing an eval set for early stopping.
@@ -400,7 +401,10 @@ class BaseModel:
         if 'drop_columns__drop_patterns' in param_grid:
 
             # Define drop pattern combinations as selections of columns
-            if self.modeling_config['grid_search_params'].get('drop_patterns_include_n_features'):
+            if (
+                self.modeling_config['grid_search_params'].get('enabled') and
+                self.modeling_config['grid_search_params'].get('drop_patterns_include_n_features')
+            ):
                 drop_pattern_combinations = self._create_drop_pattern_combinations()
             else:
                 base_drop_patterns = self.modeling_config['feature_selection']['drop_patterns']
