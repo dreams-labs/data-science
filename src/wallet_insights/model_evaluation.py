@@ -25,6 +25,7 @@ from dreams_core import core as dc
 import utils as u
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
+# pylint:disable=too-many-lines  # graphs gotta live somewhere
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -725,7 +726,7 @@ class RegressorEvaluator:
             elif plot_type == 'prefix_importance':
                 self._plot_feature_importance(ax, levels=levels)
             elif plot_type == 'return_vs_rank':
-                self._plot_return_vs_rank(ax, levels=levels)
+                self._plot_return_vs_rank(ax, n_buckets=25)
         plt.tight_layout()
         if display:
             plt.show()
@@ -954,7 +955,8 @@ class ClassifierEvaluator(RegressorEvaluator):
                 "Validation Return Metrics",
                 "-" * 35,
                 f"Positive Threshold:         {self.y_pred_threshold:.2f}",
-                f"Positive Predictions:       {self.metrics['positive_predictions']:.0f}/{len(self.y_validation_pred)} ({self.metrics['positive_pct']:.2f}%)",
+                f"Positive Predictions:       {self.metrics['positive_predictions']:.0f}"
+                    f"/{len(self.y_validation_pred)} ({self.metrics['positive_pct']:.2f}%)",
                 f"Positive Mean Outcome:      {self.metrics['positive_pred_return']:.3f}",
                 f"Positive W-Mean Outcome:    {self.metrics['positive_pred_wins_return']:.3f}",
                 f"Top 1% W-Mean Outcome:      {self.metrics['val_wins_return_top1']:.3f}",
