@@ -246,6 +246,7 @@ def calculate_score_weighted_metrics(
     return weighted_scores
 
 
+@u.timing_decorator
 def calculate_score_distribution_metrics(
     analysis_df: pd.DataFrame,
     segment_family: str,
@@ -255,8 +256,8 @@ def calculate_score_distribution_metrics(
     usd_materiality: float = 20.0
 ) -> pd.DataFrame:
     """
-    Calculate distribution metrics (median, p10, p90, std) for multiple score columns
-    without inline lambdas, potentially improving performance for large data.
+    Calculate distribution metrics (median, percentiles, std, skewness, kurtosis)
+    for multiple score columns without inline lambdas for better performance.
 
     Params:
     - analysis_df (DataFrame): MultiIndexed (coin_id, wallet_address) data
@@ -275,15 +276,29 @@ def calculate_score_distribution_metrics(
         (analysis_df[metric_column] >= usd_materiality)
     ].copy()
 
-    # median
-    median_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].median()
+    # percentiles
+    p002_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.002)
+    p01_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.01)
     p05_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.05)
     p10_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.1)
+    median_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].median()
     p90_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.9)
     p95_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.95)
+    p99_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.99)
+    p998_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.998)
 
-    # 4) std
+    # std
     std_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].std()
+
+    # skewness - vectorized calculation
+    skew_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].apply(
+        lambda x: x.skew()
+    )
+
+    # kurtosis - vectorized calculation
+    kurt_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].apply(
+        lambda x: x.kurt()
+    )
 
     # rename columns and combine
     def rename_cols(df: pd.DataFrame, suffix: str) -> pd.DataFrame:
@@ -296,14 +311,32 @@ def calculate_score_distribution_metrics(
             new_cols[c] = f'{segment_family}/{segment_value}|{metric_column}|score_dist/{score_name}/{suffix}'
         return df.rename(columns=new_cols)
 
-    median_df = rename_cols(median_df, 'median')
+    p002_df = rename_cols(p002_df, 'p002')
+    p01_df = rename_cols(p01_df, 'p01')
     p05_df = rename_cols(p05_df, 'p05')
     p10_df = rename_cols(p10_df, 'p10')
+    median_df = rename_cols(median_df, 'median')
     p90_df = rename_cols(p90_df, 'p90')
     p95_df = rename_cols(p95_df, 'p95')
+    p99_df = rename_cols(p99_df, 'p99')
+    p998_df = rename_cols(p998_df, 'p998')
     std_df = rename_cols(std_df, 'std')
+    skew_df = rename_cols(skew_df, 'skew')
+    kurt_df = rename_cols(kurt_df, 'kurt')
 
     # merge all results horizontally
-    metrics_df = median_df.join([p05_df, p10_df, p90_df, p95_df, std_df], how='outer').fillna(0)
+    metrics_df = median_df.join([
+        p002_df,
+        p01_df,
+        p05_df,
+        p10_df,
+        p90_df,
+        p95_df,
+        p99_df,
+        p998_df,
+        std_df,
+        skew_df,
+        kurt_df
+    ], how='outer').fillna(0)
 
     return metrics_df
