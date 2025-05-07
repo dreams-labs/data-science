@@ -2,9 +2,12 @@
 Functions to flatten wallet-coin features to coin-only
 """
 import logging
-from typing import List
+from typing import List, Optional
 import pandas as pd
 import numpy as np
+
+# Add ThreadPoolExecutor for parallel processing
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Local module imports
 import utils as u
@@ -22,7 +25,8 @@ logger = logging.getLogger(__name__)
 def flatten_cw_to_coin_segment_features(
     cw_metrics_df: pd.DataFrame,
     wallet_segmentation_df: pd.DataFrame,
-    training_coin_cohort: list
+    training_coin_cohort: list,
+    n_threads: Optional[int] = 6
 ) -> pd.DataFrame:
     """
     Flatten coin-wallet metrics into coin-level features across segments.
@@ -32,6 +36,7 @@ def flatten_cw_to_coin_segment_features(
         and 'trading/...' columns.
     - wallet_segmentation_df (DataFrame): indexed by wallet_address with segment assignments.
     - training_coin_cohort (list): list of coin_ids to include
+    - n_threads (Optional[int]): number of threads for parallel processing (defaults to ThreadPoolExecutor default)
 
     Returns:
     - coin_wallet_features_df (DataFrame): indexed by coin_id, joined features for each
@@ -49,20 +54,31 @@ def flatten_cw_to_coin_segment_features(
     # Pre‑join segmentation data once to avoid repeating the join inside
     joined_metrics_df = cw_metrics_df.join(wallet_segmentation_df, how='left')
 
-    # loop through each metric × segment and join
-    total_metrics = len(cw_metrics_df.columns)
-    for i, metric_column in enumerate(cw_metrics_df.columns, start=1):
+    # Function to process a single metric column in parallel
+    def process_metric(metric_column):
+        # local DataFrame for this metric
+        metric_df = pd.DataFrame(index=training_coin_cohort)
+        metric_df.index.name = 'coin_id'
+        # loop through segment families for this metric
         for segment_family in segmentation_families:
-            # generate coin-level features for this metric & segment
-            segment_df = flatten_cw_to_coin_features(
+            seg_df = flatten_cw_to_coin_features(
                 joined_metrics_df,
                 metric_column,
                 wallet_segmentation_df,
                 segment_family,
                 training_coin_cohort
             )
-            coin_wallet_features_df = coin_wallet_features_df.join(segment_df, how='inner')
-        logger.info("Flattened metric %s/%s: %s", i, total_metrics, metric_column)
+            metric_df = metric_df.join(seg_df, how='inner')
+        return metric_column, metric_df
+
+    # Use n_threads if provided, else default
+    with ThreadPoolExecutor(max_workers=n_threads) as executor:
+        futures = {executor.submit(process_metric, metric_column): metric_column
+                   for metric_column in cw_metrics_df.columns}
+        for future in as_completed(futures):
+            metric_column, metric_features_df = future.result()
+            coin_wallet_features_df = coin_wallet_features_df.join(metric_features_df, how='inner')
+            logger.info("Flattened metric: %s", metric_column)
 
     logger.info(
         "All wallet-based features flattened. Final shape: %s",
