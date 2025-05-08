@@ -21,44 +21,75 @@ wallet_scores: #CoinModel
     #KeyParam Scores to include as segments + metrics
     score_params:
         # Return Rate
-        cw_return_rate_000:
+        cw_return_rate_min_000:
             target_variable: cw_crypto_net_gain/max_investment/base
-            target_var_class_threshold: 0.00
-            y_pred_threshold: 0.4
-
-        cw_return_rate_005:
-            target_variable: cw_crypto_net_gain/max_investment/base
-            target_var_class_threshold: 0.05
+            target_var_min_threshold: 0.00
+            target_var_max_threshold: .inf
             y_pred_threshold: 0.6
 
-        cw_return_rate_025:
+        cw_return_rate_min_005:
             target_variable: cw_crypto_net_gain/max_investment/base
-            target_var_class_threshold: .25
+            target_var_min_threshold: 0.05
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.8
+
+        cw_return_rate_min_025:
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_min_threshold: .25
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.75
+
+        cw_return_rate_min_040:
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_min_threshold: .40
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.75
+
+        # Tests
+        cw_return_rate_max_-005:
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_min_threshold: -.inf
+            target_var_max_threshold: -0.05
             y_pred_threshold: 0.6
 
-        cw_return_rate_040:
+        cw_return_rate_max_-025:
             target_variable: cw_crypto_net_gain/max_investment/base
-            target_var_class_threshold: .40
-            y_pred_threshold: 0.6
+            target_var_min_threshold: -.inf
+            target_var_max_threshold: -0.25
+            y_pred_threshold: 0.7
 
-            # cw_return_rate_regression:
-            #     model_type: regression
-            #     target_variable: cw_crypto_net_gain/max_investment/winsorized
+        return_rate_min_025:
+            target_variable: crypto_net_gain/max_investment/base
+            target_var_min_threshold: .25
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.7
 
-            # return_rate_regression:
-            #     model_type: regression
-            #     target_variable: crypto_net_gain/max_investment/winsorized
+        cw_net_flows_rate_min_025:
+            target_variable: cw_crypto_net_flows/crypto_inflows/base
+            target_var_min_threshold: .25
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.7
 
-            # # USD Metrics
-            # net_gain_1000:
-            #     target_variable: crypto_net_gain
-            #     target_var_class_threshold: 1000
-            #     y_pred_threshold: 0.7
+        # cw_return_rate_regression:
+        #     model_type: regression
+        #     target_variable: cw_crypto_net_gain/max_investment/winsorized
 
-            # cw_net_flows_1000:
-            #     target_variable: cw_crypto_net_flows
-            #     target_var_class_threshold: 1000
-            #     y_pred_threshold: 0.7
+        # return_rate_regression:
+        #     model_type: regression
+        #     target_variable: crypto_net_gain/max_investment/winsorized
+
+        # # USD Metrics
+        # net_gain_min_1000:
+        #     target_variable: crypto_net_gain
+        #     target_var_min_threshold: 1000
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.7
+
+        # cw_net_flows_min_1000:
+        #     target_variable: cw_crypto_net_flows
+        #     target_var_min_threshold: 1000
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.7
 
 
 # CoinModel Segments
@@ -113,7 +144,7 @@ coin_modeling: #CoinModel
     # target_variable: coin_return
     # target_variable: coin_return_pctile_full
     # target_variable: coin_return_pctile
-    target_var_class_threshold: 0.3  # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.3  # a classification model will try to predict the target var above this value
     y_pred_threshold: 0.5  # scores above this probability threshold are positive predictions
 
     returns_winsorization: 0.005

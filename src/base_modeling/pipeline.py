@@ -4,6 +4,7 @@ from typing import List
 import pandas as pd
 from sklearn.pipeline import Pipeline
 from sklearn.base import BaseEstimator, TransformerMixin
+import numpy as np
 
 # Local modules
 import base_modeling.feature_selection as fs
@@ -88,7 +89,6 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
         X_trans = self.x_transformer_.transform(X)
         return self.estimator.predict_proba(X_trans)
 
-        return self
 
     def predict(self, X):
         """Predict using the fitted regressor on transformed X."""
@@ -119,16 +119,21 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
     If y is a DataFrame, returns the column specified by target_variable as a Series.
     If y is already a Series, returns it unchanged.
 
+    Optionally, if min/max thresholds are provided, values between (inclusive) are labelled
+     positive (1), others negative (0).
+
     This centralizes the target extraction logic so that grid search can update the target
-    variable parameter without interference from pre-extraction.
+     variable parameter without interference from pre-extraction.
     """
     def __init__(
             self,
             target_variable: str,
-            target_var_class_threshold: float
+            target_var_min_threshold: float | None = None,
+            target_var_max_threshold: float | None = None
         ):
         self.target_variable = target_variable
-        self.target_var_class_threshold = target_var_class_threshold
+        self.target_var_min_threshold = target_var_min_threshold
+        self.target_var_max_threshold = target_var_max_threshold
 
     def fit(self, y, X=None):
         """
@@ -144,14 +149,16 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
     def transform(self, y, X=None):
         """
         Extract the target column specified by target_variable and return a 1D Series.
-        If the model is classification,
+        If the model is classification and min/max thresholds are provided, binarize accordingly.
         """
         # Extract target variable
         result = y[self.target_variable]
 
-        # Convert to boolean if a threhsold is provided
-        if self.target_var_class_threshold is not None:
-            result = (result >= self.target_var_class_threshold).astype(int)
+        # Convert to boolean if a min or max threshold is provided
+        if (self.target_var_min_threshold is not None) or (self.target_var_max_threshold is not None):
+            lower = -np.inf if self.target_var_min_threshold is None else self.target_var_min_threshold
+            upper = np.inf if self.target_var_max_threshold is None else self.target_var_max_threshold
+            result = ((result >= lower) & (result <= upper)).astype(int)
 
         return result
 

@@ -230,3 +230,49 @@ def add_derived_values(config_dict: dict) -> dict:
     td['investing_period_end'] = (modeling_end + timedelta(days=2 * modeling_duration)).strftime("%Y-%m-%d")
 
     return cfg
+
+
+def validate_config_alignment(config: dict, wallets_config: dict, wallets_coin_config: dict) -> None:
+    """
+    Validates that configuration objects are properly aligned.
+
+    Params:
+    - config (dict): Main configuration object
+    - wallets_config (dict): Wallet features configuration
+    - wallets_coin_config (dict): Wallet-coin configuration
+
+    Returns:
+    - None: Raises ValueError if configurations are misaligned
+    """
+    # First validate dataset alignment between wallet configs
+    if not (wallets_config['training_data']['dataset'] ==
+            wallets_coin_config['training_data']['dataset']):
+        raise ValueError("Config datasets not aligned:\n"
+            f" - wallets_config: {wallets_config['training_data']['dataset']}\n"
+            f" - wallets_coin_config: {wallets_coin_config['training_data']['dataset']}\n"
+        )
+
+    # If coin flow model features enabled, perform additional validation
+    if wallets_coin_config['wallet_features']['toggle_coin_flow_model_features']:
+        # Confirm period boundaries align
+        model_start = config['training_data']['modeling_period_start']
+        val_start = wallets_config['training_data']['coin_modeling_period_start']
+        model_end = config['training_data']['modeling_period_end']
+        val_end = wallets_config['training_data']['coin_modeling_period_end']
+
+        if not (model_start == val_start and model_end == val_end):
+            raise ValueError(
+                f"Coin features modeling period must align with wallet features validation period:\n"
+                f"Wallet-coin model coin_modeling_period boundaries: {val_start} to {val_end} \n"
+                f"Coin Flow Model modeling_period boundaries: {model_start} to {model_end}"
+            )
+
+        # Validate all three configs have aligned datasets
+        if not (wallets_config['training_data']['dataset'] ==
+                wallets_coin_config['training_data']['dataset'] ==
+                config['training_data']['dataset']):
+            raise ValueError("Config datasets not aligned:\n"
+                f" - wallets_config: {wallets_config['training_data']['dataset']}\n"
+                f" - wallets_coin_config: {wallets_coin_config['training_data']['dataset']}\n"
+                f" - config: {config['training_data']['dataset']}"
+            )

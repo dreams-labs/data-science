@@ -521,15 +521,28 @@ class BaseModel:
             'target_selector__target_variable',
             self.modeling_config['target_variable']
         )
-        target_var_class_threshold = None
+        target_var_min_threshold = None
+        target_var_max_threshold = None
         if self.modeling_config['model_type'] == 'classification':
-            target_var_class_threshold = (self.modeling_config.get('model_params', {}).get(
-                'target_selector__target_var_class_threshold',
-                self.modeling_config['target_var_class_threshold']
-            ))
+            target_var_min_threshold = (
+                self.modeling_config.get('model_params', {}).get(
+                    'target_selector__target_var_min_threshold',
+                    self.modeling_config.get('target_var_min_threshold')
+                )
+            )
+            target_var_max_threshold = (
+                self.modeling_config.get('model_params', {}).get(
+                    'target_selector__target_var_max_threshold',
+                    self.modeling_config.get('target_var_max_threshold')
+                )
+            )
 
         y_pipeline = Pipeline([
-            ('target_selector', bmp.TargetVarSelector(target_var, target_var_class_threshold))
+            ('target_selector', bmp.TargetVarSelector(
+                target_var,
+                target_var_min_threshold,
+                target_var_max_threshold
+            ))
         ])
 
         return y_pipeline

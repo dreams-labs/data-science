@@ -8,6 +8,7 @@ import pandas as pd
 # Local module imports
 import feature_engineering.coin_flow_features_orchestrator as cffo
 import wallet_modeling.wallet_training_data_orchestrator as wtdo
+import wallet_modeling.wallets_config_manager as wcm
 import coin_wallet_features.wallet_segmentation as cws
 import coin_wallet_features.wallet_metrics as cwwm
 import coin_wallet_features.wallet_metrics_flattening as cwwmf
@@ -32,16 +33,16 @@ class CoinFeaturesOrchestrator:
         wallets_config: dict,
         wallets_coin_config: dict,
         metrics_config: dict,
-        coins_config: dict,
-        coins_modeling_config: dict,
+        coin_flow_config: dict,
+        coin_flow_modeling_config: dict,
         training_coin_cohort: pd.Series
     ):
         # Store configs
         self.wallets_config = wallets_config
         self.wallets_coin_config = wallets_coin_config
         self.metrics_config = metrics_config
-        self.coins_config = coins_config
-        self.coins_modeling_config = coins_modeling_config
+        self.coin_flow_config = coin_flow_config
+        self.coin_flow_modeling_config = coin_flow_modeling_config
 
         # Store cohort
         self.training_coin_cohort = training_coin_cohort
@@ -106,6 +107,14 @@ class CoinFeaturesOrchestrator:
 
         # Generate and merge Coin Flow Model features if configured
         if self.wallets_coin_config['wallet_features']['toggle_coin_flow_model_features']:
+
+            # Confirm config alignment
+            wcm.validate_config_alignment(
+                self.coin_flow_config,
+                self.wallets_config,
+                self.wallets_coin_config)
+
+            # Generate and merge all features
             coin_flows_model_features_df = self._generate_coin_flow_model_features()
             coin_flows_model_features_df.to_parquet(
                 f"{self.wallets_coin_config['training_data']['parquet_folder']}"
@@ -198,9 +207,9 @@ class CoinFeaturesOrchestrator:
         - coin_non_wallet_features_df (DataFrame): index=coin_id, features from all windows
         """
         # Confirm period boundaries align
-        model_start = self.coins_config['training_data']['modeling_period_start']
+        model_start = self.coin_flow_config['training_data']['modeling_period_start']
         val_start = self.wallets_config['training_data']['coin_modeling_period_start']
-        model_end = self.coins_config['training_data']['modeling_period_end']
+        model_end = self.coin_flow_config['training_data']['modeling_period_end']
         val_end = self.wallets_config['training_data']['coin_modeling_period_end']
         if not (model_start == val_start and model_end == val_end):
             raise ValueError(
@@ -211,9 +220,9 @@ class CoinFeaturesOrchestrator:
 
         # Generate features based on the coin config files
         coin_flow_features_orchestrator = cffo.CoinFlowFeaturesOrchestrator(
-            self.coins_config,
+            self.coin_flow_config,
             self.metrics_config,
-            self.coins_modeling_config
+            self.coin_flow_modeling_config
         )
         coin_features_df, _, _ = coin_flow_features_orchestrator.generate_all_time_windows_model_inputs()
 
