@@ -444,6 +444,10 @@ class MultiEpochOrchestrator:
         all_epochs_configs = []
         base_training_data = self.base_config['training_data']
         offsets = self.epochs_config['offset_epochs']['offsets']
+        offsets = set(offsets + [
+            base_training_data['modeling_period_duration'],
+            base_training_data['modeling_period_duration']*2
+        ])
 
         for offset_days in offsets:
             # Deep copy base config to prevent mutations
