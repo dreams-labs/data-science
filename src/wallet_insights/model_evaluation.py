@@ -197,7 +197,8 @@ class RegressorEvaluator:
         """
         # Include class threshold if it's a classification model
         if self.modeling_config['model_type'] == 'classification':
-            class_threshold_str = self.modeling_config.get('target_var_class_threshold', '')
+            class_threshold_str = (f"{self.modeling_config.get('target_var_min_threshold', '')} to "
+                                   f"{self.modeling_config.get('target_var_max_threshold', '')}")
         else:
             class_threshold_str = ''
 
@@ -209,7 +210,12 @@ class RegressorEvaluator:
         ]
         # feature counts
         n_features = len(self.feature_names) if self.feature_names is not None else 0
-        n_all_windows = sum(1 for f in self.feature_names if "|all_windows" in f)
+        n_per_window = sum(1 for f in self.feature_names if "|w2" in f)
+        if n_per_window > 0:
+            window_n_features_str = f"Features per Window:      {n_per_window:,d}\n"
+        else:
+            window_n_features_str = '\n'
+
         if "total_cohort_samples" in self.metrics:
             header.extend([
                 f"Training Cohort:          {self.metrics['total_cohort_samples']:,d}",
@@ -221,8 +227,7 @@ class RegressorEvaluator:
             header.extend([
                 f"Test Samples:             {self.metrics['test_samples']:,d}",
                 f"Number of Features:       {n_features:,d}",
-                f"Features per Window:      {n_all_windows:,d}",
-                ""
+                window_n_features_str,
             ])
         return header
 
