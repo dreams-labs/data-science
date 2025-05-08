@@ -46,32 +46,44 @@ time_series:
 
 # Keyed on coin_id-date
 wallet_cohorts:
-    # whales_longterm:
-    #     buyers_new:
-    #         aggregations:
-    #             sum:
-    #                 scaling: none
-    #     buyers_repeat:
-    #         rolling:
-    #             aggregations:
-    #                 sum:
-    #                     scaling: none
-    #             window_duration: 5
-    #             lookback_periods: 4
-    #     total_bought:
-    #         rolling:
-    #             aggregations:
-    #                 sum:
-    #                     scaling: none
-    #             window_duration: 5
-    #             lookback_periods: 4
-    #     total_balance:
-    #         rolling:
-    #             aggregations:
-    #                 last:
-    #                     scaling: none
-    #             window_duration: 5
-    #             lookback_periods: 4
+
+    whales_longterm:
+        buyers_new:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: none
+                window_duration: 30
+                lookback_periods: 3
+        total_holders:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: none
+                window_duration: 30
+                lookback_periods: 3
+        total_bought:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: none
+                window_duration: 30
+                lookback_periods: 3
+        total_sold:
+            rolling:
+                aggregations:
+                    sum:
+                        scaling: none
+                window_duration: 30
+                lookback_periods: 3
+        total_balance:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: none
+                window_duration: 30
+                lookback_periods: 3
+
     # whales:
     #     buyers_new:
     #         aggregations:
