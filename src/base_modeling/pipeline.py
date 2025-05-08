@@ -88,7 +88,6 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
         X_trans = self.x_transformer_.transform(X)
         return self.estimator.predict_proba(X_trans)
 
-        return self
 
     def predict(self, X):
         """Predict using the fitted regressor on transformed X."""
