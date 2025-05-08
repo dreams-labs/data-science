@@ -107,6 +107,9 @@ class WalletModelOrchestrator:
         with open(save_location, 'w', encoding='utf-8') as f:
             json.dump(models_dict, f, indent=4, default=u.numpy_type_converter)
 
+        u.notify('inside_computer_startup')
+        logger.info(f"Finished traning all {len(self.score_params)} models.")
+
         return models_dict
 
 
