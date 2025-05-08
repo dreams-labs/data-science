@@ -20,7 +20,6 @@ from sklearn.metrics import (
     auc,
     log_loss,
     RocCurveDisplay,
-    PrecisionRecallDisplay
 )
 from dreams_core import core as dc
 import utils as u
