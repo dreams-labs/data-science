@@ -4,7 +4,7 @@ training_data:
     # Defining the modeling and training periods (dates must follow YYYY-MM-DD format)
     # The modeling period end date and training period start and end dates are automatically
     # imputed using utils.py function calculate_period_dates() when load_config() is run
-    modeling_period_start: "2024-10-29"  # Start date for the modeling period
+    modeling_period_start: "2025-02-26"  # Start date for the modeling period
     modeling_period_duration: 30    # Duration of the modeling period in days
     training_period_duration: 90    # Duration of the training period in days
 
@@ -14,7 +14,7 @@ training_data:
     time_window_frequency: 20 # how many days apart each time_window should start
 
     # Whether to query 'core' or 'dev_core' dataset tables
-    dataset: prod  # Set to 'prod' or 'dev'; determines whether to query 'core' or 'dev' dataset tables
+    dataset: dev  # Set to 'prod' or 'dev'; determines whether to query 'core' or 'dev' dataset tables
 
 
 datasets:
