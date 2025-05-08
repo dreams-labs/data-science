@@ -277,8 +277,14 @@ def validate_config_consistency(config,metrics_config, modeling_config):
         if missing_in_metrics or missing_in_config:
             error_msg = []
             if missing_in_metrics:
-                error_msg.append(f"Missing in metrics_config.yaml[{key}]: {', '.join(missing_in_metrics)}")
+                error_msg.append("Config cohorts in [config][datasets][wallet_cohorts] are missing "
+                                 "corresponding settings in [metrics_config][wallet_cohorts]: "
+                                 f"[{', '.join(missing_in_metrics)}]")
             if missing_in_config:
+                error_msg.append("Metrics config cohorts in [metrics_config][wallet_cohorts] are missing "
+                                 "corresponding settings in [config][datasets][wallet_cohorts]: "
+                                 f"[{', '.join(missing_in_metrics)}]")
+
                 error_msg.append(f"Missing in config.yaml datasets[{key}]: {', '.join(missing_in_config)}")
             raise ValueError(f"Inconsistency in {key}:\n" + "\n".join(error_msg))
 

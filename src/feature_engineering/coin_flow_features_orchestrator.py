@@ -45,6 +45,9 @@ class CoinFlowFeaturesOrchestrator:
         config: dict,
         metrics_config: dict,
         modeling_config: dict,
+        complete_profits_df: pd.DataFrame = None,
+        complete_market_data_df: pd.DataFrame = None,
+        complete_macro_trends_df: pd.DataFrame = None
     ):
         """
         Params
@@ -57,14 +60,16 @@ class CoinFlowFeaturesOrchestrator:
         self.metrics_config = metrics_config
         self.modeling_config = modeling_config
 
-        # Base dataframes
-        self.macro_trends_df = None
-        self.market_data_df = None
-        self.profits_df = None
-        self.prices_df = None
+        # All time dataframes
+        self.complete_profits_df = complete_profits_df
+        self.complete_market_data_df = complete_market_data_df
+        self.complete_macro_trends_df = complete_macro_trends_df
 
-        # Re-use module-level logger so behaviour is identical
-        self.logger = logger
+        # Window-trimmed dataframes
+        self.profits_df = None
+        self.market_data_df = None
+        self.macro_trends_df = None
+        self.prices_df = None
 
 
 
@@ -93,19 +98,24 @@ class CoinFlowFeaturesOrchestrator:
         join_logs_df : DataFrame
             Outcomes of each dataset join/fill step.
         """
-        self.logger.info(
+        logger.info(
             "Beginning generation of all time windows' data for epoch with "
             f"modeling period start of {self.config['training_data']['modeling_period_start']}."
         )
         u.notify('default')
 
-        # 1. Base datasets used by all windows
-        (
-            self.macro_trends_df,
-            self.market_data_df,
-            self.profits_df,
-            self.prices_df,
-        ) = self._prepare_all_windows_base_data()
+        # 1. Prepare base datasets
+        if self.macro_trends_df is not None:
+            self._transform_complete_dfs_to_base_data()
+
+        else:
+            # Repull complete data if not provided
+            (
+                self.macro_trends_df,
+                self.market_data_df,
+                self.profits_df,
+                self.prices_df,
+            ) = self._prepare_all_windows_base_data()
 
         # 2. Flattened features per window
         time_windows = self._generate_time_windows()
@@ -130,7 +140,7 @@ class CoinFlowFeaturesOrchestrator:
         concatenated_dfs = self._concat_dataset_time_windows_dfs(all_flattened_filepaths)
         training_data_df, join_logs_df = self._join_dataset_all_windows_dfs(concatenated_dfs)
 
-        self.logger.info(
+        logger.info(
             "Generated training_data_df with shape %s for epoch with modeling period start %s.",
             training_data_df.shape,
             self.config['training_data']['modeling_period_start'],
@@ -145,6 +155,33 @@ class CoinFlowFeaturesOrchestrator:
     # ----------------------------------
     #           Helper Methods
     # ----------------------------------
+
+
+    def _transform_complete_dfs_to_base_data(self):
+        """
+        Converts the complete_* dfs to the windowed dfs associate with the
+         config.yaml-defined training period.
+        """
+        # training_period_end = pd.to_datetime(self.config['training_data']['modeling_period_start'])
+        # training_period_duration_= self.config['training_data']['training_period_duration']
+        # training_period_start = training_period_end - timedelta(days=training_period_duration_)
+
+        # # DDA 752 LOGIC TO TRIM GOES HERE
+        # macro_trends_df = self.complete_macro_trends_df
+        # market_data_df = self.complete_market_data_df
+        # profits_df = self.complete_profits_df
+
+        # self.macro_trends_df = macro_trends_df
+        # self.market_data_df = market_data_df
+        # self.profits_df = profits_df
+        # self.prices_df = market_data_df[['coin_id','date','price']].copy()
+
+        # u.assert_period(profits_df,training_period_start,training_period_end)
+        # u.assert_period(market_data_df,training_period_start,training_period_end)
+
+        pass
+
+
 
     def _prepare_all_windows_base_data(self):
         """
@@ -177,7 +214,11 @@ class CoinFlowFeaturesOrchestrator:
 
         # Macro trends: retrieve and clean full history
         macro_trends_df = dr.retrieve_macro_trends_data()
-        macro_trends_cols = list(self.config['datasets']['macro_trends'].keys()) if 'macro_trends' in self.config['datasets'] else []
+        macro_trends_cols = (
+            list(self.config['datasets']['macro_trends'].keys())
+            if 'macro_trends' in self.config['datasets']
+            else []
+        )
         macro_trends_df = dr.clean_macro_trends(macro_trends_df, macro_trends_cols)
 
 
