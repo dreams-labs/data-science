@@ -17,6 +17,7 @@ from sklearn.metrics import (
     recall_score,
     f1_score,
     roc_auc_score,
+    auc,
     log_loss,
     RocCurveDisplay,
     PrecisionRecallDisplay
@@ -185,6 +186,13 @@ class RegressorEvaluator:
         plt.rcParams['xtick.color'] = '#afc6ba'
         plt.rcParams['ytick.color'] = '#afc6ba'
         plt.rcParams['axes.titlecolor'] = '#afc6ba'
+
+        # Increase default font sizes for all plots
+        plt.rcParams['font.size'] = 12
+        plt.rcParams['axes.titlesize'] = 14
+        plt.rcParams['axes.labelsize'] = 14
+        plt.rcParams['xtick.labelsize'] = 16
+        plt.rcParams['ytick.labelsize'] = 13
 
         self.custom_cmap = mcolors.LinearSegmentedColormap.from_list(
             'custom_blues', ['#1b2530', '#145a8d', '#ddeeff']
@@ -1011,8 +1019,8 @@ class ClassifierEvaluator(RegressorEvaluator):
         ax4 = fig.add_subplot(gs[1, 1])
 
         self._plot_roc_curves(ax1)
-        self._plot_pr_curves(ax2)
-        self._plot_return_vs_rank_classifier(ax3, n_buckets=10)
+        self._plot_auc_pr_curves(ax2)
+        self._plot_return_vs_rank_classifier(ax3, n_buckets=20)
         self._plot_feature_importance(ax4, levels=levels)
 
 
@@ -1067,43 +1075,74 @@ class ClassifierEvaluator(RegressorEvaluator):
         ax.legend()
 
 
-    def _plot_pr_curves(self, ax):
+    def _plot_auc_pr_curves(self, ax):
         """
-        Precision‑Recall curves for test & validation.
+        Precision-Recall curves with AUC-PR values for test & validation sets.
 
-        We manually draw the validation curve to omit the (recall=0, precision=1)
-        anchor point that creates a misleading vertical spike when only a handful
-        top‑score wallets exist.  The validation line is thick green (#22DD22).
+        Validation line: thick green (#22DD22)
+        Baseline: horizontal dashed line showing the positive class prevalence.
         """
-        # --- Test PR curve (default colour, thin line) --------------------
-        PrecisionRecallDisplay.from_predictions(
+        # Calculate baseline (positive class prevalence)
+        baseline = self.y_test.mean()
+
+        # --- Test PR curve with AUC-PR
+        precision, recall, _ = precision_recall_curve(
             self.y_test,
             self.y_pred_proba,
-            ax=ax,
-            name="Test",
+            pos_label=1
+        )
+        test_auc_pr = auc(recall, precision)  # Calculate AUC-PR
+
+        # Plot test curve
+        ax.plot(
+            recall[1:], precision[1:],  # Skip first point to avoid misleading spike
             linewidth=1.5,
+            color="#1f77b4",  # Default blue
+            label=f"Test (AUC-PR: {test_auc_pr:.3f})"
         )
 
-        # --- Validation PR curve (if available) ---------------------------
+        # --- Validation PR curve with AUC-PR (if available)
         if getattr(self, "y_validation_pred_proba", None) is not None \
-           and getattr(self, "y_validation", None) is not None:
-            # Compute precision‑recall pairs
-            prec, rec, _ = precision_recall_curve(
+        and getattr(self, "y_validation", None) is not None:
+            # Calculate validation baseline
+            val_baseline = self.y_validation.mean()
+
+            # Compute precision-recall pairs and AUC-PR for validation
+            val_precision, val_recall, _ = precision_recall_curve(
                 self.y_validation,
                 self.y_validation_pred_proba,
                 pos_label=1
             )
-            # Skip the first point (precision=1 at recall=0)
+            val_auc_pr = auc(val_recall, val_precision)
+
+            # Plot validation curve
             ax.plot(
-                rec[1:], prec[1:],
+                val_recall[1:], val_precision[1:],  # Skip first point
                 linewidth=2.5,
-                color="#22DD22",
-                label="Validation"
+                color="#22DD22",  # Green
+                label=f"Validation (AUC-PR: {val_auc_pr:.3f})"
             )
 
-        ax.set_title("Precision‑Recall Curve – Test vs Validation")
+            # Update baseline to show validation baseline if available
+            baseline = val_baseline
+
+        # --- Baseline reference line (positive class prevalence)
+        ax.axhline(
+            baseline,
+            linestyle="--",
+            linewidth=1,
+            color="#afc6ba",  # Light grey-green
+            label=f"Baseline ({baseline:.3f})"
+        )
+
+        # Formatting
+        ax.set_xlim([0.0, 1.0])
+        ax.set_ylim([0.0, 1.05])
+        ax.set_xlabel('Recall')
+        ax.set_ylabel('Precision')
+        ax.set_title('Precision-Recall Curve with AUC-PR')
         ax.grid(True, linestyle=":", alpha=0.3)
-        ax.legend()
+        ax.legend(loc="lower left")
 
 
     def _plot_return_vs_rank_classifier(self, ax, n_buckets: int = 10):
@@ -1176,7 +1215,7 @@ class ClassifierEvaluator(RegressorEvaluator):
         if linthresh <= 0:
             max_abs = abs_returns.max()
             linthresh = max_abs * 0.05 if max_abs > 0 else 1.0
-        ax2.set_yscale("symlog", linthresh=linthresh)
+        ax2.set_yscale("symlog", linthresh=linthresh)  # comment to toggle log/linear y2 axis
         ax2.plot(
             valid_centers,
             valid_median_ret,
@@ -1195,6 +1234,19 @@ class ClassifierEvaluator(RegressorEvaluator):
             label="Winsorized Return",
             color="#ffe000"
         )
+        # Annotate lowest and highest winsorized return
+        low_interval = bin_winsorized_ret.idxmin()
+        high_interval = bin_winsorized_ret.idxmax()
+        x_low = (low_interval.left + low_interval.right) / 2
+        x_high = (high_interval.left + high_interval.right) / 2
+        y_low = bin_winsorized_ret.loc[low_interval]
+        y_high = bin_winsorized_ret.loc[high_interval]
+        ax2.annotate(f"{y_low:.2f}", xy=(x_low, y_low),
+                     xytext=(0, -10), textcoords="offset points",
+                     ha="center", va="top")
+        ax2.annotate(f"{y_high:.2f}", xy=(x_high, y_high),
+                     xytext=(0, 10), textcoords="offset points",
+                     ha="center", va="bottom")
         ax2.plot(
             valid_centers,
             valid_mean_ret,
