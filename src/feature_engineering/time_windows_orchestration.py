@@ -99,12 +99,15 @@ class TimeWindowsOrchestrator:
         u.notify('default')
 
         # 1. Base datasets used by all windows
-        macro_trends_df, market_data_df, profits_df, prices_df = prepare_all_windows_base_data(
-            self.config, self.metrics_config
-        )
+        (
+            macro_trends_df,
+            market_data_df,
+            profits_df,
+            prices_df,
+        ) = self._prepare_all_windows_base_data()
 
         # 2. Flattened features per window
-        time_windows = generate_time_windows(self.config)
+        time_windows = self._generate_time_windows()
         all_flattened_filepaths = []
 
         for time_window in time_windows:
@@ -142,109 +145,96 @@ class TimeWindowsOrchestrator:
 
 
 
-# -------------------------------------------------
-#          Back‑compat shim (to be removed)
-# -------------------------------------------------
-def generate_all_time_windows_model_inputs(config, metrics_config, modeling_config):
-    """
-    DEPRECATED.  Instantiate `TimeWindowsOrchestrator` instead.
-    """
-    return TimeWindowsOrchestrator(
-        config, metrics_config, modeling_config
-    ).generate_all_time_windows_model_inputs()
 
 
+    # ----------------------------------
+    #           Helper Methods
+    # ----------------------------------
 
-def generate_time_windows(config):
-    """
-    Generates the parameter dicts used by i.prepare_configs() to generate the full set
-    of config files.
+    def _prepare_all_windows_base_data(self):
+        """
+        Retrieves, cleans and adds indicators to the all windows training data.
 
-    Params:
-        config (dict): config.yaml
+        Wallet cohort indicators will be generated for each window as the cohort groups will
+        change based on the boundary dates of the cohort lookback_period specified in the self.config.
 
-    Returns:
-        time_windows (list of dicts): a list of dicts that can be used to override the
-        config.yaml settings for each time window.
-    """
-    start_date = pd.to_datetime(config['training_data']['modeling_period_start'])
-    window_frequency = config['training_data']['time_window_frequency']
+        Returns:
+        - macro_trends_df (DataFrame): macro trends keyed on date only
+        - market_data_df, prices_df (DataFrame): market data for coin-date pairs
+        - profits_df (DataFrame): wallet transfer activity keyed on coin-date-wallet that will be used
+            to compute wallet cohorts metrics
+        """
+        # 1. Data Retrieval, Cleaning, Indicator Calculation
+        # --------------------------------------------------
+        # Market data: retrieve and clean full history
+        market_data_df = dr.retrieve_market_data(dataset=self.config['training_data']['dataset'])
+        market_data_df = dr.clean_market_data(market_data_df, self.config,
+                                                self.config['training_data']['earliest_window_start'],
+                                                self.config['training_data']['training_period_end'])
 
-    time_windows = [
-        {'config.training_data.modeling_period_start': start_date.strftime('%Y-%m-%d')}
-    ]
+        # Profits: retrieve and clean profits data spanning the earliest to latest training periods
+        profits_df = dr.retrieve_profits_data(
+            start_date = self.config['training_data']['earliest_cohort_lookback_start'],
+            end_date = self.config['training_data']['training_period_end'],
+            min_wallet_inflows = self.config['data_cleaning']['min_wallet_inflows'],
+            dataset = self.config['training_data']['dataset'])
+        profits_df, _ = dr.clean_profits_df(profits_df, self.config['data_cleaning'])
 
-    for _ in range(config['training_data']['additional_windows']):
-        start_date -= timedelta(days=window_frequency)
-        time_windows.append({'config.training_data.modeling_period_start': start_date.strftime('%Y-%m-%d')})
-
-    return time_windows
-
-
-def prepare_all_windows_base_data(config, metrics_config):
-    """
-    Retrieves, cleans and adds indicators to the all windows training data.
-
-    Wallet cohort indicators will be generated for each window as the cohort groups will
-    change based on the boundary dates of the cohort lookback_period specified in the config.
-
-    Params:
-    - config (dict): overall config.yaml without any window overrides
-
-    Returns:
-    - macro_trends_df (DataFrame): macro trends keyed on date only
-    - market_data_df, prices_df (DataFrame): market data for coin-date pairs
-    - profits_df (DataFrame): wallet transfer activity keyed on coin-date-wallet that will be used
-        to compute wallet cohorts metrics
-    """
-    # 1. Data Retrieval, Cleaning, Indicator Calculation
-    # --------------------------------------------------
-    # Market data: retrieve and clean full history
-    market_data_df = dr.retrieve_market_data(dataset=config['training_data']['dataset'])
-    market_data_df = dr.clean_market_data(market_data_df, config,
-                                            config['training_data']['earliest_window_start'],
-                                            config['training_data']['training_period_end'])
-
-    # Profits: retrieve and clean profits data spanning the earliest to latest training periods
-    profits_df = dr.retrieve_profits_data(
-        start_date = config['training_data']['earliest_cohort_lookback_start'],
-        end_date = config['training_data']['training_period_end'],
-        min_wallet_inflows = config['data_cleaning']['min_wallet_inflows'],
-        dataset = config['training_data']['dataset'])
-    profits_df, _ = dr.clean_profits_df(profits_df, config['data_cleaning'])
-
-    # Macro trends: retrieve and clean full history
-    macro_trends_df = dr.retrieve_macro_trends_data()
-    macro_trends_cols = list(config['datasets']['macro_trends'].keys()) if 'macro_trends' in config['datasets'] else []
-    macro_trends_df = dr.clean_macro_trends(macro_trends_df, macro_trends_cols)
+        # Macro trends: retrieve and clean full history
+        macro_trends_df = dr.retrieve_macro_trends_data()
+        macro_trends_cols = list(self.config['datasets']['macro_trends'].keys()) if 'macro_trends' in self.config['datasets'] else []
+        macro_trends_df = dr.clean_macro_trends(macro_trends_df, macro_trends_cols)
 
 
-    # 2. Filtering based on dataset overlap
-    # -------------------------------------
-    # Filter market_data to only coins with transfers data if configured to
-    if config['data_cleaning']['exclude_coins_without_transfers']:
-        market_data_df = market_data_df[market_data_df['coin_id'].isin(profits_df['coin_id'])]
-    # Create prices_df: lightweight reference for other functions
-    prices_df = market_data_df[['coin_id','date','price']].copy()
+        # 2. Filtering based on dataset overlap
+        # -------------------------------------
+        # Filter market_data to only coins with transfers data if self.configured to
+        if self.config['data_cleaning']['exclude_coins_without_transfers']:
+            market_data_df = market_data_df[market_data_df['coin_id'].isin(profits_df['coin_id'])]
+        # Create prices_df: lightweight reference for other functions
+        prices_df = market_data_df[['coin_id','date','price']].copy()
 
-    # Filter profits_df to remove records for any coins that were removed in data cleaning
-    profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
+        # Filter profits_df to remove records for any coins that were removed in data cleaning
+        profits_df = profits_df[profits_df['coin_id'].isin(market_data_df['coin_id'])]
 
 
-    # 3. Add indicators (additional time series)
-    # ------------------------------------------
-    # Macro trends: add indicators if there are metrics configured
-    if metrics_config.get('macro_trends'):
-        macro_trends_df = ind.generate_time_series_indicators(macro_trends_df,
-                                                              metrics_config['macro_trends'],
-                                                              None)
-    # Market data: add indicators
-    market_data_df = ind.generate_time_series_indicators(market_data_df,
-                                                        metrics_config['time_series']['market_data'],
-                                                        'coin_id')
-    market_data_df = ind.add_market_data_dualcolumn_indicators(market_data_df)
+        # 3. Add indicators (additional time series)
+        # ------------------------------------------
+        # Macro trends: add indicators if there are metrics self.configured
+        if self.metrics_config.get('macro_trends'):
+            macro_trends_df = ind.generate_time_series_indicators(macro_trends_df,
+                                                                self.metrics_config['macro_trends'],
+                                                                None)
+        # Market data: add indicators
+        market_data_df = ind.generate_time_series_indicators(market_data_df,
+                                                            self.metrics_config['time_series']['market_data'],
+                                                            'coin_id')
+        market_data_df = ind.add_market_data_dualcolumn_indicators(market_data_df)
 
-    return macro_trends_df, market_data_df, profits_df, prices_df
+        return macro_trends_df, market_data_df, profits_df, prices_df
+
+
+    def _generate_time_windows(self):
+        """
+        Generates the parameter dicts used by i.prepare_configs() to generate the full set
+        of config files.
+
+        Returns:
+            time_windows (list of dicts): a list of dicts that can be used to override the
+            config.yaml settings for each time window.
+        """
+        start_date = pd.to_datetime(self.config['training_data']['modeling_period_start'])
+        window_frequency = self.config['training_data']['time_window_frequency']
+
+        time_windows = [
+            {'config.training_data.modeling_period_start': start_date.strftime('%Y-%m-%d')}
+        ]
+
+        for _ in range(self.config['training_data']['additional_windows']):
+            start_date -= timedelta(days=window_frequency)
+            time_windows.append({'config.training_data.modeling_period_start': start_date.strftime('%Y-%m-%d')})
+
+        return time_windows
 
 
 
