@@ -45,7 +45,7 @@ wallet_features:
     ]
 
     # Features from the feature_engineering directory
-    toggle_prior_model_features: False
+    toggle_coin_flow_model_features: False
 
 
 # CoinModel Modeling Config

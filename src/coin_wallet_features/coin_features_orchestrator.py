@@ -104,17 +104,17 @@ class CoinFeaturesOrchestrator:
             self.wallets_coin_config['n_threads']['cw_flattening_threads']
         )
 
-        # Generate and merge prior model features if configured
-        if self.wallets_coin_config['wallet_features']['toggle_prior_model_features']:
-            prior_coin_model_features_df = self._generate_prior_coin_model_features()
-            prior_coin_model_features_df.to_parquet(
+        # Generate and merge Coin Flow Model features if configured
+        if self.wallets_coin_config['wallet_features']['toggle_coin_flow_model_features']:
+            coin_flows_model_features_df = self._generate_coin_flow_model_features()
+            coin_flows_model_features_df.to_parquet(
                 f"{self.wallets_coin_config['training_data']['parquet_folder']}"
-                f"/{prd}_prior_coin_model_features_df.parquet",
+                f"/{prd}_coin_flows_model_features_df.parquet",
                 index=True
             )
             coin_training_data_df_full = self._merge_all_features(
                 coin_wallet_features_df,
-                prior_coin_model_features_df
+                coin_flows_model_features_df
             )
         else:
             coin_training_data_df_full = coin_wallet_features_df
@@ -184,7 +184,7 @@ class CoinFeaturesOrchestrator:
     #           Helper Methods
     # ----------------------------------
 
-    def _generate_prior_coin_model_features(
+    def _generate_coin_flow_model_features(
         self,
     ) -> pd.DataFrame:
         """
@@ -206,15 +206,16 @@ class CoinFeaturesOrchestrator:
             raise ValueError(
                 f"Coin features modeling period must align with wallet features validation period:\n"
                 f"Wallet-coin model coin_modeling_period boundaries: {val_start} to {val_end} \n"
-                f"Prior coin model modeling_period boundaries: {model_start} to {model_end}"
+                f"Coin Flow Model modeling_period boundaries: {model_start} to {model_end}"
             )
 
         # Generate features based on the coin config files
-        coin_features_df, _, _ = tw.generate_all_time_windows_model_inputs(
+        coin_flow_features_orchestrator = tw.CoinFlowFeaturesOrchestrator(
             self.coins_config,
             self.metrics_config,
             self.coins_modeling_config
         )
+        coin_features_df, _, _ = coin_flow_features_orchestrator.generate_all_time_windows_model_inputs()
 
         # Remove time window index since we aren't using that for now
         coin_features_df = coin_features_df.reset_index(level='time_window', drop=True)
@@ -226,7 +227,7 @@ class CoinFeaturesOrchestrator:
     def _merge_all_features(
         self,
         coin_wallet_features_df: pd.DataFrame,
-        prior_coin_model_features_df: pd.DataFrame = None
+        coin_flows_model_features_df: pd.DataFrame = None
     ) -> pd.DataFrame:
         """
         Inner-join wallet_df & non_wallet_df into final coin-level feature set.
@@ -238,9 +239,9 @@ class CoinFeaturesOrchestrator:
         Returns:
         - merged_df (DataFrame): inner-joined on coin_id, only coins present in both.
         """
-        if prior_coin_model_features_df is not None:
+        if coin_flows_model_features_df is not None:
             # Confirm overlap
-            coin_features_ids = prior_coin_model_features_df.index
+            coin_features_ids = coin_flows_model_features_df.index
             coin_wallet_features_ids = coin_wallet_features_df.index
             wallet_features_only_ids = set(coin_wallet_features_ids) - set(coin_features_ids)
 
@@ -252,10 +253,10 @@ class CoinFeaturesOrchestrator:
                             "not in the non wallet coin features")
 
             # Join together
-            coin_training_data_df_full = coin_wallet_features_df.join(prior_coin_model_features_df,how='inner')
+            coin_training_data_df_full = coin_wallet_features_df.join(coin_flows_model_features_df,how='inner')
 
         else:
-            # Just return base features if prior model features aren't input
+            # Just return base features if Coin Flow Model features aren't input
             coin_training_data_df_full = coin_wallet_features_df
 
         logger.info("Final features shape: %s",coin_training_data_df_full.shape)
