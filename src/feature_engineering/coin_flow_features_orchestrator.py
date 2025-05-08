@@ -130,7 +130,6 @@ class CoinFlowFeaturesOrchestrator:
         concatenated_dfs = self._concat_dataset_time_windows_dfs(all_flattened_filepaths)
         training_data_df, join_logs_df = self._join_dataset_all_windows_dfs(concatenated_dfs)
 
-        # u.notify('calendar_reminder')
         self.logger.info(
             "Generated training_data_df with shape %s for epoch with modeling period start %s.",
             training_data_df.shape,
@@ -366,7 +365,7 @@ class CoinFlowFeaturesOrchestrator:
     def _join_dataset_all_windows_dfs(concatenated_dfs):
         """
         Merges the all-windows dataframes of each dataset together according to the fill method
-        specified in the model_config. The param is the format from tw.concat_dataset_time_windows_dfs().
+        specified in the model_config. The param is the format from cffo.concat_dataset_time_windows_dfs().
 
         Params:
         - concatenated_dfs (Dict[str, Tuple[pd.DataFrame, str]]): A dictionary where keys are
