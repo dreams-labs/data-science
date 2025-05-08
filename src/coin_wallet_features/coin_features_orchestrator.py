@@ -6,7 +6,7 @@ from datetime import datetime
 import pandas as pd
 
 # Local module imports
-import feature_engineering.time_windows_orchestration as tw
+import feature_engineering.coin_flow_features_orchestrator as cffo
 import wallet_modeling.wallet_training_data_orchestrator as wtdo
 import coin_wallet_features.wallet_segmentation as cws
 import coin_wallet_features.wallet_metrics as cwwm
@@ -192,7 +192,7 @@ class CoinFeaturesOrchestrator:
 
         Params:
         - modeling_profits_df (DataFrame): profits for modeling period
-        - time_window_generator (callable): tw.generate_all_time_windows_model_inputs
+        - time_window_generator (callable): cffo.generate_all_time_windows_model_inputs
 
         Returns:
         - coin_non_wallet_features_df (DataFrame): index=coin_id, features from all windows
@@ -210,7 +210,7 @@ class CoinFeaturesOrchestrator:
             )
 
         # Generate features based on the coin config files
-        coin_flow_features_orchestrator = tw.CoinFlowFeaturesOrchestrator(
+        coin_flow_features_orchestrator = cffo.CoinFlowFeaturesOrchestrator(
             self.coins_config,
             self.metrics_config,
             self.coins_modeling_config

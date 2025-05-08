@@ -19,7 +19,7 @@ from dreams_core import core as dc
 
 # pyright: reportMissingImports=false
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
-import feature_engineering.time_windows_orchestration as tw
+import feature_engineering.coin_flow_features_orchestrator as cffo
 
 load_dotenv()
 logger = dc.setup_logger()
@@ -61,7 +61,7 @@ def test_merge_and_fill_training_data_same_coin_ids():
     ]
 
     # Run the function
-    training_data_df, merge_logs_df = tw.join_dataset_all_windows_dfs(input_dfs)
+    training_data_df, merge_logs_df = cffo.join_dataset_all_windows_dfs(input_dfs)
 
     # Assert that the merged DataFrame matches the expected DataFrame
     expected_df = pd.DataFrame({
@@ -88,7 +88,7 @@ def test_merge_and_fill_training_data_same_coin_ids():
     ]
 
     # Run the function
-    training_data_df, merge_logs_df = tw.join_dataset_all_windows_dfs(input_dfs)
+    training_data_df, merge_logs_df = cffo.join_dataset_all_windows_dfs(input_dfs)
 
     # Assert that the merged DataFrame matches the expected DataFrame
     np.array_equal(training_data_df.values,expected_df.values)
@@ -116,7 +116,7 @@ def test_merge_and_fill_training_data_fill_zeros():
     })
 
     # Call the function
-    merged_df, merge_logs_df = tw.join_dataset_all_windows_dfs([
+    merged_df, merge_logs_df = cffo.join_dataset_all_windows_dfs([
         (df1, 'fill_zeros', 'df1'),
         (df2, 'fill_zeros', 'df2')
     ])
@@ -161,7 +161,7 @@ def test_merge_and_fill_training_data_drop_records():
     })
 
     # Run the function
-    merged_df, logs_df = tw.join_dataset_all_windows_dfs([
+    merged_df, logs_df = cffo.join_dataset_all_windows_dfs([
         (df1, 'drop_records', 'df1'),
         (df2, 'drop_records', 'df2')
     ])
