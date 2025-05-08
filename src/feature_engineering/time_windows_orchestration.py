@@ -228,7 +228,7 @@ def generate_window_flattened_dfs(
     window_flattened_filepaths.extend([flattened_market_data_filepath])
 
     # Macro trends: generate window-specific flattened metrics
-    if not macro_trends_df.drop(columns='date').empty:
+    if not macro_trends_df.reset_index().drop(columns='date').empty:
         flattened_macro_trends_df, flattened_macro_trends_filepath = fg.generate_window_macro_trends_features(
             macro_trends_df,
             'macro_trends',
