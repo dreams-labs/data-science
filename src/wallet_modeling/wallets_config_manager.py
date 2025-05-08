@@ -35,26 +35,26 @@ def load_all_wallets_configs(config_dir: str):
     wallets_config = WalletsConfig.load_from_yaml(wallets_yaml_path)
     wallets_coin_config = WalletsCoinConfig.load_from_yaml(wallets_coin_yaml_path)
 
-    # Confirm dataset match
-    if wallets_config['training_data']['dataset'] != wallets_coin_config['training_data']['dataset']:
-        raise ValueError(
-            f"Mismatch between wallets_config dataset "
-            f"'{wallets_config['training_data']['dataset']}' "
-            f"and wallets_coin_config dataset "
-            f"'{wallets_coin_config['training_data']['dataset']}'"
-        )
+    # Populate wallets_coin_config['training_data']
+    base_wc_config = wallets_coin_config.config
+    base_wc_config['training_data'] = {}
 
-    # Confirm folders match
-    w_folder = wallets_config['training_data']['parquet_folder'].split('/')[-1]
-    wc_folder = wallets_coin_config['training_data']['parquet_folder'].split('/')[-1]
-    wcs_folder = wallets_coin_config['training_data']['coins_wallet_scores_folder'].split('/')[-2]
-    if not (w_folder == wc_folder == wcs_folder):
-        logger.warning(
-            "Folder suffixes don't match \n"
-            f"{w_folder} \n"
-            f"{wc_folder} \n"
-            f"{wcs_folder}"
-        )
+    # Fill [dataset]
+    base_wc_config['training_data']['dataset'] = wallets_config['training_data']['dataset']
+
+    # Fill [parquet_folder]
+    base_folder = '/'.join(wallets_config['training_data']['parquet_folder'].split('/')[:-2])
+    instance_folder = wallets_config['training_data']['parquet_folder'].split('/')[-1]
+    wc_folder = f"{base_folder}/coin_modeling_dfs/{instance_folder}"
+    base_wc_config['training_data']['parquet_folder'] = wc_folder
+
+    # Fill [coins_wallet_scores_folder]
+    coins_wallet_scores_folder = f"{wc_folder}/scores"
+    Path(coins_wallet_scores_folder).mkdir(parents=True, exist_ok=True)
+    base_wc_config['training_data']['coins_wallet_scores_folder'] = coins_wallet_scores_folder
+
+    # Store updated config
+    wallets_coin_config.config = base_wc_config
 
     return wallets_config, wallets_coin_config
 
