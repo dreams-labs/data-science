@@ -26,6 +26,62 @@ import insights.experiments as exp
 logger = dc.setup_logger()
 
 
+
+# -------------------------------------------------
+#               TimeWindowsOrchestrator
+# -------------------------------------------------
+
+class TimeWindowsOrchestrator:
+    """
+    Thin wrapper around the current free-function workflow.
+    Step 1 only adds an object to carry the three config blobs plus
+    lazy placeholders for heavy data pulls; core logic stays where it is
+    to minimise diff size and risk.
+    """
+
+    def __init__(
+        self,
+        config: dict,
+        metrics_config: dict,
+        modeling_config: dict,
+    ):
+        """
+        Params
+        ------
+        config : config.yaml
+        metrics_config : metrics_config.yaml
+        modeling_config : modeling_config.yaml
+        """
+        self.config = config
+        self.metrics_config = metrics_config
+        self.modeling_config = modeling_config
+
+        # Lazy-loaded heavy artefacts (populated later so we build them once)
+        self._macro_trends_df = None
+        self._market_data_df = None
+        self._profits_df = None
+        self._prices_df = None
+
+        # Re-use module-level logger so behaviour is identical
+        self.logger = logger
+
+
+    # -------------------------------
+    #       Primary Interface
+    # -------------------------------
+
+    def run(self):
+        """
+        Proxy to the existing all-windows generator.
+        Returns the same (training_data_df, prices_df, join_logs_df) tuple.
+        """
+        return generate_all_time_windows_model_inputs(
+            self.config,
+            self.metrics_config,
+            self.modeling_config,
+        )
+
+
 def generate_all_time_windows_model_inputs(config,metrics_config,modeling_config):
     """
     The full sequence to generate X and y splits for all sets that incorporates all datasets,
