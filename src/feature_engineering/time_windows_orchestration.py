@@ -11,19 +11,20 @@ functions used to orchestrate time windows. the major steps are:
 
 import os
 import re
+import logging
 from datetime import timedelta
 from typing import List, Dict, Tuple
 import pandas as pd
-import dreams_core.core as dc
 
 # project modules
 import training_data.data_retrieval as dr
 import coin_wallet_metrics.indicators as ind
 import feature_engineering.feature_generation as fg
 import insights.experiments as exp
+import utils as u
 
-# set up logger at the module level
-logger = dc.setup_logger()
+# Set up logger at the module level
+logger = logging.getLogger(__name__)
 
 
 
@@ -104,6 +105,9 @@ def generate_all_time_windows_model_inputs(config,metrics_config,modeling_config
     - join_logs_df (pd.DataFrame): DataFrame showing the outcomes of each dataset's join and fill
         methods
     """
+    logger.info("Beginning generation of all time windows' data for epoch with "
+                f"modeling period start of {config['training_data']['modeling_period_start']}.")
+    u.notify('boot_up')
 
     # 1. Retrieve base datasets used by all windows
     # ---------------------------------------------
@@ -146,6 +150,10 @@ def generate_all_time_windows_model_inputs(config,metrics_config,modeling_config
     # Combine all time windows for each dataset, the join the datasets together
     concatenated_dfs = concat_dataset_time_windows_dfs(all_flattened_filepaths,modeling_config)
     training_data_df, join_logs_df = join_dataset_all_windows_dfs(concatenated_dfs)
+
+    logger.info(f"Generated training_data_df with shape ({training_data_df.shape}) for epoch with "
+                f"modeling period start of {config['training_data']['modeling_period_start']}.")
+
 
     return training_data_df, prices_df, join_logs_df
 
