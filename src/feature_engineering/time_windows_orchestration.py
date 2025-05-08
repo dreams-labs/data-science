@@ -71,91 +71,87 @@ class TimeWindowsOrchestrator:
     #       Primary Interface
     # -------------------------------
 
-    def run(self):
+    def generate_all_time_windows_model_inputs(self):
         """
-        Proxy to the existing all-windows generator.
-        Returns the same (training_data_df, prices_df, join_logs_df) tuple.
+        The full sequence to generate X and y splits for all sets that
+        incorporates all datasets, time windows, metrics, and indicators.
+
+        Sequence:
+        1. Retrieve the base datasets that contain records across all windows
+        2. Loop through each time window and generate flattened features
+        3a. Concat each dataset's window dfs, then join the datasets together
+            to create a comprehensive feature set keyed on coin_id.
+        3b. Split the full feature set into train/test/validation/future sets.
+
+        Returns
+        -------
+        training_data_df : DataFrame
+            MultiIndex (time_window, coin_id) with all configured features.
+        prices_df : DataFrame
+            Prices for all coins on all dates.
+        join_logs_df : DataFrame
+            Outcomes of each dataset join/fill step.
         """
-        return generate_all_time_windows_model_inputs(
-            self.config,
-            self.metrics_config,
-            self.modeling_config,
+        self.logger.info(
+            "Beginning generation of all time windows' data for epoch with "
+            f"modeling period start of {self.config['training_data']['modeling_period_start']}."
+        )
+        u.notify('default')
+
+        # 1. Base datasets used by all windows
+        macro_trends_df, market_data_df, profits_df, prices_df = prepare_all_windows_base_data(
+            self.config, self.metrics_config
         )
 
+        # 2. Flattened features per window
+        time_windows = generate_time_windows(self.config)
+        all_flattened_filepaths = []
 
-def generate_all_time_windows_model_inputs(config,metrics_config,modeling_config):
-    """
-    The full sequence to generate X and y splits for all sets that incorporates all datasets,
-    time windows, metrics, and indicators.
+        for time_window in time_windows:
+            window_config, window_metrics_config, window_modeling_config = (
+                exp.prepare_configs(
+                    self.modeling_config['modeling']['config_folder'], time_window
+                )
+            )
 
-    Sequence:
-    1. Retrieve the base datasets that contain records across all windows
-    2. Loop through each time window and generate flattened features for the window
-    3a. Concat each dataset's window dfs, then join all the dataset dfs with the target variable to
-        create a comprehensive feature set keyed on coin_id.
-    3b. Split the full feature set into train/test/validation/future sets.
+            _, window_flattened_filepaths = generate_window_flattened_dfs(
+                market_data_df,
+                macro_trends_df,
+                profits_df,
+                prices_df,
+                window_config,
+                window_metrics_config,
+                window_modeling_config,
+            )
+            all_flattened_filepaths.extend(window_flattened_filepaths)
 
-    Params:
-    - config, metrics_config, modeling_config: loaded config yaml files
+        # 3. Combine features & targets
+        concatenated_dfs = concat_dataset_time_windows_dfs(
+            all_flattened_filepaths, self.modeling_config
+        )
+        training_data_df, join_logs_df = join_dataset_all_windows_dfs(concatenated_dfs)
 
-    Returns:
-    - training_data_df (pd.DataFrame): DataFrame with MultiIndex on time_window,coin_id that contains
-        columns for all configured features for all datasets in all time windows.
-    - prices_df (pd.DataFrame): DataFrame with prices for all coins on all dates
-    - join_logs_df (pd.DataFrame): DataFrame showing the outcomes of each dataset's join and fill
-        methods
-    """
-    logger.info("Beginning generation of all time windows' data for epoch with "
-                f"modeling period start of {config['training_data']['modeling_period_start']}.")
-    u.notify('boot_up')
-
-    # 1. Retrieve base datasets used by all windows
-    # ---------------------------------------------
-    macro_trends_df, market_data_df, profits_df, prices_df = prepare_all_windows_base_data(config,
-                                                                                           metrics_config)
-
-
-    # 2. Generate flattened features for each dataset in each window
-    # --------------------------------------------------------------
-    # Generate time_windows config overrides that will modify each window's config settings
-    time_windows = generate_time_windows(config)
-
-    all_flattened_dfs = []
-    all_flattened_filepaths = []
-
-    for _, time_window in enumerate(time_windows):
-
-        # Prepare time window config files
-        window_config, window_metrics_config, window_modeling_config = (
-            exp.prepare_configs(modeling_config['modeling']['config_folder'], time_window))
-
-        # Generate flattened feature dfs for all datasets for the window
-        window_flattened_dfs, window_flattened_filepaths = generate_window_flattened_dfs(
-            market_data_df,
-            macro_trends_df,
-            profits_df,
-            prices_df,
-            window_config,
-            window_metrics_config,
-            window_modeling_config
+        u.notify('calendar_reminder')
+        self.logger.info(
+            "Generated training_data_df with shape %s for epoch with modeling period start %s.",
+            training_data_df.shape,
+            self.config['training_data']['modeling_period_start'],
         )
 
-        # Store window's flattened features
-        all_flattened_dfs.extend(window_flattened_dfs)
-        all_flattened_filepaths.extend(window_flattened_filepaths)
+        return training_data_df, prices_df, join_logs_df
 
 
-    # 3. Combine features from all datasets in all time windows with target variables
-    # -------------------------------------------------------------------------------
-    # Combine all time windows for each dataset, the join the datasets together
-    concatenated_dfs = concat_dataset_time_windows_dfs(all_flattened_filepaths,modeling_config)
-    training_data_df, join_logs_df = join_dataset_all_windows_dfs(concatenated_dfs)
 
-    logger.info(f"Generated training_data_df with shape ({training_data_df.shape}) for epoch with "
-                f"modeling period start of {config['training_data']['modeling_period_start']}.")
-
-
-    return training_data_df, prices_df, join_logs_df
+# -------------------------------------------------
+#          Back‑compat shim (to be removed)
+# -------------------------------------------------
+def generate_all_time_windows_model_inputs(config, metrics_config, modeling_config):
+    """
+    DEPRECATED.  Instantiate `TimeWindowsOrchestrator` instead.
+    """
+    return TimeWindowsOrchestrator(
+        config, metrics_config, modeling_config
+    ).generate_all_time_windows_model_inputs()
 
 
 
