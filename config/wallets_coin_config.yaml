@@ -2,7 +2,7 @@
 
 training_data: #CoinModel
 
-    dataset: dev  # Set to prod or dev; determines whether to query core or dev dataset tables
+    dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
     parquet_folder: temp/coin_modeling_dfs/dda729_coin_market_data
 
 # CoinModel Cleaning
@@ -41,24 +41,24 @@ wallet_scores: #CoinModel
             target_var_class_threshold: .40
             y_pred_threshold: 0.6
 
-        cw_return_rate_regression:
-            model_type: regression
-            target_variable: cw_crypto_net_gain/max_investment/winsorized
+        # cw_return_rate_regression:
+        #     model_type: regression
+        #     target_variable: cw_crypto_net_gain/max_investment/winsorized
 
-        return_rate_regression:
-            model_type: regression
-            target_variable: crypto_net_gain/max_investment/winsorized
+        # return_rate_regression:
+        #     model_type: regression
+        #     target_variable: crypto_net_gain/max_investment/winsorized
 
-        # USD Metrics
-        net_gain_1000:
-            target_variable: crypto_net_gain
-            target_var_class_threshold: 1000
-            y_pred_threshold: 0.7
+        # # USD Metrics
+        # net_gain_1000:
+        #     target_variable: crypto_net_gain
+        #     target_var_class_threshold: 1000
+        #     y_pred_threshold: 0.7
 
-        cw_net_flows_1000:
-            target_variable: cw_crypto_net_flows
-            target_var_class_threshold: 1000
-            y_pred_threshold: 0.7
+        # cw_net_flows_1000:
+        #     target_variable: cw_crypto_net_flows
+        #     target_var_class_threshold: 1000
+        #     y_pred_threshold: 0.7
 
 
 # CoinModel Segments
@@ -114,8 +114,8 @@ coin_modeling: #CoinModel
     # target_variable: coin_return
     # target_variable: coin_return_pctile_full
     # target_variable: coin_return_pctile
-    target_var_class_threshold: 0.3  # a classification model will try to predict the target var above this value
-    y_pred_threshold: 0.2  # scores above this probability threshold are positive predictions
+    target_var_class_threshold: 0.30  # a classification model will try to predict the target var above this value
+    y_pred_threshold: 0.15  # scores above this probability threshold are positive predictions
 
     returns_winsorization: 0.005
 
@@ -144,17 +144,17 @@ coin_modeling: #CoinModel
             # all_wallets*,
             # score_quantile|*,
             # score_binary|*
+            # wallet_cohorts|*,
+            # time_series|*,
             # training_clusters|*,
 
             # Segment Family
             # score_binary|cw_return_rate_000*,
             # score_binary|cw_return_rate_005*,
-            score_binary|cw_return_rate_025*,
+            # score_binary|cw_return_rate_025*,
             score_binary|cw_return_rate_040*,
             score_binary|net_gain_1000*,
             score_binary|cw_net_flows_1000*,
-            # score_binary|cw_net_flows_1000*,
-            # score_binary|net_gain_1000*,
 
             # # Segment Value
             # 'training_clusters|k5_cluster/cluster_0|*',
@@ -162,6 +162,23 @@ coin_modeling: #CoinModel
             'training_clusters|k5_cluster/cluster_2|*',
             'training_clusters|k5_cluster/cluster_3|*',
             'training_clusters|k5_cluster/cluster_4|*',
+
+            # Metric
+            # time_series|market_data|price*,
+            time_series|market_data|volume*,
+            time_series|market_data|*period_1,
+            time_series|market_data|*period_2,
+            # time_series|market_data|*period_3,
+
+            # wallet_cohorts|*|*period_1,
+            # wallet_cohorts|*|*period_2,
+            # wallet_cohorts|*|*period_3,
+            wallet_cohorts|*|buyers_new*,
+            wallet_cohorts|*|total_bought*,
+            # wallet_cohorts|*|total_holders*,
+            # wallet_cohorts|*|total_balance*,
+            wallet_cohorts|*|total_sold*,
+
 
 
             # Metric Detail
@@ -309,25 +326,40 @@ coin_modeling: #CoinModel
                 # training_clusters|*,
 
                 # Segment Family
-                # # score_binary|cw_return_rate_000*,
-                # # score_binary|cw_return_rate_005*,
+                # score_binary|cw_return_rate_000*,
+                # score_binary|cw_return_rate_005*,
                 # score_binary|cw_return_rate_025*,
                 # score_binary|cw_return_rate_040*,
                 # score_binary|net_gain_1000*,
                 # score_binary|cw_net_flows_1000*,
-                # # score_binary|cw_net_flows_1000*,
-                # # score_binary|net_gain_1000*,
+                # score_binary|cw_net_flows_1000*,
+                # score_binary|net_gain_1000*,
 
-                # Segment Value
-                'training_clusters|k5_cluster/cluster_0|*',
-                'training_clusters|k5_cluster/cluster_1|*',
-                'training_clusters|k5_cluster/cluster_2|*',
-                'training_clusters|k5_cluster/cluster_3|*',
-                'training_clusters|k5_cluster/cluster_4|*',
+                # # Segment Value
+                # 'training_clusters|k5_cluster/cluster_0|*',
+                # 'training_clusters|k5_cluster/cluster_1|*',
+                # 'training_clusters|k5_cluster/cluster_2|*',
+                # 'training_clusters|k5_cluster/cluster_3|*',
+                # 'training_clusters|k5_cluster/cluster_4|*',
 
 
-                # Metrics
-                # -------
+                # Metric
+                # time_series|market_data|price*,
+                # time_series|market_data|volume*,
+                # time_series|market_data|*_period_1,
+                # time_series|market_data|*_period_2,
+                # time_series|market_data|*_period_3,
+
+                # wallet_cohorts|*|*period_1,
+                # wallet_cohorts|*|*period_2,
+                # wallet_cohorts|*|*period_3,
+                # wallet_cohorts|*|buyers_new*,
+                # wallet_cohorts|*|total_bought*,
+                # # wallet_cohorts|*|total_holders*,
+                # # wallet_cohorts|*|total_balance*,
+                # wallet_cohorts|*|total_sold*,
+
+                # Metric Details
                 # '*|trading/average_transaction|*',
                 # '*|trading/crypto_cash_buys|*',
                 # '*|trading/crypto_cash_sells|*',
