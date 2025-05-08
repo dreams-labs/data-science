@@ -114,7 +114,7 @@ class CoinFeaturesOrchestrator:
         else:
             coin_training_data_df_full = coin_wallet_features_df
 
-        u.notify('level_up')
+        u.notify('notification_toast')
         logger.info("Successfully generated coin_training_data_df with shape "
                     f"({coin_training_data_df_full.shape}).")
 

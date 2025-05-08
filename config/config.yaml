@@ -14,7 +14,7 @@ training_data:
     time_window_frequency: 20 # how many days apart each time_window should start
 
     # Whether to query 'core' or 'dev_core' dataset tables
-    dataset: 'prod'  # Set to 'prod' or 'dev'; determines whether to query 'core' or 'dev' dataset tables
+    dataset: prod  # Set to 'prod' or 'dev'; determines whether to query 'core' or 'dev' dataset tables
 
 
 datasets:
