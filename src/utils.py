@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 
 def load_all_configs(config_folder):
     """
-    Loads and returns all config files needed for the prior coin model
+    Loads and returns all config files needed for the Coin Flow Model
     """
     config = load_config(f'{config_folder}/config.yaml')
     metrics_config = load_config(f'{config_folder}/metrics_config.yaml')

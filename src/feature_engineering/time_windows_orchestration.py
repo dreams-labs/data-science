@@ -29,10 +29,10 @@ logger = logging.getLogger(__name__)
 
 
 # -------------------------------------------------
-#               TimeWindowsOrchestrator
+#            CoinFlowFeaturesOrchestrator
 # -------------------------------------------------
 
-class TimeWindowsOrchestrator:
+class CoinFlowFeaturesOrchestrator:
     """
     Thin wrapper around the current free-function workflow.
     Step 1 only adds an object to carry the three config blobs plus
@@ -130,7 +130,7 @@ class TimeWindowsOrchestrator:
         concatenated_dfs = self._concat_dataset_time_windows_dfs(all_flattened_filepaths)
         training_data_df, join_logs_df = self._join_dataset_all_windows_dfs(concatenated_dfs)
 
-        u.notify('calendar_reminder')
+        # u.notify('calendar_reminder')
         self.logger.info(
             "Generated training_data_df with shape %s for epoch with modeling period start %s.",
             training_data_df.shape,
