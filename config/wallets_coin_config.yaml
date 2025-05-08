@@ -31,7 +31,7 @@ wallet_scores: #CoinModel
             target_variable: cw_crypto_net_gain/max_investment/base
             target_var_min_threshold: 0.05
             target_var_max_threshold: .inf
-            y_pred_threshold: 0.6
+            y_pred_threshold: 0.8
 
         cw_return_rate_min_025:
             target_variable: cw_crypto_net_gain/max_investment/base

@@ -8,7 +8,6 @@ training_data: #WalletModel
     modeling_period_start: '2024-09-29'
     modeling_period_duration: 30
     training_window_lookbacks: [  # How many days prior to the modeling period each window begins
-        600,
         420,
         270,
         180,
@@ -51,9 +50,9 @@ modeling: #WalletModel
     # target_variable: cw_crypto_net_gain/max_investment/base
     # target_var_min_threshold: -.inf  # a classification model will try to predict the target var above this value
     # target_var_max_threshold: -0.40  # a classification model will try to predict the target var above this value
-    target_var_min_threshold: 0.40  # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.05  # a classification model will try to predict the target var above this value
     target_var_max_threshold: .inf  # a classification model will try to predict the target var above this value
-    y_pred_threshold: 0.75  # scores above this probability threshold are positive predictions
+    y_pred_threshold: 0.7  # scores above this probability threshold are positive predictions
 
     # target_variable: crypto_net_gain/max_investment/winsorized
     # target_variable: cw_crypto_net_gain/max_investment/winsorized
@@ -67,7 +66,6 @@ modeling: #WalletModel
 
     # Epoch Assignment Toggle
     assign_epochs_to_addresses: False  # whether a given wallet has data for 1 or multiple epochs included in training data
-    oversample_to_pct: 0.05  # removes random negative values until dataset has this % of positives
 
     # Train/Test/Eval split
     test_size: 0.2  # what % of the total population will be used as test
@@ -89,22 +87,19 @@ modeling: #WalletModel
 
         subsample: 1.0  # samples rows, e.g. trees use x% of all wallet rows
         colsample_bytree: 0.9  # samples columns, e.g. trees use x% of all column features
+        gamma: 0.005  # minimum gain required to split further on a leaf node
+        tree_method: hist  # method for building trees, e.g., histogram-based
+        max_bin: 256  # how many bins to categorize features into
 
         # Performance Profiles (Choose One Section)
         # --------------------------------------
         #KeyParam Estimator Counts
-        # CHECKPOINTER
         n_estimators: 350  # number of trees to train in the model
-        learning_rate: 0.4  # step size for updates to weights during training
+        learning_rate: 0.7  # step size for updates to weights during training
 
-        # # PRODUCTION
-        # n_estimators: 500  # number of trees to train in the model
-        # learning_rate: 0.05  # step size for updates to weights during training
-
+        #KeyParam Positive Weight Scaler
+        # scale_pos_weight: 20  # ratio of neg:pos, e.g. 20 means 20neg:1pos
         early_stopping_rounds: 10  # stop training if no improvement after x rounds
-        gamma: 0.005  # minimum gain required to split further on a leaf node
-        tree_method: hist  # method for building trees, e.g., histogram-based
-        max_bin: 256  # how many bins to categorize features into
 
         # Threading Controls
         n_jobs: -1
@@ -204,7 +199,6 @@ modeling: #WalletModel
 
             # cluster|*,
 
-            '*|w1',
             '*|all_windows',
 
             # cw_timing|*,
