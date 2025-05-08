@@ -11,6 +11,55 @@ from coin_modeling.coin_config_manager import WalletsCoinConfig
 logger = logging.getLogger(__name__)
 
 
+
+# -----------------------------------------------------------
+#         Orchestrator: Reload Wallets + Coin Configs
+# -----------------------------------------------------------
+
+def load_all_wallets_configs(config_dir: str):
+    """
+    Reload both wallets and wallets-coin configurations from their YAML files,
+    and validate consistency between their datasets and folder suffixes.
+    Params:
+    - config_dir (str): Path to directory containing 'wallets_config.yaml' and 'wallets_coin_config.yaml'.
+    Returns:
+    - wallets_config (WalletsConfig): Reloaded wallets configuration instance.
+    - wallets_coin_config (WalletsCoinConfig): Reloaded wallets-coin configuration instance.
+    """
+    # Identify paths
+    base_path = Path(config_dir)
+    wallets_yaml_path = base_path / 'wallets_config.yaml'
+    wallets_coin_yaml_path = base_path / 'wallets_coin_config.yaml'
+
+    # Reload configs
+    wallets_config = WalletsConfig.load_from_yaml(wallets_yaml_path)
+    wallets_coin_config = WalletsCoinConfig.load_from_yaml(wallets_coin_yaml_path)
+
+    # Populate wallets_coin_config['training_data']
+    base_wc_config = wallets_coin_config.config
+    base_wc_config['training_data'] = {}
+
+    # Fill [dataset]
+    base_wc_config['training_data']['dataset'] = wallets_config['training_data']['dataset']
+
+    # Fill [parquet_folder]
+    base_folder = '/'.join(wallets_config['training_data']['parquet_folder'].split('/')[:-2])
+    instance_folder = wallets_config['training_data']['parquet_folder'].split('/')[-1]
+    wc_folder = f"{base_folder}/coin_modeling_dfs/{instance_folder}"
+    base_wc_config['training_data']['parquet_folder'] = wc_folder
+
+    # Fill [coins_wallet_scores_folder]
+    coins_wallet_scores_folder = f"{wc_folder}/scores"
+    Path(coins_wallet_scores_folder).mkdir(parents=True, exist_ok=True)
+    base_wc_config['training_data']['coins_wallet_scores_folder'] = coins_wallet_scores_folder
+
+    # Store updated config
+    wallets_coin_config.config = base_wc_config
+
+    return wallets_config, wallets_coin_config
+
+
+
 # -------------------------
 #       Primary Class
 # -------------------------
@@ -122,55 +171,6 @@ class WalletsConfig:
     def __str__(self):
         # Provide a string representation of the config for debugging
         return f"WalletsConfig(keys={list(self.config.keys())})"
-
-
-
-# -----------------------------------------------------------
-#         Orchestrator: Reload Wallets + Coin Configs
-# -----------------------------------------------------------
-
-def load_all_wallets_configs(config_dir: str):
-    """
-    Reload both wallets and wallets-coin configurations from their YAML files,
-    and validate consistency between their datasets and folder suffixes.
-    Params:
-    - config_dir (str): Path to directory containing 'wallets_config.yaml' and 'wallets_coin_config.yaml'.
-    Returns:
-    - wallets_config (WalletsConfig): Reloaded wallets configuration instance.
-    - wallets_coin_config (WalletsCoinConfig): Reloaded wallets-coin configuration instance.
-    """
-    # Identify paths
-    base_path = Path(config_dir)
-    wallets_yaml_path = base_path / 'wallets_config.yaml'
-    wallets_coin_yaml_path = base_path / 'wallets_coin_config.yaml'
-
-    # Reload configs
-    wallets_config = WalletsConfig.load_from_yaml(wallets_yaml_path)
-    wallets_coin_config = WalletsCoinConfig.load_from_yaml(wallets_coin_yaml_path)
-
-    # Confirm dataset match
-    if wallets_config['training_data']['dataset'] != wallets_coin_config['training_data']['dataset']:
-        raise ValueError(
-            f"Mismatch between wallets_config dataset "
-            f"'{wallets_config['training_data']['dataset']}' "
-            f"and wallets_coin_config dataset "
-            f"'{wallets_coin_config['training_data']['dataset']}'"
-        )
-
-    # Confirm folders match
-    w_folder = wallets_config['training_data']['parquet_folder'].split('/')[-1]
-    wc_folder = wallets_coin_config['training_data']['parquet_folder'].split('/')[-1]
-    wcs_folder = wallets_coin_config['training_data']['coins_wallet_scores_folder'].split('/')[-2]
-    if not (w_folder == wc_folder == wcs_folder):
-        logger.warning(
-            "Folder suffixes don't match \n"
-            f"{w_folder} \n"
-            f"{wc_folder} \n"
-            f"{wcs_folder}"
-        )
-
-    return wallets_config, wallets_coin_config
-
 
 
 # -----------------------------------
