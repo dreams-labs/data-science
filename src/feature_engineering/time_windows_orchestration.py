@@ -57,14 +57,15 @@ class TimeWindowsOrchestrator:
         self.metrics_config = metrics_config
         self.modeling_config = modeling_config
 
-        # Lazy-loaded heavy artefacts (populated later so we build them once)
-        self._macro_trends_df = None
-        self._market_data_df = None
-        self._profits_df = None
-        self._prices_df = None
+        # Base dataframes
+        self.macro_trends_df = None
+        self.market_data_df = None
+        self.profits_df = None
+        self.prices_df = None
 
         # Re-use module-level logger so behaviour is identical
         self.logger = logger
+
 
 
     # -------------------------------
@@ -100,10 +101,10 @@ class TimeWindowsOrchestrator:
 
         # 1. Base datasets used by all windows
         (
-            macro_trends_df,
-            market_data_df,
-            profits_df,
-            prices_df,
+            self.macro_trends_df,
+            self.market_data_df,
+            self.profits_df,
+            self.prices_df,
         ) = self._prepare_all_windows_base_data()
 
         # 2. Flattened features per window
@@ -111,20 +112,17 @@ class TimeWindowsOrchestrator:
         all_flattened_filepaths = []
 
         for time_window in time_windows:
+
+            # Generate custom configs for each window
             window_config, window_metrics_config, window_modeling_config = (
                 exp.prepare_configs(
                     self.modeling_config['modeling']['config_folder'], time_window
                 )
             )
 
-            _, window_flattened_filepaths = generate_window_flattened_dfs(
-                market_data_df,
-                macro_trends_df,
-                profits_df,
-                prices_df,
-                window_config,
-                window_metrics_config,
-                window_modeling_config,
+            # Pass the window configs into feature generators
+            _, window_flattened_filepaths = self._generate_window_flattened_dfs(
+                window_config, window_metrics_config, window_modeling_config
             )
             all_flattened_filepaths.extend(window_flattened_filepaths)
 
@@ -141,7 +139,7 @@ class TimeWindowsOrchestrator:
             self.config['training_data']['modeling_period_start'],
         )
 
-        return training_data_df, prices_df, join_logs_df
+        return training_data_df, self.prices_df, join_logs_df
 
 
 
@@ -238,69 +236,63 @@ class TimeWindowsOrchestrator:
 
 
 
-def generate_window_flattened_dfs(
-        market_data_df,
-        macro_trends_df,
-        profits_df,
-        prices_df,
-        config,
-        metrics_config,
-        modeling_config
-    ):
-    """
-    Takes the all windows datasets and filters and transforms them as needed to generate
-    flattened dfs with all configured aggregations and indicators for all columns.
+    def _generate_window_flattened_dfs(
+            self,
+            window_config: dict,
+            window_metrics_config: dict,
+            window_modeling_config: dict):
+        """
+        Takes the all windows datasets and filters and transforms them as needed to generate
+        flattened dfs with all configured aggregations and indicators for all columns.
 
-    Params:
-    - market_data_df,macro_trends_df (DataFrames): all windows datasets with indicators added
-        that will be flattened
-    - profits_df,prices_df (DataFrames): all windows datasets that will be used to compute
-        wallet cohorts metrics, which will then have indicators added and be flattened
-    - config,metrics_config,modeling_config (dicts): full config files for the given window
+        Params:
+        - window_config, window_metrics_config, window_modeling_config (dicts):
+            Full config files for the given window. Note that the window's config files
+            will differ from the base configs stored in the class and must be passed as params.
 
-    Returns:
-    - window_flattened_dfs (list of DataFrames): all flattened dfs keyed on coin_id with columns
-        for every specified aggregation and indicator
-    - window_flattened_filepaths (list of strings): filepaths to csv versions of the flattened dfs
-    """
-    window_flattened_dfs = []
-    window_flattened_filepaths = []
+        Returns:
+        - window_flattened_dfs (list of DataFrames): all flattened dfs keyed on coin_id with columns
+            for every specified aggregation and indicator
+        - window_flattened_filepaths (list of strings): filepaths to csv versions of the flattened dfs
+        """
+        window_flattened_dfs = []
+        window_flattened_filepaths = []
 
-    # Market data: generate window-specific flattened metrics
-    flattened_market_data_df, flattened_market_data_filepath = fg.generate_window_time_series_features(
-        market_data_df,
-        'time_series-market_data',
-        config,
-        metrics_config['time_series']['market_data'],
-        modeling_config
-    )
-    window_flattened_dfs.extend([flattened_market_data_df])
-    window_flattened_filepaths.extend([flattened_market_data_filepath])
-
-    # Macro trends: generate window-specific flattened metrics
-    if not macro_trends_df.reset_index().drop(columns='date').empty:
-        flattened_macro_trends_df, flattened_macro_trends_filepath = fg.generate_window_macro_trends_features(
-            macro_trends_df,
-            'macro_trends',
-            config,
-            metrics_config,
-            modeling_config
+        # Market data: generate window-specific flattened metrics
+        flattened_market_data_df, flattened_market_data_filepath = fg.generate_window_time_series_features(
+            self.market_data_df,
+            'time_series-market_data',
+            window_config,
+            window_metrics_config['time_series']['market_data'],
+            window_modeling_config
         )
-        window_flattened_dfs.extend([flattened_macro_trends_df])
-        window_flattened_filepaths.extend([flattened_macro_trends_filepath])
+        window_flattened_dfs.extend([flattened_market_data_df])
+        window_flattened_filepaths.extend([flattened_market_data_filepath])
 
-    # Cohorts: generate window-specific flattened metrics
-    flattened_cohort_dfs, flattened_cohort_filepaths = fg.generate_window_wallet_cohort_features(
-        profits_df,
-        prices_df,
-        config,
-        metrics_config,
-        modeling_config
-    )
-    window_flattened_dfs.extend(flattened_cohort_dfs)
-    window_flattened_filepaths.extend(flattened_cohort_filepaths)
+        # Macro trends: generate window-specific flattened metrics
+        if not self.macro_trends_df.reset_index().drop(columns='date').empty:
+            flattened_macro_trends_df, flattened_macro_trends_filepath = fg.generate_window_macro_trends_features(
+                self.macro_trends_df,
+                'macro_trends',
+                window_config,
+                window_metrics_config,
+                window_modeling_config
+            )
+            window_flattened_dfs.extend([flattened_macro_trends_df])
+            window_flattened_filepaths.extend([flattened_macro_trends_filepath])
 
-    return window_flattened_dfs, window_flattened_filepaths
+        # Cohorts: generate window-specific flattened metrics
+        flattened_cohort_dfs, flattened_cohort_filepaths = fg.generate_window_wallet_cohort_features(
+            self.profits_df,
+            self.prices_df,
+            window_config,
+            window_metrics_config,
+            window_modeling_config
+        )
+        window_flattened_dfs.extend(flattened_cohort_dfs)
+        window_flattened_filepaths.extend(flattened_cohort_filepaths)
+
+        return window_flattened_dfs, window_flattened_filepaths
 
 
 
