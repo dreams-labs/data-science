@@ -17,6 +17,11 @@ import utils as u
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
 
+
+# -------------------------------------------------
+#              CoinFeaturesOrchestrator
+# -------------------------------------------------
+
 class CoinFeaturesOrchestrator:
     """
     Orchestrates coin-model pipeline: data loading, feature engineering,
