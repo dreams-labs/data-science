@@ -222,8 +222,7 @@ def add_derived_values(config_dict: dict) -> dict:
                          f"the modeling period end of {td['modeling_period_end']}.")
 
     # Validation Period Boundaries
-    validation_period_end = datetime.strptime(td['validation_period_end'], "%Y-%m-%d")
-    validation_period_start_dt = validation_period_end - timedelta(days=modeling_duration)
+    validation_period_start_dt = modeling_end + timedelta(days=modeling_duration)
     td['validation_period_start'] = validation_period_start_dt
     td['validation_starting_balance_date'] = (validation_period_start_dt - timedelta(days=1)).strftime("%Y-%m-%d")
 

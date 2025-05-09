@@ -163,10 +163,10 @@ class MultiEpochOrchestrator:
                 epoch_date, epoch_training_df, epoch_modeling_df = future.result()
 
                 # Store data in dicts
-                if cfg.get('epoch_type') == 'validation':
+                if cfg.get('epoch_type') == 'modeling':
                     training_validation_dfs[epoch_date] = epoch_training_df
                     modeling_validation_dfs[epoch_date] = epoch_modeling_df
-                else:
+                elif cfg.get('epoch_type') == 'validation':
                     training_modeling_dfs[epoch_date] = epoch_training_df
                     modeling_modeling_dfs[epoch_date] = epoch_modeling_df
                 # inline: log completion before storing data
@@ -434,6 +434,68 @@ class MultiEpochOrchestrator:
         return epoch_date, epoch_training_data_df, epoch_modeling_data_df, cohorts
 
 
+    def _assert_no_epoch_overlap(self, modeling_offsets: Set[int], validation_offsets: Set[int]) -> None:
+        """
+        Checks for overlap between modeling and validation epochs.
+        Raises ValueError if the latest modeling end date is after
+        the earliest validation start date.
+        """
+        modeling_latest_offset = max(modeling_offsets)
+        modeling_latest_end_date = (
+            pd.to_datetime(self.base_config['training_data']['modeling_period_end'])
+            + timedelta(days=modeling_latest_offset)
+        )
+
+        validation_earliest_offset = min(validation_offsets)
+        validation_earliest_start_date = (
+            pd.to_datetime(self.base_config['training_data']['modeling_period_start'])
+            + timedelta(days=validation_earliest_offset)
+        )
+
+        if modeling_latest_end_date > validation_earliest_start_date:
+            raise ValueError(
+                f"Latest modeling end date as of {modeling_latest_end_date.strftime('%Y-%m-%d')} "
+                f"is later than earliest validation start date as of "
+                f"{validation_earliest_start_date.strftime('%Y-%m-%d')}."
+            )
+
+
+    def _build_epoch_config(
+        self,
+        offset_days: int,
+        epoch_type: str,
+        base_modeling_start: datetime,
+        base_modeling_end: datetime,
+        base_window_starts: List[datetime],
+        base_parquet_folder_base: Path
+    ) -> Dict:
+        """
+        Build a single epoch config by offsetting dates and updating folder based on offset.
+        """
+        epoch_config = copy.deepcopy(self.base_config)
+        epoch_config['epoch_type'] = epoch_type
+
+        # Offset key dates
+        new_start = (base_modeling_start + timedelta(days=offset_days)).strftime('%Y-%m-%d')
+        new_end = (base_modeling_end + timedelta(days=offset_days)).strftime('%Y-%m-%d')
+        epoch_config['training_data']['modeling_period_start'] = new_start
+        epoch_config['training_data']['modeling_period_end'] = new_end
+
+        # Offset every date in training_window_starts
+        epoch_config['training_data']['training_window_starts'] = [
+            (dt + timedelta(days=offset_days)).strftime('%Y-%m-%d')
+            for dt in base_window_starts
+        ]
+
+        # Update parquet folder based on new modeling_period_start
+        folder_suffix = datetime.strptime(new_start, '%Y-%m-%d').strftime('%y%m%d')
+        epoch_config['training_data']['parquet_folder'] = str(base_parquet_folder_base / folder_suffix)
+
+        # Add derived values
+        return wcm.add_derived_values(epoch_config)
+
+
+
     def _generate_epoch_configs(self) -> List[Dict]:
         """
         Generates config dicts for each offset epoch, including modeling and validation epochs.
@@ -443,73 +505,44 @@ class MultiEpochOrchestrator:
         """
         all_epochs_configs = []
         base_training_data = self.base_config['training_data']
-        offsets = self.epochs_config['offset_epochs']['offsets']
-        offsets = set(offsets + [
+
+        # Cache parsed base dates and base folder path
+        base_modeling_start = datetime.strptime(base_training_data['modeling_period_start'], '%Y-%m-%d')
+        base_modeling_end = datetime.strptime(base_training_data['modeling_period_end'], '%Y-%m-%d')
+        base_training_window_starts = [
+            datetime.strptime(dt, '%Y-%m-%d')
+            for dt in base_training_data['training_window_starts']
+        ]
+        base_parquet_folder_base = Path(base_training_data['parquet_folder'])
+
+        # Identify all offsets
+        validation_offsets = self.epochs_config['offset_epochs'].get('validation_offsets', [])
+        modeling_offsets = self.epochs_config['offset_epochs']['offsets']
+        coin_model_offsets = [
             base_training_data['modeling_period_duration'],
             base_training_data['modeling_period_duration']*2
-        ])
+        ]
+        existing_offsets = validation_offsets + modeling_offsets
+        coin_model_new_offsets = [offset for offset in coin_model_offsets if offset not in existing_offsets]
 
-        for offset_days in offsets:
-            # Deep copy base config to prevent mutations
-            epoch_config = copy.deepcopy(self.base_config)
-            epoch_config['epoch_type'] = 'modeling'
+        # Confirm there is no overlap between any modeling and validation periods
+        if len(validation_offsets) > 0:
+            self._assert_no_epoch_overlap(modeling_offsets, validation_offsets)
 
-            # Offset key dates
-            for date_key in [
-                'modeling_period_start',
-                'modeling_period_end',
-                # 'validation_period_end'
-            ]:
-                base_date = datetime.strptime(base_training_data[date_key], '%Y-%m-%d')
-                new_date = base_date + timedelta(days=offset_days)
-                epoch_config['training_data'][date_key] = new_date.strftime('%Y-%m-%d')
-
-            # Offset every date in training_window_starts
-            epoch_config['training_data']['training_window_starts'] = [
-                (datetime.strptime(dt, '%Y-%m-%d') + timedelta(days=offset_days)).strftime('%Y-%m-%d')
-                for dt in base_training_data['training_window_starts']
-            ]
-
-            # Update parquet folder based on new modeling_period_start
-            model_start = epoch_config['training_data']['modeling_period_start']
-            folder_suffix = datetime.strptime(model_start, '%Y-%m-%d').strftime('%y%m%d')
-            base_folder = Path(base_training_data['parquet_folder'])
-            epoch_config['training_data']['parquet_folder'] = str(base_folder / folder_suffix)
-
-            # Use WalletsConfig to add derived values
-            epoch_config = wcm.add_derived_values(epoch_config)
-
-            # Log epoch configuration
-            logger.debug(
-                f"Generated config for {offset_days} day offset epoch: "
-                f"modeling_period={epoch_config['training_data']['modeling_period_start']} "
-                f"to {epoch_config['training_data']['modeling_period_end']}"
-            )
-
-            all_epochs_configs.append(epoch_config)
-
-        # Add validation epochs if present
+        # Build unified list of epochs to generate (preserve modeling → validation → coin_modeling order)
+        epoch_specs: List[Tuple[int, str]] = [(offset, 'modeling') for offset in modeling_offsets]
         if self.base_config['training_data'].get('validation_period_end') is not None:
-            validation_offsets = self.epochs_config['offset_epochs'].get('validation_offsets', [])
-            for offset_days in validation_offsets:
-                epoch_config = copy.deepcopy(self.base_config)
-                # Offset key dates
-                for date_key in ['modeling_period_start','modeling_period_end']:
-                    base_date = datetime.strptime(self.base_config['training_data'][date_key], '%Y-%m-%d')
-                    new_date = base_date + timedelta(days=offset_days)
-                    epoch_config['training_data'][date_key] = new_date.strftime('%Y-%m-%d')
-                epoch_config['training_data']['training_window_starts'] = [
-                    (datetime.strptime(dt, '%Y-%m-%d') + timedelta(days=offset_days)).strftime('%Y-%m-%d')
-                    for dt in self.base_config['training_data']['training_window_starts']
-                ]
-                folder_suffix = (datetime.strptime(epoch_config['training_data']['modeling_period_start'], '%Y-%m-%d')
-                                .strftime('%y%m%d'))
-                base_folder = Path(self.base_config['training_data']['parquet_folder'])
-                epoch_config['training_data']['parquet_folder'] = str(base_folder / folder_suffix)
-                epoch_config = wcm.add_derived_values(epoch_config)
-                epoch_config['epoch_type'] = 'validation'
-                all_epochs_configs.append(epoch_config)
+            epoch_specs += [(offset, 'validation') for offset in validation_offsets]
+            epoch_specs += [(offset, 'coin_modeling') for offset in coin_model_new_offsets]
 
+        # Generate all epoch configs
+        for offset_days, epoch_type in epoch_specs:
+            cfg = self._build_epoch_config(
+                offset_days, epoch_type,
+                base_modeling_start, base_modeling_end,
+                base_training_window_starts, base_parquet_folder_base
+            )
+            all_epochs_configs.append(cfg)
 
         return all_epochs_configs
 
