@@ -15,7 +15,6 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import RandomizedSearchCV, train_test_split
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import fbeta_score
 from xgboost import XGBRegressor, XGBClassifier
 
 # Local modules
@@ -147,7 +146,6 @@ class BaseModel:
             })
 
         return result
-
 
 
 
@@ -670,7 +668,6 @@ class BaseModel:
             cloudpickle.dump(self.pipeline, f)
 
         logger.info(f"Pipeline saved to {filepath}")
-
 
 
 
