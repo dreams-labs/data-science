@@ -8,6 +8,7 @@ training_data: #WalletModel
     modeling_period_start: '2024-09-29'
     modeling_period_duration: 30
     training_window_lookbacks: [  # How many days prior to the modeling period each window begins
+        240,
         180,
         120,
         90,
@@ -22,7 +23,7 @@ training_data: #WalletModel
 
     # Local pipeline configs
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
-    parquet_folder: temp/wallet_modeling_dfs/dda625_modeling_v2  # where to store parquet files
+    parquet_folder: temp/wallet_modeling_dfs/dda_771_ablation_retest  # where to store parquet files
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
 
@@ -35,7 +36,6 @@ modeling: #WalletModel
     y_pred_threshold: 0.8  # scores above this probability threshold are positive predictions
 
     #KeyParam Target Variable
-
     # Return Rate
     target_variable: cw_crypto_net_gain/max_investment/base
     # target_variable: cw_crypto_net_gain/max_investment/winsorized
@@ -43,7 +43,7 @@ modeling: #WalletModel
 
     # target_var_min_threshold: -.inf  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.05  # a classification model will try to predict the target var above this value
-    target_var_min_threshold: 0.80  # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.25  # a classification model will try to predict the target var above this value
 
     # target_var_max_threshold: -0.40  # a classification model will try to predict the target var above this value
     target_var_max_threshold: .inf  # a classification model will try to predict the target var above this value
@@ -93,7 +93,6 @@ modeling: #WalletModel
         n_estimators: 250  # number of trees to train in the model
         learning_rate: 0.4  # step size for updates to weights during training
 
-        #KeyParam Positive Weight Scaler
         # scale_pos_weight: 20  # used for oversampling; number is a ratio of neg:pos, e.g. 20 means 20neg:1pos
         early_stopping_rounds: 10  # stop training if no improvement after x rounds
 
@@ -109,21 +108,23 @@ modeling: #WalletModel
         # Column patterns to remove
         drop_patterns: [
 
-            trading|*,
             cw_trading|*,
+            cw_macro|*,
+# TEST 1
+            # trading|*,
 
             # timing|*,
             timing|*/buy_mean*,
             timing|*/sell_mean*,
-            timing|*/sell_weighted*,
+            # timing|*/sell_weighted*,
 
             # timing|btc_mvrv_z_score/*,
             # timing|btc_vdd_multiple/*,
-            timing|gtrends_altcoin_worldwide/*,
+            # timing|gtrends_altcoin_worldwide/*,
             # timing|gtrends_memecoin_us/*,
-            timing|gtrends_memecoin_us/lag_21/*,
-            timing|gtrends_memecoin_us/lead_60/*,
-            timing|gtrends_memecoin_us/lag_60/*,
+            # timing|gtrends_memecoin_us/lag_21/*,
+            # timing|gtrends_memecoin_us/lead_60/*,
+            # timing|gtrends_memecoin_us/lag_60/*,
 
             # performance|*,
             performance|crypto_net_gain/crypto_inflows/*,
@@ -131,21 +132,36 @@ modeling: #WalletModel
             performance|*/ntile_rank|*,
             performance|crypto_net_flows/max_investment/*,
 
-            # mktcap|*,
-            mktcap|portfolio_mcap_mean/market_cap_filled|*,
+# TEST 1.1
+            trading|average_transaction|*,
+            trading|crypto_cash_buys|*,
+            trading|crypto_cash_sells|*,
+            # trading|crypto_net_cash_flows|*, keep
+            # trading|crypto_inflows|*, keep
+            trading|crypto_outflows|*,
+            trading|crypto_net_flows|*,
+            trading|crypto_net_gain|*,
+            # trading|max_investment|*, keep
+            # trading|total_volume|*, keep
+            # trading|unique_coins_traded|*, keep
+
+# TEST 1.2
+            '*|all_windows',
+            '*|w1',
+            # '*|w2',
+
+# TEST 2
+            # # mktcap|*,
             mktcap|portfolio_mcap_median/market_cap_filled|*,
             mktcap|portfolio_mcap_min/market_cap_filled|*,
             mktcap|portfolio_mcap_max/market_cap_filled|*, #retain?
             mktcap|portfolio_mcap_std/market_cap_filled|*,
             mktcap|portfolio_mcap_mean/market_cap_unadj|*,
-            mktcap|portfolio_mcap_median/market_cap_unadj|*,
             mktcap|portfolio_mcap_std/market_cap_unadj|*,
 
-            # transfers|*,
 
-            # scenario|*,
-
-            # macro|*,
+# # TEST 3
+#             # macro|*,
             macro|*_first|*,
             # macro|btc_mvrv_z_score_first|*,
             # macro|btc_mvrv_z_score_last|*,
@@ -158,16 +174,14 @@ modeling: #WalletModel
             macro|gtrends_altcoin_worldwide*,
             macro|gtrends_memecoin_us*,
 
-
-            # cluster|*,
-
-            '*|all_windows',
+            cluster|*,
 
 
+# TEST 4
             # cw_timing|*,
             cw_timing|*/buy_mean*,
             cw_timing|*/sell_mean*,
-            cw_timing|*/sell_weighted*,
+            # cw_timing|*/sell_weighted*,
 
             cw_timing|btc_mvrv_z_score/*,
             cw_timing|btc_vdd_multiple/*,
@@ -187,17 +201,7 @@ modeling: #WalletModel
             cw_performance|*/ntile_rank|*,
             cw_performance|crypto_net_flows/crypto_inflows/*,
 
-            # cw_trading|*,
-            cw_trading|unique_coins_traded|*,
-            cw_trading|average_transaction|*,
-            cw_trading|crypto_inflows|*,
-            cw_trading|max_investment|*,
-            cw_trading|crypto_net_flows|*,
-            cw_trading|crypto_outflows|*,
-            cw_trading|crypto_net_cash_flows|*,
-            cw_trading|crypto_cash_sells|*,
-            cw_trading|crypto_cash_buys|*,
-
+# TEST 5
             # cw_mktcap|*,
             cw_mktcap|portfolio_mcap_mean/market_cap_filled|*,
             cw_mktcap|portfolio_mcap_median/market_cap_filled|*,
@@ -217,10 +221,7 @@ modeling: #WalletModel
 
             # cw_scenario|*,
 
-            cw_macro|*,
-
             # cluster|k5/*,
-            cluster|k2/*,
 
         ]
 
@@ -242,9 +243,9 @@ modeling: #WalletModel
         # -------------------------------
 
         # Search Methodology
-        drop_patterns_include_n_features: 1
+        drop_patterns_include_n_features: 1  # if set to n, the drop_patterns grid search will apply all but n patterns for each model. otherwise, it will apply 1 drop pattern in each model.
 
-        n_iter: 40  # random search limit
+        n_iter: 40   # random search limit
         n_splits: 3  # cv splits
 
         # regressor_scoring: neg_root_mean_squared_error
@@ -311,107 +312,63 @@ modeling: #WalletModel
 
             # # Column Selection
             drop_columns__drop_patterns: [
-            #     # timing|*,
-            #     # performance|*,
-                # trading|*,
-                # cw_timing|price_sma_2/*,
-                # cw_timing|volume_sma_12/*,
-                # timing|gtrends_memecoin_us/*,
-                # timing|price_sma_2/*/sell_weighted|*,
-                # timing|volume_sma_12/*/sell_weighted|*,
-                # timing|btc_mvrv_z_score/*/sell_weighted|*,
-                # timing|btc_vdd_multiple/*/sell_weighted|*,
-                # # timing|gtrends_altcoin_worldwide/*/sell_weighted/*,
-                # timing|gtrends_memecoin_us/*/sell_weighted|*,
-
-                # timing|gtrends_memecoin_us/lead_21/*,
-                # timing|gtrends_memecoin_us/lag_21/*,
-                # timing|gtrends_memecoin_us/lead_60/*,
-                # timing|gtrends_memecoin_us/lag_60/*,
-                # timing|btc_mvrv_z_score/lead_21/*,
-                # timing|btc_mvrv_z_score/lag_21/*,
-                # timing|btc_mvrv_z_score/lead_60/*,
-                # timing|btc_mvrv_z_score/lag_60/*,
-                # timing|btc_vdd_multiple/lead_21/*,
-                # timing|btc_vdd_multiple/lag_21/*,
-                # timing|btc_vdd_multiple/lead_60/*,
-                # timing|btc_vdd_multiple/lag_60/*,
-                # timing|gtrends_altcoin_worldwide/lead_21/*,
-                # timing|gtrends_altcoin_worldwide/lag_21/*,
-                # timing|gtrends_altcoin_worldwide/lead_60/*,
-                # timing|gtrends_altcoin_worldwide/lag_60/*,
 
 
-                # timing|gtrends_memecoin_us/lead_21/sell_weighted/*,
-                # timing|gtrends_memecoin_us/lag_21/sell_weighted/*,
-                # timing|gtrends_memecoin_us/lead_60/sell_weighted/*,
-                # timing|gtrends_memecoin_us/lag_60/sell_weighted/*,
-                # timing|btc_mvrv_z_score/lead_21/sell_weighted/*,
-                # timing|btc_mvrv_z_score/lag_21/sell_weighted/*,
-                # timing|btc_mvrv_z_score/lead_60/sell_weighted/*,
-                # timing|btc_mvrv_z_score/lag_60/sell_weighted/*,
-                # timing|btc_vdd_multiple/lead_21/sell_weighted/*,
-                # timing|btc_vdd_multiple/lag_21/sell_weighted/*,
-                # timing|btc_vdd_multiple/lead_60/sell_weighted/*,
-                # timing|btc_vdd_multiple/lag_60/sell_weighted/*,
-                # timing|gtrends_altcoin_worldwide/lead_21/sell_weighted/*,
-                # timing|gtrends_altcoin_worldwide/lag_21/sell_weighted/*,
-                # timing|gtrends_altcoin_worldwide/lead_60/sell_weighted/*,
-                # timing|gtrends_altcoin_worldwide/lag_60/sell_weighted/*,
+    # TEST 3
+                # # macro|*,
+                # macro|*_first|*,
+                # # macro|btc_mvrv_z_score_first|*,
+                # # macro|btc_mvrv_z_score_last|*,
+                # # macro|btc_price_std|*,
+                # macro|global_market_cap_first|*,
+                # macro|global_market_cap_last|*,
 
+                # # macro|global_market_cap_rsi_30*,
+                # macro|btc_vdd_multiple*,
+                # macro|gtrends_altcoin_worldwide*,
+                # macro|gtrends_memecoin_us*,
 
                 # cluster|*,
 
+    # # TEST 4
+                # cw_timing|*,
+                cw_timing|*/buy_mean*,
+                cw_timing|*/sell_mean*,
+                # cw_timing|*/sell_weighted*,
 
-            #     # # performance|*,
-                # performance|crypto_net_flows/crypto_inflows/*,
-                # performance|crypto_net_flows/max_investment/*,
+                cw_timing|btc_mvrv_z_score/*,
+                cw_timing|btc_vdd_multiple/*,
+                cw_timing|gtrends_altcoin_worldwide/*,
+                cw_timing|gtrends_memecoin_us/*,
+                # cw_timing|price_sma_2/sell_weighted/*,
+                # cw_timing|volume_sma_12/sell_weighted/*,
+                # cw_timing|btc_mvrv_z_score/sell_weighted/*,
+                # cw_timing|btc_vdd_multiple/sell_weighted/*,
+                # cw_timing|gtrends_altcoin_worldwide/sell_weighted/*,
+                # cw_timing|gtrends_memecoin_us/sell_weighted/*,
+
+
+                # # cw_performance|*,
+                # cw_performance|crypto_net_gain/crypto_inflows/*,
+                # cw_performance|*/log|*,
+                # cw_performance|*/ntile_rank|*,
                 # cw_performance|crypto_net_flows/crypto_inflows/*,
-                # cw_performance|crypto_net_flows/max_investment/*,
-            #     # performance|crypto_net_gain/twb/*,
-            #     # performance|crypto_net_gain/active_twb/*,
-            #     # performance|*/log|*,
-            #     # performance|*/ntile_rank|*,
 
-            #     # # trading|*,
-            #     # trading|unique_coins_traded|*,
-            #     # trading|transaction_days|*,
-            #     # trading|average_transaction|*,
-
-            #     # # mktcap|*,
-            #     # mktcap|portfolio_mcap_mean/market_cap_filled|*,
-            #     # mktcap|portfolio_mcap_median/market_cap_filled|*,
-            #     # mktcap|portfolio_mcap_min/market_cap_filled|*,
-                cw_mktcap|end_portfolio_wtd_market_cap/market_cap_filled*,
-                cw_mktcap|end_portfolio_wtd_market_cap/market_cap_unadj*,
-                cw_mktcap|portfolio_mcap_min/market_cap_unadj*,
-                cw_mktcap|volume_wtd_market_cap/market_cap_filled*,
-                cw_mktcap|volume_wtd_market_cap/market_cap_unadj*,
-            #     # # transfers|*,
-
-            #     # # scenario|*,
-
-            #     # # balance|*,
-            #     # balance|coin_fraction_std|*,
-            #     # balance|concentration_index|*,
-
-                # cw_macro|*,
-                # macro|global_market_cap_rsi_30*,
-                # macro|global_market_cap_rsi_100*,
-                # macro|global_market_cap_std|*,
-
-                # cluster|k2/*,
-                # cluster|k5/*,
-
-                # '*|w1',
-                # '*|w2',
-                # '*|w3',
-
-                # cw_timing|btc_vdd_multiple/*,
-                # cw_timing|gtrends_altcoin_worldwide/*,
-                # cw_timing|gtrends_memecoin_us/*,
-                # cw_timing|price_sma_2/*/sell_weighted|*,
-                # cw_timing|volume_sma_12/*/sell_weighted|*,
+    # # TEST 5
+    #             # cw_mktcap|*,
+    #             cw_mktcap|portfolio_mcap_mean/market_cap_filled|*,
+    #             cw_mktcap|portfolio_mcap_median/market_cap_filled|*,
+    #             cw_mktcap|portfolio_mcap_min/market_cap_filled|*,
+    #             cw_mktcap|portfolio_mcap_max/market_cap_filled|*, #retain?
+    #             cw_mktcap|portfolio_mcap_std/market_cap_filled|*,
+    #             cw_mktcap|portfolio_mcap_mean/market_cap_unadj|*,
+    #             cw_mktcap|portfolio_mcap_median/market_cap_unadj|*,
+    #             cw_mktcap|portfolio_mcap_std/market_cap_unadj|*,
+    #             cw_mktcap|portfolio_mcap_max/*,
+    #             cw_mktcap|end_portfolio_wtd_market_cap/market_cap_filled*,
+    #             cw_mktcap|end_portfolio_wtd_market_cap/market_cap_unadj*,
+    #             cw_mktcap|portfolio_mcap_min/market_cap_unadj*,
+    #             cw_mktcap|volume_wtd_market_cap/market_cap_filled*,
 
 
             ]
@@ -515,7 +472,7 @@ features: #WalletModel
     ]
 
     # Clustering Params
-    clustering_n_clusters: [2,5]
+    # clustering_n_clusters: [5]
     clustering_n_components: 25
     clustering_fill_method: fill_0  # fill_0 or fill_mean
     clustering_include_pca: False
