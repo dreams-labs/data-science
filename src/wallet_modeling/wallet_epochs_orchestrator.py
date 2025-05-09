@@ -495,6 +495,7 @@ class MultiEpochOrchestrator:
         return wcm.add_derived_values(epoch_config)
 
 
+
     def _generate_epoch_configs(self) -> List[Dict]:
         """
         Generates config dicts for each offset epoch, including modeling and validation epochs.
@@ -528,35 +529,20 @@ class MultiEpochOrchestrator:
         if len(validation_offsets) > 0:
             self._assert_no_epoch_overlap(modeling_offsets, validation_offsets)
 
-        # Generate modeling epoch configs
-        for offset_days in modeling_offsets:
-            all_epochs_configs.append(
-                self._build_epoch_config(
-                    offset_days, 'modeling',
-                    base_modeling_start, base_modeling_end,
-                    base_training_window_starts, base_parquet_folder_base
-                )
-            )
-
-        # Add validation epoch configs if configured
+        # Build unified list of epochs to generate (preserve modeling → validation → coin_modeling order)
+        epoch_specs: List[Tuple[int, str]] = [(offset, 'modeling') for offset in modeling_offsets]
         if self.base_config['training_data'].get('validation_period_end') is not None:
-            for offset_days in validation_offsets:
-                cfg = self._build_epoch_config(
-                    offset_days, 'validation',
-                    base_modeling_start, base_modeling_end,
-                    base_training_window_starts, base_parquet_folder_base
-                )
-                all_epochs_configs.append(cfg)
+            epoch_specs += [(offset, 'validation') for offset in validation_offsets]
+            epoch_specs += [(offset, 'coin_modeling') for offset in coin_model_new_offsets]
 
-            # Add wallet_modeling and coin_modeling offsets if they fall within the validation date range
-            if len(coin_model_new_offsets) > 0:
-                for offset_days in coin_model_new_offsets:
-                    cfg = self._build_epoch_config(
-                        offset_days, 'coin_modeling',
-                        base_modeling_start, base_modeling_end,
-                        base_training_window_starts, base_parquet_folder_base
-                    )
-                    all_epochs_configs.append(cfg)
+        # Generate all epoch configs
+        for offset_days, epoch_type in epoch_specs:
+            cfg = self._build_epoch_config(
+                offset_days, epoch_type,
+                base_modeling_start, base_modeling_end,
+                base_training_window_starts, base_parquet_folder_base
+            )
+            all_epochs_configs.append(cfg)
 
         return all_epochs_configs
 
