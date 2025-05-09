@@ -188,6 +188,10 @@ def promote_indicators_to_metrics(df_metrics_config):
     df_metrics_indicators_config = copy.deepcopy(df_metrics_config)
 
     for key, value in df_metrics_config.items():
+        # Ignore keys without any features configured
+        if value is None:
+            continue
+
         # Check if indicators are present
         if 'indicators' in value:
             # If there are indicators...

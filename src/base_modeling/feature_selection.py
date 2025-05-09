@@ -36,6 +36,29 @@ def identify_matching_columns(column_patterns: List[str], all_columns: List[str]
     return matched
 
 
+def validate_drop_params(df: pd.DataFrame, wallets_config: dict):
+    """
+    Utility function that identifies feature_selector.drop_patterns that don't
+    match any columns.
+
+    Params:
+    - df (pd.DataFrame): df with columns that should match the drop_patterns
+    - wallets_config (dict): from yaml
+    """
+    base_patterns = wallets_config['modeling']['feature_selection']['drop_patterns']
+
+    # check for patterns that match nothing
+    all_cols = df.columns.tolist()
+    missing = [p for p in base_patterns
+               if not identify_matching_columns([p], all_cols)]
+
+    if missing:
+        missing_str = "\n".join(missing)
+        logger.info(f"Base drop patterns with no matches:\n{missing_str}")
+    else:
+        logger.info("All base patterns match at least one column.")
+
+
 
 # ------------------------------------
 #    Variance/Correlation Functions

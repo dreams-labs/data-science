@@ -91,16 +91,17 @@ def calculate_wallet_features(
     wallet_features_df = wallet_features_df.join(trading_features_df, how='left')\
         .fillna({col: 0 for col in trading_features_df.columns})
 
+    # Transfers features (left join, do not fill)
     if wallets_config['features']['toggle_transfers_features']:
-        # Transfers features (left join, do not fill)
         transfers_sequencing_features_df = wts.calculate_transfers_features(profits_df, transfers_sequencing_df)
         feature_column_names['transfers|'] = transfers_sequencing_features_df.columns
         wallet_features_df = wallet_features_df.join(transfers_sequencing_features_df, how='left')
 
     # Balance features (left join, do not fill)
-    balance_features_df = wbf.calculate_balance_features(wallets_config,profits_df)
-    feature_column_names['balance|'] = balance_features_df.columns
-    wallet_features_df = wallet_features_df.join(balance_features_df, how='left')
+    if wallets_config['features']['toggle_balance_features']:
+        balance_features_df = wbf.calculate_balance_features(wallets_config,profits_df)
+        feature_column_names['balance|'] = balance_features_df.columns
+        wallet_features_df = wallet_features_df.join(balance_features_df, how='left')
 
     # Macroeconomic features (cross join)
     macroeconomic_features_df = wmac.calculate_macro_features(

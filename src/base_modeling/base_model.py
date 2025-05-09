@@ -338,7 +338,8 @@ class BaseModel:
         self.random_search = RandomizedSearchCV(
             cv_pipeline,
             gs_config['param_grid'],
-            **gs_config['search_config']
+            **gs_config['search_config'],
+            refit=False,   # skip that extra full-dataset fit
         )
 
         # Always pass the eval_set for early stopping

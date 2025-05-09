@@ -16,21 +16,23 @@ time_series:
                 sma:
                     parameters:
                         window: [12]
-        # mfi:
-        #     indicators:
-        #         sma:
-        #             parameters:
-        #                 window: [5]
-        # obv:
-        #     indicators:
-        #         sma:
-        #             parameters:
-        #                 window: [5]
 
 
-    # Time series keyed on only date
+    # Controls what populates the macro_trends|* features
+    # All keys of wallets_features_config.market_timing.offsets.keys() must
+    #  be included here
     macro_trends:
         btc_price:
+            aggregations:
+                std:
+                    scaling: none
+        btc_mvrv_z_score:
+            aggregations:
+                last:
+                    scaling: none
+                std:
+                    scaling: none
+        global_market_cap:
             aggregations:
                 first:
                     scaling: none
@@ -41,32 +43,34 @@ time_series:
             indicators:
                 rsi:
                     parameters:
-                        window: [100]
+                        window: [30]
                     aggregations:
                         last:
                             scaling: none
-        btc_mvrv_z_score:
+        btc_vdd_multiple:
             aggregations:
-                first:
+                std:
                     scaling: none
-                last:
-                    scaling: none
-        global_market_cap:
+        gtrends_altcoin_worldwide:
             aggregations:
-                first:
+                std:
                     scaling: none
-                last:
-                    scaling: none
-            indicators:
-                rsi:
-                    parameters:
-                        window: [100]
-                    aggregations:
-                        last:
-                            scaling: none
-        global_volume:
+        gtrends_memecoin_us:
             aggregations:
-                first:
+                std:
                     scaling: none
-                last:
-                    scaling: none
+        # global_volume:
+        #     aggregations:
+        #         first:
+        #             scaling: none
+        #         last:
+        #             scaling: none
+        #     indicators:
+        #         rsi:
+        #             parameters:
+        #                 window: [30,100]
+        #             aggregations:
+        #                 last:
+        #                     scaling: none
+
+        # These features are retained for use in market timing features
