@@ -275,52 +275,7 @@ def calculate_relative_changes(
     return result_df,features_columns
 
 
-# def calculate_timing_features_for_column(df: pd.DataFrame, metric_column: str) -> pd.DataFrame:
-#     """
-#     Calculate buy_weighted feature for a single metric column.
 
-#     FEATUREREMOVAL:
-#      previously we computed all of these columns and only buy_weighted
-#      proved to be predictive. the other features were removed as part of
-#      ticket DDA-768:
-#         {metric_column}/buy_weighted,
-#         {metric_column}/buy_mean,
-#         {metric_column}/sell_weighted
-#         {metric_column}/sell_mean,
-
-
-
-#     Params:
-#     - df (DataFrame): input profits data.
-#     - metric_column (str): column name to calculate weighted average for.
-
-#     Returns:
-#     - DataFrame with wallet_address index and {metric_column}/buy_weighted column.
-#     """
-#     # Filter to only buy transactions (positive net transfers)
-#     buy_df = df[df['usd_net_transfers'] > 0].copy()
-
-#     # Skip calculation if no buy transactions
-#     if buy_df.empty:
-#         return pd.DataFrame(columns=['wallet_address', f'{metric_column}/buy_weighted'])
-
-#     # Calculate weighted values directly
-#     buy_df['weighted_values'] = buy_df[metric_column] * buy_df['usd_net_transfers']
-
-#     # Group by wallet_address
-#     result = buy_df.groupby('wallet_address').agg(
-#         sum_weighted_values=('weighted_values', 'sum'),
-#         sum_weights=('usd_net_transfers', 'sum')
-#     ).reset_index()
-
-#     # Compute weighted average
-#     result[f'{metric_column}/buy_weighted'] = result['sum_weighted_values'] / result['sum_weights']
-
-#     # Keep only needed columns
-#     return result[['wallet_address', f'{metric_column}/buy_weighted']].set_index('wallet_address')
-
-
-# FEATUREREMOVAL only buy_weighted was predictive
 def calculate_timing_features_for_column(df: pd.DataFrame, metric_column: str) -> pd.DataFrame:
     """
     Calculate timing features (mean, weighted mean) for a single metric column in a single pass.
