@@ -1387,11 +1387,22 @@ def setup_notebook_logger(log_filepath: str = None) -> logging.Logger:
 
     # Optional file handler without color
     if log_filepath:
+        # full log
         file_handler = logging.FileHandler(log_filepath)
         file_handler.setFormatter(logging.Formatter(
             '[%(asctime)s] %(levelname)s [%(module)s.%(funcName)s:%(lineno)d] %(message)s',
             datefmt='%d/%b/%Y %H:%M:%S'
         ))
         root_logger.addHandler(file_handler)
+        # milestone-only log
+        base, ext = os.path.splitext(log_filepath)
+        milestone_path = f"{base}_milestone{ext}"
+        milestone_handler = logging.FileHandler(milestone_path)
+        milestone_handler.setLevel(MILESTONE_LEVEL)
+        milestone_handler.setFormatter(logging.Formatter(
+            '[%(asctime)s] %(levelname)s [%(module)s.%(funcName)s:%(lineno)d] %(message)s',
+            datefmt='%d/%b/%Y %H:%M:%S'
+        ))
+        root_logger.addHandler(milestone_handler)
 
     return root_logger
