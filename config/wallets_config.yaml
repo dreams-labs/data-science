@@ -8,7 +8,6 @@ training_data: #WalletModel
     modeling_period_start: '2024-09-29'
     modeling_period_duration: 30
     training_window_lookbacks: [  # How many days prior to the modeling period each window begins
-        270,
         180,
         120,
         90,
@@ -97,7 +96,7 @@ modeling: #WalletModel
         learning_rate: 0.4  # step size for updates to weights during training
 
         #KeyParam Positive Weight Scaler
-        # scale_pos_weight: 20  # ratio of neg:pos, e.g. 20 means 20neg:1pos
+        # scale_pos_weight: 20  # used for oversampling; number is a ratio of neg:pos, e.g. 20 means 20neg:1pos
         early_stopping_rounds: 10  # stop training if no improvement after x rounds
 
         # Threading Controls
@@ -111,23 +110,13 @@ modeling: #WalletModel
     feature_selection:
         # Column patterns to remove
         drop_patterns: [
-            # timing|*,
-            # performance|*,
-            trading|*,
-            # mktcap|*,
-            # transfers|*,
-            # scenario|*,
-            # macro|*,
-            # cluster|*,
-            # cw_timing|*,
-            # cw_performance|*,
-            cw_trading|*,
-            # cw_mktcap|*,
-            # cw_transfers|*,
-            # cw_scenario|*,
-            # cw_macro|*,
-            # cw_cluster|*,
 
+            # REMOVE AFTER DDA 760
+            '*|w1',
+            # '*|w2',
+
+            trading|*,
+            cw_trading|*,
 
             # timing|*,
             timing|*/buy_mean*,
@@ -179,8 +168,7 @@ modeling: #WalletModel
             # cluster|*,
 
             '*|all_windows',
-            # '*|w1',
-            # '*|w2',
+
 
             # cw_timing|*,
             cw_timing|*/buy_mean*,
@@ -225,12 +213,18 @@ modeling: #WalletModel
             cw_mktcap|portfolio_mcap_mean/market_cap_unadj|*,
             cw_mktcap|portfolio_mcap_median/market_cap_unadj|*,
             cw_mktcap|portfolio_mcap_std/market_cap_unadj|*,
+            cw_mktcap|portfolio_mcap_max/*,
+            cw_mktcap|end_portfolio_wtd_market_cap/market_cap_filled*,
+            cw_mktcap|end_portfolio_wtd_market_cap/market_cap_unadj*,
+            cw_mktcap|portfolio_mcap_min/market_cap_unadj*,
+            cw_mktcap|volume_wtd_market_cap/market_cap_filled*,
 
             # cw_transfers|*,
 
             # cw_scenario|*,
 
-            cluster|k5/*,
+            # cluster|k5/*,
+            cluster|k2/*,
 
         ]
 
@@ -248,7 +242,7 @@ modeling: #WalletModel
 
         #KeyParam Grid Search Toggle
         # -------------------------------
-        enabled: True
+        # enabled: True
         # -------------------------------
 
         # Search Methodology
@@ -392,7 +386,11 @@ modeling: #WalletModel
             #     # mktcap|portfolio_mcap_mean/market_cap_filled|*,
             #     # mktcap|portfolio_mcap_median/market_cap_filled|*,
             #     # mktcap|portfolio_mcap_min/market_cap_filled|*,
-
+                cw_mktcap|end_portfolio_wtd_market_cap/market_cap_filled*,
+                cw_mktcap|end_portfolio_wtd_market_cap/market_cap_unadj*,
+                cw_mktcap|portfolio_mcap_min/market_cap_unadj*,
+                cw_mktcap|volume_wtd_market_cap/market_cap_filled*,
+                cw_mktcap|volume_wtd_market_cap/market_cap_unadj*,
             #     # # transfers|*,
 
             #     # # scenario|*,
@@ -404,13 +402,14 @@ modeling: #WalletModel
                 # cw_macro|*,
                 # macro|global_market_cap_rsi_30*,
                 # macro|global_market_cap_rsi_100*,
-                macro|global_market_cap_std|*,
+                # macro|global_market_cap_std|*,
 
                 # cluster|k2/*,
                 # cluster|k5/*,
 
-            #     # '*|w1',
-            #     # '*|w2',
+                # '*|w1',
+                # '*|w2',
+                # '*|w3',
 
                 # cw_timing|btc_vdd_multiple/*,
                 # cw_timing|gtrends_altcoin_worldwide/*,
