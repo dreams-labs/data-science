@@ -529,20 +529,46 @@ class MultiEpochOrchestrator:
         if len(validation_offsets) > 0:
             self._assert_no_epoch_overlap(modeling_offsets, validation_offsets)
 
-        # Build unified list of epochs to generate (preserve modeling → validation → coin_modeling order)
-        epoch_specs: List[Tuple[int, str]] = [(offset, 'modeling') for offset in modeling_offsets]
-        if self.base_config['training_data'].get('validation_period_end') is not None:
-            epoch_specs += [(offset, 'validation') for offset in validation_offsets]
-            epoch_specs += [(offset, 'coin_modeling') for offset in coin_model_new_offsets]
-
-        # Generate all epoch configs
-        for offset_days, epoch_type in epoch_specs:
-            cfg = self._build_epoch_config(
-                offset_days, epoch_type,
-                base_modeling_start, base_modeling_end,
-                base_training_window_starts, base_parquet_folder_base
+        # Generate modeling epoch configs
+        for offset_days in modeling_offsets:
+            all_epochs_configs.append(
+                self._build_epoch_config(
+                    offset_days, 'modeling',
+                    base_modeling_start, base_modeling_end,
+                    base_training_window_starts, base_parquet_folder_base
+                )
             )
-            all_epochs_configs.append(cfg)
+
+        # Add validation epoch configs if configured
+        if self.base_config['training_data'].get('validation_period_end') is not None:
+            for offset_days in validation_offsets:
+                cfg = self._build_epoch_config(
+                    offset_days, 'validation',
+                    base_modeling_start, base_modeling_end,
+                    base_training_window_starts, base_parquet_folder_base
+                )
+                all_epochs_configs.append(cfg)
+
+            # Add wallet_modeling and coin_modeling offsets if they fall within the validation date range
+            if len(coin_model_new_offsets) > 0:
+                for offset_days in coin_model_new_offsets:
+                    try:
+                        cfg = self._build_epoch_config(
+                            offset_days, 'coin_modeling',
+                            base_modeling_start, base_modeling_end,
+                            base_training_window_starts, base_parquet_folder_base
+                        )
+                        all_epochs_configs.append(cfg)
+
+                    # ValueError will be correctly raised by wallets_config_manager.py if the coin modeling
+                    #  config modeling_period_end is later than the base config validation_period_end.
+                    #  Coin modeling configs are only generated as a time save and should be skipped if
+                    #  they fall after the validation period.
+                    except ValueError as e:
+                        logger.debug(e)
+                        logger.info(f"Did not include coin_modeling epoch_config with offset {offset_days} "
+                                    "that extends later than the validation period end of "
+                                    f"{self.base_config['training_data']['validation_period_end']}.")
 
         return all_epochs_configs
 
