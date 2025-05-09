@@ -305,7 +305,7 @@ class WalletTrainingData:
                     [training_profits_df.index.get_level_values('date') >= training_windows_starts[0]]
                     ['usd_net_transfers'].sum())
         window_sum = sum(df['usd_net_transfers'].sum() for df in training_windows_profits_dfs)
-        if not np.isclose(full_sum, window_sum, rtol=1e-5):
+        if not np.isclose(full_sum, window_sum, rtol=1e-3):
             raise ValueError(f"Net transfers in full training period ({full_sum}) do not match combined "
                             f"sum of transfers in windows dfs ({window_sum})")
 

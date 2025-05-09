@@ -48,6 +48,18 @@ wallet_scores: #CoinModel
             y_pred_threshold: 0.75
 
         # Tests
+        cw_return_rate_min_060:
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_min_threshold: .40
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.75
+
+        cw_return_rate_min_080:
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_min_threshold: .40
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.75
+
         cw_return_rate_max_-005:
             target_variable: cw_crypto_net_gain/max_investment/base
             target_var_min_threshold: -.inf
@@ -72,26 +84,26 @@ wallet_scores: #CoinModel
             target_var_max_threshold: .inf
             y_pred_threshold: 0.7
 
-        # cw_return_rate_regression:
-        #     model_type: regression
-        #     target_variable: cw_crypto_net_gain/max_investment/winsorized
+        cw_return_rate_regression:
+            model_type: regression
+            target_variable: cw_crypto_net_gain/max_investment/winsorized
 
-        # return_rate_regression:
-        #     model_type: regression
-        #     target_variable: crypto_net_gain/max_investment/winsorized
+        return_rate_regression:
+            model_type: regression
+            target_variable: crypto_net_gain/max_investment/winsorized
 
-        # # USD Metrics
-        # net_gain_min_1000:
-        #     target_variable: crypto_net_gain
-        #     target_var_min_threshold: 1000
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.7
+        # USD Metrics
+        net_gain_min_1000:
+            target_variable: crypto_net_gain
+            target_var_min_threshold: 1000
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.7
 
-        # cw_net_flows_min_1000:
-        #     target_variable: cw_crypto_net_flows
-        #     target_var_min_threshold: 1000
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.7
+        cw_net_flows_min_1000:
+            target_variable: cw_crypto_net_flows
+            target_var_min_threshold: 1000
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.7
 
 
 # CoinModel Segments
