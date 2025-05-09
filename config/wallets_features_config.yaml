@@ -37,16 +37,13 @@ market_timing:
 
         # Macro trends
         btc_mvrv_z_score:
-            offsets: [-60, -21, 21, 60]
+            offsets: [-21] # lag_21
             retain_base_columns: True
         btc_vdd_multiple:
-            offsets: [-60, -21, 21, 60]
-            retain_base_columns: True
-        gtrends_altcoin_worldwide:
-            offsets: [-60, -21, 21, 60]
+            offsets: [60] # lead_60
             retain_base_columns: True
         gtrends_memecoin_us:
-            offsets: [-60, -21, 21, 60]
+            offsets: [21] # lead_21
             retain_base_columns: True
         # btc_price_rsi_100:
         #     offsets: []

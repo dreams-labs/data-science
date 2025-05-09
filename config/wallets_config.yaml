@@ -5,21 +5,20 @@
 training_data: #WalletModel
 
     #KeyParam Period Dates
-    modeling_period_start: '2025-01-27'
+    modeling_period_start: '2024-09-29'
     modeling_period_duration: 30
     training_window_lookbacks: [  # How many days prior to the modeling period each window begins
-        270,
-        # 180,
-        # 120,
-        # 90,
-        # 60,
+        180,
+        120,
+        90,
+        60,
         30
     ]
     validation_period_end: '2025-04-30'  # toggle to activate/deactivate validation data
 
     # Training Data Toggles
     hybridize_wallet_ids: True  # if true, training data will be keyed on wallet-coin pairs
-    predrop_features: False  # if true, the feature_selection.drop_patterns will be applied early to save memory
+    predrop_features: True  # if true, the feature_selection.drop_patterns will be applied early to save memory
 
     # Local pipeline configs
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
@@ -35,7 +34,7 @@ modeling: #WalletModel
     #KeyParam Model Type
     # model_type: regression  # "regression" or "classification"
     model_type: classification  # "regression" or "classification"
-    y_pred_threshold: 0.7  # scores above this probability threshold are positive predictions
+    y_pred_threshold: 0.8  # scores above this probability threshold are positive predictions
 
     #KeyParam Target Variable
 
@@ -46,7 +45,7 @@ modeling: #WalletModel
 
     # target_var_min_threshold: -.inf  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.05  # a classification model will try to predict the target var above this value
-    target_var_min_threshold: 0.40  # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.60  # a classification model will try to predict the target var above this value
 
     # target_var_max_threshold: -0.40  # a classification model will try to predict the target var above this value
     target_var_max_threshold: .inf  # a classification model will try to predict the target var above this value
@@ -94,10 +93,10 @@ modeling: #WalletModel
         # --------------------------------------
         #KeyParam Estimator Counts
         n_estimators: 250  # number of trees to train in the model
-        learning_rate: 0.5  # step size for updates to weights during training
+        learning_rate: 0.4  # step size for updates to weights during training
 
         #KeyParam Positive Weight Scaler
-        # scale_pos_weight: 20  # ratio of neg:pos, e.g. 20 means 20neg:1pos
+        # scale_pos_weight: 20  # used for oversampling; number is a ratio of neg:pos, e.g. 20 means 20neg:1pos
         early_stopping_rounds: 10  # stop training if no improvement after x rounds
 
         # Threading Controls
@@ -111,34 +110,26 @@ modeling: #WalletModel
     feature_selection:
         # Column patterns to remove
         drop_patterns: [
-            # timing|*,
-            # performance|*,
-            trading|*,
-            # mktcap|*,
-            # transfers|*,
-            # scenario|*,
-            balance|*,
-            # macro|*,
-            # cluster|*,
-            # cw_timing|*,
-            # cw_performance|*,
-            cw_trading|*,
-            # cw_mktcap|*,
-            # cw_transfers|*,
-            # cw_scenario|*,
-            cw_balance|*,
-            cw_macro|*,
-            # cw_cluster|*,
 
+            # REMOVE AFTER DDA 760
+            '*|w1',
+            # '*|w2',
+
+            trading|*,
+            cw_trading|*,
 
             # timing|*,
             timing|*/buy_mean*,
             timing|*/sell_mean*,
-            # timing|*/sell_weighted*,
+            timing|*/sell_weighted*,
+
             # timing|btc_mvrv_z_score/*,
             # timing|btc_vdd_multiple/*,
-            # timing|gtrends_altcoin_worldwide/*,
+            timing|gtrends_altcoin_worldwide/*,
             # timing|gtrends_memecoin_us/*,
+            timing|gtrends_memecoin_us/lag_21/*,
+            timing|gtrends_memecoin_us/lead_60/*,
+            timing|gtrends_memecoin_us/lag_60/*,
 
             # performance|*,
             performance|crypto_net_gain/crypto_inflows/*,
@@ -177,17 +168,24 @@ modeling: #WalletModel
             # cluster|*,
 
             '*|all_windows',
-            # '*|w1',
-            # '*|w2',
+
 
             # cw_timing|*,
             cw_timing|*/buy_mean*,
             cw_timing|*/sell_mean*,
-            # cw_timing|*/sell_weighted*,
+            cw_timing|*/sell_weighted*,
+
             cw_timing|btc_mvrv_z_score/*,
             cw_timing|btc_vdd_multiple/*,
             cw_timing|gtrends_altcoin_worldwide/*,
             cw_timing|gtrends_memecoin_us/*,
+            # cw_timing|price_sma_2/sell_weighted/*,
+            # cw_timing|volume_sma_12/sell_weighted/*,
+            # cw_timing|btc_mvrv_z_score/sell_weighted/*,
+            # cw_timing|btc_vdd_multiple/sell_weighted/*,
+            # cw_timing|gtrends_altcoin_worldwide/sell_weighted/*,
+            # cw_timing|gtrends_memecoin_us/sell_weighted/*,
+
 
             # cw_performance|*,
             cw_performance|crypto_net_gain/crypto_inflows/*,
@@ -215,14 +213,18 @@ modeling: #WalletModel
             cw_mktcap|portfolio_mcap_mean/market_cap_unadj|*,
             cw_mktcap|portfolio_mcap_median/market_cap_unadj|*,
             cw_mktcap|portfolio_mcap_std/market_cap_unadj|*,
+            cw_mktcap|portfolio_mcap_max/*,
+            cw_mktcap|end_portfolio_wtd_market_cap/market_cap_filled*,
+            cw_mktcap|end_portfolio_wtd_market_cap/market_cap_unadj*,
+            cw_mktcap|portfolio_mcap_min/market_cap_unadj*,
+            cw_mktcap|volume_wtd_market_cap/market_cap_filled*,
 
             # cw_transfers|*,
 
             # cw_scenario|*,
 
-            cw_macro|*,
-
-            cw_cluster|*,
+            # cluster|k5/*,
+            cluster|k2/*,
 
         ]
 
@@ -240,7 +242,7 @@ modeling: #WalletModel
 
         #KeyParam Grid Search Toggle
         # -------------------------------
-        enabled: True
+        # enabled: True
         # -------------------------------
 
         # Search Methodology
@@ -316,51 +318,60 @@ modeling: #WalletModel
             #     # timing|*,
             #     # performance|*,
                 # trading|*,
-                # mktcap|*,
-            #     # transfers|*,
-            #     # scenario|*,
-                # balance|*,
-            #     # macro|*,
-            #     # cluster|*,
-            #     # cw_timing|*,
-            #     # cw_performance|*,
-                # cw_trading|*,
-            #     # cw_mktcap|*,
-            #     # cw_transfers|*,
-            #     # cw_scenario|*,
-                # cw_balance|*,
-            #     # cw_macro|*,
-            #     # cw_cluster|*,
-
-
-            #     # # timing|*,
-                # timing|price_sma_2/*,
-                # timing|volume_sma_12/*,
-
-                # timing|global_market_cap/*,
-                # timing|btc_mvrv_z_score/*,
-                # timing|btc_vdd_multiple/*,
-                # timing|global_volume/*,
-
-                # timing|gtrends_cryptocurrency_us/*,
-                # timing|gtrends_altcoin_worldwide/*,
-                # timing|gtrends_memecoin_worldwide/*,
+                # cw_timing|price_sma_2/*,
+                # cw_timing|volume_sma_12/*,
                 # timing|gtrends_memecoin_us/*,
-                # timing|gtrends_altcoin_us/*,
-                # timing|gtrends_bitcoin_worldwide/*,
-                # timing|gtrends_cryptocurrency_worldwide/*,
-                # timing|gtrends_coinbase_worldwide/*,
-                # timing|gtrends_solana_worldwide/*,
-                # timing|gtrends_coinbase_us/*,
-                # timing|gtrends_bitcoin_us/*,
-                # timing|gtrends_solana_us/*,
+                # timing|price_sma_2/*/sell_weighted|*,
+                # timing|volume_sma_12/*/sell_weighted|*,
+                # timing|btc_mvrv_z_score/*/sell_weighted|*,
+                # timing|btc_vdd_multiple/*/sell_weighted|*,
+                # # timing|gtrends_altcoin_worldwide/*/sell_weighted/*,
+                # timing|gtrends_memecoin_us/*/sell_weighted|*,
+
+                # timing|gtrends_memecoin_us/lead_21/*,
+                # timing|gtrends_memecoin_us/lag_21/*,
+                # timing|gtrends_memecoin_us/lead_60/*,
+                # timing|gtrends_memecoin_us/lag_60/*,
+                # timing|btc_mvrv_z_score/lead_21/*,
+                # timing|btc_mvrv_z_score/lag_21/*,
+                # timing|btc_mvrv_z_score/lead_60/*,
+                # timing|btc_mvrv_z_score/lag_60/*,
+                # timing|btc_vdd_multiple/lead_21/*,
+                # timing|btc_vdd_multiple/lag_21/*,
+                # timing|btc_vdd_multiple/lead_60/*,
+                # timing|btc_vdd_multiple/lag_60/*,
+                # timing|gtrends_altcoin_worldwide/lead_21/*,
+                # timing|gtrends_altcoin_worldwide/lag_21/*,
+                # timing|gtrends_altcoin_worldwide/lead_60/*,
+                # timing|gtrends_altcoin_worldwide/lag_60/*,
+
+
+                # timing|gtrends_memecoin_us/lead_21/sell_weighted/*,
+                # timing|gtrends_memecoin_us/lag_21/sell_weighted/*,
+                # timing|gtrends_memecoin_us/lead_60/sell_weighted/*,
+                # timing|gtrends_memecoin_us/lag_60/sell_weighted/*,
+                # timing|btc_mvrv_z_score/lead_21/sell_weighted/*,
+                # timing|btc_mvrv_z_score/lag_21/sell_weighted/*,
+                # timing|btc_mvrv_z_score/lead_60/sell_weighted/*,
+                # timing|btc_mvrv_z_score/lag_60/sell_weighted/*,
+                # timing|btc_vdd_multiple/lead_21/sell_weighted/*,
+                # timing|btc_vdd_multiple/lag_21/sell_weighted/*,
+                # timing|btc_vdd_multiple/lead_60/sell_weighted/*,
+                # timing|btc_vdd_multiple/lag_60/sell_weighted/*,
+                # timing|gtrends_altcoin_worldwide/lead_21/sell_weighted/*,
+                # timing|gtrends_altcoin_worldwide/lag_21/sell_weighted/*,
+                # timing|gtrends_altcoin_worldwide/lead_60/sell_weighted/*,
+                # timing|gtrends_altcoin_worldwide/lag_60/sell_weighted/*,
+
+
+                # cluster|*,
 
 
             #     # # performance|*,
-                performance|crypto_net_flows/crypto_inflows/*,
-                performance|crypto_net_flows/max_investment/*,
-                cw_performance|crypto_net_flows/crypto_inflows/*,
-                cw_performance|crypto_net_flows/max_investment/*,
+                # performance|crypto_net_flows/crypto_inflows/*,
+                # performance|crypto_net_flows/max_investment/*,
+                # cw_performance|crypto_net_flows/crypto_inflows/*,
+                # cw_performance|crypto_net_flows/max_investment/*,
             #     # performance|crypto_net_gain/twb/*,
             #     # performance|crypto_net_gain/active_twb/*,
             #     # performance|*/log|*,
@@ -375,7 +386,11 @@ modeling: #WalletModel
             #     # mktcap|portfolio_mcap_mean/market_cap_filled|*,
             #     # mktcap|portfolio_mcap_median/market_cap_filled|*,
             #     # mktcap|portfolio_mcap_min/market_cap_filled|*,
-
+                cw_mktcap|end_portfolio_wtd_market_cap/market_cap_filled*,
+                cw_mktcap|end_portfolio_wtd_market_cap/market_cap_unadj*,
+                cw_mktcap|portfolio_mcap_min/market_cap_unadj*,
+                cw_mktcap|volume_wtd_market_cap/market_cap_filled*,
+                cw_mktcap|volume_wtd_market_cap/market_cap_unadj*,
             #     # # transfers|*,
 
             #     # # scenario|*,
@@ -384,17 +399,23 @@ modeling: #WalletModel
             #     # balance|coin_fraction_std|*,
             #     # balance|concentration_index|*,
 
-            #     # # macro|*,
+                # cw_macro|*,
                 # macro|global_market_cap_rsi_30*,
                 # macro|global_market_cap_rsi_100*,
+                # macro|global_market_cap_std|*,
 
-            #     # cluster|*,
+                # cluster|k2/*,
+                # cluster|k5/*,
 
-            #     # '*|w1',
+                # '*|w1',
+                # '*|w2',
+                # '*|w3',
 
                 # cw_timing|btc_vdd_multiple/*,
                 # cw_timing|gtrends_altcoin_worldwide/*,
                 # cw_timing|gtrends_memecoin_us/*,
+                # cw_timing|price_sma_2/*/sell_weighted|*,
+                # cw_timing|volume_sma_12/*/sell_weighted|*,
 
 
             ]

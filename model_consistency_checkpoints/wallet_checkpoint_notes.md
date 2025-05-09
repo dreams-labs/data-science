@@ -1,3 +1,42 @@
+# DDA 760 ablation
+checkpoint w_.6_1.934 ablation analysis complete
+Model Performance Summary
+Target: cw_crypto_net_gain/max_investment/base 0.6 to inf
+ID: 47290d65-c40e-4d02-b89c-3d549c8ad20f
+===================================
+Test Samples:             191,189
+Number of Features:       285
+Features per Window:      56
+
+Classification Metrics
+-----------------------------------
+ROC AUC:                    0.924
+Log Loss:                   0.101
+Accuracy:                   0.962
+Precision:                  0.859
+Recall:                     0.065
+F1 Score:                   0.121
+
+Validation Metrics
+-----------------------------------
+Val ROC AUC:                0.952
+Val Accuracy:               0.942
+Val Precision:              0.909
+Val Recall:                 0.121
+Val F1 Score:               0.214
+
+Validation Return Metrics
+-----------------------------------
+Positive Threshold:         0.80
+Positive Predictions:       20883/2385725 (0.88%)
+Positive Mean Outcome:      1.934
+Positive W-Mean Outcome:    1.357
+Top 1% W-Mean Outcome:      1.337
+Top 5% W-Mean Outcome:      0.946
+Overall W-Mean Outcome:     0.069
+
+
+
 # DDA 718 coin model grid search
 checkpoint 1: seems alive
 Model Performance Summary
@@ -56,7 +95,7 @@ Recall:                   0.000
 F1 Score:                 0.000
 
 Validation Return Metrics
------------------------------------
+----------------------------------
 Val ROC AUC:              0.588
 Top 1% Mean Return:       0.173
 Top 5% Mean Return:       -0.115
