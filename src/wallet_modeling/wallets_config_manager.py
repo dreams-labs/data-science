@@ -36,6 +36,7 @@ def load_all_wallets_configs(config_dir: str):
     wallets_coin_config = WalletsCoinConfig.load_from_yaml(wallets_coin_yaml_path)
 
     # Populate wallets_coin_config['training_data']
+    # ---------------------------------------------
     base_wc_config = wallets_coin_config.config
     base_wc_config['training_data'] = {}
 
@@ -149,9 +150,14 @@ class WalletsConfig:
             dev_folder = f"{raw_config['training_data']['parquet_folder']}_dev"
             raw_config['training_data']['parquet_folder'] = dev_folder
 
+        # Impute model_scores_folder
+        raw_config['training_data']['model_scores_folder'] = (
+            raw_config['training_data']['parquet_folder']
+            .replace('wallet_modeling_dfs','wallet_modeling_score_dfs')
+        )
+
         # Add derived values
         self.config = add_derived_values(raw_config)
-
 
         # Confirm modeling period is later than all windows
         first_window_start = self.config['training_data']['training_window_starts'][-1]
