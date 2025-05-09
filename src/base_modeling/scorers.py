@@ -166,6 +166,8 @@ def validation_top_scores_returns_scorer(wallet_model):
         # Get actual returns aligned to validation index
         target_var = wallet_model.modeling_config['target_variable']
         returns = wallet_model.validation_wallet_features_df[target_var].reindex(wallet_model.X_validation.index)
+
+        # Mild winsorization to limit impact of major outliers
         returns = u.winsorize(returns,0.005)
 
         # Predict class probabilities for positive class
