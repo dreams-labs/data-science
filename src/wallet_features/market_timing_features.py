@@ -339,7 +339,6 @@ def calculate_timing_features_for_column(df: pd.DataFrame, metric_column: str) -
 
     # Group once on [wallet_address, transaction_side]
     grouped = df.groupby(['wallet_address', 'transaction_side'], observed=True).agg(
-        mean_val=(metric_column, 'mean'),
         sum_weighted_values=('weighted_values', 'sum'),
         sum_weights=('abs_net_transfers', 'sum'),
     ).reset_index()
@@ -351,19 +350,15 @@ def calculate_timing_features_for_column(df: pd.DataFrame, metric_column: str) -
     pivoted = grouped.pivot(index='wallet_address', columns='transaction_side')
 
     # We only want mean and weighted columns
-    # pivoted["mean_val"] => buy / sell means
     # pivoted["weighted_val"] => buy / sell weighted
-    pivoted_mean = pivoted['mean_val'].copy()
     pivoted_weighted = pivoted['weighted_val'].copy()
 
     # Rename columns
-    pivoted_mean.columns = [f'{metric_column}/{side}_mean' for side in pivoted_mean.columns]
     pivoted_weighted.columns = [f'{metric_column}/{side}_weighted' for side in pivoted_weighted.columns]
 
     # Combine back
-    final_df = pd.concat([pivoted_mean, pivoted_weighted], axis=1)
 
-    return final_df
+    return pivoted_weighted
 
 
 
