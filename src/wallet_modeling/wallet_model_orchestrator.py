@@ -101,6 +101,9 @@ class WalletModelOrchestrator:
             # Store model ID in dictionary for later use
             models_dict[score_name] = model_id
 
+            logger.milestone(f"Finished training model {len(models_dict)}/{len(self.score_params)}"
+                             f": {score_name}.")
+
         # Store and save models_dict
         self.models_dict = models_dict
         save_location = f"{self.wallets_coin_config['training_data']['parquet_folder']}/wallet_model_ids.json"
