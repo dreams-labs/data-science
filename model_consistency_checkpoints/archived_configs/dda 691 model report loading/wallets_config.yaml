@@ -1,0 +1,443 @@
+# WalletModel Config
+
+
+# WalletModel Period Boundaries
+training_data: #WalletModel
+
+    #KeyParam Period Dates
+    modeling_period_start: '2024-11-28'
+    modeling_period_duration: 30
+    training_window_lookbacks: [  # How many days prior to the modeling period each window begins
+        240,
+        180,
+        120,
+        90,
+        60,
+        30
+    ]
+    validation_period_end: '2025-04-30'  # toggle to activate/deactivate validation data
+
+    # Training Data Toggles
+    hybridize_wallet_ids: True  # if true, training data will be keyed on wallet-coin pairs
+    predrop_features: True  # if true, the feature_selection.drop_patterns will be applied early to save memory
+
+    # Local pipeline configs
+    dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
+    parquet_folder: temp/wallet_modeling_dfs/dda_771_ablation_retest_v2  # where to store parquet files
+    model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
+
+
+# WalletModel Modeling Config
+modeling: #WalletModel
+
+    #KeyParam Model Type
+    # model_type: regression  # "regression" or "classification"
+    model_type: classification  # "regression" or "classification"
+    y_pred_threshold: 0.8  # scores above this probability threshold are positive predictions
+
+    #KeyParam Target Variable
+    # Return Rate
+    target_variable: cw_crypto_net_gain/max_investment/base
+    # target_variable: cw_crypto_net_gain/max_investment/winsorized
+    # target_variable: cw_crypto_net_flows/crypto_inflows/base
+
+    # target_var_min_threshold: -.inf  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.00  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.05  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.25  # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.40  # a classification model will try to predict the target var above this value
+
+    # target_var_max_threshold: -0.05  # a classification model will try to predict the target var above this value
+    # target_var_max_threshold: 0.25  # a classification model will try to predict the target var above this value
+    target_var_max_threshold: .inf  # a classification model will try to predict the target var above this value
+
+    # # Net Gain
+    # target_variable: cw_crypto_net_gain
+    # # target_variable: crypto_net_gain
+    # # target_variable: cw_crypto_net_flows
+    # # # target_variable: crypto_net_cash_flows
+    # y_pred_threshold: 0.7  # scores above this probability threshold are positive predictions
+
+
+    #KeyParam Modeling Cohort Definition
+    modeling_min_investment: 1000
+    modeling_min_coins_traded: 1
+
+    #KeyParam Epoch Assignment Toggle
+    assign_epochs_to_addresses: True  # whether a given wallet has data for 1 or multiple epochs included in training data
+
+    # Train/Test/Eval split
+    test_size: 0.2  # what % of the total population will be used as test
+    eval_size: 0.05  # what % used for the early stopping eval set
+
+    # Metaparameters
+    verbose_estimators: True  # whether to print each estimator's scores
+
+
+    # WalletModel Params
+    # Model specifics
+    model_params:
+
+        # Core Tree Params (Always Active)
+        # -------------------------------
+        #KeyParam Tree Depth
+        max_depth: 4  # how deep the trees can go
+        min_child_weight: 40  # what % of rows each tree must have
+
+        subsample: 1.0  # samples rows, e.g. trees use x% of all wallet rows
+        colsample_bytree: 0.9  # samples columns, e.g. trees use x% of all column features
+        gamma: 0.005  # minimum gain required to split further on a leaf node
+        tree_method: hist  # method for building trees, e.g., histogram-based
+        max_bin: 256  # how many bins to categorize features into
+
+        # Performance Profiles (Choose One Section)
+        # --------------------------------------
+        #KeyParam Estimator Counts
+        n_estimators: 250  # number of trees to train in the model
+        learning_rate: 0.5  # step size for updates to weights during training
+
+        # scale_pos_weight: 20  # used for oversampling; number is a ratio of neg:pos, e.g. 20 means 20neg:1pos
+        early_stopping_rounds: 10  # stop training if no improvement after x rounds
+
+        # Threading Controls
+        n_jobs: -1
+
+        # Metaparams
+        random_state: 42
+
+
+    # WalletModel Feature Selection
+    feature_selection:
+        # Column patterns to remove
+        drop_patterns: [
+
+            cw_trading|*,
+            cw_macro|*,
+            # trading|*,
+
+            # timing|*,
+            timing|*/buy_mean*,
+            timing|*/sell_mean*,
+            # timing|*/sell_weighted*,
+
+            # timing|btc_mvrv_z_score/*,
+            # timing|btc_vdd_multiple/*,
+            # timing|gtrends_altcoin_worldwide/*,
+            # timing|gtrends_memecoin_us/*,
+            # timing|gtrends_memecoin_us/lag_21/*,
+            # timing|gtrends_memecoin_us/lead_60/*,
+            # timing|gtrends_memecoin_us/lag_60/*,
+
+            # performance|*,
+            performance|crypto_net_gain/crypto_inflows/*,
+            performance|*/log|*,
+            performance|*/ntile_rank|*,
+            performance|crypto_net_flows/max_investment/*,
+
+            trading|average_transaction|*,
+            trading|crypto_cash_buys|*,
+            trading|crypto_cash_sells|*,
+            # trading|crypto_net_cash_flows|*, keep
+            # trading|crypto_inflows|*, keep
+            trading|crypto_outflows|*,
+            trading|crypto_net_flows|*,
+            trading|crypto_net_gain|*,
+            # trading|max_investment|*, keep
+            # trading|total_volume|*, keep
+            # trading|unique_coins_traded|*, keep
+
+            '*|all_windows',
+
+
+            # # mktcap|*,
+            mktcap|portfolio_mcap_median/market_cap_filled|*,
+            mktcap|portfolio_mcap_min/market_cap_filled|*,
+            mktcap|portfolio_mcap_max/market_cap_filled|*, #retain?
+            mktcap|portfolio_mcap_std/market_cap_filled|*,
+            mktcap|portfolio_mcap_mean/market_cap_unadj|*,
+            mktcap|portfolio_mcap_std/market_cap_unadj|*,
+
+
+#             # macro|*,
+            macro|*_first|*,
+            # macro|btc_mvrv_z_score_first|*,
+            # macro|btc_mvrv_z_score_last|*,
+            # macro|btc_price_std|*,
+            macro|global_market_cap_first|*,
+            macro|global_market_cap_last|*,
+
+            # macro|global_market_cap_rsi_30*,
+            macro|btc_vdd_multiple*,
+            macro|gtrends_altcoin_worldwide*,
+            macro|gtrends_memecoin_us*,
+
+            cluster|*,
+
+
+            # cw_timing|*,
+            cw_timing|*/buy_mean*,
+            cw_timing|*/sell_mean*,
+            # cw_timing|*/sell_weighted*,
+
+            cw_timing|btc_mvrv_z_score/*,
+            cw_timing|btc_vdd_multiple/*,
+            cw_timing|gtrends_altcoin_worldwide/*,
+            cw_timing|gtrends_memecoin_us/*,
+            # cw_timing|price_sma_2/sell_weighted/*,
+            # cw_timing|volume_sma_12/sell_weighted/*,
+            # cw_timing|btc_mvrv_z_score/sell_weighted/*,
+            # cw_timing|btc_vdd_multiple/sell_weighted/*,
+            # cw_timing|gtrends_altcoin_worldwide/sell_weighted/*,
+            # cw_timing|gtrends_memecoin_us/sell_weighted/*,
+
+
+            # cw_performance|*,
+            cw_performance|crypto_net_gain/crypto_inflows/*,
+            cw_performance|*/log|*,
+            cw_performance|*/ntile_rank|*,
+            cw_performance|crypto_net_flows/crypto_inflows/*,
+
+            # cw_mktcap|*,
+            cw_mktcap|portfolio_mcap_mean/market_cap_filled|*,
+            cw_mktcap|portfolio_mcap_median/market_cap_filled|*,
+            cw_mktcap|portfolio_mcap_min/market_cap_filled|*,
+            cw_mktcap|portfolio_mcap_max/market_cap_filled|*, #retain?
+            cw_mktcap|portfolio_mcap_std/market_cap_filled|*,
+            cw_mktcap|portfolio_mcap_mean/market_cap_unadj|*,
+            cw_mktcap|portfolio_mcap_median/market_cap_unadj|*,
+            cw_mktcap|portfolio_mcap_std/market_cap_unadj|*,
+            cw_mktcap|portfolio_mcap_max/*,
+            cw_mktcap|end_portfolio_wtd_market_cap/market_cap_filled*,
+            cw_mktcap|end_portfolio_wtd_market_cap/market_cap_unadj*,
+            cw_mktcap|portfolio_mcap_min/market_cap_unadj*,
+            cw_mktcap|volume_wtd_market_cap/market_cap_filled*,
+
+            # cw_transfers|*,
+
+            # cw_scenario|*,
+
+            # cluster|k5/*,
+
+        ]
+
+        # Correlation/variance-based removal
+        # variance_threshold: 0.00 # features with this level of variance or less will be removed
+        # correlation_threshold: 2.0 # features above this correlation coefficient will be removed
+        protected_features: [
+            cluster|
+        ]
+
+
+    # WalletModel Grid Search
+    # Params for model construction
+    grid_search_params:
+
+        #KeyParam Grid Search Toggle
+        # -------------------------------
+        # enabled: True
+        # -------------------------------
+
+        # Search Methodology
+        drop_patterns_include_n_features: 1  # if set to n, the drop_patterns grid search will apply all but n patterns for each model. otherwise, it will apply 1 drop pattern in each model.
+
+        n_iter: 40   # random search limit
+        n_splits: 3  # cv splits
+
+        # regressor_scoring: neg_root_mean_squared_error
+        # regressor_scoring: custom_neg_rmse_scorer
+        # regressor_scoring: custom_r2_scorer
+        regressor_scoring: validation_r2_scorer
+
+        # classifier_scoring: validation_auc_scorer
+        classifier_scoring: validation_top_scores_returns_scorer
+        # classifier_scoring: validation_top_percentile_returns_scorer
+        # percentile_threshold: 0.01  # cutoff for validation_top_percentile_returns_scorer
+
+        # Metaparameters
+        # build_post_search_model: False  # whether to build a model after the grid search
+        verbose_level: 3  # 3 outputs model performance but not training scores
+        verbose_estimators: False  # whether to print each estimator's scores
+        n_jobs: -1
+        # pre_dispatch: -1
+
+        # Params for target variable generation
+        # param_grid_y:
+
+            # Target variables
+            # target_selector__target_variable: [
+            #     'max_investment',
+            #     'crypto_net_gain/max_investment/winsorized',
+
+            # ]
+            # target_selector__target_var_min_threshold: [
+            #     0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7
+            # ]
+
+        # Params for model construction
+        param_grid:
+
+            # # Depth and Child Weight
+            # estimator__min_child_weight_pct: [0.00004, 0.00007, 0.0001]
+            # estimator__min_child_weight: [25,40,60,80]
+            # estimator__max_depth: [4,5,6,7,8]
+            # basic depth param
+
+            # # Col/Row Sampling
+            # estimator__subsample: [0.85, 0.9, 0.95, 1.0]   # samples rows, e.g. trees use x% of all wallet rows
+            # estimator__colsample_bytree: [ 0.9, 0.95, 1.0]   # samples columns, e.g. trees use x% of all column features
+
+            # # Model Speed
+            # estimator__tree_method: [hist, approx, auto]
+            # estimator__max_bin: [64, 128, 256]
+            # estimator__gamma: [0.005, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
+
+            # Tree Training Speed Overrides
+            estimator__n_estimators: [120]
+            estimator__learning_rate: [0.9]
+            # estimator__max_depth: [7]
+            # estimator__min_child_weight: [30]
+
+            # estimator__gamma: [0, 0.005]
+
+            # Optimize for Speed
+            estimator__n_jobs: [4]  # how many models to build at once
+            # estimator__max_bin: [128]
+            # estimator__tree_method: [hist]
+
+
+            # # Column Selection
+            drop_columns__drop_patterns: [
+
+
+                # # macro|*,
+                # macro|*_first|*,
+                # # macro|btc_mvrv_z_score_first|*,
+                # # macro|btc_mvrv_z_score_last|*,
+                # # macro|btc_price_std|*,
+                # macro|global_market_cap_first|*,
+                # macro|global_market_cap_last|*,
+
+                # # macro|global_market_cap_rsi_30*,
+                # macro|btc_vdd_multiple*,
+                # macro|gtrends_altcoin_worldwide*,
+                # macro|gtrends_memecoin_us*,
+
+                # cluster|*,
+
+
+            ]
+
+    # Phase training section
+    phase_training:
+        enabled: False
+        phases:
+            - params:
+                max_depth: 9
+                min_child_weight: 100
+                gamma: 0.02
+            - params:
+                max_depth: 15
+                min_child_weight: 15
+                gamma: 0.005
+
+
+# WalletModel Cleaning
+data_cleaning: #WalletModel
+
+    #KeyParam Wallet cohort thresholds
+    min_coins_traded: 4  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
+    max_coins_traded: 250  # Exclude wallets that have traded more coins than this during the training period
+
+    min_wallet_investment: 2000 # time weighted average balance filter
+    min_wallet_inflows: 2000  # Exclude wallets with inflows below this amount (USD)
+    min_wallet_volume: 2000  # Exclude wallets with fewer than this amount of training period USD volume
+
+    max_wallet_investment: 15_000_000 # time weighted average balance filter
+    max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
+    max_wallet_volume: 25_000_000  # Exclude wallets with fewer than this amount of training period USD volume
+    max_wallet_profits: 100_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
+
+    # Market data filters
+    max_initial_market_cap: 999150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
+    max_gap_days: 30  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
+    min_daily_volume: 500 # Minimum average daily volume the coin must have
+
+    # Warnings about potential data gaps in profits_df or market_data_df
+    coverage_decrease_audit_window: 10  # how far to look back to assess decreases in coverage
+    price_coverage_warning_min_coin_increase: 100  # if this many coin prices has recently become imputed...
+    price_coverage_warning_min_pct_increase: 0.03  # ...and the % of imputed coin prices has increased by this value, issue a warning
+    transfers_coverage_warning_min_coin_increase: 150  # if this many coins have lost transfers data...
+    transfers_coverage_warning_min_pct_increase: 0.05  # ...and the % of coin without transfers data has increased by this value, issue a warning
+
+    # Market cap imputation filters
+    min_mc_imputation_coverage: 0.1  # coins with market cap coverage below this level will have hardcoded market cap values filled
+    max_mc_imputation_multiple: 3.0  # will not impute dates where the imputed market cap exceeds the max known market cap * this ratio
+    market_cap_default_fill:  500000  # coins below the imputation coverage level will have empty values filled with this
+
+
+# WalletModel Features
+features: #WalletModel
+    # Trading Params
+    include_twb_metrics: False  # whether to calculate time weighted balances
+    include_twr_metrics: False  # whether to calculate time weighted returns
+    usd_materiality: 5  # dates with both transfers and balances below this level will be ignored for time weighted returns
+    twr_max_annual_return: 100.0  # caps the max annual return at this percent (100.0 is a 100x return)
+
+    # Performance Params
+    returns_winsorization: 0.005
+    ranking_ntiles: 2
+
+    # Market Timing Params
+    offset_winsorization: 0.02 # comparisons between metrics and their offset values will be winsorized by this amount
+    timing_metrics_min_transaction_size: 20  # trades below this USD threshold will not be evaluated for market timing peformance or transfers buyer sequencing
+
+    # Market Cap Params
+    market_cap_feature_columns: [  # which columns to generate market cap features with
+        market_cap_filled,
+        market_cap_unadj
+    ]
+
+    # Transfers Params
+    toggle_transfers_features: False
+    include_transfers_features: [
+        first_buy,
+        # first_sell,
+        # initial_hold_time,
+    ]
+
+    # Scenarios Params
+    toggle_scenario_features: False  # predictive but slow
+    scenario_performance_features: [
+        # crypto_net_flows/crypto_inflows/winsorized,
+        crypto_net_flows/max_investment/winsorized,
+        # crypto_net_gain/max_investment/winsorized,
+    ]
+
+    # Balance Params
+    toggle_balance_features: False  # seemingly not predictive
+    balance_features_min_balance: 20  # determines
+
+    # Macroeconomic Params
+    macroeconomic_features: [
+        btc_price,
+        btc_mvrv_z_score,
+        global_market_cap,
+        global_volume
+    ]
+
+    # Clustering Params
+    # clustering_n_clusters: [5]
+    clustering_n_components: 25
+    clustering_fill_method: fill_0  # fill_0 or fill_mean
+    clustering_include_pca: False
+
+
+# WalletModel Multithreading
+# Determines how many workers will be used in multithreading executions
+n_threads: #WalletModel
+    raw_data_retrieval: 3  # retrieves raw dfs from bigquery
+    profits_row_imputation: 4  # generates imputed rows in profits_df
+    training_dfs_preparation: 3  # generates market indicators, macro indicators, cohort profits dfs
+    epoch_tm_features: 2  # determines whether training and modeling features are generated concurrently or sequentially
+    concurrent_epochs: 12  # how many epochs' training data are processed concurrently
+    concurrent_windows: 8  # how many windows are processed concurrently

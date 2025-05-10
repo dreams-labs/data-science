@@ -1,7 +1,8 @@
 """
 Functions for generating and storing model training reports and associated data
 """
-from typing import Dict,Tuple
+from typing import Dict, Tuple, Any
+import yaml
 import json
 from datetime import datetime
 from pathlib import Path
@@ -154,7 +155,8 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path, sav
         model_report_filename = (
             f"model_report_{filename_timestamp}__"
             f"mr{model_r2:.3f}__"
-            f"{f'vr{validation_r2:.3f}' if not np.isnan(validation_r2) else 'vr___'}.json"
+            f"{f'vr{validation_r2:.3f}' if not np.isnan(validation_r2) else 'vr___'}"
+            f"|{model_id}.json"
         )
     elif model_results['model_type'] == 'classification':
         model_auc = evaluation_dict['roc_auc']
@@ -162,7 +164,8 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path, sav
         model_report_filename = (
             f"model_report_{filename_timestamp}__"
             f"mauc{model_auc:.3f}__"
-            f"{f'vauc{validation_auc:.3f}' if not np.isnan(validation_auc) else 'vauc___'}.json"
+            f"{f'vauc{validation_auc:.3f}' if not np.isnan(validation_auc) else 'vauc___'}"
+            f"|{model_id}.json"
         )
     else:
         raise ValueError(f"Invalid model type {model_results['model_type']} found in results object.")
@@ -223,7 +226,7 @@ def save_model_artifacts(model_results, evaluation_dict, configs, base_path, sav
 
 
 
-def load_model_artifacts(model_id, base_path):
+def load_model_report(model_id: str, base_path: str, configs_output_path: str = None):
     """
     Loads all artifacts associated with a specific model ID
 
@@ -238,16 +241,42 @@ def load_model_artifacts(model_id, base_path):
     """
     base_dir = Path(base_path)
 
-    # Load model report
-    report_path = base_dir / 'model_reports' / f"model_report_{model_id}.json"
+    # Load model report by matching filename suffix "|{model_id}.json"
+    reports_dir = base_dir / 'model_reports'
+    matching_reports = list(reports_dir.glob(f"*|{model_id}.json"))
+    if not matching_reports:
+        raise FileNotFoundError(f"No model report found for model_id {model_id} in {reports_dir}")
+    report_path = matching_reports[0]
     with open(report_path, 'r', encoding='utf-8') as f:
         report = json.load(f)
 
-    # Load wallet scores
-    wallet_scores_path = base_dir / 'wallet_scores' / f"wallet_scores_{model_id}.csv"
-    wallet_scores = pd.read_csv(wallet_scores_path)
+    # Optionally dump each configuration to YAML
+    if configs_output_path:
+        configs_dir = Path(configs_output_path)
+        configs_dir.mkdir(parents=True, exist_ok=True)
+        for config_name, config_obj in report.get('configurations', {}).items():
+            yaml_path = configs_dir / f"{config_name}.yaml"
+            yaml_path = configs_dir / f"{config_name}.yaml"
+            with open(yaml_path, 'w', encoding='utf-8') as yaml_file:
+                yaml.safe_dump(config_obj, yaml_file)
 
-    return {
-        'report': report,
-        'wallet_scores': wallet_scores,
-    }
+    return report
+
+
+# ---------------------------------
+#         Config Comparison
+# ---------------------------------
+
+def compare_configs(config_1: Dict[str, Any], config_2: Dict[str, Any]) -> None:
+    """
+    Compare two configuration dicts and log differences.
+    """
+    all_keys = set(config_1.keys()) | set(config_2.keys())
+    for key in sorted(all_keys):
+        val1 = config_1.get(key)
+        val2 = config_2.get(key)
+        if val1 != val2:
+            logger.info(
+                "Config key '%s' differs: %s vs %s",
+                key, val1, val2
+            )
