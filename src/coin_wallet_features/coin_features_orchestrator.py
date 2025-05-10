@@ -102,6 +102,7 @@ class CoinFeaturesOrchestrator:
             cw_metrics_df,
             wallet_segmentation_df,
             self.training_coin_cohort,
+            self.wallets_coin_config['wallet_features']['score_distributions'],
             self.wallets_coin_config['n_threads']['cw_flattening_threads']
         )
 
