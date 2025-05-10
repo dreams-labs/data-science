@@ -3,6 +3,8 @@ import copy
 import json
 from pathlib import Path
 import pandas as pd
+import matplotlib.pyplot as plt
+import math
 
 # Local modules
 from wallet_modeling.wallet_model import WalletModel
@@ -76,6 +78,7 @@ class WalletModelOrchestrator:
         - models_dict: Dictionary mapping score names to model IDs
         """
         models_dict = {}
+        evaluators = []
 
         for score_name in self.score_params:
             # Create a deep copy of the configuration to avoid modifying the original
@@ -90,13 +93,14 @@ class WalletModelOrchestrator:
             score_wallets_config['modeling']['verbose_estimators'] = False
 
             # Train and evaluate the model
-            model_id = self._train_and_evaluate(
+            model_id, evaluator = self._train_and_evaluate(
                 score_wallets_config,
                 wallet_training_data_df,
                 modeling_wallet_features_df,
                 validation_training_data_df,
                 validation_wallet_features_df
             )
+            evaluators.append((score_name, evaluator))
 
             # Store model ID in dictionary for later use
             models_dict[score_name] = model_id
@@ -110,8 +114,10 @@ class WalletModelOrchestrator:
         with open(save_location, 'w', encoding='utf-8') as f:
             json.dump(models_dict, f, indent=4, default=u.numpy_type_converter)
 
-        u.notify('intro_3')
+        u.notify('level_up')
         logger.info(f"Finished traning all {len(self.score_params)} models.")
+
+        self._plot_score_summaries(evaluators)
 
         return models_dict
 
@@ -173,7 +179,7 @@ class WalletModelOrchestrator:
         modeling_wallet_features_df,
         validation_training_data_df,
         validation_wallet_features_df
-    ) -> str:
+    ):
         """
         Train and evaluate a single model with given configuration.
 
@@ -185,7 +191,7 @@ class WalletModelOrchestrator:
         - validation_wallet_features_df: Validation features
 
         Returns:
-        - model_id: ID of the trained model
+        - (model_id, wallet_evaluator): ID of the trained model and evaluator object
         """
         # Construct model
         wallet_model = WalletModel(score_wallets_config['modeling'])
@@ -210,4 +216,40 @@ class WalletModelOrchestrator:
         # Display model evaluation summary
         wallet_evaluator.summary_report()
 
-        return model_id
+        return model_id, wallet_evaluator
+
+
+
+    def _plot_score_summaries(self, evaluators: list[tuple[str, any]]) -> None:
+        """
+        Plot score summaries for each trained model in a 2-column layout.
+        """
+        # Temporarily reduce base font sizes
+        for key in [
+            'font.size',
+            'axes.titlesize',
+            'axes.labelsize',
+            'xtick.labelsize',
+            'ytick.labelsize'
+        ]:
+            plt.rcParams[key] = plt.rcParams[key] - 3
+
+        n = len(evaluators)
+        cols = 2
+        rows = math.ceil(n / cols)
+        _, axes = plt.subplots(rows, cols, figsize=(cols * 6, rows * 4))
+        axes_flat = axes.flatten() if hasattr(axes, 'flatten') else [axes]
+
+        for ax, (score_name, evaluator) in zip(axes_flat, evaluators):
+            if evaluator.modeling_config.get('model_type') == 'classification':
+                evaluator._plot_return_vs_rank_classifier(ax, n_buckets=20)  # pylint:disable=protected-access
+            else:
+                evaluator._plot_score_distribution(ax)  # pylint:disable=protected-access
+            ax.set_title(score_name)
+
+        # Hide any unused subplots
+        for ax in axes_flat[n:]:
+            ax.axis('off')
+
+        plt.tight_layout()
+        plt.show()
