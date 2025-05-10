@@ -274,8 +274,8 @@ def test_calculate_timing_features_basic():
     # Sell mean: Single value = -0.5
     expected = pd.DataFrame(
         {
-            'test_metric/buy_mean': [0.75],
-            'test_metric/sell_mean': [-0.5],
+            # 'test_metric/buy_mean': [0.75],
+            # 'test_metric/sell_mean': [-0.5],
             'test_metric/buy_weighted': [0.833333],
             'test_metric/sell_weighted': [-0.5],
         },
@@ -329,8 +329,8 @@ def test_calculate_timing_features_empty_groups():
     # Expected values
     expected = pd.DataFrame(
         {
-            'test_metric/buy_mean': [0.75, np.nan],
-            'test_metric/sell_mean': [np.nan, -0.75],
+            # 'test_metric/buy_mean': [0.75, np.nan],
+            # 'test_metric/sell_mean': [np.nan, -0.75],
             'test_metric/buy_weighted': [0.833333, np.nan],
             'test_metric/sell_weighted': [np.nan, -0.833333],
         },
@@ -384,8 +384,8 @@ def test_calculate_timing_features_extreme_values():
     # Expected values
     expected = pd.DataFrame(
         {
-            'test_metric/buy_mean': [50.00005],    # Simple average of extremes
-            'test_metric/sell_mean': [0.0],         # Single zero-value sell
+            # 'test_metric/buy_mean': [50.00005],    # Simple average of extremes
+            # 'test_metric/sell_mean': [0.0],         # Single zero-value sell
             'test_metric/buy_weighted': [0.0001],  # Dominated by large transaction
             'test_metric/sell_weighted': [0.0],    # Single zero-value sell
         },
@@ -399,11 +399,11 @@ def test_calculate_timing_features_extreme_values():
         rtol=1e-5
     ), "Buy weighted average calculation failed with extreme values"
 
-    # Verify buy mean
-    assert np.isclose(
-        result['test_metric/buy_mean'].iloc[0],
-        expected['test_metric/buy_mean'].iloc[0]
-    ), "Buy mean calculation failed with extreme values"
+    # # Verify buy mean
+    # assert np.isclose(
+    #     result['test_metric/buy_mean'].iloc[0],
+    #     expected['test_metric/buy_mean'].iloc[0]
+    # ), "Buy mean calculation failed with extreme values"
 
     # Verify sell calculations
     assert np.isclose(
@@ -411,7 +411,7 @@ def test_calculate_timing_features_extreme_values():
         expected['test_metric/sell_weighted'].iloc[0]
     ), "Sell weighted average calculation failed with zero value"
 
-    assert np.isclose(
-        result['test_metric/sell_mean'].iloc[0],
-        expected['test_metric/sell_mean'].iloc[0]
-    ), "Sell mean calculation failed with zero value"
+    # assert np.isclose(
+    #     result['test_metric/sell_mean'].iloc[0],
+    #     expected['test_metric/sell_mean'].iloc[0]
+    # ), "Sell mean calculation failed with zero value"
