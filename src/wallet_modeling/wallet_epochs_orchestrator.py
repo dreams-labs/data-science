@@ -164,11 +164,11 @@ class MultiEpochOrchestrator:
 
                 # Store data in dicts
                 if cfg.get('epoch_type') == 'modeling':
-                    training_validation_dfs[epoch_date] = epoch_training_df
-                    modeling_validation_dfs[epoch_date] = epoch_modeling_df
-                elif cfg.get('epoch_type') == 'validation':
                     training_modeling_dfs[epoch_date] = epoch_training_df
                     modeling_modeling_dfs[epoch_date] = epoch_modeling_df
+                elif cfg.get('epoch_type') == 'validation':
+                    training_validation_dfs[epoch_date] = epoch_training_df
+                    modeling_validation_dfs[epoch_date] = epoch_modeling_df
                 # inline: log completion before storing data
 
                 i += 1
