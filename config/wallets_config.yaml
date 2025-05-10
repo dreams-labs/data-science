@@ -14,6 +14,7 @@ training_data: #WalletModel
         90,
         60,
         30,
+        15,
     ]
     validation_period_end: '2025-04-30'  # toggle to activate/deactivate validation data
 
@@ -23,7 +24,7 @@ training_data: #WalletModel
 
     # Local pipeline configs
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
-    parquet_folder: temp/wallet_modeling_dfs/dda_771_ablation_retest_v2  # where to store parquet files
+    parquet_folder: temp/wallet_modeling_dfs/dda_769_coin_model_toggles  # where to store parquet files
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
 
@@ -94,7 +95,7 @@ modeling: #WalletModel
         # --------------------------------------
         #KeyParam Estimator Counts
         n_estimators: 250  # number of trees to train in the model
-        learning_rate: 0.5  # step size for updates to weights during training
+        learning_rate: 0.7  # step size for updates to weights during training
 
         # scale_pos_weight: 20  # used for oversampling; number is a ratio of neg:pos, e.g. 20 means 20neg:1pos
         early_stopping_rounds: 10  # stop training if no improvement after x rounds
@@ -133,18 +134,6 @@ modeling: #WalletModel
             performance|*/log|*,
             performance|*/ntile_rank|*,
             performance|crypto_net_flows/max_investment/*,
-
-            trading|average_transaction|*,
-            trading|crypto_cash_buys|*,
-            trading|crypto_cash_sells|*,
-            # trading|crypto_net_cash_flows|*, keep
-            # trading|crypto_inflows|*, keep
-            trading|crypto_outflows|*,
-            trading|crypto_net_flows|*,
-            trading|crypto_net_gain|*,
-            # trading|max_investment|*, keep
-            # trading|total_volume|*, keep
-            # trading|unique_coins_traded|*, keep
 
             '*|all_windows',
 
@@ -292,7 +281,7 @@ modeling: #WalletModel
             # estimator__gamma: [0.005, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            estimator__n_estimators: [120]
+            estimator__n_estimators: [150]
             estimator__learning_rate: [0.9]
             # estimator__max_depth: [7]
             # estimator__min_child_weight: [30]
@@ -308,22 +297,7 @@ modeling: #WalletModel
             # # Column Selection
             drop_columns__drop_patterns: [
 
-
-                # # macro|*,
-                # macro|*_first|*,
-                # # macro|btc_mvrv_z_score_first|*,
-                # # macro|btc_mvrv_z_score_last|*,
-                # # macro|btc_price_std|*,
-                # macro|global_market_cap_first|*,
-                # macro|global_market_cap_last|*,
-
-                # # macro|global_market_cap_rsi_30*,
-                # macro|btc_vdd_multiple*,
-                # macro|gtrends_altcoin_worldwide*,
-                # macro|gtrends_memecoin_us*,
-
-                # cluster|*,
-
+                timing|*/sell_weighted*,
 
             ]
 
