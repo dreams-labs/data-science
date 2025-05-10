@@ -3,11 +3,9 @@ Functions to flatten wallet-coin features to coin-only
 """
 import logging
 from typing import List, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 import numpy as np
-
-# Add ThreadPoolExecutor for parallel processing
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Local module imports
 import utils as u
@@ -26,6 +24,7 @@ def flatten_cw_to_coin_segment_features(
     cw_metrics_df: pd.DataFrame,
     wallet_segmentation_df: pd.DataFrame,
     training_coin_cohort: list,
+    score_distribution_cols: list,
     n_threads: Optional[int] = 6
 ) -> pd.DataFrame:
     """
@@ -36,6 +35,7 @@ def flatten_cw_to_coin_segment_features(
         and 'trading/...' columns.
     - wallet_segmentation_df (DataFrame): indexed by wallet_address with segment assignments.
     - training_coin_cohort (list): list of coin_ids to include
+    - score_distribution_cols (list): Which scores should have distribution metrics.
     - n_threads (Optional[int]): number of threads for parallel processing (defaults to ThreadPoolExecutor default)
 
     Returns:
@@ -66,7 +66,8 @@ def flatten_cw_to_coin_segment_features(
                 metric_column,
                 wallet_segmentation_df,
                 segment_family,
-                training_coin_cohort
+                training_coin_cohort,
+                score_distribution_cols
             )
             metric_df = metric_df.join(seg_df, how='inner')
         return metric_column, metric_df
@@ -88,11 +89,12 @@ def flatten_cw_to_coin_segment_features(
 
 
 def flatten_cw_to_coin_features(
-    wallet_metric_df: pd.DataFrame,
+    analysis_df: pd.DataFrame,
     metric_column: str,
     wallet_segmentation_df: pd.DataFrame,
     segment_family: str,
     all_coin_ids: List[str],
+    score_distribution_cols: list,
     usd_materiality: float = 20.0
 ) -> pd.DataFrame:
     """Generate coin-level features from wallet-level metric.
@@ -103,24 +105,14 @@ def flatten_cw_to_coin_features(
     - wallet_segmentation_df (DataFrame): Segment labels and scores
     - segment_family (str): Column name for segment labels
     - all_coin_ids (List[str]): Complete list of coins
+    - score_distribution_cols (list): Which scores should have distribution metrics.
     - usd_materiality (float): USD threshold for including wallets in distribution metrics
 
     Returns:
     - DataFrame: Coin-level features with segment metrics
     """
     # Get score columns
-    score_columns = [col for col in wallet_segmentation_df.columns
-                     if col.startswith('scores|')]
-
-    # If segmentation columns are already present (pre‑joined), skip the join
-    if segment_family in wallet_metric_df.columns:
-        analysis_df = wallet_metric_df
-        logger.debug("Using pre‑joined dataframe; join skipped.")
-    else:
-        analysis_df = wallet_metric_df.join(
-            wallet_segmentation_df[[segment_family] + score_columns],
-            how='left'
-        )
+    score_columns = [f"scores|{dist}_score" for dist in score_distribution_cols]
 
     # Initialize results with MultiIndex aware groupby
     totals_df = analysis_df.groupby(level='coin_id', observed=True).agg({
@@ -157,7 +149,7 @@ def flatten_cw_to_coin_features(
 
 
         # Checks if the column is includes material usd values
-        if wallet_metric_df[metric_column].abs().mean() > (10 * usd_materiality):
+        if analysis_df[metric_column].abs().mean() > (10 * usd_materiality):
 
             # Add new distribution metrics
             score_dist_metrics_df = calculate_score_distribution_metrics(
