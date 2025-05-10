@@ -5,7 +5,7 @@
 training_data: #WalletModel
 
     #KeyParam Period Dates
-    modeling_period_start: '2024-09-29'
+    modeling_period_start: '2024-11-28'
     modeling_period_duration: 30
     training_window_lookbacks: [  # How many days prior to the modeling period each window begins
         240,
@@ -23,7 +23,7 @@ training_data: #WalletModel
 
     # Local pipeline configs
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
-    parquet_folder: temp/wallet_modeling_dfs/dda_771_ablation_retest  # where to store parquet files
+    parquet_folder: temp/wallet_modeling_dfs/dda_771_ablation_retest_v2  # where to store parquet files
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
 
@@ -42,10 +42,13 @@ modeling: #WalletModel
     # target_variable: cw_crypto_net_flows/crypto_inflows/base
 
     # target_var_min_threshold: -.inf  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.00  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.05  # a classification model will try to predict the target var above this value
-    target_var_min_threshold: 0.25  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.25  # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.40  # a classification model will try to predict the target var above this value
 
-    # target_var_max_threshold: -0.40  # a classification model will try to predict the target var above this value
+    # target_var_max_threshold: -0.05  # a classification model will try to predict the target var above this value
+    # target_var_max_threshold: 0.25  # a classification model will try to predict the target var above this value
     target_var_max_threshold: .inf  # a classification model will try to predict the target var above this value
 
     # # Net Gain
@@ -91,7 +94,7 @@ modeling: #WalletModel
         # --------------------------------------
         #KeyParam Estimator Counts
         n_estimators: 250  # number of trees to train in the model
-        learning_rate: 0.4  # step size for updates to weights during training
+        learning_rate: 0.5  # step size for updates to weights during training
 
         # scale_pos_weight: 20  # used for oversampling; number is a ratio of neg:pos, e.g. 20 means 20neg:1pos
         early_stopping_rounds: 10  # stop training if no improvement after x rounds
@@ -110,7 +113,6 @@ modeling: #WalletModel
 
             cw_trading|*,
             cw_macro|*,
-# TEST 1
             # trading|*,
 
             # timing|*,
@@ -132,7 +134,6 @@ modeling: #WalletModel
             performance|*/ntile_rank|*,
             performance|crypto_net_flows/max_investment/*,
 
-# TEST 1.1
             trading|average_transaction|*,
             trading|crypto_cash_buys|*,
             trading|crypto_cash_sells|*,
@@ -145,12 +146,9 @@ modeling: #WalletModel
             # trading|total_volume|*, keep
             # trading|unique_coins_traded|*, keep
 
-# TEST 1.2
             '*|all_windows',
-            '*|w1',
-            # '*|w2',
 
-# TEST 2
+
             # # mktcap|*,
             mktcap|portfolio_mcap_median/market_cap_filled|*,
             mktcap|portfolio_mcap_min/market_cap_filled|*,
@@ -160,7 +158,6 @@ modeling: #WalletModel
             mktcap|portfolio_mcap_std/market_cap_unadj|*,
 
 
-# # TEST 3
 #             # macro|*,
             macro|*_first|*,
             # macro|btc_mvrv_z_score_first|*,
@@ -177,7 +174,6 @@ modeling: #WalletModel
             cluster|*,
 
 
-# TEST 4
             # cw_timing|*,
             cw_timing|*/buy_mean*,
             cw_timing|*/sell_mean*,
@@ -201,7 +197,6 @@ modeling: #WalletModel
             cw_performance|*/ntile_rank|*,
             cw_performance|crypto_net_flows/crypto_inflows/*,
 
-# TEST 5
             # cw_mktcap|*,
             cw_mktcap|portfolio_mcap_mean/market_cap_filled|*,
             cw_mktcap|portfolio_mcap_median/market_cap_filled|*,
@@ -314,7 +309,6 @@ modeling: #WalletModel
             drop_columns__drop_patterns: [
 
 
-    # TEST 3
                 # # macro|*,
                 # macro|*_first|*,
                 # # macro|btc_mvrv_z_score_first|*,
@@ -329,46 +323,6 @@ modeling: #WalletModel
                 # macro|gtrends_memecoin_us*,
 
                 # cluster|*,
-
-    # # TEST 4
-                # cw_timing|*,
-                cw_timing|*/buy_mean*,
-                cw_timing|*/sell_mean*,
-                # cw_timing|*/sell_weighted*,
-
-                cw_timing|btc_mvrv_z_score/*,
-                cw_timing|btc_vdd_multiple/*,
-                cw_timing|gtrends_altcoin_worldwide/*,
-                cw_timing|gtrends_memecoin_us/*,
-                # cw_timing|price_sma_2/sell_weighted/*,
-                # cw_timing|volume_sma_12/sell_weighted/*,
-                # cw_timing|btc_mvrv_z_score/sell_weighted/*,
-                # cw_timing|btc_vdd_multiple/sell_weighted/*,
-                # cw_timing|gtrends_altcoin_worldwide/sell_weighted/*,
-                # cw_timing|gtrends_memecoin_us/sell_weighted/*,
-
-
-                # # cw_performance|*,
-                # cw_performance|crypto_net_gain/crypto_inflows/*,
-                # cw_performance|*/log|*,
-                # cw_performance|*/ntile_rank|*,
-                # cw_performance|crypto_net_flows/crypto_inflows/*,
-
-    # # TEST 5
-    #             # cw_mktcap|*,
-    #             cw_mktcap|portfolio_mcap_mean/market_cap_filled|*,
-    #             cw_mktcap|portfolio_mcap_median/market_cap_filled|*,
-    #             cw_mktcap|portfolio_mcap_min/market_cap_filled|*,
-    #             cw_mktcap|portfolio_mcap_max/market_cap_filled|*, #retain?
-    #             cw_mktcap|portfolio_mcap_std/market_cap_filled|*,
-    #             cw_mktcap|portfolio_mcap_mean/market_cap_unadj|*,
-    #             cw_mktcap|portfolio_mcap_median/market_cap_unadj|*,
-    #             cw_mktcap|portfolio_mcap_std/market_cap_unadj|*,
-    #             cw_mktcap|portfolio_mcap_max/*,
-    #             cw_mktcap|end_portfolio_wtd_market_cap/market_cap_filled*,
-    #             cw_mktcap|end_portfolio_wtd_market_cap/market_cap_unadj*,
-    #             cw_mktcap|portfolio_mcap_min/market_cap_unadj*,
-    #             cw_mktcap|volume_wtd_market_cap/market_cap_filled*,
 
 
             ]

@@ -195,8 +195,8 @@ coin_modeling: #CoinModel
 
             # Segment Family
             # score_binary|cw_return_rate_000*,
-            # score_binary|cw_return_rate_005*,
-            # score_binary|cw_return_rate_025*,
+            score_binary|cw_return_rate_005*,
+            score_binary|cw_return_rate_025*,
             score_binary|cw_return_rate_040*,
             score_binary|net_gain_1000*,
             score_binary|cw_net_flows_1000*,
@@ -205,7 +205,7 @@ coin_modeling: #CoinModel
 
             # # Segment Value
             'training_clusters|k5_cluster/cluster_0|*',
-            # 'training_clusters|k5_cluster/cluster_1|*',
+            'training_clusters|k5_cluster/cluster_1|*',
             'training_clusters|k5_cluster/cluster_2|*',
             'training_clusters|k5_cluster/cluster_3|*',
             'training_clusters|k5_cluster/cluster_4|*',
