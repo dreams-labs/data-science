@@ -1144,7 +1144,7 @@ class ClassifierEvaluator(RegressorEvaluator):
         ax.set_ylabel('Precision')
         ax.set_title('Precision-Recall Curve with AUC-PR')
         ax.grid(True, linestyle=":", alpha=0.3)
-        ax.legend(loc="lower left")
+        ax.legend(loc="upper right")
 
 
     def _plot_return_vs_rank_classifier(self, ax, n_buckets: int = 10):

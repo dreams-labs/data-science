@@ -9,5 +9,6 @@ offset_epochs:
     # validation_offsets: [30]
     # validation_offsets: [30, 60]
     validation_offsets: [30, 60, 90]
-    # validation_offsets: [30, 60, 90, 120]
+    # validation_offsets: [40, 70, 100]
+    # validation_offsets: [30, 60, 90, 120, 150, 180]
     # validation_offsets: [85]
