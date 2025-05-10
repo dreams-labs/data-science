@@ -1,3 +1,41 @@
+# DDA 769 coin model score dist toggle
+checkpoint 1: w1%_.211 rolled back some drop patterns
+Model Performance Summary
+Target: cw_crypto_net_gain/max_investment/base 0.4 to inf
+ID: b13e0dc1-3e58-4ccd-b43b-23d88c5ded89
+===================================
+Test Samples:             178,992
+Number of Features:       372
+Features per Window:      62
+
+Classification Metrics
+-----------------------------------
+ROC AUC:                    0.935
+Log Loss:                   0.110
+Accuracy:                   0.954
+Precision:                  0.868
+Recall:                     0.093
+F1 Score:                   0.167
+
+Validation Metrics
+-----------------------------------
+Val ROC AUC:                0.845
+Val Accuracy:               0.948
+Val Precision:              0.273
+Val Recall:                 0.007
+Val F1 Score:               0.014
+
+Validation Return Metrics
+-----------------------------------
+Positive Threshold:         0.80
+Positive Predictions:       4395/3305076 (0.13%)
+Positive Mean Outcome:      0.620
+Positive W-Mean Outcome:    0.278
+Top 1% W-Mean Outcome:      0.211
+Top 5% W-Mean Outcome:      0.131
+Overall W-Mean Outcome:     -0.006
+
+
 # DDA 760 ablation
 checkpoint w_.6_1.934 ablation analysis complete
 Model Performance Summary

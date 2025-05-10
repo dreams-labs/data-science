@@ -5,7 +5,7 @@
 training_data: #WalletModel
 
     #KeyParam Period Dates
-    modeling_period_start: '2024-11-28'
+    modeling_period_start: '2024-06-01'
     modeling_period_duration: 30
     training_window_lookbacks: [  # How many days prior to the modeling period each window begins
         240,
@@ -13,7 +13,7 @@ training_data: #WalletModel
         120,
         90,
         60,
-        30
+        30,
     ]
     validation_period_end: '2025-04-30'  # toggle to activate/deactivate validation data
 
@@ -111,14 +111,14 @@ modeling: #WalletModel
         # Column patterns to remove
         drop_patterns: [
 
+            trading|*,
             cw_trading|*,
             cw_macro|*,
-            # trading|*,
 
             # timing|*,
             timing|*/buy_mean*,
             timing|*/sell_mean*,
-            # timing|*/sell_weighted*,
+            timing|*/sell_weighted*,
 
             # timing|btc_mvrv_z_score/*,
             # timing|btc_vdd_multiple/*,
