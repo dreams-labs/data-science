@@ -23,6 +23,7 @@ from sklearn.metrics import (
 )
 from dreams_core import core as dc
 import utils as u
+import textwrap
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
 # pylint:disable=too-many-lines  # graphs gotta live somewhere
@@ -549,7 +550,9 @@ class RegressorEvaluator:
 
         # Labels and title
         ax.set_xlabel("Prediction-rank bucket (1 = top scores)")
-        ax.set_ylabel(f"Mean {target_var} during validation")
+        label = f"Mean {target_var} during validation"
+        wrapped_label = "\n".join(textwrap.wrap(label, width=30))
+        ax.set_ylabel(wrapped_label)
         ax.set_title("Return vs Rank – Validation")
         ax.legend()
 
@@ -1269,7 +1272,9 @@ class ClassifierEvaluator(RegressorEvaluator):
         # Labels and title
         ax.set_xlabel("Prediction Score")
         ax.set_ylabel("Number of Wallets")
-        ax2.set_ylabel(f"Mean {target_var} during validation")
+        label = f"Mean {target_var} during validation"
+        wrapped_label = "\n".join(textwrap.wrap(label, width=30))
+        ax2.set_ylabel(wrapped_label)
         ax.set_title("Prediction Score Distribution and Returns")
         ax.grid(True, linestyle=":", alpha=0.3)
 
