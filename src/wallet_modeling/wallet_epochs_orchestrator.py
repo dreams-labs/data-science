@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 #       Primary Orchestration Class
 # ----------------------------------------
 
-class MultiEpochOrchestrator:
+class WalletEpochsOrchestrator:
     """
     Orchestrates training data generation across multiple epochs by
     offsetting base config dates and managing the resulting datasets.
