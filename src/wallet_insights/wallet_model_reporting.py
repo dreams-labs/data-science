@@ -1,7 +1,7 @@
 """
 Functions for generating and storing model training reports and associated data
 """
-from typing import Dict,Tuple
+from typing import Dict, Tuple, Any
 import yaml
 import json
 from datetime import datetime
@@ -256,7 +256,27 @@ def load_model_report(model_id: str, base_path: str, configs_output_path: str = 
         configs_dir.mkdir(parents=True, exist_ok=True)
         for config_name, config_obj in report.get('configurations', {}).items():
             yaml_path = configs_dir / f"{config_name}.yaml"
+            yaml_path = configs_dir / f"{config_name}.yaml"
             with open(yaml_path, 'w', encoding='utf-8') as yaml_file:
                 yaml.safe_dump(config_obj, yaml_file)
 
     return report
+
+
+# ---------------------------------
+#         Config Comparison
+# ---------------------------------
+
+def compare_configs(config_1: Dict[str, Any], config_2: Dict[str, Any]) -> None:
+    """
+    Compare two configuration dicts and log differences.
+    """
+    all_keys = set(config_1.keys()) | set(config_2.keys())
+    for key in sorted(all_keys):
+        val1 = config_1.get(key)
+        val2 = config_2.get(key)
+        if val1 != val2:
+            logger.info(
+                "Config key '%s' differs: %s vs %s",
+                key, val1, val2
+            )
