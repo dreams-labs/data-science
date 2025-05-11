@@ -89,8 +89,9 @@ class WalletEpochsOrchestrator:
         latest_validation_end = max(all_validation_ends)
 
         # Retrieve the full data once (BigQuery or otherwise)
-        logger.milestone("Pulling complete raw datasets from %s through %s...",
-                    earliest_training_start, latest_validation_end)
+        logger.milestone("<%s> Pulling complete raw datasets from %s through %s...",
+                         self.base_config['training_data']['dataset'].upper(),
+                         earliest_training_start, latest_validation_end)
         (
             self.complete_profits_df,
             self.complete_market_data_df,
@@ -460,7 +461,7 @@ class WalletEpochsOrchestrator:
             )
 
 
-    def _build_epoch_config(
+    def build_epoch_config(
         self,
         offset_days: int,
         epoch_type: str,
@@ -471,6 +472,8 @@ class WalletEpochsOrchestrator:
     ) -> Dict:
         """
         Build a single epoch config by offsetting dates and updating folder based on offset.
+
+        Public method that is also used by the CoinEpochsOrchestrator.
         """
         epoch_config = copy.deepcopy(self.base_config)
         epoch_config['epoch_type'] = epoch_type
@@ -532,7 +535,7 @@ class WalletEpochsOrchestrator:
         # Generate modeling epoch configs
         for offset_days in modeling_offsets:
             all_epochs_configs.append(
-                self._build_epoch_config(
+                self.build_epoch_config(
                     offset_days, 'modeling',
                     base_modeling_start, base_modeling_end,
                     base_training_window_starts, base_parquet_folder_base
@@ -542,7 +545,7 @@ class WalletEpochsOrchestrator:
         # Add validation epoch configs if configured
         if self.base_config['training_data'].get('validation_period_end') is not None:
             for offset_days in validation_offsets:
-                cfg = self._build_epoch_config(
+                cfg = self.build_epoch_config(
                     offset_days, 'validation',
                     base_modeling_start, base_modeling_end,
                     base_training_window_starts, base_parquet_folder_base
@@ -553,7 +556,7 @@ class WalletEpochsOrchestrator:
             if len(coin_model_new_offsets) > 0:
                 for offset_days in coin_model_new_offsets:
                     try:
-                        cfg = self._build_epoch_config(
+                        cfg = self.build_epoch_config(
                             offset_days, 'coin_modeling',
                             base_modeling_start, base_modeling_end,
                             base_training_window_starts, base_parquet_folder_base
