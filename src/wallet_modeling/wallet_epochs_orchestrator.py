@@ -60,7 +60,7 @@ class WalletEpochsOrchestrator:
         # Create hybrid ID mapping if configured and able
         self.complete_hybrid_cw_id_df = None
         if self.base_config['training_data']['hybridize_wallet_ids'] and self.complete_profits_df is not None:
-            self.complete_hybrid_cw_id_df = self._create_hybrid_mapping()
+            self.complete_hybrid_cw_id_df = self.create_hybrid_mapping()
 
         # Generated objects
         self.output_dfs = {}
@@ -107,7 +107,7 @@ class WalletEpochsOrchestrator:
 
         # Create hybrid mapping if configured
         if self.base_config['training_data']['hybridize_wallet_ids']:
-            self.complete_hybrid_cw_id_df = self._create_hybrid_mapping()
+            self.complete_hybrid_cw_id_df = self.create_hybrid_mapping()
 
         # Save them to parquet for future reuse
         parquet_folder = self.base_config['training_data']['parquet_folder']
@@ -661,9 +661,11 @@ class WalletEpochsOrchestrator:
         return full_df
 
 
-    def _create_hybrid_mapping(self) -> pd.DataFrame:
+    def create_hybrid_mapping(self) -> pd.DataFrame:
         """
         Create hybrid wallet-coin ID mapping if configured in the base config.
+
+        Also used by CoinEpochsOrchestrator.
         """
         if self.base_config['training_data']['hybridize_wallet_ids']:
             hybrid_df = (
