@@ -12,6 +12,7 @@ training_data: #CoinModel
         90,
         60,
         30,
+        0
     ]
 
 

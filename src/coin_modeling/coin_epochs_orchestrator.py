@@ -50,13 +50,14 @@ class CoinEpochsOrchestrator:
         self.complete_market_data_df = complete_market_data_df
         self.complete_macro_trends_df = complete_macro_trends_df
 
+        self.wallet_epochs_orchestrator = None
+
 
 
     # -----------------------------------
     #         Primary Interface
     # -----------------------------------
 
-    @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def load_complete_raw_datasets(self) -> None:
         """
         Identifies the earliest training start date from the earliest coin window
@@ -87,17 +88,17 @@ class CoinEpochsOrchestrator:
         wallets_lookback_config.reload()
 
         # Load and store complete dfs
-        epochs_orchestrator = weo.WalletEpochsOrchestrator(
+        self.wallet_epochs_orchestrator = weo.WalletEpochsOrchestrator(
             wallets_lookback_config, # lookback config
             self.wallets_metrics_config,
             self.wallets_features_config,
             self.wallets_epochs_config
         )
-        epochs_orchestrator.load_complete_raw_datasets()
+        self.wallet_epochs_orchestrator.load_complete_raw_datasets()
 
-        self.complete_profits_df = epochs_orchestrator.complete_profits_df
-        self.complete_market_data_df = epochs_orchestrator.complete_market_data_df
-        self.complete_macro_trends_df = epochs_orchestrator.complete_macro_trends_df
+        self.complete_profits_df = self.wallet_epochs_orchestrator.complete_profits_df
+        self.complete_market_data_df = self.wallet_epochs_orchestrator.complete_market_data_df
+        self.complete_macro_trends_df = self.wallet_epochs_orchestrator.complete_macro_trends_df
         logger.info("Successfully retrieved complete dfs.")
 
 
@@ -106,11 +107,62 @@ class CoinEpochsOrchestrator:
     #           Helper Methods
     # -----------------------------------
 
-    def _prepare_coin_epoch_base_config(self, lookback_duration):
+    def _generate_coin_epoch_training_data(self, lookback_duration: int):
         """
-        Creates a config with the following changes:
-         - dates offset by a wallets_coin_config training_window_lookback
-         - parquet_folder subdirectory added
+        Generates a coin epoch's training data for all wallet windows and epochs.
+
+        Params:
+         - lookback_duration (int): How many days the coin lookback is offset vs the base config.
+        """
+        # Overwrite base config in wallets orchestrator
+        coin_epoch_wallets_config = self._prepare_coin_epoch_base_config(lookback_duration)
+        self.wallet_epochs_orchestrator.wallets_config = coin_epoch_wallets_config
+
+        # Identify filepaths
+        parquet_folder = coin_epoch_wallets_config['training_data']['parquet_folder']
+        period = coin_epoch_wallets_config['training_data']['modeling_period_start']
+        wallet_td_df_path = f"{parquet_folder}/{period}_multiwindow_wallet_training_data_df.parquet"
+        modeling_wf_df_path = f"{parquet_folder}/{period}_multiwindow_modeling_wallet_features_df.parquet"
+        validation_td_df_path = f"{parquet_folder}/{period}_multiwindow_validation_training_data_df.parquet"
+        validation_wf_df_path = f"{parquet_folder}/{period}_multiwindow_validation_wallet_features_df.parquet"
+
+        # Load and return existing files if they exist
+        if os.path.exists(wallet_td_df_path):
+            logger.info("Successfully loaded existing wallet epoch dfs.")
+            return (
+                pd.load_parquet(wallet_td_df_path),
+                pd.load_parquet(modeling_wf_df_path),
+                pd.load_parquet(validation_td_df_path),
+                pd.load_parquet(validation_wf_df_path),
+            )
+
+        # If not, generate and save training and modeling dfs for all windows
+        (
+            wallet_training_data_df,
+            modeling_wallet_features_df,
+            validation_training_data_df,
+            validation_wallet_features_df
+        ) = self.wallet_epochs_orchestrator.generate_epochs_training_data()
+        wallet_training_data_df.to_parquet(wallet_td_df_path, index=True)
+        modeling_wallet_features_df.to_parquet(modeling_wf_df_path, index=True)
+        validation_training_data_df.to_parquet(validation_td_df_path, index=True)
+        validation_wallet_features_df.to_parquet(validation_wf_df_path, index=True)
+
+        logger.info("Successfully generated and saved wallet epoch dfs.")
+        return (
+            wallet_training_data_df,
+            modeling_wallet_features_df,
+            validation_training_data_df,
+            validation_wallet_features_df
+        )
+
+
+    def _prepare_coin_epoch_base_config(self, lookback_duration: int):
+        """
+        Creates a config with dates offset by a wallets_coin_config lookback_duration.
+
+        Params:
+         - lookback_duration (int): How many days the coin lookback is offset vs the base config.
         """
         # Cache parsed base dates and base folder path
         base_training_data = copy.deepcopy(self.wallets_config.config['training_data'])
@@ -123,23 +175,19 @@ class CoinEpochsOrchestrator:
         base_parquet_folder_base = Path(base_training_data['parquet_folder'])
 
         # Load and store complete dfs
-        epochs_orchestrator = weo.WalletEpochsOrchestrator(
+        wallet_epochs_orchestrator = weo.WalletEpochsOrchestrator(
             self.wallets_config.config, # lookback config
             self.wallets_metrics_config,
             self.wallets_features_config,
             self.wallets_epochs_config
         )
-        coin_epoch_base_config = epochs_orchestrator.build_epoch_config(
+        coin_epoch_base_config = wallet_epochs_orchestrator.build_epoch_config(
             lookback_duration,
             'coin_modeling',
             base_modeling_start,
             base_modeling_end,
             base_training_window_starts,
             base_parquet_folder_base
-        )
-
-        coin_epoch_base_config['training_data']['parquet_folder'] = (
-            f"{coin_epoch_base_config['training_data']['parquet_folder']}_coin_epoch"
         )
 
         return coin_epoch_base_config
