@@ -41,7 +41,7 @@ class CoinEpochsOrchestrator:
         # Coin Params
         self.wallets_coin_config = wallets_coin_config
 
-        # Wallet WalletEpochsOrchestrator() Configs and DataFrames
+        # WalletEpochsOrchestrator Configs and DataFrames
         self.wallets_config = wallets_config
         self.wallets_metrics_config = wallets_metrics_config
         self.wallets_features_config = wallets_features_config
@@ -50,8 +50,16 @@ class CoinEpochsOrchestrator:
         self.complete_market_data_df = complete_market_data_df
         self.complete_macro_trends_df = complete_macro_trends_df
 
-        self.wallet_epochs_orchestrator = None
-
+        # WalletEpochsOrchestrator
+        self.wallet_orchestrator = weo.WalletEpochsOrchestrator(
+            wallets_config.config,
+            wallets_metrics_config,
+            wallets_features_config,
+            wallets_epochs_config,
+            complete_profits_df,
+            complete_market_data_df,
+            complete_macro_trends_df,
+        )
 
 
     # -----------------------------------
@@ -72,9 +80,23 @@ class CoinEpochsOrchestrator:
         parquet_folder = self.wallets_config['training_data']['parquet_folder']
         if os.path.exists(f"{parquet_folder}/complete_profits_df.parquet"):
             parquet_folder = self.wallets_config['training_data']['parquet_folder']
+
+            # Store in self
             self.complete_profits_df = pd.read_parquet(f"{parquet_folder}/complete_profits_df.parquet")
             self.complete_market_data_df = pd.read_parquet(f"{parquet_folder}/complete_market_data_df.parquet")
             self.complete_macro_trends_df = pd.read_parquet(f"{parquet_folder}/complete_macro_trends_df.parquet")
+
+            # Store in self.wallets_orchestrator
+            self.wallet_orchestrator.complete_profits_df      = self.complete_profits_df
+            self.wallet_orchestrator.complete_market_data_df  = self.complete_market_data_df
+            self.wallet_orchestrator.complete_macro_trends_df = self.complete_macro_trends_df
+
+            # create hybrid mapping on wallet orchestrator if enabled
+            if self.wallets_config['training_data']['hybridize_wallet_ids']:
+                self.wallet_orchestrator.complete_hybrid_cw_id_df = (
+                    self.wallet_orchestrator.create_hybrid_mapping()
+                )
+
             logger.info("Loaded complete dfs from parquet.")
             return
 
@@ -88,17 +110,17 @@ class CoinEpochsOrchestrator:
         wallets_lookback_config.reload()
 
         # Load and store complete dfs
-        self.wallet_epochs_orchestrator = weo.WalletEpochsOrchestrator(
+        self.wallet_orchestrator = weo.WalletEpochsOrchestrator(
             wallets_lookback_config, # lookback config
             self.wallets_metrics_config,
             self.wallets_features_config,
             self.wallets_epochs_config
         )
-        self.wallet_epochs_orchestrator.load_complete_raw_datasets()
+        self.wallet_orchestrator.load_complete_raw_datasets()
 
-        self.complete_profits_df = self.wallet_epochs_orchestrator.complete_profits_df
-        self.complete_market_data_df = self.wallet_epochs_orchestrator.complete_market_data_df
-        self.complete_macro_trends_df = self.wallet_epochs_orchestrator.complete_macro_trends_df
+        self.complete_profits_df = self.wallet_orchestrator.complete_profits_df
+        self.complete_market_data_df = self.wallet_orchestrator.complete_market_data_df
+        self.complete_macro_trends_df = self.wallet_orchestrator.complete_macro_trends_df
         logger.info("Successfully retrieved complete dfs.")
 
 
@@ -116,7 +138,7 @@ class CoinEpochsOrchestrator:
         """
         # Overwrite base config in wallets orchestrator
         coin_epoch_wallets_config = self._prepare_coin_epoch_base_config(lookback_duration)
-        self.wallet_epochs_orchestrator.wallets_config = coin_epoch_wallets_config
+        self.wallet_orchestrator.wallets_config = coin_epoch_wallets_config
 
         # Identify filepaths
         parquet_folder = coin_epoch_wallets_config['training_data']['parquet_folder']
@@ -142,7 +164,7 @@ class CoinEpochsOrchestrator:
             modeling_wallet_features_df,
             validation_training_data_df,
             validation_wallet_features_df
-        ) = self.wallet_epochs_orchestrator.generate_epochs_training_data()
+        ) = self.wallet_orchestrator.generate_epochs_training_data()
         wallet_training_data_df.to_parquet(wallet_td_df_path, index=True)
         modeling_wallet_features_df.to_parquet(modeling_wf_df_path, index=True)
         validation_training_data_df.to_parquet(validation_td_df_path, index=True)
