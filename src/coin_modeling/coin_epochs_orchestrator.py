@@ -135,52 +135,33 @@ class CoinEpochsOrchestrator:
 
         Params:
          - lookback_duration (int): How many days the coin lookback is offset vs the base config.
+
+         Returns:
+           - (
+                wallet_training_data_df,modeling_wallet_features_df,
+                validation_training_data_df,validation_wallet_features_df
+            ) (pd.DataFrames): training_data_df and target variables to the epoch
+
         """
-        # Overwrite base config in wallets orchestrator
-        coin_epoch_wallets_config = self._prepare_coin_epoch_base_config(lookback_duration)
+        # 1) Build a fresh epoch-offset config
+        epoch_wallets_config = self._prepare_coin_epoch_base_config(lookback_duration)
 
-        # Overwrite base_config on wallet orchestrator and regenerate epoch configs
-        self.wallet_orchestrator.base_config = coin_epoch_wallets_config
-        self.wallet_orchestrator.all_epochs_configs = self.wallet_orchestrator.generate_epoch_configs()
-
-        # Identify filepaths
-        parquet_folder = self.wallets_config['training_data']['parquet_folder']  # overall parquet folder, not epoch
-        period = (datetime.strptime(coin_epoch_wallets_config['training_data']['modeling_period_start'], '%Y-%m-%d')
-                  .strftime('%y%m%d'))
-        wallet_td_df_path = f"{parquet_folder}/{period}_multiwindow_wallet_training_data_df.parquet"
-        modeling_wf_df_path = f"{parquet_folder}/{period}_multiwindow_modeling_wallet_features_df.parquet"
-        validation_td_df_path = f"{parquet_folder}/{period}_multiwindow_validation_training_data_df.parquet"
-        validation_wf_df_path = f"{parquet_folder}/{period}_multiwindow_validation_wallet_features_df.parquet"
-
-        # Load and return existing files if they exist
-        if os.path.exists(wallet_td_df_path):
-            logger.info("Successfully loaded existing wallet epoch dfs.")
-            return (
-                pd.read_parquet(wallet_td_df_path),
-                pd.read_parquet(modeling_wf_df_path),
-                pd.read_parquet(validation_td_df_path),
-                pd.read_parquet(validation_wf_df_path),
-            )
-
-        # If not, generate and save training and modeling dfs for all windows
-        (
-            wallet_training_data_df,
-            modeling_wallet_features_df,
-            validation_training_data_df,
-            validation_wallet_features_df
-        ) = self.wallet_orchestrator.generate_epochs_training_data()
-        wallet_training_data_df.to_parquet(wallet_td_df_path, index=True)
-        modeling_wallet_features_df.to_parquet(modeling_wf_df_path, index=True)
-        validation_training_data_df.to_parquet(validation_td_df_path, index=True)
-        validation_wallet_features_df.to_parquet(validation_wf_df_path, index=True)
-
-        logger.info("Successfully generated and saved wallet epoch dfs.")
-        return (
-            wallet_training_data_df,
-            modeling_wallet_features_df,
-            validation_training_data_df,
-            validation_wallet_features_df
+        # 2) Instantiate a new WalletEpochsOrchestrator for this epoch
+        epoch_orch = weo.WalletEpochsOrchestrator(
+            base_config=epoch_wallets_config,
+            metrics_config=self.wallets_metrics_config,
+            features_config=self.wallets_features_config,
+            epochs_config=self.wallets_epochs_config,
+            complete_profits_df=self.complete_profits_df,
+            complete_market_data_df=self.complete_market_data_df,
+            complete_macro_trends_df=self.complete_macro_trends_df,
         )
+
+        # 3) Generate its epoch configs
+        epoch_orch.all_epochs_configs = epoch_orch.generate_epoch_configs()
+
+        # 4) Generate and return its training & modeling data
+        return epoch_orch.generate_epochs_training_data()
 
 
     def _prepare_coin_epoch_base_config(self, lookback_duration: int):
