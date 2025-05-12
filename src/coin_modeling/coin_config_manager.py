@@ -59,6 +59,8 @@ class WalletsCoinConfig:
         raw_config = yaml.safe_load(self._yaml_path.read_text(encoding='utf-8'))
 
         self.config = raw_config
+        # Validate that distributions correspond to defined score parameters
+        self._validate_score_distribution_features()
 
 
     def get(self, key, default=None):
@@ -82,3 +84,16 @@ class WalletsCoinConfig:
 
     def __str__(self):
         return f"WalletsCoinConfig(keys={list(self.config.keys())})"
+
+    def _validate_score_distribution_features(self):
+        """
+        Validate that each score in wallet_features.score_distributions
+        has a corresponding key in wallet_scores.score_params.
+        """
+        features = self.config.get('wallet_features', {}).get('score_distributions', [])
+        params_keys = set(self.config.get('wallet_scores', {}).get('score_params', {}).keys())
+        missing = [s for s in features if s not in params_keys]
+        if missing:
+            raise ValueError(
+                f"Invalid score_distributions entries not found in score_params: {missing}"
+            )
