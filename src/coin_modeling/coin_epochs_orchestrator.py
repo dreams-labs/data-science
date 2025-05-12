@@ -115,6 +115,23 @@ class CoinEpochsOrchestrator:
             self._process_coin_epoch(lookback)
 
 
+    # Primary helper
+    def _process_coin_epoch(self, lookback_duration: int) -> None:
+        """
+        Process a single coin epoch: generate data, train wallet models, generate coin modeling data, and score wallets.
+        """
+        # 1) Generate epoch-specific WalletEpochsOrchestrator and training data
+        epoch_weo, epoch_training_dfs = self._generate_coin_epoch_training_data(lookback_duration)
+
+        # 2) Prepare coin config with date suffix folders
+        epoch_coins_config = self._prepare_epoch_coins_config(epoch_weo)
+
+        # 3) Train and score wallet models for this epoch
+        models_dict, wamo_training_data_df = self._train_and_score_wallet_epoch(
+            epoch_weo, epoch_coins_config, epoch_training_dfs
+        )
+
+
 
 
     # -----------------------------------
@@ -194,49 +211,6 @@ class CoinEpochsOrchestrator:
         return coin_epoch_base_config
 
 
-    def _process_coin_epoch(self, lookback_duration: int) -> None:
-        """
-        Process a single coin epoch: generate data, train wallet models, generate coin modeling data, and score wallets.
-        """
-        # 1) Generate epoch-specific WalletEpochsOrchestrator and training data
-        epoch_weo, epoch_training_dfs = self._generate_coin_epoch_training_data(lookback_duration)
-
-        # 2) Prepare coin config with date suffix folders
-        epoch_coins_config = self._prepare_epoch_coins_config(epoch_weo)
-
-        # 3) Train wallet models for this epoch
-        epoch_wmo = wmo.WalletModelOrchestrator(
-            epoch_weo.base_config,
-            self.wallets_metrics_config,
-            self.wallets_features_config,
-            self.wallets_epochs_config,
-            epoch_coins_config
-        )
-        models_dict = epoch_wmo.train_wallet_models(*epoch_training_dfs)
-
-        # 4) Generate coin modeling epochs data
-        modeling_offset = self.wallets_coin_config['training_data']['modeling_period_duration']
-        coin_modeling_epochs_config = {
-            'offset_epochs': {
-                'offsets': [modeling_offset],
-                'validation_offsets': [modeling_offset * 2]
-            }
-        }
-        epoch_como_weo = weo.WalletEpochsOrchestrator(
-            epoch_weo.base_config,
-            self.wallets_metrics_config,
-            self.wallets_features_config,
-            coin_modeling_epochs_config,
-            self.complete_profits_df,
-            self.complete_market_data_df,
-            self.complete_macro_trends_df
-        )
-        wamo_training_data_df, wamo_modeling_data_df, \
-        como_training_data_df, como_modeling_data_df = epoch_como_weo.generate_epochs_training_data()
-
-        # 5) Score wallets and store the results
-        epoch_wmo.predict_and_store(models_dict, wamo_training_data_df)
-
 
     def _prepare_epoch_coins_config(self, epoch_weo) -> dict:
         """
@@ -259,3 +233,36 @@ class CoinEpochsOrchestrator:
         epoch_coins_config['training_data']['coins_wallet_scores_folder'] = scores_folder
         Path(scores_folder).mkdir(exist_ok=True)
         return epoch_coins_config
+
+
+
+    def _train_and_score_wallet_epoch(
+        self,
+        epoch_weo,
+        epoch_coins_config: dict,
+        epoch_training_dfs: tuple
+    ) -> tuple[dict, pd.DataFrame]:
+        """
+        Train wallet models for a single epoch and score wallets.
+
+        Returns:
+        - models_dict (dict): trained model objects per score.
+        - wamo_training_data_df (DataFrame): training data used for scoring.
+        """
+        # Instantiate the WalletModelOrchestrator for this epoch
+        epoch_wmo = wmo.WalletModelOrchestrator(
+            epoch_weo.base_config,
+            self.wallets_metrics_config,
+            self.wallets_features_config,
+            self.wallets_epochs_config,
+            epoch_coins_config
+        )
+
+        # Train wallet models using all epoch dfs
+        models_dict = epoch_wmo.train_wallet_models(*epoch_training_dfs)
+
+        # Score wallets on the first training df
+        wamo_training_data_df = epoch_training_dfs[0]
+        epoch_wmo.predict_and_store(models_dict, wamo_training_data_df)
+
+        return models_dict, wamo_training_data_df
