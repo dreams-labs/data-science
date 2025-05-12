@@ -49,7 +49,7 @@ class WalletEpochsOrchestrator:
         self.epochs_config = epochs_config
 
         # Generated configs
-        self.all_epochs_configs = self._generate_epoch_configs()
+        self.all_epochs_configs = self.generate_epoch_configs()
 
         # Complete df objects
         self.complete_profits_df = complete_profits_df
@@ -499,9 +499,11 @@ class WalletEpochsOrchestrator:
 
 
 
-    def _generate_epoch_configs(self) -> List[Dict]:
+    def generate_epoch_configs(self) -> List[Dict]:
         """
         Generates config dicts for each offset epoch, including modeling and validation epochs.
+
+        Also used by CoinEpochsOrchestrator.
 
         Returns:
         - List[Dict]: List of config dicts, one per epoch.
