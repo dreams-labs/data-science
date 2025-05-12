@@ -202,18 +202,7 @@ class CoinEpochsOrchestrator:
         epoch_weo, epoch_training_dfs = self._generate_coin_epoch_training_data(lookback_duration)
 
         # 2) Prepare coin config with date suffix folders
-        wamo_date_suffix = pd.to_datetime(
-            epoch_weo.base_config['training_data']['modeling_period_start']
-        ).strftime('%Y%m%d')
-        epoch_coins_config = copy.deepcopy(self.wallets_coin_config.config)
-        epoch_coins_config['training_data']['parquet_folder'] = (
-            f"{epoch_coins_config['training_data']['parquet_folder']}/{wamo_date_suffix}"
-        )
-        Path(epoch_coins_config['training_data']['parquet_folder']).mkdir(exist_ok=True)
-        epoch_coins_config['training_data']['coins_wallet_scores_folder'] = (
-            f"{epoch_coins_config['training_data']['parquet_folder']}/scores"
-        )
-        Path(epoch_coins_config['training_data']['coins_wallet_scores_folder']).mkdir(exist_ok=True)
+        epoch_coins_config = self._prepare_epoch_coins_config(epoch_weo)
 
         # 3) Train wallet models for this epoch
         epoch_wmo = wmo.WalletModelOrchestrator(
@@ -247,3 +236,26 @@ class CoinEpochsOrchestrator:
 
         # 5) Score wallets and store the results
         epoch_wmo.predict_and_store(models_dict, wamo_training_data_df)
+
+
+    def _prepare_epoch_coins_config(self, epoch_weo) -> dict:
+        """
+        Prepare epoch-specific coins config with date suffix folders.
+        """
+        # Build a date suffix from the modeling_period_start
+        wamo_date_suffix = pd.to_datetime(
+            epoch_weo.base_config['training_data']['modeling_period_start']
+        ).strftime('%Y%m%d')
+
+        # Deep-copy the coin config and adjust folder paths
+        epoch_coins_config = copy.deepcopy(self.wallets_coin_config.config)
+        base_folder = epoch_coins_config['training_data']['parquet_folder']
+
+        parquet_folder = f"{base_folder}/{wamo_date_suffix}"
+        epoch_coins_config['training_data']['parquet_folder'] = parquet_folder
+        Path(parquet_folder).mkdir(exist_ok=True)
+
+        scores_folder = f"{parquet_folder}/scores"
+        epoch_coins_config['training_data']['coins_wallet_scores_folder'] = scores_folder
+        Path(scores_folder).mkdir(exist_ok=True)
+        return epoch_coins_config
