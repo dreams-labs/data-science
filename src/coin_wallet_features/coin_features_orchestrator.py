@@ -327,14 +327,25 @@ def parse_feature_names(
     return feature_details_df
 
 
-def load_wallet_data_for_coin_features(wallets_config) -> None:
+def load_wallet_data_for_coin_features(
+        wallets_config: dict,
+        complete_dfs_folder: str = None) -> None:
     """
     Reload modules, load configs and profits/market data, hybridize IDs,
     filter market data slices, assert periods, and save parquet outputs.
+
+    Params:
+    - wallets_config (dict): used for folder locations and date boundaries
+    - complete_dfs_folder (str): directory containing complete dfs if they exist
+        outside of the base parquet folder.
     """
     logger.info("Loading profits and market data for post-wallet model analysis...")
 
     pf = wallets_config['training_data']['parquet_folder']
+    if complete_dfs_folder:
+        c_pf = complete_dfs_folder
+    else:
+        c_pf = pf
 
     # load profits DataFrames
     wamo_date = datetime.strptime(
@@ -351,7 +362,7 @@ def load_wallet_data_for_coin_features(wallets_config) -> None:
 
     # hybridize wallet IDs if configured
     if wallets_config['training_data']['hybridize_wallet_ids']:
-        hybrid_map = pd.read_parquet(f"{pf}/complete_hybrid_cw_id_df.parquet")
+        hybrid_map = pd.read_parquet(f"{c_pf}/complete_hybrid_cw_id_df.parquet")
         wamo_profits_df = wtdo.hybridize_wallet_address(
             wamo_profits_df, hybrid_map
         )
@@ -360,7 +371,7 @@ def load_wallet_data_for_coin_features(wallets_config) -> None:
         )
 
     # filter market data
-    complete_md = pd.read_parquet(f"{pf}/complete_market_data_df.parquet")
+    complete_md = pd.read_parquet(f"{c_pf}/complete_market_data_df.parquet")
     como_market_data_df = complete_md.loc[
         (complete_md.index.get_level_values('date') >=
             wallets_config['training_data']['modeling_period_end']) &
