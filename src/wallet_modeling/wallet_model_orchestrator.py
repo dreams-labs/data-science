@@ -133,8 +133,14 @@ class WalletModelOrchestrator:
         Returns:
         - None: Files are saved to the temp_path directory
         """
+        # Ensure there is exactly one epoch_start_date in the data, as each coin model
+        #  epoch will have a single coin modeling period.
+        epoch_dates = training_data_df.reset_index()['epoch_start_date'].unique()
+        if len(epoch_dates) > 1:
+            raise ValueError(f"Expected a single epoch_start_date, but found multiple: {epoch_dates}")
+
         # Extract epoch start date from training data
-        epoch_start = training_data_df.reset_index()['epoch_start_date'][0].strftime('%Y%m%d')
+        epoch_start = epoch_dates[0].strftime('%Y%m%d')
 
         # Process each model in the dictionary
         for score_name in models_dict.keys():
