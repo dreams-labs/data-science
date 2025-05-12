@@ -12,7 +12,7 @@ import pandas as pd
 
 # Local module imports
 import wallet_modeling.wallet_epochs_orchestrator as weo
-import utils as u
+# import utils as u
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -111,7 +111,7 @@ class CoinEpochsOrchestrator:
 
         # Load and store complete dfs
         self.wallet_orchestrator = weo.WalletEpochsOrchestrator(
-            wallets_lookback_config, # lookback config
+            wallets_lookback_config.config, # lookback config
             self.wallets_metrics_config,
             self.wallets_features_config,
             self.wallets_epochs_config
@@ -138,11 +138,15 @@ class CoinEpochsOrchestrator:
         """
         # Overwrite base config in wallets orchestrator
         coin_epoch_wallets_config = self._prepare_coin_epoch_base_config(lookback_duration)
-        self.wallet_orchestrator.wallets_config = coin_epoch_wallets_config
+
+        # Overwrite base_config on wallet orchestrator and regenerate epoch configs
+        self.wallet_orchestrator.base_config = coin_epoch_wallets_config
+        self.wallet_orchestrator.all_epochs_configs = self.wallet_orchestrator.generate_epoch_configs()
 
         # Identify filepaths
-        parquet_folder = coin_epoch_wallets_config['training_data']['parquet_folder']
-        period = coin_epoch_wallets_config['training_data']['modeling_period_start']
+        parquet_folder = self.wallets_config['training_data']['parquet_folder']  # overall parquet folder, not epoch
+        period = (datetime.strptime(coin_epoch_wallets_config['training_data']['modeling_period_start'], '%Y-%m-%d')
+                  .strftime('%y%m%d'))
         wallet_td_df_path = f"{parquet_folder}/{period}_multiwindow_wallet_training_data_df.parquet"
         modeling_wf_df_path = f"{parquet_folder}/{period}_multiwindow_modeling_wallet_features_df.parquet"
         validation_td_df_path = f"{parquet_folder}/{period}_multiwindow_validation_training_data_df.parquet"
@@ -152,10 +156,10 @@ class CoinEpochsOrchestrator:
         if os.path.exists(wallet_td_df_path):
             logger.info("Successfully loaded existing wallet epoch dfs.")
             return (
-                pd.load_parquet(wallet_td_df_path),
-                pd.load_parquet(modeling_wf_df_path),
-                pd.load_parquet(validation_td_df_path),
-                pd.load_parquet(validation_wf_df_path),
+                pd.read_parquet(wallet_td_df_path),
+                pd.read_parquet(modeling_wf_df_path),
+                pd.read_parquet(validation_td_df_path),
+                pd.read_parquet(validation_wf_df_path),
             )
 
         # If not, generate and save training and modeling dfs for all windows
