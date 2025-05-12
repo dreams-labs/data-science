@@ -13,6 +13,7 @@ import pandas as pd
 # Local module imports
 import wallet_modeling.wallet_epochs_orchestrator as weo
 import wallet_modeling.wallets_config_manager as wcm
+import wallet_modeling.wallet_model_orchestrator as wmo
 
 # import utils as u
 
@@ -86,8 +87,9 @@ class CoinEpochsOrchestrator:
             pd.to_datetime(wallets_lookback_config['training_data']['modeling_period_start'])
             + timedelta(days=coins_earliest_epoch)
         ).strftime('%Y-%m-%d')
-        wallets_lookback_config.config['training_data']['modeling_period_start'] = earliest_modeling_period_start
-        wallets_lookback_config = wcm.add_derived_values(wallets_lookback_config.config)
+        wallets_lookback_config_dict = copy.deepcopy(wallets_lookback_config.config)
+        wallets_lookback_config_dict['training_data']['modeling_period_start'] = earliest_modeling_period_start
+        wallets_lookback_config = wcm.add_derived_values(wallets_lookback_config_dict)
 
         # Load and store complete dfs
         wallet_orchestrator = weo.WalletEpochsOrchestrator(
@@ -102,6 +104,16 @@ class CoinEpochsOrchestrator:
         self.complete_market_data_df = wallet_orchestrator.complete_market_data_df
         self.complete_macro_trends_df = wallet_orchestrator.complete_macro_trends_df
         logger.info("Successfully retrieved complete dfs.")
+
+
+
+    def orchestrate_coin_epochs(self) -> None:
+        """
+        Orchestrate coin-level epochs by iterating through lookbacks and processing each epoch.
+        """
+        for lookback in self.wallets_coin_config['training_data']['coin_epoch_lookbacks']:
+            self._process_coin_epoch(lookback)
+
 
 
 
@@ -145,53 +157,6 @@ class CoinEpochsOrchestrator:
         return epoch_orch, epoch_orch.generate_epochs_training_data()
 
 
-    def _prepare_coin_and_wallet_modeling_epochs(self, epoch_weo):
-        """
-        Prepares and generates wallet and coin modeling epochs training data for the coin orchestrator.
-        1. Computes the offset between modeling_period_end and training_period_end from self.wallets_config.
-        2. Builds a new epochs config dict for coin modeling.
-        3. Overrides the wallet orchestrator's epochs_config attribute with this dict.
-        4. Computes period from self.wallets_config['training_data']['modeling_period_start'].
-        5. Appends /period to self.wallets_coin_config['training_data']['coins_wallet_scores_folder'].
-        6. Calls and returns self.wallet_orchestrator.generate_epochs_training_data().
-
-        Params:
-         - epoch_orch (WalletEpochsOrchestrator): orchestrator with config set for lookback
-
-        Returns:
-         - (
-                wamo_training_data_df, wamo_modeling_data_df,como_training_data_df, como_modeling_data_df
-            ) (pd.DataFrames): training and target var dfs for the Coin Modeling and
-             Wallet Modeling periods
-        """
-        # 1. Compute offset between modeling_period_end and training_period_end
-        modeling_period_end = pd.to_datetime(self.wallets_config.config['training_data']['modeling_period_end'])
-        training_period_end = pd.to_datetime(self.wallets_config.config['training_data']['training_period_end'])
-        modeling_offset = (modeling_period_end - training_period_end).days
-
-        # 2. Build new epochs config dict
-        coin_modeling_epochs_config = {
-            'offset_epochs': {
-                'offsets': [modeling_offset],
-                'validation_offsets': [modeling_offset * 2]
-            }
-        }
-
-        # 3. Override wallet orchestrator's epochs_config
-        self.wallet_orchestrator.epochs_config = coin_modeling_epochs_config
-
-        # 4. Compute period from modeling_period_start
-        period = self.wallets_config.config['training_data']['modeling_period_start']
-
-        # 5. Append /period to coins_wallet_scores_folder
-        if 'coins_wallet_scores_folder' in self.wallets_coin_config['training_data']:
-            self.wallets_coin_config['training_data']['coins_wallet_scores_folder'] = (
-                f"{self.wallets_coin_config['training_data']['coins_wallet_scores_folder']}/{period}"
-            )
-
-        # 6. Call and return generate_epochs_training_data
-        return epoch_weo.generate_epochs_training_data()
-
 
     def _prepare_coin_epoch_base_config(self, lookback_duration: int):
         """
@@ -200,7 +165,6 @@ class CoinEpochsOrchestrator:
         Params:
          - lookback_duration (int): How many days the coin lookback is offset vs the base config.
         """
-        logger.warning(lookback_duration)
         # Cache parsed base dates and base folder path
         base_training_data = copy.deepcopy(self.wallets_config.config['training_data'])
         base_modeling_start = datetime.strptime(base_training_data['modeling_period_start'], '%Y-%m-%d')
@@ -228,3 +192,58 @@ class CoinEpochsOrchestrator:
         )
 
         return coin_epoch_base_config
+
+
+    def _process_coin_epoch(self, lookback_duration: int) -> None:
+        """
+        Process a single coin epoch: generate data, train wallet models, generate coin modeling data, and score wallets.
+        """
+        # 1) Generate epoch-specific WalletEpochsOrchestrator and training data
+        epoch_weo, epoch_training_dfs = self._generate_coin_epoch_training_data(lookback_duration)
+
+        # 2) Prepare coin config with date suffix folders
+        wamo_date_suffix = pd.to_datetime(
+            epoch_weo.base_config['training_data']['modeling_period_start']
+        ).strftime('%Y%m%d')
+        epoch_coins_config = copy.deepcopy(self.wallets_coin_config.config)
+        epoch_coins_config['training_data']['parquet_folder'] = (
+            f"{epoch_coins_config['training_data']['parquet_folder']}/{wamo_date_suffix}"
+        )
+        Path(epoch_coins_config['training_data']['parquet_folder']).mkdir(exist_ok=True)
+        epoch_coins_config['training_data']['coins_wallet_scores_folder'] = (
+            f"{epoch_coins_config['training_data']['parquet_folder']}/scores"
+        )
+        Path(epoch_coins_config['training_data']['coins_wallet_scores_folder']).mkdir(exist_ok=True)
+
+        # 3) Train wallet models for this epoch
+        epoch_wmo = wmo.WalletModelOrchestrator(
+            epoch_weo.base_config,
+            self.wallets_metrics_config,
+            self.wallets_features_config,
+            self.wallets_epochs_config,
+            epoch_coins_config
+        )
+        models_dict = epoch_wmo.train_wallet_models(*epoch_training_dfs)
+
+        # 4) Generate coin modeling epochs data
+        modeling_offset = self.wallets_coin_config['training_data']['modeling_period_duration']
+        coin_modeling_epochs_config = {
+            'offset_epochs': {
+                'offsets': [modeling_offset],
+                'validation_offsets': [modeling_offset * 2]
+            }
+        }
+        epoch_como_weo = weo.WalletEpochsOrchestrator(
+            epoch_weo.base_config,
+            self.wallets_metrics_config,
+            self.wallets_features_config,
+            coin_modeling_epochs_config,
+            self.complete_profits_df,
+            self.complete_market_data_df,
+            self.complete_macro_trends_df
+        )
+        wamo_training_data_df, wamo_modeling_data_df, \
+        como_training_data_df, como_modeling_data_df = epoch_como_weo.generate_epochs_training_data()
+
+        # 5) Score wallets and store the results
+        epoch_wmo.predict_and_store(models_dict, wamo_training_data_df)
