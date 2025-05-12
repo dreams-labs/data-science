@@ -339,7 +339,7 @@ def load_wallet_data_for_coin_features(
     - complete_dfs_folder (str): directory containing complete dfs if they exist
         outside of the base parquet folder.
     """
-    logger.info("Loading profits and market data for post-wallet model analysis...")
+    logger.info("Loading wamo/como profits and market data for post-wallet model analysis...")
 
     pf = wallets_config['training_data']['parquet_folder']
     if complete_dfs_folder:
