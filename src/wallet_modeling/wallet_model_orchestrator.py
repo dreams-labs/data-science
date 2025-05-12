@@ -1,10 +1,10 @@
 import logging
 import copy
 import json
+import math
 from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
-import math
 
 # Local modules
 from wallet_modeling.wallet_model import WalletModel
@@ -82,7 +82,7 @@ class WalletModelOrchestrator:
 
         for score_name in self.score_params:
             # Create a deep copy of the configuration to avoid modifying the original
-            score_wallets_config = copy.deepcopy(self.wallets_config.config)
+            score_wallets_config = copy.deepcopy(self.wallets_config)
 
             # Override score name and model params in base config
             score_wallets_config['modeling']['score_name'] = score_name
@@ -205,7 +205,7 @@ class WalletModelOrchestrator:
             model_results=wallet_model_results,
             base_path=self.base_path,
             configs={
-                'wallets_config': self.wallets_config.config,
+                'wallets_config': self.wallets_config,
                 'wallets_metrics_config': self.wallets_metrics_config,
                 'wallets_features_config': self.wallets_features_config,
                 'wallets_epochs_config': self.wallets_epochs_config,
