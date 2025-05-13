@@ -102,6 +102,7 @@ def load_config(file_path='../notebooks/config.yaml'):
             config_mapping = {
                 'config.yaml': py_c.MainConfig,
                 'metrics_config.yaml': py_mc.MetricsConfig,
+                'coins_metrics_config.yaml': py_mc.MetricsConfig,
                 'modeling_config.yaml': py_mo.ModelingConfig,
                 'experiments_config.yaml': py_e.ExperimentsConfig
             }
