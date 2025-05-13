@@ -184,10 +184,11 @@ class WalletTrainingDataOrchestrator:
         # Generate market indicators
         def generate_market_indicators_df():
             logger.info("Generating market indicators...")
-            market_indicators_df = self._generate_indicators_df(
+            market_indicators_df = self.generate_indicators_df(
                 market_data_df_full,
+                self.wallets_config['training_data'][f'{period}_period_start'],
+                self.wallets_config['training_data'][f'{period}_period_end'],
                 parquet_filename = None,
-                period = period,
                 metric_type = 'market_data'
             )
             return market_indicators_df
@@ -195,11 +196,12 @@ class WalletTrainingDataOrchestrator:
         # Generate macro indicators
         def generate_macro_indicators_df():
             logger.info("Generating macro trends indicators...")
-            macro_indicators_df = self._generate_indicators_df(
+            macro_indicators_df = self.generate_indicators_df(
                 macro_trends_df_full.reset_index(),
+                self.wallets_config['training_data'][f'{period}_period_start'],
+                self.wallets_config['training_data'][f'{period}_period_end'],
                 parquet_filename = None,
-                period = period,
-                metric_type = 'macro_trends'
+                metric_type = 'macro_trends',
             )
             macro_indicators_df = macro_indicators_df.set_index('date')
             return macro_indicators_df
@@ -623,13 +625,14 @@ class WalletTrainingDataOrchestrator:
 
 
     @u.timing_decorator
-    def _generate_indicators_df(
+    def generate_indicators_df(
         self,
         training_data_df_full,
+        period_start_date: str,
+        period_end_date: str,
         parquet_filename="training_market_indicators_data_df",
         parquet_folder="temp/wallet_modeling_dfs",
-        period='training',
-        metric_type='market_data'
+        metric_type='market_data',
     ):
         """
         Adds the configured indicators to the training period market_data_df and stores it
@@ -640,9 +643,10 @@ class WalletTrainingDataOrchestrator:
         Params:
         - training_data_df_full (df): df with complete historical data, because indicators can
             have long lookback periods (e.g. SMA 200)
+        - period_start_date: Starting date of the period in YYYY-MM-DD format
+        - period_end_date: Ending date of the period in YYYY-MM-DD format
         - parquet_file, parquet_folder (strings): if these have values, the output df will be saved to this
             location instead of being returned
-        - period: Which period to retrieve dates from
         - metric_type (str): the key in wallet_metrics_config, e.g. 'market_data', 'macro_trends'
 
         Returns:
@@ -652,12 +656,11 @@ class WalletTrainingDataOrchestrator:
         logger.info("Beginning indicator generation process...")
 
         # Validate that no records exist after the training period
-        training_period_end = self.wallets_config['training_data'][f'{period}_period_end']
         latest_record = training_data_df_full['date'].max()
-        if latest_record > pd.to_datetime(training_period_end):
+        if latest_record > pd.to_datetime(period_end_date):
             raise ValueError(
-                f"Detected data after the end of the {period} period in indicators input df."
-                f"Latest record found: {latest_record} vs period end of {training_period_end}"
+                f"Detected data after the end of the period in indicators input df."
+                f"Latest record found: {latest_record} vs period end of {period_end_date}"
             )
         group_column = None
         if 'coin_id' in training_data_df_full.reset_index().columns:
@@ -680,12 +683,12 @@ class WalletTrainingDataOrchestrator:
         )
 
         # Reset OBV to 0 at training start if it exists
-        training_start = pd.to_datetime(self.wallets_config['training_data'][f'{period}_starting_balance_date'])
+        period_starting_balance_date = pd.to_datetime(period_start_date) - timedelta(days=1)
         if 'obv' in indicators_df.columns:
             # Group by coin_id since OBV is coin-specific
             for coin_id in indicators_df['coin_id'].unique():
                 mask = (indicators_df['coin_id'] == coin_id) & \
-                    (indicators_df['date'] >= training_start)
+                    (indicators_df['date'] >= period_starting_balance_date)
                 coin_idx = indicators_df[mask].index
                 if len(coin_idx) > 0:
                     # Reset OBV to start from 0 for each coin's training period
