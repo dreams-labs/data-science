@@ -351,6 +351,7 @@ class CoinEpochsOrchestrator:
         return wamo_como_dfs
 
 
+
     def _generate_coin_features(
         self,
         epoch_weo,
