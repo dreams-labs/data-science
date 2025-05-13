@@ -179,7 +179,7 @@ class CoinEpochsOrchestrator:
 
         # 2) Instantiate a new WalletEpochsOrchestrator for this epoch
         epoch_weo = weo.WalletEpochsOrchestrator(
-            base_config=epoch_wallets_config,              # epoch-specific config
+            base_config=epoch_wallets_config,       # epoch-specific config
             metrics_config=self.wallets_metrics_config,
             features_config=self.wallets_features_config,
             epochs_config=self.wallets_epochs_config,
@@ -222,12 +222,15 @@ class CoinEpochsOrchestrator:
         )
         coin_epoch_base_config = wallet_epochs_orchestrator.build_epoch_config(
             lookback_duration,
-            'coin_modeling',
+            'coin_modeling',  # epoch_type, which has no impact on this class's data
             base_modeling_start,
             base_modeling_end,
             base_training_window_starts,
             base_parquet_folder_base
         )
+
+        # Retain the parquet_folder so all periods are built in the same root directory
+        coin_epoch_base_config['training_data']['parquet_folder'] = base_training_data['parquet_folder']
 
         return coin_epoch_base_config
 
