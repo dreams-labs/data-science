@@ -199,7 +199,6 @@ class CoinModel(BaseModel):
         training_data_df: pd.DataFrame,
         target_vars_df: pd.DataFrame
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        import pandas as pd  # ensure pandas is imported at top
 
         def _convert_index_to_str(idx: pd.Index) -> pd.Index:
             """Convert only the 'coin_id' level to str, preserve other levels."""
