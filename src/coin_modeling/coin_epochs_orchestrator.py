@@ -143,15 +143,15 @@ class CoinEpochsOrchestrator:
             wamo_como_dfs[2]   # como_training_data_df
         )
 
-        # # 5) Calculate and persist target variables for this epoch
-        # self._generate_coin_target_vars(
-        #     epoch_weo,
-        #     epoch_coins_config,
-        #     wamo_features_df,
-        #     como_features_df,
-        #     como_market_data_df,
-        #     investing_market_data_df
-        # )
+        # 5) Calculate and persist target variables for this epoch
+        self._generate_coin_target_vars(
+            epoch_weo,
+            epoch_coins_config,
+            wamo_features_df,
+            como_features_df,
+            como_market_data_df,
+            investing_market_data_df
+        )
 
 
 
@@ -297,7 +297,7 @@ class CoinEpochsOrchestrator:
         epoch_wamo_weo = weo.WalletEpochsOrchestrator(
             base_config=epoch_weo.base_config,
             metrics_config=epoch_weo.metrics_config,
-            features_config=epoch_weo.wallets_features_config,
+            features_config=epoch_weo.features_config,
             epochs_config=coin_modeling_epochs_config,          # custom wamo/como config
             complete_profits_df=epoch_weo.complete_profits_df,
             complete_market_data_df=epoch_weo.complete_market_data_df,
@@ -402,8 +402,8 @@ class CoinEpochsOrchestrator:
         # Calculate WaMo target variables
         wamo_target = features_generator.calculate_target_variables(
             como_market_data_df,
-            epoch_coins_config['training_data']['coin_modeling_period_start'],
-            epoch_coins_config['training_data']['coin_modeling_period_end'],
+            epoch_weo.base_config['training_data']['coin_modeling_period_start'],
+            epoch_weo.base_config['training_data']['coin_modeling_period_end'],
             set(wamo_features_df.index)
         )
         wamo_target.to_parquet(f"{base_folder}/wamo_coin_target_var_df.parquet", index=True)
@@ -411,8 +411,8 @@ class CoinEpochsOrchestrator:
         # Calculate CoMo target variables
         como_target = features_generator.calculate_target_variables(
             investing_market_data_df,
-            epoch_coins_config['training_data']['investing_period_start'],
-            epoch_coins_config['training_data']['investing_period_end'],
+            epoch_weo.base_config['training_data']['investing_period_start'],
+            epoch_weo.base_config['training_data']['investing_period_end'],
             set(como_features_df.index)
         )
         como_target.to_parquet(f"{base_folder}/como_coin_target_var_df.parquet", index=True)
