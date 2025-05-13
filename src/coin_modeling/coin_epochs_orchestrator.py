@@ -269,7 +269,7 @@ class CoinEpochsOrchestrator:
         Returns:
         - wamo_como_dfs: Tuple of four dfs:
             (wamo_training_data_df, wamo_modeling_data_df,
-            como_training_data_df, como_modeling_data_df)
+             como_training_data_df, como_modeling_data_df)
         """
         # 1) Train all models
         # Instantiate the WalletModelOrchestrator for this epoch
@@ -286,7 +286,6 @@ class CoinEpochsOrchestrator:
 
 
         # 2) Generate this epoch's wamo/como training and modeling dfs
-
         # Build epochs config for only the coin and wallet modeling periods
         modeling_offset = self.wallets_config['training_data']['modeling_period_duration']
         coin_modeling_epochs_config = {
@@ -304,11 +303,10 @@ class CoinEpochsOrchestrator:
             complete_market_data_df=epoch_weo.complete_market_data_df,
             complete_macro_trends_df=epoch_weo.complete_macro_trends_df,
         )
-
         # Generate TRAINING_DATA_DF for the WAllet MOdeling period and COin MOdeling periods
         wamo_como_dfs = epoch_wamo_weo.generate_epochs_training_data()
 
-        # Score wallets on the wamo training df
+        # 3) Score wallets on the wamo training data
         epoch_wmo.predict_and_store(models_dict, wamo_como_dfs[0])
 
         return wamo_como_dfs
