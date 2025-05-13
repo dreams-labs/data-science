@@ -1,10 +1,10 @@
 import logging
 import copy
 import json
+import math
 from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
-import math
 
 # Local modules
 from wallet_modeling.wallet_model import WalletModel
@@ -82,7 +82,7 @@ class WalletModelOrchestrator:
 
         for score_name in self.score_params:
             # Create a deep copy of the configuration to avoid modifying the original
-            score_wallets_config = copy.deepcopy(self.wallets_config.config)
+            score_wallets_config = copy.deepcopy(self.wallets_config)
 
             # Override score name and model params in base config
             score_wallets_config['modeling']['score_name'] = score_name
@@ -133,8 +133,14 @@ class WalletModelOrchestrator:
         Returns:
         - None: Files are saved to the temp_path directory
         """
+        # Ensure there is exactly one epoch_start_date in the data, as each coin model
+        #  epoch will have a single coin modeling period.
+        epoch_dates = training_data_df.reset_index()['epoch_start_date'].unique()
+        if len(epoch_dates) > 1:
+            raise ValueError(f"Expected a single epoch_start_date, but found multiple: {epoch_dates}")
+
         # Extract epoch start date from training data
-        epoch_start = training_data_df.reset_index()['epoch_start_date'][0].strftime('%Y%m%d')
+        epoch_start = epoch_dates[0].strftime('%Y%m%d')
 
         # Process each model in the dictionary
         for score_name in models_dict.keys():
@@ -205,7 +211,7 @@ class WalletModelOrchestrator:
             model_results=wallet_model_results,
             base_path=self.base_path,
             configs={
-                'wallets_config': self.wallets_config.config,
+                'wallets_config': self.wallets_config,
                 'wallets_metrics_config': self.wallets_metrics_config,
                 'wallets_features_config': self.wallets_features_config,
                 'wallets_epochs_config': self.wallets_epochs_config,

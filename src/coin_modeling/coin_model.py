@@ -200,10 +200,24 @@ class CoinModel(BaseModel):
         target_vars_df: pd.DataFrame
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
-        # Convert index to str (from categorical) and sort
-        training_data_df.index = training_data_df.index.astype(str)
+        def _convert_index_to_str(idx: pd.Index) -> pd.Index:
+            """Convert only the 'coin_id' level to str, preserve other levels."""
+            if isinstance(idx, pd.MultiIndex):
+                lvl_names = idx.names
+                lvl_vals = []
+                for name in lvl_names:
+                    vals = idx.get_level_values(name)
+                    if name == 'coin_id':
+                        vals = vals.astype(str)
+                    lvl_vals.append(vals)
+                return pd.MultiIndex.from_arrays(lvl_vals, names=lvl_names)
+            else:
+                return idx.astype(str)
+
+        # Normalize indices: only cast coin_id to str, preserve other levels
+        training_data_df.index = _convert_index_to_str(training_data_df.index)
         training_data_df = training_data_df.sort_index()
-        target_vars_df.index = target_vars_df.index.astype(str)
+        target_vars_df.index = _convert_index_to_str(target_vars_df.index)
         target_vars_df = target_vars_df.sort_index()
 
         u.assert_matching_indices(training_data_df, target_vars_df)

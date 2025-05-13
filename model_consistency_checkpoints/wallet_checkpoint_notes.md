@@ -1,3 +1,41 @@
+# DDA 625 coin epochs v1
+checkpoint 1: vauc.611 coin epochs working
+Model Performance Summary
+Target: coin_return_winsorized 0.3 to
+ID: 0bf585c2-b1e0-4f8e-9b25-546724704a08
+===================================
+Test Samples:             2,554
+Number of Features:       72
+
+
+Classification Metrics
+-----------------------------------
+ROC AUC:                    0.671
+Log Loss:                   0.478
+Accuracy:                   0.795
+Precision:                  0.667
+Recall:                     0.015
+F1 Score:                   0.030
+
+Validation Metrics
+-----------------------------------
+Val ROC AUC:                0.611
+Val Accuracy:               0.927
+Val Precision:              0.083
+Val Recall:                 0.003
+Val F1 Score:               0.006
+
+Validation Return Metrics
+-----------------------------------
+Positive Threshold:         0.50
+Positive Predictions:       36/12700 (0.28%)
+Positive Mean Outcome:      -0.071
+Positive W-Mean Outcome:    -0.071
+Top 1% W-Mean Outcome:      0.018
+Top 5% W-Mean Outcome:      -0.061
+Overall W-Mean Outcome:     -0.151
+
+
 # DDA 769 coin model score dist toggle
 checkpoint 1: w1%_.211 rolled back some drop patterns
 Model Performance Summary

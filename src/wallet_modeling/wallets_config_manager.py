@@ -38,7 +38,6 @@ def load_all_wallets_configs(config_dir: str):
     # Populate wallets_coin_config['training_data']
     # ---------------------------------------------
     base_wc_config = wallets_coin_config.config
-    base_wc_config['training_data'] = {}
 
     # Fill [dataset]
     base_wc_config['training_data']['dataset'] = wallets_config['training_data']['dataset']
