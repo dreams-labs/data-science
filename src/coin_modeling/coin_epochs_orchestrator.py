@@ -11,9 +11,11 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 # Local module imports
+import training_data.data_retrieval as dr
 import wallet_modeling.wallet_epochs_orchestrator as weo
 import wallet_modeling.wallets_config_manager as wcm
 import wallet_modeling.wallet_model_orchestrator as wmo
+import wallet_modeling.wallet_training_data_orchestrator as wtdo
 import coin_wallet_features.coin_features_orchestrator as cfo
 
 # import utils as u
@@ -34,6 +36,7 @@ class CoinEpochsOrchestrator:
     def __init__(
         self,
         wallets_coin_config: dict,
+        wallets_coins_metrics_config: dict,
         wallets_config: dict,
         wallets_metrics_config: dict,
         wallets_features_config: dict,
@@ -44,6 +47,7 @@ class CoinEpochsOrchestrator:
     ):
         # Coin Params
         self.wallets_coin_config = wallets_coin_config
+        self.wallets_coins_metrics_config = wallets_coins_metrics_config
 
         # WalletEpochsOrchestrator Configs and DataFrames
         self.wallets_config = wallets_config
@@ -293,6 +297,53 @@ class CoinEpochsOrchestrator:
         epoch_coins_config['training_data']['coins_wallet_scores_folder'] = scores_folder
         Path(scores_folder).mkdir(exist_ok=True)
         return epoch_coins_config
+
+
+
+    def _generate_macro_indicators(self,
+                                epoch_weo,
+                                period_start_date: str,
+                                period_end_date: str) -> pd.DataFrame:
+        """
+        Generate macro indicators for the specified period using WalletTrainingDataOrchestrator.
+
+        Args:
+            epoch_weo: WalletEpochsOrchestrator instance with configs
+            period_start_date: Start date in 'YYYY-MM-DD' format
+            period_end_date: End date in 'YYYY-MM-DD' format
+
+        Returns:
+            DataFrame with generated indicators
+        """
+        # Use existing training data orchestrator for consistency
+        wtdo_instance = wtdo.WalletTrainingDataOrchestrator(
+            epoch_weo.base_config,
+            self.wallets_metrics_config,
+            self.wallets_features_config
+        )
+
+        period_macro_trends_df = dr.clean_macro_trends(
+            self.complete_macro_trends_df,
+            macro_trends_cols=list(self.wallets_coins_metrics_config['macro_trends'].keys()),
+            start_date = None,  # retain historical data for indicators
+            end_date = self.wallets_config['training_data']['modeling_period_end'])
+
+        # Call the public indicator generation method
+        macro_indicators_df = wtdo_instance.generate_indicators_df(
+            period_macro_trends_df.reset_index(),
+            period_start_date=period_start_date,
+            period_end_date=period_end_date,
+            metric_type='macro_trends',
+            parquet_filename=None
+        )
+
+        # Set date index for consistency with rest of pipeline
+        macro_indicators_df = macro_indicators_df.set_index('date')
+
+        logger.info(f"Generated {len(macro_indicators_df.columns)} macro indicators for period "
+                    f"{period_start_date} to {period_end_date}")
+
+        return macro_indicators_df
 
 
 

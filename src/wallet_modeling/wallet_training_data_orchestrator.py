@@ -643,10 +643,10 @@ class WalletTrainingDataOrchestrator:
         Params:
         - training_data_df_full (df): df with complete historical data, because indicators can
             have long lookback periods (e.g. SMA 200)
-        - period_start_date: Starting date of the period in YYYY-MM-DD format
-        - period_end_date: Ending date of the period in YYYY-MM-DD format
         - parquet_file, parquet_folder (strings): if these have values, the output df will be saved to this
             location instead of being returned
+        - period_start_date: Starting date of the period in YYYY-MM-DD format
+        - period_end_date: Ending date of the period in YYYY-MM-DD format
         - metric_type (str): the key in wallet_metrics_config, e.g. 'market_data', 'macro_trends'
 
         Returns:

@@ -17,57 +17,57 @@ time_series:  #CoinModel
                         window: [12]
 
 
-    # Controls what populates the macro_trends|* features
-    # All keys of wallets_features_config.market_timing.offsets.keys() must
-    #  be included here
-    macro_trends:  #CoinModel
-        btc_price:
-            aggregations:
-                std:
-                    scaling: none
-        btc_mvrv_z_score:
-            aggregations:
-                last:
-                    scaling: none
-                std:
-                    scaling: none
-        global_market_cap:
-            aggregations:
-                last:
-                    scaling: none
-                std:
-                    scaling: none
-            indicators:
-                rsi:
-                    parameters:
-                        window: [30]
-                    aggregations:
-                        last:
-                            scaling: none
-        btc_vdd_multiple:
-            aggregations:
-                std:
-                    scaling: none
-        gtrends_altcoin_worldwide:
-            aggregations:
-                std:
-                    scaling: none
-        gtrends_memecoin_us:
-            aggregations:
-                std:
-                    scaling: none
-        # global_volume:
-        #     aggregations:
-        #         first:
-        #             scaling: none
-        #         last:
-        #             scaling: none
-        #     indicators:
-        #         rsi:
-        #             parameters:
-        #                 window: [30,100]
-        #             aggregations:
-        #                 last:
-        #                     scaling: none
+# Controls what populates the macro_trends|* features
+# All keys of wallets_features_config.market_timing.offsets.keys() must
+#  be included here
+macro_trends:  #CoinModel
+    btc_price:
+        aggregations:
+            std:
+                scaling: none
+    btc_mvrv_z_score:
+        aggregations:
+            last:
+                scaling: none
+            std:
+                scaling: none
+    global_market_cap:
+        aggregations:
+            last:
+                scaling: none
+            std:
+                scaling: none
+        indicators:
+            rsi:
+                parameters:
+                    window: [30]
+                aggregations:
+                    last:
+                        scaling: none
+    btc_vdd_multiple:
+        aggregations:
+            std:
+                scaling: none
+    gtrends_altcoin_worldwide:
+        aggregations:
+            std:
+                scaling: none
+    gtrends_memecoin_us:
+        aggregations:
+            std:
+                scaling: none
+    # global_volume:
+    #     aggregations:
+    #         first:
+    #             scaling: none
+    #         last:
+    #             scaling: none
+    #     indicators:
+    #         rsi:
+    #             parameters:
+    #                 window: [30,100]
+    #             aggregations:
+    #                 last:
+    #                     scaling: none
 
-        # These features are retained for use in market timing features
+    # These features are retained for use in market timing features
