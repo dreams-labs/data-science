@@ -7,12 +7,12 @@ training_data: #CoinModel
     # coins_wallet_scores_folder: automatically filled
 
     modeling_period_duration: 30
-    training_window_lookbacks: [  # How many days prior to the modeling period each window begins
-        120,
-        # 90,
-        # 60,
-        # 30,
-        0
+    coin_epoch_lookbacks: [  # How many days prior to the modeling period each window begins
+        0,
+        -60,
+        -120,
+        -180,
+        -240,
     ]
 
 
@@ -36,25 +36,25 @@ wallet_scores: #CoinModel
             target_variable: cw_crypto_net_gain/max_investment/base
             target_var_min_threshold: 0.00
             target_var_max_threshold: .inf
-            y_pred_threshold: 0.9
+            y_pred_threshold: 0.85
 
         cw_return_rate_min_005:
             target_variable: cw_crypto_net_gain/max_investment/base
             target_var_min_threshold: 0.05
             target_var_max_threshold: .inf
-            y_pred_threshold: 0.9
+            y_pred_threshold: 0.85
 
-        # cw_return_rate_min_025:
-        #     target_variable: cw_crypto_net_gain/max_investment/base
-        #     target_var_min_threshold: .25
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.9
+        cw_return_rate_min_025:
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_min_threshold: .25
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.85
 
-        # cw_return_rate_min_040:
-        #     target_variable: cw_crypto_net_gain/max_investment/base
-        #     target_var_min_threshold: .40
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.9
+        cw_return_rate_min_040:
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_min_threshold: .40
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.85
 
         # # Tests
         # cw_return_rate_min_060:
@@ -85,7 +85,7 @@ wallet_scores: #CoinModel
         #     target_variable: crypto_net_gain/max_investment/base
         #     target_var_min_threshold: .25
         #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.9
+        #     y_pred_threshold: 0.85
 
         # return_rate_min_060:
         #     target_variable: crypto_net_gain/max_investment/base
@@ -97,7 +97,7 @@ wallet_scores: #CoinModel
         #     target_variable: cw_crypto_net_flows/crypto_inflows/base
         #     target_var_min_threshold: .25
         #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.9
+        #     y_pred_threshold: 0.85
 
         # cw_return_rate_regression:
         #     target_variable: cw_crypto_net_gain/max_investment/winsorized
@@ -107,18 +107,18 @@ wallet_scores: #CoinModel
         #     target_variable: crypto_net_gain/max_investment/winsorized
         #     model_type: regression
 
-        # # USD Metrics
-        # net_gain_min_1000:
-        #     target_variable: crypto_net_gain
-        #     target_var_min_threshold: 1000
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.9
+        # USD Metrics
+        cw_net_gain_min_1000:
+            target_variable: cw_crypto_net_gain
+            target_var_min_threshold: 1000
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.9
 
-        # cw_net_flows_min_1000:
-        #     target_variable: cw_crypto_net_flows
-        #     target_var_min_threshold: 1000
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.9
+        cw_net_flows_min_1000:
+            target_variable: cw_crypto_net_flows
+            target_var_min_threshold: 1000
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.9
 
 
 # CoinModel Segments
@@ -143,15 +143,15 @@ wallet_features: #CoinModel
         cw_return_rate_min_005,
         cw_return_rate_min_025,
         cw_return_rate_min_040,
-        cw_return_rate_min_060,
-        cw_return_rate_min_080,
-        cw_return_rate_max_-005,
-        cw_return_rate_max_-025,
-        return_rate_min_025,
-        # return_rate_min_060,
-        cw_net_flows_rate_min_025,
-        cw_return_rate_regression,
-        return_rate_regression,
+        # cw_return_rate_min_060,
+        # cw_return_rate_min_080,
+        # cw_return_rate_max_-005,
+        # cw_return_rate_max_-025,
+        # return_rate_min_025,
+        # # return_rate_min_060,
+        # cw_net_flows_rate_min_025,
+        # cw_return_rate_regression,
+        # return_rate_regression,
     ]
 
     # Features from the feature_engineering directory
@@ -225,19 +225,20 @@ coin_modeling: #CoinModel
             time_series|*,
             training_clusters|*,
 
-            # Segment Family
-            score_binary|cw_net_flows_min_1000/*,
-            score_binary|cw_net_flows_rate_min_025/*,
-            score_binary|cw_return_rate_max_-005/*,
-            score_binary|cw_return_rate_max_-025/*,
+            # # Segment Family
+            # score_binary|cw_net_flows_min_1000/*,
+            # score_binary|cw_net_gain_min_1000/*,
             score_binary|cw_return_rate_min_000/*,
-            score_binary|cw_return_rate_min_005/*,
-            score_binary|cw_return_rate_min_025/*,
+            # score_binary|cw_return_rate_min_005/*,
+            # score_binary|cw_return_rate_min_025/*,
             # score_binary|cw_return_rate_min_040/*,
-            score_binary|cw_return_rate_min_060/*,
-            score_binary|cw_return_rate_min_080/*,
-            score_binary|net_gain_min_1000/*,
-            score_binary|return_rate_min_025/*,
+            # score_binary|cw_net_flows_rate_min_025/*,
+            # score_binary|cw_return_rate_max_-005/*,
+            # score_binary|cw_return_rate_max_-025/*,
+            # score_binary|cw_return_rate_min_060/*,
+            # score_binary|cw_return_rate_min_080/*,
+            # score_binary|net_gain_min_1000/*,
+            # score_binary|return_rate_min_025/*,
             # wallet_cohorts|whales_longterm|*,
             # wallet_cohorts|normies|*,
 
@@ -409,25 +410,13 @@ coin_modeling: #CoinModel
 
             drop_columns__drop_patterns: [
                 # Segment Category
-                # all_wallets*,
-                # score_quantile|*,
-                # score_binary|*
-                # training_clusters|*,
-
                 # Segment Family
-                # score_binary|cw_net_flows_min_1000/*,
-                # score_binary|cw_net_flows_rate_min_025/*,
-                # score_binary|cw_return_rate_max_-005/*,
-                # score_binary|cw_return_rate_max_-025/*,
-                # score_binary|cw_return_rate_min_000/*,
-                # score_binary|cw_return_rate_min_005/*,
-                # score_binary|cw_return_rate_min_025/*,
-                # score_binary|cw_return_rate_min_040/*,
-                # score_binary|cw_return_rate_min_060/*,
-                # score_binary|cw_return_rate_min_080/*,
-                # score_binary|net_gain_min_1000/*,
-                # score_binary|return_rate_min_025/*,
-
+                score_binary|cw_net_flows_min_1000/*,
+                score_binary|cw_net_gain_min_1000/*,
+                score_binary|cw_return_rate_min_000/*,
+                score_binary|cw_return_rate_min_005/*,
+                score_binary|cw_return_rate_min_025/*,
+                score_binary|cw_return_rate_min_040/*,
 
                 # # Segment Value
                 # 'training_clusters|k5_cluster/cluster_0|*',
@@ -477,18 +466,18 @@ coin_modeling: #CoinModel
                 # '*/count',
                 # '*/count_pct',
 
-                '*|*/*/kurt',
-                '*|*/*/median',
-                # '*|*/*/p002',
-                '*|*/*/p01',
-                '*|*/*/p05',
-                '*|*/*/p10',
-                '*|*/*/p90',
-                '*|*/*/p95',
-                '*|*/*/p99',
-                # '*|*/*/p998',
-                '*|*/*/skew',
-                '*|*/*/std',
+                # '*|*/*/kurt',
+                # '*|*/*/median',
+                # # '*|*/*/p002',
+                # '*|*/*/p01',
+                # '*|*/*/p05',
+                # '*|*/*/p10',
+                # '*|*/*/p90',
+                # '*|*/*/p95',
+                # '*|*/*/p99',
+                # # '*|*/*/p998',
+                # '*|*/*/skew',
+                # '*|*/*/std',
 
             ]
 

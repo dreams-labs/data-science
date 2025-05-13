@@ -112,17 +112,51 @@ class CoinEpochsOrchestrator:
         """
         Orchestrate coin-level epochs by iterating through lookbacks and processing each epoch.
         """
+        wamo_feature_dfs = []
+        wamo_target_dfs = []
+        como_feature_dfs = []
+        como_target_dfs = []
+
+        # Tag each DataFrame with the epoch date
+        def tag_with_epoch(df: pd.DataFrame) -> pd.DataFrame:
+            df = df.copy()
+            df['coin_epoch_start_date'] = epoch_date
+            return df.set_index('coin_epoch_start_date', append=True)
         for lookback in self.wallets_coin_config['training_data']['coin_epoch_lookbacks']:
-            self._process_coin_epoch(lookback)
+            epoch_date, wamo_features_df, wamo_target_df, como_features_df, como_target_df = \
+                self._process_coin_epoch(lookback)
+            wamo_feature_dfs.append(tag_with_epoch(wamo_features_df))
+            wamo_target_dfs.append(tag_with_epoch(wamo_target_df))
+            como_feature_dfs.append(tag_with_epoch(como_features_df))
+            como_target_dfs.append(tag_with_epoch(como_target_df))
+
+        # Concatenate across epochs
+        multiwindow_wamo = pd.concat(wamo_feature_dfs).sort_index()
+        multiwindow_wamo_target = pd.concat(wamo_target_dfs).sort_index()
+        multiwindow_como = pd.concat(como_feature_dfs).sort_index()
+        multiwindow_como_target = pd.concat(como_target_dfs).sort_index()
+
+        # Persist multiwindow parquet files
+        root_folder = self.wallets_coin_config['training_data']['parquet_folder']
+        multiwindow_wamo.to_parquet(f"{root_folder}/multiwindow_wamo_coin_training_data_df_full.parquet")
+        multiwindow_wamo_target.to_parquet(f"{root_folder}/multiwindow_wamo_coin_target_var_df.parquet")
+        multiwindow_como.to_parquet(f"{root_folder}/multiwindow_como_coin_training_data_df_full.parquet")
+        multiwindow_como_target.to_parquet(f"{root_folder}/multiwindow_como_coin_target_var_df.parquet")
 
 
     # Primary helper
-    def _process_coin_epoch(self, lookback_duration: int) -> None:
+    def _process_coin_epoch(
+            self,
+            lookback_duration: int
+        ) -> tuple[datetime, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         Process a single coin epoch: generate data, train wallet models, generate coin modeling data, and score wallets.
         """
         # 1) Generate epoch-specific WalletEpochsOrchestrator and training data
         epoch_weo, epoch_training_dfs = self._generate_coin_epoch_training_data(lookback_duration)
+        epoch_date = pd.to_datetime(
+            epoch_weo.base_config['training_data']['coin_modeling_period_start']
+        )
 
         # 2) Prepare coin config with date suffix folders
         epoch_coins_config = self._prepare_epoch_coins_config(epoch_weo)
@@ -144,7 +178,7 @@ class CoinEpochsOrchestrator:
         )
 
         # 5) Calculate and persist target variables for this epoch
-        self._generate_coin_target_vars(
+        wamo_target_df, como_target_df = self._generate_coin_target_vars(
             epoch_weo,
             epoch_coins_config,
             wamo_features_df,
@@ -152,6 +186,8 @@ class CoinEpochsOrchestrator:
             como_market_data_df,
             investing_market_data_df
         )
+
+        return epoch_date, wamo_features_df, wamo_target_df, como_features_df, como_target_df
 
 
 
@@ -387,7 +423,7 @@ class CoinEpochsOrchestrator:
         como_features_df: pd.DataFrame,
         como_market_data_df: pd.DataFrame,
         investing_market_data_df: pd.DataFrame
-    ) -> None:
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
         Calculate and save target variable tables for WaMo and CoMo periods.
         """
@@ -419,3 +455,5 @@ class CoinEpochsOrchestrator:
             set(como_features_df.index)
         )
         como_target.to_parquet(f"{base_folder}/como_coin_target_var_df.parquet", index=True)
+
+        return wamo_target, como_target
