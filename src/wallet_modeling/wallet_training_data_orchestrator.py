@@ -47,7 +47,7 @@ class WalletTrainingDataOrchestrator:
         # Base configs
         self.wallets_config = copy.deepcopy(wallets_config)
         self.wallets_metrics_config = wallets_metrics_config
-        self.wallets_features_config = wallets_features_config
+        self.wallets_features_config = wallets_features_config # currently unused pending DDA766
         self.training_wallet_cohort = training_wallet_cohort
 
         # Generated objects
