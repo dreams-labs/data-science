@@ -238,7 +238,7 @@ class CoinFlowFeaturesOrchestrator:
         # ------------------------------------------
         # Macro trends: add indicators if there are metrics self.configured
         if self.metrics_config.get('macro_trends'):
-            macro_trends_df = ind.generate_time_series_indicators(macro_trends_df,
+            macro_trends_df = ind.generate_time_series_indicators(macro_trends_df.reset_index(),
                                                                 self.metrics_config['macro_trends'],
                                                                 None)
         # Market data: add indicators

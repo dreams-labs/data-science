@@ -4,7 +4,7 @@ training_data:
     # Defining the modeling and training periods (dates must follow YYYY-MM-DD format)
     # The modeling period end date and training period start and end dates are automatically
     # imputed using utils.py function calculate_period_dates() when load_config() is run
-    modeling_period_start: "2025-02-26"  # Start date for the modeling period
+    modeling_period_start: "2025-01-30"  # Start date for the modeling period
     modeling_period_duration: 30    # Duration of the modeling period in days
     training_period_duration: 90    # Duration of the training period in days
 
@@ -27,12 +27,12 @@ datasets:
                 sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
             volume:
                 sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
-            market_cap:
-                sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
-            mfi:
-                sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
-            obv:
-                sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
+            # market_cap:
+            #     sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
+            # mfi:
+            #     sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
+            # obv:
+            #     sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
 
     # Keyed on coin_id-date
     wallet_cohorts:

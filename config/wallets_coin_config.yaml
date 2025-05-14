@@ -10,13 +10,27 @@ training_data: #CoinModel
     coin_epoch_lookbacks: [  # How many days prior to the modeling period each window begins
         0,
         -30,
-        -60,
-        -90,
-        -120,
-        -180,
-        -240,
-        -300,
-        -360
+        # -60,
+        # -90,
+        # -120,
+        # -180,
+        # -240,
+        # -300,
+        # -360,
+        # -420,
+        # -480,
+        # -540,
+        # -600,
+        # -660,
+        # -720,
+        # -780,
+        # -840,
+        # -900,
+        # -960,
+        # -1020,
+        # -1080,
+        # -1140,
+        # -1200
     ]
 
 
@@ -65,25 +79,31 @@ wallet_scores: #CoinModel
         #     target_variable: cw_crypto_net_gain/max_investment/base
         #     target_var_min_threshold: .60
         #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.9
+        #     y_pred_threshold: 0.85
 
         # cw_return_rate_min_080:
         #     target_variable: cw_crypto_net_gain/max_investment/base
         #     target_var_min_threshold: .80
         #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.9
+        #     y_pred_threshold: 0.85
 
         # cw_return_rate_max_-005:
         #     target_variable: cw_crypto_net_gain/max_investment/base
         #     target_var_min_threshold: -.inf
         #     target_var_max_threshold: -0.05
-        #     y_pred_threshold: 0.9
+        #     y_pred_threshold: 0.85
 
         # cw_return_rate_max_-025:
         #     target_variable: cw_crypto_net_gain/max_investment/base
         #     target_var_min_threshold: -.inf
         #     target_var_max_threshold: -0.25
-        #     y_pred_threshold: 0.9
+        #     y_pred_threshold: 0.85
+
+        # return_rate_min_005:
+        #     target_variable: crypto_net_gain/max_investment/base
+        #     target_var_min_threshold: .05
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.85
 
         # return_rate_min_025:
         #     target_variable: crypto_net_gain/max_investment/base
@@ -91,11 +111,11 @@ wallet_scores: #CoinModel
         #     target_var_max_threshold: .inf
         #     y_pred_threshold: 0.85
 
-        # return_rate_min_060:
+        # return_rate_min_040:
         #     target_variable: crypto_net_gain/max_investment/base
-        #     target_var_min_threshold: .60
+        #     target_var_min_threshold: .40
         #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.9
+        #     y_pred_threshold: 0.85
 
         # cw_net_flows_rate_min_025:
         #     target_variable: cw_crypto_net_flows/crypto_inflows/base
@@ -151,11 +171,14 @@ features: #CoinModel
         # cw_return_rate_min_080,
         # cw_return_rate_max_-005,
         # cw_return_rate_max_-025,
+        # return_rate_min_005,
         # return_rate_min_025,
-        # # return_rate_min_060,
+        # return_rate_min_040,
         # cw_net_flows_rate_min_025,
         # cw_return_rate_regression,
         # return_rate_regression,
+        # cw_net_gain_min_1000,
+        # cw_net_flows_min_1000,
     ]
 
     # Features from the feature_engineering directory
@@ -231,15 +254,17 @@ coin_modeling: #CoinModel
             # score_binary|*
             wallet_cohorts|*,
             time_series|*,
+            # macro|*,
             training_clusters|*,
 
-            # # Segment Family
-            # score_binary|cw_net_flows_min_1000/*,
-            # score_binary|cw_net_gain_min_1000/*,
+            # Segment Family
+            score_binary|cw_net_flows_min_1000/*,
+            score_binary|cw_net_gain_min_1000/*,
             score_binary|cw_return_rate_min_000/*,
             # score_binary|cw_return_rate_min_005/*,
             # score_binary|cw_return_rate_min_025/*,
-            # score_binary|cw_return_rate_min_040/*,
+            score_binary|cw_return_rate_min_040/*,
+
             # score_binary|cw_net_flows_rate_min_025/*,
             # score_binary|cw_return_rate_max_-005/*,
             # score_binary|cw_return_rate_max_-025/*,
@@ -249,6 +274,13 @@ coin_modeling: #CoinModel
             # score_binary|return_rate_min_025/*,
             # wallet_cohorts|whales_longterm|*,
             # wallet_cohorts|normies|*,
+
+            macro|global_market_cap/*,
+            # macro|btc_mvrv_z_score/*,
+            macro|btc_vdd_multiple/*,
+            macro|gtrends_altcoin_worldwide/*,
+            macro|gtrends_memecoin_us/*,
+            macro|btc_price/*,
 
             # # Segment Value
             'training_clusters|k5_cluster/cluster_0|*',
@@ -423,7 +455,7 @@ coin_modeling: #CoinModel
                 score_binary|cw_net_gain_min_1000/*,
                 score_binary|cw_return_rate_min_000/*,
                 score_binary|cw_return_rate_min_005/*,
-                score_binary|cw_return_rate_min_025/*,
+                # score_binary|cw_return_rate_min_025/*,
                 score_binary|cw_return_rate_min_040/*,
 
                 # # Segment Value
@@ -433,7 +465,15 @@ coin_modeling: #CoinModel
                 # 'training_clusters|k5_cluster/cluster_3|*',
                 # 'training_clusters|k5_cluster/cluster_4|*',
 
-
+                # macro|global_market_cap/*,
+                # # macro|btc_mvrv_z_score/*,
+                # macro|btc_vdd_multiple/*,
+                # macro|gtrends_altcoin_worldwide/*,
+                # macro|gtrends_memecoin_us/*,
+                # macro|btc_price/*,
+                # macro|*/*period_1,
+                # macro|*/*period_2,
+                # macro|*/*period_3,
                 # Metric
                 # time_series|market_data|price*,
                 # time_series|market_data|volume*,

@@ -17,9 +17,7 @@ import wallet_modeling.wallet_epochs_orchestrator as weo
 import wallet_modeling.wallet_training_data_orchestrator as wtdo
 import wallet_modeling.wallet_model_orchestrator as wmo
 import coin_wallet_features.coin_features_orchestrator as cfo
-
-
-# import utils as u
+import utils as u
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -156,10 +154,13 @@ class CoinEpochsOrchestrator:
 
 
 
+    @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def orchestrate_coin_epochs(self) -> None:
         """
         Orchestrate coin-level epochs by iterating through lookbacks and processing each epoch.
         """
+        logger.milestone("Beginning generation of all coin model training data...")
+
         wamo_feature_dfs = []
         wamo_target_dfs = []
         como_feature_dfs = []
