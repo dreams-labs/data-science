@@ -1,7 +1,6 @@
-# CheckpointValidation
 # WalletModel Config
 # Time series keyed on coin_id-date
-time_series:
+time_series:  #WalletModel
     market_data:
         price:
             indicators:
@@ -21,7 +20,7 @@ time_series:
     # Controls what populates the macro_trends|* features
     # All keys of wallets_features_config.market_timing.offsets.keys() must
     #  be included here
-    macro_trends:
+    macro_trends:  #WalletModel
         btc_price:
             aggregations:
                 std:
@@ -34,8 +33,6 @@ time_series:
                     scaling: none
         global_market_cap:
             aggregations:
-                first:
-                    scaling: none
                 last:
                     scaling: none
                 std:

@@ -9,10 +9,14 @@ training_data: #CoinModel
     modeling_period_duration: 30
     coin_epoch_lookbacks: [  # How many days prior to the modeling period each window begins
         0,
+        -30,
         -60,
+        -90,
         -120,
         -180,
         -240,
+        -300,
+        -360
     ]
 
 
@@ -135,14 +139,14 @@ wallet_segments: #CoinModel
 
 
 # CoinModel Features
-wallet_features: #CoinModel
+features: #CoinModel
 
     # Which scores will have distribution metrics created
     score_distributions: [
-        cw_return_rate_min_000,
-        cw_return_rate_min_005,
-        cw_return_rate_min_025,
-        cw_return_rate_min_040,
+        # cw_return_rate_min_000,
+        # cw_return_rate_min_005,
+        # cw_return_rate_min_025,
+        # cw_return_rate_min_040,
         # cw_return_rate_min_060,
         # cw_return_rate_min_080,
         # cw_return_rate_max_-005,
@@ -174,6 +178,10 @@ wallet_features: #CoinModel
         unique_coins_traded,
         # average_transaction,
     ]
+
+    # Macroeconomic features: most params are in wallets_coins_metrics_config.yaml
+    toggle_macro_features: True  # whether to build macro features
+    max_macro_lookback: 180  # Maximum macroeconomic features lookback days for wallets_coins_metrics_config
 
 
 # CoinModel Modeling Config
