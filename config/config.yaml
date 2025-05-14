@@ -37,41 +37,41 @@ datasets:
     # Keyed on coin_id-date
     wallet_cohorts:
 
-        whales_longterm:
-            lookback_period: 150 # how long the window for wallet thresholds extends backwards before the training_period_start
-            wallet_minimum_inflows: 50000  # Minimum USD inflows for a wallet to be considered a "shark"
-            wallet_maximum_inflows: 50000000  # Maximum USD inflows for a wallet to be considered a "shark"
-            coin_profits_win_threshold: 15000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
-            coin_return_win_threshold: 1.0  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
-            wallet_min_coin_wins: 3  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
-            sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
-
-        # whales:
-        #     lookback_period: 0 # how long the window for wallet thresholds extends backwards before the training_period_start
+        # whales_longterm:
+        #     lookback_period: 150 # how long the window for wallet thresholds extends backwards before the training_period_start
         #     wallet_minimum_inflows: 50000  # Minimum USD inflows for a wallet to be considered a "shark"
         #     wallet_maximum_inflows: 50000000  # Maximum USD inflows for a wallet to be considered a "shark"
-        #     coin_profits_win_threshold: 10000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
-        #     coin_return_win_threshold: 0.3  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
-        #     wallet_min_coin_wins: 4  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
+        #     coin_profits_win_threshold: 15000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
+        #     coin_return_win_threshold: 1.0  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
+        #     wallet_min_coin_wins: 3  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
         #     sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
 
-        normies:
+        whales:
             lookback_period: 0 # how long the window for wallet thresholds extends backwards before the training_period_start
-            wallet_minimum_inflows: 100  # Minimum USD inflows for a wallet to be considered a "shark"
-            wallet_maximum_inflows: 10000  # Maximum USD inflows for a wallet to be considered a "shark"
-            coin_profits_win_threshold: 0  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
-            coin_return_win_threshold: 0  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
-            wallet_min_coin_wins: 0  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
+            wallet_minimum_inflows: 500000  # Minimum USD inflows for a wallet to be considered a "shark"
+            wallet_maximum_inflows: 50000000  # Maximum USD inflows for a wallet to be considered a "shark"
+            coin_profits_win_threshold: 25000  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
+            coin_return_win_threshold: 0.3  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
+            wallet_min_coin_wins: 1  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
             sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
 
-        # midtier:
-        #   lookback_period: 0 # how long the window for wallet thresholds extends backwards before the training_period_start
-        #   wallet_minimum_inflows: 10000  # Minimum USD inflows for a wallet to be considered a "shark"
-        #   wallet_maximum_inflows: 50000  # Maximum USD inflows for a wallet to be considered a "shark"
-        #   coin_profits_win_threshold: 0  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
-        #   coin_return_win_threshold: 0  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
-        #   wallet_min_coin_wins: 0  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
-        #   sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
+        # normies:
+        #     lookback_period: 0 # how long the window for wallet thresholds extends backwards before the training_period_start
+        #     wallet_minimum_inflows: 100  # Minimum USD inflows for a wallet to be considered a "shark"
+        #     wallet_maximum_inflows: 10000  # Maximum USD inflows for a wallet to be considered a "shark"
+        #     coin_profits_win_threshold: 0  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
+        #     coin_return_win_threshold: 0  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
+        #     wallet_min_coin_wins: 0  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
+        #     sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
+
+        # # midtier:
+        # #   lookback_period: 0 # how long the window for wallet thresholds extends backwards before the training_period_start
+        # #   wallet_minimum_inflows: 10000  # Minimum USD inflows for a wallet to be considered a "shark"
+        # #   wallet_maximum_inflows: 50000  # Maximum USD inflows for a wallet to be considered a "shark"
+        # #   coin_profits_win_threshold: 0  # Lifetime absolute USD profit threshold for a coin to be classified as a "win"
+        # #   coin_return_win_threshold: 0  # Minimum lifetime percentage return threshold for a coin to be classified as a "win"
+        # #   wallet_min_coin_wins: 0  # Minimum number of coins that meet the "win" threshold for a wallet to join the cohort
+        # #   sameness_threshold: 0.95  # columns with more than this % of one value will be dropped
 
     # # Keyed on only coin_id
     # coin_facts:
@@ -85,18 +85,18 @@ datasets:
     # Keyed on only date
     macro_trends:
 
-    # btc_price:
-    #     sameness_threshold: .9  # columns with more than this % of one value will be dropped
-    # gtrends_cryptocurrency_worldwide:
-    #     sameness_threshold: .9  # columns with more than this % of one value will be dropped
-    # btc_mvrv_z_score:
-    #     sameness_threshold: .9  # columns with more than this % of one value will be dropped
-    # # btc_vdd_multiple:
-    # #     sameness_threshold: .9  # columns with more than this % of one value will be dropped
-    # global_volume:
-    #     sameness_threshold: .9  # columns with more than this % of one value will be dropped
-    # global_market_cap:
-    #     sameness_threshold: .9  # columns with more than this % of one value will be dropped
+        btc_price:
+            sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
+        btc_mvrv_z_score:
+            sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
+        global_market_cap:
+            sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
+        btc_vdd_multiple:
+            sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
+        gtrends_altcoin_worldwide:
+            sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
+        gtrends_memecoin_us:
+            sameness_threshold: 1.0  # columns with more than this % of one value will be dropped
 
 
 data_cleaning:
