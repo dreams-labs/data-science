@@ -87,32 +87,57 @@ class CoinEpochsOrchestrator:
         Identifies the earliest training start date from the earliest coin epoch
         and generates complete dfs for them.
         """
+        # Calculate earliest required modeling start date for coverage validation
+        coins_earliest_epoch = min(self.wallets_coin_config['training_data']['coin_epoch_lookbacks'])
+        earliest_modeling_period_start = (
+            pd.to_datetime(self.wallets_config['training_data']['modeling_period_start'])
+            + timedelta(days=coins_earliest_epoch)
+        )
+        validation_period_end = pd.to_datetime(self.wallets_config['training_data']['validation_period_end'])
+
         # Return existing dfs if available
         if self.complete_profits_df is not None:
-            logger.info("Stored complete dfs will be used.")
-            return
+            # Validate coverage of stored dfs
+            min_date = self.complete_profits_df.index.get_level_values('date').min()
+            max_date = self.complete_profits_df.index.get_level_values('date').max()
+            if min_date <= earliest_modeling_period_start and max_date >= validation_period_end:
+                logger.info("Stored complete dfs cover required period and will be used.")
+                return
+            logger.warning(
+                f"Stored complete dfs cover dates {min_date.date()} to {max_date.date()}, "
+                f"which does not cover required range {earliest_modeling_period_start.date()} "
+                f"to {validation_period_end.date()}. Regenerating complete dfs."
+            )
 
-        # Load the existing files if avilable
+        # Load the existing files if available
         parquet_folder = self.wallets_config['training_data']['parquet_folder']
         if os.path.exists(f"{parquet_folder}/complete_profits_df.parquet"):
             parquet_folder = self.wallets_config['training_data']['parquet_folder']
-
             # Store in self
             self.complete_profits_df = pd.read_parquet(f"{parquet_folder}/complete_profits_df.parquet")
             self.complete_market_data_df = pd.read_parquet(f"{parquet_folder}/complete_market_data_df.parquet")
             self.complete_macro_trends_df = pd.read_parquet(f"{parquet_folder}/complete_macro_trends_df.parquet")
-            logger.info("Loaded complete dfs from parquet.")
-            return
+            # Validate coverage of parquet-loaded dfs
+            min_date = self.complete_profits_df.index.get_level_values('date').min()
+            max_date = self.complete_profits_df.index.get_level_values('date').max()
+            if min_date <= earliest_modeling_period_start and max_date >= validation_period_end:
+                logger.info("Loaded complete dfs from parquet and they cover required period.")
+                return
+            logger.warning(
+                f"Parquet-loaded complete dfs cover dates {min_date.date()} to {max_date.date()}, "
+                f"which does not cover required range {earliest_modeling_period_start.date()} to "
+                f"{validation_period_end.date()}. Regenerating complete dfs."
+            )
 
         # Generate wallets_lookback_config with the earliest lookback date
         coins_earliest_epoch = min(self.wallets_coin_config['training_data']['coin_epoch_lookbacks'])
         wallets_lookback_config = copy.deepcopy(self.wallets_config)
-        earliest_modeling_period_start = (
+        earliest_modeling_period_start_str = (
             pd.to_datetime(wallets_lookback_config['training_data']['modeling_period_start'])
             + timedelta(days=coins_earliest_epoch)
         ).strftime('%Y-%m-%d')
         wallets_lookback_config_dict = copy.deepcopy(wallets_lookback_config.config)
-        wallets_lookback_config_dict['training_data']['modeling_period_start'] = earliest_modeling_period_start
+        wallets_lookback_config_dict['training_data']['modeling_period_start'] = earliest_modeling_period_start_str
         wallets_lookback_config = wcm.add_derived_values(wallets_lookback_config_dict)
 
         # Load and store complete dfs
