@@ -300,10 +300,11 @@ class CoinEpochsOrchestrator:
 
 
 
-    def _generate_macro_indicators(self,
-                                epoch_weo,
-                                period_start_date: str,
-                                period_end_date: str) -> pd.DataFrame:
+    def _generate_macro_indicators(
+            self,
+            epoch_weo: weo.WalletEpochsOrchestrator,
+            period_start_date: str,
+            period_end_date: str) -> pd.DataFrame:
         """
         Generate macro indicators for the specified period using WalletTrainingDataOrchestrator.
 
@@ -322,6 +323,7 @@ class CoinEpochsOrchestrator:
             self.wallets_features_config
         )
 
+        # Trim, clean, and impute missing values in complete_macro_trends_df
         period_macro_trends_df = dr.clean_macro_trends(
             self.complete_macro_trends_df,
             macro_trends_cols=list(self.wallets_coins_metrics_config['macro_trends'].keys()),
