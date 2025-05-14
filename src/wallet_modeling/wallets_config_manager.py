@@ -257,7 +257,7 @@ def validate_config_alignment(config: dict, wallets_config: dict, wallets_coin_c
         )
 
     # If coin flow model features enabled, perform additional validation
-    if wallets_coin_config['wallet_features']['toggle_coin_flow_model_features']:
+    if wallets_coin_config['features']['toggle_coin_flow_model_features']:
         # Confirm period boundaries align
         model_start = config['training_data']['modeling_period_start']
         val_start = wallets_config['training_data']['coin_modeling_period_start']

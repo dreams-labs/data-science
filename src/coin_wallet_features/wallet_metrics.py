@@ -62,7 +62,7 @@ def compute_coin_wallet_metrics(
         profits_df,
         period_start,
         period_end,
-        wallets_coin_config['wallet_features']['drop_trading_metrics']
+        wallets_coin_config['features']['drop_trading_metrics']
     ).add_prefix('trading/')
     cw_metrics_df = (
         cw_metrics_df

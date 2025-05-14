@@ -102,12 +102,12 @@ class CoinFeaturesOrchestrator:
             cw_metrics_df,
             wallet_segmentation_df,
             self.training_coin_cohort,
-            self.wallets_coin_config['wallet_features']['score_distributions'],
+            self.wallets_coin_config['features']['score_distributions'],
             self.wallets_coin_config['n_threads']['cw_flattening_threads']
         )
 
         # Generate and merge Coin Flow Model features if configured
-        if self.wallets_coin_config['wallet_features']['toggle_coin_flow_model_features']:
+        if self.wallets_coin_config['features']['toggle_coin_flow_model_features']:
 
             # Confirm config alignment
             wcm.validate_config_alignment(
