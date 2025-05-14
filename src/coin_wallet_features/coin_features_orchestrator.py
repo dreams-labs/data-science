@@ -2,13 +2,14 @@
 Orchestrates groups of functions to generate wallet model pipeline
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 
 # Local module imports
 import feature_engineering.coin_flow_features_orchestrator as cffo
 import wallet_modeling.wallet_training_data_orchestrator as wtdo
 import wallet_modeling.wallets_config_manager as wcm
+import wallet_features.macroeconomic_features as wmac
 import coin_wallet_features.wallet_segmentation as cws
 import coin_wallet_features.wallet_metrics as cwwm
 import coin_wallet_features.wallet_metrics_flattening as cwwmf
@@ -32,19 +33,19 @@ class CoinFeaturesOrchestrator:
         self,
         wallets_config: dict,
         wallets_coin_config: dict,
-        metrics_config: dict,
         wallets_coins_metrics_config: dict,
         coin_flow_config: dict,
         coin_flow_modeling_config: dict,
+        coin_flow_metrics_config: dict,
         training_coin_cohort: pd.Series
     ):
         # Store configs
         self.wallets_config = wallets_config
         self.wallets_coin_config = wallets_coin_config
-        self.metrics_config = metrics_config
         self.wallets_coins_metrics_config = wallets_coins_metrics_config
         self.coin_flow_config = coin_flow_config
         self.coin_flow_modeling_config = coin_flow_modeling_config
+        self.coin_flow_metrics_config = coin_flow_metrics_config
 
         # Store cohort
         self.training_coin_cohort = training_coin_cohort
@@ -75,7 +76,7 @@ class CoinFeaturesOrchestrator:
         Params:
         - profits_df (DataFrame): profits data for the specified period
         - training_data_df (DataFrame): wallet training features for the specified period
-        - macro_indicators_df (DataFrame): date-keyed macroeconomic indicators
+        - macro_indicators_df (DataFrame): date-indexed macroeconomic indicators
         - period (str): period identifier (e.g., 'coin_modeling')
         - prd (str): abbreviated prefix for saved files (e.g., 'como')
 
@@ -109,6 +110,13 @@ class CoinFeaturesOrchestrator:
             self.wallets_coin_config['n_threads']['cw_flattening_threads']
         )
 
+        # Instantiate full features df
+        coin_training_data_df_full = coin_wallet_features_df
+
+        # Generate and merge macro features if configured
+        if self.wallets_coin_config['features']['toggle_macro_features']:
+            macro_features_df = self._generate_macro_features(macro_indicators_df)
+
         # Generate and merge Coin Flow Model features if configured
         if self.wallets_coin_config['features']['toggle_coin_flow_model_features']:
 
@@ -123,8 +131,6 @@ class CoinFeaturesOrchestrator:
                 coin_wallet_features_df,
                 coin_flows_model_features_df
             )
-        else:
-            coin_training_data_df_full = coin_wallet_features_df
 
         u.notify('notification_toast')
         logger.info("Successfully generated coin_training_data_df with shape "
@@ -225,7 +231,7 @@ class CoinFeaturesOrchestrator:
         # Generate features based on the coin config files
         coin_flow_features_orchestrator = cffo.CoinFlowFeaturesOrchestrator(
             self.coin_flow_config,
-            self.metrics_config,
+            self.coin_flow_metrics_config,
             self.coin_flow_modeling_config
         )
         coin_features_df, _, _ = coin_flow_features_orchestrator.generate_all_time_windows_model_inputs()
@@ -236,6 +242,34 @@ class CoinFeaturesOrchestrator:
         u.notify('ui_1')
 
         return coin_features_df
+
+
+    def _generate_macro_features(
+        self,
+        macro_indicators_df: pd.DataFrame,
+    ) -> pd.DataFrame:
+        """
+        Params:
+        - macro_indicators_df (DataFrame): date-indexed macroeconomic indicators
+
+        Returns:
+        - macro_features_df (pd.DataFrame): single row dataframe containing a
+            column for each macro feature. These flattened features will be
+            cross joined onto every coin's record
+        """
+        lookback_start_date = (
+            pd.to_datetime(self.wallets_config['training_data']['modeling_period_start'])
+            - timedelta(days=self.wallets_coin_config['features']['max_macro_lookback'])
+        )
+
+        macro_features_df = wmac.calculate_macro_features(
+            macro_indicators_df,
+            lookback_start_date,
+            self.wallets_coins_metrics_config['time_series']['macro_trends']
+        )
+
+        return macro_features_df
+
 
     def _merge_all_features(
         self,
