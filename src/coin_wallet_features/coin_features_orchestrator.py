@@ -33,6 +33,7 @@ class CoinFeaturesOrchestrator:
         wallets_config: dict,
         wallets_coin_config: dict,
         metrics_config: dict,
+        wallets_coins_metrics_config: dict,
         coin_flow_config: dict,
         coin_flow_modeling_config: dict,
         training_coin_cohort: pd.Series
@@ -41,6 +42,7 @@ class CoinFeaturesOrchestrator:
         self.wallets_config = wallets_config
         self.wallets_coin_config = wallets_coin_config
         self.metrics_config = metrics_config
+        self.wallets_coins_metrics_config = wallets_coins_metrics_config
         self.coin_flow_config = coin_flow_config
         self.coin_flow_modeling_config = coin_flow_modeling_config
 
@@ -63,6 +65,7 @@ class CoinFeaturesOrchestrator:
         self,
         profits_df: pd.DataFrame,
         training_data_df: pd.DataFrame,
+        macro_indicators_df: pd.DataFrame,
         period: str,
         prd: str
     ) -> pd.DataFrame:
@@ -72,7 +75,7 @@ class CoinFeaturesOrchestrator:
         Params:
         - profits_df (DataFrame): profits data for the specified period
         - training_data_df (DataFrame): wallet training features for the specified period
-            including cluster labels
+        - macro_indicators_df (DataFrame): date-keyed macroeconomic indicators
         - period (str): period identifier (e.g., 'coin_modeling')
         - prd (str): abbreviated prefix for saved files (e.g., 'como')
 
@@ -108,12 +111,6 @@ class CoinFeaturesOrchestrator:
 
         # Generate and merge Coin Flow Model features if configured
         if self.wallets_coin_config['features']['toggle_coin_flow_model_features']:
-
-            # Confirm config alignment
-            wcm.validate_config_alignment(
-                self.coin_flow_config,
-                self.wallets_config,
-                self.wallets_coin_config)
 
             # Generate and merge all features
             coin_flows_model_features_df = self._generate_coin_flow_model_features()
@@ -207,6 +204,12 @@ class CoinFeaturesOrchestrator:
         Returns:
         - coin_non_wallet_features_df (DataFrame): index=coin_id, features from all windows
         """
+        # Confirm config alignment
+        wcm.validate_config_alignment(
+            self.coin_flow_config,
+            self.wallets_config,
+            self.wallets_coin_config)
+
         # Confirm period boundaries align
         model_start = self.coin_flow_config['training_data']['modeling_period_start']
         val_start = self.wallets_config['training_data']['coin_modeling_period_start']
