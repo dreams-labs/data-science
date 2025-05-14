@@ -116,6 +116,12 @@ class CoinFeaturesOrchestrator:
         # Generate and merge macro features if configured
         if self.wallets_coin_config['features']['toggle_macro_features']:
             macro_features_df = self._generate_macro_features(macro_indicators_df)
+            # Cross join macro features to coin features DataFrame, prefixing "macro|"
+            prefixed_macro_features = {
+                f"macro|{col}": val
+                for col, val in macro_features_df.iloc[0].to_dict().items()
+            }
+            coin_training_data_df_full = coin_training_data_df_full.assign(**prefixed_macro_features)
 
         # Generate and merge Coin Flow Model features if configured
         if self.wallets_coin_config['features']['toggle_coin_flow_model_features']:
@@ -267,6 +273,18 @@ class CoinFeaturesOrchestrator:
             lookback_start_date,
             self.wallets_coins_metrics_config['time_series']['macro_trends']
         )
+
+        # Rename macro feature columns: replace first underscore after key with '/'
+        macro_keys = self.wallets_coins_metrics_config['time_series']['macro_trends'].keys()
+        rename_map = {}
+        for col in macro_features_df.columns:
+            for key in macro_keys:
+                prefix = f"{key}_"
+                if col.startswith(prefix):
+                    rename_map[col] = f"{key}/{col[len(prefix):]}"
+                    break
+        if rename_map:
+            macro_features_df = macro_features_df.rename(columns=rename_map)
 
         return macro_features_df
 
