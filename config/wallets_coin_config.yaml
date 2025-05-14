@@ -143,10 +143,12 @@ features: #CoinModel
 
     # Which scores will have distribution metrics created
     score_distributions: [
-        # cw_return_rate_min_000,
-        # cw_return_rate_min_005,
-        # cw_return_rate_min_025,
-        # cw_return_rate_min_040,
+        cw_return_rate_min_000,
+        cw_return_rate_min_005,
+        cw_return_rate_min_025,
+        cw_return_rate_min_040,
+        cw_net_gain_min_1000,
+        cw_net_flows_min_1000,
         # cw_return_rate_min_060,
         # cw_return_rate_min_080,
         # cw_return_rate_max_-005,
@@ -231,15 +233,17 @@ coin_modeling: #CoinModel
             # score_binary|*
             wallet_cohorts|*,
             time_series|*,
+            # macro|*,
             training_clusters|*,
 
-            # # Segment Family
-            # score_binary|cw_net_flows_min_1000/*,
-            # score_binary|cw_net_gain_min_1000/*,
+            # Segment Family
+            score_binary|cw_net_flows_min_1000/*,
+            score_binary|cw_net_gain_min_1000/*,
             score_binary|cw_return_rate_min_000/*,
             # score_binary|cw_return_rate_min_005/*,
             # score_binary|cw_return_rate_min_025/*,
-            # score_binary|cw_return_rate_min_040/*,
+            score_binary|cw_return_rate_min_040/*,
+
             # score_binary|cw_net_flows_rate_min_025/*,
             # score_binary|cw_return_rate_max_-005/*,
             # score_binary|cw_return_rate_max_-025/*,
@@ -249,6 +253,13 @@ coin_modeling: #CoinModel
             # score_binary|return_rate_min_025/*,
             # wallet_cohorts|whales_longterm|*,
             # wallet_cohorts|normies|*,
+
+            macro|global_market_cap/*,
+            # macro|btc_mvrv_z_score/*,
+            macro|btc_vdd_multiple/*,
+            macro|gtrends_altcoin_worldwide/*,
+            macro|gtrends_memecoin_us/*,
+            macro|btc_price/*,
 
             # # Segment Value
             'training_clusters|k5_cluster/cluster_0|*',
@@ -423,7 +434,7 @@ coin_modeling: #CoinModel
                 score_binary|cw_net_gain_min_1000/*,
                 score_binary|cw_return_rate_min_000/*,
                 score_binary|cw_return_rate_min_005/*,
-                score_binary|cw_return_rate_min_025/*,
+                # score_binary|cw_return_rate_min_025/*,
                 score_binary|cw_return_rate_min_040/*,
 
                 # # Segment Value
@@ -433,7 +444,15 @@ coin_modeling: #CoinModel
                 # 'training_clusters|k5_cluster/cluster_3|*',
                 # 'training_clusters|k5_cluster/cluster_4|*',
 
-
+                # macro|global_market_cap/*,
+                # # macro|btc_mvrv_z_score/*,
+                # macro|btc_vdd_multiple/*,
+                # macro|gtrends_altcoin_worldwide/*,
+                # macro|gtrends_memecoin_us/*,
+                # macro|btc_price/*,
+                # macro|*/*period_1,
+                # macro|*/*period_2,
+                # macro|*/*period_3,
                 # Metric
                 # time_series|market_data|price*,
                 # time_series|market_data|volume*,

@@ -1,3 +1,40 @@
+# DDA 777 modeling
+checkpoint 1: pos.809 appears to be working but needs audits
+Target: coin_return_winsorized 0.3 to
+ID: 7fd85eda-2f8b-44f0-bfdb-694dc3aa9e64
+===================================
+Test Samples:             4,275
+Number of Features:       24
+
+
+Classification Metrics
+-----------------------------------
+ROC AUC:                    0.745
+Log Loss:                   0.410
+Accuracy:                   0.824
+Precision:                  0.500
+Recall:                     0.005
+F1 Score:                   0.011
+
+Validation Metrics
+-----------------------------------
+Val ROC AUC:                0.764
+Val Accuracy:               0.823
+Val Precision:              0.808
+Val Recall:                 0.006
+Val F1 Score:               0.011
+
+Validation Return Metrics
+-----------------------------------
+Positive Threshold:         0.50
+Positive Predictions:       26/21238 (0.12%)
+Positive Mean Outcome:      0.809
+Positive W-Mean Outcome:    0.809
+Top 1% W-Mean Outcome:      0.611
+Top 5% W-Mean Outcome:      0.465
+Overall W-Mean Outcome:     0.027
+
+
 # DDA 625 coin epochs v1
 checkpoint 1: vauc.611 coin epochs working
 Model Performance Summary
