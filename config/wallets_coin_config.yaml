@@ -10,7 +10,7 @@ training_data: #CoinModel
     coin_epoch_lookbacks: [  # How many days prior to the modeling period each window begins
         0,
         -30,
-        # -60,
+        -60,
         # -90,
         # -120,
         # -180,
@@ -131,18 +131,18 @@ wallet_scores: #CoinModel
         #     target_variable: crypto_net_gain/max_investment/winsorized
         #     model_type: regression
 
-        # USD Metrics
-        cw_net_gain_min_1000:
-            target_variable: cw_crypto_net_gain
-            target_var_min_threshold: 1000
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.9
+        # # USD Metrics
+        # cw_net_gain_min_1000:
+        #     target_variable: cw_crypto_net_gain
+        #     target_var_min_threshold: 1000
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.9
 
-        cw_net_flows_min_1000:
-            target_variable: cw_crypto_net_flows
-            target_var_min_threshold: 1000
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.9
+        # cw_net_flows_min_1000:
+        #     target_variable: cw_crypto_net_flows
+        #     target_var_min_threshold: 1000
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.9
 
 
 # CoinModel Segments
@@ -163,10 +163,10 @@ features: #CoinModel
 
     # Which scores will have distribution metrics created
     score_distributions: [
-        # cw_return_rate_min_000,
-        # cw_return_rate_min_005,
-        # cw_return_rate_min_025,
-        # cw_return_rate_min_040,
+        cw_return_rate_min_000,
+        cw_return_rate_min_005,
+        cw_return_rate_min_025,
+        cw_return_rate_min_040,
         # cw_return_rate_min_060,
         # cw_return_rate_min_080,
         # cw_return_rate_max_-005,
