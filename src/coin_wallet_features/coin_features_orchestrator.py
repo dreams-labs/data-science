@@ -461,12 +461,11 @@ def load_wallet_data_for_coin_features(
     )
 
     validation_end = wallets_config['training_data']['validation_period_end']
-    coin_modeling_end = wallets_config['training_data']['coin_modeling_period_end']
-    if validation_end == coin_modeling_end:
+    investing_end = wallets_config['training_data']['investing_period_end']
+    if investing_end > validation_end:
         logger.info(
-            "Skipping investing period data generation as the coin_modeling period "
-            "encompasses the complete validation period with both ending on "
-            f"{coin_modeling_end}."
+            "Skipping investing period data generation as the validation period ends "
+            f"on {validation_end} before the investing end of {investing_end}."
         )
         logger.info("Successfully loaded base data for coin_modeling period only.")
 
