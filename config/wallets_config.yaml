@@ -24,7 +24,7 @@ training_data: #WalletModel
 
     # Local pipeline configs
     dataset: dev  # Set to prod or dev; determines whether to query core or dev dataset tables
-    parquet_folder: temp/wallet_modeling_dfs/dda_777_modeling_v2  # where to store parquet files
+    parquet_folder: temp/wallet_modeling_dfs/dda_778_coin_parquet_v2  # where to store parquet files
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
 

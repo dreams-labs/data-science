@@ -87,12 +87,15 @@ class WalletsCoinConfig:
 
     def _validate_score_distribution_features(self):
         """
-        Validate that each score in wallet_features.score_distributions
+        Validate that each feature in features.score_distributions
         has a corresponding key in wallet_scores.score_params.
         """
-        features = self.config.get('wallet_features', {}).get('score_distributions', [])
-        params_keys = set(self.config.get('wallet_scores', {}).get('score_params', {}).keys())
-        missing = [s for s in features if s not in params_keys]
+        # List of distributions to validate
+        distributions = self.config['features']['score_distributions']
+        # Valid score parameters
+        params_keys = set(self.config['wallet_scores']['score_params'].keys())
+        # Identify any missing distributions
+        missing = [d for d in distributions if d not in params_keys]
         if missing:
             raise ValueError(
                 f"Invalid score_distributions entries not found in score_params: {missing}"
