@@ -28,20 +28,20 @@ time_series:
                                 scaling: none
                         window_duration: 30
                         lookback_periods: 3
-        # market_cap:
-        #     indicators:
-        #         sma:
-        #             parameters:
-        #                 window: [3]
-        #             rolling:
-        #                 aggregations:
-        #                     last:
-        #                         scaling: none
-        #                 comparisons:
-        #                     pct_change:
-        #                         scaling: none
-        #                 window_duration: 30
-        #                 lookback_periods: 3
+        market_cap_filled:
+            indicators:
+                sma:
+                    parameters:
+                        window: [3]
+                    rolling:
+                        aggregations:
+                            last:
+                                scaling: none
+                        comparisons:
+                            pct_change:
+                                scaling: none
+                        window_duration: 30
+                        lookback_periods: 3
 
 
 # Keyed on coin_id-date
