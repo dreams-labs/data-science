@@ -199,7 +199,11 @@ class CoinEpochsOrchestrator:
 
 
 
-    def prepare_epoch_coin_training_data(self, offset_days: int) -> None:
+    def prepare_epoch_coin_training_data(
+            self,
+            offset_days: int,
+            generate_target_vars: bool
+        ) -> None:
         """
         Prepare coin features as of the end of the coin modeling period without
          retraining models.
@@ -241,19 +245,37 @@ class CoinEpochsOrchestrator:
             epoch_training_dfs,
             include_validation_period=False
         )
-        # Tuple: (wamo_training_df, wamo_modeling_df, como_training_df, como_modeling_df)
+        # wamo_como_dfs (Tuple): (wamo_training_df, wamo_modeling_df, como_training_df, como_modeling_df)
 
-        # 6) Generate coin features using existing feature generator
-        _, como_features_df, _, _ = self._generate_coin_features(
+        # 6) Generate and save coin features using existing feature generator
+        (
+            wamo_features_df,
+            como_features_df,
+            como_market_data_df,
+            investing_market_data_df
+        ) = self._generate_coin_features(
             epoch_weo,
             epoch_coins_config,
             wamo_como_dfs[0],
             wamo_como_dfs[2]
         )
         root_folder = self.wallets_coin_config['training_data']['parquet_folder']
-        como_start = (pd.to_datetime(epoch_coins_config['training_data']['coin_modeling_period_start'])
+        como_start = (pd.to_datetime(epoch_wallets_config['training_data']['coin_modeling_period_start'])
                       .strftime('%Y%m%d'))
-        como_features_df.to_parquet(f"{root_folder}/como_coin_training_data_df_full_{como_start}.parquet")
+        como_features_df.to_parquet(f"{root_folder}/como_coin_target_var_df_{como_start}.parquet")
+
+        # 7) Generate target var data if configured
+        if generate_target_vars:
+            _, como_target_df = self._generate_coin_target_vars(
+                epoch_weo,
+                epoch_coins_config,
+                wamo_features_df,
+                como_features_df,
+                como_market_data_df,
+                investing_market_data_df
+            )
+            como_target_df.to_parquet(f"{root_folder}/como_coin_training_data_df_full_{como_start}.parquet")
+
 
 
 
@@ -341,8 +363,6 @@ class CoinEpochsOrchestrator:
         epoch_date = pd.to_datetime(
             epoch_weo.base_config['training_data']['coin_modeling_period_start']
         )
-        logger.warning(epoch_weo.base_config['training_data'])
-        logger.warning(epoch_date)
 
         # 2) Prepare coin config with date suffix folders
         epoch_weo.all_epochs_configs = epoch_weo.generate_epoch_configs()

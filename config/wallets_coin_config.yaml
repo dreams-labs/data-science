@@ -293,7 +293,7 @@ coin_modeling: #CoinModel
             macro|gtrends_altcoin_worldwide/std_*,
             macro|gtrends_altcoin_worldwide/last_*,
             macro|gtrends_memecoin_us/std_*,
-            # macro|gtrends_memecoin_us/last_*,
+            macro|gtrends_memecoin_us/last_*,
             # macro|btc_mvrv_z_score/std_*,
             macro|btc_mvrv_z_score/last_*,
             macro|btc_price/std_*,
