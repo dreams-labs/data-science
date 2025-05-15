@@ -136,8 +136,6 @@ class CoinModel(BaseModel):
             raise ValueError(f"All values in y_eval classification target var were {str(self.y_eval[0])}. "
                                 "Adjust thresholds to ensure both 1s and 0s.")
 
-
-
         # Build result dict
         result = {
             'modeling_config': self.modeling_config,
@@ -185,7 +183,8 @@ class CoinModel(BaseModel):
                 pos_idx = list(self.pipeline.estimator.classes_).index(1)
                 result['y_pred_proba'] = pd.Series(probas[:, pos_idx], index=self.X_test.index)
 
-        u.notify('notify_coin_model')
+        u.notify('notify')
+
         return result
 
 
