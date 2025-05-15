@@ -177,6 +177,7 @@ features: #CoinModel
         cw_net_flows_rate_min_025,
         cw_return_rate_regression,
         return_rate_regression,
+        cw_net_gain_min_1000,
         cw_net_flows_min_1000,
     ]
 
