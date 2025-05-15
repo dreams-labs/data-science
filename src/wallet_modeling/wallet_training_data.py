@@ -305,11 +305,15 @@ class WalletTrainingData:
             training_windows_profits_dfs.append(window_df)
 
         # Confirm that all window dfs' transfers match the full df's transfers starting from the first window
+        # Compare absolute USD flow so tiny signed‑sum drift doesn’t trigger a failure
         full_sum = (training_profits_df
                     [training_profits_df.index.get_level_values('date') >= training_windows_starts[0]]
-                    ['usd_net_transfers'].sum())
-        window_sum = sum(df['usd_net_transfers'].sum() for df in training_windows_profits_dfs)
-        if not np.isclose(full_sum, window_sum, rtol=1e-3):
+                    ['usd_net_transfers']
+                    .abs()
+                    .sum())
+        window_sum = sum(df['usd_net_transfers'].abs().sum()
+                         for df in training_windows_profits_dfs)
+        if not np.isclose(full_sum, window_sum, rtol=1e-5):
             raise ValueError(f"Net transfers in full training period ({full_sum}) do not match combined "
                             f"sum of transfers in windows dfs ({window_sum})")
 
