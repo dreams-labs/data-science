@@ -517,7 +517,7 @@ class BaseModel:
                 param_value = row[param]
 
                 # Clean up drop patterns display
-                if param_name == 'drop_columns__drop_patterns' and isinstance(param_value, list):
+                if param_name == 'model_pipeline__drop_columns__drop_patterns' and isinstance(param_value, list):
                     # Only show patterns that aren't in base config
                     unique_patterns = [p for p in param_value if p not in base_patterns and p != 'feature_retainer']
                     param_value = unique_patterns if unique_patterns else ['feature_retainer']
