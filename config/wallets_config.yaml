@@ -298,12 +298,12 @@ modeling: #WalletModel
             # estimator__tree_method: [hist]
 
 
-            # # Column Selection
-            drop_columns__drop_patterns: [
+            # # # Column Selection
+            # drop_columns__drop_patterns: [
 
-                timing|*/sell_weighted*,
+            #     timing|*/sell_weighted*,
 
-            ]
+            # ]
 
     # Phase training section
     phase_training:
