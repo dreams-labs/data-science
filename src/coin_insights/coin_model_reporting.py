@@ -73,6 +73,7 @@ def generate_and_save_coin_model_artifacts(
     model_id = save_coin_model_artifacts(
         model_results=model_results_artifacts,
         evaluation_dict=evaluation,
+        model=evaluator.model,
         configs=configs,
         base_path=base_path
     )
@@ -85,13 +86,14 @@ def generate_and_save_coin_model_artifacts(
 #         Helper Functions
 # ---------------------------------
 
-def save_coin_model_artifacts(model_results, evaluation_dict, configs, base_path):
+def save_coin_model_artifacts(model_results, evaluation_dict, model, configs, base_path):
     """
     Saves all model-related artifacts with a consistent UUID across files.
 
     Parameters:
     - model_results (dict): Output from train_xgb_model containing pipeline and training data
     - evaluation_dict (dict): Model evaluation metrics and analysis
+    - model (xgboost model): Raw XGB model
     - configs (dict): Dictionary containing configuration objects
     - base_path (str): Base path for saving all model artifacts
 
@@ -100,7 +102,7 @@ def save_coin_model_artifacts(model_results, evaluation_dict, configs, base_path
     """
     # Validate required directories exist
     base_dir = Path(base_path)
-    required_dirs = ['model_reports', 'scores', 'models']
+    required_dirs = ['model_reports', 'coin_models', 'coin_scores']
     missing_dirs = [dir_name for dir_name in required_dirs
                     if not (base_dir / dir_name).exists()]
     if missing_dirs:
@@ -150,11 +152,15 @@ def save_coin_model_artifacts(model_results, evaluation_dict, configs, base_path
         'configurations': configs,
         'evaluation': evaluation_dict
     }
-
     report_path = base_dir / 'model_reports' / model_report_filename
     with open(report_path, 'w', encoding='utf-8') as f:
         json.dump(report, f, indent=2, default=u.numpy_type_converter)
     logger.info(f"Saved model report to {report_path}")
+
+    # Save model
+    model_filename = f"coin_model_{model_id}.json"
+    model_path = base_dir / 'coin_models' / model_filename
+    model.save_model(model_path)
 
     # Save scores
     coin_scores_df = pd.DataFrame(model_results['y_pred'])
