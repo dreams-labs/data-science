@@ -87,9 +87,13 @@ class CoinEpochsOrchestrator:
         """
         # Calculate earliest required modeling start date for coverage validation
         coins_earliest_epoch = min(self.wallets_coin_config['training_data']['coin_epoch_lookbacks'])
+        wallets_earliest_epoch = min(self.wallets_epochs_config['offset_epochs']['offsets'])
+        wallets_earliest_window = max(self.wallets_config['training_data']['training_window_lookbacks'])
         earliest_modeling_period_start = (
             pd.to_datetime(self.wallets_config['training_data']['modeling_period_start'])
             + timedelta(days=coins_earliest_epoch)
+            + timedelta(days=wallets_earliest_epoch)
+            - timedelta(days=wallets_earliest_window)
         )
         validation_period_end = pd.to_datetime(self.wallets_config['training_data']['validation_period_end'])
 
