@@ -132,7 +132,8 @@ def save_coin_model_artifacts(model_results, evaluation_dict, pipeline, configs,
         model_report_filename = (
             f"model_report_{filename_timestamp}__"
             f"mauc{model_auc:.3f}__"
-            f"{f'vauc{validation_auc:.3f}' if not np.isnan(validation_auc) else 'vauc___'}.json"
+            f"{f'vauc{validation_auc:.3f}' if not np.isnan(validation_auc) else 'vauc___'}"
+            f"|{model_id}.json"
         )
     else:
         raise ValueError(f"Invalid model type {model_results['model_type']} found in results object.")
