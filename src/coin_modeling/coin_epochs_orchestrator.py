@@ -262,7 +262,7 @@ class CoinEpochsOrchestrator:
         root_folder = self.wallets_coin_config['training_data']['parquet_folder']
         como_start = (pd.to_datetime(epoch_wallets_config['training_data']['coin_modeling_period_start'])
                       .strftime('%Y%m%d'))
-        como_features_df.to_parquet(f"{root_folder}/como_coin_target_var_df_{como_start}.parquet")
+        como_features_df.to_parquet(f"{root_folder}/como_coin_training_data_df_full_{como_start}.parquet")
 
         # 7) Generate target var data if configured
         if generate_target_vars:
@@ -274,7 +274,7 @@ class CoinEpochsOrchestrator:
                 como_market_data_df,
                 investing_market_data_df
             )
-            como_target_df.to_parquet(f"{root_folder}/como_coin_training_data_df_full_{como_start}.parquet")
+            como_target_df.to_parquet(f"{root_folder}/como_coin_target_var_df_{como_start}.parquet")
 
 
 
