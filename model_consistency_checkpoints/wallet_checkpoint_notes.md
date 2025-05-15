@@ -1,3 +1,41 @@
+# DDA 741 investing period performance
+checkpoint 1: c1%.776 model updates
+Model Performance Summary
+Target: coin_return 0.5 to
+ID: f8857fcf-6f44-48ce-89b5-8a60337a5af3
+===================================
+Test Samples:             6,141
+Number of Features:       51
+
+
+Classification Metrics
+-----------------------------------
+ROC AUC:                    0.807
+Log Loss:                   0.241
+Accuracy:                   0.914
+Precision:                  0.522
+Recall:                     0.045
+F1 Score:                   0.083
+
+Validation Metrics
+-----------------------------------
+Val ROC AUC:                0.644
+Val Accuracy:               0.913
+Val Precision:              0.812
+Val Recall:                 0.021
+Val F1 Score:               0.041
+
+Validation Return Metrics
+-----------------------------------
+Positive Threshold:         0.50
+Positive Predictions:       69/30387 (0.23%)
+Positive Mean Outcome:      2.162
+Positive W-Mean Outcome:    1.072
+Top 1% W-Mean Outcome:      0.776
+Top 5% W-Mean Outcome:      0.485
+Overall W-Mean Outcome:     -0.024
+
+
 # DDA 778 parquet logic modeling
 checkpoint 1: pos1.00
 Model Performance Summary

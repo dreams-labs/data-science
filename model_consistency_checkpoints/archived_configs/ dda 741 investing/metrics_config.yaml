@@ -152,38 +152,38 @@ wallet_cohorts:
 # Time series keyed on only date
 macro_trends:
 
-    btc_price:
-        aggregations:
-            std:
-                scaling: none
-    btc_mvrv_z_score:
-        aggregations:
-            last:
-                scaling: none
-            std:
-                scaling: none
-    global_market_cap:
-        aggregations:
-            last:
-                scaling: none
-            std:
-                scaling: none
-        indicators:
-            rsi:
-                parameters:
-                    window: [30]
-                aggregations:
-                    last:
-                        scaling: none
-    btc_vdd_multiple:
-        aggregations:
-            std:
-                scaling: none
-    gtrends_altcoin_worldwide:
-        aggregations:
-            std:
-                scaling: none
-    gtrends_memecoin_us:
-        aggregations:
-            std:
-                scaling: none
+    # btc_price:
+    #     aggregations:
+    #         std:
+    #             scaling: none
+    # btc_mvrv_z_score:
+    #     aggregations:
+    #         last:
+    #             scaling: none
+    #         std:
+    #             scaling: none
+    # global_market_cap:
+    #     aggregations:
+    #         last:
+    #             scaling: none
+    #         std:
+    #             scaling: none
+    #     indicators:
+    #         rsi:
+    #             parameters:
+    #                 window: [30]
+    #             aggregations:
+    #                 last:
+    #                     scaling: none
+    # btc_vdd_multiple:
+    #     aggregations:
+    #         std:
+    #             scaling: none
+    # gtrends_altcoin_worldwide:
+    #     aggregations:
+    #         std:
+    #             scaling: none
+    # gtrends_memecoin_us:
+    #     aggregations:
+    #         std:
+    #             scaling: none

@@ -78,6 +78,10 @@ class WalletTrainingData:
             market_data_df = market_future.result()
             macro_trends_df = macro_future.result()
 
+        # Remove all records after the training period end to ensure no data leakage
+        market_data_df = market_data_df[market_data_df['date']<=period_end_date]
+        macro_trends_df = macro_trends_df[macro_trends_df.index.get_level_values('date')<=period_end_date]
+
         return profits_df, market_data_df, macro_trends_df
 
 

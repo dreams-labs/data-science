@@ -17,11 +17,11 @@ training_data: #CoinModel
         -240,
         -300,
         -360,
-        -420,
-        -480,
-        -540,
-        -600,
-        -660,
+        # -420,
+        # -480,
+        # -540,
+        # -600,
+        # -660,
         # -720,
         # -780,
         # -840,
@@ -278,25 +278,12 @@ coin_modeling: #CoinModel
             # wallet_cohorts|whales_longterm|*,
             # wallet_cohorts|normies|*,
 
-            # macro|global_market_cap/*,
-            # # macro|btc_mvrv_z_score/*,
-            # macro|btc_vdd_multiple/*,
-            # macro|gtrends_altcoin_worldwide/*,
-            # macro|gtrends_memecoin_us/*,
-            # macro|btc_price/*,
-
-            macro|global_market_cap/rsi_30*,
-            macro|global_market_cap/std_*,
-            macro|global_market_cap/last_*,
-            macro|btc_vdd_multiple/std_*,
-            # macro|btc_vdd_multiple/last_*,
-            macro|gtrends_altcoin_worldwide/std_*,
-            macro|gtrends_altcoin_worldwide/last_*,
-            macro|gtrends_memecoin_us/std_*,
-            macro|gtrends_memecoin_us/last_*,
-            # macro|btc_mvrv_z_score/std_*,
-            macro|btc_mvrv_z_score/last_*,
-            macro|btc_price/std_*,
+            macro|global_market_cap/*,
+            # macro|btc_mvrv_z_score/*,
+            macro|btc_vdd_multiple/*,
+            macro|gtrends_altcoin_worldwide/*,
+            macro|gtrends_memecoin_us/*,
+            macro|btc_price/*,
 
             # # Segment Value
             'training_clusters|k5_cluster/cluster_0|*',
@@ -329,14 +316,14 @@ coin_modeling: #CoinModel
             '*|trading/crypto_inflows|*',
             '*|trading/crypto_net_cash_flows|*',
             '*|trading/crypto_net_flows|*',
-            # # '*|trading/crypto_net_gain|*',
+            '*|trading/crypto_net_gain|*',
             '*|trading/crypto_outflows|*',
             '*|trading/max_investment|*',
             # '*|trading/total_volume|*',
-            # '*|trading/unique_coins_traded|*',
-            '*|trading/average_transaction|*',
+            '*|trading/unique_coins_traded|*',
+            # '*|trading/average_transaction|*',
             '*|balances/usd_balance_starting*|*',
-            '*|balances/usd_balance_ending*|*',
+            # '*|balances/usd_balance_ending*|*',
 
 
             # Transformation Category
@@ -363,7 +350,7 @@ coin_modeling: #CoinModel
             '*|*/return_rate_min_005_score/*',
             '*|*/return_rate_min_025_score/*',
             '*|*/return_rate_min_040_score/*',
-            '*|*/cw_return_rate_regression_score/*',
+            # '*|*/cw_return_rate_regression_score/*',
             '*|*/return_rate_regression_score/*',
 
             # '*|score_dist/*',
@@ -428,7 +415,7 @@ coin_modeling: #CoinModel
         # -------------------------------
 
         # Search Methodology
-        drop_patterns_include_n_features: 1  # if set to n, the drop_patterns grid search will apply all but n patterns for each model. otherwise, it will apply 1 drop pattern in each model.
+        # drop_patterns_include_n_features: 1
 
         n_iter: 400  # random search limit
         n_splits: 5  # cv splits
@@ -438,7 +425,7 @@ coin_modeling: #CoinModel
         percentile_threshold: 0.005
 
         build_post_search_model: False  # whether to build a model after the grid search
-        verbose_level: 3  # 3 outputs model performance but not training scores
+        verbose_level: 3  # scikit-learn verbosity
 
 
         # Params
@@ -506,19 +493,6 @@ coin_modeling: #CoinModel
                 # macro|*/*period_2,
                 # macro|*/*period_3,
 
-                # # macro|global_market_cap/rsi_30*,
-                # # macro|global_market_cap/std_*,
-                # # macro|global_market_cap/last_*,
-                # # macro|btc_vdd_multiple/std_*,
-                # macro|btc_vdd_multiple/last_*,
-                # # macro|gtrends_altcoin_worldwide/std_*,
-                # # macro|gtrends_altcoin_worldwide/last_*,
-                # # macro|gtrends_memecoin_us/std_*,
-                # macro|gtrends_memecoin_us/last_*,
-                # macro|btc_mvrv_z_score/std_*,
-                # # macro|btc_mvrv_z_score/last_*,
-                # # macro|btc_price/std_*,
-
                 # Metric
                 # time_series|market_data|price*,
                 # time_series|market_data|volume*,
@@ -530,39 +504,39 @@ coin_modeling: #CoinModel
                 # wallet_cohorts|*|*period_2,
                 # wallet_cohorts|*|total_sold*,
 
-                # # Metric Details
+                # Metric Details
                 # # '*|trading/crypto_cash_buys|*',
                 # # '*|trading/crypto_cash_sells|*',
                 # # '*|trading/crypto_inflows|*',
                 # # '*|trading/crypto_net_cash_flows|*',
                 # # '*|trading/crypto_net_flows|*',
-                # # # # '*|trading/crypto_net_gain|*',
+                # # '*|trading/crypto_net_gain|*',
                 # # '*|trading/crypto_outflows|*',
                 # # '*|trading/max_investment|*',
                 # '*|trading/total_volume|*',
-                # '*|trading/unique_coins_traded|*',
-                # # '*|trading/average_transaction|*',
+                # # '*|trading/unique_coins_traded|*',
+                # '*|trading/average_transaction|*',
                 # '*|balances/usd_balance_starting*|*',
                 # '*|balances/usd_balance_ending*|*',
 
 
                 # # Transformation Base
-                # # '*|*/cw_net_flows_min_1000_score/*',
-                # # '*|*/cw_net_gain_min_1000_score/*',
-                # # '*|*/cw_return_rate_min_000_score/*',
-                # # '*|*/cw_return_rate_min_005_score/*',
-                # # '*|*/cw_return_rate_min_025_score/*',
+                # '*|*/cw_net_flows_min_1000_score/*',
+                # '*|*/cw_net_gain_min_1000_score/*',
+                # '*|*/cw_return_rate_min_000_score/*',
+                # '*|*/cw_return_rate_min_005_score/*',
+                # '*|*/cw_return_rate_min_025_score/*',
                 # '*|*/cw_return_rate_min_040_score/*',
-                # # '*|*/cw_net_flows_rate_min_025_score/*',
-                # # '*|*/cw_return_rate_max_-005_score/*',
+                # '*|*/cw_net_flows_rate_min_025_score/*',
+                # '*|*/cw_return_rate_max_-005_score/*',
                 # # '*|*/cw_return_rate_max_-025_score/*',
-                # # '*|*/cw_return_rate_min_060_score/*',
-                # # '*|*/cw_return_rate_min_080_score/*',
-                # # '*|*/return_rate_min_005_score/*',
-                # # '*|*/return_rate_min_025_score/*',
-                # # '*|*/return_rate_min_040_score/*',
+                # '*|*/cw_return_rate_min_060_score/*',
+                # '*|*/cw_return_rate_min_080_score/*',
+                # '*|*/return_rate_min_005_score/*',
+                # '*|*/return_rate_min_025_score/*',
+                # '*|*/return_rate_min_040_score/*',
                 # '*|*/cw_return_rate_regression_score/*',
-                # # '*|*/return_rate_regression_score/*',
+                # '*|*/return_rate_regression_score/*',
 
                 # '*|score_wtd/*',
 
@@ -572,17 +546,18 @@ coin_modeling: #CoinModel
                 # '*/count_pct',
 
                 # '*|*/*/kurt',
-                '*|*/*/median',
+                # # '*|*/*/median',
                 # '*|*/*/p002',
                 # '*|*/*/p01',
-                '*|*/*/p05',
+                # # '*|*/*/p05',
                 # '*|*/*/p10',
                 # '*|*/*/p90',
                 # '*|*/*/p95',
-                '*|*/*/p99',
-                '*|*/*/p998',
+                # # '*|*/*/p99',
+                # # '*|*/*/p998',
                 # '*|*/*/skew',
                 # '*|*/*/std',
+
 
             ]
 

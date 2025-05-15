@@ -9,6 +9,7 @@ import json
 import pandas as pd
 import numpy as np
 import wallet_insights.model_evaluation as wime
+import joblib
 
 # Local modules
 import utils as u
@@ -73,6 +74,7 @@ def generate_and_save_coin_model_artifacts(
     model_id = save_coin_model_artifacts(
         model_results=model_results_artifacts,
         evaluation_dict=evaluation,
+        pipeline=model_results['pipeline'],
         configs=configs,
         base_path=base_path
     )
@@ -85,13 +87,14 @@ def generate_and_save_coin_model_artifacts(
 #         Helper Functions
 # ---------------------------------
 
-def save_coin_model_artifacts(model_results, evaluation_dict, configs, base_path):
+def save_coin_model_artifacts(model_results, evaluation_dict, pipeline, configs, base_path):
     """
     Saves all model-related artifacts with a consistent UUID across files.
 
     Parameters:
     - model_results (dict): Output from train_xgb_model containing pipeline and training data
     - evaluation_dict (dict): Model evaluation metrics and analysis
+    - model (xgboost model): Raw XGB model
     - configs (dict): Dictionary containing configuration objects
     - base_path (str): Base path for saving all model artifacts
 
@@ -100,7 +103,7 @@ def save_coin_model_artifacts(model_results, evaluation_dict, configs, base_path
     """
     # Validate required directories exist
     base_dir = Path(base_path)
-    required_dirs = ['model_reports', 'scores', 'models']
+    required_dirs = ['model_reports', 'coin_models', 'coin_scores']
     missing_dirs = [dir_name for dir_name in required_dirs
                     if not (base_dir / dir_name).exists()]
     if missing_dirs:
@@ -129,7 +132,8 @@ def save_coin_model_artifacts(model_results, evaluation_dict, configs, base_path
         model_report_filename = (
             f"model_report_{filename_timestamp}__"
             f"mauc{model_auc:.3f}__"
-            f"{f'vauc{validation_auc:.3f}' if not np.isnan(validation_auc) else 'vauc___'}.json"
+            f"{f'vauc{validation_auc:.3f}' if not np.isnan(validation_auc) else 'vauc___'}"
+            f"|{model_id}.json"
         )
     else:
         raise ValueError(f"Invalid model type {model_results['model_type']} found in results object.")
@@ -150,11 +154,17 @@ def save_coin_model_artifacts(model_results, evaluation_dict, configs, base_path
         'configurations': configs,
         'evaluation': evaluation_dict
     }
-
     report_path = base_dir / 'model_reports' / model_report_filename
     with open(report_path, 'w', encoding='utf-8') as f:
         json.dump(report, f, indent=2, default=u.numpy_type_converter)
     logger.info(f"Saved model report to {report_path}")
+
+    # Save full transformation+estimator pipeline
+    models_dir = base_dir / 'coin_models'
+    models_dir.mkdir(parents=True, exist_ok=True)
+    pipeline_path = models_dir / f'coin_model_pipeline_{model_id}.pkl'
+    joblib.dump(pipeline, pipeline_path)
+    logger.info(f"Saved coin model pipeline to {pipeline_path}")
 
     # Save scores
     coin_scores_df = pd.DataFrame(model_results['y_pred'])

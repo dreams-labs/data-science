@@ -459,13 +459,24 @@ def load_wallet_data_for_coin_features(
         wallets_config['training_data']['coin_modeling_period_start'],
         wallets_config['training_data']['coin_modeling_period_end']
     )
-    u.assert_period(
-        investing_market_data_df,
-        wallets_config['training_data']['investing_period_start'],
-        wallets_config['training_data']['investing_period_end']
-    )
 
-    logger.info("Successfully loaded base data for coin_modeling and investing predictions.")
+    validation_end = wallets_config['training_data']['validation_period_end']
+    investing_end = wallets_config['training_data']['investing_period_end']
+    if investing_end > validation_end:
+        logger.info(
+            "Skipping investing period data generation as the validation period ends "
+            f"on {validation_end} before the investing end of {investing_end}."
+        )
+        logger.info("Successfully loaded base data for coin_modeling period only.")
+
+    else:
+        u.assert_period(
+            investing_market_data_df,
+            wallets_config['training_data']['investing_period_start'],
+            wallets_config['training_data']['investing_period_end']
+        )
+        logger.info("Successfully loaded base data for coin_modeling and investing predictions.")
+
 
     return (
         training_coin_cohort,
