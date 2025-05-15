@@ -283,7 +283,7 @@ class CoinEpochsOrchestrator:
         try:
             pipeline.x_transformer_.transform(features_df)
         except Exception as e:
-            raise ValueError(f"Pipeline transform failed due to missing or invalid features: {e}")
+            raise ValueError(f"Pipeline transform failed due to missing or invalid features: {e}") from e
 
         # 4) Predict using the pipeline
         if hasattr(pipeline, 'predict_proba'):
