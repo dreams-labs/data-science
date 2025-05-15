@@ -23,39 +23,33 @@ time_series:  #CoinModel
     macro_trends:  #CoinModel
         btc_price:
             rolling:
-                aggregations:
-                    std:
+                comparisons:
+                    pct_change:
                         scaling: none
                 window_duration: 30
                 lookback_periods: 3
+
         btc_mvrv_z_score:
             rolling:
                 aggregations:
                     last:
                         scaling: none
-                    std:
+                comparisons:
+                    pct_change:
+                        scaling: none
+                    change:
                         scaling: none
                 window_duration: 30
                 lookback_periods: 3
+
         global_market_cap:
             rolling:
-                aggregations:
-                    last:
-                        scaling: none
-                    std:
+                comparisons:
+                    pct_change:
                         scaling: none
                 window_duration: 30
                 lookback_periods: 3
-            indicators:
-                rsi:
-                    parameters:
-                        window: [30]
-                    rolling:
-                        aggregations:
-                            last:
-                                scaling: none
-                        window_duration: 30
-                        lookback_periods: 3
+
         btc_vdd_multiple:
             rolling:
                 aggregations:
@@ -63,23 +57,31 @@ time_series:  #CoinModel
                         scaling: none
                     std:
                         scaling: none
+                comparisons:
+                    pct_change:
+                        scaling: none
+                    change:
+                        scaling: none
                 window_duration: 30
                 lookback_periods: 3
+
         gtrends_altcoin_worldwide:
             rolling:
-                aggregations:
-                    last:
-                        scaling: none
-                    std:
+                comparisons:
+                    pct_change:
                         scaling: none
                 window_duration: 30
                 lookback_periods: 3
+
         gtrends_memecoin_us:
             rolling:
                 aggregations:
                     last:
                         scaling: none
-                    std:
+                comparisons:
+                    pct_change:
+                        scaling: none
+                    change:
                         scaling: none
                 window_duration: 30
                 lookback_periods: 3
