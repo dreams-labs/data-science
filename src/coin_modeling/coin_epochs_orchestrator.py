@@ -197,6 +197,63 @@ class CoinEpochsOrchestrator:
         multiwindow_como_target.to_parquet(f"{root_folder}/multiwindow_como_coin_target_var_df.parquet")
 
 
+
+    def prepare_current_coin_modeling_data(self) -> None:
+        """
+        Prepare coin features as of the end of the coin modeling period without
+         retraining models.
+
+        Returns:
+        - coin_features_df (DataFrame): coin feature DataFrame as of today.
+        """
+        # 1) Ensure raw data loaded
+        self.load_complete_raw_datasets()
+
+        # 2) Build wallets epoch orchestrator for lookback of 0 days (today)
+        epoch_wallets_config = self._prepare_coin_epoch_base_config(0)
+        epoch_weo = weo.WalletEpochsOrchestrator(
+            base_config=epoch_wallets_config,
+            metrics_config=self.wallets_metrics_config,
+            features_config=self.wallets_features_config,
+            epochs_config=self.wallets_epochs_config,
+            complete_profits_df=self.complete_profits_df,
+            complete_market_data_df=self.complete_market_data_df,
+            complete_macro_trends_df=self.complete_macro_trends_df,
+        )
+        epoch_weo.all_epochs_configs = epoch_weo.generate_epoch_configs()
+
+        # 3) Generate all epoch dfs for today
+        epoch_training_dfs = epoch_weo.generate_epochs_training_data()
+
+        # 4) Prepare epoch-specific coin config for today
+        epoch_coins_config = self._prepare_epoch_coins_config(epoch_weo)
+
+        # 5) Train and score wallet models for this epoch's coin modeling period
+        wamo_como_dfs = self._train_and_score_wallet_epoch(
+            epoch_weo,
+            epoch_coins_config,
+            epoch_training_dfs,
+            include_validation_period=False
+        )
+        # Tuple: (wamo_training_df, wamo_modeling_df, como_training_df, como_modeling_df)
+
+        # 6) Generate coin features using existing feature generator
+        _, como_features_df, _, _ = self._generate_coin_features(
+            epoch_weo,
+            epoch_coins_config,
+            wamo_como_dfs[0],
+            wamo_como_dfs[2]
+        )
+        root_folder = self.wallets_coin_config['training_data']['parquet_folder']
+        como_features_df.to_parquet(f"{root_folder}/current_como_coin_training_data_df_full.parquet")
+
+
+
+
+    # -----------------------------------
+    #           Helper Methods
+    # -----------------------------------
+
     # Primary helper
     def _process_coin_epoch(
             self,
@@ -278,11 +335,6 @@ class CoinEpochsOrchestrator:
         return epoch_date, wamo_features_df, wamo_target_df, como_features_df, como_target_df
 
 
-
-
-    # -----------------------------------
-    #           Helper Methods
-    # -----------------------------------
 
     def _generate_coin_epoch_training_data(self, lookback_duration: int):
         """
@@ -438,7 +490,8 @@ class CoinEpochsOrchestrator:
         self,
         epoch_weo,
         epoch_coins_config: dict,
-        epoch_training_dfs: tuple
+        epoch_training_dfs: tuple,
+        include_validation_period: bool = True
     ) -> tuple[pd.DataFrame]:
         """
         Train wallet models for a single epoch and score wallets.
@@ -468,9 +521,13 @@ class CoinEpochsOrchestrator:
         coin_modeling_epochs_config = {
             'offset_epochs': {
                 'offsets': [modeling_offset],
-                'validation_offsets': [modeling_offset*2]
             }
         }
+        if include_validation_period:
+            coin_modeling_epochs_config['validation_offsets'] = [modeling_offset*2]
+        else:
+            coin_modeling_epochs_config['validation_offsets'] = []
+
         epoch_wamo_weo = weo.WalletEpochsOrchestrator(
             base_config=epoch_weo.base_config,
             metrics_config=epoch_weo.metrics_config,
