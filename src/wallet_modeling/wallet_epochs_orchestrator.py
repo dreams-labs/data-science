@@ -571,7 +571,8 @@ class WalletEpochsOrchestrator:
                     #  they fall after the validation period.
                     except ValueError as e:
                         logger.debug(e)
-                        logger.info(f"Did not include coin_modeling epoch_config with offset {offset_days} "
+                        logger.info("All wallet_modeling epochs are valid but no data will be generated "
+                                    f"for coin_modeling epoch_config with offset {offset_days} "
                                     "that extends later than the validation period end of "
                                     f"{self.base_config['training_data']['validation_period_end']}.")
 
