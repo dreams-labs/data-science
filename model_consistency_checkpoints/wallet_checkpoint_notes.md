@@ -1,3 +1,43 @@
+# DDA 778 parquet logic modeling
+checkpoint 1: pos1.00
+Model Performance Summary
+Target: coin_return 0.5 to
+ID: 4e19e982-3520-4993-bcbb-9453cbeff8f0
+===================================
+Test Samples:             4,294
+Number of Features:       96
+
+
+Classification Metrics
+-----------------------------------
+ROC AUC:                    0.813
+Log Loss:                   0.212
+Accuracy:                   0.926
+Precision:                  0.500
+Recall:                     0.060
+F1 Score:                   0.107
+
+Validation Metrics
+-----------------------------------
+Val ROC AUC:                0.767
+Val Accuracy:               0.916
+Val Precision:              1.000
+Val Recall:                 0.002
+Val F1 Score:               0.003
+
+Validation Return Metrics
+-----------------------------------
+Positive Threshold:         0.60
+Positive Predictions:       3/21193 (0.01%)
+Positive Mean Outcome:      1.006
+Positive W-Mean Outcome:    1.006
+Top 1% W-Mean Outcome:      0.717
+Top 5% W-Mean Outcome:      0.532
+Overall W-Mean Outcome:     -0.055
+
+
+
+
 # DDA 777 modeling
 checkpoint 1: pos.809 appears to be working but needs audits
 Target: coin_return_winsorized 0.3 to

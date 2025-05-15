@@ -11,11 +11,11 @@ training_data: #CoinModel
         0,
         -30,
         -60,
-        # -90,
-        # -120,
-        # -180,
-        # -240,
-        # -300,
+        -90,
+        -120,
+        -180,
+        -240,
+        -300,
         # -360,
         # -420,
         # -480,
@@ -74,75 +74,75 @@ wallet_scores: #CoinModel
             target_var_max_threshold: .inf
             y_pred_threshold: 0.85
 
-        # # Tests
-        # cw_return_rate_min_060:
-        #     target_variable: cw_crypto_net_gain/max_investment/base
-        #     target_var_min_threshold: .60
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.85
+        # Tests
+        cw_return_rate_min_060:
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_min_threshold: .60
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.85
 
-        # cw_return_rate_min_080:
-        #     target_variable: cw_crypto_net_gain/max_investment/base
-        #     target_var_min_threshold: .80
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.85
+        cw_return_rate_min_080:
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_min_threshold: .80
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.85
 
-        # cw_return_rate_max_-005:
-        #     target_variable: cw_crypto_net_gain/max_investment/base
-        #     target_var_min_threshold: -.inf
-        #     target_var_max_threshold: -0.05
-        #     y_pred_threshold: 0.85
+        cw_return_rate_max_-005:
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_min_threshold: -.inf
+            target_var_max_threshold: -0.05
+            y_pred_threshold: 0.85
 
-        # cw_return_rate_max_-025:
-        #     target_variable: cw_crypto_net_gain/max_investment/base
-        #     target_var_min_threshold: -.inf
-        #     target_var_max_threshold: -0.25
-        #     y_pred_threshold: 0.85
+        cw_return_rate_max_-025:
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_min_threshold: -.inf
+            target_var_max_threshold: -0.25
+            y_pred_threshold: 0.85
 
-        # return_rate_min_005:
-        #     target_variable: crypto_net_gain/max_investment/base
-        #     target_var_min_threshold: .05
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.85
+        return_rate_min_005:
+            target_variable: crypto_net_gain/max_investment/base
+            target_var_min_threshold: .05
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.85
 
-        # return_rate_min_025:
-        #     target_variable: crypto_net_gain/max_investment/base
-        #     target_var_min_threshold: .25
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.85
+        return_rate_min_025:
+            target_variable: crypto_net_gain/max_investment/base
+            target_var_min_threshold: .25
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.85
 
-        # return_rate_min_040:
-        #     target_variable: crypto_net_gain/max_investment/base
-        #     target_var_min_threshold: .40
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.85
+        return_rate_min_040:
+            target_variable: crypto_net_gain/max_investment/base
+            target_var_min_threshold: .40
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.85
 
-        # cw_net_flows_rate_min_025:
-        #     target_variable: cw_crypto_net_flows/crypto_inflows/base
-        #     target_var_min_threshold: .25
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.85
+        cw_net_flows_rate_min_025:
+            target_variable: cw_crypto_net_flows/crypto_inflows/base
+            target_var_min_threshold: .25
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.85
 
-        # cw_return_rate_regression:
-        #     target_variable: cw_crypto_net_gain/max_investment/winsorized
-        #     model_type: regression
+        cw_return_rate_regression:
+            target_variable: cw_crypto_net_gain/max_investment/winsorized
+            model_type: regression
 
-        # return_rate_regression:
-        #     target_variable: crypto_net_gain/max_investment/winsorized
-        #     model_type: regression
+        return_rate_regression:
+            target_variable: crypto_net_gain/max_investment/winsorized
+            model_type: regression
 
-        # # USD Metrics
-        # cw_net_gain_min_1000:
-        #     target_variable: cw_crypto_net_gain
-        #     target_var_min_threshold: 1000
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.9
+        # USD Metrics
+        cw_net_gain_min_1000:
+            target_variable: cw_crypto_net_gain
+            target_var_min_threshold: 1000
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.9
 
-        # cw_net_flows_min_1000:
-        #     target_variable: cw_crypto_net_flows
-        #     target_var_min_threshold: 1000
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.9
+        cw_net_flows_min_1000:
+            target_variable: cw_crypto_net_flows
+            target_var_min_threshold: 1000
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.9
 
 
 # CoinModel Segments
@@ -167,18 +167,17 @@ features: #CoinModel
         cw_return_rate_min_005,
         cw_return_rate_min_025,
         cw_return_rate_min_040,
-        # cw_return_rate_min_060,
-        # cw_return_rate_min_080,
-        # cw_return_rate_max_-005,
-        # cw_return_rate_max_-025,
-        # return_rate_min_005,
-        # return_rate_min_025,
-        # return_rate_min_040,
-        # cw_net_flows_rate_min_025,
-        # cw_return_rate_regression,
-        # return_rate_regression,
-        # cw_net_gain_min_1000,
-        # cw_net_flows_min_1000,
+        cw_return_rate_min_060,
+        cw_return_rate_min_080,
+        cw_return_rate_max_-005,
+        cw_return_rate_max_-025,
+        return_rate_min_005,
+        return_rate_min_025,
+        return_rate_min_040,
+        cw_net_flows_rate_min_025,
+        cw_return_rate_regression,
+        return_rate_regression,
+        cw_net_flows_min_1000,
     ]
 
     # Features from the feature_engineering directory
@@ -189,17 +188,17 @@ features: #CoinModel
 
     # Metrics to drop based on low observed importance
     drop_trading_metrics: [
-        crypto_cash_buys,
-        crypto_cash_sells,
-        crypto_inflows,
-        crypto_net_cash_flows,
-        crypto_net_flows,
-        crypto_net_gain,
-        crypto_outflows,
-        max_investment,
-        # total_volume,
-        unique_coins_traded,
-        # average_transaction,
+        # crypto_cash_buys,
+        # crypto_cash_sells,
+        # crypto_inflows,
+        # crypto_net_cash_flows,
+        # crypto_net_flows,
+        # crypto_net_gain,
+        # crypto_outflows,
+        # max_investment,
+        # # total_volume,
+        # unique_coins_traded,
+        # # average_transaction,
     ]
 
     # Macroeconomic features: most params are in wallets_coins_metrics_config.yaml
@@ -217,11 +216,11 @@ coin_modeling: #CoinModel
     model_type: classification  # "regression" or "classification"
 
     #KeyParam Target Variable
-    target_variable: coin_return_winsorized
-    # target_variable: coin_return
+    # target_variable: coin_return_winsorized
+    target_variable: coin_return
     # target_variable: coin_return_pctile_full
     # target_variable: coin_return_pctile
-    target_var_min_threshold: 0.3  # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.5  # a classification model will try to predict the target var above this value
     y_pred_threshold: 0.5  # scores above this probability threshold are positive predictions
 
     returns_winsorization: 0.005
@@ -251,7 +250,7 @@ coin_modeling: #CoinModel
             # Segment Category
             # all_wallets*,
             # score_quantile|*,
-            # score_binary|*
+            # score_binary|*,
             wallet_cohorts|*,
             time_series|*,
             # macro|*,
@@ -261,17 +260,18 @@ coin_modeling: #CoinModel
             score_binary|cw_net_flows_min_1000/*,
             score_binary|cw_net_gain_min_1000/*,
             score_binary|cw_return_rate_min_000/*,
-            # score_binary|cw_return_rate_min_005/*,
-            # score_binary|cw_return_rate_min_025/*,
+            score_binary|cw_return_rate_min_005/*,
+            score_binary|cw_return_rate_min_025/*,
             score_binary|cw_return_rate_min_040/*,
-
             # score_binary|cw_net_flows_rate_min_025/*,
-            # score_binary|cw_return_rate_max_-005/*,
+            score_binary|cw_return_rate_max_-005/*,
             # score_binary|cw_return_rate_max_-025/*,
-            # score_binary|cw_return_rate_min_060/*,
-            # score_binary|cw_return_rate_min_080/*,
-            # score_binary|net_gain_min_1000/*,
-            # score_binary|return_rate_min_025/*,
+            score_binary|cw_return_rate_min_060/*,
+            score_binary|cw_return_rate_min_080/*,
+            score_binary|return_rate_min_005/*,
+            score_binary|return_rate_min_025/*,
+            score_binary|return_rate_min_040/*,
+
             # wallet_cohorts|whales_longterm|*,
             # wallet_cohorts|normies|*,
 
@@ -326,24 +326,29 @@ coin_modeling: #CoinModel
             # Transformation Category
             # '*|aggregations/*',
             # '*|score_dist/*',
-            # '*|score_wtd/*',
+            '*|score_wtd/*',
+
             'training_clusters|*|score_dist/*',
             'training_clusters|*|score_wtd/*',
 
 
             # Transformation Base
-            '*|*/cw_return_rate_min_000*',
-            # '*|*/cw_return_rate_min_005*',
-            '*|*/cw_return_rate_min_025*',
-            '*|*/cw_return_rate_min_040*',
-            '*|*/cw_return_rate_min_060*',
-            '*|*/cw_return_rate_min_080*',
-            '*|*/cw_return_rate_max_-005*',
-            '*|*/cw_return_rate_max_-025*',
-            '*|*/return_rate_min_025*',
-            '*|*/cw_net_flows_rate_min_025*',
-            '*|*/cw_return_rate_regression*',
-            '*|*/return_rate_regression*',
+            '*|*/cw_net_flows_min_1000_score/*',
+            '*|*/cw_net_gain_min_1000_score/*',
+            '*|*/cw_return_rate_min_000_score/*',
+            '*|*/cw_return_rate_min_005_score/*',
+            '*|*/cw_return_rate_min_025_score/*',
+            # '*|*/cw_return_rate_min_040_score/*',
+            '*|*/cw_net_flows_rate_min_025_score/*',
+            '*|*/cw_return_rate_max_-005_score/*',
+            '*|*/cw_return_rate_max_-025_score/*',
+            '*|*/cw_return_rate_min_060_score/*',
+            '*|*/cw_return_rate_min_080_score/*',
+            '*|*/return_rate_min_005_score/*',
+            '*|*/return_rate_min_025_score/*',
+            '*|*/return_rate_min_040_score/*',
+            # '*|*/cw_return_rate_regression_score/*',
+            '*|*/return_rate_regression_score/*',
 
             # '*|score_dist/*',
             # '*|score_dist/*_median',
@@ -353,8 +358,6 @@ coin_modeling: #CoinModel
             # '*|score_dist/*_p95',
             # '*|score_dist/*_std',
 
-            '*|score_wtd/*',
-
             # Transformation Method
             # '*/sum',
             # '*/sum_pct',
@@ -362,14 +365,14 @@ coin_modeling: #CoinModel
             '*/count_pct',
 
             '*|*/*/kurt',
-            '*|*/*/median',
-            # '*|*/*/p002',
+            # '*|*/*/median',
+            '*|*/*/p002',
             '*|*/*/p01',
-            '*|*/*/p05',
+            # '*|*/*/p05',
             '*|*/*/p10',
             '*|*/*/p90',
             '*|*/*/p95',
-            '*|*/*/p99',
+            # '*|*/*/p99',
             # '*|*/*/p998',
             '*|*/*/skew',
             '*|*/*/std',
@@ -409,7 +412,7 @@ coin_modeling: #CoinModel
         # -------------------------------
 
         # Search Methodology
-        drop_patterns_include_n_features: 1
+        # drop_patterns_include_n_features: 1
 
         n_iter: 400  # random search limit
         n_splits: 5  # cv splits
@@ -449,14 +452,25 @@ coin_modeling: #CoinModel
             # estimator__tree_method: [hist]
 
             drop_columns__drop_patterns: [
+                # 'feature_retainer',
+
                 # Segment Category
                 # Segment Family
-                score_binary|cw_net_flows_min_1000/*,
-                score_binary|cw_net_gain_min_1000/*,
-                score_binary|cw_return_rate_min_000/*,
-                score_binary|cw_return_rate_min_005/*,
+                # score_binary|cw_net_flows_min_1000/*,
+                # score_binary|cw_net_gain_min_1000/*,
+                # score_binary|cw_return_rate_min_000/*,
+                # score_binary|cw_return_rate_min_005/*,
                 # score_binary|cw_return_rate_min_025/*,
-                score_binary|cw_return_rate_min_040/*,
+                # score_binary|cw_return_rate_min_040/*,
+                # # score_binary|cw_net_flows_rate_min_025/*,
+                # score_binary|cw_return_rate_max_-005/*,
+                # # score_binary|cw_return_rate_max_-025/*,
+                # score_binary|cw_return_rate_min_060/*,
+                # score_binary|cw_return_rate_min_080/*,
+                # score_binary|return_rate_min_005/*,
+                # score_binary|return_rate_min_025/*,
+                # score_binary|return_rate_min_040/*,
+
 
                 # # Segment Value
                 # 'training_clusters|k5_cluster/cluster_0|*',
@@ -471,9 +485,11 @@ coin_modeling: #CoinModel
                 # macro|gtrends_altcoin_worldwide/*,
                 # macro|gtrends_memecoin_us/*,
                 # macro|btc_price/*,
+
                 # macro|*/*period_1,
                 # macro|*/*period_2,
                 # macro|*/*period_3,
+
                 # Metric
                 # time_series|market_data|price*,
                 # time_series|market_data|volume*,
@@ -486,26 +502,38 @@ coin_modeling: #CoinModel
                 # wallet_cohorts|*|total_sold*,
 
                 # Metric Details
+                # # '*|trading/crypto_cash_buys|*',
+                # # '*|trading/crypto_cash_sells|*',
+                # # '*|trading/crypto_inflows|*',
+                # # '*|trading/crypto_net_cash_flows|*',
+                # # '*|trading/crypto_net_flows|*',
+                # # '*|trading/crypto_net_gain|*',
+                # # '*|trading/crypto_outflows|*',
+                # # '*|trading/max_investment|*',
+                # '*|trading/total_volume|*',
+                # # '*|trading/unique_coins_traded|*',
                 # '*|trading/average_transaction|*',
-                # '*|trading/crypto_cash_buys|*',
-                # '*|trading/crypto_cash_sells|*',
+                # '*|balances/usd_balance_starting*|*',
+                # '*|balances/usd_balance_ending*|*',
 
 
                 # # Transformation Base
-                # '*|*/cw_return_rate_min_000*',
-                # '*|*/cw_return_rate_min_005*',
-                # '*|*/cw_return_rate_min_025*',
-                # '*|*/cw_return_rate_min_040*',
-                # '*|*/cw_return_rate_min_060*',
-                # '*|*/cw_return_rate_min_080*',
-                # '*|*/cw_return_rate_max_-005*',
-                # '*|*/cw_return_rate_max_-025*',
-                # '*|*/return_rate_min_025*',
-                # # '*|*/return_rate_min_060*',
-                # '*|*/cw_net_flows_rate_min_025*',
-                # '*|*/cw_return_rate_regression*',
-                # '*|*/return_rate_regression*',
-
+                # '*|*/cw_net_flows_min_1000_score/*',
+                # '*|*/cw_net_gain_min_1000_score/*',
+                # '*|*/cw_return_rate_min_000_score/*',
+                # '*|*/cw_return_rate_min_005_score/*',
+                # '*|*/cw_return_rate_min_025_score/*',
+                # '*|*/cw_return_rate_min_040_score/*',
+                # '*|*/cw_net_flows_rate_min_025_score/*',
+                # '*|*/cw_return_rate_max_-005_score/*',
+                # # '*|*/cw_return_rate_max_-025_score/*',
+                # '*|*/cw_return_rate_min_060_score/*',
+                # '*|*/cw_return_rate_min_080_score/*',
+                # '*|*/return_rate_min_005_score/*',
+                # '*|*/return_rate_min_025_score/*',
+                # '*|*/return_rate_min_040_score/*',
+                # '*|*/cw_return_rate_regression_score/*',
+                # '*|*/return_rate_regression_score/*',
 
                 # '*|score_wtd/*',
 
@@ -515,17 +543,18 @@ coin_modeling: #CoinModel
                 # '*/count_pct',
 
                 # '*|*/*/kurt',
-                # '*|*/*/median',
-                # # '*|*/*/p002',
+                # # '*|*/*/median',
+                # '*|*/*/p002',
                 # '*|*/*/p01',
-                # '*|*/*/p05',
+                # # '*|*/*/p05',
                 # '*|*/*/p10',
                 # '*|*/*/p90',
                 # '*|*/*/p95',
-                # '*|*/*/p99',
+                # # '*|*/*/p99',
                 # # '*|*/*/p998',
                 # '*|*/*/skew',
                 # '*|*/*/std',
+
 
             ]
 
