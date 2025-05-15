@@ -199,10 +199,15 @@ class CoinEpochsOrchestrator:
 
 
 
-    def prepare_current_coin_modeling_data(self) -> None:
+    def prepare_epoch_coin_training_data(self, offset_days: int) -> None:
         """
         Prepare coin features as of the end of the coin modeling period without
          retraining models.
+
+        Params:
+        - offset_days (int): The training data will be generated for the epoch that
+            starts {offset_days} later than the base epoch. The config will have all
+            dates offset into the future by this number of days.
 
         Returns:
         - coin_features_df (DataFrame): coin feature DataFrame as of today.
@@ -210,8 +215,8 @@ class CoinEpochsOrchestrator:
         # 1) Ensure raw data loaded
         self.load_complete_raw_datasets()
 
-        # 2) Build wallets epoch orchestrator for lookback of 0 days (today)
-        epoch_wallets_config = self._prepare_coin_epoch_base_config(0)
+        # 2) Build wallets epoch orchestrator with config offset by the offset_days param
+        epoch_wallets_config = self._prepare_coin_epoch_base_config(offset_days)
         epoch_weo = weo.WalletEpochsOrchestrator(
             base_config=epoch_wallets_config,
             metrics_config=self.wallets_metrics_config,
@@ -246,7 +251,9 @@ class CoinEpochsOrchestrator:
             wamo_como_dfs[2]
         )
         root_folder = self.wallets_coin_config['training_data']['parquet_folder']
-        como_features_df.to_parquet(f"{root_folder}/current_como_coin_training_data_df_full.parquet")
+        como_start = (pd.to_datetime(epoch_coins_config['training_data']['coin_modeling_period_start'])
+                      .strftime('%Y%m%d'))
+        como_features_df.to_parquet(f"{root_folder}/como_coin_training_data_df_full_{como_start}.parquet")
 
 
 
@@ -334,6 +341,8 @@ class CoinEpochsOrchestrator:
         epoch_date = pd.to_datetime(
             epoch_weo.base_config['training_data']['coin_modeling_period_start']
         )
+        logger.warning(epoch_weo.base_config['training_data'])
+        logger.warning(epoch_date)
 
         # 2) Prepare coin config with date suffix folders
         epoch_weo.all_epochs_configs = epoch_weo.generate_epoch_configs()
