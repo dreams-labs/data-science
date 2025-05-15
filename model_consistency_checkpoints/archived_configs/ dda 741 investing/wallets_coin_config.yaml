@@ -16,7 +16,7 @@ training_data: #CoinModel
         -180,
         -240,
         -300,
-        # -360,
+        -360,
         # -420,
         # -480,
         # -540,
@@ -50,23 +50,23 @@ wallet_scores: #CoinModel
     #KeyParam Scores to include as segments + metrics
     score_params:
         # Return Rate
-        cw_return_rate_min_000:
-            target_variable: cw_crypto_net_gain/max_investment/base
-            target_var_min_threshold: 0.00
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.85
+        # cw_return_rate_min_000:
+        #     target_variable: cw_crypto_net_gain/max_investment/base
+        #     target_var_min_threshold: 0.00
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.85
 
-        cw_return_rate_min_005:
-            target_variable: cw_crypto_net_gain/max_investment/base
-            target_var_min_threshold: 0.05
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.85
+        # cw_return_rate_min_005:
+        #     target_variable: cw_crypto_net_gain/max_investment/base
+        #     target_var_min_threshold: 0.05
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.85
 
-        cw_return_rate_min_025:
-            target_variable: cw_crypto_net_gain/max_investment/base
-            target_var_min_threshold: .25
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.85
+        # cw_return_rate_min_025:
+        #     target_variable: cw_crypto_net_gain/max_investment/base
+        #     target_var_min_threshold: .25
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.85
 
         cw_return_rate_min_040:
             target_variable: cw_crypto_net_gain/max_investment/base
@@ -74,24 +74,24 @@ wallet_scores: #CoinModel
             target_var_max_threshold: .inf
             y_pred_threshold: 0.85
 
-        # Tests
-        cw_return_rate_min_060:
-            target_variable: cw_crypto_net_gain/max_investment/base
-            target_var_min_threshold: .60
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.85
+        # # Tests
+        # cw_return_rate_min_060:
+        #     target_variable: cw_crypto_net_gain/max_investment/base
+        #     target_var_min_threshold: .60
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.85
 
-        cw_return_rate_min_080:
-            target_variable: cw_crypto_net_gain/max_investment/base
-            target_var_min_threshold: .80
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.85
+        # cw_return_rate_min_080:
+        #     target_variable: cw_crypto_net_gain/max_investment/base
+        #     target_var_min_threshold: .80
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.85
 
-        cw_return_rate_max_-005:
-            target_variable: cw_crypto_net_gain/max_investment/base
-            target_var_min_threshold: -.inf
-            target_var_max_threshold: -0.05
-            y_pred_threshold: 0.85
+        # cw_return_rate_max_-005:
+        #     target_variable: cw_crypto_net_gain/max_investment/base
+        #     target_var_min_threshold: -.inf
+        #     target_var_max_threshold: -0.05
+        #     y_pred_threshold: 0.85
 
         cw_return_rate_max_-025:
             target_variable: cw_crypto_net_gain/max_investment/base
@@ -99,23 +99,23 @@ wallet_scores: #CoinModel
             target_var_max_threshold: -0.25
             y_pred_threshold: 0.85
 
-        return_rate_min_005:
-            target_variable: crypto_net_gain/max_investment/base
-            target_var_min_threshold: .05
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.85
+        # return_rate_min_005:
+        #     target_variable: crypto_net_gain/max_investment/base
+        #     target_var_min_threshold: .05
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.85
 
-        return_rate_min_025:
-            target_variable: crypto_net_gain/max_investment/base
-            target_var_min_threshold: .25
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.85
+        # return_rate_min_025:
+        #     target_variable: crypto_net_gain/max_investment/base
+        #     target_var_min_threshold: .25
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.85
 
-        return_rate_min_040:
-            target_variable: crypto_net_gain/max_investment/base
-            target_var_min_threshold: .40
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.85
+        # return_rate_min_040:
+        #     target_variable: crypto_net_gain/max_investment/base
+        #     target_var_min_threshold: .40
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.85
 
         cw_net_flows_rate_min_025:
             target_variable: cw_crypto_net_flows/crypto_inflows/base
@@ -127,22 +127,22 @@ wallet_scores: #CoinModel
             target_variable: cw_crypto_net_gain/max_investment/winsorized
             model_type: regression
 
-        return_rate_regression:
-            target_variable: crypto_net_gain/max_investment/winsorized
-            model_type: regression
+        # return_rate_regression:
+        #     target_variable: crypto_net_gain/max_investment/winsorized
+        #     model_type: regression
 
-        # USD Metrics
-        cw_net_gain_min_1000:
-            target_variable: cw_crypto_net_gain
-            target_var_min_threshold: 1000
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.9
+        # # USD Metrics
+        # cw_net_gain_min_1000:
+        #     target_variable: cw_crypto_net_gain
+        #     target_var_min_threshold: 1000
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.9
 
-        cw_net_flows_min_1000:
-            target_variable: cw_crypto_net_flows
-            target_var_min_threshold: 1000
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.9
+        # cw_net_flows_min_1000:
+        #     target_variable: cw_crypto_net_flows
+        #     target_var_min_threshold: 1000
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.9
 
 
 # CoinModel Segments
@@ -163,22 +163,22 @@ features: #CoinModel
 
     # Which scores will have distribution metrics created
     score_distributions: [
-        cw_return_rate_min_000,
-        cw_return_rate_min_005,
-        cw_return_rate_min_025,
+        # cw_return_rate_min_000,
+        # cw_return_rate_min_005,
+        # cw_return_rate_min_025,
         cw_return_rate_min_040,
-        cw_return_rate_min_060,
-        cw_return_rate_min_080,
-        cw_return_rate_max_-005,
+        # cw_return_rate_min_060,
+        # cw_return_rate_min_080,
+        # cw_return_rate_max_-005,
         cw_return_rate_max_-025,
-        return_rate_min_005,
-        return_rate_min_025,
-        return_rate_min_040,
+        # return_rate_min_005,
+        # return_rate_min_025,
+        # return_rate_min_040,
         cw_net_flows_rate_min_025,
         cw_return_rate_regression,
-        return_rate_regression,
-        cw_net_gain_min_1000,
-        cw_net_flows_min_1000,
+        # return_rate_regression,
+        # cw_net_gain_min_1000,
+        # cw_net_flows_min_1000,
     ]
 
     # Features from the feature_engineering directory
@@ -189,16 +189,16 @@ features: #CoinModel
 
     # Metrics to drop based on low observed importance
     drop_trading_metrics: [
-        crypto_cash_buys,
-        crypto_cash_sells,
-        crypto_inflows,
-        crypto_net_cash_flows,
-        crypto_net_flows,
-        crypto_net_gain,
-        crypto_outflows,
-        max_investment,
+        # crypto_cash_buys,
+        # crypto_cash_sells,
+        # crypto_inflows,
+        # crypto_net_cash_flows,
+        # crypto_net_flows,
+        # crypto_net_gain,
+        # crypto_outflows,
+        # max_investment,
         # total_volume,
-        unique_coins_traded,
+        # unique_coins_traded,
         # average_transaction,
     ]
 

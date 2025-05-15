@@ -188,17 +188,17 @@ features: #CoinModel
 
     # Metrics to drop based on low observed importance
     drop_trading_metrics: [
-        # crypto_cash_buys,
-        # crypto_cash_sells,
-        # crypto_inflows,
-        # crypto_net_cash_flows,
-        # crypto_net_flows,
-        # crypto_net_gain,
-        # crypto_outflows,
-        # max_investment,
-        # # total_volume,
-        # unique_coins_traded,
-        # # average_transaction,
+        crypto_cash_buys,
+        crypto_cash_sells,
+        crypto_inflows,
+        crypto_net_cash_flows,
+        crypto_net_flows,
+        crypto_net_gain,
+        crypto_outflows,
+        max_investment,
+        # total_volume,
+        unique_coins_traded,
+        # average_transaction,
     ]
 
     # Macroeconomic features: most params are in wallets_coins_metrics_config.yaml

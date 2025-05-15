@@ -9,6 +9,7 @@ from pathlib import Path
 import copy
 from datetime import datetime, timedelta
 import pandas as pd
+import joblib
 
 # Local module imports
 import training_data.data_retrieval as dr
@@ -246,6 +247,62 @@ class CoinEpochsOrchestrator:
         )
         root_folder = self.wallets_coin_config['training_data']['parquet_folder']
         como_features_df.to_parquet(f"{root_folder}/current_como_coin_training_data_df_full.parquet")
+
+
+
+    def score_current_coins(
+            self,
+            model_id: str,
+            artifacts_path: str,
+            features_df: pd.DataFrame = None
+        ) -> pd.DataFrame:
+        """
+        Load a saved coin model pipeline and score current coin features.
+
+        Params:
+        - model_id (str): UUID of the saved model to load.
+        - artifacts_path (str): Base directory where model artifacts are stored.
+        - features_df (DataFrame, optional): DataFrame of features to score.
+
+        Returns:
+        - results_df (DataFrame): DataFrame with coin_id index, score, model_id.
+        """
+        # 1) Use provided features_df or load from parquet
+        if features_df is None:
+            base_folder = self.wallets_coin_config['training_data']['parquet_folder']
+            features_file = Path(base_folder) / 'current_como_coin_training_data_df_full.parquet'
+            features_df = pd.read_parquet(features_file)
+
+        # 2) Load the saved sklearn Pipeline
+        pipeline_file = Path(artifacts_path) / 'coin_models' / f'coin_model_pipeline_{model_id}.pkl'
+        if not pipeline_file.exists():
+            raise FileNotFoundError(f'Pipeline file {pipeline_file} not found.')
+        pipeline = joblib.load(str(pipeline_file))
+
+        # 3) Validate that the pipeline can transform the raw features
+        try:
+            pipeline.x_transformer_.transform(features_df)
+        except Exception as e:
+            raise ValueError(f"Pipeline transform failed due to missing or invalid features: {e}")
+
+        # 4) Predict using the pipeline
+        if hasattr(pipeline, 'predict_proba'):
+            preds = pipeline.predict_proba(features_df)[:, 1]
+        else:
+            preds = pipeline.predict(features_df)
+
+        # 5) Assemble and save results (unchanged)...
+        results_df = features_df.copy()
+        results_df['score'] = preds
+        results_df['model_id'] = model_id
+
+        pred_folder = Path(artifacts_path) / 'coin_predictions'
+        pred_folder.mkdir(parents=True, exist_ok=True)
+        output_file = pred_folder / f'coin_predictions_{model_id}.csv'
+        results_df.to_csv(output_file, index=True)
+        logger.info(f'Saved coin predictions to {output_file}')
+
+        return results_df
 
 
 

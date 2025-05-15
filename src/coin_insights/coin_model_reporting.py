@@ -9,6 +9,7 @@ import json
 import pandas as pd
 import numpy as np
 import wallet_insights.model_evaluation as wime
+import joblib
 
 # Local modules
 import utils as u
@@ -73,7 +74,7 @@ def generate_and_save_coin_model_artifacts(
     model_id = save_coin_model_artifacts(
         model_results=model_results_artifacts,
         evaluation_dict=evaluation,
-        model=evaluator.model,
+        pipeline=model_results['pipeline'],
         configs=configs,
         base_path=base_path
     )
@@ -86,7 +87,7 @@ def generate_and_save_coin_model_artifacts(
 #         Helper Functions
 # ---------------------------------
 
-def save_coin_model_artifacts(model_results, evaluation_dict, model, configs, base_path):
+def save_coin_model_artifacts(model_results, evaluation_dict, pipeline, configs, base_path):
     """
     Saves all model-related artifacts with a consistent UUID across files.
 
@@ -157,10 +158,12 @@ def save_coin_model_artifacts(model_results, evaluation_dict, model, configs, ba
         json.dump(report, f, indent=2, default=u.numpy_type_converter)
     logger.info(f"Saved model report to {report_path}")
 
-    # Save model
-    model_filename = f"coin_model_{model_id}.json"
-    model_path = base_dir / 'coin_models' / model_filename
-    model.save_model(model_path)
+    # Save full transformation+estimator pipeline
+    models_dir = base_dir / 'coin_models'
+    models_dir.mkdir(parents=True, exist_ok=True)
+    pipeline_path = models_dir / f'coin_model_pipeline_{model_id}.pkl'
+    joblib.dump(pipeline, pipeline_path)
+    logger.info(f"Saved coin model pipeline to {pipeline_path}")
 
     # Save scores
     coin_scores_df = pd.DataFrame(model_results['y_pred'])
