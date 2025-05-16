@@ -1,0 +1,59 @@
+# CheckpointValidation
+# WalletModel Config
+
+# These params determine what timing features are populated to create
+#  features such as buy_weighted/sell_weighted averages of the metric.
+# Offsets will calculate these as of x days ahead/behind of the buy or sell.
+#
+# Example
+# -------
+# btc_vdd_multiple:
+#     offsets: [-15, 30]
+#     retain_base_columns: True
+#
+# This will output the average VDD on transaction dates, as well as the average
+#  VDD 15 days prior to transactions and 30 days after transactions.
+#
+# The features will be structured as:
+# timing|btc_vdd_multiple/lag_15/*
+# timing|btc_vdd_multiple/lead_30/*
+# timing|btc_vdd_multiple/* (included because retain_base_columns==True)
+#
+#
+# If the offset value would exceed the training period boundary, it will be
+#  recorded as None to avoid data leakage.
+#
+# All offsets keys must be included in wallets_metrics_config.time_series
+
+market_timing:
+    offsets:
+        # Coin time series
+        price_sma_2:
+            offsets: [-200, -60, -30, -15, 30, 100]
+            retain_base_columns: False
+        volume_sma_12:
+            offsets: [-80, -21, 21, 100]
+            retain_base_columns: False
+
+        # Macro trends
+        btc_mvrv_z_score:
+            offsets: [-21] # lag_21
+            retain_base_columns: True
+        btc_vdd_multiple:
+            offsets: [60] # lead_60
+            retain_base_columns: True
+        gtrends_memecoin_us:
+            offsets: [21] # lead_21
+            retain_base_columns: True
+        # btc_price_rsi_100:
+        #     offsets: []
+        #     retain_base_columns: True
+        # btc_price_rsi_30:
+        #     offsets: []
+        #     retain_base_columns: True
+        # global_volume_rsi_100:
+        #     offsets: []
+        #     retain_base_columns: True
+        # global_volume_rsi_30:
+        #     offsets: []
+        #     retain_base_columns: True

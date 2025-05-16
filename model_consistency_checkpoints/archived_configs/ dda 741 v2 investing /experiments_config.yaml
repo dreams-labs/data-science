@@ -1,0 +1,62 @@
+# This experiment config file defines parameter variations for running experiments
+# across multiple configurations. It is linked to three main config files:
+# - config.yaml: Contains settings for training data, wallet cohorts, and data cleaning.
+# - modeling_config.yaml: Contains preprocessing steps and modeling-related parameters.
+# - metrics_config.yaml: Defines metrics and their aggregations for evaluation.
+
+metadata:
+  experiment_name: "1003_time_windows_dev"
+  search_method: "grid"
+  description: "initiate time travel sequence"
+  # metrics_to_compare:
+  #   - roc_auc
+  # threshold: 0.5
+  max_evals: 1000
+
+variable_overrides:
+  config:
+    training_data:
+      modeling_period_start: ['2024-07-03','2024-09-01']
+    #   modeling_period_duration: [10,20]
+    #   training_period_duration: [30,60]
+    # datasets:
+    #   wallet_cohorts:
+    #     whales:
+    #       # wallet_minimum_inflows: [50000]
+    #       coin_return_win_threshold: [0.15,.3]
+    #       wallet_min_coin_wins: [1,3]
+
+  # modeling_config:
+  #   preprocessing:
+  #     drop_features:
+  #       - ['total_sellers_sum', 'buyers_new_median']  # Drop these two features
+  #       - ['total_sellers_sum']  # Drop only one feature for comparison
+
+    # target_variables:
+      # moon_threshold: [0.1,0.25]
+    # modeling:
+    #   target_column: ["is_moon"]
+    #   model_params:
+    #     n_estimators: [50,100]
+
+
+  # metrics_config:
+  #   wallet_cohorts:
+  #     normies:
+  #       total_volume:
+  #         aggregations:
+  #           last:
+  #             scaling: ["log","none"]
+  #       total_balance:
+  #         aggregations:
+  #           last:
+  #             scaling: ["log","none"]
+
+  #   time_series:
+  #     market_data:
+  #       price:
+  #         rolling:
+  #           window_duration: [5,10]
+  #       volume:
+  #         rolling:
+  #           window_duration: [5,10]
