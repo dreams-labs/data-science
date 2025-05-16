@@ -1,0 +1,85 @@
+# CoinModel Config
+# Time series keyed on coin_id-date
+time_series:  #CoinModel
+    market_data:
+        price:
+            indicators:
+                sma:
+                    parameters:
+                        window: [2]
+                # rsi:
+                #     parameters:
+                #         window: [7]
+        volume:
+            indicators:
+                sma:
+                    parameters:
+                        window: [12]
+
+
+    # Controls what populates the macro_trends|* features
+    # All keys of wallets_features_config.market_timing.offsets.keys() must
+    #  be included here
+    macro_trends:  #CoinModel
+        btc_price:
+            rolling:
+                aggregations:
+                    std:
+                        scaling: none
+                window_duration: 30
+                lookback_periods: 3
+        btc_mvrv_z_score:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: none
+                    std:
+                        scaling: none
+                window_duration: 30
+                lookback_periods: 3
+        global_market_cap:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: none
+                    std:
+                        scaling: none
+                window_duration: 30
+                lookback_periods: 3
+            indicators:
+                rsi:
+                    parameters:
+                        window: [30]
+                    rolling:
+                        aggregations:
+                            last:
+                                scaling: none
+                        window_duration: 30
+                        lookback_periods: 3
+        btc_vdd_multiple:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: none
+                    std:
+                        scaling: none
+                window_duration: 30
+                lookback_periods: 3
+        gtrends_altcoin_worldwide:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: none
+                    std:
+                        scaling: none
+                window_duration: 30
+                lookback_periods: 3
+        gtrends_memecoin_us:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: none
+                    std:
+                        scaling: none
+                window_duration: 30
+                lookback_periods: 3
