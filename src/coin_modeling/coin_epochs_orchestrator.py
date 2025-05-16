@@ -279,7 +279,7 @@ class CoinEpochsOrchestrator:
 
 
 
-    def score_current_coins(
+    def score_coin_training_data(
             self,
             model_id: str,
             artifacts_path: str,
