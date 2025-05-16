@@ -16,7 +16,7 @@ training_data: #WalletModel
         30,
         15,
     ]
-    validation_period_end: '2025-03-31'  # toggle to activate/deactivate validation data
+    validation_period_end: '2025-04-30'  # toggle to activate/deactivate validation data
 
     # Training Data Toggles
     hybridize_wallet_ids: True  # if true, training data will be keyed on wallet-coin pairs

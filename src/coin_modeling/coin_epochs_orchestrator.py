@@ -294,7 +294,7 @@ class CoinEpochsOrchestrator:
         - features_df (DataFrame, optional): DataFrame of features to score.
 
         Returns:
-        - results_df (DataFrame): DataFrame with coin_id index, score, model_id.
+        - scores_df (DataFrame): DataFrame with coin_id index, score, model_id.
         """
         # 1) Use provided features_df or load from parquet
         if features_df is None:
@@ -321,17 +321,16 @@ class CoinEpochsOrchestrator:
             preds = pipeline.predict(features_df)
 
         # 5) Assemble and save results (unchanged)...
-        results_df = features_df.copy()
-        results_df['score'] = preds
-        results_df['model_id'] = model_id
+        scores_df = features_df[[]].copy()
+        scores_df['score'] = preds
 
         pred_folder = Path(artifacts_path) / 'coin_predictions'
         pred_folder.mkdir(parents=True, exist_ok=True)
         output_file = pred_folder / f'coin_predictions_{model_id}.csv'
-        results_df.to_csv(output_file, index=True)
+        scores_df.to_csv(output_file, index=True)
         logger.info(f'Saved coin predictions to {output_file}')
 
-        return results_df
+        return scores_df
 
 
 
