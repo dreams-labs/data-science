@@ -313,10 +313,14 @@ class WalletEpochsOrchestrator:
     def _build_epoch_features(
         self,
         epoch_config: dict,
-        cohorts: Optional[Dict[Set,np.array]] = None
-    ) -> Tuple[datetime, pd.DataFrame, pd.DataFrame, Dict[Set,np.array]]:
+        cohorts: Optional[Dict[Set, np.array]] = None,
+        generate_modeling: bool = True,
+    ) -> Tuple[datetime, pd.DataFrame, pd.DataFrame, Dict[Set, np.array]]:
         """
         Process a single epoch configuration to generate training and modeling data.
+
+        - generate_modeling (bool): If False, skip creation of modeling features and return an
+            empty DataFrame for that output.
 
         Params:
         - epoch_config (dict): Configuration for the specific epoch
@@ -329,6 +333,8 @@ class WalletEpochsOrchestrator:
         - cohorts (Dict[Set,np.array]): The wallets and coins included in the training data
         """
         model_start = epoch_config['training_data']['modeling_period_start']
+        if not generate_modeling:
+            logger.info("Training‑only mode enabled: modeling features will be skipped for this epoch.")
         if cohorts is None:
             cohorts = {}
 
@@ -375,28 +381,30 @@ class WalletEpochsOrchestrator:
                 training_macro_trends_df_full,
                 return_files=True
             )
-        modeling_profits_df, modeling_market_data_df, modeling_macro_trends_df = \
-            self._transform_complete_dfs_for_epoch(
-                epoch_config['training_data']['modeling_period_start'],
-                epoch_config['training_data']['modeling_period_end'],
+
+        if generate_modeling:
+            modeling_profits_df, modeling_market_data_df, modeling_macro_trends_df = \
+                self._transform_complete_dfs_for_epoch(
+                    epoch_config['training_data']['modeling_period_start'],
+                    epoch_config['training_data']['modeling_period_end'],
+                )
+
+            modeling_generator = wtdo.WalletTrainingDataOrchestrator(
+                epoch_config,
+                self.metrics_config,
+                self.features_config,
+                training_wallet_cohort=training_generator.training_wallet_cohort,  # add cohort
+                profits_df=modeling_profits_df,
+                market_data_df=modeling_market_data_df,
+                macro_trends_df=modeling_macro_trends_df,
+                complete_hybrid_cw_id_df=self.complete_hybrid_cw_id_df
             )
 
-        modeling_generator = wtdo.WalletTrainingDataOrchestrator(
-            epoch_config,
-            self.metrics_config,
-            self.features_config,
-            training_wallet_cohort=training_generator.training_wallet_cohort,  # add cohort
-            profits_df=modeling_profits_df,
-            market_data_df=modeling_market_data_df,
-            macro_trends_df=modeling_macro_trends_df,
-            complete_hybrid_cw_id_df=self.complete_hybrid_cw_id_df
-        )
-
-        modeling_profits_df_full, _, _, _ = modeling_generator.retrieve_cleaned_period_datasets(
-            epoch_config['training_data']['modeling_period_start'],
-            epoch_config['training_data']['modeling_period_end'],
-            training_coin_cohort
-        )
+            modeling_profits_df_full, _, _, _ = modeling_generator.retrieve_cleaned_period_datasets(
+                epoch_config['training_data']['modeling_period_start'],
+                epoch_config['training_data']['modeling_period_end'],
+                training_coin_cohort
+            )
 
         # 3. Concurrently generate training and modeling features
         with ThreadPoolExecutor(max_workers=self.base_config['n_threads']['epoch_tm_features']) as executor:
@@ -407,13 +415,19 @@ class WalletEpochsOrchestrator:
                 training_macro_indicators_df,
                 training_transfers_df
             )
-            model_future = executor.submit(
-                modeling_generator.prepare_modeling_features,
-                modeling_profits_df_full,
-                self.complete_hybrid_cw_id_df
-            )
             epoch_training_data_df = train_future.result()
-            epoch_modeling_data_df = model_future.result()
+
+            # Generate modeling data if configured; otherwise return empty df
+            epoch_modeling_data_df = pd.DataFrame()
+            if generate_modeling:
+                model_future = executor.submit(
+                    modeling_generator.prepare_modeling_features,
+                    modeling_profits_df_full,
+                    self.complete_hybrid_cw_id_df
+                )
+                epoch_modeling_data_df = (
+                    model_future.result() if generate_modeling else pd.DataFrame()
+                )
 
         # Store training df with epoch date
         epoch_date = datetime.strptime(
@@ -428,7 +442,8 @@ class WalletEpochsOrchestrator:
         start_time = time.time()
         output_folder = f"{epoch_config['training_data']['parquet_folder']}/"
         training_profits_df.to_parquet(f"{output_folder}/training_profits_df.parquet", index=True)
-        modeling_profits_df.to_parquet(f"{output_folder}/modeling_profits_df.parquet", index=True)
+        if generate_modeling:
+            modeling_profits_df.to_parquet(f"{output_folder}/modeling_profits_df.parquet", index=True)
         logger.info("(%.1fs) Saved %s profits_df files to %s.",
             time.time() - start_time, model_start, output_folder)
 

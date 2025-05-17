@@ -5,7 +5,7 @@
 training_data: #WalletModel
 
     #KeyParam Period Dates
-    modeling_period_start: '2025-04-30'
+    modeling_period_start: '2025-01-30'
     modeling_period_duration: 30
     training_window_lookbacks: [  # How many days prior to the modeling period each window begins
         # 240,
@@ -325,12 +325,12 @@ modeling: #WalletModel
 data_cleaning: #WalletModel
 
     #KeyParam Wallet cohort thresholds
-    min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
+    min_coins_traded: 4  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
     max_coins_traded: 250  # Exclude wallets that have traded more coins than this during the training period
 
-    min_wallet_investment: 1000 # time weighted average balance filter
-    min_wallet_inflows: 1000  # Exclude wallets with inflows below this amount (USD)
-    min_wallet_volume: 1000  # Exclude wallets with fewer than this amount of training period USD volume
+    min_wallet_investment: 2000 # time weighted average balance filter
+    min_wallet_inflows: 2000  # Exclude wallets with inflows below this amount (USD)
+    min_wallet_volume: 2000  # Exclude wallets with fewer than this amount of training period USD volume
 
     max_wallet_investment: 15_000_000 # time weighted average balance filter
     max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
