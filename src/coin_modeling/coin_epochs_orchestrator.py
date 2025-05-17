@@ -196,13 +196,17 @@ class CoinEpochsOrchestrator:
             df = df.copy()
             df['coin_epoch_start_date'] = epoch_date
             return df.set_index('coin_epoch_start_date', append=True)
+        i = 1
         for lookback in offsets:
+            logger.milestone(f"Creating coin training data for epoch {i}/{len(offsets)}")
             epoch_date, wamo_features_df, wamo_target_df, como_features_df, como_target_df = \
                 self._process_coin_epoch(lookback)
             wamo_feature_dfs.append(tag_with_epoch(wamo_features_df))
             wamo_target_dfs.append(tag_with_epoch(wamo_target_df))
             como_feature_dfs.append(tag_with_epoch(como_features_df))
             como_target_dfs.append(tag_with_epoch(como_target_df))
+            logger.milestone(f"Completed generating coin training data for epoch {i}/{len(offsets)}")
+            i+=1
 
         # Concatenate across epochs
         multiwindow_wamo = pd.concat(wamo_feature_dfs).sort_index()
@@ -256,7 +260,7 @@ class CoinEpochsOrchestrator:
             raise ValueError(f"Pipeline transform failed due to missing or invalid features: {e}") from e
 
         # 4) Predict using the pipeline
-        if hasattr(pipeline, 'predict_proba'):
+        if hasattr(pipeline.estimator, 'predict_proba'):
             preds = pipeline.predict_proba(features_df)[:, 1]
         else:
             preds = pipeline.predict(features_df)
