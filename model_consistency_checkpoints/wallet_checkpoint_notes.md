@@ -1,4 +1,108 @@
 # DDA 741 investing period performance
+checkpoint 5: c1%.40 works in bull market?
+Model Performance Summary
+Target: coin_return 0.8 to
+ID: 81ba23fe-488b-4dfd-a819-4fcec05e7dfd
+===================================
+Test Samples:             1,632
+Number of Features:       30
+
+
+Classification Metrics
+-----------------------------------
+ROC AUC:                    0.831
+Log Loss:                   0.404
+Accuracy:                   0.838
+Precision:                  0.251
+Recall:                     0.731
+F1 Score:                   0.374
+
+Validation Metrics
+-----------------------------------
+Val ROC AUC:                0.607
+Val Accuracy:               0.925
+Val Precision:              0.000
+Val Recall:                 0.000
+Val F1 Score:               0.000
+
+Validation Return Metrics
+-----------------------------------
+Positive Threshold:         0.80
+Positive Predictions:       0/2558 (0.00%)
+Positive Mean Outcome:      nan
+Positive W-Mean Outcome:    nan
+Top 1% W-Mean Outcome:      0.400
+Top 5% W-Mean Outcome:      0.331
+Overall W-Mean Outcome:     0.113
+
+
+
+checkpoint 4: regression?
+Model Performance Summary
+Target: coin_return_pctile_full
+ID: 754a5d9d-66c9-4f73-9c7c-9272a50e542c
+===================================
+Test Samples:             1,713
+Number of Features:       24
+
+
+Core Metrics
+-----------------------------------
+R² Score:                 0.071
+RMSE:                     0.279
+MAE:                      0.234
+
+Validation Set Metrics
+-----------------------------------
+R² Score:                 -0.019
+RMSE:                     0.306
+MAE:                      0.265
+
+Residuals Analysis
+-----------------------------------
+Mean of Residuals:        -0.015
+Std of Residuals:         0.278
+95% Prediction Interval:  ±0.546
+
+
+checkpoint 3: c1%.041 back to square 1 I guess
+Model Performance Summary
+Target: coin_return 0.1 to
+ID: 0aa3e5e4-1215-4d87-a575-dcca8a3870ea
+===================================
+Test Samples:             1,713
+Number of Features:       24
+
+
+Classification Metrics
+-----------------------------------
+ROC AUC:                    0.833
+Log Loss:                   0.385
+Accuracy:                   0.849
+Precision:                  0.718
+Recall:                     0.541
+F1 Score:                   0.617
+
+Validation Metrics
+-----------------------------------
+Val ROC AUC:                0.479
+Val Accuracy:               0.761
+Val Precision:              0.000
+Val Recall:                 0.000
+Val F1 Score:               0.000
+
+Validation Return Metrics
+-----------------------------------
+Positive Threshold:         0.50
+Positive Predictions:       0/12087 (0.00%)
+Positive Mean Outcome:      nan
+Positive W-Mean Outcome:    nan
+Top 1% W-Mean Outcome:      0.041
+Top 5% W-Mean Outcome:      -0.003
+Overall W-Mean Outcome:     -0.048
+
+
+# DDA 741 investing period performance
 checkpoint 2: c1%.804 model rebuild
 Model Performance Summary
 Target: coin_return 0.5 to

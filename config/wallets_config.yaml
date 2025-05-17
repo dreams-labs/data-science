@@ -5,7 +5,7 @@
 training_data: #WalletModel
 
     #KeyParam Period Dates
-    modeling_period_start: '2024-12-31'
+    modeling_period_start: '2025-04-30'
     modeling_period_duration: 30
     training_window_lookbacks: [  # How many days prior to the modeling period each window begins
         # 240,
@@ -24,7 +24,7 @@ training_data: #WalletModel
 
     # Local pipeline configs
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
-    parquet_folder: temp/wallet_modeling_dfs/dda_741_v2_investing  # where to store parquet files
+    parquet_folder: temp/wallet_modeling_dfs/dda_741_v3_investing  # where to store parquet files
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
 
@@ -38,18 +38,19 @@ modeling: #WalletModel
 
     #KeyParam Target Variable
     # Return Rate
-    target_variable: crypto_net_gain/max_investment/base
+    # target_variable: crypto_net_gain/max_investment/base
     # target_variable: cw_crypto_net_gain/max_investment/base
     # target_variable: cw_crypto_net_gain/max_investment/rank
     # target_variable: cw_crypto_net_gain/max_investment/winsorized
-    # target_variable: cw_crypto_net_flows/crypto_inflows/base
+    target_variable: cw_crypto_net_flows/crypto_inflows/base
 
     # target_var_min_threshold: -.inf  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.00  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.05  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.25  # a classification model will try to predict the target var above this value
-    # target_var_min_threshold: 0.40  # a classification model will try to predict the target var above this value
-    target_var_min_threshold: 0.9  # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.40  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.6  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.8  # a classification model will try to predict the target var above this value
 
     # target_var_max_threshold: -0.05  # a classification model will try to predict the target var above this value
     # target_var_max_threshold: 0.25  # a classification model will try to predict the target var above this value
@@ -88,6 +89,9 @@ modeling: #WalletModel
         max_depth: 4  # how deep the trees can go
         min_child_weight: 40  # what % of rows each tree must have
 
+        #KeyParam True Positive Weighting
+        # scale_pos_weight: 20  # used for oversampling; number is a ratio of neg:pos, e.g. 20 means 20neg:1pos
+
         subsample: 1.0  # samples rows, e.g. trees use x% of all wallet rows
         colsample_bytree: 0.9  # samples columns, e.g. trees use x% of all column features
         gamma: 0.005  # minimum gain required to split further on a leaf node
@@ -100,7 +104,6 @@ modeling: #WalletModel
         n_estimators: 400  # number of trees to train in the model
         learning_rate: 0.5  # step size for updates to weights during training
 
-        # scale_pos_weight: 20  # used for oversampling; number is a ratio of neg:pos, e.g. 20 means 20neg:1pos
         early_stopping_rounds: 10  # stop training if no improvement after x rounds
 
         # Threading Controls
@@ -150,7 +153,7 @@ modeling: #WalletModel
             mktcap|portfolio_mcap_std/market_cap_unadj|*,
 
 
-#             # macro|*,
+            # macro|*,
             macro|*_first|*,
             # macro|btc_mvrv_z_score_first|*,
             # macro|btc_mvrv_z_score_last|*,
@@ -322,12 +325,12 @@ modeling: #WalletModel
 data_cleaning: #WalletModel
 
     #KeyParam Wallet cohort thresholds
-    min_coins_traded: 4  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
+    min_coins_traded: 3  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
     max_coins_traded: 250  # Exclude wallets that have traded more coins than this during the training period
 
-    min_wallet_investment: 2000 # time weighted average balance filter
-    min_wallet_inflows: 2000  # Exclude wallets with inflows below this amount (USD)
-    min_wallet_volume: 2000  # Exclude wallets with fewer than this amount of training period USD volume
+    min_wallet_investment: 1000 # time weighted average balance filter
+    min_wallet_inflows: 1000  # Exclude wallets with inflows below this amount (USD)
+    min_wallet_volume: 1000  # Exclude wallets with fewer than this amount of training period USD volume
 
     max_wallet_investment: 15_000_000 # time weighted average balance filter
     max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)

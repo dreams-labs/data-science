@@ -217,7 +217,7 @@ def add_derived_values(config_dict: dict) -> dict:
     td['modeling_period_end'] = modeling_end.strftime("%Y-%m-%d")
     td['modeling_starting_balance_date'] = td['training_period_end']
     if td['modeling_period_end'] > td['validation_period_end']:
-        raise ValueError(f"Validation period end of {td['validation_period_end']} is earlier than "
+        logger.warning(f"Validation period end of {td['validation_period_end']} is earlier than "
                          f"the modeling period end of {td['modeling_period_end']}.")
 
     # Validation Period Boundaries
