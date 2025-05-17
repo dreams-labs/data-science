@@ -65,6 +65,12 @@ class CoinModel(BaseModel):
         Returns:
         - result (dict): Contains fitted pipeline, predictions, and optional train/test data
         """
+        # Confirm no overlap between training and validation data
+        if len(set(training_df.index.get_level_values('coin_epoch_start_date')).intersection(
+        set(validation_df.index.get_level_values('coin_epoch_start_date')))) > 0:
+            raise ValueError("Overlap found between training data and validation data epochs. "
+                             "This will cause data leakage of the validation target variables.")
+
         logger.info("Preparing training data for coin model construction...")
         u.notify('intro_2')
 
