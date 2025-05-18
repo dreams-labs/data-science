@@ -829,6 +829,7 @@ def hybridize_wallet_address(
     return df_copy
 
 
+
 def validate_hybrid_mapping_completeness(base_df, hybrid_cw_id_df):
     """
     Validates that all coin_id/wallet_address pairs in base_df exist in hybrid_cw_id_df.
@@ -862,10 +863,6 @@ def validate_hybrid_mapping_completeness(base_df, hybrid_cw_id_df):
     logger.info("All hybrid_cw_ids have coverage.")
 
 
-
-# -----------------------------------
-#   De-hybridize Utility Function
-# -----------------------------------
 
 @u.timing_decorator
 def dehybridize_wallet_address(
@@ -933,16 +930,15 @@ def dehybridize_wallet_address(
     df_out = df_out.merge(hybrid_cw_id_df, on=wallet_col, how='left')
 
     # Verify mapping completeness
-    if df_out['wallet_id'].isna().any():
-        missing = df_out['wallet_id'].isna().sum()
+    if df_out['wallet_address'].isna().any():
+        missing = df_out['wallet_address'].isna().sum()
         raise ValueError(
             f"Failed to de‑hybridize {missing} rows – missing hybrid_cw_id "
             "mappings."
         )
 
     # Replace hybrid id with original wallet_id and rename for consistency
-    df_out['wallet_address'] = df_out['wallet_id']
-    df_out = df_out.drop(columns=['wallet_id', 'hybrid_cw_id'])
+    df_out = df_out.drop(columns=['hybrid_cw_id'])
 
     # Restore original index structure
     if used_index:
