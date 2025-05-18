@@ -5,7 +5,7 @@
 training_data: #WalletModel
 
     #KeyParam Period Dates
-    modeling_period_start: '2025-01-30'
+    modeling_period_start: '2025-04-30'
     modeling_period_duration: 30
     training_window_lookbacks: [  # How many days prior to the modeling period each window begins
         # 240,
@@ -19,7 +19,7 @@ training_data: #WalletModel
     validation_period_end: '2025-04-30'  # toggle to activate/deactivate validation data
 
     # Training Data Toggles
-    training_data_only: False  # if true, only generates training data to be scored by another model
+    training_data_only: True  # if true, only generates training data to be scored by another model
     hybridize_wallet_ids: True  # if true, training data will be keyed on wallet-coin pairs
     predrop_features: True  # if true, the feature_selection.drop_patterns will be applied early to save memory
 
