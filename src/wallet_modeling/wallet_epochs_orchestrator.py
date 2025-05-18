@@ -132,54 +132,80 @@ class WalletEpochsOrchestrator:
 
 
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
-    def generate_epochs_training_data(self) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    def generate_epochs_training_data(self, training_only: bool = False
+        ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
-        Generates training data for all epoch configs in parallel using multithreading.
+        Generates epoch‑level training data.  When `training_only=True`, it returns **only** the merged
+        `wallet_training_data_df` (historical training snapshots) and skips all future‑dated data
+        generation.
 
         Returns:
-        - wallet_training_data_df: MultiIndexed on (wallet_address, epoch_start_date) for modeling epochs
+        - wallet_training_data_df (always returned)
+
+        When `training_only=False` it also returns:
         - modeling_wallet_features_df: MultiIndexed on (wallet_address, epoch_start_date) for modeling epochs
         - validation_training_data_df: MultiIndexed on (wallet_address, epoch_start_date) for validation epochs
         - validation_wallet_features_df: MultiIndexed on (wallet_address, epoch_start_date) for validation epochs
         """
-        # Ensure the complete dfs encompass the full range of training_epoch_starts
-        self._assert_complete_coverage()
-
+        training_only = self.base_config['training_data']['training_data_only']
         logger.milestone(f"Compiling training data for {len(self.all_epochs_configs)} epochs...")
+        if training_only:
+            logger.milestone("Training‑only mode: will build historical snapshots only.")
+
         u.notify('intro_3')
 
         training_modeling_dfs = {}
-        modeling_modeling_dfs = {}
-        training_validation_dfs = {}
-        modeling_validation_dfs = {}
+        if not training_only:
+            # Ensure the complete dfs encompass the full range of training_epoch_starts
+            self._assert_complete_coverage()
+
+            modeling_modeling_dfs = {}
+            training_validation_dfs = {}
+            modeling_validation_dfs = {}
 
         # Set a suitable number of threads. You could retrieve this from config; here we use 8 as an example.
         max_workers = self.base_config['n_threads']['concurrent_epochs']
         i = 0
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit each epoch processing task to the executor
-            futures = {executor.submit(self._process_single_epoch, cfg): cfg for cfg in self.all_epochs_configs}
+            # Skip validation epochs entirely in training‑only mode
+            epoch_configs_to_process = (
+                [cfg for cfg in self.all_epochs_configs if cfg.get('epoch_type') == 'modeling']
+                if training_only else self.all_epochs_configs
+            )
+            futures = {
+                executor.submit(self._process_single_epoch, cfg, training_only): cfg
+                for cfg in epoch_configs_to_process
+            }
             for future in as_completed(futures):
                 cfg = futures[future]
                 epoch_date, epoch_training_df, epoch_modeling_df = future.result()
 
-                # Store data in dicts
+                # Store data
                 if cfg.get('epoch_type') == 'modeling':
                     training_modeling_dfs[epoch_date] = epoch_training_df
-                    modeling_modeling_dfs[epoch_date] = epoch_modeling_df
-                elif cfg.get('epoch_type') == 'validation':
-                    training_validation_dfs[epoch_date] = epoch_training_df
-                    modeling_validation_dfs[epoch_date] = epoch_modeling_df
-                # inline: log completion before storing data
+                    if not training_only:
+                        modeling_modeling_dfs[epoch_date] = epoch_modeling_df
+                elif not training_only and cfg.get('epoch_type') == 'validation':
+                    training_validation_dfs[epoch_date] = epoch_training_df #pylint:disable=possibly-used-before-assignment
+                    modeling_validation_dfs[epoch_date] = epoch_modeling_df #pylint:disable=possibly-used-before-assignment
 
                 i += 1
-                logger.milestone(f"Epoch {i}/{len(self.all_epochs_configs)} completed (date: {epoch_date})")
+                logger.milestone(f"Epoch {i}/{len(epoch_configs_to_process)} completed (date: {epoch_date})")
 
         del epoch_training_df, epoch_modeling_df
         gc.collect()
 
-        # Merge the epoch DataFrames into a single DataFrame for training and modeling respectively
-        wallet_training_data_df       = self._merge_epoch_dfs(training_modeling_dfs)
+        wallet_training_data_df = self._merge_epoch_dfs(training_modeling_dfs)
+
+        # Training‑only fast path
+        if training_only:
+            logger.milestone(
+                "Generated historical training snapshots with shape: %s",
+                wallet_training_data_df.shape,
+            )
+            return wallet_training_data_df, pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+        # Full four‑tuple path
         validation_training_data_df   = (self._merge_epoch_dfs(training_validation_dfs)
                                          if training_validation_dfs else pd.DataFrame())
         modeling_wallet_features_df   = self._merge_epoch_dfs(modeling_modeling_dfs)
@@ -190,7 +216,7 @@ class WalletEpochsOrchestrator:
         u.assert_matching_indices(wallet_training_data_df, modeling_wallet_features_df)
 
         logger.milestone(
-            "Generated multi-epoch DataFrames with shapes:\n"
+            "Generated multi‑epoch DataFrames with shapes:\n"
             " - modeling train: %s\n"
             " - modeling model: %s\n"
             " - validation train: %s\n"
@@ -215,7 +241,7 @@ class WalletEpochsOrchestrator:
     #           Helper Methods
     # -----------------------------------
 
-    def _process_single_epoch(self, epoch_config: dict) -> Tuple[datetime, pd.DataFrame, pd.DataFrame]:
+    def _process_single_epoch(self, epoch_config: dict, training_only: bool = False) -> Tuple[datetime, pd.DataFrame, pd.DataFrame]:
         """
         Process a single epoch configuration to generate training and modeling data, including
         handling of hybridization features.
@@ -228,11 +254,13 @@ class WalletEpochsOrchestrator:
         - epoch_training_data_df (DataFrame): Training features for this epoch
         - epoch_modeling_data_df (DataFrame): Modeling features for this epoch
         """
+        generate_modeling = not training_only
+
         # Short-circuit: if dfs are already saved, just load them
         output_folder = epoch_config['training_data']['parquet_folder']
         training_path = f"{output_folder}/training_data_df.parquet"
         modeling_path = f"{output_folder}/modeling_data_df.parquet"
-        if os.path.exists(training_path) and os.path.exists(modeling_path):
+        if os.path.exists(training_path) and (not generate_modeling or os.path.exists(modeling_path)):
             logger.info(
                 f"Loading precomputed features for epoch starting "
                 f"{epoch_config['training_data']['modeling_period_start']} from {output_folder}"
@@ -241,7 +269,10 @@ class WalletEpochsOrchestrator:
                 epoch_config['training_data']['modeling_period_start'], '%Y-%m-%d'
             )
             epoch_training_data_df = pd.read_parquet(training_path)
-            epoch_modeling_data_df = pd.read_parquet(modeling_path)
+            if generate_modeling:
+                epoch_modeling_data_df = pd.read_parquet(modeling_path)
+            else:
+                epoch_modeling_data_df = pd.DataFrame()
 
             # Drop columns before returning if configured
             if epoch_config['training_data']['predrop_features']:
@@ -260,7 +291,10 @@ class WalletEpochsOrchestrator:
         epoch_config['training_data']['hybridize_wallet_ids'] = False
 
         # Build features with initial data
-        epoch_date, epoch_training_data_df, epoch_modeling_data_df, cohorts = self._build_epoch_features(epoch_config)
+        epoch_date, epoch_training_data_df, epoch_modeling_data_df, cohorts = self._build_epoch_features(
+            epoch_config,
+            generate_modeling=generate_modeling
+        )
 
         # If using hybrid IDs, generate hybridized feature set using IDs from the original cohorts
         if self.base_config['training_data']['hybridize_wallet_ids']:
@@ -276,28 +310,29 @@ class WalletEpochsOrchestrator:
             # Build features with hybrid IDs
             (
                 _, hybridized_training_data_df, hybridized_modeling_data_df, _
-            ) = self._build_epoch_features(epoch_config, cohorts)
+            ) = self._build_epoch_features(epoch_config, cohorts, generate_modeling)
 
             # Merge hybrid/nonhybrid training and modeling dfs
             epoch_training_data_df = self._merge_hybrid_dfs(epoch_training_data_df,hybridized_training_data_df)
-            epoch_modeling_data_df = self._merge_hybrid_dfs(epoch_modeling_data_df,hybridized_modeling_data_df)
-
-            # Remove modeling-only IDs - these represent wallets in the cohort but
-            #  coin-wallet pairs that only became active during the modeling period
-            epoch_modeling_data_df = (epoch_modeling_data_df[
-                epoch_modeling_data_df.index.isin(epoch_training_data_df.index.values)
-            ])
-
-            u.assert_matching_indices(epoch_training_data_df,epoch_modeling_data_df)
 
             # Downcast all features
             epoch_training_data_df = u.df_downcast(epoch_training_data_df)
-            epoch_modeling_data_df = u.df_downcast(epoch_modeling_data_df)
-
             # Save features
             output_folder = f"{epoch_config['training_data']['parquet_folder']}/"
             epoch_training_data_df.to_parquet(f"{output_folder}/training_data_df.parquet", index=True)
-            epoch_modeling_data_df.to_parquet(f"{output_folder}/modeling_data_df.parquet", index=True)
+
+            if generate_modeling:
+                epoch_modeling_data_df = self._merge_hybrid_dfs(epoch_modeling_data_df,hybridized_modeling_data_df)
+                # Remove modeling-only IDs - these represent wallets in the cohort but
+                #  coin-wallet pairs that only became active during the modeling period
+                epoch_modeling_data_df = (epoch_modeling_data_df[
+                    epoch_modeling_data_df.index.isin(epoch_training_data_df.index.values)
+                ])
+                u.assert_matching_indices(epoch_training_data_df,epoch_modeling_data_df)
+                # Downcast all features
+                epoch_modeling_data_df = u.df_downcast(epoch_modeling_data_df)
+                # Save features
+                epoch_modeling_data_df.to_parquet(f"{output_folder}/modeling_data_df.parquet", index=True)
             logger.info(f"Saved {model_start} features to %s.", output_folder)
 
         # Drop columns before returning if configured
@@ -306,6 +341,8 @@ class WalletEpochsOrchestrator:
             col_dropper = bp.DropColumnPatterns(drop_patterns)
             epoch_training_data_df = col_dropper.fit_transform(epoch_training_data_df)
 
+        if training_only:
+            epoch_modeling_data_df = pd.DataFrame()
         return epoch_date, epoch_training_data_df, epoch_modeling_data_df
 
 
