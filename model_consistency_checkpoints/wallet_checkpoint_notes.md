@@ -1,4 +1,41 @@
 # DDA 785 wallet scores for may
+checkpoint 2: flows with training boolean: w1%.305
+Model Performance Summary
+Target: cw_crypto_net_flows/crypto_inflows/base 0.4 to inf
+ID: f94683b8-5143-488d-b169-142e4a8fa621
+===================================
+Test Samples:             153,572
+Number of Features:       372
+Features per Window:      62
+
+Classification Metrics
+-----------------------------------
+ROC AUC:                    0.928
+Log Loss:                   0.186
+Accuracy:                   0.904
+Precision:                  0.801
+Recall:                     0.065
+F1 Score:                   0.120
+
+Validation Metrics
+-----------------------------------
+Val ROC AUC:                0.856
+Val Accuracy:               0.927
+Val Precision:              0.501
+Val Recall:                 0.013
+Val F1 Score:               0.025
+
+Validation Return Metrics
+-----------------------------------
+Positive Threshold:         0.80
+Positive Predictions:       1570/838092 (0.19%)
+Positive Mean Outcome:      0.356
+Positive W-Mean Outcome:    0.364
+Top 1% W-Mean Outcome:      0.305
+Top 5% W-Mean Outcome:      0.271
+Overall W-Mean Outcome:     0.095
+
+
 checkpoint 1: flows baseline: w1%.322
 Model Performance Summary
 Target: cw_crypto_net_flows/crypto_inflows/base 0.4 to inf
