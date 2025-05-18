@@ -213,24 +213,23 @@ coin_modeling: #CoinModel
 
     #KeyParam Model Type
     # Target variable parameters
-    # model_type: regression  # "regression" or "classification"
-    model_type: classification  # "regression" or "classification"
+    model_type: regression  # "regression" or "classification"
+    # model_type: classification  # "regression" or "classification"
 
     #KeyParam Target Variable
     # target_variable: coin_return_winsorized
-    target_variable: coin_return
-    # target_variable: coin_return_pctile_full
-    # target_variable: coin_return_pctile
-    target_var_min_threshold: 0.5  # a classification model will try to predict the target var above this value
-    y_pred_threshold: 0.5  # scores above this probability threshold are positive predictions
+    # target_variable: coin_return
+    target_variable: coin_return_pctile_full
+    target_var_min_threshold: .7  # a classification model will try to predict the target var above this value
+    y_pred_threshold: 0.6  # scores above this probability threshold are positive predictions
 
     returns_winsorization: 0.005
 
 
     #KeyParam Modeling Cohort Definition
     # Thresholds for coin inclusion in training data
-    min_cohort_wallets: 15  # how many wallets must hold a coin for the coin to be elegible for forecasting
-    min_cohort_balance: 1000  # how much USD all wallets must hold for the coin to be elegible for forecasting
+    min_cohort_wallets: 25  # how many wallets must hold a coin for the coin to be elegible for forecasting
+    min_cohort_balance: 20000  # how much USD all wallets must hold for the coin to be elegible for forecasting
 
     # Thresholds for coin inclusion in training data
     min_market_cap: 000_000  # coins below this market cap will not be included in performance assessments
@@ -257,7 +256,7 @@ coin_modeling: #CoinModel
             wallet_cohorts|*,
             time_series|*,
             # macro|*,
-            training_clusters|*,
+            # training_clusters|*,
 
             # Segment Family
             score_binary|cw_net_flows_min_1000/*,
@@ -289,13 +288,13 @@ coin_modeling: #CoinModel
             macro|global_market_cap/std_*,
             macro|global_market_cap/last_*,
             macro|btc_vdd_multiple/std_*,
-            # macro|btc_vdd_multiple/last_*,
-            macro|gtrends_altcoin_worldwide/std_*,
+            macro|btc_vdd_multiple/last_*,
+            # macro|gtrends_altcoin_worldwide/std_*,
             macro|gtrends_altcoin_worldwide/last_*,
-            macro|gtrends_memecoin_us/std_*,
+            # macro|gtrends_memecoin_us/std_*,
             macro|gtrends_memecoin_us/last_*,
             # macro|btc_mvrv_z_score/std_*,
-            macro|btc_mvrv_z_score/last_*,
+            # macro|btc_mvrv_z_score/last_*,
             macro|btc_price/std_*,
 
             # # Segment Value
@@ -308,18 +307,18 @@ coin_modeling: #CoinModel
             # Metric
             # time_series|market_data|price*,
             # time_series|market_data|volume*,
-            time_series|market_data|*period_1,
-            time_series|market_data|*period_2,
+            # time_series|market_data|*period_1,
+            # time_series|market_data|*period_2,
             # time_series|market_data|*period_3,
 
             # wallet_cohorts|*|*period_1,
             # wallet_cohorts|*|*period_2,
             # wallet_cohorts|*|*period_3,
-            wallet_cohorts|*|buyers_new*,
-            wallet_cohorts|*|total_bought*,
+            # wallet_cohorts|*|buyers_new*,
+            # wallet_cohorts|*|total_bought*,
             # wallet_cohorts|*|total_holders*,
             # wallet_cohorts|*|total_balance*,
-            wallet_cohorts|*|total_sold*,
+            # wallet_cohorts|*|total_sold*,
 
 
 
@@ -354,7 +353,7 @@ coin_modeling: #CoinModel
             '*|*/cw_return_rate_min_000_score/*',
             '*|*/cw_return_rate_min_005_score/*',
             '*|*/cw_return_rate_min_025_score/*',
-            # '*|*/cw_return_rate_min_040_score/*',
+            '*|*/cw_return_rate_min_040_score/*',
             '*|*/cw_net_flows_rate_min_025_score/*',
             '*|*/cw_return_rate_max_-005_score/*',
             '*|*/cw_return_rate_max_-025_score/*',
@@ -385,8 +384,8 @@ coin_modeling: #CoinModel
             '*|*/*/p002',
             '*|*/*/p01',
             # '*|*/*/p05',
-            '*|*/*/p10',
-            '*|*/*/p90',
+            # '*|*/*/p10',
+            # '*|*/*/p90',
             '*|*/*/p95',
             # '*|*/*/p99',
             # '*|*/*/p998',
@@ -418,6 +417,9 @@ coin_modeling: #CoinModel
         # non modeling metaparams
         random_state: 42
         n_jobs: -1
+
+        scale_pos_weight: 20  # used for oversampling; number is a ratio of neg:pos, e.g. 20 means 20neg:1pos
+
 
     # CoinModel Grid Search
     grid_search_params:
@@ -470,119 +472,19 @@ coin_modeling: #CoinModel
             drop_columns__drop_patterns: [
                 # 'feature_retainer',
 
-                # Segment Category
-                # Segment Family
-                # score_binary|cw_net_flows_min_1000/*,
-                # score_binary|cw_net_gain_min_1000/*,
-                # score_binary|cw_return_rate_min_000/*,
-                # score_binary|cw_return_rate_min_005/*,
-                # score_binary|cw_return_rate_min_025/*,
-                # score_binary|cw_return_rate_min_040/*,
-                # # score_binary|cw_net_flows_rate_min_025/*,
-                # score_binary|cw_return_rate_max_-005/*,
-                # # score_binary|cw_return_rate_max_-025/*,
-                # score_binary|cw_return_rate_min_060/*,
-                # score_binary|cw_return_rate_min_080/*,
-                # score_binary|return_rate_min_005/*,
-                # score_binary|return_rate_min_025/*,
-                # score_binary|return_rate_min_040/*,
+                macro|global_market_cap/rsi_30*,
+                macro|global_market_cap/std_*,
+                macro|global_market_cap/last_*,
+                macro|btc_vdd_multiple/std_*,
+                macro|btc_vdd_multiple/last_*,
+                macro|gtrends_altcoin_worldwide/std_*,
+                macro|gtrends_altcoin_worldwide/last_*,
+                macro|gtrends_memecoin_us/std_*,
+                macro|gtrends_memecoin_us/last_*,
+                macro|btc_mvrv_z_score/std_*,
+                macro|btc_mvrv_z_score/last_*,
+                macro|btc_price/std_*,
 
-
-                # # Segment Value
-                # 'training_clusters|k5_cluster/cluster_0|*',
-                # 'training_clusters|k5_cluster/cluster_1|*',
-                # 'training_clusters|k5_cluster/cluster_2|*',
-                # 'training_clusters|k5_cluster/cluster_3|*',
-                # 'training_clusters|k5_cluster/cluster_4|*',
-
-                # macro|global_market_cap/*,
-                # # macro|btc_mvrv_z_score/*,
-                # macro|btc_vdd_multiple/*,
-                # macro|gtrends_altcoin_worldwide/*,
-                # macro|gtrends_memecoin_us/*,
-                # macro|btc_price/*,
-
-                # macro|*/*period_1,
-                # macro|*/*period_2,
-                # macro|*/*period_3,
-
-                # # macro|global_market_cap/rsi_30*,
-                # # macro|global_market_cap/std_*,
-                # # macro|global_market_cap/last_*,
-                # # macro|btc_vdd_multiple/std_*,
-                # macro|btc_vdd_multiple/last_*,
-                # # macro|gtrends_altcoin_worldwide/std_*,
-                # # macro|gtrends_altcoin_worldwide/last_*,
-                # # macro|gtrends_memecoin_us/std_*,
-                # macro|gtrends_memecoin_us/last_*,
-                # macro|btc_mvrv_z_score/std_*,
-                # # macro|btc_mvrv_z_score/last_*,
-                # # macro|btc_price/std_*,
-
-                # Metric
-                # time_series|market_data|price*,
-                # time_series|market_data|volume*,
-                # time_series|market_data|*_period_1,
-                # time_series|market_data|*_period_2,
-                # time_series|market_data|*_period_3,
-
-                # wallet_cohorts|*|*period_1,
-                # wallet_cohorts|*|*period_2,
-                # wallet_cohorts|*|total_sold*,
-
-                # # Metric Details
-                # # '*|trading/crypto_cash_buys|*',
-                # # '*|trading/crypto_cash_sells|*',
-                # # '*|trading/crypto_inflows|*',
-                # # '*|trading/crypto_net_cash_flows|*',
-                # # '*|trading/crypto_net_flows|*',
-                # # # # '*|trading/crypto_net_gain|*',
-                # # '*|trading/crypto_outflows|*',
-                # # '*|trading/max_investment|*',
-                # '*|trading/total_volume|*',
-                # '*|trading/unique_coins_traded|*',
-                # # '*|trading/average_transaction|*',
-                # '*|balances/usd_balance_starting*|*',
-                # '*|balances/usd_balance_ending*|*',
-
-
-                # # Transformation Base
-                # # '*|*/cw_net_flows_min_1000_score/*',
-                # # '*|*/cw_net_gain_min_1000_score/*',
-                # # '*|*/cw_return_rate_min_000_score/*',
-                # # '*|*/cw_return_rate_min_005_score/*',
-                # # '*|*/cw_return_rate_min_025_score/*',
-                # '*|*/cw_return_rate_min_040_score/*',
-                # # '*|*/cw_net_flows_rate_min_025_score/*',
-                # # '*|*/cw_return_rate_max_-005_score/*',
-                # # '*|*/cw_return_rate_max_-025_score/*',
-                # # '*|*/cw_return_rate_min_060_score/*',
-                # # '*|*/cw_return_rate_min_080_score/*',
-                # # '*|*/return_rate_min_005_score/*',
-                # # '*|*/return_rate_min_025_score/*',
-                # # '*|*/return_rate_min_040_score/*',
-                # '*|*/cw_return_rate_regression_score/*',
-                # # '*|*/return_rate_regression_score/*',
-
-                # '*|score_wtd/*',
-
-                # '*/sum',
-                # '*/sum_pct',
-                # '*/count',
-                # '*/count_pct',
-
-                # '*|*/*/kurt',
-                '*|*/*/median',
-                # '*|*/*/p002',
-                # '*|*/*/p01',
-                '*|*/*/p05',
-                # '*|*/*/p10',
-                # '*|*/*/p90',
-                # '*|*/*/p95',
-                '*|*/*/p99',
-                '*|*/*/p998',
-                # '*|*/*/skew',
-                # '*|*/*/std',
 
             ]
 
