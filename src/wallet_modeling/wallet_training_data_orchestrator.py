@@ -767,6 +767,7 @@ class WalletTrainingDataOrchestrator:
 #   Hybrid Index Utility Functions
 # -----------------------------------
 
+
 @u.timing_decorator
 def hybridize_wallet_address(
     df: pd.DataFrame,
@@ -826,3 +827,129 @@ def hybridize_wallet_address(
         )
 
     return df_copy
+
+
+
+def validate_hybrid_mapping_completeness(base_df, hybrid_cw_id_df):
+    """
+    Validates that all coin_id/wallet_address pairs in base_df exist in hybrid_cw_id_df.
+
+    Params:
+    - base_df (DataFrame): MultiIndexed profits dataframe with (coin_id, wallet_address)
+        or just wallet_address
+    - hybrid_cw_id_df (DataFrame): Mapping dataframe with coin_id, wallet_address, hybrid_cw_id columns
+
+    Raises:
+    - ValueError: If any coin_id/wallet_address pairs in base_df are missing from hybrid_cw_id_df
+    """
+    logger.info("Validating hybrid_cw_id coverage...")
+    if (base_df.reset_index()['wallet_address'].astype(str).str[0] == '3').all():
+        logger.info("Input IDs are hybrid_cw_ids.")
+        profits_pairs = set(base_df.reset_index()['wallet_address'])
+        hybrid_pairs = set(hybrid_cw_id_df['hybrid_cw_id'])
+        missing_pairs = profits_pairs - hybrid_pairs
+
+    else:
+        profits_pairs = set(zip(base_df.reset_index()['coin_id'],base_df.reset_index()['wallet_address']))
+        hybrid_pairs = set(zip(hybrid_cw_id_df['coin_id'], hybrid_cw_id_df['wallet_address']))
+        missing_pairs = profits_pairs - hybrid_pairs
+
+    if missing_pairs:
+        missing_count = len(missing_pairs)
+        example_pairs = list(missing_pairs)[:3]
+        raise ValueError(f"Found {missing_count} coin_id/wallet_address pairs in base_df with no corresponding "
+                            f"entry in hybrid_cw_id_df. Examples: {example_pairs}")
+
+    logger.info("All hybrid_cw_ids have coverage.")
+
+
+
+@u.timing_decorator
+def dehybridize_wallet_address(
+    df: pd.DataFrame,
+    hybrid_cw_id_df: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Reverse hybridization by expanding the integer hybrid IDs back into their
+    original wallet_address and coin_id components.
+
+    Params:
+    - df (DataFrame): Input DataFrame whose *wallet_address* column (or index
+      level) contains `hybrid_cw_id` integers produced by
+      `hybridize_wallet_address`.
+    - hybrid_cw_id_df (DataFrame): Mapping DataFrame with columns
+      ['hybrid_cw_id', 'wallet_id', 'coin_id'].
+
+    Returns:
+    - DataFrame identical to the input but with the hybrid IDs replaced by the
+      original `wallet_address` values **and** a corresponding `coin_id`
+      (either as a column or index level mirroring the input structure).
+
+    Notes
+    -----
+    * The function preserves the original index structure:
+      - If the hybrid IDs were in the index, the output will have a
+        MultiIndex (wallet_address, coin_id).
+      - If they were in a regular column, two explicit columns will be
+        present.
+    * Raises ValueError if any hybrid IDs fail to map.
+    """
+    logger.info("De‑hybridizing DataFrame with shape %s …", df.shape)
+    df_out = df.copy()
+    original_index = df_out.index.names
+
+    # -------------------------------------------------
+    # Detect where the hybrid IDs live and rename the
+    # column/index level to *hybrid_cw_id* so we can
+    # merge cleanly without duplicate label errors.
+    # -------------------------------------------------
+    if 'wallet_address' in df_out.columns:
+        # Column case → rename in‑place
+        df_out = df_out.rename(columns={'wallet_address': 'hybrid_cw_id'})
+        wallet_col = 'hybrid_cw_id'
+        used_index = False
+
+    elif 'wallet_address' in df_out.index.names:
+        # Index case → bring into columns, then rename
+        # Drop any duplicate column first to avoid reset_index collision
+        if 'wallet_address' in df_out.columns:
+            df_out = df_out.drop(columns=['wallet_address'])
+
+        df_out = df_out.reset_index()
+        df_out = df_out.rename(columns={'wallet_address': 'hybrid_cw_id'})
+        wallet_col = 'hybrid_cw_id'
+        used_index = True
+
+    else:
+        raise ValueError(
+            "dehybridize_wallet_address: expected 'wallet_address' either as "
+            "a column or an index level containing hybrid IDs."
+        )
+
+    # Merge to add wallet_id + coin_id
+    df_out = df_out.merge(hybrid_cw_id_df, on=wallet_col, how='left')
+
+    # Verify mapping completeness
+    if df_out['wallet_address'].isna().any():
+        missing = df_out['wallet_address'].isna().sum()
+        raise ValueError(
+            f"Failed to de‑hybridize {missing} rows – missing hybrid_cw_id "
+            "mappings."
+        )
+
+    # Replace hybrid id with original wallet_id and rename for consistency
+    df_out = df_out.drop(columns=['hybrid_cw_id'])
+
+    # Restore original index structure
+    if used_index:
+        # Re‑establish MultiIndex (wallet_address, coin_id, [other …])
+        df_out = df_out.set_index(
+            ['wallet_address', 'coin_id'] +
+            [col for col in original_index if col not in ('wallet_address', 'coin_id')]
+        )
+    else:
+        # Ensure wallet_address & coin_id are regular columns
+        pass  # nothing required
+
+    logger.info("Completed de‑hybridization; resulting shape %s.", df_out.shape)
+    return df_out

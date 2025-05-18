@@ -41,6 +41,7 @@ class WalletEpochsOrchestrator:
         complete_profits_df: pd.DataFrame = None,
         complete_market_data_df: pd.DataFrame = None,
         complete_macro_trends_df: pd.DataFrame = None,
+        complete_hybrid_cw_id_df: pd.DataFrame = None
     ):
         # Param Configs
         self.base_config = base_config
@@ -55,12 +56,20 @@ class WalletEpochsOrchestrator:
         self.complete_profits_df = complete_profits_df
         self.complete_market_data_df = complete_market_data_df
         self.complete_macro_trends_df = complete_macro_trends_df
+        self.complete_hybrid_cw_id_df = complete_hybrid_cw_id_df
         self.wtd = WalletTrainingData(self.base_config)  # helper for complete df generation
 
         # Create hybrid ID mapping if configured and able
         self.complete_hybrid_cw_id_df = None
         if self.base_config['training_data']['hybridize_wallet_ids'] and self.complete_profits_df is not None:
             self.complete_hybrid_cw_id_df = self.create_hybrid_mapping()
+
+        # Confirm all pairs in profits_df have a hybrid mapping
+        if self.complete_hybrid_cw_id_df is not None:
+            wtdo.validate_hybrid_mapping_completeness(
+                self.complete_profits_df,
+                self.complete_hybrid_cw_id_df
+            )
 
         # Generated objects
         self.output_dfs = {}
