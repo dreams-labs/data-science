@@ -136,6 +136,11 @@ class WalletModel(BaseModel):
         }
 
         # Store validation datasets and predictions if applicable
+        if self.X_validation is None or self.X_validation.empty:
+            logger.warning("Validation dataset is empty – skipping validation metrics.")
+            self.X_validation = None
+            self.validation_wallet_features_df = None
+
         if self.X_validation is not None:
             result['X_validation'] = self.X_validation
             result['validation_wallet_features_df'] = self.validation_wallet_features_df

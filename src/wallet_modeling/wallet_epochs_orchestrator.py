@@ -199,7 +199,8 @@ class WalletEpochsOrchestrator:
                     modeling_validation_dfs[epoch_date] = epoch_modeling_df #pylint:disable=possibly-used-before-assignment
 
                 i += 1
-                logger.milestone(f"Epoch {i}/{len(epoch_configs_to_process)} completed (date: {epoch_date})")
+                logger.milestone(f"Epoch {i}/{len(epoch_configs_to_process)} completed (date: " \
+                                 f"{pd.to_datetime(epoch_date).strftime('%Y-%m-%d')})")
 
         del epoch_training_df, epoch_modeling_df
         gc.collect()
