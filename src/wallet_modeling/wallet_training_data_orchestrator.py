@@ -843,22 +843,64 @@ def validate_hybrid_mapping_completeness(base_df, hybrid_cw_id_df):
     - ValueError: If any coin_id/wallet_address pairs in base_df are missing from hybrid_cw_id_df
     """
     logger.info("Validating hybrid_cw_id coverage...")
-    if (base_df.reset_index()['wallet_address'].astype(str).str[0] == '3').all():
-        logger.info("Input IDs are hybrid_cw_ids.")
-        profits_pairs = set(base_df.reset_index()['wallet_address'])
-        hybrid_pairs = set(hybrid_cw_id_df['hybrid_cw_id'])
-        missing_pairs = profits_pairs - hybrid_pairs
 
+    # -------------------------------------------------
+    # 1) Quickly grab the wallet_address Series
+    # -------------------------------------------------
+    if 'wallet_address' in base_df.columns:
+        wallet_series = base_df['wallet_address']
     else:
-        profits_pairs = set(zip(base_df.reset_index()['coin_id'],base_df.reset_index()['wallet_address']))
-        hybrid_pairs = set(zip(hybrid_cw_id_df['coin_id'], hybrid_cw_id_df['wallet_address']))
-        missing_pairs = profits_pairs - hybrid_pairs
+        wallet_series = base_df.index.get_level_values('wallet_address')
 
-    if missing_pairs:
-        missing_count = len(missing_pairs)
-        example_pairs = list(missing_pairs)[:3]
-        raise ValueError(f"Found {missing_count} coin_id/wallet_address pairs in base_df with no corresponding "
-                            f"entry in hybrid_cw_id_df. Examples: {example_pairs}")
+    # Detect whether the IDs are already hybrid ints (they start with '3')
+    is_hybrid = wallet_series.astype(str).str.startswith('3').all()
+
+    # -------------------------------------------------
+    # 2) Hybrid‑ID case  →  simple vectorized membership test
+    # -------------------------------------------------
+    if is_hybrid:
+        in_mapping = pd.Series(wallet_series.unique()).isin(
+            hybrid_cw_id_df['hybrid_cw_id'].unique()
+        )
+        if not in_mapping.all():
+            missing_ids = pd.Series(wallet_series.unique())[~in_mapping]
+            raise ValueError(
+                f"Found {missing_ids.size} hybrid_cw_id values with no mapping. "
+                f"Examples: {missing_ids.iloc[:3].tolist()}"
+            )
+
+    # -------------------------------------------------
+    # 3) Regular (coin_id, wallet_address) pair case
+    #    →  use a left merge with an indicator to spot gaps
+    # -------------------------------------------------
+    else:
+        # Build a de‑duplicated DataFrame of unique pairs from *base_df*
+        if {'coin_id', 'wallet_address'}.issubset(base_df.columns):
+            base_pairs = base_df[['coin_id', 'wallet_address']].drop_duplicates()
+        else:
+            base_pairs = (
+                base_df.reset_index()[['coin_id', 'wallet_address']]
+                .drop_duplicates()
+            )
+
+        mapping_pairs = hybrid_cw_id_df[['coin_id', 'wallet_address']].drop_duplicates()
+
+        # Left‑join to find pairs that exist only in *base_df*
+        merged = base_pairs.merge(
+            mapping_pairs,
+            on=['coin_id', 'wallet_address'],
+            how='left',
+            indicator=True
+        )
+
+        missing_rows = merged[merged['_merge'] == 'left_only']
+
+        if not missing_rows.empty:
+            raise ValueError(
+                f"Found {len(missing_rows)} coin_id/wallet_address pairs in base_df with "
+                f"no corresponding entry in hybrid_cw_id_df. "
+                f"Examples: {missing_rows.head(3).to_dict('records')}"
+            )
 
     logger.info("All hybrid_cw_ids have coverage.")
 
