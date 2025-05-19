@@ -9,14 +9,15 @@ training_data: #CoinModel
     modeling_period_duration: 30
     coin_epoch_lookbacks: [  # How many days prior to the modeling period each window begins
         0,
+        -180,
+        -360,
+
         -30,
         -60,
         -90,
         -120,
-        -180,
         -240,
         -300,
-        -360,
         # -420,
         # -480,
         # -540,
@@ -119,37 +120,37 @@ wallet_scores: #CoinModel
 
         cw_net_flows_rate_min_025:
             target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: .25
+            target_var_min_threshold: 0.25
             target_var_max_threshold: .inf
             y_pred_threshold: 0.85
 
         cw_net_flows_rate_min_-025:
             target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: -.25
+            target_var_min_threshold: -0.25
             target_var_max_threshold: .inf
             y_pred_threshold: 0.85
 
         cw_net_flows_rate_min_-005:
             target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: -.05
+            target_var_min_threshold: -0.05
             target_var_max_threshold: .inf
             y_pred_threshold: 0.85
 
         cw_net_flows_rate_min_005:
             target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: .05
+            target_var_min_threshold: 0.05
             target_var_max_threshold: .inf
             y_pred_threshold: 0.85
 
         cw_net_flows_rate_min_040:
             target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: .40
+            target_var_min_threshold: 0.40
             target_var_max_threshold: .inf
             y_pred_threshold: 0.85
 
         cw_net_flows_rate_max_-40:
             target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: -.40
+            target_var_min_threshold: -0.40
             target_var_max_threshold: .inf
             y_pred_threshold: 0.85
 
