@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 import copy
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import joblib
 
@@ -616,45 +617,55 @@ class CoinEpochsOrchestrator:
             self.wallets_config['training_data']['parquet_folder']
         )
 
-        # 2) Instantiate the CoinFeaturesOrchestrator for this epoch
-        epoch_cfo = cfo.CoinFeaturesOrchestrator(
-            epoch_weo.base_config,              # epoch-specific wallet config
-            epoch_coins_config,                 # epoch-specific coin config
-            self.wallets_coins_metrics_config,  # coin metrics config
-            self.coin_flow_config,              # coin flow base config
-            self.coin_flow_modeling_config,     # coin flow modeling config
-            self.coin_flow_metrics_config,      # coin flow metrics config
-            training_coin_cohort                # initial coin cohort
-        )
-
-        # 3) Generate features for modeling (WaMo) period
-        wamo_macro_indicators_df = self._generate_epoch_macro_indicators(
-            epoch_weo.base_config['training_data']['modeling_period_start'],
-            epoch_weo.base_config['training_data']['modeling_period_end']
-        )
+        # 2) Build WaMo and CoMo feature sets concurrently
         wamo_suffix = pd.to_datetime(
             epoch_weo.base_config['training_data']['coin_modeling_period_start']
         ).strftime('%Y%m%d')
-        wamo_coin_features = epoch_cfo.generate_coin_features_for_period(
-            wamo_profits_df,
-            wamo_training_data_df,
-            wamo_macro_indicators_df,
-            'modeling',
-            wamo_suffix
-        )
 
-        # 4) Generate features for coin-modeling (CoMo) period
-        como_macro_indicators_df = self._generate_epoch_macro_indicators(
-            epoch_weo.base_config['training_data']['coin_modeling_period_start'],
-            epoch_weo.base_config['training_data']['coin_modeling_period_end']
-        )
-        como_coin_features = epoch_cfo.generate_coin_features_for_period(
-            como_profits_df,
-            como_training_data_df,
-            como_macro_indicators_df,
-            'coin_modeling',
-            wamo_suffix  # retain same suffix
-        )
+        def _build_features(period: str):
+            """
+            Helper to build coin features for either WaMo or CoMo inside its own CFO instance.
+            """
+            if period == 'wamo':
+                macro_df = self._generate_epoch_macro_indicators(
+                    epoch_weo.base_config['training_data']['modeling_period_start'],
+                    epoch_weo.base_config['training_data']['modeling_period_end']
+                )
+                profits_df_local = wamo_profits_df
+                training_df_local = wamo_training_data_df
+                period_key = 'modeling'
+            else:  # 'como'
+                macro_df = self._generate_epoch_macro_indicators(
+                    epoch_weo.base_config['training_data']['coin_modeling_period_start'],
+                    epoch_weo.base_config['training_data']['coin_modeling_period_end']
+                )
+                profits_df_local = como_profits_df
+                training_df_local = como_training_data_df
+                period_key = 'coin_modeling'
+
+            # Each thread gets its own orchestrator instance (thread‑safe)
+            local_cfo = cfo.CoinFeaturesOrchestrator(
+                epoch_weo.base_config,
+                epoch_coins_config,
+                self.wallets_coins_metrics_config,
+                self.coin_flow_config,
+                self.coin_flow_modeling_config,
+                self.coin_flow_metrics_config,
+                training_coin_cohort
+            )
+            return local_cfo.generate_coin_features_for_period(
+                profits_df_local,
+                training_df_local,
+                macro_df,
+                period_key,
+                wamo_suffix
+            )
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            wamo_future = pool.submit(_build_features, 'wamo')
+            como_future = pool.submit(_build_features, 'como')
+            wamo_coin_features = wamo_future.result()
+            como_coin_features = como_future.result()
 
         # 5) Persist results to parquet
         base_folder = epoch_coins_config['training_data']['parquet_folder']
