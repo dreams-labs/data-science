@@ -110,7 +110,7 @@ class WalletsCoinConfig:
         - period_duration (int): How long a modeling period lasts for, as defined in
             wallets_config['training_data']['modeling_period_duration']
         """
-        td_epochs = self.config['training_data']['coin_epoch_lookbacks']
+        td_epochs = self.config['training_data']['coin_epochs_training']
         val_epochs = self.config['training_data']['coin_epochs_validation']
         latest_td_end = max(td_epochs) + period_duration
         earliest_val_start = min(val_epochs)

@@ -88,7 +88,7 @@ class CoinEpochsOrchestrator:
         and generates complete dfs for them.
         """
         # Calculate earliest required modeling start date for coverage validation
-        coins_earliest_epoch = min(self.wallets_coin_config['training_data']['coin_epoch_lookbacks'])
+        coins_earliest_epoch = min(self.wallets_coin_config['training_data']['coin_epochs_training'])
         wallets_earliest_epoch = min(self.wallets_epochs_config['offset_epochs']['offsets'])
         wallets_earliest_window = max(self.wallets_config['training_data']['training_window_lookbacks'])
         earliest_modeling_period_start = (
@@ -134,7 +134,7 @@ class CoinEpochsOrchestrator:
             )
 
         # Generate wallets_lookback_config with the earliest lookback date
-        coins_earliest_epoch = min(self.wallets_coin_config['training_data']['coin_epoch_lookbacks'])
+        coins_earliest_epoch = min(self.wallets_coin_config['training_data']['coin_epochs_training'])
         wallets_lookback_config = copy.deepcopy(self.wallets_config)
         earliest_modeling_period_start_str = (
             pd.to_datetime(wallets_lookback_config['training_data']['modeling_period_start'])
@@ -170,12 +170,12 @@ class CoinEpochsOrchestrator:
         Orchestrate coin-level epochs by iterating through lookbacks and processing each epoch.
 
         Params:
-        - custom_offset_days: overrides coin_epoch_lookbacks in wallets_coin_config
+        - custom_offset_days: overrides coin_epochs_training in wallets_coin_config
         - file_prefix: changes the filename of the parquet files
         """
         # Determine which offsets to use
         offsets = custom_offset_days if custom_offset_days is not None \
-            else self.wallets_coin_config['training_data']['coin_epoch_lookbacks']
+            else self.wallets_coin_config['training_data']['coin_epochs_training']
 
         # Check validity of inputs vs available data
         most_recent_data = self.complete_profits_df.index.get_level_values('date').max()

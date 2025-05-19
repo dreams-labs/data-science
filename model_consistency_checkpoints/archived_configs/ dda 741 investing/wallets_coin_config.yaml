@@ -7,7 +7,7 @@ training_data: #CoinModel
     # coins_wallet_scores_folder: automatically filled
 
     modeling_period_duration: 30
-    coin_epoch_lookbacks: [  # How many days prior to the modeling period each window begins
+    coin_epochs_training: [  # How many days prior to the modeling period each window begins
         0,
         -30,
         -60,

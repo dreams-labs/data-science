@@ -11,17 +11,17 @@ training_data: #CoinModel
         30
     ]
 
-    coin_epoch_lookbacks: [  # How many days prior to the modeling period each window begins
+    coin_epochs_training: [  # How many days prior to the modeling period each window begins
         # 0,
-        -180,
-        -360,
-
         -30,
+        # -180,
+        # -360,
+
         -60,
         -90,
-        -120,
-        -240,
-        -300,
+        # -120,
+        # -240,
+        # -300,
         # -420,
         # -480,
         # -540,
