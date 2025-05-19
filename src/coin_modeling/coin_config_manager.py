@@ -100,3 +100,20 @@ class WalletsCoinConfig:
             raise ValueError(
                 f"Invalid score_distributions entries not found in score_params: {missing}"
             )
+
+
+    def validate_epochs_validation_overlap(self, period_duration: int):
+        """
+        Validates that there is no overlap between coin training and validation epochs
+
+        Params:
+        - period_duration (int): How long a modeling period lasts for, as defined in
+            wallets_config['training_data']['modeling_period_duration']
+        """
+        td_epochs = self.config['training_data']['coin_epoch_lookbacks']
+        val_epochs = self.config['training_data']['coin_epochs_validation']
+        latest_td_end = max(td_epochs) + period_duration
+        earliest_val_start = min(val_epochs)
+        if latest_td_end > earliest_val_start:
+            raise ValueError(f"Latest training epoch offset ends at day {latest_td_end} which overlaps "
+                             f"with the earliest validation epoch offset of {earliest_val_start}.")
