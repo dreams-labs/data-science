@@ -131,6 +131,7 @@ class WalletTrainingData:
 
         if not coin_cohort:
             # Apply initial market cap threshold filter if no coin cohort was passed
+            # Above threshold
             max_initial_market_cap = self.wallets_config['data_cleaning']['max_initial_market_cap']
             above_initial_threshold_coins = market_data_df[
                 (market_data_df['date']==self.wallets_config['training_data']['training_period_start'])
@@ -139,6 +140,16 @@ class WalletTrainingData:
             market_data_df = market_data_df[~market_data_df['coin_id'].isin(above_initial_threshold_coins)]
             logger.info("Removed data for %s coins with a market cap above $%s at the start of the training period."
                         ,len(above_initial_threshold_coins),dc.human_format(max_initial_market_cap))
+
+            # Below threshold
+            min_initial_market_cap = self.wallets_config['data_cleaning']['min_initial_market_cap']
+            below_initial_threshold_coins = market_data_df[
+                (market_data_df['date']==self.wallets_config['training_data']['training_period_start'])
+                & (market_data_df['market_cap_filled']<min_initial_market_cap)
+            ]['coin_id']
+            market_data_df = market_data_df[~market_data_df['coin_id'].isin(below_initial_threshold_coins)]
+            logger.info("Removed data for %s coins with a market cap below $%s at the start of the training period."
+                        ,len(below_initial_threshold_coins),dc.human_format(min_initial_market_cap))
         else:
             logger.info("Returned market data for the %s coins in the coin cohort passed as a parameter.",
                         len(coin_cohort))
