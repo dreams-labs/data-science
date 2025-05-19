@@ -56,6 +56,11 @@ def load_all_wallets_configs(config_dir: str):
     # Store updated config
     wallets_coin_config.config = base_wc_config
 
+    # Validate no overlap between coin training and validation epochs
+    wallets_coin_config.validate_epochs_validation_overlap(
+        wallets_config['training_data']['modeling_period_duration']
+    )
+
     return wallets_config, wallets_coin_config
 
 
