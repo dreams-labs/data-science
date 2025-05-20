@@ -377,8 +377,8 @@ class CoinEpochsOrchestrator:
          Returns:
          - epoch_orch (WalletEpochsOrchestrator): orchestrator with config set for lookback
          - (
-                wallet_training_data_df,modeling_wallet_features_df,
-                validation_training_data_df,validation_wallet_features_df
+                wallet_training_data_df,wallet_target_vars_df,
+                validation_training_data_df,validation_target_vars_df
             ) Tuple(pd.DataFrames): training_data_df and target variables to the epoch
         """
         # 1) Generate coin epoch-specific wallets_config

@@ -1,3 +1,79 @@
+# DDA 794 target var df terminology
+checkpoint 1b: w1%.311 rename complete (main)
+Model Performance Summary
+Target: cw_crypto_net_flows/crypto_inflows/base 0.4 to inf
+ID: 080f4a6e-1115-4c67-8a50-94d8ba426046
+===================================
+Test Samples:             188,145
+Number of Features:       372
+Features per Window:      62
+
+Classification Metrics
+-----------------------------------
+ROC AUC:                    0.939
+Log Loss:                   0.110
+Accuracy:                   0.955
+Precision:                  0.871
+Recall:                     0.090
+F1 Score:                   0.164
+
+Validation Metrics
+-----------------------------------
+Val ROC AUC:                0.765
+Val Accuracy:               0.862
+Val Precision:              0.547
+Val Recall:                 0.003
+Val F1 Score:               0.005
+
+Validation Return Metrics
+-----------------------------------
+Positive Threshold:         0.80
+Positive Predictions:       2614/3837386 (0.07%)
+Positive Mean Outcome:      0.241
+Positive W-Mean Outcome:    0.269
+Top 1% W-Mean Outcome:      0.311
+Top 5% W-Mean Outcome:      0.277
+Overall W-Mean Outcome:     0.115
+
+
+checkpoint 1: w1%.340 rename complete
+Model Performance Summary
+Target: cw_crypto_net_flows/crypto_inflows/base 0.4 to inf
+ID: 6c717c6f-5210-44c0-abfd-a516e1bb0fa2
+===================================
+Test Samples:             188,145
+Number of Features:       372
+Features per Window:      62
+
+Classification Metrics
+-----------------------------------
+ROC AUC:                    0.940
+Log Loss:                   0.110
+Accuracy:                   0.955
+Precision:                  0.872
+Recall:                     0.090
+F1 Score:                   0.163
+
+Validation Metrics
+-----------------------------------
+Val ROC AUC:                0.770
+Val Accuracy:               0.862
+Val Precision:              0.686
+Val Recall:                 0.006
+Val F1 Score:               0.013
+
+Validation Return Metrics
+-----------------------------------
+Positive Threshold:         0.80
+Positive Predictions:       5009/3837386 (0.13%)
+Positive Mean Outcome:      0.406
+Positive W-Mean Outcome:    0.412
+Top 1% W-Mean Outcome:      0.340
+Top 5% W-Mean Outcome:      0.286
+Overall W-Mean Outcome:     0.115
+
+
+
 # DDA 785 wallet scores for may
 checkpoint 2: flows with training boolean: w1%.305
 Model Performance Summary
