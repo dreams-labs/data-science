@@ -308,13 +308,13 @@ class BaseModel:
 
         elif scoring_param == 'validation_r2_scorer':
             # Ensure validation data is available
-            if self.X_validation is None or self.validation_wallet_features_df is None:
+            if self.X_validation is None or self.validation_target_vars_df is None:
                 raise ValueError("Validation data required for validation_r2_scorer")
             gs_config['search_config']['scoring'] = sco.validation_r2_scorer(self)
 
         elif scoring_param == 'validation_auc_scorer':
             # Ensure validation data is available
-            if self.X_validation is None or self.validation_wallet_features_df is None:
+            if self.X_validation is None or self.validation_target_vars_df is None:
                 raise ValueError("Validation data required for validation_auc_scorer")
             gs_config['search_config']['scoring'] = sco.validation_auc_scorer(self)
 

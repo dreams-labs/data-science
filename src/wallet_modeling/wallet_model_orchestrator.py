@@ -61,18 +61,18 @@ class WalletModelOrchestrator:
     def train_wallet_models(
         self,
         wallet_training_data_df,
-        modeling_wallet_features_df,
+        wallet_target_vars_df,
         validation_training_data_df,
-        validation_wallet_features_df
+        validation_target_vars_df
     ) -> dict:
         """
         Train multiple wallet scoring models with different parameter configurations.
 
         Params:
         - wallet_training_data_df: Training data DataFrame
-        - modeling_wallet_features_df: Features for modeling
+        - wallet_target_vars_df: Features for modeling
         - validation_training_data_df: Validation training data
-        - validation_wallet_features_df: Validation features
+        - validation_target_vars_df: Validation features
 
         Returns:
         - models_dict: Dictionary mapping score names to model IDs
@@ -96,9 +96,9 @@ class WalletModelOrchestrator:
             model_id, evaluator = self._train_and_evaluate(
                 score_wallets_config,
                 wallet_training_data_df,
-                modeling_wallet_features_df,
+                wallet_target_vars_df,
                 validation_training_data_df,
-                validation_wallet_features_df
+                validation_target_vars_df
             )
             evaluators.append((score_name, evaluator))
 
@@ -181,9 +181,9 @@ class WalletModelOrchestrator:
         self,
         score_wallets_config,
         wallet_training_data_df,
-        modeling_wallet_features_df,
+        wallet_target_vars_df,
         validation_training_data_df,
-        validation_wallet_features_df
+        validation_target_vars_df
     ):
         """
         Train and evaluate a single model with given configuration.
@@ -191,9 +191,9 @@ class WalletModelOrchestrator:
         Params:
         - score_wallets_config: Configuration specific to this score
         - wallet_training_data_df: Training data DataFrame
-        - modeling_wallet_features_df: Features for modeling
+        - wallet_target_vars_df: Features for modeling
         - validation_training_data_df: Validation training data
-        - validation_wallet_features_df: Validation features
+        - validation_target_vars_df: Validation features
 
         Returns:
         - (model_id, wallet_evaluator): ID of the trained model and evaluator object
@@ -201,8 +201,8 @@ class WalletModelOrchestrator:
         # Construct model
         wallet_model = WalletModel(score_wallets_config['modeling'])
         wallet_model_results = wallet_model.construct_wallet_model(
-            wallet_training_data_df, modeling_wallet_features_df,
-            validation_training_data_df, validation_wallet_features_df
+            wallet_training_data_df, wallet_target_vars_df,
+            validation_training_data_df, validation_target_vars_df
         )
 
         # Generate and save all model artifacts

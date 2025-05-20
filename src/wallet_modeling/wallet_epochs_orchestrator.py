@@ -152,9 +152,9 @@ class WalletEpochsOrchestrator:
         - wallet_training_data_df (always returned)
 
         When `training_only=False` it also returns:
-        - modeling_wallet_features_df: MultiIndexed on (wallet_address, epoch_start_date) for modeling epochs
+        - wallet_target_vars_df: MultiIndexed on (wallet_address, epoch_start_date) for modeling epochs
         - validation_training_data_df: MultiIndexed on (wallet_address, epoch_start_date) for validation epochs
-        - validation_wallet_features_df: MultiIndexed on (wallet_address, epoch_start_date) for validation epochs
+        - validation_target_vars_df: MultiIndexed on (wallet_address, epoch_start_date) for validation epochs
         """
         training_only = self.base_config['training_data']['training_data_only']
         logger.milestone(f"Compiling training data for {len(self.all_epochs_configs)} epochs...")
@@ -218,12 +218,12 @@ class WalletEpochsOrchestrator:
         # Full four‑tuple path
         validation_training_data_df   = (self._merge_epoch_dfs(training_validation_dfs)
                                          if training_validation_dfs else pd.DataFrame())
-        modeling_wallet_features_df   = self._merge_epoch_dfs(modeling_modeling_dfs)
-        validation_wallet_features_df = (self._merge_epoch_dfs(modeling_validation_dfs)
+        wallet_target_vars_df   = self._merge_epoch_dfs(modeling_modeling_dfs)
+        validation_target_vars_df = (self._merge_epoch_dfs(modeling_validation_dfs)
                                          if modeling_validation_dfs else pd.DataFrame())
 
         # Confirm indices match
-        u.assert_matching_indices(wallet_training_data_df, modeling_wallet_features_df)
+        u.assert_matching_indices(wallet_training_data_df, wallet_target_vars_df)
 
         logger.milestone(
             "Generated multi‑epoch DataFrames with shapes:\n"
@@ -232,17 +232,17 @@ class WalletEpochsOrchestrator:
             " - validation train: %s\n"
             " - validation model: %s",
             wallet_training_data_df.shape,
-            modeling_wallet_features_df.shape,
+            wallet_target_vars_df.shape,
             validation_training_data_df.shape,
-            validation_wallet_features_df.shape
+            validation_target_vars_df.shape
         )
         u.notify('level_up')
 
         return (
             wallet_training_data_df,
-            modeling_wallet_features_df,
+            wallet_target_vars_df,
             validation_training_data_df,
-            validation_wallet_features_df
+            validation_target_vars_df
         )
 
 

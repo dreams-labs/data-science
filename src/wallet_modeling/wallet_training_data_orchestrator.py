@@ -410,7 +410,7 @@ class WalletTrainingDataOrchestrator:
 
 
         Returns:
-        - modeling_wallet_features_df: Generated wallet features
+        - wallet_target_vars_df: Generated wallet features
         """
         logger.info("Beginning modeling data preparation...")
 
@@ -438,8 +438,8 @@ class WalletTrainingDataOrchestrator:
 
         # Initialize features DataFrame
         logger.info("Generating modeling features...")
-        modeling_wallet_features_df = pd.DataFrame(index=self.training_wallet_cohort)
-        modeling_wallet_features_df.index.name = 'wallet_address'
+        wallet_target_vars_df = pd.DataFrame(index=self.training_wallet_cohort)
+        wallet_target_vars_df.index.name = 'wallet_address'
 
         # Generate trading features and identify modeling cohort
         # modeling_trading_features_df = self._identify_modeling_cohort(modeling_profits_df)
@@ -448,17 +448,17 @@ class WalletTrainingDataOrchestrator:
             self.wallets_config['training_data']['modeling_period_start'],
             self.wallets_config['training_data']['modeling_period_end']
         )
-        modeling_wallet_features_df = modeling_wallet_features_df.join(
+        wallet_target_vars_df = wallet_target_vars_df.join(
             modeling_trading_features_df,
             how='left'
         ).fillna({col: 0 for col in modeling_trading_features_df.columns})
 
         # Generate performance features
         modeling_performance_features_df = wpf.calculate_performance_features(
-            modeling_wallet_features_df,
+            wallet_target_vars_df,
             include_twb_metrics=False
         )
-        modeling_wallet_features_df = modeling_wallet_features_df.join(
+        wallet_target_vars_df = wallet_target_vars_df.join(
             modeling_performance_features_df,
             how='left'
         ).fillna({col: 0 for col in modeling_performance_features_df.columns})
@@ -467,7 +467,7 @@ class WalletTrainingDataOrchestrator:
         del modeling_trading_features_df, modeling_performance_features_df, modeling_profits_df
         gc.collect()
 
-        return modeling_wallet_features_df
+        return wallet_target_vars_df
 
 
     # ----------------------------------

@@ -61,7 +61,7 @@ class RegressorEvaluator:
         self.X_validation      = wallet_model_results.get('X_validation')
         self.y_validation      = wallet_model_results.get('y_validation')
         self.y_validation_pred = wallet_model_results.get('y_validation_pred')
-        self.validation_wallet_features_df = wallet_model_results.get('validation_wallet_features_df')
+        self.validation_target_vars_df = wallet_model_results.get('validation_target_vars_df')
 
         # model + features
         self.modeling_config = wallet_model_results['modeling_config']
@@ -478,7 +478,7 @@ class RegressorEvaluator:
         Y-axis shows mean actual return in each bucket (validation set).
         """
         # need validation preds + raw returns
-        if self.y_validation_pred is None or self.validation_wallet_features_df is None:
+        if self.y_validation_pred is None or self.validation_target_vars_df is None:
             ax.text(0.5, 0.5, "Validation data not available",
                     ha="center", va="center")
             return
@@ -489,13 +489,13 @@ class RegressorEvaluator:
         # Handle both NumPy arrays and pandas Series/DataFrames
         if hasattr(self.y_validation_pred, 'index'):  # pandas Series/DataFrame
             # Use pandas index for alignment
-            returns = self.validation_wallet_features_df[target_var].reindex(
+            returns = self.validation_target_vars_df[target_var].reindex(
                 self.y_validation_pred.index
             )
             df = pd.DataFrame({"pred": self.y_validation_pred, "ret": returns}).dropna()
         else:  # NumPy array
-            # Since we don't have index, use positions - assumes validation_wallet_features_df is aligned
-            returns = self.validation_wallet_features_df[target_var].values
+            # Since we don't have index, use positions - assumes validation_target_vars_df is aligned
+            returns = self.validation_target_vars_df[target_var].values
             df = pd.DataFrame({
                 "pred": self.y_validation_pred,
                 "ret": returns
@@ -566,7 +566,7 @@ class RegressorEvaluator:
         X-axis shows the actual prediction scores rather than percentiles.
         """
         # Check if validation data is available
-        if self.y_validation_pred is None or self.validation_wallet_features_df is None:
+        if self.y_validation_pred is None or self.validation_target_vars_df is None:
             # Fall back to just showing score distribution without returns
             self._plot_score_distribution(ax)
             ax.text(0.5, 0.1, "Return data not available (validation set missing)",
@@ -594,12 +594,12 @@ class RegressorEvaluator:
 
         # Extract validation data for returns
         if hasattr(self.y_validation_pred, 'index'):  # pandas Series/DataFrame
-            returns = self.validation_wallet_features_df[target_var].reindex(
+            returns = self.validation_target_vars_df[target_var].reindex(
                 self.y_validation_pred.index
             )
             df = pd.DataFrame({"pred": self.y_validation_pred, "ret": returns}).dropna()
         else:  # NumPy array
-            returns = self.validation_wallet_features_df[target_var].values
+            returns = self.validation_target_vars_df[target_var].values
             df = pd.DataFrame({
                 "pred": self.y_validation_pred,
                 "ret": returns,
@@ -914,9 +914,9 @@ class ClassifierEvaluator(RegressorEvaluator):
 
         # Validation return-based metrics
         if (getattr(self, 'y_validation_pred_proba', None) is not None
-            and hasattr(self, 'validation_wallet_features_df')):
+            and hasattr(self, 'validation_target_vars_df')):
             target = self.modeling_config['target_variable']
-            returns = self.validation_wallet_features_df[target].reindex(self.y_validation_pred_proba.index)
+            returns = self.validation_target_vars_df[target].reindex(self.y_validation_pred_proba.index)
             df_val = pd.DataFrame({
                 'pred' :self.y_validation_pred,
                 'proba': self.y_validation_pred_proba,
@@ -1155,13 +1155,13 @@ class ClassifierEvaluator(RegressorEvaluator):
         Secondary Y-axis: mean return per score bin.
         """
         # Check for validation data
-        if self.y_validation_pred_proba is None or self.validation_wallet_features_df is None:
+        if self.y_validation_pred_proba is None or self.validation_target_vars_df is None:
             ax.text(0.5, 0.5, "Validation data not available",
                     ha="center", va="center")
             return
 
         target_var = self.modeling_config["target_variable"]
-        returns = self.validation_wallet_features_df[target_var].reindex(
+        returns = self.validation_target_vars_df[target_var].reindex(
             self.y_validation_pred_proba.index
         )
         returns_winsorized = u.winsorize(returns, 0.01)
