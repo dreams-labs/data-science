@@ -210,11 +210,18 @@ class CoinEpochsOrchestrator:
         multiwindow_features = pd.concat(feature_dfs).sort_index()
         multiwindow_targets = pd.concat(target_dfs).sort_index()
 
+        def reset_index_codes(df):
+            """Helper to ensure matching indices by reseting MultiIndex codes while preserving values"""
+            df.index = pd.MultiIndex.from_tuples(df.index.values, names=df.index.names)
+            return df
+
         # Persist multiwindow parquet files
         root_folder = self.wallets_coin_config['training_data']['parquet_folder']
-        multiwindow_features.to_parquet(f"{root_folder}/{file_prefix}coin_training_data_df.parquet")
+        multiwindow_features = reset_index_codes(multiwindow_features)
+        multiwindow_features.to_parquet(f"{root_folder}/{file_prefix}multiwindow_coin_training_data_df.parquet")
         if not multiwindow_targets.empty:
-            multiwindow_targets.to_parquet(f"{root_folder}/{file_prefix}coin_target_var_df.parquet")
+            multiwindow_targets = reset_index_codes(multiwindow_targets)
+            multiwindow_targets.to_parquet(f"{root_folder}/{file_prefix}multiwindow_coin_target_var_df.parquet")
 
 
 
