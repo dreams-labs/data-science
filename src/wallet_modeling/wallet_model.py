@@ -35,11 +35,11 @@ class WalletModel(BaseModel):
         super().__init__(modeling_config)
 
         # y data for modeling period; includes Modeling cohort and target variables
-        self.modeling_wallet_features_df = None
+        self.wallet_target_vars_df = None
 
         # Validation set objects
         self.X_validation = None
-        self.validation_wallet_features_df = None
+        self.validation_target_vars_df = None
 
 
     # -----------------------------------
@@ -50,9 +50,9 @@ class WalletModel(BaseModel):
     def construct_wallet_model(
             self,
             training_data_df: pd.DataFrame,
-            modeling_wallet_features_df: pd.DataFrame,
+            wallet_target_vars_df: pd.DataFrame,
             validation_data_df: pd.DataFrame = None,
-            validation_wallet_features_df: pd.DataFrame = None,
+            validation_target_vars_df: pd.DataFrame = None,
             return_data: bool = True
         ) -> Dict[str, Union[Pipeline, pd.DataFrame, np.ndarray]]:
         """
@@ -60,9 +60,9 @@ class WalletModel(BaseModel):
 
         Params:
         - training_data_df (DataFrame): full training cohort feature data
-        - modeling_wallet_features_df (DataFrame): Contains modeling cohort flag and target
+        - wallet_target_vars_df (DataFrame): Contains modeling cohort flag and target
         - validation_data_df (DataFrame, optional): Feature data for external validation
-        - validation_wallet_features_df (DataFrame, optional): Target data for external validation
+        - validation_target_vars_df (DataFrame, optional): Target data for external validation
         - return_data (bool): Whether to return train/test splits and predictions
 
         Returns:
@@ -72,19 +72,19 @@ class WalletModel(BaseModel):
         u.notify('intro_2')
 
         # Validate indices match and store DataFrames
-        u.assert_matching_indices(training_data_df, modeling_wallet_features_df)
+        u.assert_matching_indices(training_data_df, wallet_target_vars_df)
         self.training_data_df = training_data_df
-        self.modeling_wallet_features_df = modeling_wallet_features_df
+        self.wallet_target_vars_df = wallet_target_vars_df
 
         # Store validation data if provided
-        if validation_data_df is not None and validation_wallet_features_df is not None:
-            u.assert_matching_indices(validation_data_df, validation_wallet_features_df)
+        if validation_data_df is not None and validation_target_vars_df is not None:
+            u.assert_matching_indices(validation_data_df, validation_target_vars_df)
             self.X_validation = validation_data_df
-            self.validation_wallet_features_df = validation_wallet_features_df
+            self.validation_target_vars_df = validation_target_vars_df
             logger.info(f"Validation data with {len(validation_data_df)} records loaded.")
 
         # Prepare data
-        X, y = self._prepare_data(training_data_df, modeling_wallet_features_df)
+        X, y = self._prepare_data(training_data_df, wallet_target_vars_df)
 
         # Split data
         self._split_data(X, y)
@@ -139,12 +139,12 @@ class WalletModel(BaseModel):
         if self.X_validation is None or self.X_validation.empty:
             logger.warning("Validation dataset is empty – skipping validation metrics.")
             self.X_validation = None
-            self.validation_wallet_features_df = None
+            self.validation_target_vars_df = None
 
         if self.X_validation is not None:
             result['X_validation'] = self.X_validation
-            result['validation_wallet_features_df'] = self.validation_wallet_features_df
-            result['y_validation'] = self.y_pipeline.transform(self.validation_wallet_features_df)
+            result['validation_target_vars_df'] = self.validation_target_vars_df
+            result['y_validation'] = self.y_pipeline.transform(self.validation_target_vars_df)
 
             if self.modeling_config['model_type'] == 'classification':
                 # get positive-class probabilities directly from pipeline
@@ -194,7 +194,7 @@ class WalletModel(BaseModel):
             # Optionally add predictions for full training cohort
             training_cohort_pred = self._predict_training_cohort()
             target_var = self.modeling_config['target_variable']
-            full_cohort_actuals = modeling_wallet_features_df[target_var]
+            full_cohort_actuals = wallet_target_vars_df[target_var]
             training_cohort_actuals = full_cohort_actuals.loc[training_cohort_pred.index]
 
             # update the result with all three series
@@ -216,14 +216,14 @@ class WalletModel(BaseModel):
     def _prepare_data(
             self,
             training_data_df: pd.DataFrame,
-            modeling_wallet_features_df: pd.DataFrame
+            wallet_target_vars_df: pd.DataFrame
         ) -> Tuple[pd.DataFrame, pd.Series]:
         """
         Prepare wallet-specific data for modeling. Returns features and target only.
 
         Params:
         - training_data_df (DataFrame): full training cohort feature data
-        - modeling_wallet_features_df (DataFrame): Contains in_modeling_cohort flag and target variable
+        - wallet_target_vars_df (DataFrame): Contains in_modeling_cohort flag and target variable
 
         Returns:
         - X (DataFrame): feature data for modeling cohort
@@ -231,9 +231,9 @@ class WalletModel(BaseModel):
         """
         if self.modeling_config['assign_epochs_to_addresses']:
             # Select 1 epoch for each wallet address
-            training_data_df, modeling_wallet_features_df = self._assign_epoch_to_wallets(
+            training_data_df, wallet_target_vars_df = self._assign_epoch_to_wallets(
                 training_data_df,
-                modeling_wallet_features_df,
+                wallet_target_vars_df,
                 random_state = self.modeling_config['model_params']['random_state']
             )
 
@@ -242,18 +242,18 @@ class WalletModel(BaseModel):
 
         # Identify modeling cohort
         cohort_mask = (
-            (modeling_wallet_features_df['max_investment'] >= self.modeling_config['modeling_min_investment']) &
-            (modeling_wallet_features_df['unique_coins_traded'] >= self.modeling_config['modeling_min_coins_traded'])
+            (wallet_target_vars_df['max_investment'] >= self.modeling_config['modeling_min_investment']) &
+            (wallet_target_vars_df['unique_coins_traded'] >= self.modeling_config['modeling_min_coins_traded'])
         )
         logger.milestone("Defined modeling cohort as %.1f%% (%s/%s) wallets.",
-            cohort_mask.sum()/len(modeling_wallet_features_df)*100,
+            cohort_mask.sum()/len(wallet_target_vars_df)*100,
             cohort_mask.sum(),
-            len(modeling_wallet_features_df)
+            len(wallet_target_vars_df)
         )
 
         # Define X and y
         X = training_data_df[cohort_mask].copy()
-        y = modeling_wallet_features_df[cohort_mask].copy()
+        y = wallet_target_vars_df[cohort_mask].copy()
 
         return X, y
 
@@ -261,7 +261,7 @@ class WalletModel(BaseModel):
     def _assign_epoch_to_wallets(
         self,
         training_data_df: pd.DataFrame,
-        modeling_wallet_features_df: pd.DataFrame,
+        wallet_target_vars_df: pd.DataFrame,
         random_state: int = None
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
@@ -270,11 +270,11 @@ class WalletModel(BaseModel):
 
         Params:
         - training_data_df (DataFrame): multiindexed by ['wallet_address','epoch_start_date']
-        - modeling_wallet_features_df  (DataFrame): same index as training_data_df
+        - wallet_target_vars_df  (DataFrame): same index as training_data_df
 
         Returns:
         - sampled_training_data_df: one random epoch per wallet
-        - sampled_modeling_wallet_features_df:   matching rows from modeling_wallet_features_df
+        - sampled_wallet_target_vars_df:   matching rows from wallet_target_vars_df
         """
         wallet_addresses = training_data_df.index.get_level_values('wallet_address').to_numpy()
         random_generator = np.random.default_rng(random_state)
@@ -289,10 +289,10 @@ class WalletModel(BaseModel):
 
         # Create df of sampled records
         sampled_training_data_df = training_data_df.loc[selected_multiindices]
-        sampled_modeling_wallet_features_df = modeling_wallet_features_df.loc[selected_multiindices]
-        u.assert_matching_indices(sampled_training_data_df,sampled_modeling_wallet_features_df)
+        sampled_wallet_target_vars_df = wallet_target_vars_df.loc[selected_multiindices]
+        u.assert_matching_indices(sampled_training_data_df,sampled_wallet_target_vars_df)
 
-        return sampled_training_data_df,sampled_modeling_wallet_features_df
+        return sampled_training_data_df,sampled_wallet_target_vars_df
 
 
     def _prepare_grid_search_params(self, X: pd.DataFrame, base_params_override=None) -> dict:

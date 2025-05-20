@@ -78,7 +78,7 @@ class CoinModel(BaseModel):
         if validation_df is not None and validation_coin_df is not None:
 
             # Prepare and store validation datasets
-            self.X_validation, self.validation_wallet_features_df = self._prepare_data(
+            self.X_validation, self.validation_target_vars_df = self._prepare_data(
                 validation_df,
                 validation_coin_df
             )
@@ -156,8 +156,8 @@ class CoinModel(BaseModel):
         # Validation predictions
         if self.X_validation is not None:
             result['X_validation'] = self.X_validation
-            result['validation_wallet_features_df'] = self.validation_wallet_features_df
-            result['y_validation'] = self.y_pipeline.transform(self.validation_wallet_features_df)
+            result['validation_target_vars_df'] = self.validation_target_vars_df
+            result['y_validation'] = self.y_pipeline.transform(self.validation_target_vars_df)
 
             # Classification predictions
             if self.modeling_config['model_type'] == 'classification':

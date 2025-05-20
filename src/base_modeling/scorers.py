@@ -60,11 +60,11 @@ def validation_r2_scorer(wallet_model):
     """
     def scorer(estimator, X=None, y=None):
         """Score using the validation data instead of provided X and y"""
-        if wallet_model.X_validation is None or wallet_model.validation_wallet_features_df is None:
+        if wallet_model.X_validation is None or wallet_model.validation_target_vars_df is None:
             raise ValueError("Validation data not set in wallet_model")
 
         # Transform y using the pipeline
-        y_trans = estimator.y_pipeline.transform(wallet_model.validation_wallet_features_df)
+        y_trans = estimator.y_pipeline.transform(wallet_model.validation_target_vars_df)
 
         # Get predictions
         y_pred = estimator.predict(wallet_model.X_validation)
@@ -86,11 +86,11 @@ def validation_auc_scorer(wallet_model):
     - scorer function compatible with scikit-learn that computes ROC AUC.
     """
     def scorer(estimator, X=None, y=None):
-        if wallet_model.X_validation is None or wallet_model.validation_wallet_features_df is None:
+        if wallet_model.X_validation is None or wallet_model.validation_target_vars_df is None:
             raise ValueError("Validation data not set in wallet_model")
 
         # Transform true labels using the y_pipeline
-        y_true = estimator.y_pipeline.transform(wallet_model.validation_wallet_features_df)
+        y_true = estimator.y_pipeline.transform(wallet_model.validation_target_vars_df)
 
         # Transform validation features for probability prediction
         X_val_trans = estimator.x_transformer_.transform(wallet_model.X_validation)
@@ -119,12 +119,12 @@ def validation_top_percentile_returns_scorer(wallet_model, top_pct: float):
     """
     def scorer(estimator, X=None, y=None):
         # Ensure validation data is available
-        if wallet_model.X_validation is None or wallet_model.validation_wallet_features_df is None:
+        if wallet_model.X_validation is None or wallet_model.validation_target_vars_df is None:
             raise ValueError("Validation data not set in wallet_model")
 
         # Get actual returns
         target_var = wallet_model.modeling_config['target_variable']
-        returns = wallet_model.validation_wallet_features_df[target_var].reindex(wallet_model.X_validation.index)
+        returns = wallet_model.validation_target_vars_df[target_var].reindex(wallet_model.X_validation.index)
         returns = u.winsorize(returns,0.001)
 
         # Predict class probabilities for positive class
@@ -160,12 +160,12 @@ def validation_top_scores_returns_scorer(wallet_model):
     """
     def scorer(estimator, X=None, y=None):
         # Ensure validation data is available
-        if wallet_model.X_validation is None or wallet_model.validation_wallet_features_df is None:
+        if wallet_model.X_validation is None or wallet_model.validation_target_vars_df is None:
             raise ValueError("Validation data not set in wallet_model")
 
         # Get actual returns aligned to validation index
         target_var = wallet_model.modeling_config['target_variable']
-        returns = wallet_model.validation_wallet_features_df[target_var].reindex(wallet_model.X_validation.index)
+        returns = wallet_model.validation_target_vars_df[target_var].reindex(wallet_model.X_validation.index)
 
         # Mild winsorization to limit impact of major outliers
         returns = u.winsorize(returns,0.005)
