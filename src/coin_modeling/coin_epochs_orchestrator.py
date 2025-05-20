@@ -172,6 +172,9 @@ class CoinEpochsOrchestrator:
         - custom_offset_days: overrides coin_epochs_training in wallets_coin_config
         - file_prefix: changes the filename of the parquet files
         """
+        # Build all wallet parquet files needed for the base configs
+        self._build_all_wallet_data()
+
         # Determine which offsets to use
         offsets = custom_offset_days if custom_offset_days is not None \
             else self.wallets_coin_config['training_data']['coin_epochs_training']
@@ -553,6 +556,8 @@ class CoinEpochsOrchestrator:
 
         # 2) Generate this epoch's training and modeling dfs
         # Build epochs config for only the coin and wallet modeling periods
+        logger.info("Generating wallet training_data_df for scoring in the coin modeling "
+                    "and validation periods...")
         modeling_offset = self.wallets_config['training_data']['modeling_period_duration']
         coin_modeling_epochs_config = {
             'offset_epochs': {
@@ -675,3 +680,86 @@ class CoinEpochsOrchestrator:
         coin_target_var_df.to_parquet(f"{base_folder}/coin_target_var_df.parquet", index=True)
 
         return coin_target_var_df
+
+
+
+    def _build_all_wallet_data(self) -> None:
+        """
+        Pre-build every wallet-epoch parquet so later coin loops just `pd.read_parquet`.
+        """
+        # Identify all offsets
+        all_offsets = self._compute_all_wallet_offsets()
+
+        # Find offsets that still need computation
+        base_parquet_folder = self.wallets_config['training_data']['parquet_folder']
+        base_model_start_dt = pd.to_datetime(
+            self.wallets_config['training_data']['modeling_period_start']
+        )
+        missing_offsets: list[int] = []
+        for offs in all_offsets:
+            date_suffix = (base_model_start_dt + timedelta(days=offs)).strftime('%y%m%d')
+            epoch_folder = f"{base_parquet_folder}/{date_suffix}"
+            train_file   = f"{epoch_folder}/training_data_df.parquet"
+            model_file   = f"{epoch_folder}/modeling_data_df.parquet"
+
+            # If either core parquet is missing, mark this offset for build
+            if not (os.path.exists(train_file) and os.path.exists(model_file)):
+                missing_offsets.append(offs)
+
+        if not missing_offsets:
+            logger.info("All wallet‑epoch parquet files already exist — warm‑up skipped.")
+            return
+
+        logger.milestone(
+            "Warm‑up: generating %d missing wallet‑epoch(s) %s",
+            len(missing_offsets),
+            missing_offsets
+        )
+
+        # Clone the epochs config and inject the superset
+        bulk_epochs_cfg = copy.deepcopy(self.wallets_epochs_config)
+        bulk_epochs_cfg['offset_epochs']['offsets'] = all_offsets
+        bulk_epochs_cfg['offset_epochs']['validation_offsets'] = []
+        # (keep validation_offsets as-is; they’re already in all_offsets)
+
+        bulk_weo = weo.WalletEpochsOrchestrator(
+            base_config         = self.wallets_config.config,
+            metrics_config      = self.wallets_metrics_config,
+            features_config     = self.wallets_features_config,
+            epochs_config       = wcm.add_derived_values(bulk_epochs_cfg),
+            complete_profits_df = self.complete_profits_df,
+            complete_market_data_df = self.complete_market_data_df,
+            complete_macro_trends_df = self.complete_macro_trends_df,
+        )
+
+        # One parallel run builds every epoch (training+modeling) in its own date-suffix folder
+        bulk_weo.generate_epochs_training_data()
+
+
+
+    def _compute_all_wallet_offsets(self) -> dict[str, list[int]]:
+        """
+        Pulls all day-shifts that WalletEpochsOrchestrator will need, using only
+        the config objects already stored on `self`.
+        """
+        # coin-epoch lookbacks
+        coin_train = self.wallets_coin_config['training_data']['coin_epochs_training']
+        coin_val   = self.wallets_coin_config['training_data'].get('coin_epochs_validation', [])
+
+        # wallet-epoch lookbacks
+        w_train = self.wallets_epochs_config['offset_epochs']['offsets']
+        w_val   = self.wallets_epochs_config['offset_epochs'].get('validation_offsets', [])
+
+        # Build Cartesian combos
+        train_epochs  = [c + w for c in coin_train for w in w_train]
+        val_epochs    = [c + v for c in coin_val  for v in w_val]
+
+        # Single merged list
+        all_offsets = sorted(
+            set(train_epochs)        |
+            set(val_epochs)          |
+            set(w_train) | set(w_val)|
+            set(coin_train) | set(coin_val)
+        )
+
+        return all_offsets
