@@ -577,11 +577,11 @@ class RegressorEvaluator:
         ax_ret = ax.twinx()
 
         # 1. Plot score distribution on primary Y-axis (left)
-        sns.kdeplot(data=self.y_test, ax=ax, label='Actual', color='#69c4ff')
-        sns.kdeplot(data=self.y_pred, ax=ax, label='Predicted', color='#ff6969')
+        sns.kdeplot(data=self.y_validation, ax=ax, label='Actual', color='#69c4ff', cut=0)
+        sns.kdeplot(data=self.y_validation_pred, ax=ax, label='Predicted', color='#ff6969', cut=0)
 
-        ax.axvline(np.mean(self.y_test), color='#69c4ff', linestyle='--', alpha=0.5)
-        ax.axvline(np.mean(self.y_pred), color='#ff6969', linestyle='--', alpha=0.5)
+        ax.axvline(np.mean(self.y_validation), color='#69c4ff', linestyle='--', alpha=0.5)
+        ax.axvline(np.mean(self.y_validation_pred), color='#ff6969', linestyle='--', alpha=0.5)
 
         ax.set_title('Score Distribution & Returns by Score')
         ax.set_xlabel('Prediction Score')
