@@ -762,7 +762,7 @@ def assert_matching_indices(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
     idx2 = df2.index if df2.index.is_monotonic_increasing else df2.index.sort_values()
 
     # Check if indices match exactly
-    if not idx1.equals(idx2):
+    if not np.array_equal(idx1.values, idx2.values):
         raise ValueError("DataFrames have mismatched indices.")
 
 
