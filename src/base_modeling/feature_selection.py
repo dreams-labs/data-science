@@ -84,7 +84,7 @@ def remove_low_variance_features(
     - reduced_df (DataFrame): DataFrame with low variance features removed
     """
     if variance_threshold is None or variance_threshold < 0:
-        logger.info("Skipping variance-based feature selection entirely.")
+        logger.info("Skipping variance-based feature selection...")
         return training_df  # no changes
 
     # Work on a copy so we don’t mutate in-place
@@ -136,7 +136,7 @@ def remove_correlated_features(
     """
     # If the threshold is 1.0 then don't compute anything
     if correlation_threshold is None or correlation_threshold > 1.0:
-        logger.info("Didn't apply correlation-based feature selection.")
+        logger.info("Skipping correlation-based feature selection..s.")
         return training_df
 
     # Calculate correlation matrix

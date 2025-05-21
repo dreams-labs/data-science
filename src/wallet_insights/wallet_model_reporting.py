@@ -152,6 +152,10 @@ def generate_and_upload_wallet_cw_scores(
     report_model_cfg = report['configurations']['wallets_config']['modeling']
     epoch_duration = report['configurations']['wallets_config']['training_data']['modeling_period_duration']
     epoch_end_date = (epochs[0] + timedelta(days=epoch_duration))
+    if report_model_cfg['model_type'] == 'regression':
+        target_threshold = np.nan
+    else:
+        target_threshold = report_model_cfg['target_var_min_threshold']
 
     score_metadata_df = pd.DataFrame({
         'score_run_id': [score_run_id],
@@ -161,7 +165,7 @@ def generate_and_upload_wallet_cw_scores(
         'scored_at': [report['timestamp']],
         'model_type': [report_model_cfg['model_type']],
         'target_var': [report_model_cfg['target_variable']],
-        'target_var_threshold': [report_model_cfg['target_var_min_threshold']],
+        'target_var_threshold': [target_threshold],
         'notes': [score_notes],
         'updated_at': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')]
     })
