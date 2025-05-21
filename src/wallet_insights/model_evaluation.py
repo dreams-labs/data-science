@@ -963,6 +963,13 @@ class ClassifierEvaluator(RegressorEvaluator):
             }).dropna()
             pct1 = np.percentile(df_val['proba'], 99)
             pct5 = np.percentile(df_val['proba'], 95)
+            # Store cutoff thresholds and compute raw means
+            self.metrics['val_top1_thr'] = pct1
+            self.metrics['val_top5_thr'] = pct5
+            self.metrics['val_ret_mean_top1'] = df_val.loc[df_val['proba'] >= pct1, 'ret'].mean()
+            self.metrics['val_ret_mean_top5'] = df_val.loc[df_val['proba'] >= pct5, 'ret'].mean()
+            self.metrics['val_ret_mean_overall'] = df_val['ret'].mean()
+            self.metrics['val_wins_return_overall_raw'] = df_val['ret_wins'].mean()
             self.metrics['positive_pred_return'] = df_val.loc[df_val['pred'] == 1, 'ret'].mean()
             self.metrics['positive_pred_wins_return'] = df_val.loc[df_val['pred'] == 1, 'ret_wins'].mean()
             self.metrics['val_wins_return_top1'] = df_val.loc[df_val['proba'] >= pct1, 'ret_wins'].mean()
@@ -975,6 +982,10 @@ class ClassifierEvaluator(RegressorEvaluator):
                     thr_val = self.metrics[thr_key]
                     self.metrics[f"val_ret_mean_f{beta}"] = (
                         df_val.loc[df_val['proba'] >= thr_val, 'ret'].mean()
+                    )
+                    # compute winsorized mean for this F-beta threshold
+                    self.metrics[f'val_wins_ret_mean_f{beta}'] = (
+                        df_val.loc[df_val['proba'] >= thr_val, 'ret_wins'].mean()
                     )
 
         # Feature importance if available
@@ -1024,34 +1035,22 @@ class ClassifierEvaluator(RegressorEvaluator):
             summary.extend([
                 "Classification Metrics:      Val   |  Test",
                 "-" * 43,
-                f"Val ROC AUC:                {self.metrics['val_roc_auc']:.3f}"
-                    f"  |  {self.metrics['roc_auc']:.3f}",
-                f"Val Accuracy:               {self.metrics['val_accuracy']:.3f}"
-                    f"  |  {self.metrics['accuracy']:.3f}",
-                f"Val Precision:              {self.metrics['val_precision']:.3f}"
-                    f"  |  {self.metrics['precision']:.3f}",
-                f"Val Recall:                 {self.metrics['val_recall']:.3f}"
-                    f"  |  {self.metrics['recall']:.3f}",
-                f"Val F1 Score:               {self.metrics['val_f1']:.3f}"
-                    f"  |  {self.metrics['f1']:.3f}",
+                f"Val ROC AUC:                {self.metrics['val_roc_auc']:.3f}  |  {self.metrics['roc_auc']:.3f}",
+                f"Val Accuracy:               {self.metrics['val_accuracy']:.3f}  |  {self.metrics['accuracy']:.3f}",
+                f"Val Precision:              {self.metrics['val_precision']:.3f}  |  {self.metrics['precision']:.3f}",
+                f"Val Recall:                 {self.metrics['val_recall']:.3f}  |  {self.metrics['recall']:.3f}",
+                f"Val F1 Score:               {self.metrics['val_f1']:.3f}  |  {self.metrics['f1']:.3f}",
                 "",
-                "Validation Return Metrics",
-                "-" * 35,
-                f"Positive Threshold:         {self.y_pred_threshold:.2f}",
-                f"Positive Predictions:       {self.metrics['positive_predictions']:.0f}"
-                    f"/{len(self.y_validation_pred)} ({self.metrics['positive_pct']:.2f}%)",
-                f"Positive Mean Outcome:      {self.metrics['positive_pred_return']:.3f}",
-                f"Positive W-Mean Outcome:    {self.metrics['positive_pred_wins_return']:.3f}",
-                "",
-                f"Top 1% W-Mean Outcome:      {self.metrics['val_wins_return_top1']:.3f}",
-                f"Top 5% W-Mean Outcome:      {self.metrics['val_wins_return_top5']:.3f}",
-                f"Overall W-Mean Outcome:     {self.metrics['val_wins_return_overall']:.3f}",
-                "",
-                f"F.25 Threshold ({self.metrics['f0.25_thr']:.2f}):      {self.metrics['val_ret_mean_f0.25']:.3f}",
-                f"F.5 Threshold ({self.metrics['f0.5_thr']:.2f}):       {self.metrics['val_ret_mean_f0.5']:.3f}",
-                f"F1 Threshold ({self.metrics['f1_thr']:.2f}):        {self.metrics['val_ret_mean_f1']:.3f}",
-                f"F2 Threshold ({self.metrics['f2_thr']:.2f}):        {self.metrics['val_ret_mean_f2']:.3f}",
-                ""
+                "Validation Returns    | Cutoff |  Mean   |  W-Mean",
+                "-" * 50,
+                f"Overall Average       |   n/a  |  {self.metrics['val_ret_mean_overall']:.3f}  |  {self.metrics['val_wins_return_overall']:.3f}",
+                f"Param Threshold       |  {self.y_pred_threshold:.2f}  |  {self.metrics['positive_pred_return']:.3f}  |  {self.metrics['positive_pred_wins_return']:.3f}",
+                f"Top 1% Scores         |  {self.metrics['val_top1_thr']:.2f}  |  {self.metrics['val_ret_mean_top1']:.3f}  |  {self.metrics['val_wins_return_top1']:.3f}",
+                f"Top 5% Scores         |  {self.metrics['val_top5_thr']:.2f}  |  {self.metrics['val_ret_mean_top5']:.3f}  |  {self.metrics['val_wins_return_top5']:.3f}",
+                f"F0.25 Score           |  {self.metrics['f0.25_thr']:.2f}  |  {self.metrics['val_ret_mean_f0.25']:.3f}  |  {self.metrics['val_wins_ret_mean_f0.25']:.3f}",
+                f"F0.5 Score            |  {self.metrics['f0.5_thr']:.2f}  |  {self.metrics['val_ret_mean_f0.5']:.3f}  |  {self.metrics['val_wins_ret_mean_f0.5']:.3f}",
+                f"F1 Score              |  {self.metrics['f1_thr']:.2f}  |  {self.metrics['val_ret_mean_f1']:.3f}  |  {self.metrics['val_wins_ret_mean_f1']:.3f}",
+                f"F2 Score              |  {self.metrics['f2_thr']:.2f}  |  {self.metrics['val_ret_mean_f2']:.3f}  |  {self.metrics['val_wins_ret_mean_f2']:.3f}",
             ])
 
         report = "\n".join(summary)
