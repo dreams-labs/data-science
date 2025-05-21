@@ -257,6 +257,15 @@ class RegressorEvaluator:
         else:
             header.extend([
                 f"Test Samples:             {self.metrics['test_samples']:,d}",
+            ])
+
+            if self.modeling_config['model_type'] == 'classification':
+                header.extend([
+                    f"Test Positive Samples:    {self.y_validation.sum():,d} "
+                    f"({self.y_validation.sum()/self.metrics['test_samples']*100:.2f}%)",
+                ])
+
+            header.extend([
                 f"Number of Features:       {n_features:,d}",
                 window_n_features_str,
             ])
@@ -996,42 +1005,48 @@ class ClassifierEvaluator(RegressorEvaluator):
         # Header and sample info
         summary = self._get_summary_header()
 
-        # Classification metrics
-        summary.extend([
-                "Classification Metrics",
-                "-" * 35,
-                f"ROC AUC:                    {self.metrics['roc_auc']:.3f}",
-                f"Log Loss:                   {self.metrics['log_loss']:.3f}",
-                f"Accuracy:                   {self.metrics['accuracy']:.3f}",
-                f"Precision:                  {self.metrics['precision']:.3f}",
-                f"Recall:                     {self.metrics['recall']:.3f}",
-                f"F1 Score:                   {self.metrics['f1']:.3f}",
-                ""
-        ])
+        # Classification test set metrics
+        if 'val_roc_auc' not in self.metrics:
+            summary.extend([
+                    "Test Set Classification Metrics",
+                    "-" * 35,
+                    f"ROC AUC:                    {self.metrics['roc_auc']:.3f}",
+                    f"Log Loss:                   {self.metrics['log_loss']:.3f}",
+                    f"Accuracy:                   {self.metrics['accuracy']:.3f}",
+                    f"Precision:                  {self.metrics['precision']:.3f}",
+                    f"Recall:                     {self.metrics['recall']:.3f}",
+                    f"F1 Score:                   {self.metrics['f1']:.3f}",
+                    ""
+            ])
 
         # Validation return metrics
-        if 'val_roc_auc' in self.metrics:
+        else:
             summary.extend([
-                "Validation Metrics",
-                "-" * 35,
-                f"Val ROC AUC:                {self.metrics['val_roc_auc']:.3f}",
-                f"Val Accuracy:               {self.metrics['val_accuracy']:.3f}",
-                f"Val Precision:              {self.metrics['val_precision']:.3f}",
-                f"Val Recall:                 {self.metrics['val_recall']:.3f}",
-                f"Val F1 Score:               {self.metrics['val_f1']:.3f}",
+                "Classification Metrics:      Val   |  Test",
+                "-" * 43,
+                f"Val ROC AUC:                {self.metrics['val_roc_auc']:.3f}"
+                    f"  |  {self.metrics['roc_auc']:.3f}",
+                f"Val Accuracy:               {self.metrics['val_accuracy']:.3f}"
+                    f"  |  {self.metrics['accuracy']:.3f}",
+                f"Val Precision:              {self.metrics['val_precision']:.3f}"
+                    f"  |  {self.metrics['precision']:.3f}",
+                f"Val Recall:                 {self.metrics['val_recall']:.3f}"
+                    f"  |  {self.metrics['recall']:.3f}",
+                f"Val F1 Score:               {self.metrics['val_f1']:.3f}"
+                    f"  |  {self.metrics['f1']:.3f}",
                 "",
                 "Validation Return Metrics",
                 "-" * 35,
-                f"Top 1% W-Mean Outcome:      {self.metrics['val_wins_return_top1']:.3f}",
-                f"Top 5% W-Mean Outcome:      {self.metrics['val_wins_return_top5']:.3f}",
-                f"Overall W-Mean Outcome:     {self.metrics['val_wins_return_overall']:.3f}",
-
                 f"Positive Threshold:         {self.y_pred_threshold:.2f}",
                 f"Positive Predictions:       {self.metrics['positive_predictions']:.0f}"
                     f"/{len(self.y_validation_pred)} ({self.metrics['positive_pct']:.2f}%)",
                 f"Positive Mean Outcome:      {self.metrics['positive_pred_return']:.3f}",
                 f"Positive W-Mean Outcome:    {self.metrics['positive_pred_wins_return']:.3f}",
-
+                "",
+                f"Top 1% W-Mean Outcome:      {self.metrics['val_wins_return_top1']:.3f}",
+                f"Top 5% W-Mean Outcome:      {self.metrics['val_wins_return_top5']:.3f}",
+                f"Overall W-Mean Outcome:     {self.metrics['val_wins_return_overall']:.3f}",
+                "",
                 f"F.25 Threshold ({self.metrics['f0.25_thr']:.2f}):      {self.metrics['val_ret_mean_f0.25']:.3f}",
                 f"F.5 Threshold ({self.metrics['f0.5_thr']:.2f}):       {self.metrics['val_ret_mean_f0.5']:.3f}",
                 f"F1 Threshold ({self.metrics['f1_thr']:.2f}):        {self.metrics['val_ret_mean_f1']:.3f}",
