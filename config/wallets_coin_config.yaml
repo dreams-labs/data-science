@@ -14,14 +14,14 @@ training_data: #CoinModel
     coin_epochs_training: [  # How many days prior to the modeling period each window begins
         # 0,
         -30,
-        # -180,
-        # -360,
+        -180,
+        -360,
 
         -60,
         -90,
-        # -120,
-        # -240,
-        # -300,
+        -120,
+        -240,
+        -300,
         # -420,
         # -480,
         # -540,
@@ -68,6 +68,22 @@ wallet_scores: #CoinModel
             target_var_min_threshold: 0.60
             target_var_max_threshold: .inf
             y_pred_threshold: 0.25
+            assign_epochs_to_addresses: False
+
+        cw_net_flows_neg_040:
+            model_type: classification
+            target_variable: cw_crypto_net_flows/crypto_inflows/base
+            target_var_min_threshold: -0.40
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.25
+            assign_epochs_to_addresses: False
+
+        cw_crypto_net_flows_1k:
+            model_type: classification
+            target_variable: cw_crypto_net_flows
+            target_var_min_threshold: 1000
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.85
             assign_epochs_to_addresses: False
 
         cw_net_flows_regression:

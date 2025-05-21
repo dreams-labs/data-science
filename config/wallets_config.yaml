@@ -5,7 +5,7 @@
 training_data: #WalletModel
 
     #KeyParam Period Dates
-    modeling_period_start: '2025-03-31'
+    modeling_period_start: '2024-12-31'
     modeling_period_duration: 30
     training_window_lookbacks: [  # How many days prior to the modeling period each window begins
         # 240,
@@ -34,39 +34,50 @@ training_data: #WalletModel
 modeling: #WalletModel
 
     #KeyParam Model Type
-    model_type: regression  # "regression" or "classification"
-    # model_type: classification  # "regression" or "classification"
+    # model_type: regression  # "regression" or "classification"
+    model_type: classification  # "regression" or "classification"
     y_pred_threshold: 0.85  # scores above this probability threshold are positive predictizzons
 
     #KeyParam Target Variable
     # Return Rate
-    # target_variable: crypto_net_gain/max_investment/base
-    # target_variable: cw_crypto_net_gain/max_investment/base
     # target_variable: cw_crypto_net_gain/max_investment/rank
     # target_variable: cw_crypto_net_gain/max_investment/winsorized
     # target_variable: cw_crypto_net_flows/crypto_inflows/rank
-    target_variable: cw_crypto_net_flows/crypto_inflows/winsorized
+    # target_variable: cw_crypto_net_flows/crypto_inflows/winsorized
     # target_variable: cw_crypto_net_flows/crypto_inflows/base
 
+    # Non-CW return rate
+    # target_variable: crypto_net_gain/max_investment/base
+    target_variable: crypto_net_flows/crypto_inflows/base
+    # target_variable: crypto_net_flows/crypto_inflows/winsorized
+
     # target_var_min_threshold: -.inf  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: -0.80  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: -0.60  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: -0.40  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: -0.25  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: -0.05  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.00  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.05  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.15  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.25  # a classification model will try to predict the target var above this value
-    target_var_min_threshold: 0.40  # a classification model will try to predict the target var above this value
-    # target_var_min_threshold: 0.60  # a classification model will try to predict the target var above this value
-    # target_var_min_threshold: 0.8  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.40  # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.60  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.80  # a classification model will try to predict the target var above this value
 
     # target_var_max_threshold: -0.05  # a classification model will try to predict the target var above this value
     # target_var_max_threshold: 0.25  # a classification model will try to predict the target var above this value
     target_var_max_threshold: .inf  # a classification model will try to predict the target var above this value
 
-    # # Net Gain
+    # USD Targets
     # target_variable: cw_crypto_net_gain
     # # target_variable: crypto_net_gain
-    # # target_variable: cw_crypto_net_flows
+    # target_variable: cw_crypto_net_flows
     # # # target_variable: crypto_net_cash_flows
     # y_pred_threshold: 0.7  # scores above this probability threshold are positive predictions
+    # target_var_min_threshold: -1000  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 1000  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 10000  # a classification model will try to predict the target var above this value
 
 
     #KeyParam Modeling Cohort Definition
