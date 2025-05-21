@@ -7,20 +7,20 @@ training_data: #CoinModel
     # coins_wallet_scores_folder: automatically filled
 
     coin_epochs_validation: [
-        0,
-        30
+        30,
+        60,
+        90
     ]
 
     coin_epochs_training: [  # How many days prior to the modeling period each window begins
-        # 0,
+        0,
         -30,
-        -180,
-        -360,
-
         -60,
         -90,
         -120,
+        -180,
         -240,
+        -360,
         -300,
         # -420,
         # -480,
