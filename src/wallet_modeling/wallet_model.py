@@ -242,7 +242,7 @@ class WalletModel(BaseModel):
 
         # Identify modeling cohort
         cohort_mask = (
-            (wallet_target_vars_df['max_investment'] >= self.modeling_config['modeling_min_investment']) &
+            (wallet_target_vars_df['crypto_inflows'] >= self.modeling_config['modeling_min_crypto_inflows']) &
             (wallet_target_vars_df['unique_coins_traded'] >= self.modeling_config['modeling_min_coins_traded'])
         )
         logger.milestone("Defined modeling cohort as %.1f%% (%s/%s) wallets.",
