@@ -26,7 +26,7 @@ training_data: #WalletModel
 
     # Local pipeline configs
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
-    parquet_folder: temp/wallet_modeling_dfs/dda_786_wallet_score_uploads_v1_pred  # where to store parquet files
+    parquet_folder: temp/wallet_modeling_dfs/dda_795_market_cap_filters  # where to store parquet files
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
 
@@ -34,9 +34,9 @@ training_data: #WalletModel
 modeling: #WalletModel
 
     #KeyParam Model Type
-    # model_type: regression  # "regression" or "classification"
-    model_type: classification  # "regression" or "classification"
-    y_pred_threshold: 0.8  # scores above this probability threshold are positive predictizzons
+    model_type: regression  # "regression" or "classification"
+    # model_type: classification  # "regression" or "classification"
+    y_pred_threshold: 0.85  # scores above this probability threshold are positive predictizzons
 
     #KeyParam Target Variable
     # Return Rate
@@ -44,14 +44,17 @@ modeling: #WalletModel
     # target_variable: cw_crypto_net_gain/max_investment/base
     # target_variable: cw_crypto_net_gain/max_investment/rank
     # target_variable: cw_crypto_net_gain/max_investment/winsorized
-    target_variable: cw_crypto_net_flows/crypto_inflows/base
+    # target_variable: cw_crypto_net_flows/crypto_inflows/rank
+    target_variable: cw_crypto_net_flows/crypto_inflows/winsorized
+    # target_variable: cw_crypto_net_flows/crypto_inflows/base
 
     # target_var_min_threshold: -.inf  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.00  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.05  # a classification model will try to predict the target var above this value
-    target_var_min_threshold: 0.25  # a classification model will try to predict the target var above this value
-    # target_var_min_threshold: 0.40  # a classification model will try to predict the target var above this value
-    # target_var_min_threshold: 0.6  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.15  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.25  # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.40  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.60  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.8  # a classification model will try to predict the target var above this value
 
     # target_var_max_threshold: -0.05  # a classification model will try to predict the target var above this value
@@ -67,7 +70,7 @@ modeling: #WalletModel
 
 
     #KeyParam Modeling Cohort Definition
-    modeling_min_investment: 250
+    modeling_min_crypto_inflows: 250
     modeling_min_coins_traded: 1
 
     #KeyParam Epoch Assignment Toggle
@@ -103,7 +106,7 @@ modeling: #WalletModel
         # Performance Profiles (Choose One Section)
         # --------------------------------------
         #KeyParam Estimator Counts
-        n_estimators: 400  # number of trees to train in the model
+        n_estimators: 500  # number of trees to train in the model
         learning_rate: 0.5  # step size for updates to weights during training
 
         early_stopping_rounds: 10  # stop training if no improvement after x rounds
@@ -238,7 +241,7 @@ modeling: #WalletModel
         drop_patterns_include_n_features: 1  # if set to n, the drop_patterns grid search will apply all but n patterns for each model. otherwise, it will apply 1 drop pattern in each model.
 
         n_iter: 40   # random search limit
-        n_splits: 3  # cv splits
+        n_splits: 4  # cv splits
 
         # regressor_scoring: neg_root_mean_squared_error
         # regressor_scoring: custom_neg_rmse_scorer
@@ -276,7 +279,7 @@ modeling: #WalletModel
             # # Depth and Child Weight
             # estimator__min_child_weight_pct: [0.00004, 0.00007, 0.0001]
             # estimator__min_child_weight: [25,40,60,80]
-            # estimator__max_depth: [4,5,6,7,8]
+            estimator__max_depth: [2,3,4,5]
             # basic depth param
 
             # # Col/Row Sampling
@@ -289,7 +292,7 @@ modeling: #WalletModel
             # estimator__gamma: [0.005, 0.01, 0.015]  # controls the minimum loss reduction needed to split a node
 
             # Tree Training Speed Overrides
-            estimator__n_estimators: [150]
+            estimator__n_estimators: [250]
             estimator__learning_rate: [0.9]
             # estimator__max_depth: [7]
             # estimator__min_child_weight: [30]
@@ -340,8 +343,10 @@ data_cleaning: #WalletModel
     max_wallet_profits: 100_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
 
     #KeyParam Coin Cohort Definitions
-    min_initial_market_cap: 2_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
-    max_initial_market_cap: 999150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
+    min_initial_market_cap: 0_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
+    max_initial_market_cap: 500_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
+    min_ending_market_cap: 2_000_000  # coins above this market cap as of the end of the training period will be removed from all datasets
+    max_ending_market_cap: 500_000_000  # coins above this market cap as of the end of the training period will be removed from all datasets
     max_gap_days: 30  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
     min_daily_volume: 500 # Minimum average daily volume the coin must have
 
@@ -367,7 +372,7 @@ features: #WalletModel
     twr_max_annual_return: 100.0  # caps the max annual return at this percent (100.0 is a 100x return)
 
     # Performance Params
-    returns_winsorization: 0.005
+    returns_winsorization: 0.01
     ranking_ntiles: 2
 
     # Market Timing Params
