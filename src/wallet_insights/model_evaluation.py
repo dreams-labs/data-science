@@ -245,7 +245,7 @@ class RegressorEvaluator:
         if n_per_window > 0:
             window_n_features_str = f"Features per Window:      {n_per_window:,d}\n"
         else:
-            window_n_features_str = '\n'
+            window_n_features_str = ''
 
         if "total_cohort_samples" in self.metrics:
             header.extend([
@@ -915,6 +915,10 @@ class ClassifierEvaluator(RegressorEvaluator):
         self.metrics['precision'] = precision_score(self.y_test, self.y_pred, zero_division=0)
         self.metrics['recall'] = recall_score(self.y_test, self.y_pred, zero_division=0)
         self.metrics['f1'] = f1_score(self.y_test, self.y_pred, zero_division=0)
+
+        # Add F-beta metrics
+        self._add_fbeta_metrics()
+
         try:
             self.metrics['roc_auc'] = roc_auc_score(self.y_test, self.y_pred_proba)
             self.metrics['log_loss'] = log_loss(self.y_test, self.y_pred_proba)
@@ -955,10 +959,34 @@ class ClassifierEvaluator(RegressorEvaluator):
             self.metrics['val_wins_return_top1'] = df_val.loc[df_val['proba'] >= pct1, 'ret_wins'].mean()
             self.metrics['val_wins_return_top5'] = df_val.loc[df_val['proba'] >= pct5, 'ret_wins'].mean()
             self.metrics['val_wins_return_overall'] = df_val['ret_wins'].mean()
+            # --- F‑beta threshold mean returns (F1 & F2) -------------------
+            for beta in (0.25,0.5,1,2):
+                thr_key = f"f{beta}_thr"
+                if thr_key in self.metrics:
+                    thr_val = self.metrics[thr_key]
+                    self.metrics[f"val_ret_mean_f{beta}"] = (
+                        df_val.loc[df_val['proba'] >= thr_val, 'ret'].mean()
+                    )
 
         # Feature importance if available
         if self.model is not None and hasattr(self.model, 'feature_importances_'):
             self._calculate_feature_importance()
+
+
+    def _add_fbeta_metrics(self, betas=(0.25,0.5,1,2)):
+        """
+        Compute F-beta metrics for various beta values and store best scores and thresholds.
+        """
+        y_true = self.y_test
+        y_prob = self.y_pred_proba
+        prec, rec, thr = precision_recall_curve(y_true, y_prob)
+        # `thr` length is len(prec)-1; pad to align
+        thr = np.append(thr, 1.0)
+        for beta in betas:
+            f = (1 + beta**2) * (prec * rec) / (beta**2 * prec + rec + 1e-9)
+            idx = np.nanargmax(f)
+            self.metrics[f'f{beta}'] = f[idx]
+            self.metrics[f'f{beta}_thr'] = thr[idx]
 
 
     def summary_report(self):
@@ -994,14 +1022,20 @@ class ClassifierEvaluator(RegressorEvaluator):
                 "",
                 "Validation Return Metrics",
                 "-" * 35,
+                f"Top 1% W-Mean Outcome:      {self.metrics['val_wins_return_top1']:.3f}",
+                f"Top 5% W-Mean Outcome:      {self.metrics['val_wins_return_top5']:.3f}",
+                f"Overall W-Mean Outcome:     {self.metrics['val_wins_return_overall']:.3f}",
+
                 f"Positive Threshold:         {self.y_pred_threshold:.2f}",
                 f"Positive Predictions:       {self.metrics['positive_predictions']:.0f}"
                     f"/{len(self.y_validation_pred)} ({self.metrics['positive_pct']:.2f}%)",
                 f"Positive Mean Outcome:      {self.metrics['positive_pred_return']:.3f}",
                 f"Positive W-Mean Outcome:    {self.metrics['positive_pred_wins_return']:.3f}",
-                f"Top 1% W-Mean Outcome:      {self.metrics['val_wins_return_top1']:.3f}",
-                f"Top 5% W-Mean Outcome:      {self.metrics['val_wins_return_top5']:.3f}",
-                f"Overall W-Mean Outcome:     {self.metrics['val_wins_return_overall']:.3f}",
+
+                f"F.25 Threshold ({self.metrics['f0.25_thr']:.2f}):      {self.metrics['val_ret_mean_f0.25']:.3f}",
+                f"F.5 Threshold ({self.metrics['f0.5_thr']:.2f}):       {self.metrics['val_ret_mean_f0.5']:.3f}",
+                f"F1 Threshold ({self.metrics['f1_thr']:.2f}):        {self.metrics['val_ret_mean_f1']:.3f}",
+                f"F2 Threshold ({self.metrics['f2_thr']:.2f}):        {self.metrics['val_ret_mean_f2']:.3f}",
                 ""
             ])
 
@@ -1113,7 +1147,7 @@ class ClassifierEvaluator(RegressorEvaluator):
         baseline = self.y_test.mean()
 
         # --- Test PR curve with AUC-PR
-        precision, recall, _ = precision_recall_curve(
+        precision, recall, thr_test = precision_recall_curve(
             self.y_test,
             self.y_pred_proba,
             pos_label=1
@@ -1161,6 +1195,43 @@ class ClassifierEvaluator(RegressorEvaluator):
             color="#afc6ba",  # Light grey-green
             label=f"Baseline ({baseline:.3f})"
         )
+
+        # --- F‑β optimal threshold verticals --------------------------------
+        beta_colors = {
+            0.25:'#ffffff',
+            0.5:'#cccccc',
+            1:'#aaaaaa',
+            2:'#888888',
+        }
+
+        # Add vertical lines for F-beta thresholds
+        for beta, color in beta_colors.items():
+            thr_key = f"f{beta}_thr"
+            if thr_key in self.metrics:
+                # Find the recall value closest to this threshold
+                idx = (np.abs(thr_test - self.metrics[thr_key])).argmin()
+                beta_recall = recall[idx]
+
+                # Add vertical line
+                ax.axvline(
+                    beta_recall,
+                    linestyle=':',
+                    linewidth=1.5,
+                    color=color,
+                    label=f"F{beta} threshold"
+                )
+
+                # Add text label
+                ax.text(
+                    beta_recall + 0.02,
+                    0.4,
+                    f"F{beta}",
+                    color=color,
+                    rotation=90,
+                    fontsize=10,
+                    va='bottom'
+                )
+
 
         # Formatting
         ax.set_xlim([0.0, 1.0])
@@ -1228,6 +1299,22 @@ class ClassifierEvaluator(RegressorEvaluator):
 
         # Primary axis: histogram of counts
         ax.bar(valid_centers, valid_counts, width=width, alpha=0.6, label="Count")
+
+        # --- F‑β threshold markers -----------------------------------------
+        beta_colors = {
+            0.25:'#ffffff',
+            0.5:'#cccccc',
+            1:'#aaaaaa',
+            2:'#888888',
+        }
+        for beta, col in beta_colors.items():
+            thr_key = f"f{beta}_thr"
+            if thr_key not in self.metrics:
+                continue
+            thr_val = self.metrics[thr_key]
+            ax.axvline(thr_val, linestyle=':', linewidth=1, color=col)
+            ax.text(thr_val, ax.get_ylim()[1]*0.98, f"F{beta}", rotation=90,
+                    va='top', ha='right', color=col, fontsize=10)
 
         # Use log scale for wallet counts
         ax.set_yscale('log')
