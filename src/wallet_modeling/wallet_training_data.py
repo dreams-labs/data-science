@@ -130,26 +130,48 @@ class WalletTrainingData:
         )
 
         if not coin_cohort:
-            # Apply initial market cap threshold filter if no coin cohort was passed
-            # Above threshold
-            max_initial_market_cap = self.wallets_config['data_cleaning']['max_initial_market_cap']
-            above_initial_threshold_coins = market_data_df[
-                (market_data_df['date']==self.wallets_config['training_data']['training_period_start'])
-                & (market_data_df['market_cap_filled']>max_initial_market_cap)
-            ]['coin_id']
-            market_data_df = market_data_df[~market_data_df['coin_id'].isin(above_initial_threshold_coins)]
-            logger.info("Removed data for %s coins with a market cap above $%s at the start of the training period."
-                        ,len(above_initial_threshold_coins),dc.human_format(max_initial_market_cap))
+            cfg = self.wallets_config
+            start_date = cfg['training_data']['training_period_start']
+            end_date   = cfg['training_data']['training_period_end']
 
-            # Below threshold
-            min_initial_market_cap = self.wallets_config['data_cleaning']['min_initial_market_cap']
-            below_initial_threshold_coins = market_data_df[
-                (market_data_df['date']==self.wallets_config['training_data']['training_period_start'])
-                & (market_data_df['market_cap_filled']<min_initial_market_cap)
-            ]['coin_id']
-            market_data_df = market_data_df[~market_data_df['coin_id'].isin(below_initial_threshold_coins)]
-            logger.info("Removed data for %s coins with a market cap below $%s at the start of the training period."
-                        ,len(below_initial_threshold_coins),dc.human_format(min_initial_market_cap))
+            mc = market_data_df['market_cap_filled']
+            dt = market_data_df['date']
+
+            # thresholds
+            max_init = cfg['data_cleaning']['max_initial_market_cap']
+            min_init = cfg['data_cleaning']['min_initial_market_cap']
+            max_end  = cfg['data_cleaning']['max_ending_market_cap']
+            min_end  = cfg['data_cleaning']['min_ending_market_cap']
+
+            # Masks for each filter
+            mask_start_high = (dt == start_date) & (mc > max_init)
+            mask_start_low  = (dt == start_date) & (mc < min_init)
+            mask_end_high   = (dt == end_date)   & (mc > max_end)
+            mask_end_low    = (dt == end_date)   & (mc < min_end)
+
+            # Identify coin_ids for each
+            drop_start_high = set(market_data_df.loc[mask_start_high, 'coin_id'])
+            drop_start_low  = set(market_data_df.loc[mask_start_low,  'coin_id'])
+            drop_end_high   = set(market_data_df.loc[mask_end_high,   'coin_id'])
+            drop_end_low    = set(market_data_df.loc[mask_end_low,    'coin_id'])
+
+            # Combine all drops and filter once
+            coins_to_drop = drop_start_high | drop_start_low | drop_end_high | drop_end_low
+            market_data_df = market_data_df[
+                ~market_data_df['coin_id'].isin(coins_to_drop)
+            ]
+
+            # Log individual counts
+            logger.info("Total coins removed for market cap thresholds: %s", len(coins_to_drop))
+            logger.info("  %s coins above max_initial_market_cap at start date %s.",
+                        len(drop_start_high), start_date)
+            logger.info("  %s coins below min_initial_market_cap at start date %s.",
+                        len(drop_start_low), start_date)
+            logger.info("  %s coins above max_ending_market_cap at end date %s.",
+                        len(drop_end_high), end_date)
+            logger.info("  %s coins below min_ending_market_cap at end date %s.",
+                        len(drop_end_low), end_date)
+
         else:
             logger.info("Returned market data for the %s coins in the coin cohort passed as a parameter.",
                         len(coin_cohort))
