@@ -251,7 +251,11 @@ class WalletEpochsOrchestrator:
     #           Helper Methods
     # -----------------------------------
 
-    def _process_single_epoch(self, epoch_config: dict, training_only: bool = False) -> Tuple[datetime, pd.DataFrame, pd.DataFrame]:
+    def _process_single_epoch(
+            self,
+            epoch_config: dict,
+            training_only: bool = False
+        ) -> Tuple[datetime, pd.DataFrame, pd.DataFrame]:
         """
         Process a single epoch configuration to generate training and modeling data, including
         handling of hybridization features.
