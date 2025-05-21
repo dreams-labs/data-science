@@ -585,12 +585,6 @@ class WalletEpochsOrchestrator:
         # Identify all offsets
         validation_offsets = self.epochs_config['offset_epochs'].get('validation_offsets', [])
         modeling_offsets = self.epochs_config['offset_epochs']['offsets']
-        coin_model_offsets = [
-            base_training_data['modeling_period_duration'],
-            base_training_data['modeling_period_duration']*2
-        ]
-        existing_offsets = validation_offsets + modeling_offsets
-        coin_model_new_offsets = [offset for offset in coin_model_offsets if offset not in existing_offsets]
 
         # Confirm there is no overlap between any modeling and validation periods
         if len(validation_offsets) > 0:
@@ -615,28 +609,6 @@ class WalletEpochsOrchestrator:
                     base_training_window_starts, base_parquet_folder_base
                 )
                 all_epochs_configs.append(cfg)
-
-            # Add wallet_modeling and coin_modeling offsets if they fall within the validation date range
-            if len(coin_model_new_offsets) > 0:
-                for offset_days in coin_model_new_offsets:
-                    try:
-                        cfg = self.build_epoch_config(
-                            offset_days, 'coin_modeling',
-                            base_modeling_start, base_modeling_end,
-                            base_training_window_starts, base_parquet_folder_base
-                        )
-                        all_epochs_configs.append(cfg)
-
-                    # ValueError will be correctly raised by wallets_config_manager.py if the coin modeling
-                    #  config modeling_period_end is later than the base config validation_period_end.
-                    #  Coin modeling configs are only generated as a time save and should be skipped if
-                    #  they fall after the validation period.
-                    except ValueError as e:
-                        logger.debug(e)
-                        logger.info("All wallet_modeling epochs are valid but no data will be generated "
-                                    f"for coin_modeling epoch_config with offset {offset_days} "
-                                    "that extends later than the validation period end of "
-                                    f"{self.base_config['training_data']['validation_period_end']}.")
 
         return all_epochs_configs
 
