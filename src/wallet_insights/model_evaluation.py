@@ -2,7 +2,7 @@ import logging
 from typing import List
 import pandas as pd
 import numpy as np
-from scipy.stats import chi2_contingency
+from scipy.stats import chi2_contingency, spearmanr
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import seaborn as sns
@@ -138,10 +138,33 @@ class RegressorEvaluator:
 
         # Validation set performance if applicable
         if self.y_validation is not None and self.y_validation_pred is not None:
+            # Core validation metrics
+            r2_val   = r2_score(self.y_validation, self.y_validation_pred)
+            rmse_val = np.sqrt(mean_squared_error(self.y_validation, self.y_validation_pred))
+            mae_val  = mean_absolute_error(self.y_validation, self.y_validation_pred)
+
+            # Spearman rank‑correlation
+            spearman_val = spearmanr(self.y_validation, self.y_validation_pred).correlation
+
+            # Top‑1 % mean of actuals for the highest 1 % predicted scores
+            # ----------------------------------------------------------------
+            # Ensure we can sort predictions as a Series aligned to y_validation
+            if isinstance(self.y_validation_pred, pd.Series):
+                preds_series = self.y_validation_pred
+            else:  # NumPy array
+                preds_series = pd.Series(self.y_validation_pred, index=self.y_validation.index)
+
+            top_n = max(1, int(np.ceil(0.01 * len(preds_series))))
+            top_idx = preds_series.sort_values(ascending=False).head(top_n).index
+            top1pct_mean_val = self.y_validation.loc[top_idx].mean()
+
+            # Store
             self.metrics['validation_metrics'] = {
-                'r2': r2_score(self.y_validation, self.y_validation_pred),
-                'rmse': np.sqrt(mean_squared_error(self.y_validation, self.y_validation_pred)),
-                'mae': mean_absolute_error(self.y_validation, self.y_validation_pred)
+                'r2': r2_val,
+                'rmse': rmse_val,
+                'mae': mae_val,
+                'spearman': spearman_val,
+                'top1pct_mean': top1pct_mean_val,
             }
 
     def _calculate_cohort_metrics(self):
@@ -264,6 +287,8 @@ class RegressorEvaluator:
                 f"R² Score:                 {vm['r2']:.3f}",
                 f"RMSE:                     {vm['rmse']:.3f}",
                 f"MAE:                      {vm['mae']:.3f}",
+                f"Spearman ρ:               {vm['spearman']:.3f}",
+                f"Top 1% Mean:              {vm['top1pct_mean']:.3f}",
                 ""
             ])
 
