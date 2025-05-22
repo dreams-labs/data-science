@@ -134,23 +134,8 @@ class WalletModelOrchestrator:
                 # keep None explicitly so predict_and_store skips binary prediction
                 self.score_params[score_name]['y_pred_threshold'] = None
 
-            # -----------------------------------------------
-            # Extract return metrics for analysis
-            n_buckets = 20
-            if evaluator.modeling_config.get('model_type') == 'classification':
-                # equal-count buckets for classification to match plots
-                bucket_df = self._compute_return_vs_rank_df(evaluator, n_buckets=n_buckets)
-            else:
-                # equal-width buckets for regression
-                bucket_df = self._compute_combined_score_return_df(evaluator, n_buckets=n_buckets)
-            # Convert DataFrame to serializable dict
-            return_metrics = bucket_df.to_dict(orient='list')
-
-            # Store model ID and return metrics in dictionary for later use
-            models_dict[score_name] = {
-                'model_id': model_id,
-                'return_metrics': return_metrics
-            }
+            # Store model metrics
+            models_dict[score_name] = self._store_model_metrics(model_id, evaluator)
 
             logger.milestone(f"Finished training model {len(models_dict)}/{len(self.score_params)}"
                              f": {score_name}.")
@@ -166,6 +151,46 @@ class WalletModelOrchestrator:
         self._plot_score_summaries(evaluators)
 
         return models_dict
+
+
+
+    def _store_model_metrics(self, model_id: str, evaluator) -> dict:
+        """
+        Extract and store model performance metrics and macroeconomic features.
+
+        Params:
+        - model_id: Unique identifier for the trained model
+        - evaluator: Model evaluator object containing predictions and validation data
+
+        Returns:
+        - dict: Model metrics including ID, return metrics, and macro averages
+        """
+        # Extract return metrics for analysis
+        n_buckets = 20
+        if evaluator.modeling_config.get('model_type') == 'classification':
+            # Use evaluator's bucket computation method for classification
+            bucket_df = self._compute_return_vs_rank_df(evaluator, n_buckets=n_buckets)
+        else:
+            # Equal-width buckets for regression
+            bucket_df = self._compute_combined_score_return_df(evaluator, n_buckets=n_buckets)
+
+        # Convert DataFrame to serializable dict
+        return_metrics = bucket_df.to_dict(orient='list')
+
+        # Extract macroeconomic features for analysis
+        macro_cols = [col for col in evaluator.X_validation.columns if col.startswith('macro|')]
+        macro_metrics = (evaluator.X_validation[macro_cols].reset_index()
+                         .groupby('epoch_start_date')
+                         .mean())
+        # Convert macro_metrics to serializable dict
+        macro_averages = macro_metrics.to_dict(orient='list')
+
+        return {
+            'model_id': model_id,
+            'return_metrics': return_metrics,
+            'macro_averages': macro_averages
+        }
+
 
 
     def predict_and_store(self, models_dict, training_data_df):
@@ -362,7 +387,6 @@ class WalletModelOrchestrator:
         if actual_buckets < 2:
             # If only 1 unique prediction, create single bucket
             df["bucket"] = 1
-            bucket_indices = [1]
         else:
             # Use qcut with duplicates='drop' and track actual buckets created
             df["bucket_raw"] = pd.qcut(df["pred"], actual_buckets, labels=False, duplicates="drop")
