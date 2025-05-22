@@ -961,8 +961,6 @@ class ClassifierEvaluator(RegressorEvaluator):
                     f"F1 Score:                   {self.metrics['f1']:.3f}",
                     ""
             ])
-
-        # Validation return metrics
         else:
             summary.extend([
                 "Classification Metrics:      Val   |  Test",
@@ -973,18 +971,31 @@ class ClassifierEvaluator(RegressorEvaluator):
                 f"Val Recall:                 {self.metrics['val_recall']:.3f}  |  {self.metrics['recall']:.3f}",
                 f"Val F1 Score:               {self.metrics['val_f1']:.3f}  |  {self.metrics['f1']:.3f}",
                 "",
-                "Validation Returns    | Cutoff |  Mean   |  W-Mean",
-                "-" * 50,
-                f"Overall Average       |   n/a  |  {self.metrics['val_ret_mean_overall']:.3f}  |  {self.metrics['val_wins_return_overall']:.3f}",
-                f"Param Threshold       |  {self.y_pred_threshold:.2f}  |  {self.metrics['positive_pred_return']:.3f}  |  {self.metrics['positive_pred_wins_return']:.3f}",
-                f"Top 1% Scores         |  {self.metrics['val_top1_thr']:.2f}  |  {self.metrics['val_ret_mean_top1']:.3f}  |  {self.metrics['val_wins_return_top1']:.3f}",
-                f"Top 5% Scores         |  {self.metrics['val_top5_thr']:.2f}  |  {self.metrics['val_ret_mean_top5']:.3f}  |  {self.metrics['val_wins_return_top5']:.3f}",
-                f"F0.10 Score           |  {self.metrics['f0.1_thr']:.2f}  |  {self.metrics['val_ret_mean_f0.1']:.3f}  |  {self.metrics['val_wins_ret_mean_f0.1']:.3f}",
-                f"F0.25 Score           |  {self.metrics['f0.25_thr']:.2f}  |  {self.metrics['val_ret_mean_f0.25']:.3f}  |  {self.metrics['val_wins_ret_mean_f0.25']:.3f}",
-                f"F0.50 Score           |  {self.metrics['f0.5_thr']:.2f}  |  {self.metrics['val_ret_mean_f0.5']:.3f}  |  {self.metrics['val_wins_ret_mean_f0.5']:.3f}",
-                f"F1 Score              |  {self.metrics['f1.0_thr']:.2f}  |  {self.metrics['val_ret_mean_f1.0']:.3f}  |  {self.metrics['val_wins_ret_mean_f1.0']:.3f}",
-                f"F2 Score              |  {self.metrics['f2.0_thr']:.2f}  |  {self.metrics['val_ret_mean_f2.0']:.3f}  |  {self.metrics['val_wins_ret_mean_f2.0']:.3f}",
             ])
+            # Validation Return metrics with fixed-width formatting
+            summary.append("Validation Returns    | Cutoff |  Mean   |  W-Mean")
+            summary.append("-" * 50)
+            # Base rows
+            rows = [
+                ("Overall Average", "n/a", self.metrics['val_ret_mean_overall'], self.metrics['val_wins_return_overall']),
+                ("Param Threshold", f"{self.y_pred_threshold:.2f}", self.metrics['positive_pred_return'], self.metrics['positive_pred_wins_return']),
+                ("Top 1% Scores", f"{self.metrics['val_top1_thr']:.2f}", self.metrics['val_ret_mean_top1'], self.metrics['val_wins_return_top1']),
+                ("Top 5% Scores", f"{self.metrics['val_top5_thr']:.2f}", self.metrics['val_ret_mean_top5'], self.metrics['val_wins_return_top5']),
+            ]
+            # Dynamically add F‑beta rows if available
+            for label, thr_key, ret_key, wins_key in [
+                ("F0.10 Score", "f0.1_thr", "val_ret_mean_f0.1", "val_wins_ret_mean_f0.1"),
+                ("F0.25 Score", "f0.25_thr", "val_ret_mean_f0.25", "val_wins_ret_mean_f0.25"),
+                ("F0.50 Score", "f0.5_thr", "val_ret_mean_f0.5", "val_wins_ret_mean_f0.5"),
+                ("F1 Score",    "f1.0_thr", "val_ret_mean_f1.0", "val_wins_ret_mean_f1.0"),
+                ("F2 Score",    "f2.0_thr", "val_ret_mean_f2.0", "val_wins_ret_mean_f2.0"),
+            ]:
+                thr_val = self.metrics.get(thr_key)
+                if thr_val is not None:
+                    rows.append((label, f"{thr_val:.2f}", self.metrics.get(ret_key, 0.0), self.metrics.get(wins_key, 0.0)))
+            # Append formatted rows
+            for name, cutoff, mean, wins in rows:
+                summary.append(f"{name:<21} | {cutoff:>6} | {mean:>7.3f} | {wins:>7.3f}")
 
         report = "\n".join(summary)
         logger.info("\n%s", report)
