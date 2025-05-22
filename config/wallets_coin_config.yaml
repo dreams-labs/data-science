@@ -7,21 +7,21 @@ training_data: #CoinModel
     # coins_wallet_scores_folder: automatically filled
 
     coin_epochs_validation: [
-        # 30,
-        # 60,
-        # 90
+        30,
+        60,
+        90
     ]
 
     coin_epochs_training: [  # How many days prior to the modeling period each window begins
-        90,
-        # 0,
-        # -30,
-        # -60,
-        # -90,
-        # -120,
-        # -180,
-        # -240,
-        # -360,
+        # 90,
+        0,
+        -30,
+        -60,
+        -90,
+        -120,
+        -180,
+        -240,
+        -360,
         # -300,
         # -420,
         # -480,
@@ -52,6 +52,9 @@ training_data: #CoinModel
 
 # CoinModel Wallet Scores
 wallet_scores: #CoinModel
+
+    # Whether to use existing models if wallet_model_ids.json is present
+    reuse_existing: True
 
     #KeyParam Scores to include as segments + metrics
     # y_pred_threshold defines the binary coin cohorts and can be defined
@@ -181,7 +184,7 @@ coin_modeling: #CoinModel
     target_variable: coin_return_winsorized
     # target_variable: coin_return
     # target_variable: coin_return_pctile_full
-    target_var_min_threshold: .6  # a classification model will try to predict the target var above this value
+    target_var_min_threshold: .4 # a classification model will try to predict the target var above this value
     y_pred_threshold: 0.6  # scores above this probability threshold are positive predictions
 
     returns_winsorization: 0.005
@@ -189,8 +192,8 @@ coin_modeling: #CoinModel
 
     #KeyParam Modeling Cohort Definition
     # Thresholds for coin inclusion in training data
-    min_cohort_wallets: 25  # how many wallets must hold a coin for the coin to be elegible for forecasting
-    min_cohort_balance: 20000  # how much USD all wallets must hold for the coin to be elegible for forecasting
+    min_cohort_wallets: 15  # how many wallets must hold a coin for the coin to be elegible for forecasting
+    min_cohort_balance: 10000  # how much USD all wallets must hold for the coin to be elegible for forecasting
 
     # Thresholds for coin inclusion in training data
     min_market_cap: 2_000_000  # coins below this market cap will not be included in performance assessments

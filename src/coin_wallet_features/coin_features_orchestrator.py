@@ -86,6 +86,16 @@ class CoinFeaturesOrchestrator:
         logger.info("Beginning coin feature generation...")
         u.notify('intro_4')
 
+        # Guard: profits_df covers expected date range
+        u.assert_period(
+            profits_df,
+            self.wallets_config['training_data'][f'{period}_period_start'],
+            self.wallets_config['training_data'][f'{period}_period_end']
+        )
+        # Guard: training_data_df has unique wallet rows (needed for segmentation)
+        if training_data_df.index.duplicated().any():
+            raise ValueError("training_data_df contains duplicated wallet rows.")
+
         # Generate metrics for coin-wallet pairs
         cw_metrics_df = cwwm.compute_coin_wallet_metrics(
             self.wallets_coin_config,

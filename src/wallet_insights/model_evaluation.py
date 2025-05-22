@@ -1070,8 +1070,28 @@ class ClassifierEvaluator(RegressorEvaluator):
         self.metrics['recall'] = recall_score(self.y_test, self.y_pred, zero_division=0)
         self.metrics['f1'] = f1_score(self.y_test, self.y_pred, zero_division=0)
 
-        # Add F-beta metrics
-        self.add_fbeta_metrics()
+        # Compute F-beta thresholds & scores on validation set
+        if hasattr(self, "y_validation_pred_proba"):
+            precisions, recalls, ths = precision_recall_curve(
+                self.y_validation, self.y_validation_pred_proba
+            )
+            ths = np.append(ths, 1.0)
+            for beta in (0.1, 0.25, 0.5, 1.0, 2.0):
+                thr_key = f"f{beta}_thr"
+                score_key = f"f{beta}_score"
+                # static converter returns best threshold
+                thresh = ClassifierEvaluator.add_fbeta_metrics(
+                    precisions, recalls, ths, beta
+                )
+                # recompute F-beta score at that threshold
+                beta_sq = beta ** 2
+                f_scores = (1 + beta_sq) * precisions * recalls / (
+                    beta_sq * precisions + recalls + 1e-9
+                )
+                score = f_scores[np.nanargmax(f_scores)]
+                self.metrics[thr_key] = thresh
+                self.metrics[score_key] = score
+
 
         try:
             self.metrics['roc_auc'] = roc_auc_score(self.y_test, self.y_pred_proba)
@@ -1138,41 +1158,32 @@ class ClassifierEvaluator(RegressorEvaluator):
             self._calculate_feature_importance()
 
 
-
-    def add_fbeta_metrics(self, betas: tuple[float, ...] = (0.1, 0.25, 0.5, 1.0, 2.0)) -> None:
+    @staticmethod
+    def add_fbeta_metrics(
+        precisions: np.ndarray,
+        recalls: np.ndarray,
+        thresholds: np.ndarray,
+        beta: float
+    ) -> float:
         """
-        Populate self.metrics with F-beta scores and their optimal thresholds,
-        **computed exclusively on the validation set**. If no validation data
-        were provided, the method returns without making changes.
+        Compute the optimal probability threshold for a given F-beta value.
 
-        Stored keys:
-            f{β}_score   – best F-β score on validation set
-            f{β}_thr     – probability threshold that achieves that score
+        Params:
+        - precisions (np.ndarray): precision values from precision_recall_curve
+        - recalls (np.ndarray): recall values from precision_recall_curve
+        - thresholds (np.ndarray): threshold values from precision_recall_curve
+        - beta (float): the beta value for F-beta
+
+        Returns:
+        - float: best threshold achieving max F-beta score
         """
-        # Need positive-class probabilities on the validation split
-        if (
-            getattr(self, "y_validation", None) is None
-            or getattr(self, "y_validation_pred_proba", None) is None
-        ):
-            logger.warning("Validation data missing → skipping F-beta metrics.")
-            return
-
-        y_val   = self.y_validation
-        proba   = self.y_validation_pred_proba
-
-        precisions, recalls, ths = precision_recall_curve(y_val, proba)
-        ths = np.append(ths, 1.0)  # align lengths with precision/recall arrays
-
-        # compute each beta
-        for beta in betas:
-            beta_sq = beta ** 2
-            f_scores = (1 + beta_sq) * precisions * recalls / (beta_sq * precisions + recalls + 1e-9)
-            best_idx = np.nanargmax(f_scores)
-            best_thr = ths[best_idx] if best_idx < len(ths) else ths[-1]
-
-            # Store both the score and threshold
-            self.metrics[f"f{beta}_score"] = f_scores[best_idx]
-            self.metrics[f"f{beta}_thr"]   = best_thr
+        ths = np.append(thresholds, 1.0)
+        beta_sq = beta ** 2
+        f_scores = (1 + beta_sq) * precisions * recalls / (
+            beta_sq * precisions + recalls + 1e-9
+        )
+        best_idx = np.nanargmax(f_scores)
+        return ths[best_idx] if best_idx < len(ths) else ths[-1]
 
 
 

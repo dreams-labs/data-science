@@ -42,6 +42,21 @@ def flatten_cw_to_coin_segment_features(
     - coin_wallet_features_df (DataFrame): indexed by coin_id, joined features for each
         metric × segment family.
     """
+    if cw_metrics_df.empty:
+        raise ValueError(f"Provided cw_metrics_df is empty. Columns: {list(cw_metrics_df.columns)}")
+    if wallet_segmentation_df.empty:
+        raise ValueError(f"Provided wallet_segmentation_df is empty. Columns: {list(wallet_segmentation_df.columns)}")
+
+    # Index coverage – every wallet in metrics must have a segment label
+    wallets_in_metrics = set(cw_metrics_df.index.get_level_values('wallet_address'))
+    wallets_in_seg     = set(wallet_segmentation_df.index)
+    missing = wallets_in_metrics - wallets_in_seg
+    if missing:
+        raise ValueError(
+            f"{len(missing):,} wallet(s) in cw_metrics_df lack segmentation labels "
+            "(example IDs: %s)" % list(missing)[:5]
+        )
+
     # start with an empty coin-level df
     coin_wallet_features_df = pd.DataFrame(index=training_coin_cohort)
     coin_wallet_features_df.index.name = 'coin_id'
@@ -52,7 +67,7 @@ def flatten_cw_to_coin_segment_features(
     ]
 
     # Pre‑join segmentation data once to avoid repeating the join inside
-    joined_metrics_df = cw_metrics_df.join(wallet_segmentation_df, how='left')
+    joined_metrics_df = cw_metrics_df.join(wallet_segmentation_df, how='inner')
 
     # Function to process a single metric column in parallel
     def process_metric(metric_column):
