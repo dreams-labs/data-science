@@ -181,7 +181,8 @@ class WalletModelOrchestrator:
         macro_cols = [col for col in evaluator.X_validation.columns if col.startswith('macro|')]
         macro_metrics = (evaluator.X_validation[macro_cols].reset_index()
                          .groupby('epoch_start_date')
-                         .mean())
+                         .mean()
+                         .mean())  # Second mean() collapses to single row
         # Convert macro_metrics to serializable dict
         macro_averages = macro_metrics.to_dict(orient='list')
 
