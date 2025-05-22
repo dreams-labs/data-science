@@ -3,6 +3,7 @@ from typing import Dict, Union, Tuple
 import pandas as pd
 import numpy as np
 from sklearn.pipeline import Pipeline
+from sklearn.metrics import precision_recall_curve
 
 # Local modules
 from base_modeling.base_model import BaseModel
@@ -152,10 +153,25 @@ class WalletModel(BaseModel):
                 pos_idx = list(meta_pipeline.named_steps['estimator'].classes_).index(1)
                 proba_series = pd.Series(proba[:, pos_idx], index=self.X_validation.index)
 
-                # Apply configurable threshold for class prediction
-                threshold = self.modeling_config.get('y_pred_threshold', 0.5)
+                # Resolve F-beta string threshold if present
+                raw_thr = self.modeling_config.get('y_pred_threshold', 0.5)
+                if isinstance(raw_thr, str) and raw_thr.startswith('f'):
+                    beta = float(raw_thr[1:])
+                    # Compute precision-recall curve on validation set
+                    true_vals = result['y_validation']
+                    precisions, recalls, ths = precision_recall_curve(true_vals, proba_series)
+                    ths = np.append(ths, 1.0)  # pad to align with precision/recall arrays
+                    beta_sq = beta ** 2
+                    f_scores = (1 + beta_sq) * precisions * recalls / (beta_sq * precisions + recalls + 1e-9)
+                    best_idx = np.nanargmax(f_scores)
+                    thr_val = ths[best_idx] if best_idx < len(ths) else ths[-1]
+                    # overwrite config and use numeric threshold
+                    self.modeling_config['y_pred_threshold'] = thr_val
+                    threshold = thr_val
+                else:
+                    threshold = raw_thr
                 result['y_validation_pred_proba'] = proba_series
-                result['y_validation_pred']       = (proba_series >= threshold).astype(int)
+                result['y_validation_pred'] = (proba_series >= threshold).astype(int)
             else:
                 result['y_validation_pred'] = meta_pipeline.predict(self.X_validation)
 

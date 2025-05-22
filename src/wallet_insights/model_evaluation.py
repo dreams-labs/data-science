@@ -970,8 +970,9 @@ class ClassifierEvaluator(RegressorEvaluator):
                 f"Param Threshold       |  {self.y_pred_threshold:.2f}  |  {self.metrics['positive_pred_return']:.3f}  |  {self.metrics['positive_pred_wins_return']:.3f}",
                 f"Top 1% Scores         |  {self.metrics['val_top1_thr']:.2f}  |  {self.metrics['val_ret_mean_top1']:.3f}  |  {self.metrics['val_wins_return_top1']:.3f}",
                 f"Top 5% Scores         |  {self.metrics['val_top5_thr']:.2f}  |  {self.metrics['val_ret_mean_top5']:.3f}  |  {self.metrics['val_wins_return_top5']:.3f}",
+                f"F0.10 Score           |  {self.metrics['f0.1_thr']:.2f}  |  {self.metrics['val_ret_mean_f0.1']:.3f}  |  {self.metrics['val_wins_ret_mean_f0.1']:.3f}",
                 f"F0.25 Score           |  {self.metrics['f0.25_thr']:.2f}  |  {self.metrics['val_ret_mean_f0.25']:.3f}  |  {self.metrics['val_wins_ret_mean_f0.25']:.3f}",
-                f"F0.5 Score            |  {self.metrics['f0.5_thr']:.2f}  |  {self.metrics['val_ret_mean_f0.5']:.3f}  |  {self.metrics['val_wins_ret_mean_f0.5']:.3f}",
+                f"F0.50 Score           |  {self.metrics['f0.5_thr']:.2f}  |  {self.metrics['val_ret_mean_f0.5']:.3f}  |  {self.metrics['val_wins_ret_mean_f0.5']:.3f}",
                 f"F1 Score              |  {self.metrics['f1_thr']:.2f}  |  {self.metrics['val_ret_mean_f1']:.3f}  |  {self.metrics['val_wins_ret_mean_f1']:.3f}",
                 f"F2 Score              |  {self.metrics['f2_thr']:.2f}  |  {self.metrics['val_ret_mean_f2']:.3f}  |  {self.metrics['val_wins_ret_mean_f2']:.3f}",
             ])
@@ -1050,7 +1051,7 @@ class ClassifierEvaluator(RegressorEvaluator):
         self.metrics['f1'] = f1_score(self.y_test, self.y_pred, zero_division=0)
 
         # Add F-beta metrics
-        self._add_fbeta_metrics()
+        self.add_fbeta_metrics()
 
         try:
             self.metrics['roc_auc'] = roc_auc_score(self.y_test, self.y_pred_proba)
@@ -1100,7 +1101,7 @@ class ClassifierEvaluator(RegressorEvaluator):
             self.metrics['val_wins_return_top5'] = df_val.loc[df_val['proba'] >= pct5, 'ret_wins'].mean()
             self.metrics['val_wins_return_overall'] = df_val['ret_wins'].mean()
             # --- F‑beta threshold mean returns (F1 & F2) -------------------
-            for beta in (0.25,0.5,1,2):
+            for beta in (0.1,0.25,0.5,1,2):
                 thr_key = f"f{beta}_thr"
                 if thr_key in self.metrics:
                     thr_val = self.metrics[thr_key]
@@ -1117,7 +1118,7 @@ class ClassifierEvaluator(RegressorEvaluator):
             self._calculate_feature_importance()
 
 
-    def _add_fbeta_metrics(self, betas=(0.25,0.5,1,2)):
+    def add_fbeta_metrics(self, betas=(0.1,0.25,0.5,1,2)):
         """
         Compute F-beta metrics for various beta values and store best scores and thresholds.
         """
@@ -1239,7 +1240,8 @@ class ClassifierEvaluator(RegressorEvaluator):
 
         # --- F‑β optimal threshold verticals --------------------------------
         beta_colors = {
-            0.25:'#ffffff',
+            0.1:'#ffffff',
+            0.25:'#eeeeee',
             0.5:'#cccccc',
             1:'#aaaaaa',
             2:'#888888',
@@ -1343,7 +1345,8 @@ class ClassifierEvaluator(RegressorEvaluator):
 
         # --- F‑β threshold markers -----------------------------------------
         beta_colors = {
-            0.25:'#ffffff',
+            0.1:'#ffffff',
+            0.25:'#eeeeee',
             0.5:'#cccccc',
             1:'#aaaaaa',
             2:'#888888',
