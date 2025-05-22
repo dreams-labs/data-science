@@ -4,12 +4,16 @@ Functions for generating and storing model training reports and associated data
 from typing import Dict,Tuple
 from pathlib import Path
 import logging
-from datetime import datetime
+import uuid
+from datetime import datetime,timedelta
+import joblib
 import json
 import pandas as pd
 import numpy as np
+import pandas_gbq
 import wallet_insights.model_evaluation as wime
-import joblib
+import wallet_insights.wallet_model_reporting as wimr
+import coin_modeling.coin_epochs_orchestrator as ceo
 
 # Local modules
 import utils as u
@@ -83,6 +87,95 @@ def generate_and_save_coin_model_artifacts(
 
 
 
+def generate_and_upload_coin_scores(
+    wallets_coin_config: dict,
+    training_data_df: pd.DataFrame,
+    model_id: str,
+    score_name: str,
+    score_notes: str,
+    project_id: str = 'western-verve-411004'
+) -> None:
+    """
+    Generate wallet scores for coin-wallet pairs using the specified model and upload
+     to normalized BigQuery tables.
+
+    Params:
+    - wallets_coin_config (dict, optional): Configuration dictionary.
+    - training_data_df (DataFrame): Multiwindow wallet training data.
+    - model_id (str): Unique ID of the model to use for prediction.
+    - score_name (str): Name of the score being generated.
+    - score_notes (str): Additional notes about the scoring process.
+    - project_id (str, optional): GCP project ID for BigQuery upload.
+    """
+    # Validate epochs
+    epochs = sorted(list(training_data_df.index.get_level_values('coin_epoch_start_date').unique()))
+    if len(epochs) > 1:
+        raise ValueError("Training data contains more than one epoch. Predictions should only "
+                            f"include a single epoch. Epochs found: {epochs}")
+
+    # Generate a unique score_run_id to link metadata with scores
+    score_run_id = str(uuid.uuid4())
+
+    # Load and predict
+    y_pred = ceo.CoinEpochsOrchestrator.score_coin_training_data(
+        wallets_coin_config,
+        model_id,
+        wallets_coin_config['training_data']['model_artifacts_folder'],
+        training_data_df,
+    )
+
+    # Create base df
+    coin_scores_df = y_pred.reset_index()
+
+    # Add score_run_id to link with metadata
+    coin_scores_df['score_run_id'] = score_run_id
+
+    # Create metadata dataframe with a single row
+    report = wimr.load_model_report(
+        model_id,
+        wallets_coin_config['training_data']['model_artifacts_folder']
+    )
+    report_model_cfg = report['configurations']['wallets_coin_config']['coin_modeling']
+    epoch_duration = report['configurations']['wallets_config']['training_data']['modeling_period_duration']
+    epoch_end_date = (epochs[0] + timedelta(days=epoch_duration))
+    if report_model_cfg['model_type'] == 'regression':
+        target_threshold = np.nan
+    else:
+        target_threshold = report_model_cfg['target_var_min_threshold']
+
+    score_metadata_df = pd.DataFrame({
+        'score_run_id': [score_run_id],
+        'epoch_end_date': [epoch_end_date],
+        'model_id': [report['model_id']],
+        'score_name': [score_name],
+        'scored_at': [report['timestamp']],
+        'model_type': [report_model_cfg['model_type']],
+        'target_var': [report_model_cfg['target_variable']],
+        'target_var_threshold': [target_threshold],
+        'notes': [score_notes],
+        'updated_at': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')]
+    })
+
+    # Upload to BigQuery
+    pandas_gbq.to_gbq(
+        dataframe=coin_scores_df,
+        destination_table='scores.coin_scores',
+        project_id=project_id,
+        if_exists='append'
+    )
+    pandas_gbq.to_gbq(
+        dataframe=score_metadata_df,
+        destination_table='scores.coin_scores_metadata',
+        project_id=project_id,
+        if_exists='append'
+    )
+
+    logger.milestone(f"Successfully uploaded score '{score_name}' with {len(coin_scores_df)} records.")
+    u.notify('ui_sound_on')
+
+
+
+
 # ---------------------------------
 #         Helper Functions
 # ---------------------------------
@@ -124,6 +217,7 @@ def save_coin_model_artifacts(model_results, evaluation_dict, pipeline, configs,
             f"model_report_{filename_timestamp}__"
             f"mr{model_r2:.3f}__"
             f"{f'vr{validation_r2:.3f}' if not np.isnan(validation_r2) else 'vr___'}.json"
+            f"|{model_id}.json"
         )
         base_dir = Path(base_path)
     elif model_results['model_type'] == 'classification':

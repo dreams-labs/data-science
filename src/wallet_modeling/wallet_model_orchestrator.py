@@ -181,7 +181,8 @@ class WalletModelOrchestrator:
         macro_cols = [col for col in evaluator.X_validation.columns if col.startswith('macro|')]
         macro_metrics = (evaluator.X_validation[macro_cols].reset_index()
                          .groupby('epoch_start_date')
-                         .mean())
+                         .mean()
+                         .mean())  # Second mean() collapses to single row
         # Convert macro_metrics to serializable dict
         macro_averages = macro_metrics.to_dict(orient='list')
 
@@ -392,7 +393,6 @@ class WalletModelOrchestrator:
             df["bucket_raw"] = pd.qcut(df["pred"], actual_buckets, labels=False, duplicates="drop")
             # Reverse ranking so highest predictions get bucket 1
             df["bucket"] = actual_buckets - df["bucket_raw"]
-            bucket_indices = sorted(df["bucket"].unique())
 
         # Calculate metrics only for buckets that exist
         bucket_mean = df.groupby("bucket")["ret"].mean()
