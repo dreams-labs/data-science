@@ -249,7 +249,7 @@ class WalletModelOrchestrator:
             if evaluator.modeling_config.get('model_type') == 'classification':
                 evaluator._plot_return_vs_rank_classifier(ax, n_buckets=20)  # pylint:disable=protected-access
             else:
-                evaluator._plot_score_distribution(ax)  # pylint:disable=protected-access
+                evaluator._plot_combined_score_return(ax)  # pylint:disable=protected-access
             ax.set_title(score_name)
 
         # Hide any unused subplots

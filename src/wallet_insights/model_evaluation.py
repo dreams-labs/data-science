@@ -1,5 +1,6 @@
 import logging
 from typing import List
+import textwrap
 import pandas as pd
 import numpy as np
 from scipy.stats import chi2_contingency, spearmanr
@@ -23,10 +24,10 @@ from sklearn.metrics import (
 )
 from dreams_core import core as dc
 import utils as u
-import textwrap
 
-# pylint:disable=invalid-name  # X_test isn't camelcase
+# pylint:disable=invalid-name    # X_test isn't camelcase
 # pylint:disable=too-many-lines  # graphs gotta live somewhere
+# pylint:disable=line-too-long   # reports should mimic output format rather than force breaks
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -82,6 +83,159 @@ class RegressorEvaluator:
 
         # model id
         self.model_id = wallet_model_results['model_id']
+
+
+
+
+    # -----------------------------------
+    #      Primary Regressor Methods
+    # -----------------------------------
+
+
+    def summary_report(self):
+        """Generate formatted summary of model performance."""
+        # now just grab the header + samples
+        summary = self._get_summary_header()
+
+        # Add core regression metrics
+        summary.extend([
+            "Core Metrics",
+            "-" * 35,
+            f"R² Score:                 {self.metrics['r2']:.3f}",
+            f"RMSE:                     {self.metrics['rmse']:.3f}",
+            f"MAE:                      {self.metrics['mae']:.3f}",
+            ""
+        ])
+
+        # Validation metrics
+        if "validation_metrics" in self.metrics:
+            vm = self.metrics["validation_metrics"]
+            summary.extend([
+                "Validation Set Metrics",
+                "-" * 35,
+                f"R² Score:                 {vm['r2']:.3f}",
+                f"RMSE:                     {vm['rmse']:.3f}",
+                f"MAE:                      {vm['mae']:.3f}",
+                f"Spearman ρ:               {vm['spearman']:.3f}",
+                f"Top 1% Mean:              {vm['top1pct_mean']:.3f}",
+                ""
+            ])
+
+        # Training-cohort metrics
+        if "training_cohort" in self.metrics:
+            tc = self.metrics["training_cohort"]
+            summary.extend([
+                "Inactive Wallets Cohort Metrics",
+                "-" * 35,
+                f"R² Score:                 {tc['r2']:.3f}",
+                f"RMSE:                     {tc['rmse']:.3f}",
+                f"MAE:                      {tc['mae']:.3f}",
+                ""
+            ])
+
+        # Residuals
+        summary.extend([
+            "Residuals Analysis",
+            "-" * 35,
+            f"Mean of Residuals:        {self.metrics['residuals_mean']:.3f}",
+            f"Std of Residuals:         {self.metrics['residuals_std']:.3f}",
+            f"95% Prediction Interval:  ±{self.metrics['prediction_interval_95']:.3f}"
+        ])
+
+        report = "\n".join(summary)
+        logger.info("\n%s", report)
+
+
+
+    def plot_coin_evaluation(self, plot_type='all', display=True):
+        """Generate evaluation plots for coin models."""
+        if plot_type == 'all':
+            fig = plt.figure(figsize=(15, 12))
+            gs = plt.GridSpec(2, 2, height_ratios=[1, 1], width_ratios=[1, 1])
+
+            ax1 = fig.add_subplot(gs[0, 0])  # Actual vs Predicted
+            ax2 = fig.add_subplot(gs[0, 1])  # Residuals
+            ax3 = fig.add_subplot(gs[1, 0])  # Score Distribution
+            ax4 = fig.add_subplot(gs[1, 1])  # Feature Importance
+
+            self._plot_return_vs_rank(ax1)
+            self._plot_actual_vs_predicted(ax2)
+            self._plot_score_distribution(ax3)
+            self._plot_feature_importance(ax4)
+        else:
+            fig, ax = plt.subplots(figsize=(8, 6))
+            if plot_type == 'actual_vs_predicted':
+                self._plot_actual_vs_predicted(ax)
+            elif plot_type == 'residuals':
+                self._plot_residuals(ax)
+            elif plot_type == 'score_distribution':
+                self._plot_score_distribution(ax)
+            elif plot_type == 'feature_importance':
+                self._plot_feature_importance(ax)
+
+        plt.tight_layout()
+        if display:
+            plt.show()
+            return None
+        return fig
+
+
+    def plot_wallet_evaluation(self, plot_type='all', display=True, levels=0):
+        """
+        Generate evaluation plots for wallet models with cohort analysis.
+
+        Params:
+        - plot_type: 'all' or one of ['actual_vs_predicted', 'residuals', 'combined_score_return',
+        'feature_importance', 'prefix_importance', 'cohort_comparison']
+        - display: If True, show plots directly; if False, return the figure.
+        - levels: Prefix grouping depth (used only if plot_type=='prefix_importance')
+        """
+        if not hasattr(self, 'training_cohort_pred'):
+            raise ValueError("Wallet evaluation requires training cohort data")
+
+        if plot_type == 'all':
+            # 2x2 layout for multiple evaluation plots
+            fig = plt.figure(figsize=(15, 12))
+            gs = plt.GridSpec(2, 2, height_ratios=[1, 1], width_ratios=[1, 1])
+
+            ax1 = fig.add_subplot(gs[0, 0])  # Actual vs Predicted
+            ax2 = fig.add_subplot(gs[0, 1])  # Residuals
+            ax3 = fig.add_subplot(gs[1, 0])  # Combined Score & Return
+            ax4 = fig.add_subplot(gs[1, 1])  # Prefix-based Importance
+
+            self._plot_actual_vs_predicted(ax1)
+            self._plot_residuals(ax2)
+            self._plot_combined_score_return(ax3, n_buckets=50)  # New combined method
+            self._plot_feature_importance(ax4, levels=levels)
+        else:
+            # Single plot mode
+            fig, ax = plt.subplots(figsize=(8, 6))
+            if plot_type == 'actual_vs_predicted':
+                self._plot_actual_vs_predicted(ax)
+            elif plot_type == 'residuals':
+                self._plot_residuals(ax)
+            elif plot_type == 'combined_score_return':  # New option
+                self._plot_combined_score_return(ax, n_buckets=25)
+            elif plot_type == 'cohort_comparison':  # Keep old option for backward compatibility
+                self._plot_cohort_comparison(ax)
+            elif plot_type == 'feature_importance':
+                self._plot_feature_importance(ax)
+            elif plot_type == 'prefix_importance':
+                self._plot_feature_importance(ax, levels=levels)
+            elif plot_type == 'return_vs_rank':
+                self._plot_return_vs_rank(ax, n_buckets=25)
+        plt.tight_layout()
+        if display:
+            plt.show()
+            return None
+        return fig
+
+
+
+    # -----------------------------------
+    #      Regressor Helper Methods
+    # -----------------------------------
+
 
 
     def _calculate_metrics(self):
@@ -270,60 +424,6 @@ class RegressorEvaluator:
                 window_n_features_str,
             ])
         return header
-
-
-    def summary_report(self):
-        """Generate formatted summary of model performance."""
-        # now just grab the header + samples
-        summary = self._get_summary_header()
-
-        # Add core regression metrics
-        summary.extend([
-            "Core Metrics",
-            "-" * 35,
-            f"R² Score:                 {self.metrics['r2']:.3f}",
-            f"RMSE:                     {self.metrics['rmse']:.3f}",
-            f"MAE:                      {self.metrics['mae']:.3f}",
-            ""
-        ])
-
-        # Validation metrics
-        if "validation_metrics" in self.metrics:
-            vm = self.metrics["validation_metrics"]
-            summary.extend([
-                "Validation Set Metrics",
-                "-" * 35,
-                f"R² Score:                 {vm['r2']:.3f}",
-                f"RMSE:                     {vm['rmse']:.3f}",
-                f"MAE:                      {vm['mae']:.3f}",
-                f"Spearman ρ:               {vm['spearman']:.3f}",
-                f"Top 1% Mean:              {vm['top1pct_mean']:.3f}",
-                ""
-            ])
-
-        # Training-cohort metrics
-        if "training_cohort" in self.metrics:
-            tc = self.metrics["training_cohort"]
-            summary.extend([
-                "Inactive Wallets Cohort Metrics",
-                "-" * 35,
-                f"R² Score:                 {tc['r2']:.3f}",
-                f"RMSE:                     {tc['rmse']:.3f}",
-                f"MAE:                      {tc['mae']:.3f}",
-                ""
-            ])
-
-        # Residuals
-        summary.extend([
-            "Residuals Analysis",
-            "-" * 35,
-            f"Mean of Residuals:        {self.metrics['residuals_mean']:.3f}",
-            f"Std of Residuals:         {self.metrics['residuals_std']:.3f}",
-            f"95% Prediction Interval:  ±{self.metrics['prediction_interval_95']:.3f}"
-        ])
-
-        report = "\n".join(summary)
-        logger.info("\n%s", report)
 
 
     def importance_summary(self, levels=0):
@@ -699,89 +799,6 @@ class RegressorEvaluator:
         ax.grid(True, linestyle=":", alpha=0.3)
 
 
-    def plot_coin_evaluation(self, plot_type='all', display=True):
-        """Generate evaluation plots for coin models."""
-        if plot_type == 'all':
-            fig = plt.figure(figsize=(15, 12))
-            gs = plt.GridSpec(2, 2, height_ratios=[1, 1], width_ratios=[1, 1])
-
-            ax1 = fig.add_subplot(gs[0, 0])  # Actual vs Predicted
-            ax2 = fig.add_subplot(gs[0, 1])  # Residuals
-            ax3 = fig.add_subplot(gs[1, 0])  # Score Distribution
-            ax4 = fig.add_subplot(gs[1, 1])  # Feature Importance
-
-            self._plot_return_vs_rank(ax1)
-            self._plot_actual_vs_predicted(ax2)
-            self._plot_score_distribution(ax3)
-            self._plot_feature_importance(ax4)
-        else:
-            fig, ax = plt.subplots(figsize=(8, 6))
-            if plot_type == 'actual_vs_predicted':
-                self._plot_actual_vs_predicted(ax)
-            elif plot_type == 'residuals':
-                self._plot_residuals(ax)
-            elif plot_type == 'score_distribution':
-                self._plot_score_distribution(ax)
-            elif plot_type == 'feature_importance':
-                self._plot_feature_importance(ax)
-
-        plt.tight_layout()
-        if display:
-            plt.show()
-            return None
-        return fig
-
-
-    def plot_wallet_evaluation(self, plot_type='all', display=True, levels=0):
-        """
-        Generate evaluation plots for wallet models with cohort analysis.
-
-        Params:
-        - plot_type: 'all' or one of ['actual_vs_predicted', 'residuals', 'combined_score_return',
-        'feature_importance', 'prefix_importance', 'cohort_comparison']
-        - display: If True, show plots directly; if False, return the figure.
-        - levels: Prefix grouping depth (used only if plot_type=='prefix_importance')
-        """
-        if not hasattr(self, 'training_cohort_pred'):
-            raise ValueError("Wallet evaluation requires training cohort data")
-
-        if plot_type == 'all':
-            # 2x2 layout for multiple evaluation plots
-            fig = plt.figure(figsize=(15, 12))
-            gs = plt.GridSpec(2, 2, height_ratios=[1, 1], width_ratios=[1, 1])
-
-            ax1 = fig.add_subplot(gs[0, 0])  # Actual vs Predicted
-            ax2 = fig.add_subplot(gs[0, 1])  # Residuals
-            ax3 = fig.add_subplot(gs[1, 0])  # Combined Score & Return
-            ax4 = fig.add_subplot(gs[1, 1])  # Prefix-based Importance
-
-            self._plot_actual_vs_predicted(ax1)
-            self._plot_residuals(ax2)
-            self._plot_combined_score_return(ax3, n_buckets=50)  # New combined method
-            self._plot_feature_importance(ax4, levels=levels)
-        else:
-            # Single plot mode
-            fig, ax = plt.subplots(figsize=(8, 6))
-            if plot_type == 'actual_vs_predicted':
-                self._plot_actual_vs_predicted(ax)
-            elif plot_type == 'residuals':
-                self._plot_residuals(ax)
-            elif plot_type == 'combined_score_return':  # New option
-                self._plot_combined_score_return(ax, n_buckets=25)
-            elif plot_type == 'cohort_comparison':  # Keep old option for backward compatibility
-                self._plot_cohort_comparison(ax)
-            elif plot_type == 'feature_importance':
-                self._plot_feature_importance(ax)
-            elif plot_type == 'prefix_importance':
-                self._plot_feature_importance(ax, levels=levels)
-            elif plot_type == 'return_vs_rank':
-                self._plot_return_vs_rank(ax, n_buckets=25)
-        plt.tight_layout()
-        if display:
-            plt.show()
-            return None
-        return fig
-
 
     def identify_predictive_populations(
         self,
@@ -910,6 +927,113 @@ class ClassifierEvaluator(RegressorEvaluator):
         super().__init__(wallet_model_results)
 
 
+
+    # ------------------------------------
+    #      Primary Classifier Methods
+    # ------------------------------------
+
+    def summary_report(self):
+        """
+        Generate formatted summary of classification model performance.
+        """
+        # Header and sample info
+        summary = self._get_summary_header()
+
+        # Classification test set metrics
+        if 'val_roc_auc' not in self.metrics:
+            summary.extend([
+                    "Test Set Classification Metrics",
+                    "-" * 35,
+                    f"ROC AUC:                    {self.metrics['roc_auc']:.3f}",
+                    f"Log Loss:                   {self.metrics['log_loss']:.3f}",
+                    f"Accuracy:                   {self.metrics['accuracy']:.3f}",
+                    f"Precision:                  {self.metrics['precision']:.3f}",
+                    f"Recall:                     {self.metrics['recall']:.3f}",
+                    f"F1 Score:                   {self.metrics['f1']:.3f}",
+                    ""
+            ])
+
+        # Validation return metrics
+        else:
+            summary.extend([
+                "Classification Metrics:      Val   |  Test",
+                "-" * 43,
+                f"Val ROC AUC:                {self.metrics['val_roc_auc']:.3f}  |  {self.metrics['roc_auc']:.3f}",
+                f"Val Accuracy:               {self.metrics['val_accuracy']:.3f}  |  {self.metrics['accuracy']:.3f}",
+                f"Val Precision:              {self.metrics['val_precision']:.3f}  |  {self.metrics['precision']:.3f}",
+                f"Val Recall:                 {self.metrics['val_recall']:.3f}  |  {self.metrics['recall']:.3f}",
+                f"Val F1 Score:               {self.metrics['val_f1']:.3f}  |  {self.metrics['f1']:.3f}",
+                "",
+                "Validation Returns    | Cutoff |  Mean   |  W-Mean",
+                "-" * 50,
+                f"Overall Average       |   n/a  |  {self.metrics['val_ret_mean_overall']:.3f}  |  {self.metrics['val_wins_return_overall']:.3f}",
+                f"Param Threshold       |  {self.y_pred_threshold:.2f}  |  {self.metrics['positive_pred_return']:.3f}  |  {self.metrics['positive_pred_wins_return']:.3f}",
+                f"Top 1% Scores         |  {self.metrics['val_top1_thr']:.2f}  |  {self.metrics['val_ret_mean_top1']:.3f}  |  {self.metrics['val_wins_return_top1']:.3f}",
+                f"Top 5% Scores         |  {self.metrics['val_top5_thr']:.2f}  |  {self.metrics['val_ret_mean_top5']:.3f}  |  {self.metrics['val_wins_return_top5']:.3f}",
+                f"F0.25 Score           |  {self.metrics['f0.25_thr']:.2f}  |  {self.metrics['val_ret_mean_f0.25']:.3f}  |  {self.metrics['val_wins_ret_mean_f0.25']:.3f}",
+                f"F0.5 Score            |  {self.metrics['f0.5_thr']:.2f}  |  {self.metrics['val_ret_mean_f0.5']:.3f}  |  {self.metrics['val_wins_ret_mean_f0.5']:.3f}",
+                f"F1 Score              |  {self.metrics['f1_thr']:.2f}  |  {self.metrics['val_ret_mean_f1']:.3f}  |  {self.metrics['val_wins_ret_mean_f1']:.3f}",
+                f"F2 Score              |  {self.metrics['f2_thr']:.2f}  |  {self.metrics['val_ret_mean_f2']:.3f}  |  {self.metrics['val_wins_ret_mean_f2']:.3f}",
+            ])
+
+        report = "\n".join(summary)
+        logger.info("\n%s", report)
+
+
+    def plot_wallet_evaluation(
+        self,
+        plot_type: str = "all",
+        display: bool = True,
+        levels: int = 0,
+    ):
+        """
+        Skeleton wallet-level evaluation plot for classification models.
+
+        Current layout (2 × 2):
+        • Chart 1  – placeholder for ROC / PR curves
+        • Chart 2  – placeholder for calibration or return-vs-rank
+        • Chart 3  – placeholder for cohort comparison
+        • Chart 4  – feature-importance bar (re-uses parent helper)
+
+        Parameters
+        ----------
+        plot_type : str, default "all"
+            Only 'all' is supported in this skeleton.
+        display : bool, default True
+            If True, shows the figure; otherwise returns the Matplotlib figure.
+        levels : int, default 0
+            Grouping depth passed to `_plot_feature_importance`.
+        """
+        if plot_type != "all":
+            raise NotImplementedError("This skeleton only supports plot_type='all'.")
+
+        # --- build 2×2 canvas
+        fig = plt.figure(figsize=(15, 12))
+        gs = plt.GridSpec(2, 2, height_ratios=[1, 1], width_ratios=[1, 1])
+
+        ax1 = fig.add_subplot(gs[0, 0])
+        ax2 = fig.add_subplot(gs[0, 1])
+        ax3 = fig.add_subplot(gs[1, 0])
+        ax4 = fig.add_subplot(gs[1, 1])
+
+        self._plot_roc_curves(ax1)
+        self._plot_auc_pr_curves(ax2)
+        self._plot_return_vs_rank_classifier(ax3, n_buckets=20)
+        self._plot_feature_importance(ax4, levels=levels)
+
+
+        plt.tight_layout()
+        if display:
+            plt.show()
+            return None
+        return fig
+
+
+
+    # ------------------------------------
+    #      Classifier Helper Methods
+    # ------------------------------------
+
     def _calculate_metrics(self):
         """
         Calculate core classification metrics for test and validation sets.
@@ -1007,103 +1131,6 @@ class ClassifierEvaluator(RegressorEvaluator):
             idx = np.nanargmax(f)
             self.metrics[f'f{beta}'] = f[idx]
             self.metrics[f'f{beta}_thr'] = thr[idx]
-
-
-    def summary_report(self):
-        """
-        Generate formatted summary of classification model performance.
-        """
-        # Header and sample info
-        summary = self._get_summary_header()
-
-        # Classification test set metrics
-        if 'val_roc_auc' not in self.metrics:
-            summary.extend([
-                    "Test Set Classification Metrics",
-                    "-" * 35,
-                    f"ROC AUC:                    {self.metrics['roc_auc']:.3f}",
-                    f"Log Loss:                   {self.metrics['log_loss']:.3f}",
-                    f"Accuracy:                   {self.metrics['accuracy']:.3f}",
-                    f"Precision:                  {self.metrics['precision']:.3f}",
-                    f"Recall:                     {self.metrics['recall']:.3f}",
-                    f"F1 Score:                   {self.metrics['f1']:.3f}",
-                    ""
-            ])
-
-        # Validation return metrics
-        else:
-            summary.extend([
-                "Classification Metrics:      Val   |  Test",
-                "-" * 43,
-                f"Val ROC AUC:                {self.metrics['val_roc_auc']:.3f}  |  {self.metrics['roc_auc']:.3f}",
-                f"Val Accuracy:               {self.metrics['val_accuracy']:.3f}  |  {self.metrics['accuracy']:.3f}",
-                f"Val Precision:              {self.metrics['val_precision']:.3f}  |  {self.metrics['precision']:.3f}",
-                f"Val Recall:                 {self.metrics['val_recall']:.3f}  |  {self.metrics['recall']:.3f}",
-                f"Val F1 Score:               {self.metrics['val_f1']:.3f}  |  {self.metrics['f1']:.3f}",
-                "",
-                "Validation Returns    | Cutoff |  Mean   |  W-Mean",
-                "-" * 50,
-                f"Overall Average       |   n/a  |  {self.metrics['val_ret_mean_overall']:.3f}  |  {self.metrics['val_wins_return_overall']:.3f}",
-                f"Param Threshold       |  {self.y_pred_threshold:.2f}  |  {self.metrics['positive_pred_return']:.3f}  |  {self.metrics['positive_pred_wins_return']:.3f}",
-                f"Top 1% Scores         |  {self.metrics['val_top1_thr']:.2f}  |  {self.metrics['val_ret_mean_top1']:.3f}  |  {self.metrics['val_wins_return_top1']:.3f}",
-                f"Top 5% Scores         |  {self.metrics['val_top5_thr']:.2f}  |  {self.metrics['val_ret_mean_top5']:.3f}  |  {self.metrics['val_wins_return_top5']:.3f}",
-                f"F0.25 Score           |  {self.metrics['f0.25_thr']:.2f}  |  {self.metrics['val_ret_mean_f0.25']:.3f}  |  {self.metrics['val_wins_ret_mean_f0.25']:.3f}",
-                f"F0.5 Score            |  {self.metrics['f0.5_thr']:.2f}  |  {self.metrics['val_ret_mean_f0.5']:.3f}  |  {self.metrics['val_wins_ret_mean_f0.5']:.3f}",
-                f"F1 Score              |  {self.metrics['f1_thr']:.2f}  |  {self.metrics['val_ret_mean_f1']:.3f}  |  {self.metrics['val_wins_ret_mean_f1']:.3f}",
-                f"F2 Score              |  {self.metrics['f2_thr']:.2f}  |  {self.metrics['val_ret_mean_f2']:.3f}  |  {self.metrics['val_wins_ret_mean_f2']:.3f}",
-            ])
-
-        report = "\n".join(summary)
-        logger.info("\n%s", report)
-
-
-    def plot_wallet_evaluation(
-        self,
-        plot_type: str = "all",
-        display: bool = True,
-        levels: int = 0,
-    ):
-        """
-        Skeleton wallet-level evaluation plot for classification models.
-
-        Current layout (2 × 2):
-        • Chart 1  – placeholder for ROC / PR curves
-        • Chart 2  – placeholder for calibration or return-vs-rank
-        • Chart 3  – placeholder for cohort comparison
-        • Chart 4  – feature-importance bar (re-uses parent helper)
-
-        Parameters
-        ----------
-        plot_type : str, default "all"
-            Only 'all' is supported in this skeleton.
-        display : bool, default True
-            If True, shows the figure; otherwise returns the Matplotlib figure.
-        levels : int, default 0
-            Grouping depth passed to `_plot_feature_importance`.
-        """
-        if plot_type != "all":
-            raise NotImplementedError("This skeleton only supports plot_type='all'.")
-
-        # --- build 2×2 canvas
-        fig = plt.figure(figsize=(15, 12))
-        gs = plt.GridSpec(2, 2, height_ratios=[1, 1], width_ratios=[1, 1])
-
-        ax1 = fig.add_subplot(gs[0, 0])
-        ax2 = fig.add_subplot(gs[0, 1])
-        ax3 = fig.add_subplot(gs[1, 0])
-        ax4 = fig.add_subplot(gs[1, 1])
-
-        self._plot_roc_curves(ax1)
-        self._plot_auc_pr_curves(ax2)
-        self._plot_return_vs_rank_classifier(ax3, n_buckets=20)
-        self._plot_feature_importance(ax4, levels=levels)
-
-
-        plt.tight_layout()
-        if display:
-            plt.show()
-            return None
-        return fig
 
 
     # ------------------------------------------------------------------
