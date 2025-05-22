@@ -1329,18 +1329,20 @@ class ClassifierEvaluator(RegressorEvaluator):
         ax.legend(loc="upper right")
 
 
-    def _plot_return_vs_rank_classifier(self, ax, n_buckets: int = 10):
+
+    def compute_score_buckets(self, n_buckets: int = 20) -> pd.DataFrame:
         """
-        Plot histogram of prediction probabilities and returns by probability bins.
-        X-axis is actual prediction score.
-        Primary Y-axis: count histogram of wallets per score bin.
-        Secondary Y-axis: mean return per score bin.
+        Extract bucket calculation logic for reuse between charts and storage.
+
+        Params:
+        - n_buckets: number of score bins to create
+
+        Returns:
+        - DataFrame with columns: score_mid, mean_return, median_return, wins_return, count
         """
         # Check for validation data
         if self.y_validation_pred_proba is None or self.validation_target_vars_df is None:
-            ax.text(0.5, 0.5, "Validation data not available",
-                    ha="center", va="center")
-            return
+            return pd.DataFrame()
 
         target_var = self.modeling_config["target_variable"]
         returns = self.validation_target_vars_df[target_var].reindex(
@@ -1354,34 +1356,67 @@ class ClassifierEvaluator(RegressorEvaluator):
             "ret_win": returns_winsorized
         }).dropna()
 
-        # Define score bins
+        # Define equal-width score bins
         try:
             score_min, score_max = df["proba"].min(), df["proba"].max()
             bin_edges = np.linspace(score_min, score_max, n_buckets + 1)
             df["score_bin"] = pd.cut(df["proba"], bins=bin_edges, include_lowest=True)
         except ValueError:
-            ax.text(0.5, 0.5, 'Insufficient score spread to generate bins.',
-                    ha='center', va='center')
-            return
+            return pd.DataFrame()
 
-
-        # Compute counts and mean returns per bin
+        # Compute metrics per bin
         bin_counts = df.groupby("score_bin", observed=True).size()
         bin_mean_ret = df.groupby("score_bin", observed=True)["ret"].mean()
         bin_median_ret = df.groupby("score_bin", observed=True)["ret"].median()
         bin_winsorized_ret = df.groupby("score_bin", observed=True)["ret_win"].mean()
 
-        # Drop bins with zero count
+        # Filter to valid bins and calculate centers
         valid_bins = bin_counts[bin_counts > 0]
         valid_centers = [
             interval.left + (interval.right - interval.left) / 2
             for interval in valid_bins.index
         ]
-        valid_counts = valid_bins.values
-        valid_mean_ret = bin_mean_ret.reindex(valid_bins.index).values
-        valid_median_ret = bin_median_ret.reindex(valid_bins.index).values
-        valid_winsorized_ret = bin_winsorized_ret.reindex(valid_bins.index).values
-        width = bin_edges[1] - bin_edges[0]
+
+        # Create result DataFrame
+        result_df = pd.DataFrame({
+            "score_mid": valid_centers,
+            "mean_return": bin_mean_ret.reindex(valid_bins.index).values,
+            "median_return": bin_median_ret.reindex(valid_bins.index).values,
+            "wins_return": bin_winsorized_ret.reindex(valid_bins.index).values,
+            "count": valid_bins.values
+        })
+
+        return result_df
+
+
+
+    def _plot_return_vs_rank_classifier(self, ax, n_buckets: int = 10):
+        """
+        Plot histogram of prediction probabilities and returns by probability bins.
+        X-axis is actual prediction score.
+        Primary Y-axis: count histogram of wallets per score bin.
+        Secondary Y-axis: mean return per score bin.
+        """
+        # Get bucket data from helper method
+        bucket_df = self.compute_score_buckets(n_buckets)
+
+        if bucket_df.empty:
+            ax.text(0.5, 0.5, "Validation data not available or insufficient score spread",
+                    ha="center", va="center")
+            return
+
+        # Extract data for plotting
+        valid_centers = bucket_df["score_mid"].values
+        valid_counts = bucket_df["count"].values
+        valid_mean_ret = bucket_df["mean_return"].values
+        valid_median_ret = bucket_df["median_return"].values
+        valid_winsorized_ret = bucket_df["wins_return"].values
+
+        # Calculate bin width for bar chart
+        if len(valid_centers) > 1:
+            width = (valid_centers[1] - valid_centers[0]) * 0.8
+        else:
+            width = 0.1
 
         # Primary axis: histogram of counts
         ax.bar(valid_centers, valid_counts, width=width, alpha=0.6, label="Count")
@@ -1409,14 +1444,19 @@ class ClassifierEvaluator(RegressorEvaluator):
 
         # Secondary axis: mean return line
         ax2 = ax.twinx()
-        # Compute threshold on absolute returns to ensure a positive linthresh
-        abs_returns = np.abs(df["ret"])
+
+        # Compute threshold for symlog scale
+        target_var = self.modeling_config["target_variable"]
+        returns = self.validation_target_vars_df[target_var].reindex(
+            self.y_validation_pred_proba.index
+        )
+        abs_returns = np.abs(returns.dropna())
         linthresh = np.percentile(abs_returns, 95)
-        # Fallback to a small positive value if the threshold isn't positive
         if linthresh <= 0:
             max_abs = abs_returns.max()
             linthresh = max_abs * 0.05 if max_abs > 0 else 1.0
-        ax2.set_yscale("symlog", linthresh=linthresh)  # comment to toggle log/linear y2 axis
+        ax2.set_yscale("symlog", linthresh=linthresh)
+
         ax2.plot(
             valid_centers,
             valid_median_ret,
@@ -1435,19 +1475,20 @@ class ClassifierEvaluator(RegressorEvaluator):
             label="Winsorized Return",
             color="#ffe000"
         )
+
         # Annotate lowest and highest winsorized return
-        low_interval = bin_winsorized_ret.idxmin()
-        high_interval = bin_winsorized_ret.idxmax()
-        x_low = (low_interval.left + low_interval.right) / 2
-        x_high = (high_interval.left + high_interval.right) / 2
-        y_low = bin_winsorized_ret.loc[low_interval]
-        y_high = bin_winsorized_ret.loc[high_interval]
-        ax2.annotate(f"{y_low:.2f}", xy=(x_low, y_low),
-                     xytext=(0, -10), textcoords="offset points",
-                     ha="center", va="top")
-        ax2.annotate(f"{y_high:.2f}", xy=(x_high, y_high),
-                     xytext=(0, 10), textcoords="offset points",
-                     ha="center", va="bottom")
+        if len(valid_winsorized_ret) > 1:
+            min_idx = np.argmin(valid_winsorized_ret)
+            max_idx = np.argmax(valid_winsorized_ret)
+            ax2.annotate(f"{valid_winsorized_ret[min_idx]:.2f}",
+                        xy=(valid_centers[min_idx], valid_winsorized_ret[min_idx]),
+                        xytext=(0, -10), textcoords="offset points",
+                        ha="center", va="top")
+            ax2.annotate(f"{valid_winsorized_ret[max_idx]:.2f}",
+                        xy=(valid_centers[max_idx], valid_winsorized_ret[max_idx]),
+                        xytext=(0, 10), textcoords="offset points",
+                        ha="center", va="bottom")
+
         ax2.plot(
             valid_centers,
             valid_mean_ret,
@@ -1459,7 +1500,7 @@ class ClassifierEvaluator(RegressorEvaluator):
         )
 
         # Overall mean return line
-        overall_mean = df["ret"].mean()
+        overall_mean = returns.mean()
         ax2.axhline(
             overall_mean,
             linestyle="--",
