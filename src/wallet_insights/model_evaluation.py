@@ -1158,8 +1158,6 @@ class ClassifierEvaluator(RegressorEvaluator):
             self._calculate_feature_importance()
 
 
-
-
     @staticmethod
     def add_fbeta_metrics(
         precisions: np.ndarray,
