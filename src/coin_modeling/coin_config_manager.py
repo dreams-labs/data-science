@@ -112,6 +112,10 @@ class WalletsCoinConfig:
         """
         td_epochs = self.config['training_data']['coin_epochs_training']
         val_epochs = self.config['training_data']['coin_epochs_validation']
+
+        if len(val_epochs) == 0:
+            return
+
         latest_td_end = max(td_epochs) + period_duration
         earliest_val_start = min(val_epochs)
         if latest_td_end > earliest_val_start:
