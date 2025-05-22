@@ -5,12 +5,15 @@ import math
 from pathlib import Path
 import pandas as pd
 import numpy as np
+from sklearn.metrics import precision_recall_curve
 import matplotlib.pyplot as plt
+import cloudpickle
 
 # Local modules
 from wallet_modeling.wallet_model import WalletModel
 import wallet_insights.wallet_model_reporting as wimr
 import wallet_insights.wallet_validation_analysis as wiva
+import wallet_insights.model_evaluation as wime
 import utils as u
 
 # Set up logger at the module level
@@ -78,7 +81,13 @@ class WalletModelOrchestrator:
         Returns:
         - models_dict: Dictionary mapping score names to model IDs
         """
-        models_dict = {}
+        # Load existing models if any
+        models_json_path = Path(self.wallets_coin_config['training_data']['parquet_folder']) / "wallet_model_ids.json"
+        if models_json_path.exists():
+            with open(models_json_path, 'r', encoding='utf-8') as f:
+                existing_models = json.load(f)
+        else:
+            existing_models = {}
         evaluators = []
 
         for score_name in self.score_params:
@@ -93,14 +102,27 @@ class WalletModelOrchestrator:
             # Don't output the scores from every tree
             score_wallets_config['modeling']['verbose_estimators'] = False
 
-            # Train and evaluate the model
-            model_id, evaluator = self._train_and_evaluate(
-                score_wallets_config,
-                wallet_training_data_df,
-                wallet_target_vars_df,
-                validation_training_data_df,
-                validation_target_vars_df
-            )
+            if score_name in existing_models:
+                # Load and evaluate existing model
+                model_id, evaluator = self._load_and_evaluate(
+                    score_name,
+                    score_wallets_config,
+                    wallet_training_data_df,
+                    wallet_target_vars_df,
+                    validation_training_data_df,
+                    validation_target_vars_df
+                )
+            else:
+                # Train new model
+                model_id, evaluator = self._train_and_evaluate(
+                    score_wallets_config,
+                    wallet_training_data_df,
+                    wallet_target_vars_df,
+                    validation_training_data_df,
+                    validation_target_vars_df
+                )
+                # Persist metrics for newly trained model
+                existing_models[score_name] = self._store_model_metrics(model_id, evaluator)
             evaluators.append((score_name, evaluator))
 
             # -------------------------------------------------
@@ -134,23 +156,20 @@ class WalletModelOrchestrator:
                 # keep None explicitly so predict_and_store skips binary prediction
                 self.score_params[score_name]['y_pred_threshold'] = None
 
-            # Store model metrics
-            models_dict[score_name] = self._store_model_metrics(model_id, evaluator)
-
-            logger.milestone(f"Finished training model {len(models_dict)}/{len(self.score_params)}"
+            logger.milestone(f"Finished training model {len(existing_models)}/{len(self.score_params)}"
                              f": {score_name}.")
 
         # Store and save models_dict
-        self.models_dict = models_dict
+        self.models_dict = existing_models
         save_location = f"{self.wallets_coin_config['training_data']['parquet_folder']}/wallet_model_ids.json"
         with open(save_location, 'w', encoding='utf-8') as f:
-            json.dump(models_dict, f, indent=4, default=u.numpy_type_converter)
+            json.dump(existing_models, f, indent=4, default=u.numpy_type_converter)
 
         logger.info(f"Finished traning all {len(self.score_params)} models.")
 
         self._plot_score_summaries(evaluators)
 
-        return models_dict
+        return existing_models
 
 
 
@@ -184,7 +203,7 @@ class WalletModelOrchestrator:
                          .mean()
                          .mean())  # Second mean() collapses to single row
         # Convert macro_metrics to serializable dict
-        macro_averages = macro_metrics.to_dict(orient='list')
+        macro_averages = macro_metrics.to_dict()
 
         return {
             'model_id': model_id,
@@ -445,3 +464,129 @@ class WalletModelOrchestrator:
                     "wins_return": df.loc[mask, "ret_wins"].mean(),
                 })
         return pd.DataFrame(buckets)
+
+
+
+    def _load_and_evaluate(
+        self,
+        score_name: str,
+        score_wallets_config,
+        wallet_training_data_df,
+        wallet_target_vars_df,
+        validation_training_data_df,
+        validation_target_vars_df
+    ) -> tuple[str, any]:
+        """
+        Load an existing saved model by score_name and evaluate on provided data.
+        Returns:
+        - model_id (str): ID of the loaded model
+        - evaluator: Evaluator object with metrics and predictions
+        """
+        # 1) Grab the stored model_id
+        models_json_path = Path(self.wallets_coin_config['training_data']['parquet_folder']) / "wallet_model_ids.json"
+        with open(models_json_path, 'r', encoding='utf-8') as f:
+            models_dict = json.load(f)
+        model_info = models_dict.get(score_name)
+        if model_info is None:
+            raise KeyError(f"No existing model found for '{score_name}'")
+        model_id = model_info['model_id']
+
+        # 2) Unpickle the pipeline
+        pipeline_path = Path(self.base_path) / 'wallet_models' / f"wallet_model_{model_id}.pkl"
+        if not pipeline_path.exists():
+            raise FileNotFoundError(f"No pipeline at {pipeline_path}")
+        with open(pipeline_path, 'rb') as f:
+            pipeline = cloudpickle.load(f)
+
+        # 3) Build a minimal result dict
+        modeling_cfg = score_wallets_config['modeling']
+        model_type = modeling_cfg['model_type']
+        result = {
+            'model_type': model_type,
+            'model_id': model_id,
+            'pipeline': pipeline,
+            'modeling_config': modeling_cfg
+        }
+
+        # 4) Attach validation data + preds
+        if validation_training_data_df is not None and validation_target_vars_df is not None:
+            result['X_validation'] = validation_training_data_df
+            result['validation_target_vars_df'] = validation_target_vars_df
+            result['y_validation'] = validation_target_vars_df[modeling_cfg['target_variable']]
+
+            # Convert continuous target to binary for classification based on min threshold
+            if model_type == 'classification':
+                min_thr = modeling_cfg.get('target_var_min_threshold', 0)
+                result['y_validation'] = (result['y_validation'] > min_thr).astype(int)
+
+            preds = wiva.load_and_predict(
+                model_id,
+                validation_training_data_df,
+                self.base_path
+            )
+            if model_type == 'classification':
+                result['y_validation_pred_proba'] = preds
+                thr = modeling_cfg.get('y_pred_threshold')
+                if thr is not None:
+                    # Resolve F-beta threshold if specified as string
+                    if isinstance(thr, str) and thr.startswith('f'):
+                        # Compute precision-recall curve on validation set
+                        precisions, recalls, ths = precision_recall_curve(
+                            result['y_validation'], preds
+                        )
+                        ths = np.append(ths, 1.0)
+                        beta = float(thr[1:])
+                        thr_val = wime.ClassifierEvaluator.add_fbeta_metrics(
+                            precisions, recalls, ths, beta
+                        )
+                        thr = thr_val
+                        modeling_cfg['y_pred_threshold'] = thr_val
+                    result['y_validation_pred'] = (preds >= thr).astype(int)
+            else:
+                result['y_validation_pred'] = preds
+
+        # 4a) Attach test set (using provided training data as test)
+        result['X_test'] = wallet_training_data_df
+        # Extract y_test as Series
+        if isinstance(wallet_target_vars_df, pd.DataFrame):
+            y_test_series = wallet_target_vars_df[modeling_cfg['target_variable']]
+        else:
+            y_test_series = wallet_target_vars_df
+        # Binarize for classification
+        if model_type == 'classification':
+            min_thr = modeling_cfg.get('target_var_min_threshold', 0)
+            y_test_series = (y_test_series > min_thr).astype(int)
+        result['y_test'] = y_test_series
+
+        # Generate predictions on test set
+        test_preds = wiva.load_and_predict(
+            model_id,
+            wallet_training_data_df,
+            self.base_path
+        )
+        if model_type == 'classification':
+            result['y_pred_proba'] = test_preds
+            thr_test = modeling_cfg.get('y_pred_threshold')
+            # Ensure numeric threshold
+            if isinstance(thr_test, str):
+                thr_test = modeling_cfg[ 'y_pred_threshold']
+            result['y_pred'] = (test_preds >= thr_test).astype(int)
+        else:
+            result['y_pred'] = test_preds
+
+        # No training metrics for loaded model
+        result['X_train'] = wallet_training_data_df
+        result['y_train'] = wallet_training_data_df
+        result['training_cohort_pred'] = None
+        result['training_cohort_actuals'] = None
+        result['full_cohort_actuals'] = None
+
+        # 5) Instantiate evaluator
+        if model_type == 'classification':
+            evaluator = wime.ClassifierEvaluator(result)
+        else:
+            evaluator = wime.RegressorEvaluator(result)
+
+        logger.info(f"Successfully loaded pretrained model for score '{score_name}'.")
+
+        return model_id, evaluator
