@@ -53,6 +53,10 @@ def load_all_wallets_configs(config_dir: str):
     Path(coins_wallet_scores_folder).mkdir(parents=True, exist_ok=True)
     base_wc_config['training_data']['coins_wallet_scores_folder'] = coins_wallet_scores_folder
 
+    # Fill [model_artifacts_folder]
+    path_without_suffix = wallets_config['training_data']['model_artifacts_folder'].rsplit('/', 1)[0]
+    base_wc_config['training_data']['model_artifacts_folder'] = f"{path_without_suffix}/coin_modeling"
+
     # Store updated config
     wallets_coin_config.config = base_wc_config
 
