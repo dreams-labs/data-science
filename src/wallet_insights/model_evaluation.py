@@ -732,6 +732,9 @@ class RegressorEvaluator:
                 self.y_validation_pred.index
             )
             df = pd.DataFrame({"pred": self.y_validation_pred, "ret": returns}).dropna()
+            # Compute winsorized returns for buckets
+            wins_thr = self.modeling_config.get("returns_winsorization", 0.005)
+            df["ret_wins"] = u.winsorize(df["ret"].values, wins_thr)
         else:  # NumPy array
             returns = self.validation_target_vars_df[target_var].values
             df = pd.DataFrame({
@@ -767,11 +770,17 @@ class RegressorEvaluator:
         bucket_df = pd.DataFrame(buckets)
 
         if not bucket_df.empty:
+            # 3. Plot winsorized return line (yellow)
+            ax_ret.plot(
+                bucket_df["score_mid"],
+                bucket_df["wins_return"],
+                marker='o',
+                markersize=6,
+                linewidth=2,
+                color='yellow',
+                label='Winsorized Return'
+            )
             # 3. Plot return line on secondary Y-axis (right)
-            # Use a single fixed marker size instead of variable sizes
-            # ax_ret.plot(bucket_df["score_mid"], bucket_df["wins_return"],
-            #         marker='o', markersize=6, linewidth=2,
-            #         color='#ffe000', label='Winsorized Return')
             ax_ret.plot(bucket_df["score_mid"], bucket_df["median_return"],
                     marker='o', markersize=6, linewidth=2,
                     color='#8000ff', label='Median Return')
@@ -952,8 +961,6 @@ class ClassifierEvaluator(RegressorEvaluator):
                     f"F1 Score:                   {self.metrics['f1']:.3f}",
                     ""
             ])
-
-        # Validation return metrics
         else:
             summary.extend([
                 "Classification Metrics:      Val   |  Test",
@@ -964,18 +971,31 @@ class ClassifierEvaluator(RegressorEvaluator):
                 f"Val Recall:                 {self.metrics['val_recall']:.3f}  |  {self.metrics['recall']:.3f}",
                 f"Val F1 Score:               {self.metrics['val_f1']:.3f}  |  {self.metrics['f1']:.3f}",
                 "",
-                "Validation Returns    | Cutoff |  Mean   |  W-Mean",
-                "-" * 50,
-                f"Overall Average       |   n/a  |  {self.metrics['val_ret_mean_overall']:.3f}  |  {self.metrics['val_wins_return_overall']:.3f}",
-                f"Param Threshold       |  {self.y_pred_threshold:.2f}  |  {self.metrics['positive_pred_return']:.3f}  |  {self.metrics['positive_pred_wins_return']:.3f}",
-                f"Top 1% Scores         |  {self.metrics['val_top1_thr']:.2f}  |  {self.metrics['val_ret_mean_top1']:.3f}  |  {self.metrics['val_wins_return_top1']:.3f}",
-                f"Top 5% Scores         |  {self.metrics['val_top5_thr']:.2f}  |  {self.metrics['val_ret_mean_top5']:.3f}  |  {self.metrics['val_wins_return_top5']:.3f}",
-                f"F0.10 Score           |  {self.metrics['f0.1_thr']:.2f}  |  {self.metrics['val_ret_mean_f0.1']:.3f}  |  {self.metrics['val_wins_ret_mean_f0.1']:.3f}",
-                f"F0.25 Score           |  {self.metrics['f0.25_thr']:.2f}  |  {self.metrics['val_ret_mean_f0.25']:.3f}  |  {self.metrics['val_wins_ret_mean_f0.25']:.3f}",
-                f"F0.50 Score           |  {self.metrics['f0.5_thr']:.2f}  |  {self.metrics['val_ret_mean_f0.5']:.3f}  |  {self.metrics['val_wins_ret_mean_f0.5']:.3f}",
-                f"F1 Score              |  {self.metrics['f1_thr']:.2f}  |  {self.metrics['val_ret_mean_f1']:.3f}  |  {self.metrics['val_wins_ret_mean_f1']:.3f}",
-                f"F2 Score              |  {self.metrics['f2_thr']:.2f}  |  {self.metrics['val_ret_mean_f2']:.3f}  |  {self.metrics['val_wins_ret_mean_f2']:.3f}",
             ])
+            # Validation Return metrics with fixed-width formatting
+            summary.append("Validation Returns    | Cutoff |  Mean   |  W-Mean")
+            summary.append("-" * 50)
+            # Base rows
+            rows = [
+                ("Overall Average", "n/a", self.metrics['val_ret_mean_overall'], self.metrics['val_wins_return_overall']),
+                ("Param Threshold", f"{self.y_pred_threshold:.2f}", self.metrics['positive_pred_return'], self.metrics['positive_pred_wins_return']),
+                ("Top 1% Scores", f"{self.metrics['val_top1_thr']:.2f}", self.metrics['val_ret_mean_top1'], self.metrics['val_wins_return_top1']),
+                ("Top 5% Scores", f"{self.metrics['val_top5_thr']:.2f}", self.metrics['val_ret_mean_top5'], self.metrics['val_wins_return_top5']),
+            ]
+            # Dynamically add F‑beta rows if available
+            for label, thr_key, ret_key, wins_key in [
+                ("F0.10 Score", "f0.1_thr", "val_ret_mean_f0.1", "val_wins_ret_mean_f0.1"),
+                ("F0.25 Score", "f0.25_thr", "val_ret_mean_f0.25", "val_wins_ret_mean_f0.25"),
+                ("F0.50 Score", "f0.5_thr", "val_ret_mean_f0.5", "val_wins_ret_mean_f0.5"),
+                ("F1 Score",    "f1.0_thr", "val_ret_mean_f1.0", "val_wins_ret_mean_f1.0"),
+                ("F2 Score",    "f2.0_thr", "val_ret_mean_f2.0", "val_wins_ret_mean_f2.0"),
+            ]:
+                thr_val = self.metrics.get(thr_key)
+                if thr_val is not None:
+                    rows.append((label, f"{thr_val:.2f}", self.metrics.get(ret_key, 0.0), self.metrics.get(wins_key, 0.0)))
+            # Append formatted rows
+            for name, cutoff, mean, wins in rows:
+                summary.append(f"{name:<21} | {cutoff:>6} | {mean:>7.3f} | {wins:>7.3f}")
 
         report = "\n".join(summary)
         logger.info("\n%s", report)
@@ -1101,7 +1121,7 @@ class ClassifierEvaluator(RegressorEvaluator):
             self.metrics['val_wins_return_top5'] = df_val.loc[df_val['proba'] >= pct5, 'ret_wins'].mean()
             self.metrics['val_wins_return_overall'] = df_val['ret_wins'].mean()
             # --- F‑beta threshold mean returns (F1 & F2) -------------------
-            for beta in (0.1,0.25,0.5,1,2):
+            for beta in (0.1,0.25,0.5,1.0,2.0):
                 thr_key = f"f{beta}_thr"
                 if thr_key in self.metrics:
                     thr_val = self.metrics[thr_key]
@@ -1118,20 +1138,43 @@ class ClassifierEvaluator(RegressorEvaluator):
             self._calculate_feature_importance()
 
 
-    def add_fbeta_metrics(self, betas=(0.1,0.25,0.5,1,2)):
+
+    def add_fbeta_metrics(self, betas: tuple[float, ...] = (0.1, 0.25, 0.5, 1.0, 2.0)) -> None:
         """
-        Compute F-beta metrics for various beta values and store best scores and thresholds.
+        Populate self.metrics with F-beta scores and their optimal thresholds,
+        **computed exclusively on the validation set**. If no validation data
+        were provided, the method returns without making changes.
+
+        Stored keys:
+            f{β}_score   – best F-β score on validation set
+            f{β}_thr     – probability threshold that achieves that score
         """
-        y_true = self.y_test
-        y_prob = self.y_pred_proba
-        prec, rec, thr = precision_recall_curve(y_true, y_prob)
-        # `thr` length is len(prec)-1; pad to align
-        thr = np.append(thr, 1.0)
+        # Need positive-class probabilities on the validation split
+        if (
+            getattr(self, "y_validation", None) is None
+            or getattr(self, "y_validation_pred_proba", None) is None
+        ):
+            logger.warning("Validation data missing → skipping F-beta metrics.")
+            return
+
+        y_val   = self.y_validation
+        proba   = self.y_validation_pred_proba
+
+        precisions, recalls, ths = precision_recall_curve(y_val, proba)
+        ths = np.append(ths, 1.0)  # align lengths with precision/recall arrays
+
+        # compute each beta
         for beta in betas:
-            f = (1 + beta**2) * (prec * rec) / (beta**2 * prec + rec + 1e-9)
-            idx = np.nanargmax(f)
-            self.metrics[f'f{beta}'] = f[idx]
-            self.metrics[f'f{beta}_thr'] = thr[idx]
+            beta_sq = beta ** 2
+            f_scores = (1 + beta_sq) * precisions * recalls / (beta_sq * precisions + recalls + 1e-9)
+            best_idx = np.nanargmax(f_scores)
+            best_thr = ths[best_idx] if best_idx < len(ths) else ths[-1]
+
+            # Store both the score and threshold
+            self.metrics[f"f{beta}_score"] = f_scores[best_idx]
+            self.metrics[f"f{beta}_thr"]   = best_thr
+
+
 
 
     # ------------------------------------------------------------------
@@ -1286,18 +1329,20 @@ class ClassifierEvaluator(RegressorEvaluator):
         ax.legend(loc="upper right")
 
 
-    def _plot_return_vs_rank_classifier(self, ax, n_buckets: int = 10):
+
+    def compute_score_buckets(self, n_buckets: int = 20) -> pd.DataFrame:
         """
-        Plot histogram of prediction probabilities and returns by probability bins.
-        X-axis is actual prediction score.
-        Primary Y-axis: count histogram of wallets per score bin.
-        Secondary Y-axis: mean return per score bin.
+        Extract bucket calculation logic for reuse between charts and storage.
+
+        Params:
+        - n_buckets: number of score bins to create
+
+        Returns:
+        - DataFrame with columns: score_mid, mean_return, median_return, wins_return, count
         """
         # Check for validation data
         if self.y_validation_pred_proba is None or self.validation_target_vars_df is None:
-            ax.text(0.5, 0.5, "Validation data not available",
-                    ha="center", va="center")
-            return
+            return pd.DataFrame()
 
         target_var = self.modeling_config["target_variable"]
         returns = self.validation_target_vars_df[target_var].reindex(
@@ -1311,34 +1356,67 @@ class ClassifierEvaluator(RegressorEvaluator):
             "ret_win": returns_winsorized
         }).dropna()
 
-        # Define score bins
+        # Define equal-width score bins
         try:
             score_min, score_max = df["proba"].min(), df["proba"].max()
             bin_edges = np.linspace(score_min, score_max, n_buckets + 1)
             df["score_bin"] = pd.cut(df["proba"], bins=bin_edges, include_lowest=True)
         except ValueError:
-            ax.text(0.5, 0.5, 'Insufficient score spread to generate bins.',
-                    ha='center', va='center')
-            return
+            return pd.DataFrame()
 
-
-        # Compute counts and mean returns per bin
+        # Compute metrics per bin
         bin_counts = df.groupby("score_bin", observed=True).size()
         bin_mean_ret = df.groupby("score_bin", observed=True)["ret"].mean()
         bin_median_ret = df.groupby("score_bin", observed=True)["ret"].median()
         bin_winsorized_ret = df.groupby("score_bin", observed=True)["ret_win"].mean()
 
-        # Drop bins with zero count
+        # Filter to valid bins and calculate centers
         valid_bins = bin_counts[bin_counts > 0]
         valid_centers = [
             interval.left + (interval.right - interval.left) / 2
             for interval in valid_bins.index
         ]
-        valid_counts = valid_bins.values
-        valid_mean_ret = bin_mean_ret.reindex(valid_bins.index).values
-        valid_median_ret = bin_median_ret.reindex(valid_bins.index).values
-        valid_winsorized_ret = bin_winsorized_ret.reindex(valid_bins.index).values
-        width = bin_edges[1] - bin_edges[0]
+
+        # Create result DataFrame
+        result_df = pd.DataFrame({
+            "score_mid": valid_centers,
+            "mean_return": bin_mean_ret.reindex(valid_bins.index).values,
+            "median_return": bin_median_ret.reindex(valid_bins.index).values,
+            "wins_return": bin_winsorized_ret.reindex(valid_bins.index).values,
+            "count": valid_bins.values
+        })
+
+        return result_df
+
+
+
+    def _plot_return_vs_rank_classifier(self, ax, n_buckets: int = 10):
+        """
+        Plot histogram of prediction probabilities and returns by probability bins.
+        X-axis is actual prediction score.
+        Primary Y-axis: count histogram of wallets per score bin.
+        Secondary Y-axis: mean return per score bin.
+        """
+        # Get bucket data from helper method
+        bucket_df = self.compute_score_buckets(n_buckets)
+
+        if bucket_df.empty:
+            ax.text(0.5, 0.5, "Validation data not available or insufficient score spread",
+                    ha="center", va="center")
+            return
+
+        # Extract data for plotting
+        valid_centers = bucket_df["score_mid"].values
+        valid_counts = bucket_df["count"].values
+        valid_mean_ret = bucket_df["mean_return"].values
+        valid_median_ret = bucket_df["median_return"].values
+        valid_winsorized_ret = bucket_df["wins_return"].values
+
+        # Calculate bin width for bar chart
+        if len(valid_centers) > 1:
+            width = (valid_centers[1] - valid_centers[0]) * 0.8
+        else:
+            width = 0.1
 
         # Primary axis: histogram of counts
         ax.bar(valid_centers, valid_counts, width=width, alpha=0.6, label="Count")
@@ -1366,14 +1444,19 @@ class ClassifierEvaluator(RegressorEvaluator):
 
         # Secondary axis: mean return line
         ax2 = ax.twinx()
-        # Compute threshold on absolute returns to ensure a positive linthresh
-        abs_returns = np.abs(df["ret"])
+
+        # Compute threshold for symlog scale
+        target_var = self.modeling_config["target_variable"]
+        returns = self.validation_target_vars_df[target_var].reindex(
+            self.y_validation_pred_proba.index
+        )
+        abs_returns = np.abs(returns.dropna())
         linthresh = np.percentile(abs_returns, 95)
-        # Fallback to a small positive value if the threshold isn't positive
         if linthresh <= 0:
             max_abs = abs_returns.max()
             linthresh = max_abs * 0.05 if max_abs > 0 else 1.0
-        ax2.set_yscale("symlog", linthresh=linthresh)  # comment to toggle log/linear y2 axis
+        ax2.set_yscale("symlog", linthresh=linthresh)
+
         ax2.plot(
             valid_centers,
             valid_median_ret,
@@ -1392,19 +1475,20 @@ class ClassifierEvaluator(RegressorEvaluator):
             label="Winsorized Return",
             color="#ffe000"
         )
+
         # Annotate lowest and highest winsorized return
-        low_interval = bin_winsorized_ret.idxmin()
-        high_interval = bin_winsorized_ret.idxmax()
-        x_low = (low_interval.left + low_interval.right) / 2
-        x_high = (high_interval.left + high_interval.right) / 2
-        y_low = bin_winsorized_ret.loc[low_interval]
-        y_high = bin_winsorized_ret.loc[high_interval]
-        ax2.annotate(f"{y_low:.2f}", xy=(x_low, y_low),
-                     xytext=(0, -10), textcoords="offset points",
-                     ha="center", va="top")
-        ax2.annotate(f"{y_high:.2f}", xy=(x_high, y_high),
-                     xytext=(0, 10), textcoords="offset points",
-                     ha="center", va="bottom")
+        if len(valid_winsorized_ret) > 1:
+            min_idx = np.argmin(valid_winsorized_ret)
+            max_idx = np.argmax(valid_winsorized_ret)
+            ax2.annotate(f"{valid_winsorized_ret[min_idx]:.2f}",
+                        xy=(valid_centers[min_idx], valid_winsorized_ret[min_idx]),
+                        xytext=(0, -10), textcoords="offset points",
+                        ha="center", va="top")
+            ax2.annotate(f"{valid_winsorized_ret[max_idx]:.2f}",
+                        xy=(valid_centers[max_idx], valid_winsorized_ret[max_idx]),
+                        xytext=(0, 10), textcoords="offset points",
+                        ha="center", va="bottom")
+
         ax2.plot(
             valid_centers,
             valid_mean_ret,
@@ -1416,7 +1500,7 @@ class ClassifierEvaluator(RegressorEvaluator):
         )
 
         # Overall mean return line
-        overall_mean = df["ret"].mean()
+        overall_mean = returns.mean()
         ax2.axhline(
             overall_mean,
             linestyle="--",

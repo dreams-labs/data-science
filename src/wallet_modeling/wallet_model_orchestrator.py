@@ -4,6 +4,7 @@ import json
 import math
 from pathlib import Path
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 
 # Local modules
@@ -133,8 +134,8 @@ class WalletModelOrchestrator:
                 # keep None explicitly so predict_and_store skips binary prediction
                 self.score_params[score_name]['y_pred_threshold'] = None
 
-            # Store model ID in dictionary for later use
-            models_dict[score_name] = model_id
+            # Store model metrics
+            models_dict[score_name] = self._store_model_metrics(model_id, evaluator)
 
             logger.milestone(f"Finished training model {len(models_dict)}/{len(self.score_params)}"
                              f": {score_name}.")
@@ -150,6 +151,46 @@ class WalletModelOrchestrator:
         self._plot_score_summaries(evaluators)
 
         return models_dict
+
+
+
+    def _store_model_metrics(self, model_id: str, evaluator) -> dict:
+        """
+        Extract and store model performance metrics and macroeconomic features.
+
+        Params:
+        - model_id: Unique identifier for the trained model
+        - evaluator: Model evaluator object containing predictions and validation data
+
+        Returns:
+        - dict: Model metrics including ID, return metrics, and macro averages
+        """
+        # Extract return metrics for analysis
+        n_buckets = 20
+        if evaluator.modeling_config.get('model_type') == 'classification':
+            # Use evaluator's bucket computation method for classification
+            bucket_df = self._compute_return_vs_rank_df(evaluator, n_buckets=n_buckets)
+        else:
+            # Equal-width buckets for regression
+            bucket_df = self._compute_combined_score_return_df(evaluator, n_buckets=n_buckets)
+
+        # Convert DataFrame to serializable dict
+        return_metrics = bucket_df.to_dict(orient='list')
+
+        # Extract macroeconomic features for analysis
+        macro_cols = [col for col in evaluator.X_validation.columns if col.startswith('macro|')]
+        macro_metrics = (evaluator.X_validation[macro_cols].reset_index()
+                         .groupby('epoch_start_date')
+                         .mean())
+        # Convert macro_metrics to serializable dict
+        macro_averages = macro_metrics.to_dict(orient='list')
+
+        return {
+            'model_id': model_id,
+            'return_metrics': return_metrics,
+            'macro_averages': macro_averages
+        }
+
 
 
     def predict_and_store(self, models_dict, training_data_df):
@@ -174,7 +215,7 @@ class WalletModelOrchestrator:
 
         # Process each model in the dictionary
         for score_name in models_dict.keys():
-            model_id = models_dict[score_name]
+            model_id = models_dict[score_name]['model_id']
 
             # Load model and generate predictions
             y_pred = wiva.load_and_predict(
@@ -289,3 +330,118 @@ class WalletModelOrchestrator:
 
         plt.tight_layout()
         plt.show()
+
+
+
+    def _compute_return_vs_rank_df(self, evaluator, n_buckets: int) -> pd.DataFrame:
+        """
+        Compute return vs rank DataFrame using the same binning logic as charts.
+        For classifiers, delegates to the evaluator's compute_score_buckets method.
+        """
+        # For classifiers, delegate to evaluator's bucket computation method
+        if evaluator.modeling_config.get('model_type') == 'classification':
+            bucket_df = evaluator.compute_score_buckets(n_buckets)
+
+            if bucket_df.empty:
+                # Return empty buckets filled with None
+                return pd.DataFrame({
+                    "bucket": range(1, n_buckets + 1),
+                    "mean_return": [None] * n_buckets,
+                    "wins_return": [None] * n_buckets
+                })
+
+            # Convert score-based buckets to rank-based format for storage
+            # Rank buckets from 1 (highest score) to n_buckets (lowest score)
+            bucket_df = bucket_df.sort_values('score_mid', ascending=False).reset_index(drop=True)
+            bucket_df['bucket'] = range(1, len(bucket_df) + 1)
+
+            # Forward fill to ensure we have n_buckets entries
+            mean_values = []
+            wins_values = []
+            last_mean = None
+            last_wins = None
+
+            for i in range(1, n_buckets + 1):
+                if i <= len(bucket_df):
+                    row = bucket_df.iloc[i-1]
+                    last_mean = row['mean_return']
+                    last_wins = row['wins_return']
+                mean_values.append(last_mean)
+                wins_values.append(last_wins)
+
+            return pd.DataFrame({
+                "bucket": range(1, n_buckets + 1),
+                "mean_return": mean_values,
+                "wins_return": wins_values
+            })
+
+        # Original regression logic for non-classification models
+        y_pred = evaluator.y_validation_pred
+        returns = evaluator.validation_target_vars_df[evaluator.modeling_config["target_variable"]]
+        df = pd.DataFrame({"pred": y_pred, "ret": returns.reindex(y_pred.index)}).dropna()
+
+        # Check if we have enough unique values for n_buckets
+        unique_preds = df["pred"].nunique()
+        actual_buckets = min(n_buckets, unique_preds)
+
+        if actual_buckets < 2:
+            # If only 1 unique prediction, create single bucket
+            df["bucket"] = 1
+        else:
+            # Use qcut with duplicates='drop' and track actual buckets created
+            df["bucket_raw"] = pd.qcut(df["pred"], actual_buckets, labels=False, duplicates="drop")
+            # Reverse ranking so highest predictions get bucket 1
+            df["bucket"] = actual_buckets - df["bucket_raw"]
+            bucket_indices = sorted(df["bucket"].unique())
+
+        # Calculate metrics only for buckets that exist
+        bucket_mean = df.groupby("bucket")["ret"].mean()
+        bucket_wins = df.groupby("bucket")["ret"].apply(
+            lambda x: u.winsorize(x.values, evaluator.modeling_config.get("returns_winsorization", 0.005)).mean()
+        )
+
+        # Create output with full range 1 to n_buckets, forward filling missing values
+        mean_values = []
+        wins_values = []
+        last_mean = None
+        last_wins = None
+
+        for i in range(1, n_buckets + 1):
+            if i in bucket_mean.index:
+                last_mean = bucket_mean[i]
+                last_wins = bucket_wins[i]
+            mean_values.append(last_mean)
+            wins_values.append(last_wins)
+
+        result_df = pd.DataFrame({
+            "bucket": range(1, n_buckets + 1),
+            "mean_return": mean_values,
+            "wins_return": wins_values
+        })
+
+        return result_df
+
+
+
+    def _compute_combined_score_return_df(self, evaluator, n_buckets: int) -> pd.DataFrame:
+        # Replicate ModelEvaluator._plot_combined_score_return bucket calc
+        y_pred = evaluator.y_validation_pred
+        returns = evaluator.validation_target_vars_df[evaluator.modeling_config["target_variable"]]
+        # Align numpy predictions to returns index
+        if not isinstance(y_pred, pd.Series):
+            y_pred = pd.Series(y_pred, index=returns.index)
+        df = pd.DataFrame({"pred": y_pred, "ret": returns}).dropna()
+        wins_thr = evaluator.modeling_config.get("returns_winsorization", 0.005)
+        df["ret_wins"] = u.winsorize(df["ret"].values, wins_thr)
+        edges = np.linspace(df["pred"].min(), df["pred"].max(), n_buckets+1)
+        buckets = []
+        for low, high in zip(edges[:-1], edges[1:]):
+            mask = (df["pred"]>=low)&(df["pred"]<=high)
+            if mask.sum()>0:
+                buckets.append({
+                    "score_mid": (low+high)/2,
+                    "mean_return": df.loc[mask, "ret"].mean(),
+                    "median_return": df.loc[mask, "ret"].median(),
+                    "wins_return": df.loc[mask, "ret_wins"].mean(),
+                })
+        return pd.DataFrame(buckets)
