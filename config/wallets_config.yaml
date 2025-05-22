@@ -59,10 +59,10 @@ modeling: #WalletModel
     # target_var_min_threshold: -0.05  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.00  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.05  # a classification model will try to predict the target var above this value
-    # target_var_min_threshold: 0.15  # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.15  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.25  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.40  # a classification model will try to predict the target var above this value
-    target_var_min_threshold: 0.60  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.60  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.80  # a classification model will try to predict the target var above this value
 
     # target_var_max_threshold: -0.05  # a classification model will try to predict the target var above this value
