@@ -392,7 +392,6 @@ class WalletModelOrchestrator:
             df["bucket_raw"] = pd.qcut(df["pred"], actual_buckets, labels=False, duplicates="drop")
             # Reverse ranking so highest predictions get bucket 1
             df["bucket"] = actual_buckets - df["bucket_raw"]
-            bucket_indices = sorted(df["bucket"].unique())
 
         # Calculate metrics only for buckets that exist
         bucket_mean = df.groupby("bucket")["ret"].mean()
