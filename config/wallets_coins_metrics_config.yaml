@@ -1,20 +1,28 @@
 # CoinModel Config
 # Time series keyed on coin_id-date
 time_series:  #CoinModel
-    market_data:
-        price:
-            indicators:
-                sma:
-                    parameters:
-                        window: [2]
-                # rsi:
-                #     parameters:
-                #         window: [7]
-        volume:
-            indicators:
-                sma:
-                    parameters:
-                        window: [12]
+    # market_data:  # DDA-805
+    #     price:
+    #         indicators:
+    #             sma:
+    #                 parameters:
+    #                     window: [2]
+    #             # rsi:
+    #             #     parameters:
+    #             #         window: [7]
+    #     volume:
+    #         indicators:
+    #             sma:
+    #                 parameters:
+    #                     window: [12]
+    #     market_cap:
+    #         aggregations:
+    #             last:
+    #                 scaling: none
+    #         indicators:
+    #             sma:
+    #                 parameters:
+    #                     window: [12]
 
 
     # Controls what populates the macro_trends|* features

@@ -40,19 +40,21 @@ training_data: #CoinModel
 
 
 # CoinModel Cleaning
-# Variables used to clean and filter raw data before training data is built
-data_cleaning: #CoinModel
+# # Variables used to clean and filter raw data before training data is built
+# data_cleaning: #CoinModel
 
-    # Market data filters
-    max_initial_market_cap: 999150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
-    max_gap_days: 30  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
-    min_daily_volume: 500 # Minimum average daily volume the coin must have
+#     # Market data filters
+#     max_initial_market_cap: 999150_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
+#     max_gap_days: 30  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
+#     min_daily_volume: 500 # Minimum average daily volume the coin must have
 
 
 # CoinModel Wallet Scores
 wallet_scores: #CoinModel
 
     #KeyParam Scores to include as segments + metrics
+    # y_pred_threshold defines the binary coin cohorts and can be defined
+    #  by using a hardcoded number (e.g. 0.8) or an F-beta score (e.g. f.5).
     score_params:
         cw_net_flows_015:
             model_type: classification
@@ -98,7 +100,7 @@ wallet_scores: #CoinModel
             model_type: regression
             target_variable: cw_crypto_net_flows/crypto_inflows/winsorized
             y_pred_lower_threshold: -1.1
-            y_pred_threshold: f.2
+            y_pred_threshold: 0.7
             assign_epochs_to_addresses: False
 
 
@@ -171,14 +173,14 @@ coin_modeling: #CoinModel
 
     #KeyParam Model Type
     # Target variable parameters
-    model_type: regression  # "regression" or "classification"
-    # model_type: classification  # "regression" or "classification"
+    # model_type: regression  # "regression" or "classification"
+    model_type: classification  # "regression" or "classification"
 
     #KeyParam Target Variable
     # target_variable: coin_return_winsorized
-    # target_variable: coin_return
-    target_variable: coin_return_pctile_full
-    target_var_min_threshold: .7  # a classification model will try to predict the target var above this value
+    target_variable: coin_return
+    # target_variable: coin_return_pctile_full
+    target_var_min_threshold: .4  # a classification model will try to predict the target var above this value
     y_pred_threshold: 0.6  # scores above this probability threshold are positive predictions
 
     returns_winsorization: 0.005
@@ -190,8 +192,8 @@ coin_modeling: #CoinModel
     min_cohort_balance: 20000  # how much USD all wallets must hold for the coin to be elegible for forecasting
 
     # Thresholds for coin inclusion in training data
-    min_market_cap: 000_000  # coins below this market cap will not be included in performance assessments
-    max_market_cap: 999150_000_000  # coins above this market cap will not be included in performance assessments
+    min_market_cap: 2_000_000  # coins below this market cap will not be included in performance assessments
+    max_market_cap: 500_000_000  # coins above this market cap will not be included in performance assessments
 
     # Train/Test/Eval split
     test_size: 0.2  # what % of the total population will be used as test
@@ -216,21 +218,13 @@ coin_modeling: #CoinModel
             # macro|*,
             # training_clusters|*,
 
-            # Segment Family
-            score_binary|cw_net_flows_min_1000/*,
-            score_binary|cw_net_gain_min_1000/*,
-            score_binary|cw_return_rate_min_000/*,
-            score_binary|cw_return_rate_min_005/*,
-            score_binary|cw_return_rate_min_025/*,
-            score_binary|cw_return_rate_min_040/*,
-            # score_binary|cw_net_flows_rate_min_025/*,
-            score_binary|cw_return_rate_max_-005/*,
-            # score_binary|cw_return_rate_max_-025/*,
-            score_binary|cw_return_rate_min_060/*,
-            score_binary|cw_return_rate_min_080/*,
-            score_binary|return_rate_min_005/*,
-            score_binary|return_rate_min_025/*,
-            score_binary|return_rate_min_040/*,
+            # # Segment Family
+            score_binary|cw_net_flows_015/*,
+            score_binary|cw_crypto_net_flows_1k/*,
+            # score_binary|cw_net_flows_neg_040/*,
+            score_binary|cw_net_flows_regression/*,
+            score_binary|cw_net_flows_025/*,
+            # score_binary|cw_net_flows_060/*,
 
             # wallet_cohorts|whales_longterm|*,
             # wallet_cohorts|normies|*,
@@ -430,19 +424,13 @@ coin_modeling: #CoinModel
             drop_columns__drop_patterns: [
                 # 'feature_retainer',
 
-                macro|global_market_cap/rsi_30*,
-                macro|global_market_cap/std_*,
-                macro|global_market_cap/last_*,
-                macro|btc_vdd_multiple/std_*,
-                macro|btc_vdd_multiple/last_*,
-                macro|gtrends_altcoin_worldwide/std_*,
-                macro|gtrends_altcoin_worldwide/last_*,
-                macro|gtrends_memecoin_us/std_*,
-                macro|gtrends_memecoin_us/last_*,
-                macro|btc_mvrv_z_score/std_*,
-                macro|btc_mvrv_z_score/last_*,
-                macro|btc_price/std_*,
-
+                # Segment Family
+                score_binary|cw_net_flows_015/*,
+                score_binary|cw_crypto_net_flows_1k/*,
+                # score_binary|cw_net_flows_neg_040/*,
+                score_binary|cw_net_flows_regression/*,
+                score_binary|cw_net_flows_025/*,
+                # score_binary|cw_net_flows_060/*,
 
             ]
 
