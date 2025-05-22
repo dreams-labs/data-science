@@ -228,8 +228,9 @@ class CoinEpochsOrchestrator:
 
 
 
+    @staticmethod
     def score_coin_training_data(
-            self,
+            wallets_coin_config: dict,
             model_id: str,
             artifacts_path: str,
             features_df: pd.DataFrame = None
@@ -247,7 +248,7 @@ class CoinEpochsOrchestrator:
         """
         # 1) Use provided features_df or load from parquet
         if features_df is None:
-            base_folder = self.wallets_coin_config['training_data']['parquet_folder']
+            base_folder = wallets_coin_config['training_data']['parquet_folder']
             features_file = Path(base_folder) / 'current_como_coin_training_data_df_full.parquet'
             features_df = pd.read_parquet(features_file)
 
