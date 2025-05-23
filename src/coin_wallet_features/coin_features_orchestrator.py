@@ -2,18 +2,16 @@
 Orchestrates groups of functions to generate wallet model pipeline
 """
 import logging
-from typing import Tuple
-from datetime import datetime, timedelta
+from datetime import timedelta
 import pandas as pd
 
 # Local module imports
 import feature_engineering.coin_flow_features_orchestrator as cffo
-import wallet_modeling.wallet_training_data_orchestrator as wtdo
 import wallet_modeling.wallets_config_manager as wcm
 import wallet_features.macroeconomic_features as wmac
 import coin_wallet_features.wallet_segmentation as cws
-import coin_wallet_features.wallet_metrics as cwwm
-import coin_wallet_features.wallet_metrics_flattening as cwwmf
+import coin_wallet_features.wallet_metrics as cfwm
+import coin_wallet_features.wallet_metrics_flattening as cfwmf
 import coin_insights.coin_validation_analysis as civa
 import utils as u
 
@@ -98,7 +96,7 @@ class CoinFeaturesOrchestrator:
             raise ValueError("training_data_df contains duplicated wallet rows.")
 
         # Generate metrics for coin-wallet pairs
-        cw_metrics_df = cwwm.compute_coin_wallet_metrics(
+        cw_metrics_df = cfwm.compute_coin_wallet_metrics(
             self.wallets_coin_config,
             profits_df,
             self.wallets_config['training_data'][f'{period}_period_start'],
@@ -113,7 +111,7 @@ class CoinFeaturesOrchestrator:
         )
 
         # Flatten cw_metrics into single values for each coin-segment pair
-        coin_wallet_features_df = cwwmf.flatten_cw_to_coin_segment_features(
+        coin_wallet_features_df = cfwmf.flatten_cw_to_coin_segment_features(
             cw_metrics_df,
             wallet_segmentation_df,
             self.training_coin_cohort,
