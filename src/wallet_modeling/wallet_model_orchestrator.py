@@ -90,6 +90,9 @@ class WalletModelOrchestrator:
             existing_models = {}
         evaluators = []
 
+        # ------------------------
+        # Train or load all models
+        # ------------------------
         for score_name in self.score_params:
             # Create a deep copy of the configuration to avoid modifying the original
             score_wallets_config = copy.deepcopy(self.wallets_config)
@@ -102,8 +105,8 @@ class WalletModelOrchestrator:
             # Don't output the scores from every tree
             score_wallets_config['modeling']['verbose_estimators'] = False
 
+            # Load and evaluate existing model
             if score_name in existing_models:
-                # Load and evaluate existing model
                 model_id, evaluator = self._load_and_evaluate(
                     score_name,
                     score_wallets_config,
@@ -112,8 +115,11 @@ class WalletModelOrchestrator:
                     validation_training_data_df,
                     validation_target_vars_df
                 )
+                logger.milestone(f"Loaded pretrained model for score '{score_name}'.")
+
+
+            # Train new model
             else:
-                # Train new model
                 model_id, evaluator = self._train_and_evaluate(
                     score_wallets_config,
                     wallet_training_data_df,
@@ -123,6 +129,9 @@ class WalletModelOrchestrator:
                 )
                 # Persist metrics for newly trained model
                 existing_models[score_name] = self._store_model_metrics(model_id, evaluator)
+                logger.milestone(f"Finished training model {len(existing_models)}/{len(self.score_params)}"
+                                f": {score_name}.")
+
             evaluators.append((score_name, evaluator))
 
             # -------------------------------------------------
@@ -156,16 +165,13 @@ class WalletModelOrchestrator:
                 # keep None explicitly so predict_and_store skips binary prediction
                 self.score_params[score_name]['y_pred_threshold'] = None
 
-            logger.milestone(f"Finished training model {len(existing_models)}/{len(self.score_params)}"
-                             f": {score_name}.")
-
         # Store and save models_dict
         self.models_dict = existing_models
         save_location = f"{self.wallets_coin_config['training_data']['parquet_folder']}/wallet_model_ids.json"
         with open(save_location, 'w', encoding='utf-8') as f:
             json.dump(existing_models, f, indent=4, default=u.numpy_type_converter)
 
-        logger.info(f"Finished traning all {len(self.score_params)} models.")
+        logger.milestone(f"Prepared all {len(self.score_params)} wallet models.")
 
         self._plot_score_summaries(evaluators)
 
@@ -586,7 +592,5 @@ class WalletModelOrchestrator:
             evaluator = wime.ClassifierEvaluator(result)
         else:
             evaluator = wime.RegressorEvaluator(result)
-
-        logger.info(f"Successfully loaded pretrained model for score '{score_name}'.")
 
         return model_id, evaluator

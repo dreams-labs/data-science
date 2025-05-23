@@ -31,9 +31,10 @@ def flatten_cw_to_coin_segment_features(
     Flatten coin-wallet metrics into coin-level features across segments.
 
     Params:
-    - cw_metrics_df (DataFrame): indexed by (coin_id, wallet_address) with 'balances/...'
-        and 'trading/...' columns.
-    - wallet_segmentation_df (DataFrame): indexed by wallet_address with segment assignments.
+    - cw_metrics_df (DataFrame): Trading metrics for wallets in the wallet modeling cohort.
+        Indexed by [coin_id,wallet_address] with trading and balance metrics.
+    - wallet_segmentation_df (DataFrame): Segment assignments for wallets in the wallet modeling cohort.
+        Indexed by wallet_address with segment assignments.
     - training_coin_cohort (list): list of coin_ids to include
     - score_distribution_cols (list): Which scores should have distribution metrics.
     - n_threads (Optional[int]): number of threads for parallel processing (defaults to ThreadPoolExecutor default)
@@ -42,20 +43,15 @@ def flatten_cw_to_coin_segment_features(
     - coin_wallet_features_df (DataFrame): indexed by coin_id, joined features for each
         metric × segment family.
     """
+    # Data quality checks
     if cw_metrics_df.empty:
         raise ValueError(f"Provided cw_metrics_df is empty. Columns: {list(cw_metrics_df.columns)}")
-    if wallet_segmentation_df.empty:
-        raise ValueError(f"Provided wallet_segmentation_df is empty. Columns: {list(wallet_segmentation_df.columns)}")
-
-    # Index coverage – every wallet in metrics must have a segment label
-    wallets_in_metrics = set(cw_metrics_df.index.get_level_values('wallet_address'))
-    wallets_in_seg     = set(wallet_segmentation_df.index)
-    missing = wallets_in_metrics - wallets_in_seg
-    if missing:
-        raise ValueError(
-            f"{len(missing):,} wallet(s) in cw_metrics_df lack segmentation labels "
-            "(example IDs: %s)" % list(missing)[:5]
-        )
+    # Matching index check
+    if not np.array_equal(
+        cw_metrics_df.index.get_level_values('wallet_address').sort_values(),  # ignores coin_id multiindex level
+        wallet_segmentation_df.index.sort_values()
+    ):
+        raise ValueError("Wallet cohort in cw_metrics_df doesn't match cohort in wallet_segmentation_df.")
 
     # start with an empty coin-level df
     coin_wallet_features_df = pd.DataFrame(index=training_coin_cohort)
