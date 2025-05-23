@@ -227,6 +227,8 @@ class RollingMetrics(NoExtrasBaseModel):
     """
     Rolling metrics generates a column for each {lookback_period} that last for
     {window_duration} days which can then be flattened through Aggregations or Comparisons.
+
+    Periods with lower numbers are more recent, i.e. '*_period_1' represents the most recent period.
     """
     window_duration: Annotated[int, Field(gt=0)]  # Must be an integer > 0
     lookback_periods: Annotated[int, Field(gt=0)]  # Must be an integer > 0
