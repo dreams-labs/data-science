@@ -881,7 +881,9 @@ class CoinEpochsOrchestrator:
             training_only=True
         )
 
-        # 3) Score wallets on the training data
-        epoch_wmo.predict_and_store(models_dict, wallet_training_data_df)
+        # 3) Score wallets on the training data using the models in wallets_coin_config
+        configured_models = set(epoch_coins_config['wallet_scores']['score_params'].keys())
+        filtered_models_dict = {k: models_dict[k] for k in configured_models}
+        epoch_wmo.predict_and_store(filtered_models_dict, wallet_training_data_df)
 
         return wallet_training_data_df
