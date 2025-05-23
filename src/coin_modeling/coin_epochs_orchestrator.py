@@ -320,10 +320,11 @@ class CoinEpochsOrchestrator:
         epoch_date = pd.to_datetime(epoch_wallets_config['training_data']['coin_modeling_period_start'])
 
         # Shortcut: if both feature and target parquet files exist, load and return them
+        toggle_rebuild_features = epoch_coins_config['features']['toggle_rebuild_all_features']
         base_folder = epoch_coins_config['training_data']['parquet_folder']
         feat_path = Path(base_folder) / "coin_training_data_df_full.parquet"
         tgt_path  = Path(base_folder) / "coin_target_var_df.parquet"
-        if feat_path.exists() and tgt_path.exists():
+        if (feat_path.exists() and tgt_path.exists() and not toggle_rebuild_features):
             coin_features_df = pd.read_parquet(feat_path)
             coin_target_df   = pd.read_parquet(tgt_path)
             logger.milestone(
@@ -405,11 +406,15 @@ class CoinEpochsOrchestrator:
         Generate and persist coin features
         """
         # 1) Load base dfs needed for coin feature generation
+        training_wallet_cohort = pd.Series(wallet_training_data_df.index.get_level_values('wallet_address'))
         (
             profits_df,
+            coin_market_data_df,
             training_coin_cohort,
-            coin_market_data_df
-        ) = self._load_wallet_data_for_coin_features(epoch_weo.base_config)
+        ) = self._load_wallet_data_for_coin_features(
+            epoch_weo.base_config,
+            training_wallet_cohort
+        )
 
         # 2) Prepare datasets
         macro_df = self._generate_epoch_macro_indicators(
@@ -486,21 +491,26 @@ class CoinEpochsOrchestrator:
 
 
     def _load_wallet_data_for_coin_features(
-            self, wallets_config: dict
+            self,
+            wallets_config: dict,
+            wallet_cohort: pd.Series
         ) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
         """
-        Loads DataFrames for generating coin model features and target variables.
+        Loads DataFrames for generating coin model features and target variables. Filters
+        out wallets that aren't in the wallet cohort from the wallet_training_data_df.
 
         Params:
-        - epoch_wallets_config (dict): epoch-specific wallets_config used for folder locations
+        - wallets_config (dict): epoch-specific wallets_config used for folder locations
             and date boundaries
+        - wallet_cohort (pd.Series): All wallets with wallet model features
 
         Returns:
         - wamo_profits_df (pd.DataFrame): Contains profits data through the end of the
             wallet_modeling period. This is used to generate coin-level features used to
             predict the coin modeling period price action.
+        - como_market_data_df (pd.DataFrame): Market data through the end of the coin_modeling
+            period. This is used to create coin-level target variables.
         - training_coin_cohort (pd.Series): All coins included in wamo_profits_df
-        - como_market_data_df (pd.DataFrame): ;;
         """
         pf = wallets_config['training_data']['parquet_folder']
 
@@ -524,8 +534,11 @@ class CoinEpochsOrchestrator:
                 wamo_profits_df, hybrid_map
             )
 
+        # Filter to wallet cohort
+        wamo_profits_df = wamo_profits_df[wamo_profits_df['wallet_address'].isin(wallet_cohort)]
+
         # Store coin cohort
-        wamo_coin_cohort = (
+        training_coin_cohort = (
             wamo_profits_df['coin_id'].drop_duplicates()
         )
 
@@ -543,7 +556,7 @@ class CoinEpochsOrchestrator:
             wallets_config['training_data']['coin_modeling_period_end']
         )
 
-        return wamo_profits_df, wamo_coin_cohort, como_market_data_df
+        return wamo_profits_df, como_market_data_df, training_coin_cohort
 
 
 
