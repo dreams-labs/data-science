@@ -242,10 +242,11 @@ coin_modeling: #CoinModel
 
     #KeyParam Modeling Cohort Definition
     # Thresholds for coin inclusion in training data
-    min_cohort_wallets: 15  # how many wallets must hold a coin for the coin to be elegible for forecasting
-    min_cohort_balance: 10000  # how much USD all wallets must hold for the coin to be elegible for forecasting
+    min_cohort_wallets: 10  # how many wallets must hold a coin for the coin to be elegible for forecasting
+    min_cohort_balance: 15000  # how much USD all wallets must hold for the coin to be elegible for forecasting
 
     # Thresholds for coin inclusion in training data
+    market_cap_column: market_cap  # 'market_cap' or 'market_cap_filled'
     min_market_cap: 2_000_000  # coins below this market cap will not be included in performance assessments
     max_market_cap: 500_000_000  # coins above this market cap will not be included in performance assessments
 

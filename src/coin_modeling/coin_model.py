@@ -241,18 +241,27 @@ class CoinModel(BaseModel):
         ]
         logger.info("Coins after balance filters: %s", len(coin_training_data_df))
 
-        # # Filter based on market cap
-        # min_market_cap = wallets_coin_config['coin_modeling']['min_market_cap']
-        # max_market_cap = wallets_coin_config['coin_modeling']['max_market_cap']
+        # Filter based on market cap
+        if self.modeling_config['market_cap_column'] == 'market_cap':
+            market_cap_col = 'market_data|market_cap/last'
+        elif self.modeling_config['market_cap_column'] == 'market_cap_filled':
+            market_cap_col = 'market_data|market_cap/filled_last'
+        else:
+            raise ValueError(f"Invalid value '{self.modeling_config['market_cap_column']}' found in "
+                             f"wallets_coin_config['coin_modeling']['market_cap_column']. The value must "
+                             "be 'market_cap' or 'market_cap_filled'.")
 
-        # coin_training_data_df = coin_training_data_df[
-        #     (coin_training_data_df['time_series|market_data|market_cap_last'].isna())
-        #     | (
-        #         (coin_training_data_df['time_series|market_data|market_cap_last'] >= min_market_cap)
-        #         & (coin_training_data_df['time_series|market_data|market_cap_last'] <= max_market_cap)
-        #     )
-        # ]
-        # logger.info("Coins after market cap filters: %s", len(coin_training_data_df))
+        min_market_cap = self.modeling_config['min_market_cap']
+        max_market_cap = self.modeling_config['max_market_cap']
+
+        coin_training_data_df = coin_training_data_df[
+            (coin_training_data_df[market_cap_col].isna())
+            | (
+                (coin_training_data_df[market_cap_col] >= min_market_cap)
+                & (coin_training_data_df[market_cap_col] <= max_market_cap)
+            )
+        ]
+        logger.info("Coins after market cap filters: %s", len(coin_training_data_df))
 
         # Align target_vars_df index with filtered coin_training_data_df
         target_vars_df = target_vars_df.reindex(coin_training_data_df.index)

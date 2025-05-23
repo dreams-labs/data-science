@@ -354,6 +354,7 @@ data_cleaning: #WalletModel
     max_wallet_profits: 100_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
 
     #KeyParam Coin Cohort Definitions
+    # Market cap params used market_cap_filled
     min_initial_market_cap: 0_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
     max_initial_market_cap: 500_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
     min_ending_market_cap: 2_000_000  # coins above this market cap as of the end of the training period will be removed from all datasets
