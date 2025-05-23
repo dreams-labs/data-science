@@ -2,6 +2,7 @@
 Orchestrates groups of functions to generate wallet model pipeline
 """
 import logging
+from typing import Tuple
 from datetime import datetime, timedelta
 import pandas as pd
 
@@ -68,7 +69,7 @@ class CoinFeaturesOrchestrator:
         training_data_df: pd.DataFrame,
         macro_indicators_df: pd.DataFrame,
         period: str,
-        prd: str
+        prefix: str
     ) -> pd.DataFrame:
         """
         Compute coin-wallet metrics for a specific period and build coin features.
@@ -108,7 +109,7 @@ class CoinFeaturesOrchestrator:
         wallet_segmentation_df = cws.build_wallet_segmentation(
             self.wallets_coin_config,
             training_data_df,
-            score_suffix=prd
+            score_suffix=prefix
         )
 
         # Flatten cw_metrics into single values for each coin-segment pair
@@ -140,7 +141,7 @@ class CoinFeaturesOrchestrator:
             coin_flows_model_features_df = self._generate_coin_flow_model_features()
             coin_flows_model_features_df.to_parquet(
                 f"{self.wallets_coin_config['training_data']['parquet_folder']}"
-                f"/{prd}_coin_flows_model_features_df.parquet",
+                f"/{prefix}_coin_flows_model_features_df.parquet",
                 index=True
             )
             coin_training_data_df_full = self._merge_all_features(
@@ -390,106 +391,3 @@ def parse_feature_names(
         feature_details_df[retain_col] = coin_training_data_df[retain_col]
 
     return feature_details_df
-
-
-def load_wallet_data_for_coin_features(
-        wallets_config: dict,
-        complete_dfs_folder: str = None) -> None:
-    """
-    Reload modules, load configs and profits/market data, hybridize IDs,
-    filter market data slices, assert periods, and save parquet outputs.
-
-    Params:
-    - wallets_config (dict): used for folder locations and date boundaries
-    - complete_dfs_folder (str): directory containing complete dfs if they exist
-        outside of the base parquet folder.
-    """
-    logger.info("Loading wamo/como profits and market data for post-wallet model analysis...")
-
-    pf = wallets_config['training_data']['parquet_folder']
-    if complete_dfs_folder:
-        c_pf = complete_dfs_folder
-    else:
-        c_pf = pf
-
-    # load profits DataFrames
-    wamo_date = datetime.strptime(
-        wallets_config['training_data']['modeling_period_start'],
-        '%Y-%m-%d'
-    ).strftime('%y%m%d')
-    wamo_profits_df = pd.read_parquet(f"{pf}/{wamo_date}/modeling_profits_df.parquet")
-
-    como_date = datetime.strptime(
-        wallets_config['training_data']['coin_modeling_period_start'],
-        '%Y-%m-%d'
-    ).strftime('%y%m%d')
-    como_profits_df = pd.read_parquet(f"{pf}/{como_date}/modeling_profits_df.parquet")
-
-    # hybridize wallet IDs if configured
-    if wallets_config['training_data']['hybridize_wallet_ids']:
-        hybrid_map = pd.read_parquet(f"{c_pf}/complete_hybrid_cw_id_df.parquet")
-        wamo_profits_df = wtdo.hybridize_wallet_address(
-            wamo_profits_df, hybrid_map
-        )
-        como_profits_df = wtdo.hybridize_wallet_address(
-            como_profits_df, hybrid_map
-        )
-
-    # filter market data
-    complete_md = pd.read_parquet(f"{c_pf}/complete_market_data_df.parquet")
-    como_market_data_df = complete_md.loc[
-        (complete_md.index.get_level_values('date') >=
-            wallets_config['training_data']['modeling_period_end']) &
-        (complete_md.index.get_level_values('date') <=
-            wallets_config['training_data']['coin_modeling_period_end'])
-    ]
-    investing_market_data_df = complete_md.loc[
-        (complete_md.index.get_level_values('date') >=
-            wallets_config['training_data']['coin_modeling_period_end']) &
-        (complete_md.index.get_level_values('date') <=
-            wallets_config['training_data']['investing_period_end'])
-    ]
-    # coin cohort
-    training_coin_cohort = (
-        wamo_profits_df['coin_id'].drop_duplicates()
-    )
-    # assertions
-    u.assert_period(
-        wamo_profits_df,
-        wallets_config['training_data']['modeling_period_start'],
-        wallets_config['training_data']['modeling_period_end']
-    )
-    u.assert_period(
-        como_profits_df,
-        wallets_config['training_data']['coin_modeling_period_start'],
-        wallets_config['training_data']['coin_modeling_period_end']
-    )
-    u.assert_period(
-        como_market_data_df,
-        wallets_config['training_data']['coin_modeling_period_start'],
-        wallets_config['training_data']['coin_modeling_period_end']
-    )
-
-    validation_end = wallets_config['training_data']['validation_period_end']
-    investing_end = wallets_config['training_data']['investing_period_end']
-    if investing_end > validation_end:
-        logger.info(
-            "Skipping investing period data generation as the validation period ends "
-            f"on {validation_end} before the investing end of {investing_end}."
-        )
-        logger.info("Successfully loaded base data for coin_modeling period only.")
-
-    else:
-        u.assert_period(
-            investing_market_data_df,
-            wallets_config['training_data']['investing_period_start'],
-            wallets_config['training_data']['investing_period_end']
-        )
-        logger.info("Successfully loaded base data for coin_modeling and investing predictions.")
-
-
-    return (
-        training_coin_cohort,
-        wamo_profits_df, como_market_data_df,
-        como_profits_df, investing_market_data_df
-    )

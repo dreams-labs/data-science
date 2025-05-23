@@ -5,6 +5,7 @@ Orchestrates the creation of wallet training data, models, and scores for each c
 """
 import os
 import logging
+from typing import Tuple
 from pathlib import Path
 import copy
 from datetime import datetime, timedelta
@@ -289,7 +290,9 @@ class CoinEpochsOrchestrator:
     #           Helper Methods
     # -----------------------------------
 
-    # Primary helper
+    # --------------
+    # Primary Helper
+    # --------------
     def _process_coin_epoch(
             self,
             lookback_duration: int,
@@ -389,42 +392,215 @@ class CoinEpochsOrchestrator:
 
 
 
-    def _generate_coin_epoch_training_data(self, lookback_duration: int):
+    # ---------------------
+    # Coin Features Helpers
+    # ---------------------
+    def _generate_coin_features(
+            self,
+            epoch_weo,
+            epoch_coins_config: dict,
+            training_data_df: pd.DataFrame
+    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
-        Generates a coin epoch's training data for all wallet windows and epochs.
-
-        Params:
-         - lookback_duration (int): How many days the coin lookback is offset vs the base config.
-
-         Returns:
-         - epoch_orch (WalletEpochsOrchestrator): orchestrator with config set for lookback
-         - (
-                wallet_training_data_df,wallet_target_vars_df,
-                validation_training_data_df,validation_target_vars_df
-            ) Tuple(pd.DataFrames): training_data_df and target variables to the epoch
+        Generate and persist coin features
         """
-        # 1) Generate coin epoch-specific wallets_config
-        epoch_wallets_config = self._prepare_coin_epoch_base_config(lookback_duration)
+        # 1) Load base dfs needed for coin feature generation
+        (
+            profits_df,
+            training_coin_cohort,
+            coin_market_data_df
+        ) = self._load_wallet_data_for_coin_features(epoch_weo.base_config)
 
-        # 2) Instantiate a new WalletEpochsOrchestrator for this epoch
-        epoch_weo = weo.WalletEpochsOrchestrator(
-            base_config=epoch_wallets_config,       # epoch-specific config
-            metrics_config=self.wallets_metrics_config,
-            features_config=self.wallets_features_config,
-            epochs_config=self.wallets_epochs_config,
-            complete_profits_df=self.complete_profits_df,
-            complete_market_data_df=self.complete_market_data_df,
-            complete_macro_trends_df=self.complete_macro_trends_df,
+        # 2) Prepare datasets
+        macro_df = self._generate_epoch_macro_indicators(
+            epoch_weo.base_config['training_data']['modeling_period_start'],
+            epoch_weo.base_config['training_data']['modeling_period_end'],
         )
 
-        # 3) Generate the coin epoch's wallet configs
-        epoch_weo.all_epochs_configs = epoch_weo.generate_epoch_configs()
+        # 3) Generate features
+        cfo_inst = cfo.CoinFeaturesOrchestrator(
+            epoch_weo.base_config,
+            epoch_coins_config,
+            self.wallets_coins_metrics_config,
+            self.coin_flow_config,
+            self.coin_flow_modeling_config,
+            self.coin_flow_metrics_config,
+            training_coin_cohort,
+        )
 
-        # 4) Generate and return its training & modeling data
-        return epoch_weo, epoch_weo.generate_epochs_training_data()
+        file_prefix = pd.to_datetime(
+            epoch_weo.base_config['training_data']['coin_modeling_period_start']
+        ).strftime('%Y%m%d')
+
+        coin_features_df = cfo_inst.generate_coin_features_for_period(
+            profits_df,
+            training_data_df,
+            macro_df,
+            "modeling",
+            file_prefix,
+        )
+
+        # 4) Persist results to parquet
+        base_folder = epoch_coins_config['training_data']['parquet_folder']
+        coin_features_df.to_parquet(
+            f"{base_folder}/coin_training_data_df_full.parquet"
+        )
+
+        return coin_features_df, coin_market_data_df
 
 
 
+    def _generate_coin_target_vars(
+        self,
+        epoch_weo,
+        epoch_coins_config: dict,
+        coin_features_df: pd.DataFrame,
+        coin_market_data_df: pd.DataFrame
+    ) -> pd.DataFrame:
+        """
+        Calculate and save target variablesfor the coin features.
+        """
+        base_folder = epoch_coins_config['training_data']['parquet_folder']
+        # Instantiate a fresh CoinFeaturesOrchestrator for target calculation
+        features_generator = cfo.CoinFeaturesOrchestrator(
+            epoch_weo.base_config,
+            epoch_coins_config,
+            self.wallets_coins_metrics_config,
+            self.coin_flow_config,
+            self.coin_flow_modeling_config,
+            self.coin_flow_metrics_config,
+            None  # training_coin_cohort not required for target calc
+        )
+
+        # Calculate target variables
+        coin_target_var_df = features_generator.calculate_target_variables(
+            coin_market_data_df,
+            epoch_weo.base_config['training_data']['coin_modeling_period_start'],
+            epoch_weo.base_config['training_data']['coin_modeling_period_end'],
+            set(coin_features_df.index)
+        )
+        coin_target_var_df.to_parquet(f"{base_folder}/coin_target_var_df.parquet", index=True)
+
+        return coin_target_var_df
+
+
+
+    def _load_wallet_data_for_coin_features(
+            self, wallets_config: dict
+        ) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
+        """
+        Loads DataFrames for generating coin model features and target variables.
+
+        Params:
+        - epoch_wallets_config (dict): epoch-specific wallets_config used for folder locations
+            and date boundaries
+
+        Returns:
+        - wamo_profits_df (pd.DataFrame): Contains profits data through the end of the
+            wallet_modeling period. This is used to generate coin-level features used to
+            predict the coin modeling period price action.
+        - training_coin_cohort (pd.Series): All coins included in wamo_profits_df
+        - como_market_data_df (pd.DataFrame): ;;
+        """
+        pf = wallets_config['training_data']['parquet_folder']
+
+        # 1) Wallet modeling period profits_df for coin-level features
+        wamo_date = datetime.strptime(
+            wallets_config['training_data']['modeling_period_start'],
+            '%Y-%m-%d'
+        ).strftime('%y%m%d')
+        wamo_profits_df = pd.read_parquet(f"{pf}/{wamo_date}/modeling_profits_df.parquet")
+        u.assert_period(
+            wamo_profits_df,
+            wallets_config['training_data']['modeling_period_start'],
+            wallets_config['training_data']['modeling_period_end']
+        )
+
+        # Hybridize wallet IDs if configured
+        if wallets_config['training_data']['hybridize_wallet_ids']:
+            hybrid_map = pd.read_parquet(f"{pf}/complete_hybrid_cw_id_df.parquet")
+            wtdo.validate_hybrid_mapping_completeness(wamo_profits_df, hybrid_map)
+            wamo_profits_df = wtdo.hybridize_wallet_address(
+                wamo_profits_df, hybrid_map
+            )
+
+        # Store coin cohort
+        wamo_coin_cohort = (
+            wamo_profits_df['coin_id'].drop_duplicates()
+        )
+
+        # 2) Coin modeling market data for coin target vars
+        complete_md = pd.read_parquet(f"{pf}/complete_market_data_df.parquet")
+        como_market_data_df = complete_md.loc[
+            (complete_md.index.get_level_values('date') >=
+                wallets_config['training_data']['modeling_period_end']) &
+            (complete_md.index.get_level_values('date') <=
+                wallets_config['training_data']['coin_modeling_period_end'])
+        ]
+        u.assert_period(
+            como_market_data_df,
+            wallets_config['training_data']['coin_modeling_period_start'],
+            wallets_config['training_data']['coin_modeling_period_end']
+        )
+
+        return wamo_profits_df, wamo_coin_cohort, como_market_data_df
+
+
+
+    def _generate_epoch_macro_indicators(
+            self,
+            period_start_date: str,
+            period_end_date: str) -> pd.DataFrame:
+        """
+        Generate macro indicators for the specified period using WalletTrainingDataOrchestrator.
+
+        Args:
+            epoch_weo: WalletEpochsOrchestrator instance with configs
+            period_start_date: Start date in 'YYYY-MM-DD' format
+            period_end_date: End date in 'YYYY-MM-DD' format
+
+        Returns:
+            DataFrame with generated indicators
+        """
+
+        # Trim, clean, and impute missing values in complete_macro_trends_df
+        period_macro_trends_df = dr.clean_macro_trends(
+            self.complete_macro_trends_df,
+            macro_trends_cols=list(self.wallets_coins_metrics_config['time_series']['macro_trends'].keys()),
+            start_date = None,  # retain historical data for indicators
+            end_date = period_end_date
+        )
+
+        # Use existing training data orchestrator for consistency
+        wtdo_instance = wtdo.WalletTrainingDataOrchestrator(
+            self.wallets_config,                # has no impact on indicators output
+            self.wallets_coins_metrics_config,  # coins metrics coCoinFeaturesOrchestratornfig
+            self.wallets_features_config        # has no impact on indicators output
+        )
+
+        # Call the public indicator generation method
+        macro_indicators_df = wtdo_instance.generate_indicators_df(
+            period_macro_trends_df.reset_index(),
+            period_start_date=period_start_date,
+            period_end_date=period_end_date,
+            metric_type='macro_trends',
+            parquet_filename=None
+        )
+
+        # Set date index for consistency with rest of pipeline
+        macro_indicators_df = macro_indicators_df.set_index('date')
+
+        logger.info(f"Generated {len(macro_indicators_df.columns)} macro indicators for period "
+                    f"{period_start_date} to {period_end_date}")
+
+        return macro_indicators_df
+
+
+
+
+    # --------------
+    # Config Helpers
+    # --------------
     def _prepare_coin_epoch_base_config(self, lookback_duration: int):
         """
         Creates a config with dates offset by a wallets_coin_config lookback_duration.
@@ -489,208 +665,9 @@ class CoinEpochsOrchestrator:
 
 
 
-    def _generate_epoch_macro_indicators(
-            self,
-            period_start_date: str,
-            period_end_date: str) -> pd.DataFrame:
-        """
-        Generate macro indicators for the specified period using WalletTrainingDataOrchestrator.
-
-        Args:
-            epoch_weo: WalletEpochsOrchestrator instance with configs
-            period_start_date: Start date in 'YYYY-MM-DD' format
-            period_end_date: End date in 'YYYY-MM-DD' format
-
-        Returns:
-            DataFrame with generated indicators
-        """
-
-        # Trim, clean, and impute missing values in complete_macro_trends_df
-        period_macro_trends_df = dr.clean_macro_trends(
-            self.complete_macro_trends_df,
-            macro_trends_cols=list(self.wallets_coins_metrics_config['time_series']['macro_trends'].keys()),
-            start_date = None,  # retain historical data for indicators
-            end_date = period_end_date
-        )
-
-        # Use existing training data orchestrator for consistency
-        wtdo_instance = wtdo.WalletTrainingDataOrchestrator(
-            self.wallets_config,                # has no impact on indicators output
-            self.wallets_coins_metrics_config,  # coins metrics coCoinFeaturesOrchestratornfig
-            self.wallets_features_config        # has no impact on indicators output
-        )
-
-        # Call the public indicator generation method
-        macro_indicators_df = wtdo_instance.generate_indicators_df(
-            period_macro_trends_df.reset_index(),
-            period_start_date=period_start_date,
-            period_end_date=period_end_date,
-            metric_type='macro_trends',
-            parquet_filename=None
-        )
-
-        # Set date index for consistency with rest of pipeline
-        macro_indicators_df = macro_indicators_df.set_index('date')
-
-        logger.info(f"Generated {len(macro_indicators_df.columns)} macro indicators for period "
-                    f"{period_start_date} to {period_end_date}")
-
-        return macro_indicators_df
-
-
-
-    def _train_and_score_wallet_epoch(
-        self,
-        epoch_weo,
-        epoch_coins_config: dict,
-        epoch_training_dfs: tuple,
-        include_validation_period: bool = True
-    ) -> pd.DataFrame:
-        """
-        Train wallet models for a single epoch and score wallets.
-
-        Returns:
-        - wallet_training_data_df (pd.DataFrame): wallet training data for the epoch
-        """
-        # 1) Train all models
-        # Instantiate the WalletModelOrchestrator for this epoch
-        epoch_wmo = wmo.WalletModelOrchestrator(
-            epoch_weo.base_config,         # epoch-specific config
-            self.wallets_metrics_config,
-            self.wallets_features_config,
-            self.wallets_epochs_config,
-            epoch_coins_config
-        )
-
-        # Train wallet models using all epoch dfs
-        models_dict = epoch_wmo.train_wallet_models(*epoch_training_dfs)
-
-
-        # 2) Generate this epoch's training and modeling dfs
-        # Build epochs config for only the coin and wallet modeling periods
-        logger.info("Generating wallet training_data_df for scoring in the coin modeling "
-                    "and validation periods...")
-        modeling_offset = self.wallets_config['training_data']['modeling_period_duration']
-        coin_modeling_epochs_config = {
-            'offset_epochs': {
-                'offsets': [modeling_offset],
-            }
-        }
-        if include_validation_period:
-            coin_modeling_epochs_config['validation_offsets'] = [modeling_offset*2]
-        else:
-            coin_modeling_epochs_config['validation_offsets'] = []
-
-        epoch_weo = weo.WalletEpochsOrchestrator(
-            base_config=epoch_weo.base_config,
-            metrics_config=epoch_weo.metrics_config,
-            features_config=epoch_weo.features_config,
-            epochs_config=coin_modeling_epochs_config,          # custom config
-            complete_profits_df=epoch_weo.complete_profits_df,
-            complete_market_data_df=epoch_weo.complete_market_data_df,
-            complete_macro_trends_df=epoch_weo.complete_macro_trends_df,
-        )
-        # Generate TRAINING_DATA_DF
-        wallet_training_data_df, _, _, _ = epoch_weo.generate_epochs_training_data(
-            training_only=True
-        )
-
-        # 3) Score wallets on the training data
-        epoch_wmo.predict_and_store(models_dict, wallet_training_data_df)
-
-        return wallet_training_data_df
-
-
-
-    def _generate_coin_features(
-            self,
-            epoch_weo,
-            epoch_coins_config: dict,
-            training_data_df: pd.DataFrame
-    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        """
-        Generate and persist coin features
-        """
-        # 1) Load base dfs needed for coin feature generation
-        (
-            training_coin_cohort,
-            profits_df,
-            coin_market_data_df
-        ) = cfo.load_wallet_data_for_coin_features(epoch_weo.base_config)
-
-        # 2) Prepare datasets
-        macro_df = self._generate_epoch_macro_indicators(
-            epoch_weo.base_config['training_data']['modeling_period_start'],
-            epoch_weo.base_config['training_data']['modeling_period_end'],
-        )
-
-        # 3) Generate features
-        cfo_inst = cfo.CoinFeaturesOrchestrator(
-            epoch_weo.base_config,
-            epoch_coins_config,
-            self.wallets_coins_metrics_config,
-            self.coin_flow_config,
-            self.coin_flow_modeling_config,
-            self.coin_flow_metrics_config,
-            training_coin_cohort,
-        )
-
-        file_prefix = pd.to_datetime(
-            epoch_weo.base_config['training_data']['coin_modeling_period_start']
-        ).strftime('%Y%m%d')
-
-        coin_features_df = cfo_inst.generate_coin_features_for_period(
-            profits_df,
-            training_data_df,
-            macro_df,
-            "modeling",
-            file_prefix,
-        )
-
-        # 4) Persist results to parquet
-        base_folder = epoch_coins_config['training_data']['parquet_folder']
-        coin_features_df.to_parquet(
-            f"{base_folder}/coin_training_data_df_full.parquet"
-        )
-
-        return coin_features_df, coin_market_data_df
-
-
-    def _generate_coin_target_vars(
-        self,
-        epoch_weo,
-        epoch_coins_config: dict,
-        coin_features_df: pd.DataFrame,
-        coin_market_data_df: pd.DataFrame
-    ) -> pd.DataFrame:
-        """
-        Calculate and save target variablesfor the coin features.
-        """
-        base_folder = epoch_coins_config['training_data']['parquet_folder']
-        # Instantiate a fresh CoinFeaturesOrchestrator for target calculation
-        features_generator = cfo.CoinFeaturesOrchestrator(
-            epoch_weo.base_config,
-            epoch_coins_config,
-            self.wallets_coins_metrics_config,
-            self.coin_flow_config,
-            self.coin_flow_modeling_config,
-            self.coin_flow_metrics_config,
-            None  # training_coin_cohort not required for target calc
-        )
-
-        # Calculate target variables
-        coin_target_var_df = features_generator.calculate_target_variables(
-            coin_market_data_df,
-            epoch_weo.base_config['training_data']['coin_modeling_period_start'],
-            epoch_weo.base_config['training_data']['coin_modeling_period_end'],
-            set(coin_features_df.index)
-        )
-        coin_target_var_df.to_parquet(f"{base_folder}/coin_target_var_df.parquet", index=True)
-
-        return coin_target_var_df
-
-
-
+    # -----------------------
+    # Wallet Features Helpers
+    # -----------------------
     def _build_all_wallet_data(self) -> None:
         """
         Pre-build every wallet-epoch parquet so later coin loops just `pd.read_parquet`.
@@ -771,3 +748,68 @@ class CoinEpochsOrchestrator:
         )
 
         return all_offsets
+
+
+
+    def _train_and_score_wallet_epoch(
+        self,
+        epoch_weo,
+        epoch_coins_config: dict,
+        epoch_training_dfs: tuple,
+        include_validation_period: bool = True
+    ) -> pd.DataFrame:
+        """
+        Train wallet models for a single epoch and score wallets.
+
+        Returns:
+        - wallet_training_data_df (pd.DataFrame): wallet training data for the epoch
+        """
+        # 1) Train all models
+        # Instantiate the WalletModelOrchestrator for this epoch
+        epoch_wmo = wmo.WalletModelOrchestrator(
+            epoch_weo.base_config,         # epoch-specific config
+            self.wallets_metrics_config,
+            self.wallets_features_config,
+            self.wallets_epochs_config,
+            epoch_coins_config
+        )
+
+        # Train wallet models using all epoch dfs
+        models_dict = epoch_wmo.train_wallet_models(*epoch_training_dfs)
+
+
+        # 2) Generate this epoch's training and modeling dfs
+        # Build epochs config for only the coin and wallet modeling periods
+        logger.info("Generating wallet training_data_df for scoring in the coin modeling "
+                    "and validation periods...")
+        modeling_offset = self.wallets_config['training_data']['modeling_period_duration']
+        coin_modeling_epochs_config = {
+            'offset_epochs': {
+                'offsets': [modeling_offset],
+            }
+        }
+        if include_validation_period:
+            coin_modeling_epochs_config['validation_offsets'] = [modeling_offset*2]
+        else:
+            coin_modeling_epochs_config['validation_offsets'] = []
+
+        epoch_weo = weo.WalletEpochsOrchestrator(
+            base_config=epoch_weo.base_config,
+            metrics_config=epoch_weo.metrics_config,
+            features_config=epoch_weo.features_config,
+            epochs_config=coin_modeling_epochs_config,          # custom config
+            complete_profits_df=epoch_weo.complete_profits_df,
+            complete_market_data_df=epoch_weo.complete_market_data_df,
+            complete_macro_trends_df=epoch_weo.complete_macro_trends_df,
+        )
+        # Generate TRAINING_DATA_DF
+        wallet_training_data_df, _, _, _ = epoch_weo.generate_epochs_training_data(
+            training_only=True
+        )
+
+        # 3) Score wallets on the training data
+        epoch_wmo.predict_and_store(models_dict, wallet_training_data_df)
+
+        return wallet_training_data_df
+
+
