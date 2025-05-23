@@ -95,7 +95,7 @@ class CoinFeaturesOrchestrator:
         if training_data_df.index.duplicated().any():
             raise ValueError("training_data_df contains duplicated wallet rows.")
 
-        # Generate metrics for coin-wallet pairs
+        # Generate metrics for coin-wallet pairs in training_data_df
         cw_metrics_df = cfwm.compute_coin_wallet_metrics(
             self.wallets_coin_config,
             profits_df,
@@ -103,7 +103,7 @@ class CoinFeaturesOrchestrator:
             self.wallets_config['training_data'][f'{period}_period_end']
         )
 
-        # Assign wallets to segments
+        # Assign wallets in training_data_df to segments
         wallet_segmentation_df = cws.build_wallet_segmentation(
             self.wallets_coin_config,
             training_data_df,
