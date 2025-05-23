@@ -16,6 +16,7 @@ import joblib
 import training_data.data_retrieval as dr
 import wallet_modeling.wallets_config_manager as wcm
 import wallet_modeling.wallet_epochs_orchestrator as weo
+import wallet_modeling.wallet_training_data as wtd
 import wallet_modeling.wallet_training_data_orchestrator as wtdo
 import wallet_modeling.wallet_model_orchestrator as wmo
 import coin_wallet_features.coin_features_orchestrator as cfo
@@ -421,6 +422,11 @@ class CoinEpochsOrchestrator:
             epoch_weo.base_config['training_data']['modeling_period_start'],
             epoch_weo.base_config['training_data']['modeling_period_end'],
         )
+        market_df = self._generate_epoch_market_indicators(
+            profits_df,
+            training_coin_cohort,
+            epoch_weo.base_config
+        )
 
         # 3) Generate features
         cfo_inst = cfo.CoinFeaturesOrchestrator(
@@ -607,6 +613,61 @@ class CoinEpochsOrchestrator:
                     f"{period_start_date} to {period_end_date}")
 
         return macro_indicators_df
+
+
+
+    def _generate_epoch_market_indicators(
+            self,
+            profits_df: pd.DataFrame,
+            training_coin_cohort: pd.Series,
+            wallets_config: dict) -> pd.DataFrame:
+        """
+        Generate market data indicators for the specified period using WalletTrainingDataOrchestrator.
+
+        Args:
+        - profits_df (pd.DataFrame): profits_df for the epoch
+        - training_coin_cohort (pd.Series): which coins to include in the output df
+        - wallets_config (dict): epoch-specific wallets_config.yaml
+
+        Returns:
+            DataFrame with generated indicators
+        """
+        wtd_orch = wtd.WalletTrainingData(self.wallets_config)
+        period_start_date = wallets_config['training_data']['modeling_period_start']
+        period_end_date = wallets_config['training_data']['modeling_period_end']
+
+        # Trim, clean, and impute missing values in complete_macro_trends_df
+        period_market_data_df = wtd_orch.clean_market_dataset(
+            self.complete_market_data_df.reset_index(),
+            profits_df,
+            period_start_date,
+            period_end_date,
+            set(training_coin_cohort)
+        )
+
+        # Use existing training data orchestrator for consistency
+        wtdo_instance = wtdo.WalletTrainingDataOrchestrator(
+            wallets_config,                     # has no impact on indicators output
+            self.wallets_coins_metrics_config,  # coins metrics coCoinFeaturesOrchestratornfig
+            self.wallets_features_config        # has no impact on indicators output
+        )
+
+        # Call the public indicator generation method
+        market_indicators_df = wtdo_instance.generate_indicators_df(
+            period_market_data_df.reset_index(),
+            period_start_date=period_start_date,
+            period_end_date=period_end_date,
+            metric_type='market_data',
+            parquet_filename=None
+        )
+
+        # Set date index for consistency with rest of pipeline
+        market_indicators_df = market_indicators_df.set_index('date')
+
+        logger.info(f"Generated {len(market_indicators_df.columns) - len(period_market_data_df.columns)} "
+                    f"market data indicators for period {period_start_date} to {period_end_date}")
+
+        return market_indicators_df
 
 
 
