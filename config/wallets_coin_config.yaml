@@ -125,6 +125,9 @@ wallet_segments: #CoinModel
 # CoinModel Features
 features: #CoinModel
 
+    # If True, existing parquet features/target dfs will be overridden
+    toggle_rebuild_all_features: True
+
     # Which scores will have distribution metrics created
     score_distributions: [
         # cw_return_rate_min_000,
