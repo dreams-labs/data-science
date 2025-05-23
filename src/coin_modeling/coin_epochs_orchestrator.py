@@ -418,11 +418,11 @@ class CoinEpochsOrchestrator:
         )
 
         # 2) Prepare datasets
-        macro_df = self._generate_epoch_macro_indicators(
+        macro_ind_df = self._generate_epoch_macro_indicators(
             epoch_weo.base_config['training_data']['modeling_period_start'],
             epoch_weo.base_config['training_data']['modeling_period_end'],
         )
-        market_df = self._generate_epoch_market_indicators(
+        market_ind_df = self._generate_epoch_market_indicators(
             profits_df,
             training_coin_cohort,
             epoch_weo.base_config
@@ -438,7 +438,6 @@ class CoinEpochsOrchestrator:
             self.coin_flow_metrics_config,
             training_coin_cohort,
         )
-
         file_prefix = pd.to_datetime(
             epoch_weo.base_config['training_data']['coin_modeling_period_start']
         ).strftime('%Y%m%d')
@@ -446,7 +445,8 @@ class CoinEpochsOrchestrator:
         coin_features_df = cfo_inst.generate_coin_features_for_period(
             profits_df,
             wallet_training_data_df,
-            macro_df,
+            market_ind_df,
+            macro_ind_df,
             "modeling",
             file_prefix,
         )

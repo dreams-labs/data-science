@@ -2,7 +2,6 @@
 Orchestrates groups of functions to generate wallet model pipeline
 """
 import logging
-from datetime import timedelta
 import pandas as pd
 
 # Local module imports
@@ -65,6 +64,7 @@ class CoinFeaturesOrchestrator:
         self,
         profits_df: pd.DataFrame,
         training_data_df: pd.DataFrame,
+        market_indicators_df: pd.DataFrame,
         macro_indicators_df: pd.DataFrame,
         period: str,
         prefix: str
@@ -75,6 +75,7 @@ class CoinFeaturesOrchestrator:
         Params:
         - profits_df (DataFrame): profits data for the specified period
         - training_data_df (DataFrame): wallet training features for the specified period
+        - market_indicators_df (DataFrame): date-indexed market data indicators
         - macro_indicators_df (DataFrame): date-indexed macroeconomic indicators
         - period (str): period identifier (e.g., 'coin_modeling')
         - prd (str): abbreviated prefix for saved files (e.g., 'como')
@@ -131,6 +132,16 @@ class CoinFeaturesOrchestrator:
                 for col, val in macro_features_df.iloc[0].to_dict().items()
             }
             coin_training_data_df_full = coin_training_data_df_full.assign(**prefixed_macro_features)
+
+        # Generate and merge macro features if configured
+        if self.wallets_coin_config['features']['toggle_market_features']:
+            market_features_df = self._generate_market_features(market_indicators_df)
+            # Cross join market features to coin features DataFrame, prefixing "market_data|"
+            prefixed_market_features = {
+                f"market_data|{col}": val
+                for col, val in market_features_df.iloc[0].to_dict().items()
+            }
+            coin_training_data_df_full = coin_training_data_df_full.assign(**prefixed_market_features)
 
         # Generate and merge Coin Flow Model features if configured
         if self.wallets_coin_config['features']['toggle_coin_flow_model_features']:
@@ -259,6 +270,7 @@ class CoinFeaturesOrchestrator:
         return coin_features_df
 
 
+
     def _generate_macro_features(
         self,
         macro_indicators_df: pd.DataFrame,
@@ -290,6 +302,41 @@ class CoinFeaturesOrchestrator:
             macro_features_df = macro_features_df.rename(columns=rename_map)
 
         return macro_features_df
+
+
+
+    def _generate_market_features(
+        self,
+        market_indicators_df: pd.DataFrame,
+    ) -> pd.DataFrame:
+        """
+        Params:
+        - market_indicators_df (DataFrame): date-indexed marketeconomic indicators
+
+        Returns:
+        - market_features_df (pd.DataFrame): single row dataframe containing a
+            column for each market feature. These flattened features will be
+            cross joined onto every coin's record
+        """
+        market_features_df = wmac.calculate_market_data_features(
+            market_indicators_df,
+            self.wallets_coins_metrics_config['time_series']['market_data']
+        )
+
+        # Rename market feature columns: replace first underscore after key with '/'
+        market_keys = self.wallets_coins_metrics_config['time_series']['market_data'].keys()
+        rename_map = {}
+        for col in market_features_df.columns:
+            for key in market_keys:
+                prefix = f"{key}_"
+                if col.startswith(prefix):
+                    rename_map[col] = f"{key}/{col[len(prefix):]}"
+                    break
+        if rename_map:
+            market_features_df = market_features_df.rename(columns=rename_map)
+
+        return market_features_df
+
 
 
     def _merge_all_features(

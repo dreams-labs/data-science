@@ -13,7 +13,6 @@ training_data: #CoinModel
     ]
 
     coin_epochs_training: [  # How many days prior to the modeling period each window begins
-        # 90,
         0,
         -30,
         -60,
@@ -21,8 +20,9 @@ training_data: #CoinModel
         -120,
         -180,
         -240,
+        -300,
         -360,
-        # -300,
+
         # -420,
         # -480,
         # -540,
@@ -216,8 +216,9 @@ features: #CoinModel
         average_transaction,
     ]
 
-    # Macroeconomic features: most params are in wallets_coins_metrics_config.yaml
+    # Time series features: most params are in wallets_coins_metrics_config.yaml
     toggle_macro_features: True  # whether to build macro features
+    toggle_market_features: True  # whether to build market data features
 
 
 # CoinModel Modeling Config
