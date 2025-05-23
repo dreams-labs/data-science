@@ -231,10 +231,10 @@ coin_modeling: #CoinModel
     model_type: classification  # "regression" or "classification"
 
     #KeyParam Target Variable
-    target_variable: coin_return_winsorized
-    # target_variable: coin_return
+    # target_variable: coin_return_winsorized
+    target_variable: coin_return
     # target_variable: coin_return_pctile_full
-    target_var_min_threshold: .05 # a classification model will try to predict the target var above this value
+    target_var_min_threshold: .30 # a classification model will try to predict the target var above this value
     y_pred_threshold: 0.95  # scores above this probability threshold are positive predictions
 
     returns_winsorization: 0.005
@@ -273,14 +273,15 @@ coin_modeling: #CoinModel
             # training_clusters|*,
 
             # # Segment Family
+            # score_binary|cw_net_flows_025_thr80/*,
+
             score_binary|cw_net_flows_015/*,
             score_binary|cw_crypto_net_flows_1k/*,
-            # score_binary|cw_net_flows_neg_040/*,
+            score_binary|cw_net_flows_neg_040/*,
             score_binary|cw_net_flows_regression/*,
             score_binary|cw_net_flows_025/*,
-            # score_binary|cw_net_flows_060/*,
+            score_binary|cw_net_flows_060/*,
             score_binary|cw_net_flows_025_thr70/*,
-            # score_binary|cw_net_flows_025_thr80/*,
             score_binary|cw_net_flows_025_thr90/*,
             score_binary|cw_net_flows_060_thr70/*,
             score_binary|cw_net_flows_060_thr80/*,
@@ -291,13 +292,6 @@ coin_modeling: #CoinModel
 
             # wallet_cohorts|whales_longterm|*,
             # wallet_cohorts|normies|*,
-
-            # macro|global_market_cap/*,
-            # # macro|btc_mvrv_z_score/*,
-            # macro|btc_vdd_multiple/*,
-            # macro|gtrends_altcoin_worldwide/*,
-            # macro|gtrends_memecoin_us/*,
-            # macro|btc_price/*,
 
             macro|global_market_cap/rsi_30*,
             macro|global_market_cap/std_*,
@@ -312,12 +306,32 @@ coin_modeling: #CoinModel
             # macro|btc_mvrv_z_score/last_*,
             macro|btc_price/std_*,
 
+
+
             # # Segment Value
-            'training_clusters|k5_cluster/cluster_0|*',
-            'training_clusters|k5_cluster/cluster_1|*',
-            'training_clusters|k5_cluster/cluster_2|*',
-            'training_clusters|k5_cluster/cluster_3|*',
-            'training_clusters|k5_cluster/cluster_4|*',
+            training_clusters|k5_cluster/cluster_0|*,
+            training_clusters|k5_cluster/cluster_1|*,
+            training_clusters|k5_cluster/cluster_2|*,
+            training_clusters|k5_cluster/cluster_3|*,
+            training_clusters|k5_cluster/cluster_4|*,
+
+            market_data|price/rsi_7_last_30d_period_1,
+            market_data|price/rsi_7_last_30d_period_2,
+            market_data|price/rsi_7_last_30d_period_3,
+            # market_data|price/sma_2_pct_change_30d_period_1,
+            # market_data|price/sma_2_pct_change_30d_period_2,
+            market_data|price/sma_2_pct_change_30d_period_3,
+            # market_data|price/sma_2_std_30d_period_1,
+            market_data|price/sma_2_std_30d_period_2,
+            market_data|price/sma_2_std_30d_period_3,
+            market_data|volume/sma_7_std_30d_period_1,
+            market_data|volume/sma_7_std_30d_period_2,
+            market_data|volume/sma_7_std_30d_period_3,
+            market_data|volume/sma_7_pct_change_30d_period_1,
+            market_data|volume/sma_7_pct_change_30d_period_2,
+            market_data|volume/sma_7_pct_change_30d_period_3,
+            market_data|market_cap/last,
+            market_data|market_cap/filled_last,
 
             # Metric
             # time_series|market_data|price*,
@@ -487,16 +501,12 @@ coin_modeling: #CoinModel
             drop_columns__drop_patterns: [
                 # 'feature_retainer',
 
-                # Segment Family
-                score_binary|cw_net_flows_025_thr70/*,
-                # score_binary|cw_net_flows_025_thr80/*,
-                score_binary|cw_net_flows_025_thr90/*,
-                score_binary|cw_net_flows_060_thr70/*,
-                score_binary|cw_net_flows_060_thr80/*,
-                score_binary|cw_net_flows_060_thr90/*,
-                score_binary|cw_net_flows_n040_thr70/*,
-                score_binary|cw_net_flows_n040_thr80/*,
-                score_binary|cw_net_flows_n040_thr90/*,
+
+                # macro|gtrends_altcoin_worldwide/last_*period_1,
+                # macro|btc_price/std_*period_1,
+                # macro|gtrends_altcoin_worldwide/last_*period_2,
+                # macro|btc_price/std_*period_2,
+
 
             ]
 
