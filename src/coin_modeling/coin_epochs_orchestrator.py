@@ -299,31 +299,24 @@ class CoinEpochsOrchestrator:
         Process a single coin epoch: generate data, train wallet models, generate coin
          modeling data, and score wallets.
 
+        Key Steps:
+        1. Generate epoch-specific config files and check if the coin features df have already
+            been generated.
+        2. Generate wallet-level features and model scores for the epoch.
+        3. Generate coin-level features, including transformations of wallet-level features into
+            coin features.
+
         Params:
         - lookback_duration (int): how many days the dates will be offset from the base modeling period
         - include_validation (bool): whether to include validation-period scoring (default True)
         """
-        # 1) Prepare epoch-specific orchestrator without heavy data generation
+        # 1) Prepare config files
+        # -----------------------
         epoch_wallets_config = self._prepare_coin_epoch_base_config(lookback_duration)
-        epoch_weo = weo.WalletEpochsOrchestrator(
-            base_config=epoch_wallets_config,
-            metrics_config=self.wallets_metrics_config,
-            features_config=self.wallets_features_config,
-            epochs_config=self.wallets_epochs_config,
-            complete_profits_df=self.complete_profits_df,
-            complete_market_data_df=self.complete_market_data_df,
-            complete_macro_trends_df=self.complete_macro_trends_df,
-        )
-        # Extract epoch date for tagging
-        epoch_date = pd.to_datetime(
-            epoch_weo.base_config['training_data']['coin_modeling_period_start']
-        )
+        epoch_coins_config = self._prepare_epoch_coins_config(epoch_wallets_config)
+        epoch_date = pd.to_datetime(epoch_wallets_config['training_data']['coin_modeling_period_start'])
 
-        # 2) Prepare coin config with date suffix folders
-        epoch_weo.all_epochs_configs = epoch_weo.generate_epoch_configs()
-        epoch_coins_config = self._prepare_epoch_coins_config(epoch_weo)
-
-        # 3) Shortcut: if both feature and target parquet files exist, load and return them
+        # Shortcut: if both feature and target parquet files exist, load and return them
         base_folder = epoch_coins_config['training_data']['parquet_folder']
         feat_path = Path(base_folder) / "coin_training_data_df_full.parquet"
         tgt_path  = Path(base_folder) / "coin_target_var_df.parquet"
@@ -336,10 +329,25 @@ class CoinEpochsOrchestrator:
             )
             return epoch_date, coin_features_df, coin_target_df
 
-        # 4) Generate training & modeling data
+
+        # 2) Wallet-Level Features
+        # ------------------------
+        # Prepare epoch-specific orchestrator without heavy data generation
+        epoch_weo = weo.WalletEpochsOrchestrator(
+            base_config=epoch_wallets_config,
+            metrics_config=self.wallets_metrics_config,
+            features_config=self.wallets_features_config,
+            epochs_config=self.wallets_epochs_config,
+            complete_profits_df=self.complete_profits_df,
+            complete_market_data_df=self.complete_market_data_df,
+            complete_macro_trends_df=self.complete_macro_trends_df,
+        )
+        epoch_weo.all_epochs_configs = epoch_weo.generate_epoch_configs()
+
+        # Generate wallets training & modeling data
         epoch_training_dfs = epoch_weo.generate_epochs_training_data()
 
-        # 5) Train and score wallet models for this epoch's coin modeling period
+        # Train and score wallet models for this epoch's coin modeling period
         wallet_training_data_df = self._train_and_score_wallet_epoch(
             epoch_weo,
             epoch_coins_config,
@@ -347,7 +355,10 @@ class CoinEpochsOrchestrator:
             include_validation_period=include_validation
         )
 
-        # 6) Generate and persist coin features for this epoch
+
+        # 3) Coin-Level Features
+        # ----------------------
+        # Generate and save coin features for this epoch
         (
             coin_features_df,
             coin_market_data_df,
@@ -357,7 +368,7 @@ class CoinEpochsOrchestrator:
             wallet_training_data_df
         )
 
-        # 7) Calculate and persist target variables for this epoch
+        # Generate and save target variables for this epoch
         try:
             coin_target_var_df = self._generate_coin_target_vars(
                 epoch_weo,
@@ -454,13 +465,13 @@ class CoinEpochsOrchestrator:
 
 
 
-    def _prepare_epoch_coins_config(self, epoch_weo) -> dict:
+    def _prepare_epoch_coins_config(self, epoch_wallets_config) -> dict:
         """
         Prepare epoch-specific coins config with date suffix folders.
         """
         # Build a date suffix from the modeling_period_start
         date_suffix = pd.to_datetime(
-            epoch_weo.base_config['training_data']['modeling_period_start']
+            epoch_wallets_config['training_data']['modeling_period_start']
         ).strftime('%Y%m%d')
 
         # Deep-copy the coin config and adjust folder paths
