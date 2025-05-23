@@ -91,7 +91,6 @@ class RegressorEvaluator:
     #      Primary Regressor Methods
     # -----------------------------------
 
-
     def summary_report(self):
         """Generate formatted summary of model performance."""
         # now just grab the header + samples
@@ -232,11 +231,10 @@ class RegressorEvaluator:
 
 
 
+
     # -----------------------------------
     #      Regressor Helper Methods
     # -----------------------------------
-
-
 
     def _calculate_metrics(self):
         """Calculate core regression metrics and optional cohort metrics."""
@@ -979,6 +977,7 @@ class ClassifierEvaluator(RegressorEvaluator):
             rows = [
                 ("Overall Average", "n/a", self.metrics['val_ret_mean_overall'], self.metrics['val_wins_return_overall']),
                 ("Param Threshold", f"{self.y_pred_threshold:.2f}", self.metrics['positive_pred_return'], self.metrics['positive_pred_wins_return']),
+                ("5 Highest Scores", f"{self.metrics['highest5_thr']:.2f}", self.metrics['highest5_ret_mean'], self.metrics['highest5_wins_mean']),
                 ("Top 1% Scores", f"{self.metrics['val_top1_thr']:.2f}", self.metrics['val_ret_mean_top1'], self.metrics['val_wins_return_top1']),
                 ("Top 5% Scores", f"{self.metrics['val_top5_thr']:.2f}", self.metrics['val_ret_mean_top5'], self.metrics['val_wins_return_top5']),
             ]
@@ -1118,8 +1117,8 @@ class ClassifierEvaluator(RegressorEvaluator):
         # Validation return-based metrics
         if (getattr(self, 'y_validation_pred_proba', None) is not None
             and hasattr(self, 'validation_target_vars_df')):
-            target = self.modeling_config['target_variable']
-            returns = self.validation_target_vars_df[target].reindex(self.y_validation_pred_proba.index)
+            target_var = self.modeling_config['target_variable']
+            returns = self.validation_target_vars_df[target_var].reindex(self.y_validation_pred_proba.index)
             df_val = pd.DataFrame({
                 'pred' :self.y_validation_pred,
                 'proba': self.y_validation_pred_proba,
@@ -1152,6 +1151,14 @@ class ClassifierEvaluator(RegressorEvaluator):
                     self.metrics[f'val_wins_ret_mean_f{beta}'] = (
                         df_val.loc[df_val['proba'] >= thr_val, 'ret_wins'].mean()
                     )
+            # ---- Top-5 coins by predicted score ----
+            if len(df_val) >= 5:          # need at least 5 coins
+                top5_df      = df_val.sort_values("proba", ascending=False).head(5)
+                top5_cutoff  = top5_df["proba"].min()
+                wins_thr     = self.modeling_config.get("returns_winsorization", 0.005)
+                self.metrics["highest5_thr"] = top5_cutoff
+                self.metrics["highest5_ret_mean"] = top5_df["ret"].mean()
+                self.metrics["highest5_wins_mean"] = u.winsorize(top5_df["ret"].values, wins_thr).mean()
 
         # Feature importance if available
         if self.model is not None and hasattr(self.model, 'feature_importances_'):

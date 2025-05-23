@@ -388,12 +388,13 @@ def clean_market_data(market_data_df, config, earliest_date, latest_date):
         2. coins with lower daily mean volume than the minimum_daily_volume between the
             earliest_window_start and the end of the last modeling period.
 
+    Note: Does NOT filter records based on date, only filters on gap days and volume.
+
     Params:
     - market_data_df (DataFrame): DataFrame containing market data as well as the
         days_imputed column, which represents the number of days a real price has been
         forwardfilled in a row to ensure a complete time series.
-    - max_gap_days (int): The maximum allowable number of forwardfilled dates before
-        all records for the coin are removed
+    - config (dict): Config with data cleaning parmas for market data
     - earliest_date (string): The earliest date relevant to the dataset formatted as
         'YYYY-MM-DD'. Data cleaning filters will not be applied to records prior to this.
     - latest_date (string): The latest date relevant to the dataset formatted as

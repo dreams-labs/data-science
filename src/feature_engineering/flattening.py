@@ -175,6 +175,8 @@ def promote_indicators_to_metrics(df_metrics_config):
     Moves indicators to the same level as other columns in the config file so that their
     features can be generated the same way they are for primary metrics.
 
+    Periods with lower numbers are more recent, i.e. '*_period_1' represents the most recent period.
+
     If there are multiple windows for an indicator, a key will be generated for each of
     them with all metrics configured for the overall indicator.
 

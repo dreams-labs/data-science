@@ -106,7 +106,6 @@ def calculate_wallet_features(
     # Macroeconomic features (cross join)
     macroeconomic_features_df = wmac.calculate_macro_features(
                                     macro_indicators_df,
-                                    period_start_date,
                                     wallets_metrics_config['time_series']['macro_trends'])
     feature_column_names['macro|'] = macroeconomic_features_df.columns
     wallet_features_df = (wallet_features_df.reset_index()

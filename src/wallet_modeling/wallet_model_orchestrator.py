@@ -106,7 +106,10 @@ class WalletModelOrchestrator:
             score_wallets_config['modeling']['verbose_estimators'] = False
 
             # Load and evaluate existing model
-            if score_name in existing_models:
+            if (
+                score_name in existing_models
+                and not self.wallets_coin_config['features']['toggle_rebuild_wallet_models']
+            ):
                 model_id, evaluator = self._load_and_evaluate(
                     score_name,
                     score_wallets_config,
