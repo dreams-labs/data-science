@@ -396,10 +396,10 @@ class CoinEpochsOrchestrator:
     # Coin Features Helpers
     # ---------------------
     def _generate_coin_features(
-            self,
-            epoch_weo,
-            epoch_coins_config: dict,
-            training_data_df: pd.DataFrame
+        self,
+        epoch_weo,
+        epoch_coins_config: dict,
+        wallet_training_data_df: pd.DataFrame
     ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         Generate and persist coin features
@@ -434,7 +434,7 @@ class CoinEpochsOrchestrator:
 
         coin_features_df = cfo_inst.generate_coin_features_for_period(
             profits_df,
-            training_data_df,
+            wallet_training_data_df,
             macro_df,
             "modeling",
             file_prefix,
@@ -811,5 +811,3 @@ class CoinEpochsOrchestrator:
         epoch_wmo.predict_and_store(models_dict, wallet_training_data_df)
 
         return wallet_training_data_df
-
-
