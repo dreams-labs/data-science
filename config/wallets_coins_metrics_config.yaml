@@ -49,13 +49,15 @@ time_series:  #CoinModel
                         window: [20]
                         num_std: 2
 
-        volume:
-            rolling: # testing sum of volume
-                aggregations:
-                    sum:
-                        scaling: none
-                window_duration: 7
-                lookback_periods: 3
+
+        market_cap: # needed for coin cohort filters in coin_model.py
+            aggregations:
+                last:
+                    scaling: none
+        market_cap_filled: # needed for coin cohort filters in coin_model.py
+            aggregations:
+                last:
+                    scaling: none
 
         mfi: # testing relevance
             rolling:
@@ -108,11 +110,12 @@ time_series:  #CoinModel
                             scaling: none
                         std:
                             scaling: none
-                    comparisons: # testing
-                        pct_change:
-                            scaling: none
-                    window_duration: 7
-                    lookback_periods: 3
+                    rolling:
+                        comparisons: # testing
+                            pct_change:
+                                scaling: none
+                        window_duration: 7
+                        lookback_periods: 3
         global_volume: # testing: didn't include in first round
             rolling:
                 aggregations:
