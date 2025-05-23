@@ -604,24 +604,16 @@ class CoinEpochsOrchestrator:
         (
             training_coin_cohort,
             profits_df,
-            coin_market_data_df,
-            _,
-            _,
-        ) = cfo.load_wallet_data_for_coin_features(
-            epoch_weo.base_config,
-            self.wallets_config['training_data']['parquet_folder']
-        )
+            coin_market_data_df
+        ) = cfo.load_wallet_data_for_coin_features(epoch_weo.base_config)
 
-        # 2) Generate Features
+        # 2) Prepare datasets
         macro_df = self._generate_epoch_macro_indicators(
             epoch_weo.base_config['training_data']['modeling_period_start'],
             epoch_weo.base_config['training_data']['modeling_period_end'],
         )
 
-        suffix = pd.to_datetime(
-            epoch_weo.base_config['training_data']['coin_modeling_period_start']
-        ).strftime('%Y%m%d')
-
+        # 3) Generate features
         cfo_inst = cfo.CoinFeaturesOrchestrator(
             epoch_weo.base_config,
             epoch_coins_config,
@@ -632,15 +624,19 @@ class CoinEpochsOrchestrator:
             training_coin_cohort,
         )
 
+        file_prefix = pd.to_datetime(
+            epoch_weo.base_config['training_data']['coin_modeling_period_start']
+        ).strftime('%Y%m%d')
+
         coin_features_df = cfo_inst.generate_coin_features_for_period(
             profits_df,
             training_data_df,
             macro_df,
             "modeling",
-            suffix,
+            file_prefix,
         )
 
-        # 3) Persist results to parquet
+        # 4) Persist results to parquet
         base_folder = epoch_coins_config['training_data']['parquet_folder']
         coin_features_df.to_parquet(
             f"{base_folder}/coin_training_data_df_full.parquet"
