@@ -272,14 +272,8 @@ class CoinFeaturesOrchestrator:
             column for each macro feature. These flattened features will be
             cross joined onto every coin's record
         """
-        lookback_start_date = (
-            pd.to_datetime(self.wallets_config['training_data']['modeling_period_start'])
-            - timedelta(days=self.wallets_coin_config['features']['max_macro_lookback'])
-        )
-
         macro_features_df = wmac.calculate_macro_features(
             macro_indicators_df,
-            lookback_start_date,
             self.wallets_coins_metrics_config['time_series']['macro_trends']
         )
 

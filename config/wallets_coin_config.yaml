@@ -53,59 +53,105 @@ training_data: #CoinModel
 # CoinModel Wallet Scores
 wallet_scores: #CoinModel
 
-    # Whether to use existing models if wallet_model_ids.json is present
-    reuse_existing: True
-
     #KeyParam Scores to include as segments + metrics
     # y_pred_threshold defines the binary coin cohorts and can be defined
     #  by using a hardcoded number (e.g. 0.8) or an F-beta score (e.g. f.5).
     score_params:
-        cw_net_flows_015:
-            model_type: classification
-            target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: 0.15
-            target_var_max_threshold: .inf
-            y_pred_threshold: f.25
-            assign_epochs_to_addresses: False
+        # cw_net_flows_015:
+        #     model_type: classification
+        #     target_variable: cw_crypto_net_flows/crypto_inflows/base
+        #     target_var_min_threshold: 0.15
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: f.25
+        #     assign_epochs_to_addresses: False
 
-        cw_net_flows_025:
-            model_type: classification
-            target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: 0.25
-            target_var_max_threshold: .inf
-            y_pred_threshold: f.15
-            assign_epochs_to_addresses: False
+        # cw_net_flows_n040_thr90:
+        #     model_type: classification
+        #     target_variable: cw_crypto_net_flows/crypto_inflows/base
+        #     target_var_min_threshold: -0.40
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.90
+        #     assign_epochs_to_addresses: False
 
-        cw_net_flows_060:
-            model_type: classification
-            target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: 0.60
-            target_var_max_threshold: .inf
-            y_pred_threshold: f.1
-            assign_epochs_to_addresses: False
-
-        cw_net_flows_neg_040:
+        cw_net_flows_n040_thr80:
             model_type: classification
             target_variable: cw_crypto_net_flows/crypto_inflows/base
             target_var_min_threshold: -0.40
             target_var_max_threshold: .inf
-            y_pred_threshold: f.2
+            y_pred_threshold: 0.80
             assign_epochs_to_addresses: False
 
-        cw_crypto_net_flows_1k:
+        # cw_net_flows_n040_thr70:
+        #     model_type: classification
+        #     target_variable: cw_crypto_net_flows/crypto_inflows/base
+        #     target_var_min_threshold: -0.40
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.70
+        #     assign_epochs_to_addresses: False
+
+        # cw_net_flows_025_thr90:
+        #     model_type: classification
+        #     target_variable: cw_crypto_net_flows/crypto_inflows/base
+        #     target_var_min_threshold: 0.25
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.90
+        #     assign_epochs_to_addresses: False
+
+        cw_net_flows_025_thr80:
             model_type: classification
-            target_variable: cw_crypto_net_flows
-            target_var_min_threshold: 1000
+            target_variable: cw_crypto_net_flows/crypto_inflows/base
+            target_var_min_threshold: 0.25
             target_var_max_threshold: .inf
-            y_pred_threshold: f.15
+            y_pred_threshold: 0.80
             assign_epochs_to_addresses: False
 
-        cw_net_flows_regression:
-            model_type: regression
-            target_variable: cw_crypto_net_flows/crypto_inflows/winsorized
-            y_pred_lower_threshold: -1.1
-            y_pred_threshold: 0.7
+        # cw_net_flows_025_thr70:
+        #     model_type: classification
+        #     target_variable: cw_crypto_net_flows/crypto_inflows/base
+        #     target_var_min_threshold: 0.25
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.70
+        #     assign_epochs_to_addresses: False
+
+        # cw_net_flows_060_thr90:
+        #     model_type: classification
+        #     target_variable: cw_crypto_net_flows/crypto_inflows/base
+        #     target_var_min_threshold: 0.60
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.90
+        #     assign_epochs_to_addresses: False
+
+        cw_net_flows_060_thr80:
+            model_type: classification
+            target_variable: cw_crypto_net_flows/crypto_inflows/base
+            target_var_min_threshold: 0.60
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.80
             assign_epochs_to_addresses: False
+
+        # cw_net_flows_060_thr70:
+        #     model_type: classification
+        #     target_variable: cw_crypto_net_flows/crypto_inflows/base
+        #     target_var_min_threshold: 0.60
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.70
+        #     assign_epochs_to_addresses: False
+
+
+        # cw_crypto_net_flows_1k:
+        #     model_type: classification
+        #     target_variable: cw_crypto_net_flows
+        #     target_var_min_threshold: 1000
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: f.15
+        #     assign_epochs_to_addresses: False
+
+        # cw_net_flows_regression:
+        #     model_type: regression
+        #     target_variable: cw_crypto_net_flows/crypto_inflows/winsorized
+        #     y_pred_lower_threshold: -1.1
+        #     y_pred_threshold: 0.7
+        #     assign_epochs_to_addresses: False
 
 
 
@@ -127,7 +173,7 @@ features: #CoinModel
 
     # Rebuilds
     toggle_rebuild_all_features: True  # If True, existing parquet features/target dfs will be overridden
-    toggle_rebuild_wallet_models: True  # If True, all wallet models will be retrained
+    toggle_rebuild_wallet_models: False  # If True, all wallet models will be retrained
 
     # Which scores will have distribution metrics created
     score_distributions: [
@@ -172,7 +218,6 @@ features: #CoinModel
 
     # Macroeconomic features: most params are in wallets_coins_metrics_config.yaml
     toggle_macro_features: True  # whether to build macro features
-    max_macro_lookback: 180  # Maximum macroeconomic features lookback days for wallets_coins_metrics_config
 
 
 # CoinModel Modeling Config
@@ -188,8 +233,8 @@ coin_modeling: #CoinModel
     target_variable: coin_return_winsorized
     # target_variable: coin_return
     # target_variable: coin_return_pctile_full
-    target_var_min_threshold: .4 # a classification model will try to predict the target var above this value
-    y_pred_threshold: 0.6  # scores above this probability threshold are positive predictions
+    target_var_min_threshold: .05 # a classification model will try to predict the target var above this value
+    y_pred_threshold: 0.95  # scores above this probability threshold are positive predictions
 
     returns_winsorization: 0.005
 
@@ -233,6 +278,15 @@ coin_modeling: #CoinModel
             score_binary|cw_net_flows_regression/*,
             score_binary|cw_net_flows_025/*,
             # score_binary|cw_net_flows_060/*,
+            score_binary|cw_net_flows_025_thr70/*,
+            # score_binary|cw_net_flows_025_thr80/*,
+            score_binary|cw_net_flows_025_thr90/*,
+            score_binary|cw_net_flows_060_thr70/*,
+            score_binary|cw_net_flows_060_thr80/*,
+            score_binary|cw_net_flows_060_thr90/*,
+            score_binary|cw_net_flows_n040_thr70/*,
+            score_binary|cw_net_flows_n040_thr80/*,
+            score_binary|cw_net_flows_n040_thr90/*,
 
             # wallet_cohorts|whales_longterm|*,
             # wallet_cohorts|normies|*,
@@ -433,12 +487,15 @@ coin_modeling: #CoinModel
                 # 'feature_retainer',
 
                 # Segment Family
-                score_binary|cw_net_flows_015/*,
-                score_binary|cw_crypto_net_flows_1k/*,
-                # score_binary|cw_net_flows_neg_040/*,
-                score_binary|cw_net_flows_regression/*,
-                score_binary|cw_net_flows_025/*,
-                # score_binary|cw_net_flows_060/*,
+                score_binary|cw_net_flows_025_thr70/*,
+                # score_binary|cw_net_flows_025_thr80/*,
+                score_binary|cw_net_flows_025_thr90/*,
+                score_binary|cw_net_flows_060_thr70/*,
+                score_binary|cw_net_flows_060_thr80/*,
+                score_binary|cw_net_flows_060_thr90/*,
+                score_binary|cw_net_flows_n040_thr70/*,
+                score_binary|cw_net_flows_n040_thr80/*,
+                score_binary|cw_net_flows_n040_thr90/*,
 
             ]
 
