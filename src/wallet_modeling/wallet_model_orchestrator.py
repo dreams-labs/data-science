@@ -64,10 +64,10 @@ class WalletModelOrchestrator:
 
     def train_wallet_models(
         self,
-        wallet_training_data_df,
-        wallet_target_vars_df,
-        validation_training_data_df,
-        validation_target_vars_df
+        wallet_training_data_df: pd.DataFrame,
+        wallet_target_vars_df: pd.DataFrame,
+        validation_training_data_df: pd.DataFrame,
+        validation_target_vars_df: pd.DataFrame,
     ) -> dict:
         """
         Train multiple wallet scoring models with different parameter configurations.
