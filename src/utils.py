@@ -1406,4 +1406,25 @@ def setup_notebook_logger(log_filepath: str = None) -> logging.Logger:
         ))
         root_logger.addHandler(milestone_handler)
 
+    # Terminal display handler with colors and simplified format
+    base, ext = os.path.splitext(log_filepath)
+    terminal_path = f"{base}_display{ext}"
+    terminal_handler = logging.FileHandler(terminal_path)
+
+    # Custom formatter for terminal viewing - no filepath, includes colors
+    class TerminalColorFormatter(ColorFormatter):
+        def format(self, record):
+            # Use simplified format without module.function:line details
+            formatter = logging.Formatter(
+                '[%(asctime)s] %(levelname)s %(message)s',
+                datefmt='%H:%M:%S'
+            )
+            base_msg = formatter.format(record)
+            color = self.COLOR_MAP.get(record.levelname, "")
+            return f"{color}{base_msg}{self.RESET}" if color else base_msg
+
+    terminal_handler.setFormatter(TerminalColorFormatter())
+    root_logger.addHandler(terminal_handler)
+
+
     return root_logger
