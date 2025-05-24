@@ -228,6 +228,7 @@ class CoinEpochsOrchestrator:
             multiwindow_targets = reset_index_codes(multiwindow_targets)
             multiwindow_targets.to_parquet(f"{root_folder}/{file_prefix}multiwindow_coin_target_var_df.parquet")
 
+        u.notify('robotz_windows_start')
 
 
     @staticmethod
@@ -777,7 +778,7 @@ class CoinEpochsOrchestrator:
             return
 
         logger.milestone(
-            "Warm‑up: generating %d missing wallet‑epoch(s) %s",
+            "Coin epoch orchestrator warm‑up: generating %d missing wallet‑epoch(s) %s",
             len(missing_offsets),
             missing_offsets
         )
