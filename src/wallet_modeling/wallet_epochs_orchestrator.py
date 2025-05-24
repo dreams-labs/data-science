@@ -156,7 +156,6 @@ class WalletEpochsOrchestrator:
         - validation_training_data_df: MultiIndexed on (wallet_address, epoch_start_date) for validation epochs
         - validation_target_vars_df: MultiIndexed on (wallet_address, epoch_start_date) for validation epochs
         """
-        training_only = self.base_config['training_data']['training_data_only']
         logger.milestone(f"Compiling wallet training data for {len(self.all_epochs_configs)} epochs...")
         if training_only:
             logger.milestone("Training‑only mode: Compiling wallet training data without validation or target variables.")
@@ -802,7 +801,7 @@ class WalletEpochsOrchestrator:
             (macro_trends_end >= latest_modeling_end)
         ):
             raise ValueError(
-                f"Insufficient data coverage for specified epochs.\n"
+                f"Insufficient wallet data coverage for specified epochs.\n"
                 f"Required coverage: {earliest_starting_balance_date.strftime('%Y-%m-%d')}"
                     f" to {latest_modeling_end.strftime('%Y-%m-%d')}\n"
                 f"Actual coverage:\n"
