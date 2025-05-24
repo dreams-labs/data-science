@@ -9,6 +9,7 @@ from typing import Tuple
 from pathlib import Path
 import copy
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 import joblib
 
@@ -173,6 +174,7 @@ class CoinEpochsOrchestrator:
         Params:
         - custom_offset_days: overrides coin_epochs_training in wallets_coin_config
         - file_prefix: changes the filename of the parquet files
+        - max_workers: number of threads (defaults to min(4, cpu_count))
         """
         # Build all wallet parquet files needed for the base configs
         self._build_all_wallet_data()
@@ -191,27 +193,43 @@ class CoinEpochsOrchestrator:
 
         logger.milestone("Beginning generation of coin model training data...")
 
-        feature_dfs = []
-        target_dfs = []
-
         # Tag each DataFrame with the epoch date
-        def tag_with_epoch(df: pd.DataFrame) -> pd.DataFrame:
+        def tag_with_epoch(df: pd.DataFrame, epoch_date: pd.Timestamp) -> pd.DataFrame:
             df = df.copy()
             df['coin_epoch_start_date'] = epoch_date
             return df.set_index('coin_epoch_start_date', append=True)
 
-        for i, lookback in enumerate(offsets, start=1):
-            logger.milestone(f"Creating coin training data for epoch {i}/{len(offsets)}")
+        def process_single_epoch(lookback: int) -> tuple:
+            """Process a single epoch and return tagged results"""
             epoch_date, coin_features_df, coin_target_df = self._process_coin_epoch(lookback)
-
-            feature_dfs.append(tag_with_epoch(coin_features_df))
-            target_dfs.append(tag_with_epoch(coin_target_df))
-
-            logger.milestone(
-                f"Completed generating coin training data for epoch {i}/{len(offsets)}"
+            return (
+                tag_with_epoch(coin_features_df, epoch_date),
+                tag_with_epoch(coin_target_df, epoch_date)
             )
 
-        # Concatenate across epochs
+        # Process epochs in parallel
+        feature_dfs = []
+        target_dfs = []
+
+        n_threads = self.wallets_coin_config['n_threads']['concurrent_coin_epochs']
+        with ThreadPoolExecutor(max_workers=n_threads) as executor:
+            future_to_offset = {
+                executor.submit(process_single_epoch, lookback): lookback
+                for lookback in offsets
+            }
+
+            for i, future in enumerate(as_completed(future_to_offset), 1):
+                lookback = future_to_offset[future]
+                try:
+                    features_df, targets_df = future.result()
+                    feature_dfs.append(features_df)
+                    target_dfs.append(targets_df)
+                    logger.milestone(f"Completed epoch {i}/{len(offsets)} (lookback={lookback})")
+                except Exception as exc:
+                    logger.error(f'Epoch with lookback {lookback} generated an exception: {exc}')
+                    raise
+
+        # Concatenate across epochs (same as before)
         multiwindow_features = pd.concat(feature_dfs).sort_index()
         multiwindow_targets = pd.concat(target_dfs).sort_index()
 
@@ -220,7 +238,7 @@ class CoinEpochsOrchestrator:
             df.index = pd.MultiIndex.from_tuples(df.index.values, names=df.index.names)
             return df
 
-        # Persist multiwindow parquet files
+        # Persist multiwindow parquet files (unchanged)
         root_folder = self.wallets_coin_config['training_data']['parquet_folder']
         multiwindow_features = reset_index_codes(multiwindow_features)
         multiwindow_features.to_parquet(f"{root_folder}/{file_prefix}multiwindow_coin_training_data_df.parquet")
@@ -750,6 +768,7 @@ class CoinEpochsOrchestrator:
     # -----------------------
     # Wallet Features Helpers
     # -----------------------
+    @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def _build_all_wallet_data(self) -> None:
         """
         Pre-build every wallet-epoch parquet so later coin loops just `pd.read_parquet`.
@@ -774,7 +793,7 @@ class CoinEpochsOrchestrator:
                 missing_offsets.append(offs)
 
         if not missing_offsets:
-            logger.info("All wallet‑epoch parquet files already exist — warm‑up skipped.")
+            logger.milestone("All wallet‑epoch parquet files already exist — warm‑up skipped.")
             return
 
         logger.milestone(
