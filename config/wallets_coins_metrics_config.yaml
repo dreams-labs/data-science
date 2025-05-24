@@ -24,6 +24,16 @@ time_series:  #CoinModel
                         window_duration: 30
                         lookback_periods: 2
 
+                rsi:
+                    parameters:
+                        window: [7]
+                    rolling:
+                        aggregations:
+                            last:
+                                scaling: none
+                        window_duration: 30
+                        lookback_periods: 3
+
                 ema:
                     parameters:
                         window: [3]
@@ -87,7 +97,12 @@ time_series:  #CoinModel
                 comparisons: # testing
                     pct_change:
                         scaling: none
-                window_duration: 10
+                aggregations:
+                    last:
+                        scaling: none
+                    std:
+                        scaling: none
+                window_duration: 30
                 lookback_periods: 3
         btc_mvrv_z_score:
             rolling:
@@ -116,6 +131,38 @@ time_series:  #CoinModel
                                 scaling: none
                         window_duration: 7
                         lookback_periods: 3
+        btc_vdd_multiple:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: none
+                    std:
+                        scaling: none
+                window_duration: 30
+                lookback_periods: 3
+
+        global_market_cap:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: none
+                    std:
+                        scaling: none
+                comparisons: # testing
+                    pct_change:
+                        scaling: none
+                window_duration: 30
+                lookback_periods: 3
+            indicators:
+                rsi:
+                    parameters:
+                        window: [30]
+                    rolling:
+                        aggregations:
+                            last:
+                                scaling: none
+                        window_duration: 30
+                        lookback_periods: 3
         global_volume: # testing: didn't include in first round
             rolling:
                 aggregations:
@@ -125,9 +172,12 @@ time_series:  #CoinModel
                         scaling: none
                 window_duration: 30
                 lookback_periods: 3
+
         gtrends_altcoin_worldwide:
             rolling:
                 aggregations:
+                    last:
+                        scaling: none
                     std:
                         scaling: none
                 comparisons: # testing
@@ -138,6 +188,8 @@ time_series:  #CoinModel
         gtrends_memecoin_us:
             rolling:
                 aggregations:
+                    last:
+                        scaling: none
                     std:
                         scaling: none
                 comparisons: # testing

@@ -19,14 +19,14 @@ training_data: #WalletModel
     validation_period_end: '2025-04-30'  # toggle to activate/deactivate validation data
 
     # Training Data Toggles
-    #KeyParam Training Data Only
+    #KeyParam Training Data Toggles
     training_data_only: False  # if true, only generates training data to be scored by another model
     hybridize_wallet_ids: True  # if true, training data will be keyed on wallet-coin pairs
     predrop_features: True  # if true, the feature_selection.drop_patterns will be applied early to save memory
 
-    # Local pipeline configs
+    #KeyParam Datasets and Folders
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
-    parquet_folder: temp/wallet_modeling_dfs/dda_805_coin_features  # where to store parquet files
+    parquet_folder: temp/wallet_modeling_dfs/dda_805_coin_features_v2  # where to store parquet files
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
 
@@ -354,7 +354,7 @@ data_cleaning: #WalletModel
     max_wallet_profits: 100_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
 
     #KeyParam Coin Cohort Definitions
-    # Market cap params used market_cap_filled
+    # Market cap params used vs market_cap_filled
     min_initial_market_cap: 0_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
     max_initial_market_cap: 500_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
     min_ending_market_cap: 2_000_000  # coins above this market cap as of the end of the training period will be removed from all datasets

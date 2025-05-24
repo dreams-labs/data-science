@@ -39,6 +39,10 @@ training_data: #CoinModel
         # -1200
     ]
 
+    #KeyParam Rebuild Features Settings
+    toggle_rebuild_all_features: True  # If True, existing parquet features/target dfs will be overridden
+    toggle_rebuild_wallet_models: False  # If True, all wallet models will be retrained
+
 
 # CoinModel Cleaning
 # # Variables used to clean and filter raw data before training data is built
@@ -170,10 +174,6 @@ wallet_segments: #CoinModel
 
 # CoinModel Features
 features: #CoinModel
-
-    # Rebuilds
-    toggle_rebuild_all_features: True  # If True, existing parquet features/target dfs will be overridden
-    toggle_rebuild_wallet_models: False  # If True, all wallet models will be retrained
 
     # Which scores will have distribution metrics created
     score_distributions: [
