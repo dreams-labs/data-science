@@ -7,7 +7,7 @@ import pandas as pd
 # Local module imports
 import feature_engineering.coin_flow_features_orchestrator as cffo
 import wallet_modeling.wallets_config_manager as wcm
-import wallet_features.macroeconomic_features as wmac
+import wallet_features.time_series_features as wfts
 import coin_wallet_features.wallet_segmentation as cws
 import coin_wallet_features.wallet_metrics as cfwm
 import coin_wallet_features.wallet_metrics_flattening as cfwmf
@@ -284,7 +284,7 @@ class CoinFeaturesOrchestrator:
             column for each macro feature. These flattened features will be
             cross joined onto every coin's record
         """
-        macro_features_df = wmac.calculate_macro_features(
+        macro_features_df = wfts.calculate_macro_features(
             macro_indicators_df,
             self.wallets_coins_metrics_config['time_series']['macro_trends']
         )
@@ -318,7 +318,7 @@ class CoinFeaturesOrchestrator:
             column for each market feature. These flattened features will be
             cross joined onto every coin's record
         """
-        market_features_df = wmac.calculate_market_data_features(
+        market_features_df = wfts.calculate_market_data_features(
             market_indicators_df,
             self.wallets_coins_metrics_config['time_series']['market_data']
         )

@@ -24,7 +24,10 @@ def calculate_macro_features(
     file structure is defined and documented in src/config_models/metrics_config.py.
     """
     # Calculate all specified metrics
-    macro_features_dict = flt.flatten_date_features(training_macro_indicators_df,df_metrics_config)
+    macro_features_dict = flt.flatten_date_features(
+        training_macro_indicators_df.reset_index(),
+        df_metrics_config
+    )
 
     # Convert to DataFrame
     macro_features_df = pd.DataFrame([macro_features_dict])
@@ -42,9 +45,10 @@ def calculate_market_data_features(
     file structure is defined and documented in src/config_models/metrics_config.py.
     """
     # Calculate all specified metrics
-    market_features_dict = flt.flatten_date_features(training_market_indicators_df,df_metrics_config)
-
-    # Convert to DataFrame
-    market_features_df = pd.DataFrame([market_features_dict])
+    market_features_df = flt.flatten_coin_date_df(
+        training_market_indicators_df.reset_index(),
+        df_metrics_config,
+        training_market_indicators_df.index.max()
+    )
 
     return market_features_df
