@@ -224,9 +224,9 @@ class CoinEpochsOrchestrator:
                     features_df, targets_df = future.result()
                     feature_dfs.append(features_df)
                     target_dfs.append(targets_df)
-                    logger.milestone(f"Completed epoch {i}/{len(offsets)} (lookback={lookback})")
+                    logger.milestone(f"Completed coin epoch {i}/{len(offsets)} (lookback={lookback})")
                 except Exception as exc:
-                    logger.error(f'Epoch with lookback {lookback} generated an exception: {exc}')
+                    logger.error(f'Coin epoch with lookback {lookback} generated an exception: {exc}')
                     raise
 
         # Concatenate across epochs (same as before)
@@ -313,6 +313,7 @@ class CoinEpochsOrchestrator:
     # --------------
     # Primary Helper
     # --------------
+    @u.timing_decorator
     def _process_coin_epoch(
             self,
             lookback_duration: int,
