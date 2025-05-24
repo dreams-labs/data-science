@@ -70,7 +70,15 @@ class CoinFeaturesOrchestrator:
         prefix: str
     ) -> pd.DataFrame:
         """
-        Compute coin-wallet metrics for a specific period and build coin features.
+        Compute coin-level features for the epoch. Features are split into 3 categories:
+         1. Wallet-based features that flatten coin-wallet pair activity to the coin_level,
+          such as aggregated trading behavior or holder scores.
+         2. Time series-based features keyed on 'date', including macroeconomic indicators
+          and market data such as price/volume/market_cap.
+         3. Coin Flow features, generated from the Coin Flow model that was the precursor
+          to this model.
+
+        All features are
 
         Params:
         - profits_df (DataFrame): profits data for the specified period
@@ -81,7 +89,7 @@ class CoinFeaturesOrchestrator:
         - prd (str): abbreviated prefix for saved files (e.g., 'como')
 
         Returns:
-        - coin_training_data_df_full (DataFrame): full coin-level feature set
+        - coin_training_data_df_full (DataFrame): coin_id-indexed feature set
         """
         logger.info("Beginning coin feature generation...")
         u.notify('intro_4')
@@ -96,6 +104,9 @@ class CoinFeaturesOrchestrator:
         if training_data_df.index.duplicated().any():
             raise ValueError("training_data_df contains duplicated wallet rows.")
 
+
+        # 1. Wallet-Based Features
+        # ------------------------
         # Generate metrics for coin-wallet pairs in training_data_df
         cw_metrics_df = cfwm.compute_coin_wallet_metrics(
             self.wallets_coin_config,
@@ -123,26 +134,31 @@ class CoinFeaturesOrchestrator:
         # Instantiate full features df
         coin_training_data_df_full = coin_wallet_features_df
 
-        # Generate and merge macro features if configured
+
+        # 2. Time Series Features
+        # -----------------------
+        # Macroeconomic features
         if self.wallets_coin_config['features']['toggle_macro_features']:
             macro_features_df = self._generate_macro_features(macro_indicators_df)
-            # Cross join macro features to coin features DataFrame, prefixing "macro|"
-            prefixed_macro_features = {
-                f"macro|{col}": val
-                for col, val in macro_features_df.iloc[0].to_dict().items()
-            }
-            coin_training_data_df_full = coin_training_data_df_full.assign(**prefixed_macro_features)
+            macro_features_df = macro_features_df.add_prefix('macro|')
+            # cross join
+            coin_training_data_df_full = (
+                coin_training_data_df_full.reset_index()
+                .merge(macro_features_df, how='cross')
+                .set_index('coin_id')
+            )
 
-        # Generate and merge macro features if configured
+        # Market data features
         if self.wallets_coin_config['features']['toggle_market_features']:
             market_features_df = self._generate_market_features(market_indicators_df)
-            # Cross join market features to coin features DataFrame, prefixing "market_data|"
-            prefixed_market_features = {
-                f"market_data|{col}": val
-                for col, val in market_features_df.iloc[0].to_dict().items()
-            }
-            coin_training_data_df_full = coin_training_data_df_full.assign(**prefixed_market_features)
+            market_features_df = market_features_df.set_index('coin_id').add_prefix('market_data|')
+            # join on coin_id
+            u.assert_matching_indices(market_features_df,coin_training_data_df_full)
+            coin_training_data_df_full = coin_training_data_df_full.join(market_features_df)
 
+
+        # 3. Coin Flow Model Features
+        # ---------------------------
         # Generate and merge Coin Flow Model features if configured
         if self.wallets_coin_config['features']['toggle_coin_flow_model_features']:
 
