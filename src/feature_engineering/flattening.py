@@ -13,12 +13,13 @@ import dreams_core.core as dc
 logger = dc.setup_logger()
 
 
-def flatten_coin_date_df(df, df_metrics_config, training_period_end):
+def flatten_coin_date_df(df, df_metrics_config, training_period_end) -> pd.DataFrame:
     """
     Processes all coins in the DataFrame and flattens relevant time series metrics for each coin.
 
     Params:
-    - df (pd.DataFrame): DataFrame containing time series data for multiple coins (coin_id-date).
+    - df (pd.DataFrame): DataFrame with columns [coin_id,date] containing time series data for
+        multiple coins.
     - df_metrics_config (dict): Configuration object showing the settings for the metrics
         that apply to the specific input df.
     - training_period_end (datetime): The end of the training period to ensure dates are filled
@@ -38,6 +39,14 @@ def flatten_coin_date_df(df, df_metrics_config, training_period_end):
     # Check if df is empty
     if df.empty:
         raise ValueError("Input DataFrame is empty. Check your data and ensure it's populated.")
+
+    # Confirm coin-date pairs are unique
+    if not (
+        ('date' in df.columns and 'coin_id' in df.columns)
+        and (df[['date', 'coin_id']].drop_duplicates().shape[0] == df.shape[0])
+    ):
+        raise ValueError("Function 'flatten_coin_date_df()' should only be used on DataFrames " \
+        "with unique combinations of columns ['coin_id','date'].")
 
     # Check that all coin-date pairs are complete for the full df
     missing_dates_dict = {}
@@ -110,7 +119,7 @@ def flatten_date_features(time_series_df, df_metrics_config):
     Flattens all relevant time series metrics for a single coin into a row of features.
 
     Params:
-    - time_series_df (pd.DataFrame): DataFrame keyed on date with a time series dataset
+    - time_series_df (pd.DataFrame): DataFrame with column ['date'] with a time series dataset
     - df_metrics_config (dict): Configuration object with metric rules from the metrics file for
         the specific input df.
 
@@ -120,6 +129,10 @@ def flatten_date_features(time_series_df, df_metrics_config):
     Raises:
     - ValueError: If no columns were matched to the config.
     """
+    if not ('date' in time_series_df.columns and time_series_df['date'].is_unique):
+        raise ValueError("Function 'flatten_date_features()' should only be used on DataFrames " \
+        "with a unique 'date' column.")
+
     flat_features = {}
     matched_columns = False
 
