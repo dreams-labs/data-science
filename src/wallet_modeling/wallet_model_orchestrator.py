@@ -105,20 +105,22 @@ class WalletModelOrchestrator:
             # Don't output the scores from every tree
             score_wallets_config['modeling']['verbose_estimators'] = False
 
-            # Load and evaluate existing model
-            if (
-                score_name in existing_models
-                and not self.wallets_coin_config['features']['toggle_rebuild_wallet_models']
-            ):
-                model_id, evaluator = self._load_and_evaluate(
-                    score_name,
-                    score_wallets_config,
-                    wallet_training_data_df,
-                    wallet_target_vars_df,
-                    validation_training_data_df,
-                    validation_target_vars_df
-                )
-                logger.milestone(f"Loaded pretrained model for score '{score_name}'.")
+            # Load and evaluate using existing model if configured
+            if score_name in existing_models:
+                if not self.wallets_coin_config['training_data']['toggle_rebuild_wallet_models']:
+                    model_id, evaluator = self._load_and_evaluate(
+                        score_name,
+                        score_wallets_config,
+                        wallet_training_data_df,
+                        wallet_target_vars_df,
+                        validation_training_data_df,
+                        validation_target_vars_df
+                    )
+                    logger.milestone(f"Loaded pretrained model for score '{score_name}'.")
+
+                # Announce overwrite if applicable
+                else:
+                    logger.warning("Overwriting existing models due to 'toggle_rebuild_wallet_models'.")
 
 
             # Train new model

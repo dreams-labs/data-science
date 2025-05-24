@@ -321,18 +321,25 @@ class CoinEpochsOrchestrator:
         epoch_date = pd.to_datetime(epoch_wallets_config['training_data']['coin_modeling_period_start'])
 
         # Shortcut: if both feature and target parquet files exist, load and return them
-        toggle_rebuild_features = epoch_coins_config['features']['toggle_rebuild_all_features']
+        toggle_rebuild_features = epoch_coins_config['training_data']['toggle_rebuild_all_features']
         base_folder = epoch_coins_config['training_data']['parquet_folder']
         feat_path = Path(base_folder) / "coin_training_data_df_full.parquet"
         tgt_path  = Path(base_folder) / "coin_target_var_df.parquet"
-        if (feat_path.exists() and tgt_path.exists() and not toggle_rebuild_features):
-            coin_features_df = pd.read_parquet(feat_path)
-            coin_target_df   = pd.read_parquet(tgt_path)
-            logger.milestone(
-                "Coin epoch %s training data loaded from existing feature and target files.",
-                epoch_date.strftime('%Y-%m-%d')
-            )
-            return epoch_date, coin_features_df, coin_target_df
+
+        # Load existing data if configured
+        if (feat_path.exists() and tgt_path.exists()):
+            if not toggle_rebuild_features:
+                coin_features_df = pd.read_parquet(feat_path)
+                coin_target_df   = pd.read_parquet(tgt_path)
+                logger.milestone(
+                    "Coin epoch %s training data loaded from existing feature and target files.",
+                    epoch_date.strftime('%Y-%m-%d')
+                )
+                return epoch_date, coin_features_df, coin_target_df
+
+            # Announce overwrite if applicable
+            else:
+                logger.warning("Overwriting existing features due to 'toggle_rebuild_all_features'.")
 
 
         # 2) Wallet-Level Features
