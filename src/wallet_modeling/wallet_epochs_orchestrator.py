@@ -157,9 +157,9 @@ class WalletEpochsOrchestrator:
         - validation_target_vars_df: MultiIndexed on (wallet_address, epoch_start_date) for validation epochs
         """
         training_only = self.base_config['training_data']['training_data_only']
-        logger.milestone(f"Compiling training data for {len(self.all_epochs_configs)} epochs...")
+        logger.milestone(f"Compiling wallet training data for {len(self.all_epochs_configs)} epochs...")
         if training_only:
-            logger.milestone("Training‑only mode: will build historical snapshots only.")
+            logger.milestone("Training‑only mode: Compiling wallet training data without validation or target variables.")
 
         u.notify('intro_3')
 
@@ -199,7 +199,7 @@ class WalletEpochsOrchestrator:
                     modeling_validation_dfs[epoch_date] = epoch_modeling_df #pylint:disable=possibly-used-before-assignment
 
                 i += 1
-                logger.milestone(f"Epoch {i}/{len(epoch_configs_to_process)} completed (date: " \
+                logger.milestone(f"Wallet epoch {i}/{len(epoch_configs_to_process)} completed (date: " \
                                  f"{pd.to_datetime(epoch_date).strftime('%Y-%m-%d')})")
 
         del epoch_training_df, epoch_modeling_df
@@ -210,7 +210,7 @@ class WalletEpochsOrchestrator:
         # Training‑only fast path
         if training_only:
             logger.milestone(
-                "Generated historical training snapshots with shape: %s",
+                "Generated historical wallet training snapshots with shape: %s",
                 wallet_training_data_df.shape,
             )
             return wallet_training_data_df, pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
@@ -226,7 +226,7 @@ class WalletEpochsOrchestrator:
         u.assert_matching_indices(wallet_training_data_df, wallet_target_vars_df)
 
         logger.milestone(
-            "Generated multi‑epoch DataFrames with shapes:\n"
+            "Generated wallet multi‑epoch DataFrames with shapes:\n"
             " - modeling train: %s\n"
             " - modeling model: %s\n"
             " - validation train: %s\n"

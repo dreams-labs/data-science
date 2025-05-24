@@ -123,7 +123,7 @@ def flatten_cw_to_coin_features(
     - DataFrame: Coin-level features with segment metrics
     """
     # Get score columns
-    score_columns = [f"scores|{dist}_score" for dist in score_distribution_cols]
+    score_columns = [f"scores|{dist}" for dist in score_distribution_cols]
 
     # Initialize results with MultiIndex aware groupby
     totals_df = analysis_df.groupby(level='coin_id', observed=True).agg({
