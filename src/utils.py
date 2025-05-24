@@ -1414,12 +1414,15 @@ def setup_notebook_logger(log_filepath: str = None) -> logging.Logger:
     # Custom formatter for terminal viewing - no filepath, includes colors
     class TerminalColorFormatter(ColorFormatter):
         def format(self, record):
-            # Use simplified format without module.function:line details
-            formatter = logging.Formatter(
-                '[%(asctime)s] %(levelname)s %(message)s',
-                datefmt='%H:%M:%S'
-            )
-            base_msg = formatter.format(record)
+            # Pad log level to 9 characters, left-aligned
+            padded_level = f"{record.levelname:<9}"
+
+            # Format timestamp
+            timestamp = self.formatTime(record, '%H:%M:%S')
+
+            # Simple format: [time] LEVEL     | message
+            base_msg = f"[{timestamp}] {padded_level} | {record.getMessage()}"
+
             color = self.COLOR_MAP.get(record.levelname, "")
             return f"{color}{base_msg}{self.RESET}" if color else base_msg
 

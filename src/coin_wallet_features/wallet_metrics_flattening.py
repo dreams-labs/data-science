@@ -151,12 +151,13 @@ def flatten_cw_to_coin_features(
             .fillna({col: 0 for col in aggregation_metrics_df.columns})
 
 
-        # Computes weighted balance scores
-        score_metrics_df = calculate_score_weighted_metrics(
-            analysis_df, segment_family, segment_value,
-            metric_column, score_columns
-        )
-        result_df = result_df.join(score_metrics_df,how='left') # leave nulls as null
+        # #FeatureRemoval Not Predictive
+        # # Computes weighted balance scores
+        # score_metrics_df = calculate_score_weighted_metrics(
+        #     analysis_df, segment_family, segment_value,
+        #     metric_column, score_columns
+        # )
+        # result_df = result_df.join(score_metrics_df,how='left') # leave nulls as null
 
 
         # Checks if the column is includes material usd values

@@ -136,7 +136,7 @@ def remove_correlated_features(
     """
     # If the threshold is 1.0 then don't compute anything
     if correlation_threshold is None or correlation_threshold > 1.0:
-        logger.info("Skipping correlation-based feature selection..s.")
+        logger.info("Skipping correlation-based feature selection...")
         return training_df
 
     # Calculate correlation matrix
@@ -162,6 +162,6 @@ def remove_correlated_features(
 
     logger.info(
         f"Removed {len(to_drop)} highly correlated features "
-        f"while protecting {protected_count if protected_features else 0} features"
+        f"while protecting {protected_count if protected_features else 0} features."
     )
     return reduced_df
