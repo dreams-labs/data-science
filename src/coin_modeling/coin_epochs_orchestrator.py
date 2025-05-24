@@ -339,7 +339,7 @@ class CoinEpochsOrchestrator:
 
             # Announce overwrite if applicable
             else:
-                logger.warning("Overwriting existing features due to 'toggle_rebuild_all_features'.")
+                logger.warning("Overwriting existing coin features due to 'toggle_rebuild_all_features'.")
 
 
         # 2) Wallet-Level Features
