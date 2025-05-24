@@ -16,7 +16,7 @@ import wallet_features.transfers_features as wts
 import wallet_features.market_timing_features as wmt
 import wallet_features.scenario_features as wsc
 import wallet_features.balance_features as wbf
-import wallet_features.macroeconomic_features as wmac
+import wallet_features.time_series_features as wfts
 import utils as u
 
 # Set up logger at the module level
@@ -104,7 +104,7 @@ def calculate_wallet_features(
         wallet_features_df = wallet_features_df.join(balance_features_df, how='left')
 
     # Macroeconomic features (cross join)
-    macroeconomic_features_df = wmac.calculate_macro_features(
+    macroeconomic_features_df = wfts.calculate_macro_features(
                                     macro_indicators_df,
                                     wallets_metrics_config['time_series']['macro_trends'])
     feature_column_names['macro|'] = macroeconomic_features_df.columns
