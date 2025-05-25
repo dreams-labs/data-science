@@ -128,8 +128,8 @@ class WalletTrainingDataOrchestrator:
         # Set the coin_cohort if it hadn't already been passed
         if not coin_cohort:
             coin_cohort = set(market_data_df['coin_id'].unique())
-            logger.info("Defined coin cohort of %s coins after applying data cleaning filters.",
-                        len(coin_cohort))
+            logger.milestone("Defined coin cohort of %s coins after applying data cleaning filters.",
+                             len(coin_cohort))
 
         # 3. Impute the period end (period start is pre-imputed during profits_df generation)
         imputed_profits_df = pri.impute_profits_for_multiple_dates(
