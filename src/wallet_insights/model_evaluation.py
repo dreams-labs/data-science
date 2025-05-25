@@ -411,7 +411,7 @@ class RegressorEvaluator:
                 f"Test Samples:             {self.metrics['test_samples']:,d}",
             ])
 
-            if self.modeling_config['model_type'] == 'classification':
+            if self.modeling_config['model_type'] == 'classification' and self.y_validation is not None:
                 header.extend([
                     f"Test Positive Samples:    {self.y_validation.sum():,d} "
                     f"({self.y_validation.sum()/self.metrics['test_samples']*100:.2f}%)",
@@ -1070,7 +1070,7 @@ class ClassifierEvaluator(RegressorEvaluator):
         self.metrics['f1'] = f1_score(self.y_test, self.y_pred, zero_division=0)
 
         # Compute F-beta thresholds & scores on validation set
-        if hasattr(self, "y_validation_pred_proba"):
+        if hasattr(self, "y_validation_pred_proba") and self.y_validation_pred_proba is not None:
             precisions, recalls, ths = precision_recall_curve(
                 self.y_validation, self.y_validation_pred_proba
             )
