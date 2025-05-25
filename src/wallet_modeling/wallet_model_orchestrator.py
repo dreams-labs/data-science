@@ -111,8 +111,6 @@ class WalletModelOrchestrator:
                     model_id, evaluator = self._load_and_evaluate(
                         score_name,
                         score_wallets_config,
-                        wallet_training_data_df,
-                        wallet_target_vars_df,
                         validation_training_data_df,
                         validation_target_vars_df
                     )
@@ -487,17 +485,25 @@ class WalletModelOrchestrator:
     def _load_and_evaluate(
         self,
         score_name: str,
-        score_wallets_config,
-        wallet_training_data_df,
-        wallet_target_vars_df,
-        validation_training_data_df,
-        validation_target_vars_df
+        score_wallets_config: dict,
+        validation_training_data_df: pd.DataFrame,
+        validation_target_vars_df: pd.DataFrame
     ) -> tuple[str, any]:
         """
-        Load an existing saved model by score_name and evaluate on provided data.
+        Load an existing saved model by score_name and evaluate on provided data. Note that
+         we cannot calculate any train/test set metrics for a pre-trained model. Because we
+         only use the model to predict the validation set, we can only evaluate the performance
+         of y_validation and y_validation_pred.
+
+        Params:
+        - score_name (str): from wallets_coin_config['wallet_scores']['score_params'].keys()
+        - score_wallets_config (dict): wallets_config.yaml with overrides for the specific score
+        - validation_training_data_df (df): Contains wallet training data for the validation period
+        - validation_target_vars_df (df): Contains target variables for the validation period
+
         Returns:
         - model_id (str): ID of the loaded model
-        - evaluator: Evaluator object with metrics and predictions
+        - evaluator (custom class): Evaluator from model_evaluation.py with metrics and predictions
         """
 
         # 1) Grab the stored model_id
@@ -530,78 +536,19 @@ class WalletModelOrchestrator:
             'pipeline': pipeline,
             'modeling_config': modeling_cfg,
 
-            # No training metrics for loaded model
+            # Pretrained models don't have train/test sets
             'X_train': None,
             'y_train': None,
+            'X_test': None,
+            'y_test': None,
+            'y_pred': None,
             'training_cohort_pred': None,
             'training_cohort_actuals': None,
             'full_cohort_actuals': None
         }
 
 
-        # 4) Attach test set
-        # ------------------
-        # Retain X_test and make predictions
-        result['X_test'] = wallet_training_data_df
-        y_test_series = wallet_target_vars_df[modeling_cfg['target_variable']]
-        test_preds = wiva.load_and_predict(
-            model_id,
-            wallet_training_data_df,
-            self.base_path
-        )
-
-        # Store regressor outcomes
-        if model_type == 'regression':
-            # y_test
-            result['y_test'] = y_test_series
-            # y_pred
-            result['y_pred'] = test_preds
-
-
-        # Store classifier outcomes
-        if model_type == 'classification':
-
-            # y_test
-            min_thr = modeling_cfg.get('target_var_min_threshold', -np.inf)
-            max_thr = modeling_cfg.get('target_var_max_threshold', np.inf)
-            result['y_test'] = (
-                (y_test_series >= min_thr) &
-                (y_test_series <= max_thr)
-            ).astype(int)
-            n_positive_test = result['y_test'].sum()
-            n_total_test = len(result['y_test'])
-            logger.info(f"Model {score_name}: y_test true positives={n_positive_test}/{n_total_test} "
-                        f"({100*n_positive_test/n_total_test:.2f}%)")
-
-            result['y_pred_proba'] = test_preds
-
-            # y_pred
-            # define threshold
-            y_threshold = modeling_cfg.get('y_pred_threshold')
-            if isinstance(y_threshold, str):
-                # define y_threshold if threshold was passed as an F-beta value
-                precisions, recalls, ths = precision_recall_curve(
-                    result['y_test'], test_preds
-                )
-                ths = np.append(ths, 1.0)
-                beta = float(y_threshold[1:])
-                y_threshold = wime.ClassifierEvaluator.add_fbeta_metrics(
-                    precisions, recalls, ths, beta
-                )
-            modeling_cfg['y_pred_threshold'] = y_threshold
-
-            # define y_pred
-            result['y_pred'] = (test_preds >= y_threshold).astype(int)
-            n_positive_pred = result['y_pred'].sum()
-            n_total_pred = len(result['y_pred'])
-            logger.info(f"Model {score_name}: test predictions={n_positive_pred}/{n_total_pred} "
-                        f"({100*n_positive_pred/n_total_pred:.2f}%)")
-
-        else:
-            raise ValueError(f"Invalid model type '{model_type}' found in config.")
-
-
-        # 5) Attach validation set + preds if provided
+        # 4) Attach validation set + preds
         # --------------------------------------------
         if not validation_training_data_df.empty and not validation_target_vars_df.empty:
 
@@ -637,7 +584,21 @@ class WalletModelOrchestrator:
                             f"({100*n_positive_val/n_total_val:.2f}%)")
 
                 # y_pred
-                # define y_pred_val
+                # define y_threshold
+                y_threshold = modeling_cfg.get('y_pred_threshold')
+                if isinstance(y_threshold, str):
+                    # define y_threshold if threshold was passed as an F-beta value
+                    precisions, recalls, ths = precision_recall_curve(
+                        result['y_test'], val_preds
+                    )
+                    ths = np.append(ths, 1.0)
+                    beta = float(y_threshold[1:])
+                    y_threshold = wime.ClassifierEvaluator.add_fbeta_metrics(
+                        precisions, recalls, ths, beta
+                    )
+                modeling_cfg['y_pred_threshold'] = y_threshold
+
+                # define predictions
                 result['y_validation_pred_proba'] = val_preds
                 result['y_validation_pred'] = (val_preds >= y_threshold).astype(int)
                 n_positive_val_pred = result['y_validation_pred'].sum()
@@ -649,7 +610,7 @@ class WalletModelOrchestrator:
                 raise ValueError(f"Invalid model type '{model_type}' found in config.")
 
 
-        # 6) Instantiate evaluator
+        # 5) Instantiate evaluator
         # ------------------------
         if model_type == 'classification':
             evaluator = wime.ClassifierEvaluator(result)
