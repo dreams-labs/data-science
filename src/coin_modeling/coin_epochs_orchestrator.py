@@ -388,9 +388,6 @@ class CoinEpochsOrchestrator:
         # Delete wallet validation epochs if we aren't generating coin target variables, as the wallet
         #  validation period overlaps with the coin modeling period used for coin target variable data.
         epoch_wallets_epochs_config = copy.deepcopy(self.wallets_epochs_config)
-        if self.coin_training_data_only:
-            epoch_wallets_config['training_data']['training_data_only'] = True
-            epoch_wallets_epochs_config['validation_offsets'] = []
 
 
         # 2) Wallet-Level Features
