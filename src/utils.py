@@ -1395,6 +1395,7 @@ def setup_notebook_logger(log_filepath: str = None) -> logging.Logger:
             datefmt='%d/%b/%Y %H:%M:%S'
         ))
         root_logger.addHandler(file_handler)
+
         # milestone-only log
         base, ext = os.path.splitext(log_filepath)
         milestone_path = f"{base}_milestone{ext}"
@@ -1429,5 +1430,11 @@ def setup_notebook_logger(log_filepath: str = None) -> logging.Logger:
     terminal_handler.setFormatter(TerminalColorFormatter())
     root_logger.addHandler(terminal_handler)
 
+    # Milestone display handler - same format as terminal display but milestone+ only
+    milestone_display_path = f"{base}_display_milestone{ext}"
+    milestone_display_handler = logging.FileHandler(milestone_display_path)
+    milestone_display_handler.setLevel(MILESTONE_LEVEL)
+    milestone_display_handler.setFormatter(TerminalColorFormatter())
+    root_logger.addHandler(milestone_display_handler)
 
     return root_logger
