@@ -158,7 +158,7 @@ class WalletEpochsOrchestrator:
         """
         logger.milestone(f"Compiling wallet training data for {len(self.all_epochs_configs)} epochs...")
         if training_only:
-            logger.milestone("Training‑only mode: Compiling wallet training data without validation or target variables.")
+            logger.warning("Training‑only mode: Compiling wallet training data without validation or target variables.")
 
         u.notify('intro_3')
 
@@ -209,7 +209,11 @@ class WalletEpochsOrchestrator:
         # Training‑only fast path
         if training_only:
             logger.milestone(
-                "Generated historical wallet training snapshots with shape: %s",
+                "Generated wallet multi‑epoch DataFrames with shapes:\n"
+                " - modeling train: %s\n"
+                " - modeling model: n/a\n"
+                " - validation train: n/a\n"
+                " - validation model: n/a",
                 wallet_training_data_df.shape,
             )
             return wallet_training_data_df, pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
