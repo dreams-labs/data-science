@@ -607,7 +607,7 @@ class WalletEpochsOrchestrator:
             )
 
         # Add validation epoch configs if configured
-        if self.base_config['training_data'].get('validation_period_end') is not None:
+        if len(validation_offsets) == 0:
             for offset_days in validation_offsets:
                 cfg = self.build_epoch_config(
                     offset_days, 'validation',
