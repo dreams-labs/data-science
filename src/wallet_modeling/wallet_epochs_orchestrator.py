@@ -611,7 +611,7 @@ class WalletEpochsOrchestrator:
             )
 
         # Add validation epoch configs if configured
-        if len(validation_offsets) == 0:
+        if len(validation_offsets) > 0:
             for offset_days in validation_offsets:
                 cfg = self.build_epoch_config(
                     offset_days, 'validation',
