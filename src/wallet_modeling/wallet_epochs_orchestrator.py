@@ -261,6 +261,9 @@ class WalletEpochsOrchestrator:
 
         Params:
         - epoch_config (dict): Configuration for the specific epoch
+        - training_only (bool): If false, generates modeling and validation data. This is used
+            for generating wallet training data through the current date that can then be
+            predicted with models that have been previously.
 
         Returns:
         - epoch_date (datetime): The modeling period start date as datetime
@@ -273,7 +276,7 @@ class WalletEpochsOrchestrator:
         output_folder = epoch_config['training_data']['parquet_folder']
         training_path = f"{output_folder}/training_data_df.parquet"
         modeling_path = f"{output_folder}/modeling_data_df.parquet"
-        if os.path.exists(training_path) and (not generate_modeling or os.path.exists(modeling_path)):
+        if os.path.exists(training_path) and (training_only or os.path.exists(modeling_path)):
             logger.info(
                 f"Loading precomputed features for epoch starting "
                 f"{epoch_config['training_data']['modeling_period_start']} from {output_folder}"
