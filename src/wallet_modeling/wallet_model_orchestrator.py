@@ -528,7 +528,14 @@ class WalletModelOrchestrator:
             'model_type': model_type,
             'model_id': model_id,
             'pipeline': pipeline,
-            'modeling_config': modeling_cfg
+            'modeling_config': modeling_cfg,
+
+            # No training metrics for loaded model
+            'X_train': None,
+            'y_train': None,
+            'training_cohort_pred': None,
+            'training_cohort_actuals': None,
+            'full_cohort_actuals': None
         }
 
 
@@ -642,18 +649,12 @@ class WalletModelOrchestrator:
                 raise ValueError(f"Invalid model type '{model_type}' found in config.")
 
 
-
-        # No training metrics for loaded model
-        result['X_train'] = wallet_training_data_df
-        result['y_train'] = wallet_training_data_df
-        result['training_cohort_pred'] = None
-        result['training_cohort_actuals'] = None
-        result['full_cohort_actuals'] = None
-
-        # 5) Instantiate evaluator
+        # 6) Instantiate evaluator
+        # ------------------------
         if model_type == 'classification':
             evaluator = wime.ClassifierEvaluator(result)
         else:
             evaluator = wime.RegressorEvaluator(result)
+
 
         return model_id, evaluator
