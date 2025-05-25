@@ -166,24 +166,33 @@ class CoinEpochsOrchestrator:
     def orchestrate_coin_epochs(
             self,
             custom_offset_days: list[int] | None = None,
-            file_prefix: str = ''
+            file_prefix: str = '',
+            coin_training_data_only: bool = False
         ) -> None:
         """
         Orchestrate coin-level epochs by iterating through lookbacks and processing each epoch.
 
         Params:
-        - custom_offset_days: overrides coin_epochs_training in wallets_coin_config
-        - file_prefix: changes the filename of the parquet files
-        - max_workers: number of threads (defaults to min(4, cpu_count))
+        - custom_offset_days (list of ints): overrides coin_epochs_training in wallets_coin_config
+        - file_prefix (str): changes the filename of the parquet files
+        - coin_training_data_only (bool): whether to exclude the coin target variables and validation
+            sets. This is used to generate training data that will be scored with an existing model
+            that can be used to predict future price action.
         """
-        # Build all wallet parquet files needed for the base configs
+        # 1. Build all wallet training data needed for all coin epochs
+        # ------------------------------------------------------------
+        # This increases execution speed by multithreading every wallet epoch, rather
+        #  than generating individual additional wallet epochs needed as the coin epoch
+        #  boundaries shift.
         self._build_all_wallet_data()
 
-        # Determine which offsets to use
+
+        # 2. Define and validate coin epoch offsets
+        # -----------------------------------------
         offsets = custom_offset_days if custom_offset_days is not None \
             else self.wallets_coin_config['training_data']['coin_epochs_training']
 
-        # Check validity of inputs vs available data
+        # Calculate maximum offset possible based on validation_period_end
         most_recent_data = self.complete_profits_df.index.get_level_values('date').max()
         base_coin_modeling_end = pd.to_datetime(self.wallets_config['training_data']['coin_modeling_period_end'])
         max_calculable_offset = (most_recent_data - base_coin_modeling_end).days
@@ -191,6 +200,9 @@ class CoinEpochsOrchestrator:
             raise ValueError(f"Offset value of {max(offsets)} extends further into the future than the "
                             f"{max_calculable_offset} calculable offset from the complete datasets.")
 
+
+        # 3. Generate all coin epochs' training data
+        # ------------------------------------------
         logger.milestone("Beginning generation of coin model training data...")
 
         # Tag each DataFrame with the epoch date
@@ -230,7 +242,7 @@ class CoinEpochsOrchestrator:
                                  f'{exc}')
                     raise
 
-        # Concatenate across epochs (same as before)
+        # Concatenate all epochs dfs
         multiwindow_features = pd.concat(feature_dfs).sort_index()
         multiwindow_targets = pd.concat(target_dfs).sort_index()
 
@@ -239,7 +251,9 @@ class CoinEpochsOrchestrator:
             df.index = pd.MultiIndex.from_tuples(df.index.values, names=df.index.names)
             return df
 
-        # Persist multiwindow parquet files (unchanged)
+
+        # 4. Persist multiwindow parquet files
+        # ------------------------------------
         root_folder = self.wallets_coin_config['training_data']['parquet_folder']
         multiwindow_features = reset_index_codes(multiwindow_features)
         multiwindow_features.to_parquet(f"{root_folder}/{file_prefix}multiwindow_coin_training_data_df.parquet")
