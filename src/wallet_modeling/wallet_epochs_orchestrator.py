@@ -156,7 +156,6 @@ class WalletEpochsOrchestrator:
         - validation_training_data_df: MultiIndexed on (wallet_address, epoch_start_date) for validation epochs
         - validation_target_vars_df: MultiIndexed on (wallet_address, epoch_start_date) for validation epochs
         """
-        training_only = self.base_config['training_data']['training_data_only']
         logger.milestone(f"Compiling wallet training data for {len(self.all_epochs_configs)} epochs...")
         if training_only:
             logger.milestone("Training‑only mode: Compiling wallet training data without validation or target variables.")
@@ -262,6 +261,9 @@ class WalletEpochsOrchestrator:
 
         Params:
         - epoch_config (dict): Configuration for the specific epoch
+        - training_only (bool): If false, generates modeling and validation data. This is used
+            for generating wallet training data through the current date that can then be
+            predicted with models that have been previously.
 
         Returns:
         - epoch_date (datetime): The modeling period start date as datetime
@@ -274,7 +276,7 @@ class WalletEpochsOrchestrator:
         output_folder = epoch_config['training_data']['parquet_folder']
         training_path = f"{output_folder}/training_data_df.parquet"
         modeling_path = f"{output_folder}/modeling_data_df.parquet"
-        if os.path.exists(training_path) and (not generate_modeling or os.path.exists(modeling_path)):
+        if os.path.exists(training_path) and (training_only or os.path.exists(modeling_path)):
             logger.info(
                 f"Loading precomputed features for epoch starting "
                 f"{epoch_config['training_data']['modeling_period_start']} from {output_folder}"
@@ -802,7 +804,7 @@ class WalletEpochsOrchestrator:
             (macro_trends_end >= latest_modeling_end)
         ):
             raise ValueError(
-                f"Insufficient data coverage for specified epochs.\n"
+                f"Insufficient wallet data coverage for specified epochs.\n"
                 f"Required coverage: {earliest_starting_balance_date.strftime('%Y-%m-%d')}"
                     f" to {latest_modeling_end.strftime('%Y-%m-%d')}\n"
                 f"Actual coverage:\n"

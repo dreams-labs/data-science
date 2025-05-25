@@ -185,8 +185,8 @@ class CoinEpochsOrchestrator:
 
         # Check validity of inputs vs available data
         most_recent_data = self.complete_profits_df.index.get_level_values('date').max()
-        base_modeling_end = pd.to_datetime(self.wallets_config['training_data']['coin_modeling_period_end'])
-        max_calculable_offset = (most_recent_data - base_modeling_end).days
+        base_coin_modeling_end = pd.to_datetime(self.wallets_config['training_data']['coin_modeling_period_end'])
+        max_calculable_offset = (most_recent_data - base_coin_modeling_end).days
         if max(offsets) > max_calculable_offset:
             raise ValueError(f"Offset value of {max(offsets)} extends further into the future than the "
                             f"{max_calculable_offset} calculable offset from the complete datasets.")
@@ -226,7 +226,8 @@ class CoinEpochsOrchestrator:
                     target_dfs.append(targets_df)
                     logger.milestone(f"Completed coin epoch {i}/{len(offsets)} (lookback={lookback})")
                 except Exception as exc:
-                    logger.error(f'Coin epoch with lookback {lookback} generated an exception: {exc}')
+                    logger.error(f'Coin epoch with lookback {lookback} generated an exception:',
+                                 f'{exc}')
                     raise
 
         # Concatenate across epochs (same as before)
@@ -316,8 +317,7 @@ class CoinEpochsOrchestrator:
     @u.timing_decorator
     def _process_coin_epoch(
             self,
-            lookback_duration: int,
-            include_validation: bool = True
+            lookback_duration: int
         ) -> tuple[datetime, pd.DataFrame, pd.DataFrame]:
         """
         Process a single coin epoch: generate data, train wallet models, generate coin
@@ -332,7 +332,6 @@ class CoinEpochsOrchestrator:
 
         Params:
         - lookback_duration (int): how many days the dates will be offset from the base modeling period
-        - include_validation (bool): whether to include validation-period scoring (default True)
         """
         # 1) Prepare config files
         # -----------------------
@@ -384,7 +383,6 @@ class CoinEpochsOrchestrator:
             epoch_weo,
             epoch_coins_config,
             epoch_training_dfs,
-            include_validation_period=include_validation
         )
 
 
@@ -857,8 +855,7 @@ class CoinEpochsOrchestrator:
         self,
         epoch_weo,
         epoch_coins_config: dict,
-        epoch_training_dfs: tuple,
-        include_validation_period: bool = True
+        epoch_training_dfs: tuple
     ) -> pd.DataFrame:
         """
         Train wallet models for a single epoch and score wallets.
@@ -880,20 +877,17 @@ class CoinEpochsOrchestrator:
         models_dict = epoch_wmo.train_wallet_models(*epoch_training_dfs)
 
 
-        # 2) Generate this epoch's training and modeling dfs
-        # Build epochs config for only the coin and wallet modeling periods
-        logger.info("Generating wallet training_data_df for scoring in the coin modeling "
-                    "and validation periods...")
+        # 2) Generate this epoch's wallet training data
+        logger.info("Generating wallet training_data_df for scoring in the coin_modeling period...")
         modeling_offset = self.wallets_config['training_data']['modeling_period_duration']
         coin_modeling_epochs_config = {
             'offset_epochs': {
                 'offsets': [modeling_offset],
             }
         }
-        if include_validation_period:
-            coin_modeling_epochs_config['validation_offsets'] = [modeling_offset*2]
-        else:
-            coin_modeling_epochs_config['validation_offsets'] = []
+
+        # Build epochs config for the current coin_modeling_period
+        coin_modeling_epochs_config['validation_offsets'] = []
 
         epoch_weo = weo.WalletEpochsOrchestrator(
             base_config=epoch_weo.base_config,
