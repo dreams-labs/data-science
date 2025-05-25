@@ -166,8 +166,7 @@ class CoinEpochsOrchestrator:
     def orchestrate_coin_epochs(
             self,
             custom_offset_days: list[int] | None = None,
-            file_prefix: str = '',
-            include_wallet_validation = True
+            file_prefix: str = ''
         ) -> None:
         """
         Orchestrate coin-level epochs by iterating through lookbacks and processing each epoch.
@@ -176,8 +175,6 @@ class CoinEpochsOrchestrator:
         - custom_offset_days: overrides coin_epochs_training in wallets_coin_config
         - file_prefix: changes the filename of the parquet files
         - max_workers: number of threads (defaults to min(4, cpu_count))
-        - include_wallet_validation (bool): whether to include validation-period scoring of the wallet
-            models (default True)
         """
         # Build all wallet parquet files needed for the base configs
         self._build_all_wallet_data()
@@ -204,7 +201,7 @@ class CoinEpochsOrchestrator:
 
         def process_single_epoch(lookback: int) -> tuple:
             """Process a single epoch and return tagged results"""
-            epoch_date, coin_features_df, coin_target_df = self._process_coin_epoch(lookback, include_wallet_validation)
+            epoch_date, coin_features_df, coin_target_df = self._process_coin_epoch(lookback)
             return (
                 tag_with_epoch(coin_features_df, epoch_date),
                 tag_with_epoch(coin_target_df, epoch_date)
@@ -320,8 +317,7 @@ class CoinEpochsOrchestrator:
     @u.timing_decorator
     def _process_coin_epoch(
             self,
-            lookback_duration: int,
-            include_wallet_validation: bool = True
+            lookback_duration: int
         ) -> tuple[datetime, pd.DataFrame, pd.DataFrame]:
         """
         Process a single coin epoch: generate data, train wallet models, generate coin
@@ -336,8 +332,6 @@ class CoinEpochsOrchestrator:
 
         Params:
         - lookback_duration (int): how many days the dates will be offset from the base modeling period
-        - include_wallet_validation (bool): whether to include validation-period scoring of the wallet
-            models (default True)
         """
         # 1) Prepare config files
         # -----------------------
@@ -389,7 +383,6 @@ class CoinEpochsOrchestrator:
             epoch_weo,
             epoch_coins_config,
             epoch_training_dfs,
-            include_wallet_validation_period=include_wallet_validation
         )
 
 
@@ -862,8 +855,7 @@ class CoinEpochsOrchestrator:
         self,
         epoch_weo,
         epoch_coins_config: dict,
-        epoch_training_dfs: tuple,
-        include_wallet_validation_period: bool = True
+        epoch_training_dfs: tuple
     ) -> pd.DataFrame:
         """
         Train wallet models for a single epoch and score wallets.
@@ -885,20 +877,17 @@ class CoinEpochsOrchestrator:
         models_dict = epoch_wmo.train_wallet_models(*epoch_training_dfs)
 
 
-        # 2) Generate this epoch's training and modeling dfs
-        # Build epochs config for only the coin and wallet modeling periods
-        logger.info("Generating wallet training_data_df for scoring in the coin modeling "
-                    "and validation periods...")
+        # 2) Generate this epoch's wallet training data
+        logger.info("Generating wallet training_data_df for scoring in the coin_modeling period...")
         modeling_offset = self.wallets_config['training_data']['modeling_period_duration']
         coin_modeling_epochs_config = {
             'offset_epochs': {
                 'offsets': [modeling_offset],
             }
         }
-        if include_wallet_validation_period:
-            coin_modeling_epochs_config['validation_offsets'] = [modeling_offset*2]
-        else:
-            coin_modeling_epochs_config['validation_offsets'] = []
+
+        # Build epochs config for the current coin_modeling_period
+        coin_modeling_epochs_config['validation_offsets'] = []
 
         epoch_weo = weo.WalletEpochsOrchestrator(
             base_config=epoch_weo.base_config,
