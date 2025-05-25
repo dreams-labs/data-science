@@ -499,7 +499,9 @@ class WalletModelOrchestrator:
         - model_id (str): ID of the loaded model
         - evaluator: Evaluator object with metrics and predictions
         """
+
         # 1) Grab the stored model_id
+        # ---------------------------
         models_json_path = Path(self.wallets_coin_config['training_data']['parquet_folder']) / "wallet_model_ids.json"
         with open(models_json_path, 'r', encoding='utf-8') as f:
             models_dict = json.load(f)
@@ -508,14 +510,18 @@ class WalletModelOrchestrator:
             raise KeyError(f"No existing model found for '{score_name}'")
         model_id = model_info['model_id']
 
+
         # 2) Unpickle the pipeline
+        # ------------------------
         pipeline_path = Path(self.base_path) / 'wallet_models' / f"wallet_model_{model_id}.pkl"
         if not pipeline_path.exists():
             raise FileNotFoundError(f"No pipeline at {pipeline_path}")
         with open(pipeline_path, 'rb') as f:
             pipeline = cloudpickle.load(f)
 
+
         # 3) Build a minimal result dict
+        # ------------------------------
         modeling_cfg = score_wallets_config['modeling']
         model_type = modeling_cfg['model_type']
         result = {
@@ -525,71 +531,117 @@ class WalletModelOrchestrator:
             'modeling_config': modeling_cfg
         }
 
-        # 4) Attach validation data + preds if validation data is provided
-        if not validation_training_data_df.empty and not validation_target_vars_df.empty:
-            result['X_validation'] = validation_training_data_df
-            result['validation_target_vars_df'] = validation_target_vars_df
-            result['y_validation'] = validation_target_vars_df[modeling_cfg['target_variable']]
 
-            # Convert continuous target to binary for classification based on min threshold
-            if model_type == 'classification':
-                min_thr = modeling_cfg.get('target_var_min_threshold', 0)
-                result['y_validation'] = (result['y_validation'] > min_thr).astype(int)
-
-            preds = wiva.load_and_predict(
-                model_id,
-                validation_training_data_df,
-                self.base_path
-            )
-            if model_type == 'classification':
-                result['y_validation_pred_proba'] = preds
-                thr = modeling_cfg.get('y_pred_threshold')
-                if thr is not None:
-                    # Resolve F-beta threshold if specified as string
-                    if isinstance(thr, str) and thr.startswith('f'):
-                        # Compute precision-recall curve on validation set
-                        precisions, recalls, ths = precision_recall_curve(
-                            result['y_validation'], preds
-                        )
-                        ths = np.append(ths, 1.0)
-                        beta = float(thr[1:])
-                        thr_val = wime.ClassifierEvaluator.add_fbeta_metrics(
-                            precisions, recalls, ths, beta
-                        )
-                        thr = thr_val
-                        modeling_cfg['y_pred_threshold'] = thr_val
-                    result['y_validation_pred'] = (preds >= thr).astype(int)
-            else:
-                result['y_validation_pred'] = preds
-
-        # 4a) Attach test set (using provided training data as test)
+        # 4) Attach test set
+        # ------------------
+        # Retain X_test and make predictions
         result['X_test'] = wallet_training_data_df
-        # Extract y_test as Series
-        if isinstance(wallet_target_vars_df, pd.DataFrame):
-            y_test_series = wallet_target_vars_df[modeling_cfg['target_variable']]
-        else:
-            y_test_series = wallet_target_vars_df
-        # Binarize for classification
-        if model_type == 'classification':
-            min_thr = modeling_cfg.get('target_var_min_threshold', 0)
-            y_test_series = (y_test_series > min_thr).astype(int)
-        result['y_test'] = y_test_series
-
-        # Generate predictions on test set
+        y_test_series = wallet_target_vars_df[modeling_cfg['target_variable']]
         test_preds = wiva.load_and_predict(
             model_id,
             wallet_training_data_df,
             self.base_path
         )
-        if model_type == 'classification':
-            result['y_pred_proba'] = test_preds
-            thr_test = modeling_cfg.get('y_pred_threshold')
-            # Ensure numeric threshold
-            if isinstance(thr_test, str):
-                thr_test = modeling_cfg[ 'y_pred_threshold']
-            result['y_pred'] = (test_preds >= thr_test).astype(int)
-        else:
+
+        # Store regressor outcomes
+        if model_type == 'regression':
+            # y_test
+            result['y_test'] = y_test_series
+            # y_pred
             result['y_pred'] = test_preds
+
+
+        # Store classifier outcomes
+        if model_type == 'classification':
+
+            # y_test
+            min_thr = modeling_cfg.get('target_var_min_threshold', -np.inf)
+            max_thr = modeling_cfg.get('target_var_max_threshold', np.inf)
+            result['y_test'] = (
+                (y_test_series >= min_thr) &
+                (y_test_series <= max_thr)
+            ).astype(int)
+            n_positive_test = result['y_test'].sum()
+            n_total_test = len(result['y_test'])
+            logger.info(f"Model {score_name}: y_test true positives={n_positive_test}/{n_total_test} "
+                        f"({100*n_positive_test/n_total_test:.2f}%)")
+
+            result['y_pred_proba'] = test_preds
+
+            # y_pred
+            # define threshold
+            y_threshold = modeling_cfg.get('y_pred_threshold')
+            if isinstance(y_threshold, str):
+                # define y_threshold if threshold was passed as an F-beta value
+                precisions, recalls, ths = precision_recall_curve(
+                    result['y_test'], test_preds
+                )
+                ths = np.append(ths, 1.0)
+                beta = float(y_threshold[1:])
+                y_threshold = wime.ClassifierEvaluator.add_fbeta_metrics(
+                    precisions, recalls, ths, beta
+                )
+            modeling_cfg['y_pred_threshold'] = y_threshold
+
+            # define y_pred
+            result['y_pred'] = (test_preds >= y_threshold).astype(int)
+            n_positive_pred = result['y_pred'].sum()
+            n_total_pred = len(result['y_pred'])
+            logger.info(f"Model {score_name}: test predictions={n_positive_pred}/{n_total_pred} "
+                        f"({100*n_positive_pred/n_total_pred:.2f}%)")
+
+        else:
+            raise ValueError(f"Invalid model type '{model_type}' found in config.")
+
+
+        # 5) Attach validation set + preds if provided
+        # --------------------------------------------
+        if not validation_training_data_df.empty and not validation_target_vars_df.empty:
+
+            # Retain X_validation and make predictions
+            result['X_validation'] = validation_training_data_df
+            result['validation_target_vars_df'] = validation_target_vars_df
+            y_val_series = validation_target_vars_df[modeling_cfg['target_variable']]
+            val_preds = wiva.load_and_predict(
+                model_id,
+                validation_training_data_df,
+                self.base_path
+            )
+
+            # Store regressor outcomes
+            if model_type == 'regression':
+                # y_true
+                result['y_validation'] = y_val_series
+                # y_pred
+                result['y_validation_pred'] = val_preds
+
+            # Store classifier outcomes
+            elif model_type == 'classification':
+                # y_true
+                min_thr = modeling_cfg.get('target_var_min_threshold', -np.inf)
+                max_thr = modeling_cfg.get('target_var_max_threshold', np.inf)
+                result['y_validation'] = (
+                    (y_val_series >= min_thr) &
+                    (y_val_series <= max_thr)
+                ).astype(int)
+                n_positive_val = result['y_validation'].sum()
+                n_total_val = len(result['y_validation'])
+                logger.info(f"Model {score_name}: y_validation true positives={n_positive_val}/{n_total_val} "
+                            f"({100*n_positive_val/n_total_val:.2f}%)")
+
+                # y_pred
+                # define y_pred_val
+                result['y_validation_pred_proba'] = val_preds
+                result['y_validation_pred'] = (val_preds >= y_threshold).astype(int)
+                n_positive_val_pred = result['y_validation_pred'].sum()
+                n_total_val_pred = len(result['y_validation_pred'])
+                logger.info(f"Model {score_name}: y_validation predicted positive={n_positive_val_pred}/{n_total_val_pred} "
+                            f"({100*n_positive_val_pred/n_total_val_pred:.2f}%)")
+
+            else:
+                raise ValueError(f"Invalid model type '{model_type}' found in config.")
+
+
 
         # No training metrics for loaded model
         result['X_train'] = wallet_training_data_df
