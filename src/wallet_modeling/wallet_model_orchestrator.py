@@ -27,11 +27,11 @@ class WalletModelOrchestrator:
 
     def __init__(
         self,
-        wallets_config,
-        wallets_metrics_config,
-        wallets_features_config,
-        wallets_epochs_config,
-        wallets_coin_config,
+        wallets_config: dict,
+        wallets_metrics_config: dict,
+        wallets_features_config: dict,
+        wallets_epochs_config: dict,
+        wallets_coin_config: dict,
     ):
         """
         Initialize the wallet model trainer.
@@ -195,6 +195,12 @@ class WalletModelOrchestrator:
         Returns:
         - dict: Model metrics including ID, return metrics, and macro averages
         """
+        # If there isn't a validation set, return just the model_id. This happens when the
+        #  wallet model is built for a current coin model without target variables, as coin
+        #  target variables are generated from the same period as wallet validation data.
+        if evaluator.X_validation is None:
+            return {'model_id': model_id,}
+
         # Extract return metrics for analysis
         n_buckets = 20
         if evaluator.modeling_config.get('model_type') == 'classification':
@@ -519,8 +525,8 @@ class WalletModelOrchestrator:
             'modeling_config': modeling_cfg
         }
 
-        # 4) Attach validation data + preds
-        if validation_training_data_df is not None and validation_target_vars_df is not None:
+        # 4) Attach validation data + preds if validation data is provided
+        if not validation_training_data_df.empty and not validation_target_vars_df.empty:
             result['X_validation'] = validation_training_data_df
             result['validation_target_vars_df'] = validation_target_vars_df
             result['y_validation'] = validation_target_vars_df[modeling_cfg['target_variable']]
