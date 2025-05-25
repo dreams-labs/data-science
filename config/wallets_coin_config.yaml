@@ -26,7 +26,7 @@ training_data: #CoinModel
     ]
 
     #KeyParam Rebuild Features Settings
-    toggle_rebuild_all_features: False  # If True, existing parquet features/target dfs will be overridden
+    toggle_rebuild_all_features: True  # If True, existing parquet features/target dfs will be overridden
     toggle_rebuild_wallet_models: False  # If True, all wallet models will be retrained
 
 
@@ -244,8 +244,8 @@ coin_modeling: #CoinModel
 
     #KeyParam Model Type
     # Target variable parameters
-    # model_type: regression  # "regression" or "classification"
-    model_type: classification  # "regression" or "classification"
+    model_type: regression  # "regression" or "classification"
+    # model_type: classification  # "regression" or "classification"
 
     #KeyParam Target Variable
     # target_variable: coin_return_winsorized
@@ -269,7 +269,8 @@ coin_modeling: #CoinModel
 
     # Train/Test/Eval split
     test_size: 0.2  # what % of the total population will be used as test
-    eval_size: 0.05  # what % used for the early stopping eval set
+    # eval_size: 0.05  # what % used for the early stopping eval set
+    eval_size: 0.15  # what % used for the early stopping eval set
 
     # Metaparameters
     verbose_estimators: True  # whether to print each estimator's scores
@@ -491,7 +492,7 @@ coin_modeling: #CoinModel
 
         #KeyParam Grid Search
         # -------------------------------
-        enabled: True
+        # enabled: True
         # -------------------------------
 
         # Search Methodology
