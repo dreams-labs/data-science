@@ -244,8 +244,8 @@ coin_modeling: #CoinModel
 
     #KeyParam Model Type
     # Target variable parameters
-    model_type: regression  # "regression" or "classification"
-    # model_type: classification  # "regression" or "classification"
+    # model_type: regression  # "regression" or "classification"
+    model_type: classification  # "regression" or "classification"
 
     #KeyParam Target Variable
     # target_variable: coin_return_winsorized
