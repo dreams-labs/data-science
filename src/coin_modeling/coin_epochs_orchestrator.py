@@ -184,6 +184,9 @@ class CoinEpochsOrchestrator:
         """
         self.coin_training_data_only = coin_training_data_only
 
+        # store in wallets_config for config validation logic
+        self.wallets_config['training_data']['coin_training_data_only'] = coin_training_data_only
+
         # 1. Build all wallet training data needed for all coin epochs
         # ------------------------------------------------------------
         # This increases execution speed by multithreading every wallet epoch, rather

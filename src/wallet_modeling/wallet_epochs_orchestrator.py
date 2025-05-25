@@ -787,9 +787,17 @@ class WalletEpochsOrchestrator:
             all_train_starts.extend(cfg['training_data']['training_window_starts'])
             all_model_ends.append(cfg['training_data']['modeling_period_end'])
 
-        earliest_training_start = pd.to_datetime(min(all_train_starts))
-        latest_modeling_end = pd.to_datetime(max(all_model_ends))
-        earliest_starting_balance_date = earliest_training_start - timedelta(days=1)
+        earliest_required_date = pd.to_datetime(min(all_train_starts))
+        if cfg['training_data']['coin_training_data_only']:
+            # if training data only, just validate through the last training period end
+            latest_required_date = (
+                pd.to_datetime(max(all_train_starts))
+                + timedelta(days = cfg['training_data']['modeling_period_duration'])
+            )
+        else:
+            # validate through the latest modeling period end
+            latest_required_date = pd.to_datetime(max(all_model_ends))
+        earliest_starting_balance_date = earliest_required_date - timedelta(days=1)
 
         # Get actual data boundaries
         profits_start = self.complete_profits_df.index.get_level_values('date').min()
@@ -801,16 +809,16 @@ class WalletEpochsOrchestrator:
 
         if not (
             (profits_start <= earliest_starting_balance_date) and
-            (profits_end >= latest_modeling_end) and
+            (profits_end >= latest_required_date) and
             (market_data_start <= earliest_starting_balance_date) and
-            (market_data_end >= latest_modeling_end) and
+            (market_data_end >= latest_required_date) and
             (macro_trends_start <= earliest_starting_balance_date) and
-            (macro_trends_end >= latest_modeling_end)
+            (macro_trends_end >= latest_required_date)
         ):
             raise ValueError(
                 f"Insufficient wallet data coverage for specified epochs.\n"
                 f"Required coverage: {earliest_starting_balance_date.strftime('%Y-%m-%d')}"
-                    f" to {latest_modeling_end.strftime('%Y-%m-%d')}\n"
+                    f" to {latest_required_date.strftime('%Y-%m-%d')}\n"
                 f"Actual coverage:\n"
                 f"- Profits data: {profits_start.strftime('%Y-%m-%d')} to {profits_end.strftime('%Y-%m-%d')}\n"
                 f"- Market data: {market_data_start.strftime('%Y-%m-%d')} to {market_data_end.strftime('%Y-%m-%d')}\n"
