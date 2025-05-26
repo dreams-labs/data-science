@@ -399,6 +399,7 @@ class CoinEpochsOrchestrator:
         # 2) Wallet-Level Features
         # ------------------------
         # Prepare epoch-specific orchestrator
+        logger.warning(f"_process_coin_epoch: {epoch_wallets_config['training_data']['modeling_period_start']}")
         epoch_weo = weo.WalletEpochsOrchestrator(
             base_config=epoch_wallets_config,               # epoch-specific config
             metrics_config=self.wallets_metrics_config,
@@ -408,7 +409,6 @@ class CoinEpochsOrchestrator:
             complete_market_data_df=self.complete_market_data_df,
             complete_macro_trends_df=self.complete_macro_trends_df,
         )
-        epoch_weo.all_epochs_configs = epoch_weo.generate_epoch_configs()
 
         # Generate wallets training & modeling data
         epoch_training_dfs = epoch_weo.generate_epochs_training_data()
