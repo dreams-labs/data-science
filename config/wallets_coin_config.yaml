@@ -26,7 +26,7 @@ training_data: #CoinModel
     ]
 
     #KeyParam Rebuild Features Settings
-    toggle_rebuild_all_features: True  # If True, existing parquet features/target dfs will be overridden
+    toggle_rebuild_all_features: False  # If True, existing parquet features/target dfs will be overridden
     toggle_rebuild_wallet_models: False  # If True, all wallet models will be retrained
 
 
