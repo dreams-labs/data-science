@@ -50,9 +50,15 @@ class WalletEpochsOrchestrator:
         self.features_config = features_config
         self.epochs_config = epochs_config
 
-        # Generated configs
+        # Modifications for generating training data only
         self.training_only = training_only
+        if self.training_only:
+            self.base_config['training_data']['training_data_only'] = True
+
+        # Generated configs for all epochs
         self.all_epochs_configs = self.generate_epoch_configs()
+        if len(self.all_epochs_configs) == 0:
+            raise ValueError("how is this possible?")
 
         # Complete df objects
         self.complete_profits_df = complete_profits_df
@@ -146,67 +152,92 @@ class WalletEpochsOrchestrator:
     def generate_epochs_training_data(self
         ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
-        Generates epoch‑level training data.  When `self.training_only=True`, it returns **only**
-         the merged `wallet_training_data_df` (historical training snapshots) and skips the modeling
-         and validation datasets.
+        Generates training features and target variables across multiple time epochs.
+         * When training_only=True, returns only wallet_training_data_df populated with features
+            from modeling and current epochs; other DataFrames are empty.
+         * When training_only=False, returns wallet_training_data_df and wallet_target_vars_df
+        from modeling epochs, plus validation_training_data_df and validation_target_vars_df
+        from validation epochs.
+        All returned DataFrames are MultiIndexed on (wallet_address, epoch_start_date).
 
         Returns:
-        - wallet_training_data_df (always returned)
-
-        When `training_only=False` it also returns:
-        - wallet_target_vars_df: MultiIndexed on (wallet_address, epoch_start_date) for modeling epochs
-        - validation_training_data_df: MultiIndexed on (wallet_address, epoch_start_date) for validation epochs
-        - validation_target_vars_df: MultiIndexed on (wallet_address, epoch_start_date) for validation epochs
+        - wallet_training_data_df, wallet_target_vars_df, validation_training_data_df, validation_target_vars_df
         """
+        # Ensure the complete dfs encompass the full range of training_epoch_starts
+        if not self.training_only:
+            self._assert_complete_coverage()
+
         logger.milestone(f"Compiling wallet training data for {len(self.all_epochs_configs)} epochs...")
         if self.training_only:
             logger.warning("Training‑only mode: Compiling wallet training data without validation or target variables.")
 
         u.notify('intro_3')
 
-        training_modeling_dfs = {}
-        if not self.training_only:
-            # Ensure the complete dfs encompass the full range of training_epoch_starts
-            self._assert_complete_coverage()
-
-            modeling_modeling_dfs = {}
-            training_validation_dfs = {}
-            modeling_validation_dfs = {}
+        # Dicts of epoch dfs by type
+        modeling_period_training_dfs = {}
+        modeling_period_target_var_dfs = {}
+        validation_period_training_dfs = {}
+        validation_period_target_var_dfs = {}
 
         # Set a suitable number of threads. You could retrieve this from config; here we use 8 as an example.
         max_workers = self.base_config['n_threads']['concurrent_epochs']
         i = 0
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Skip validation epochs entirely in training‑only mode
-            epoch_configs_to_process = (
-                [cfg for cfg in self.all_epochs_configs if cfg.get('epoch_type') == 'modeling']
-                if self.training_only else self.all_epochs_configs
-            )
+
+            # Define configs to process
+            if self.training_only:
+                # Training-only mode: process modeling epochs (for training models) and current epoch (for scoring)
+                epoch_configs_to_process = [
+                    cfg for cfg in self.all_epochs_configs
+                    if cfg.get('epoch_type') in ['modeling', 'current']
+                ]
+            else:
+                # Full mode: process all epoch types (modeling, validation, and current if present)
+                epoch_configs_to_process = self.all_epochs_configs
+
+            if len(epoch_configs_to_process) == 0:
+                raise ValueError("There must always be at least one config if we are generating " \
+                                 "epoch training data")
+
+            # Multithreading begins
             futures = {
                 executor.submit(self._process_single_epoch, cfg, self.training_only): cfg
                 for cfg in epoch_configs_to_process
             }
             for future in as_completed(futures):
                 cfg = futures[future]
-                epoch_date, epoch_training_df, epoch_modeling_df = future.result()
+                epoch_date, epoch_training_df, epoch_target_var_df = future.result()
 
-                # Store data
-                if cfg.get('epoch_type') == 'modeling':
-                    training_modeling_dfs[epoch_date] = epoch_training_df
-                    if not self.training_only:
-                        modeling_modeling_dfs[epoch_date] = epoch_modeling_df
-                elif not self.training_only and cfg.get('epoch_type') == 'validation':
-                    training_validation_dfs[epoch_date] = epoch_training_df #pylint:disable=possibly-used-before-assignment
-                    modeling_validation_dfs[epoch_date] = epoch_modeling_df #pylint:disable=possibly-used-before-assignment
+                # Process epochs by type:
+                # - 'modeling': Historical periods for training models (has both features and targets)
+                # - 'current': Latest period for scoring with existing models (features only, no targets)
+                # - 'validation': Future periods for model validation (has both features and targets)
+                if cfg.get('epoch_type') in ['modeling', 'current']:
+                    # Both modeling and current epochs provide training features
+                    modeling_period_training_dfs[epoch_date] = epoch_training_df
 
+                    # Only modeling epochs have target variables (current epoch is at data boundary)
+                    if cfg.get('epoch_type') == 'modeling':
+                        modeling_period_target_var_dfs[epoch_date] = epoch_target_var_df
+
+                elif cfg.get('epoch_type') == 'validation':
+                    # Validation epochs provide both features and targets for out-of-sample testing
+                    validation_period_training_dfs[epoch_date] = epoch_training_df
+                    validation_period_target_var_dfs[epoch_date] = epoch_target_var_df
+
+                else:
+                    raise ValueError(
+                        f"Unrecognized epoch type '{cfg.get('epoch_type')}'. "
+                        f"Expected 'modeling', 'current', or 'validation'."
+                    )
                 i += 1
                 logger.milestone(f"Wallet epoch {i}/{len(epoch_configs_to_process)} completed (date: " \
                                  f"{pd.to_datetime(epoch_date).strftime('%Y-%m-%d')})")
 
-        del epoch_training_df, epoch_modeling_df
+        del epoch_training_df, epoch_target_var_df
         gc.collect()
 
-        wallet_training_data_df = self._merge_epoch_dfs(training_modeling_dfs)
+        wallet_training_data_df = self._merge_epoch_dfs(modeling_period_training_dfs)
 
         # Training‑only fast path
         if self.training_only:
@@ -221,11 +252,11 @@ class WalletEpochsOrchestrator:
             return wallet_training_data_df, pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
         # Full four‑tuple path
-        validation_training_data_df   = (self._merge_epoch_dfs(training_validation_dfs)
-                                         if training_validation_dfs else pd.DataFrame())
-        wallet_target_vars_df   = self._merge_epoch_dfs(modeling_modeling_dfs)
-        validation_target_vars_df = (self._merge_epoch_dfs(modeling_validation_dfs)
-                                         if modeling_validation_dfs else pd.DataFrame())
+        validation_training_data_df   = (self._merge_epoch_dfs(validation_period_training_dfs)
+                                         if validation_period_training_dfs else pd.DataFrame())
+        wallet_target_vars_df   = self._merge_epoch_dfs(modeling_period_target_var_dfs)
+        validation_target_vars_df = (self._merge_epoch_dfs(validation_period_target_var_dfs)
+                                         if validation_period_target_var_dfs else pd.DataFrame())
 
         # Confirm indices match
         u.assert_matching_indices(wallet_training_data_df, wallet_target_vars_df)
@@ -577,7 +608,11 @@ class WalletEpochsOrchestrator:
 
     def generate_epoch_configs(self) -> List[Dict]:
         """
-        Generates config dicts for each offset epoch, including modeling and validation epochs.
+        Generates config dicts for modeling and validation epochs by offsetting base config dates.
+         Training epochs are not generated separately because training windows are embedded within
+         each modeling/validation epoch as offset `training_window_starts` dates.
+         Each epoch config represents a complete modeling scenario with multiple training windows
+         feeding into one modeling period.
 
         Also used by CoinEpochsOrchestrator.
 
@@ -597,8 +632,8 @@ class WalletEpochsOrchestrator:
         base_parquet_folder_base = Path(base_training_data['parquet_folder'])
 
         # Identify all offsets
-        validation_offsets = self.epochs_config['offset_epochs'].get('validation_offsets', [])
         modeling_offsets = self.epochs_config['offset_epochs']['offsets']
+        validation_offsets = self.epochs_config['offset_epochs'].get('validation_offsets', [])
 
         # Confirm there is no overlap between any modeling and validation periods
         if len(validation_offsets) > 0:
@@ -624,6 +659,24 @@ class WalletEpochsOrchestrator:
                         base_training_window_starts, base_parquet_folder_base
                     )
                     all_epochs_configs.append(cfg)
+
+        # In training_only mode, add one additional "current" epoch
+        if self.training_only:
+            # Calculate offset to bring modeling_period_start to validation_period_end
+            base_modeling_start_dt = pd.to_datetime(base_training_data['modeling_period_start'])
+            validation_end_dt = pd.to_datetime(base_training_data['validation_period_end'])
+            end_of_val_offset = (validation_end_dt - base_modeling_start_dt).days
+
+            all_epochs_configs.append(
+                self.build_epoch_wallets_config(
+                    end_of_val_offset, 'current',
+                    base_modeling_start, base_modeling_end,
+                    base_training_window_starts, base_parquet_folder_base
+                )
+            )
+
+        if len(all_epochs_configs) == 0:
+            raise ValueError("There should always be at least one config generated.")
 
         return all_epochs_configs
 
