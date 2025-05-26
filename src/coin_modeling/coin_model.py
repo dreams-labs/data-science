@@ -76,6 +76,11 @@ class CoinModel(BaseModel):
             set(validation_df.index.get_level_values('coin_epoch_start_date')))) > 0:
                 raise ValueError("Overlap found between training data and validation data epochs. "
                                 "This will cause data leakage of the validation target variables.")
+            # Confirm columns match
+            if not np.array_equal(set(training_df.columns),set(validation_df.columns)):
+                raise ValueError("Columns in training_df do not match columns in validation_df.")
+            if not np.array_equal(set(modeling_coin_df.columns),set(validation_coin_df.columns)):
+                raise ValueError("Columns in training target vars do not match columns in validation target vars.")
 
             # Prepare and store validation datasets
             self.X_validation, self.validation_target_vars_df = self._prepare_data(
