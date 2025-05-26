@@ -199,7 +199,8 @@ class CoinFlowFeaturesOrchestrator:
         # 1. Data Retrieval, Cleaning, Indicator Calculation
         # --------------------------------------------------
         # Market data: retrieve and clean full history
-        market_data_df = dr.retrieve_market_data(dataset=self.config['training_data']['dataset'])
+        market_data_df = dr.retrieve_market_data(self.config['training_data']['training_period_end'],
+                                                 dataset=self.config['training_data']['dataset'])
         market_data_df = dr.clean_market_data(market_data_df, self.config,
                                                 self.config['training_data']['earliest_window_start'],
                                                 self.config['training_data']['training_period_end'])
