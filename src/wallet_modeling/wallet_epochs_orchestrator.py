@@ -41,7 +41,8 @@ class WalletEpochsOrchestrator:
         complete_profits_df: pd.DataFrame = None,
         complete_market_data_df: pd.DataFrame = None,
         complete_macro_trends_df: pd.DataFrame = None,
-        complete_hybrid_cw_id_df: pd.DataFrame = None
+        complete_hybrid_cw_id_df: pd.DataFrame = None,
+        training_only: bool = False
     ):
         # Param Configs
         self.base_config = base_config
@@ -50,6 +51,7 @@ class WalletEpochsOrchestrator:
         self.epochs_config = epochs_config
 
         # Generated configs
+        self.training_only = training_only
         self.all_epochs_configs = self.generate_epoch_configs()
 
         # Complete df objects
@@ -141,12 +143,12 @@ class WalletEpochsOrchestrator:
 
 
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
-    def generate_epochs_training_data(self, training_only: bool = False
+    def generate_epochs_training_data(self
         ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
-        Generates epoch‑level training data.  When `training_only=True`, it returns **only** the merged
-        `wallet_training_data_df` (historical training snapshots) and skips all future‑dated data
-        generation.
+        Generates epoch‑level training data.  When `self.training_only=True`, it returns **only**
+         the merged `wallet_training_data_df` (historical training snapshots) and skips the modeling
+         and validation datasets.
 
         Returns:
         - wallet_training_data_df (always returned)
@@ -157,13 +159,13 @@ class WalletEpochsOrchestrator:
         - validation_target_vars_df: MultiIndexed on (wallet_address, epoch_start_date) for validation epochs
         """
         logger.milestone(f"Compiling wallet training data for {len(self.all_epochs_configs)} epochs...")
-        if training_only:
+        if self.training_only:
             logger.warning("Training‑only mode: Compiling wallet training data without validation or target variables.")
 
         u.notify('intro_3')
 
         training_modeling_dfs = {}
-        if not training_only:
+        if not self.training_only:
             # Ensure the complete dfs encompass the full range of training_epoch_starts
             self._assert_complete_coverage()
 
@@ -178,10 +180,10 @@ class WalletEpochsOrchestrator:
             # Skip validation epochs entirely in training‑only mode
             epoch_configs_to_process = (
                 [cfg for cfg in self.all_epochs_configs if cfg.get('epoch_type') == 'modeling']
-                if training_only else self.all_epochs_configs
+                if self.training_only else self.all_epochs_configs
             )
             futures = {
-                executor.submit(self._process_single_epoch, cfg, training_only): cfg
+                executor.submit(self._process_single_epoch, cfg, self.training_only): cfg
                 for cfg in epoch_configs_to_process
             }
             for future in as_completed(futures):
@@ -191,9 +193,9 @@ class WalletEpochsOrchestrator:
                 # Store data
                 if cfg.get('epoch_type') == 'modeling':
                     training_modeling_dfs[epoch_date] = epoch_training_df
-                    if not training_only:
+                    if not self.training_only:
                         modeling_modeling_dfs[epoch_date] = epoch_modeling_df
-                elif not training_only and cfg.get('epoch_type') == 'validation':
+                elif not self.training_only and cfg.get('epoch_type') == 'validation':
                     training_validation_dfs[epoch_date] = epoch_training_df #pylint:disable=possibly-used-before-assignment
                     modeling_validation_dfs[epoch_date] = epoch_modeling_df #pylint:disable=possibly-used-before-assignment
 
@@ -207,7 +209,7 @@ class WalletEpochsOrchestrator:
         wallet_training_data_df = self._merge_epoch_dfs(training_modeling_dfs)
 
         # Training‑only fast path
-        if training_only:
+        if self.training_only:
             logger.milestone(
                 "Generated wallet multi‑epoch DataFrames with shapes:\n"
                 " - modeling train: %s\n"
@@ -533,7 +535,7 @@ class WalletEpochsOrchestrator:
             )
 
 
-    def build_epoch_config(
+    def build_epoch_wallets_config(
         self,
         offset_days: int,
         epoch_type: str,
@@ -567,6 +569,8 @@ class WalletEpochsOrchestrator:
         epoch_config['training_data']['parquet_folder'] = str(base_parquet_folder_base / folder_suffix)
 
         # Add derived values
+        logger.warning(epoch_type)
+        logger.warning(epoch_config['training_data']['modeling_period_end'])
         return wcm.add_derived_values(epoch_config)
 
 
@@ -601,24 +605,25 @@ class WalletEpochsOrchestrator:
             self._assert_no_epoch_overlap(modeling_offsets, validation_offsets)
 
         # Generate modeling epoch configs
-        for offset_days in modeling_offsets:
-            all_epochs_configs.append(
-                self.build_epoch_config(
-                    offset_days, 'modeling',
-                    base_modeling_start, base_modeling_end,
-                    base_training_window_starts, base_parquet_folder_base
+        if not self.training_only:
+            for offset_days in modeling_offsets:
+                all_epochs_configs.append(
+                    self.build_epoch_wallets_config(
+                        offset_days, 'modeling',
+                        base_modeling_start, base_modeling_end,
+                        base_training_window_starts, base_parquet_folder_base
+                    )
                 )
-            )
 
-        # Add validation epoch configs if configured
-        if len(validation_offsets) > 0:
-            for offset_days in validation_offsets:
-                cfg = self.build_epoch_config(
-                    offset_days, 'validation',
-                    base_modeling_start, base_modeling_end,
-                    base_training_window_starts, base_parquet_folder_base
-                )
-                all_epochs_configs.append(cfg)
+            # Add validation epoch configs if configured
+            if len(validation_offsets) > 0:
+                for offset_days in validation_offsets:
+                    cfg = self.build_epoch_wallets_config(
+                        offset_days, 'validation',
+                        base_modeling_start, base_modeling_end,
+                        base_training_window_starts, base_parquet_folder_base
+                    )
+                    all_epochs_configs.append(cfg)
 
         return all_epochs_configs
 
