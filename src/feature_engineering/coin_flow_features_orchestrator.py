@@ -124,7 +124,7 @@ class CoinFlowFeaturesOrchestrator:
 
             # Generate custom configs for each window
             window_config, window_metrics_config, window_modeling_config = (
-                exp.prepare_configs(
+                prepare_configs(
                     self.modeling_config['modeling']['config_folder'], time_window
                 )
             )
@@ -517,3 +517,102 @@ class CoinFlowFeaturesOrchestrator:
             return dataset_key
         else:
             raise ValueError(f"Could not parse dataset of file {filepath}")
+
+
+
+
+# ------------------------------------
+#       Config Utility Functions
+# ------------------------------------
+
+def prepare_configs(config_folder, override_params):
+    """
+    Loads config files from the config_folder using load_config and applies overrides specified
+    in override_params.
+
+    Args:
+    - config_folder (str): Path to the folder containing the configuration files.
+    - override_params (dict): Dictionary of flattened parameters to override in the loaded configs.
+
+    Returns:
+    - config (dict): The main config file with overrides applied.
+    - metrics_config (dict): The metrics configuration with overrides applied.
+    - modeling_config (dict): The modeling configuration with overrides applied.
+
+    Raises:
+    - KeyError: if any key from override_params does not match an existing key in the
+        corresponding config.
+    """
+
+    # Load the main config files using load_config
+    config_path = os.path.join(config_folder, 'config.yaml')
+    metrics_config_path = os.path.join(config_folder, 'metrics_config.yaml')
+    modeling_config_path = os.path.join(config_folder, 'modeling_config.yaml')
+
+    config = u.load_config(config_path)
+    metrics_config = u.load_config(metrics_config_path)
+    modeling_config = u.load_config(modeling_config_path)
+
+    # Apply the flattened overrides to each config
+    for full_key, value in override_params.items():
+        if full_key.startswith('config.'):
+            # Validate the key exists before setting the value
+            validate_key_in_config(config, full_key[len('config.'):])
+            set_nested_value(config, full_key[len('config.'):], value)
+        elif full_key.startswith('metrics_config.'):
+            # Validate the key exists before setting the value
+            validate_key_in_config(metrics_config, full_key[len('metrics_config.'):])
+            set_nested_value(metrics_config, full_key[len('metrics_config.'):], value)
+        elif full_key.startswith('modeling_config.'):
+            # Validate the key exists before setting the value
+            validate_key_in_config(modeling_config, full_key[len('modeling_config.'):])
+            set_nested_value(modeling_config, full_key[len('modeling_config.'):], value)
+        else:
+            raise ValueError(f"Unknown config section in key: {full_key}")
+
+    # reapply the period boundary dates based on the current config['training_data'] params
+    period_dates = u.calculate_period_dates(config)
+    config['training_data'].update(period_dates)
+
+    return config, metrics_config, modeling_config
+
+# helper function for prepare_configs()
+def set_nested_value(config, key_path, value):
+    """
+    Sets a value in a nested dictionary based on a flattened key path.
+
+    Args:
+    - config (dict): The configuration dictionary to update.
+    - key_path (str): The flattened key path (e.g., 'config.data_cleaning.max_wallet_inflows').
+    - value: The value to set at the given key path.
+    """
+    keys = key_path.split('.')
+    sub_dict = config
+    for key in keys[:-1]:  # Traverse down to the second-to-last key
+        sub_dict = sub_dict.setdefault(key, {})
+    sub_dict[keys[-1]] = value  # Set the value at the final key
+
+# helper function for prepare_configs
+def validate_key_in_config(config, key_path):
+    """
+    Validates that a given key path exists in the nested configuration.
+
+    Args:
+    - config (dict): The configuration dictionary to validate.
+    - key_path (str): The flattened key path to check.
+        (e.g. 'config.data_cleaning.max_wallet_inflows')
+
+    Raises:
+    - KeyError: If the key path does not exist in the config.
+    """
+    keys = key_path.split('.')
+    sub_dict = config
+    for key in keys[:-1]:  # Traverse down to the second-to-last key
+        if key not in sub_dict:
+            raise KeyError(
+                f"Key '{key}' not found in config at level '{'.'.join(keys[:-1])}'")
+        sub_dict = sub_dict[key]
+    if keys[-1] not in sub_dict:
+        raise KeyError(
+            f"Key '{keys[-1]}' not found in config at final level '{'.'.join(keys[:-1])}'")
+
