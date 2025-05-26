@@ -47,16 +47,27 @@ class RegressorEvaluator:
         - wallet_model_results (dict): output of wallet_model.construct_wallet_model
 
         Required keys:
-        'y_train','y_test','y_pred',
+        'y_train','y_test','y_pred','X_test',
         'training_cohort_pred','training_cohort_actuals',
-        'pipeline','X_test'
+        'pipeline'
         """
-        # core arrays
+        # train/test arrays
+        self.X_test = wallet_model_results['X_test']
         self.y_test  = wallet_model_results['y_test']
         self.y_pred  = wallet_model_results['y_pred']
         self.y_train = wallet_model_results['y_train']
         self.training_cohort_pred     = wallet_model_results.get('training_cohort_pred')
         self.training_cohort_actuals  = wallet_model_results.get('training_cohort_actuals')
+
+        # boolean whether to evaluate train/test sets
+        self.train_test_data_provided = True
+        if any([
+            (self.X_test is None or len(self.X_test) == 0),
+            (self.y_test is None or len(self.y_test) == 0),
+            (self.y_pred is None or len(self.y_pred) == 0),
+            (self.y_train is None or len(self.y_train) == 0)
+        ]):
+            self.train_test_data_provided = False
 
         # validation (if present)
         self.X_validation      = wallet_model_results.get('X_validation')
@@ -64,25 +75,26 @@ class RegressorEvaluator:
         self.y_validation_pred = wallet_model_results.get('y_validation_pred')
         self.validation_target_vars_df = wallet_model_results.get('validation_target_vars_df')
 
-        # model + features
+        # model artifacts
+        self.model_id = wallet_model_results['model_id']
         self.modeling_config = wallet_model_results['modeling_config']
         pipeline = wallet_model_results['pipeline']
         self.model = pipeline.named_steps['estimator']
+
+        # feature names
+        if self.train_test_data_provided:
+            features_df = wallet_model_results['X_train']
+        elif self.X_validation is not None:
+            features_df = self.X_validation
         self.feature_names = (
-            pipeline[:-1].transform(wallet_model_results['X_train']).columns.tolist()
+            pipeline[:-1].transform(features_df).columns.tolist()
             if hasattr(pipeline[:-1], 'transform') else None
         )
-
-        # raw X_test for cohort methods
-        self.X_test = wallet_model_results['X_test']
 
         # init metrics & styling
         self.metrics = {}
         self._calculate_metrics()
         self._setup_plot_style()
-
-        # model id
-        self.model_id = wallet_model_results['model_id']
 
 
 
@@ -96,15 +108,17 @@ class RegressorEvaluator:
         # now just grab the header + samples
         summary = self._get_summary_header()
 
-        # Add core regression metrics
-        summary.extend([
-            "Core Metrics",
-            "-" * 35,
-            f"R² Score:                 {self.metrics['r2']:.3f}",
-            f"RMSE:                     {self.metrics['rmse']:.3f}",
-            f"MAE:                      {self.metrics['mae']:.3f}",
-            ""
-        ])
+        # Check if train/test data is available
+        if self.train_test_data_provided:
+            # Add core test set regression metrics
+            summary.extend([
+                "Core Metrics",
+                "-" * 35,
+                f"R² Score:                 {self.metrics['r2']:.3f}",
+                f"RMSE:                     {self.metrics['rmse']:.3f}",
+                f"MAE:                      {self.metrics['mae']:.3f}",
+                ""
+            ])
 
         # Validation metrics
         if "validation_metrics" in self.metrics:
@@ -133,13 +147,15 @@ class RegressorEvaluator:
             ])
 
         # Residuals
-        summary.extend([
-            "Residuals Analysis",
-            "-" * 35,
-            f"Mean of Residuals:        {self.metrics['residuals_mean']:.3f}",
-            f"Std of Residuals:         {self.metrics['residuals_std']:.3f}",
-            f"95% Prediction Interval:  ±{self.metrics['prediction_interval_95']:.3f}"
-        ])
+        # Check if train/test data is available
+        if self.train_test_data_provided:
+            summary.extend([
+                "Residuals Analysis",
+                "-" * 35,
+                f"Mean of Residuals:        {self.metrics['residuals_mean']:.3f}",
+                f"Std of Residuals:         {self.metrics['residuals_std']:.3f}",
+                f"95% Prediction Interval:  ±{self.metrics['prediction_interval_95']:.3f}"
+            ])
 
         report = "\n".join(summary)
         logger.info("\n%s", report)
@@ -238,51 +254,54 @@ class RegressorEvaluator:
 
     def _calculate_metrics(self):
         """Calculate core regression metrics and optional cohort metrics."""
-        # Calculate residuals
-        self.residuals = self.y_test - self.y_pred
 
-        # Core test set metrics
-        self.metrics['mse'] = mean_squared_error(self.y_test, self.y_pred)
-        self.metrics['rmse'] = np.sqrt(self.metrics['mse'])
-        self.metrics['mae'] = mean_absolute_error(self.y_test, self.y_pred)
-        self.metrics['r2'] = r2_score(self.y_test, self.y_pred)
-        self.metrics['explained_variance'] = explained_variance_score(self.y_test, self.y_pred)
+        # If we're just scoring and not building a new model, we don't have train/test sets
+        if self.train_test_data_provided:
+            # Calculate residuals
+            self.residuals = self.y_test - self.y_pred
 
-        # Residuals analysis
-        self.metrics['residuals_mean'] = np.mean(self.residuals)
-        self.metrics['residuals_std'] = np.std(self.residuals)
-        self.metrics['prediction_interval_95'] = 1.96 * self.metrics['residuals_std']
+            # Core test set metrics
+            self.metrics['mse'] = mean_squared_error(self.y_test, self.y_pred)
+            self.metrics['rmse'] = np.sqrt(self.metrics['mse'])
+            self.metrics['mae'] = mean_absolute_error(self.y_test, self.y_pred)
+            self.metrics['r2'] = r2_score(self.y_test, self.y_pred)
+            self.metrics['explained_variance'] = explained_variance_score(self.y_test, self.y_pred)
 
-        # Sample size tracking
-        self.metrics['test_samples'] = len(self.y_pred)
-        if self.y_train is not None:
-            self.metrics['train_samples'] = len(self.y_train)
+            # Residuals analysis
+            self.metrics['residuals_mean'] = np.mean(self.residuals)
+            self.metrics['residuals_std'] = np.std(self.residuals)
+            self.metrics['prediction_interval_95'] = 1.96 * self.metrics['residuals_std']
 
-        # Training cohort metrics if available
-        if (self.training_cohort_pred is not None and
-            self.training_cohort_actuals is not None):
-            self.metrics['training_cohort'] = {
-                'mse': mean_squared_error(
-                    self.training_cohort_actuals,
-                    self.training_cohort_pred
-                ),
-                'rmse': np.sqrt(mean_squared_error(
-                    self.training_cohort_actuals,
-                    self.training_cohort_pred
-                )),
-                'mae': mean_absolute_error(
-                    self.training_cohort_actuals,
-                    self.training_cohort_pred
-                ),
-                'r2': r2_score(
-                    self.training_cohort_actuals,
-                    self.training_cohort_pred
-                )
-            }
-            self.metrics['total_cohort_samples'] = len(self.training_cohort_actuals)
+            # Sample size tracking
+            self.metrics['test_samples'] = len(self.y_pred)
+            if self.y_train is not None:
+                self.metrics['train_samples'] = len(self.y_train)
 
-            # Add cohort comparison metrics
-            self._calculate_cohort_metrics()
+            # Training cohort metrics if available
+            if (self.training_cohort_pred is not None and
+                self.training_cohort_actuals is not None):
+                self.metrics['training_cohort'] = {
+                    'mse': mean_squared_error(
+                        self.training_cohort_actuals,
+                        self.training_cohort_pred
+                    ),
+                    'rmse': np.sqrt(mean_squared_error(
+                        self.training_cohort_actuals,
+                        self.training_cohort_pred
+                    )),
+                    'mae': mean_absolute_error(
+                        self.training_cohort_actuals,
+                        self.training_cohort_pred
+                    ),
+                    'r2': r2_score(
+                        self.training_cohort_actuals,
+                        self.training_cohort_pred
+                    )
+                }
+                self.metrics['total_cohort_samples'] = len(self.training_cohort_actuals)
+
+                # Add cohort comparison metrics
+                self._calculate_cohort_metrics()
 
         # Feature importance if available
         if self.model is not None and hasattr(self.model, 'feature_importances_'):
@@ -399,28 +418,29 @@ class RegressorEvaluator:
         else:
             window_n_features_str = ''
 
-        if "total_cohort_samples" in self.metrics:
-            header.extend([
-                f"Training Cohort:          {self.metrics['total_cohort_samples']:,d}",
-                f"Modeling Cohort Train:    {self.metrics['train_samples']:,d}",
-                f"Modeling Cohort Test:     {self.metrics['test_samples']:,d}",
-                ""
-            ])
-        else:
-            header.extend([
-                f"Test Samples:             {self.metrics['test_samples']:,d}",
-            ])
-
-            if self.modeling_config['model_type'] == 'classification':
+        if self.train_test_data_provided:
+            if "total_cohort_samples" in self.metrics:
                 header.extend([
-                    f"Test Positive Samples:    {self.y_validation.sum():,d} "
-                    f"({self.y_validation.sum()/self.metrics['test_samples']*100:.2f}%)",
+                    f"Training Cohort:          {self.metrics['total_cohort_samples']:,d}",
+                    f"Modeling Cohort Train:    {self.metrics['train_samples']:,d}",
+                    f"Modeling Cohort Test:     {self.metrics['test_samples']:,d}",
+                    ""
+                ])
+            else:
+                header.extend([
+                    f"Test Samples:             {self.metrics['test_samples']:,d}",
                 ])
 
-            header.extend([
-                f"Number of Features:       {n_features:,d}",
-                window_n_features_str,
-            ])
+                if self.modeling_config['model_type'] == 'classification' and self.y_validation is not None:
+                    header.extend([
+                        f"Test Positive Samples:    {self.y_validation.sum():,d} "
+                        f"({self.y_validation.sum()/self.metrics['test_samples']*100:.2f}%)",
+                    ])
+
+                header.extend([
+                    f"Number of Features:       {n_features:,d}",
+                    window_n_features_str,
+                ])
         return header
 
 
@@ -485,6 +505,13 @@ class RegressorEvaluator:
 
     def _plot_actual_vs_predicted(self, ax):
         """Plot actual vs predicted values using hexbin."""
+      # Check if train/test data is available
+        if not self.train_test_data_provided:
+            # Fall back to just showing score distribution without returns
+            ax.text(0.5, 0.1, "Train/test metrics are not available when \nloading a pre-trained model",
+                    ha="center", va="center", alpha=0.7, transform=ax.transAxes)
+            return
+
         extent = [
             min(self.y_test.min(), self.y_pred.min()),
             max(self.y_test.max(), self.y_pred.max()),
@@ -509,6 +536,13 @@ class RegressorEvaluator:
 
     def _plot_residuals(self, ax):
         """Plot residuals vs predicted values using hexbin."""
+        # Check if train/test data is available
+        if not self.train_test_data_provided:
+            # Fall back to just showing score distribution without returns
+            ax.text(0.5, 0.1, "Train/test metrics are not available when \nloading a pre-trained model",
+                    ha="center", va="center", alpha=0.7, transform=ax.transAxes)
+            return
+
         ax.hexbin(self.y_pred, self.residuals,
                 gridsize=50,
                 cmap=self.custom_cmap,
@@ -558,6 +592,13 @@ class RegressorEvaluator:
 
     def _plot_score_distribution(self, ax):
         """Basic distribution plot of actual vs predicted values."""
+        # Check if train/test data is available
+        if not self.train_test_data_provided:
+            # Fall back to just showing score distribution without returns
+            ax.text(0.5, 0.1, "Train/test metrics are not available when \nloading a pre-trained model",
+                    ha="center", va="center", alpha=0.7, transform=ax.transAxes)
+            return
+
         sns.kdeplot(data=self.y_test, ax=ax, label='Actual', color='#69c4ff')
         sns.kdeplot(data=self.y_pred, ax=ax, label='Predicted', color='#ff6969')
 
@@ -923,15 +964,19 @@ class ClassifierEvaluator(RegressorEvaluator):
     """
     def __init__(self, wallet_model_results: dict):
 
+        self.y_pred_proba = wallet_model_results.get('y_pred_proba')
+        super().__init__(wallet_model_results)
+
         # Extract probability predictions
-        self.y_pred_proba = wallet_model_results['y_pred_proba']
+        if (not self.train_test_data_provided and
+            not (self.y_pred_proba is None or len(self.y_pred_proba) == 0)
+        ):
+            raise ValueError("If train/test data is not available, y_pred_proba should be empty.")
+
         self.y_validation_pred_proba = wallet_model_results.get('y_validation_pred_proba')
         self.y_validation_pred = wallet_model_results.get('y_validation_pred')
         self.y_pred_threshold = wallet_model_results['modeling_config']['y_pred_threshold']
 
-
-        # super() creates metrics and
-        super().__init__(wallet_model_results)
 
 
 
@@ -948,28 +993,46 @@ class ClassifierEvaluator(RegressorEvaluator):
 
         # Classification test set metrics
         if 'val_roc_auc' not in self.metrics:
-            summary.extend([
-                    "Test Set Classification Metrics",
-                    "-" * 35,
-                    f"ROC AUC:                    {self.metrics['roc_auc']:.3f}",
-                    f"Log Loss:                   {self.metrics['log_loss']:.3f}",
-                    f"Accuracy:                   {self.metrics['accuracy']:.3f}",
-                    f"Precision:                  {self.metrics['precision']:.3f}",
-                    f"Recall:                     {self.metrics['recall']:.3f}",
-                    f"F1 Score:                   {self.metrics['f1']:.3f}",
-                    ""
-            ])
+        # Check if train/test data is available
+            if self.train_test_data_provided:
+
+                summary.extend([
+                        "Test Set Classification Metrics",
+                        f"True Positives:             {sum(self.y_test)}/{len(self.y_test)} ({100*sum(self.y_test)/len(self.y_test):.1f})",
+                        "-" * 35,
+                        f"ROC AUC:                    {self.metrics['roc_auc']:.3f}",
+                        f"Log Loss:                   {self.metrics['log_loss']:.3f}",
+                        f"Accuracy:                   {self.metrics['accuracy']:.3f}",
+                        f"Precision:                  {self.metrics['precision']:.3f}",
+                        f"Recall:                     {self.metrics['recall']:.3f}",
+                        f"F1 Score:                   {self.metrics['f1']:.3f}",
+                        ""
+                ])
         else:
-            summary.extend([
-                "Classification Metrics:      Val   |  Test",
-                "-" * 43,
-                f"Val ROC AUC:                {self.metrics['val_roc_auc']:.3f}  |  {self.metrics['roc_auc']:.3f}",
-                f"Val Accuracy:               {self.metrics['val_accuracy']:.3f}  |  {self.metrics['accuracy']:.3f}",
-                f"Val Precision:              {self.metrics['val_precision']:.3f}  |  {self.metrics['precision']:.3f}",
-                f"Val Recall:                 {self.metrics['val_recall']:.3f}  |  {self.metrics['recall']:.3f}",
-                f"Val F1 Score:               {self.metrics['val_f1']:.3f}  |  {self.metrics['f1']:.3f}",
-                "",
-            ])
+        # Check if train/test data is available
+            if self.train_test_data_provided:
+
+                summary.extend([
+                    "Classification Metrics:      Val   |  Test",
+                    "-" * 43,
+                    f"Val ROC AUC:                {self.metrics['val_roc_auc']:.3f}  |  {self.metrics['roc_auc']:.3f}",
+                    f"Val Accuracy:               {self.metrics['val_accuracy']:.3f}  |  {self.metrics['accuracy']:.3f}",
+                    f"Val Precision:              {self.metrics['val_precision']:.3f}  |  {self.metrics['precision']:.3f}",
+                    f"Val Recall:                 {self.metrics['val_recall']:.3f}  |  {self.metrics['recall']:.3f}",
+                    f"Val F1 Score:               {self.metrics['val_f1']:.3f}  |  {self.metrics['f1']:.3f}",
+                    "",
+                ])
+            else:
+                summary.extend([
+                    "Classification Metrics:      Val   |  Test",
+                    "-" * 43,
+                    f"Val ROC AUC:                {self.metrics['val_roc_auc']:.3f}  |   n/a",
+                    f"Val Accuracy:               {self.metrics['val_accuracy']:.3f}  |   n/a",
+                    f"Val Precision:              {self.metrics['val_precision']:.3f}  |   n/a",
+                    f"Val Recall:                 {self.metrics['val_recall']:.3f}  |   n/a",
+                    f"Val F1 Score:               {self.metrics['val_f1']:.3f}  |   n/a",
+                    "",
+                ])
             # Validation Return metrics with fixed-width formatting
             summary.append("Validation Returns    | Cutoff |  Mean   |  W-Mean")
             summary.append("-" * 50)
@@ -1058,47 +1121,49 @@ class ClassifierEvaluator(RegressorEvaluator):
         """
         Calculate core classification metrics for test and validation sets.
         """
-        # Sample size tracking
-        self.metrics['test_samples'] = len(self.y_pred)
-        if self.y_train is not None:
-            self.metrics['train_samples'] = len(self.y_train)
+        # If we're just scoring and not building a new model, we don't have train/test sets
+        if self.train_test_data_provided:
+            # Sample size tracking
+            self.metrics['test_samples'] = len(self.y_pred)
+            if self.y_train is not None:
+                self.metrics['train_samples'] = len(self.y_train)
 
-        # Test set metrics
-        self.metrics['accuracy'] = accuracy_score(self.y_test, self.y_pred)
-        self.metrics['precision'] = precision_score(self.y_test, self.y_pred, zero_division=0)
-        self.metrics['recall'] = recall_score(self.y_test, self.y_pred, zero_division=0)
-        self.metrics['f1'] = f1_score(self.y_test, self.y_pred, zero_division=0)
+            # Test set metrics
+            self.metrics['accuracy'] = accuracy_score(self.y_test, self.y_pred)
+            self.metrics['precision'] = precision_score(self.y_test, self.y_pred, zero_division=0)
+            self.metrics['recall'] = recall_score(self.y_test, self.y_pred, zero_division=0)
+            self.metrics['f1'] = f1_score(self.y_test, self.y_pred, zero_division=0)
 
-        # Compute F-beta thresholds & scores on validation set
-        if hasattr(self, "y_validation_pred_proba"):
-            precisions, recalls, ths = precision_recall_curve(
-                self.y_validation, self.y_validation_pred_proba
-            )
-            ths = np.append(ths, 1.0)
-            for beta in (0.1, 0.25, 0.5, 1.0, 2.0):
-                thr_key = f"f{beta}_thr"
-                score_key = f"f{beta}_score"
-                # static converter returns best threshold
-                thresh = ClassifierEvaluator.add_fbeta_metrics(
-                    precisions, recalls, ths, beta
+            # Compute F-beta thresholds & scores on validation set
+            if hasattr(self, "y_validation_pred_proba") and self.y_validation_pred_proba is not None:
+                precisions, recalls, ths = precision_recall_curve(
+                    self.y_validation, self.y_validation_pred_proba
                 )
-                # recompute F-beta score at that threshold
-                beta_sq = beta ** 2
-                f_scores = (1 + beta_sq) * precisions * recalls / (
-                    beta_sq * precisions + recalls + 1e-9
-                )
-                score = f_scores[np.nanargmax(f_scores)]
-                self.metrics[thr_key] = thresh
-                self.metrics[score_key] = score
+                ths = np.append(ths, 1.0)
+                for beta in (0.1, 0.25, 0.5, 1.0, 2.0):
+                    thr_key = f"f{beta}_thr"
+                    score_key = f"f{beta}_score"
+                    # static converter returns best threshold
+                    thresh = ClassifierEvaluator.add_fbeta_metrics(
+                        precisions, recalls, ths, beta
+                    )
+                    # recompute F-beta score at that threshold
+                    beta_sq = beta ** 2
+                    f_scores = (1 + beta_sq) * precisions * recalls / (
+                        beta_sq * precisions + recalls + 1e-9
+                    )
+                    score = f_scores[np.nanargmax(f_scores)]
+                    self.metrics[thr_key] = thresh
+                    self.metrics[score_key] = score
 
-
-        try:
-            self.metrics['roc_auc'] = roc_auc_score(self.y_test, self.y_pred_proba)
-            self.metrics['log_loss'] = log_loss(self.y_test, self.y_pred_proba)
-        except ValueError:
-            logger.warning("Only one class found in classifier predictions.")
-            self.metrics['roc_auc'] = np.nan
-            self.metrics['log_loss'] = np.nan
+            if self.train_test_data_provided:
+                try:
+                    self.metrics['roc_auc'] = roc_auc_score(self.y_test, self.y_pred_proba)
+                    self.metrics['log_loss'] = log_loss(self.y_test, self.y_pred_proba)
+                except ValueError:
+                    logger.warning("Only one class found in classifier predictions.")
+                    self.metrics['roc_auc'] = np.nan
+                    self.metrics['log_loss'] = np.nan
 
         # Validation set metrics if available
         if getattr(self, 'y_validation', None) is not None and hasattr(self, 'y_validation_pred_proba'):
@@ -1205,13 +1270,15 @@ class ClassifierEvaluator(RegressorEvaluator):
         Random-guess diagonal: grey dashed.
         """
         # --- Test ROC (thin, default blue)
-        RocCurveDisplay.from_predictions(
-            self.y_test,
-            self.y_pred_proba,
-            ax=ax,
-            name="Test",
-            linewidth=1.5,
-        )
+        # Check if train/test data is available
+        if self.train_test_data_provided:
+            RocCurveDisplay.from_predictions(
+                self.y_test,
+                self.y_pred_proba,
+                ax=ax,
+                name="Test",
+                linewidth=1.5,
+            )
 
         # --- Validation ROC (thick green) ------------------------------------
         if getattr(self, "y_validation_pred_proba", None) is not None \
@@ -1246,24 +1313,25 @@ class ClassifierEvaluator(RegressorEvaluator):
         Validation line: thick green (#22DD22)
         Baseline: horizontal dashed line showing the positive class prevalence.
         """
-        # Calculate baseline (positive class prevalence)
-        baseline = self.y_test.mean()
+        if self.train_test_data_provided:
+            # Calculate baseline (positive class prevalence)
+            baseline = self.y_test.mean()
 
-        # --- Test PR curve with AUC-PR
-        precision, recall, thr_test = precision_recall_curve(
-            self.y_test,
-            self.y_pred_proba,
-            pos_label=1
-        )
-        test_auc_pr = auc(recall, precision)  # Calculate AUC-PR
+            # --- Test PR curve with AUC-PR
+            precision, recall, thr_test = precision_recall_curve(
+                self.y_test,
+                self.y_pred_proba,
+                pos_label=1
+            )
+            test_auc_pr = auc(recall, precision)  # Calculate AUC-PR
 
-        # Plot test curve
-        ax.plot(
-            recall[1:], precision[1:],  # Skip first point to avoid misleading spike
-            linewidth=1.5,
-            color="#1f77b4",  # Default blue
-            label=f"Test (AUC-PR: {test_auc_pr:.3f})"
-        )
+            # Plot test curve
+            ax.plot(
+                recall[1:], precision[1:],  # Skip first point to avoid misleading spike
+                linewidth=1.5,
+                color="#1f77b4",  # Default blue
+                label=f"Test (AUC-PR: {test_auc_pr:.3f})"
+            )
 
         # --- Validation PR curve with AUC-PR (if available)
         if getattr(self, "y_validation_pred_proba", None) is not None \

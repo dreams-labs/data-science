@@ -26,7 +26,7 @@ training_data: #CoinModel
     ]
 
     #KeyParam Rebuild Features Settings
-    toggle_rebuild_all_features: True  # If True, existing parquet features/target dfs will be overridden
+    toggle_rebuild_all_features: False  # If True, existing parquet features/target dfs will be overridden
     toggle_rebuild_wallet_models: False  # If True, all wallet models will be retrained
 
 
@@ -53,7 +53,7 @@ wallet_scores: #CoinModel
         #     y_pred_threshold: 0.90
         #     assign_epochs_to_addresses: False
 
-        cw_net_flows_05_thr80:
+        cw_net_flows_05:
             model_type: classification
             target_variable: cw_crypto_net_flows/crypto_inflows/base
             target_var_min_threshold: 0.05
@@ -61,7 +61,7 @@ wallet_scores: #CoinModel
             y_pred_threshold: 0.85
             assign_epochs_to_addresses: False
 
-        cw_net_flows_015_thr80:
+        cw_net_flows_15:
             model_type: classification
             target_variable: cw_crypto_net_flows/crypto_inflows/base
             target_var_min_threshold: 0.15
@@ -69,7 +69,7 @@ wallet_scores: #CoinModel
             y_pred_threshold: 0.85
             assign_epochs_to_addresses: False
 
-        cw_net_flows_025_thr80:
+        cw_net_flows_25:
             model_type: classification
             target_variable: cw_crypto_net_flows/crypto_inflows/base
             target_var_min_threshold: 0.25
@@ -77,7 +77,7 @@ wallet_scores: #CoinModel
             y_pred_threshold: 0.85
             assign_epochs_to_addresses: False
 
-        cw_net_flows_040_thr80:
+        cw_net_flows_40:
             model_type: classification
             target_variable: cw_crypto_net_flows/crypto_inflows/base
             target_var_min_threshold: 0.40
@@ -85,7 +85,7 @@ wallet_scores: #CoinModel
             y_pred_threshold: 0.85
             assign_epochs_to_addresses: False
 
-        cw_net_flows_n05_thr80:
+        cw_net_flows_n05:
             model_type: classification
             target_variable: cw_crypto_net_flows/crypto_inflows/base
             target_var_min_threshold: -.inf
@@ -93,7 +93,7 @@ wallet_scores: #CoinModel
             y_pred_threshold: 0.85
             assign_epochs_to_addresses: False
 
-        cw_net_flows_n015_thr80:
+        cw_net_flows_n15:
             model_type: classification
             target_variable: cw_crypto_net_flows/crypto_inflows/base
             target_var_min_threshold: -.inf
@@ -101,7 +101,7 @@ wallet_scores: #CoinModel
             y_pred_threshold: 0.85
             assign_epochs_to_addresses: False
 
-        cw_net_flows_n025_thr80:
+        cw_net_flows_n25:
             model_type: classification
             target_variable: cw_crypto_net_flows/crypto_inflows/base
             target_var_min_threshold: -.inf
@@ -109,7 +109,7 @@ wallet_scores: #CoinModel
             y_pred_threshold: 0.85
             assign_epochs_to_addresses: False
 
-        cw_net_flows_n040_thr80:
+        cw_net_flows_n40:
             model_type: classification
             target_variable: cw_crypto_net_flows/crypto_inflows/base
             target_var_min_threshold: -.inf

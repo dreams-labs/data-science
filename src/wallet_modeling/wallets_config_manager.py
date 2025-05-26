@@ -212,9 +212,9 @@ def add_derived_values(config_dict: dict) -> dict:
     modeling_start = datetime.strptime(td['modeling_period_start'], "%Y-%m-%d")
     lookbacks = td['training_window_lookbacks']
     td['training_window_starts'] = (modeling_start - pd.to_timedelta(lookbacks, unit='d')).strftime('%Y-%m-%d').tolist()
-    first_window = min(td['training_window_starts'])
 
     # Training Period Boundaries
+    first_window = min(td['training_window_starts'])
     training_start = datetime.strptime(first_window, "%Y-%m-%d")
     td['training_period_start'] = first_window
     td['training_starting_balance_date'] = (training_start - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -229,6 +229,13 @@ def add_derived_values(config_dict: dict) -> dict:
         and not td['training_data_only']):
         raise ValueError(f"Validation period end of {td['validation_period_end']} is earlier than "
                          f"the modeling period end of {td['modeling_period_end']}.")
+
+    # Validate modeling vs training period overlap
+    last_training_start = pd.to_datetime(max(td['training_window_starts']))
+    last_training_end = last_training_start + timedelta(days = modeling_duration)
+    if last_training_end > modeling_start:
+        raise ValueError(f"Last training period ends on {last_training_end.strftime('%Y-%m-%d')} "
+                         f"which is later than the modeling start of {modeling_start.strftime('%Y-%m-%d')}")
 
     # Validation Period Boundaries
     validation_period_start_dt = modeling_end + timedelta(days=modeling_duration)

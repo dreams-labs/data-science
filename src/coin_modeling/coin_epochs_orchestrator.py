@@ -58,9 +58,12 @@ class CoinEpochsOrchestrator:
         complete_market_data_df: pd.DataFrame = None,
         complete_macro_trends_df: pd.DataFrame = None,
     ):
-        # Coin Params
+        # Coin Configs
         self.wallets_coin_config = wallets_coin_config
         self.wallets_coins_metrics_config = wallets_coins_metrics_config
+
+        # Coin Params
+        self.coin_training_data_only = None  # overridden by orchestrate_coin_epochs() param
 
         # WalletEpochsOrchestrator Configs
         self.wallets_config = wallets_config
@@ -166,32 +169,54 @@ class CoinEpochsOrchestrator:
     def orchestrate_coin_epochs(
             self,
             custom_offset_days: list[int] | None = None,
-            file_prefix: str = ''
+            file_prefix: str = '',
+            coin_training_data_only: bool = False
         ) -> None:
         """
         Orchestrate coin-level epochs by iterating through lookbacks and processing each epoch.
 
         Params:
-        - custom_offset_days: overrides coin_epochs_training in wallets_coin_config
-        - file_prefix: changes the filename of the parquet files
-        - max_workers: number of threads (defaults to min(4, cpu_count))
+        - custom_offset_days (list of ints): overrides coin_epochs_training in wallets_coin_config
+        - file_prefix (str): changes the filename of the parquet files
+        - coin_training_data_only (bool): whether to skip data generation of the coin target variables
+            and validation datasets. This is used to generate training data that will be scored with
+            an existing model that can be used to predict future price action.
         """
-        # Build all wallet parquet files needed for the base configs
+        # Override existing training data toggle with the param
+        self.coin_training_data_only = coin_training_data_only
+        self.wallets_config['training_data']['coin_training_data_only'] = coin_training_data_only
+
+        # 1. Build all wallet training data needed for all coin epochs
+        # ------------------------------------------------------------
+        # This increases execution speed by multithreading every wallet epoch, rather
+        #  than generating individual additional wallet epochs needed as the coin epoch
+        #  boundaries shift.
         self._build_all_wallet_data()
 
-        # Determine which offsets to use
+
+        # 2. Define and validate coin epoch offsets
+        # -----------------------------------------
         offsets = custom_offset_days if custom_offset_days is not None \
             else self.wallets_coin_config['training_data']['coin_epochs_training']
 
-        # Check validity of inputs vs available data
+        # Calculate maximum offset possible based on validation_period_end
         most_recent_data = self.complete_profits_df.index.get_level_values('date').max()
         base_coin_modeling_end = pd.to_datetime(self.wallets_config['training_data']['coin_modeling_period_end'])
         max_calculable_offset = (most_recent_data - base_coin_modeling_end).days
+
+        # If we don't need target vars or training data, we can extend one period further forward
+        if coin_training_data_only:
+            max_calculable_offset+= self.wallets_config['training_data']['modeling_period_duration']
+
         if max(offsets) > max_calculable_offset:
             raise ValueError(f"Offset value of {max(offsets)} extends further into the future than the "
                             f"{max_calculable_offset} calculable offset from the complete datasets.")
 
+
+        # 3. Generate all coin epochs' training data
+        # ------------------------------------------
         logger.milestone("Beginning generation of coin model training data...")
+        u.notify('whoosh_boom')
 
         # Tag each DataFrame with the epoch date
         def tag_with_epoch(df: pd.DataFrame, epoch_date: pd.Timestamp) -> pd.DataFrame:
@@ -230,7 +255,7 @@ class CoinEpochsOrchestrator:
                                  f'{exc}')
                     raise
 
-        # Concatenate across epochs (same as before)
+        # Concatenate all epochs dfs
         multiwindow_features = pd.concat(feature_dfs).sort_index()
         multiwindow_targets = pd.concat(target_dfs).sort_index()
 
@@ -239,7 +264,9 @@ class CoinEpochsOrchestrator:
             df.index = pd.MultiIndex.from_tuples(df.index.values, names=df.index.names)
             return df
 
-        # Persist multiwindow parquet files (unchanged)
+
+        # 4. Persist multiwindow parquet files
+        # ------------------------------------
         root_folder = self.wallets_coin_config['training_data']['parquet_folder']
         multiwindow_features = reset_index_codes(multiwindow_features)
         multiwindow_features.to_parquet(f"{root_folder}/{file_prefix}multiwindow_coin_training_data_df.parquet")
@@ -360,15 +387,23 @@ class CoinEpochsOrchestrator:
             else:
                 logger.warning("Overwriting existing coin features due to 'toggle_rebuild_all_features'.")
 
+        # Epoch-specific wallets_epochs_config.yaml
+        epoch_wallets_epochs_config = copy.deepcopy(self.wallets_epochs_config)
+
+        # Delete wallet validation epochs if we aren't generating coin target variables, as the wallet
+        #  validation period overlaps with the coin modeling period used for coin target variable data.
+        if self.coin_training_data_only:
+            epoch_wallets_epochs_config['offset_epochs']['validation_offsets'] = []
+
 
         # 2) Wallet-Level Features
         # ------------------------
-        # Prepare epoch-specific orchestrator without heavy data generation
+        # Prepare epoch-specific orchestrator
         epoch_weo = weo.WalletEpochsOrchestrator(
-            base_config=epoch_wallets_config,
+            base_config=epoch_wallets_config,               # epoch-specific config
             metrics_config=self.wallets_metrics_config,
             features_config=self.wallets_features_config,
-            epochs_config=self.wallets_epochs_config,
+            epochs_config=epoch_wallets_epochs_config,      # epoch-specific config
             complete_profits_df=self.complete_profits_df,
             complete_market_data_df=self.complete_market_data_df,
             complete_macro_trends_df=self.complete_macro_trends_df,
@@ -414,6 +449,12 @@ class CoinEpochsOrchestrator:
             )
             # fallback to empty targets to allow features-only epochs
             coin_target_var_df = pd.DataFrame(index=coin_features_df.index)
+
+        logger.milestone(
+            "Coin epoch %s training data with shape (%s) generated successfully.",
+            epoch_date.strftime('%Y-%m-%d'),
+            coin_features_df.shape
+        )
 
         return epoch_date, coin_features_df, coin_target_var_df
 
@@ -525,10 +566,11 @@ class CoinEpochsOrchestrator:
             self,
             wallets_config: dict,
             wallet_cohort: pd.Series
-        ) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
+        ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
         """
         Loads DataFrames for generating coin model features and target variables. Filters
-        out wallets that aren't in the wallet cohort from the wallet_training_data_df.
+        out wallets that aren't in the wallet cohort from the wallet_training_data_df. If
+
 
         Params:
         - wallets_config (dict): epoch-specific wallets_config used for folder locations
@@ -574,6 +616,11 @@ class CoinEpochsOrchestrator:
         )
 
         # 2) Coin modeling market data for coin target vars
+        # skip como_market_data_df's modeling data if we're only returning training data
+        if self.coin_training_data_only:
+            return wamo_profits_df, pd.DataFrame(), training_coin_cohort
+
+        # Filter complete market data to coin modeling period
         complete_md = pd.read_parquet(f"{pf}/complete_market_data_df.parquet")
         como_market_data_df = complete_md.loc[
             (complete_md.index.get_level_values('date') >=
@@ -702,7 +749,7 @@ class CoinEpochsOrchestrator:
     # --------------
     def _prepare_coin_epoch_base_config(self, lookback_duration: int):
         """
-        Creates a config with dates offset by a wallets_coin_config lookback_duration.
+        Creates an epoch-specific wallets_config with dates offset by the epoch's lookback_duration.
 
         Params:
          - lookback_duration (int): How many days the coin lookback is offset vs the base config.
@@ -724,7 +771,7 @@ class CoinEpochsOrchestrator:
             self.wallets_features_config,
             self.wallets_epochs_config
         )
-        coin_epoch_base_config = wallet_epochs_orchestrator.build_epoch_config(
+        epoch_base_wallets_config = wallet_epochs_orchestrator.build_epoch_wallets_config(
             lookback_duration,
             'coin_modeling',  # epoch_type, which has no impact on this class's data
             base_modeling_start,
@@ -734,9 +781,9 @@ class CoinEpochsOrchestrator:
         )
 
         # Retain the parquet_folder so all periods are built in the same root directory
-        coin_epoch_base_config['training_data']['parquet_folder'] = base_training_data['parquet_folder']
+        epoch_base_wallets_config['training_data']['parquet_folder'] = base_training_data['parquet_folder']
 
-        return coin_epoch_base_config
+        return epoch_base_wallets_config
 
 
 
@@ -880,14 +927,15 @@ class CoinEpochsOrchestrator:
         # 2) Generate this epoch's wallet training data
         logger.info("Generating wallet training_data_df for scoring in the coin_modeling period...")
         modeling_offset = self.wallets_config['training_data']['modeling_period_duration']
+
+        # This epoch's training data is built during the base modeling_period. As a result,
+        #  no target variables or validation data will be generated.
         coin_modeling_epochs_config = {
             'offset_epochs': {
                 'offsets': [modeling_offset],
+                'validation_offsets': []
             }
         }
-
-        # Build epochs config for the current coin_modeling_period
-        coin_modeling_epochs_config['validation_offsets'] = []
 
         epoch_weo = weo.WalletEpochsOrchestrator(
             base_config=epoch_weo.base_config,
@@ -897,11 +945,11 @@ class CoinEpochsOrchestrator:
             complete_profits_df=epoch_weo.complete_profits_df,
             complete_market_data_df=epoch_weo.complete_market_data_df,
             complete_macro_trends_df=epoch_weo.complete_macro_trends_df,
+            training_only=True # we're scoring with prebuilt models so only generate training data
         )
         # Generate TRAINING_DATA_DF
-        wallet_training_data_df, _, _, _ = epoch_weo.generate_epochs_training_data(
-            training_only=True
-        )
+        # training_only is toggled to skip generation of target variables and validation dfs
+        wallet_training_data_df, _, _, _ = epoch_weo.generate_epochs_training_data()
 
         # 3) Score wallets on the training data using the models in wallets_coin_config
         configured_models = set(epoch_coins_config['wallet_scores']['score_params'].keys())

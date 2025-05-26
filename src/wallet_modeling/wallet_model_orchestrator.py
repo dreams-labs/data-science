@@ -27,11 +27,11 @@ class WalletModelOrchestrator:
 
     def __init__(
         self,
-        wallets_config,
-        wallets_metrics_config,
-        wallets_features_config,
-        wallets_epochs_config,
-        wallets_coin_config,
+        wallets_config: dict,
+        wallets_metrics_config: dict,
+        wallets_features_config: dict,
+        wallets_epochs_config: dict,
+        wallets_coin_config: dict,
     ):
         """
         Initialize the wallet model trainer.
@@ -105,39 +105,37 @@ class WalletModelOrchestrator:
             # Don't output the scores from every tree
             score_wallets_config['modeling']['verbose_estimators'] = False
 
-            # Load and evaluate using existing model if configured
             if score_name in existing_models:
+                # Load and evaluate using existing model if configured and available
                 if not self.wallets_coin_config['training_data']['toggle_rebuild_wallet_models']:
                     model_id, evaluator = self._load_and_evaluate(
                         score_name,
                         score_wallets_config,
                         wallet_training_data_df,
-                        wallet_target_vars_df,
-                        validation_training_data_df,
-                        validation_target_vars_df
+                        wallet_target_vars_df
                     )
+                    evaluators.append((score_name, evaluator))
                     logger.milestone(f"Loaded pretrained model for score '{score_name}'.")
+                    continue
 
                 # Announce overwrite if applicable
                 else:
                     logger.warning("Overwriting existing models due to 'toggle_rebuild_wallet_models'.")
 
-
-            # Train new model
-            else:
-                model_id, evaluator = self._train_and_evaluate(
-                    score_wallets_config,
-                    wallet_training_data_df,
-                    wallet_target_vars_df,
-                    validation_training_data_df,
-                    validation_target_vars_df
-                )
-                # Persist metrics for newly trained model
-                existing_models[score_name] = self._store_model_metrics(model_id, evaluator)
-                logger.milestone(f"Finished training model {len(existing_models)}/{len(self.score_params)}"
-                                f": {score_name}.")
-
+            # Train new model if we didn't load an existing one
+            model_id, evaluator = self._train_and_evaluate(
+                score_wallets_config,
+                wallet_training_data_df,
+                wallet_target_vars_df,
+                validation_training_data_df,
+                validation_target_vars_df
+            )
+            # Persist metrics for newly trained model
+            existing_models[score_name] = self._store_model_metrics(model_id, evaluator)
             evaluators.append((score_name, evaluator))
+
+            logger.milestone(f"Finished training model {len(existing_models)}/{len(self.score_params)}"
+                            f": {score_name}.")
 
             # -------------------------------------------------
             # Resolve and persist the final classification cutoff
@@ -195,6 +193,12 @@ class WalletModelOrchestrator:
         Returns:
         - dict: Model metrics including ID, return metrics, and macro averages
         """
+        # If there isn't a validation set, return just the model_id. This happens when the
+        #  wallet model is built for a current coin model without target variables, as coin
+        #  target variables are generated from the same period as wallet validation data.
+        if evaluator.X_validation is None:
+            return {'model_id': model_id,}
+
         # Extract return metrics for analysis
         n_buckets = 20
         if evaluator.modeling_config.get('model_type') == 'classification':
@@ -481,19 +485,38 @@ class WalletModelOrchestrator:
     def _load_and_evaluate(
         self,
         score_name: str,
-        score_wallets_config,
-        wallet_training_data_df,
-        wallet_target_vars_df,
-        validation_training_data_df,
-        validation_target_vars_df
+        score_wallets_config: dict,
+        wallet_training_data_df: pd.DataFrame,
+        wallet_target_vars_df: pd.DataFrame
     ) -> tuple[str, any]:
         """
         Load an existing saved model by score_name and evaluate on provided data.
+
+        Note that these dfs are passed into the evaluator in the X_validation and y_validation
+         params. This is because we cannot calculate any train/test set metrics when we aren't
+         training a model. Because we are evaluating the model on scored wallet performance
+         versus true future values, the graphs and metrics should be generated using the logic
+         from the y_validation/y_validation_pred calculations.
+
+        Params:
+        - score_name (str): from wallets_coin_config['wallet_scores']['score_params'].keys()
+        - score_wallets_config (dict): wallets_config.yaml with overrides for the specific score
+        - validation_training_data_df (df): Contains wallet training data for the validation period
+        - validation_target_vars_df (df): Contains target variables for the validation period
+
         Returns:
         - model_id (str): ID of the loaded model
-        - evaluator: Evaluator object with metrics and predictions
+        - evaluator (custom class): Evaluator from model_evaluation.py with metrics and predictions
         """
+        # Data quality checks
+        if wallet_training_data_df.empty or wallet_target_vars_df.empty:
+            raise ValueError("Training data or target vars cannot be empty.",
+                             "There is valid business logic that would only provide training_data_df " \
+                             "but the logic for empty target_vars_df would need to be built out.")
+        u.assert_matching_indices(wallet_training_data_df,wallet_target_vars_df)
+
         # 1) Grab the stored model_id
+        # ---------------------------
         models_json_path = Path(self.wallets_coin_config['training_data']['parquet_folder']) / "wallet_model_ids.json"
         with open(models_json_path, 'r', encoding='utf-8') as f:
             models_dict = json.load(f)
@@ -502,100 +525,103 @@ class WalletModelOrchestrator:
             raise KeyError(f"No existing model found for '{score_name}'")
         model_id = model_info['model_id']
 
+
         # 2) Unpickle the pipeline
+        # ------------------------
         pipeline_path = Path(self.base_path) / 'wallet_models' / f"wallet_model_{model_id}.pkl"
         if not pipeline_path.exists():
             raise FileNotFoundError(f"No pipeline at {pipeline_path}")
         with open(pipeline_path, 'rb') as f:
             pipeline = cloudpickle.load(f)
 
+
         # 3) Build a minimal result dict
+        # ------------------------------
         modeling_cfg = score_wallets_config['modeling']
         model_type = modeling_cfg['model_type']
         result = {
             'model_type': model_type,
             'model_id': model_id,
             'pipeline': pipeline,
-            'modeling_config': modeling_cfg
+            'modeling_config': modeling_cfg,
+
+            # Pretrained models don't have train/test sets
+            'X_train': None,
+            'y_train': None,
+            'X_test': None,
+            'y_test': None,
+            'y_pred': None,
+            'training_cohort_pred': None,
+            'training_cohort_actuals': None,
+            'full_cohort_actuals': None
         }
 
-        # 4) Attach validation data + preds
-        if validation_training_data_df is not None and validation_target_vars_df is not None:
-            result['X_validation'] = validation_training_data_df
-            result['validation_target_vars_df'] = validation_target_vars_df
-            result['y_validation'] = validation_target_vars_df[modeling_cfg['target_variable']]
 
-            # Convert continuous target to binary for classification based on min threshold
-            if model_type == 'classification':
-                min_thr = modeling_cfg.get('target_var_min_threshold', 0)
-                result['y_validation'] = (result['y_validation'] > min_thr).astype(int)
-
-            preds = wiva.load_and_predict(
-                model_id,
-                validation_training_data_df,
-                self.base_path
-            )
-            if model_type == 'classification':
-                result['y_validation_pred_proba'] = preds
-                thr = modeling_cfg.get('y_pred_threshold')
-                if thr is not None:
-                    # Resolve F-beta threshold if specified as string
-                    if isinstance(thr, str) and thr.startswith('f'):
-                        # Compute precision-recall curve on validation set
-                        precisions, recalls, ths = precision_recall_curve(
-                            result['y_validation'], preds
-                        )
-                        ths = np.append(ths, 1.0)
-                        beta = float(thr[1:])
-                        thr_val = wime.ClassifierEvaluator.add_fbeta_metrics(
-                            precisions, recalls, ths, beta
-                        )
-                        thr = thr_val
-                        modeling_cfg['y_pred_threshold'] = thr_val
-                    result['y_validation_pred'] = (preds >= thr).astype(int)
-            else:
-                result['y_validation_pred'] = preds
-
-        # 4a) Attach test set (using provided training data as test)
-        result['X_test'] = wallet_training_data_df
-        # Extract y_test as Series
-        if isinstance(wallet_target_vars_df, pd.DataFrame):
-            y_test_series = wallet_target_vars_df[modeling_cfg['target_variable']]
-        else:
-            y_test_series = wallet_target_vars_df
-        # Binarize for classification
-        if model_type == 'classification':
-            min_thr = modeling_cfg.get('target_var_min_threshold', 0)
-            y_test_series = (y_test_series > min_thr).astype(int)
-        result['y_test'] = y_test_series
-
-        # Generate predictions on test set
-        test_preds = wiva.load_and_predict(
+        # 4) Attach validation set + preds
+        # --------------------------------------------
+        # Retain X_validation and make predictions
+        result['X_validation'] = wallet_training_data_df
+        result['validation_target_vars_df'] = wallet_target_vars_df
+        y_val_series = wallet_target_vars_df[modeling_cfg['target_variable']]
+        val_preds = wiva.load_and_predict(
             model_id,
             wallet_training_data_df,
             self.base_path
         )
-        if model_type == 'classification':
-            result['y_pred_proba'] = test_preds
-            thr_test = modeling_cfg.get('y_pred_threshold')
-            # Ensure numeric threshold
-            if isinstance(thr_test, str):
-                thr_test = modeling_cfg[ 'y_pred_threshold']
-            result['y_pred'] = (test_preds >= thr_test).astype(int)
-        else:
-            result['y_pred'] = test_preds
 
-        # No training metrics for loaded model
-        result['X_train'] = wallet_training_data_df
-        result['y_train'] = wallet_training_data_df
-        result['training_cohort_pred'] = None
-        result['training_cohort_actuals'] = None
-        result['full_cohort_actuals'] = None
+        # Store regressor outcomes
+        if model_type == 'regression':
+            # y_true
+            result['y_validation'] = y_val_series
+            # y_pred
+            result['y_validation_pred'] = val_preds
+
+        # Store classifier outcomes
+        elif model_type == 'classification':
+            # y_true
+            min_thr = modeling_cfg.get('target_var_min_threshold', -np.inf)
+            max_thr = modeling_cfg.get('target_var_max_threshold', np.inf)
+            result['y_validation'] = (
+                (y_val_series >= min_thr) &
+                (y_val_series <= max_thr)
+            ).astype(int)
+            n_positive_val = result['y_validation'].sum()
+            n_total_val = len(result['y_validation'])
+            logger.info(f"Model {score_name}: y_validation true positives={n_positive_val}/{n_total_val} "
+                        f"({100*n_positive_val/n_total_val:.2f}%)")
+
+            # y_pred
+            # define y_threshold
+            y_threshold = modeling_cfg.get('y_pred_threshold')
+            if isinstance(y_threshold, str):
+                # define y_threshold if threshold was passed as an F-beta value
+                precisions, recalls, ths = precision_recall_curve(
+                    result['y_test'], val_preds
+                )
+                ths = np.append(ths, 1.0)
+                beta = float(y_threshold[1:])
+                y_threshold = wime.ClassifierEvaluator.add_fbeta_metrics(
+                    precisions, recalls, ths, beta
+                )
+            modeling_cfg['y_pred_threshold'] = y_threshold
+
+            # define predictions
+            result['y_validation_pred_proba'] = val_preds
+            result['y_validation_pred'] = (val_preds >= y_threshold).astype(int)
+            n_positive_val_pred = result['y_validation_pred'].sum()
+            n_total_val_pred = len(result['y_validation_pred'])
+            logger.info(f"Model {score_name}: y_validation predicted positive={n_positive_val_pred}/{n_total_val_pred} "
+                        f"({100*n_positive_val_pred/n_total_val_pred:.2f}%)")
+        else:
+            raise ValueError(f"Invalid model type '{model_type}' found in config.")
+
 
         # 5) Instantiate evaluator
+        # ------------------------
         if model_type == 'classification':
             evaluator = wime.ClassifierEvaluator(result)
         else:
             evaluator = wime.RegressorEvaluator(result)
+
 
         return model_id, evaluator
