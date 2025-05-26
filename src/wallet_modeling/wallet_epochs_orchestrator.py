@@ -56,9 +56,7 @@ class WalletEpochsOrchestrator:
             self.base_config['training_data']['training_data_only'] = True
 
         # Generated configs for all epochs
-        self.all_epochs_configs = self.generate_epoch_configs()
-        if len(self.all_epochs_configs) == 0:
-            raise ValueError("how is this possible?")
+        self.all_epochs_configs = self._generate_epoch_configs()
 
         # Complete df objects
         self.complete_profits_df = complete_profits_df
@@ -169,7 +167,7 @@ class WalletEpochsOrchestrator:
 
         logger.milestone(f"Compiling wallet training data for {len(self.all_epochs_configs)} epochs...")
         if self.training_only:
-            logger.warning("Training‑only mode: Compiling wallet training data without validation or target variables.")
+            logger.milestone("Training‑only mode: Compiling wallet training data without validation or target variables.")
 
         u.notify('intro_3')
 
@@ -600,13 +598,11 @@ class WalletEpochsOrchestrator:
         epoch_config['training_data']['parquet_folder'] = str(base_parquet_folder_base / folder_suffix)
 
         # Add derived values
-        logger.warning(epoch_type)
-        logger.warning(epoch_config['training_data']['modeling_period_end'])
         return wcm.add_derived_values(epoch_config)
 
 
 
-    def generate_epoch_configs(self) -> List[Dict]:
+    def _generate_epoch_configs(self) -> List[Dict]:
         """
         Generates config dicts for modeling and validation epochs by offsetting base config dates.
          Training epochs are not generated separately because training windows are embedded within
@@ -640,40 +636,30 @@ class WalletEpochsOrchestrator:
             self._assert_no_epoch_overlap(modeling_offsets, validation_offsets)
 
         # Generate modeling epoch configs
-        if not self.training_only:
-            for offset_days in modeling_offsets:
-                all_epochs_configs.append(
-                    self.build_epoch_wallets_config(
-                        offset_days, 'modeling',
-                        base_modeling_start, base_modeling_end,
-                        base_training_window_starts, base_parquet_folder_base
-                    )
-                )
-
-            # Add validation epoch configs if configured
-            if len(validation_offsets) > 0:
-                for offset_days in validation_offsets:
-                    cfg = self.build_epoch_wallets_config(
-                        offset_days, 'validation',
-                        base_modeling_start, base_modeling_end,
-                        base_training_window_starts, base_parquet_folder_base
-                    )
-                    all_epochs_configs.append(cfg)
-
-        # In training_only mode, add one additional "current" epoch
+        # if not self.training_only:
         if self.training_only:
-            # Calculate offset to bring modeling_period_start to validation_period_end
-            base_modeling_start_dt = pd.to_datetime(base_training_data['modeling_period_start'])
-            validation_end_dt = pd.to_datetime(base_training_data['validation_period_end'])
-            end_of_val_offset = (validation_end_dt - base_modeling_start_dt).days
+            offset_type = 'current'
+        else:
+            offset_type = 'modeling'
+        for offset_days in sorted(modeling_offsets):
 
             all_epochs_configs.append(
                 self.build_epoch_wallets_config(
-                    end_of_val_offset, 'current',
-                    base_modeling_start, base_modeling_end,
+                    offset_days, offset_type, # offset days doesn't change
+                    base_modeling_start, base_modeling_end, # base modeling config date doesn't move
                     base_training_window_starts, base_parquet_folder_base
                 )
             )
+
+        # Add validation epoch configs if configured
+        if len(validation_offsets) > 0:
+            for offset_days in sorted(validation_offsets):
+                cfg = self.build_epoch_wallets_config(
+                    offset_days, 'validation',
+                    base_modeling_start, base_modeling_end,
+                    base_training_window_starts, base_parquet_folder_base
+                )
+                all_epochs_configs.append(cfg)
 
         if len(all_epochs_configs) == 0:
             raise ValueError("There should always be at least one config generated.")
@@ -845,44 +831,44 @@ class WalletEpochsOrchestrator:
             all_train_starts.extend(cfg['training_data']['training_window_starts'])
             all_model_ends.append(cfg['training_data']['modeling_period_end'])
 
-        earliest_required_date = pd.to_datetime(min(all_train_starts))
-        if cfg['training_data'].get('coin_training_data_only',False):
-            # if training data only, just validate through the last training period end
-            latest_required_date = (
-                pd.to_datetime(max(all_train_starts))
-                + timedelta(days = cfg['training_data']['modeling_period_duration'])
-            )
-        else:
-            # validate through the latest modeling period end
-            latest_required_date = pd.to_datetime(max(all_model_ends))
-        earliest_starting_balance_date = earliest_required_date - timedelta(days=1)
+            earliest_required_date = pd.to_datetime(min(all_train_starts))
+            if cfg['training_data'].get('coin_training_data_only',False):
+                # if training data only, just validate through the last training period end
+                latest_required_date = (
+                    pd.to_datetime(max(all_train_starts))
+                    + timedelta(days = cfg['training_data']['modeling_period_duration'])
+                )
+            else:
+                # validate through the latest modeling period end
+                latest_required_date = pd.to_datetime(max(all_model_ends))
+            earliest_starting_balance_date = earliest_required_date - timedelta(days=1)
 
-        # Get actual data boundaries
-        profits_start = self.complete_profits_df.index.get_level_values('date').min()
-        profits_end = self.complete_profits_df.index.get_level_values('date').max()
-        market_data_start = self.complete_market_data_df.index.get_level_values('date').min()
-        market_data_end = self.complete_market_data_df.index.get_level_values('date').max()
-        macro_trends_start = self.complete_macro_trends_df.index.get_level_values('date').min()
-        macro_trends_end = self.complete_macro_trends_df.index.get_level_values('date').max()
+            # Get actual data boundaries
+            profits_start = self.complete_profits_df.index.get_level_values('date').min()
+            profits_end = self.complete_profits_df.index.get_level_values('date').max()
+            market_data_start = self.complete_market_data_df.index.get_level_values('date').min()
+            market_data_end = self.complete_market_data_df.index.get_level_values('date').max()
+            macro_trends_start = self.complete_macro_trends_df.index.get_level_values('date').min()
+            macro_trends_end = self.complete_macro_trends_df.index.get_level_values('date').max()
 
-        if not (
-            (profits_start <= earliest_starting_balance_date) and
-            (profits_end >= latest_required_date) and
-            (market_data_start <= earliest_starting_balance_date) and
-            (market_data_end >= latest_required_date) and
-            (macro_trends_start <= earliest_starting_balance_date) and
-            (macro_trends_end >= latest_required_date)
-        ):
-            raise ValueError(
-                f"Insufficient wallet data coverage for specified epochs.\n"
-                f"Required coverage: {earliest_starting_balance_date.strftime('%Y-%m-%d')}"
-                    f" to {latest_required_date.strftime('%Y-%m-%d')}\n"
-                f"Actual coverage:\n"
-                f"- Profits data: {profits_start.strftime('%Y-%m-%d')} to {profits_end.strftime('%Y-%m-%d')}\n"
-                f"- Market data: {market_data_start.strftime('%Y-%m-%d')} to {market_data_end.strftime('%Y-%m-%d')}\n"
-                f"- Macro trends data: {macro_trends_start.strftime('%Y-%m-%d')} "
-                    f"to {macro_trends_end.strftime('%Y-%m-%d')}"
-            )
+            if not (
+                (profits_start <= earliest_starting_balance_date) and
+                (profits_end >= latest_required_date) and
+                (market_data_start <= earliest_starting_balance_date) and
+                (market_data_end >= latest_required_date) and
+                (macro_trends_start <= earliest_starting_balance_date) and
+                (macro_trends_end >= latest_required_date)
+            ):
+                raise ValueError(
+                    f"Insufficient wallet data coverage for specified epochs.\n"
+                    f"Required coverage: {earliest_starting_balance_date.strftime('%Y-%m-%d')}"
+                        f" to {latest_required_date.strftime('%Y-%m-%d')}\n"
+                    f"Actual coverage:\n"
+                    f"- Profits data: {profits_start.strftime('%Y-%m-%d')} to {profits_end.strftime('%Y-%m-%d')}\n"
+                    f"- Market data: {market_data_start.strftime('%Y-%m-%d')} to {market_data_end.strftime('%Y-%m-%d')}\n"
+                    f"- Macro trends data: {macro_trends_start.strftime('%Y-%m-%d')} "
+                        f"to {macro_trends_end.strftime('%Y-%m-%d')}"
+                )
 
         # Confirm we have hybrid mappings for all pairs if applicable
         if self.base_config['training_data']['hybridize_wallet_ids']:

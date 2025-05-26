@@ -245,9 +245,6 @@ class WalletModelOrchestrator:
         if len(epoch_dates) > 1:
             raise ValueError(f"Expected a single epoch_start_date, but found multiple: {epoch_dates}")
 
-        # Extract epoch start date from training data
-        epoch_start = epoch_dates[0].strftime('%Y%m%d')
-
         # Process each model in the dictionary
         for score_name in models_dict.keys():
             model_id = models_dict[score_name]['model_id']
@@ -271,7 +268,7 @@ class WalletModelOrchestrator:
             Path(scores_folder).mkdir(parents=True, exist_ok=True)
 
             # Save predictions to parquet file
-            output_path = f"{scores_folder}/{score_name}|{epoch_start}.parquet"
+            output_path = f"{scores_folder}/{score_name}.parquet"
             wallet_scores_df.to_parquet(output_path, index=True)
 
             logger.info(f"Saved predictions for {score_name} to {output_path}")
