@@ -447,6 +447,12 @@ class CoinEpochsOrchestrator:
             # fallback to empty targets to allow features-only epochs
             coin_target_var_df = pd.DataFrame(index=coin_features_df.index)
 
+        logger.milestone(
+            "Coin epoch %s training data with shape (%s) generated successfully.",
+            epoch_date.strftime('%Y-%m-%d'),
+            coin_features_df.shape
+        )
+
         return epoch_date, coin_features_df, coin_target_var_df
 
 
