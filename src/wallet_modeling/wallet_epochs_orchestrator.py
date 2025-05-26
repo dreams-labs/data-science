@@ -643,9 +643,6 @@ class WalletEpochsOrchestrator:
             offset_type = 'modeling'
         for offset_days in sorted(modeling_offsets):
 
-
-            logger.warning(offset_days)
-            logger.warning(base_modeling_start)
             all_epochs_configs.append(
                 self.build_epoch_wallets_config(
                     offset_days, offset_type, # offset days doesn't change

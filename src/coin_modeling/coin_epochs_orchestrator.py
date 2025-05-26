@@ -150,17 +150,35 @@ class CoinEpochsOrchestrator:
         wallets_lookback_config = wcm.add_derived_values(wallets_lookback_config_dict)
 
         # Load and store complete dfs
-        wallet_orchestrator = weo.WalletEpochsOrchestrator(
+        # This WEO has its earliest epoch set to the earliest relevant date before loading
+        #  all complete datasets.
+        #
+        #  Example Scenario
+        #  ----------------
+        #  Earliest Date Calculations
+        #    base modeling_period_start                                 2024-12-01
+        #  - earliest (wallets_coin_config['coin_epochs_training'])   - 360
+        #  - earliest (wallets_epochs_config['offsets'])              - 360
+        #  - earliest (wallets_config['training_window_lookbacks'])   - 180
+        #  - 1 day for starting_balance_date of training_period       -   1
+        #  = earliest possible date                                   = 2022-06-15 (offset -901)
+        #
+        #  Latest Date Calculations
+        #    base_validation_period_end                               = 2025-04-30 (from base config)
+        #
+        #  Complete Range
+        #    2022-06-15 through 2022-04-30 (901 days)
+        load_data_weo = weo.WalletEpochsOrchestrator(
             wallets_lookback_config, # lookback config
             self.wallets_metrics_config,
             self.wallets_features_config,
             self.wallets_epochs_config,
         )
-        wallet_orchestrator.load_complete_raw_datasets()
+        load_data_weo.load_complete_raw_datasets()
 
-        self.complete_profits_df = wallet_orchestrator.complete_profits_df
-        self.complete_market_data_df = wallet_orchestrator.complete_market_data_df
-        self.complete_macro_trends_df = wallet_orchestrator.complete_macro_trends_df
+        self.complete_profits_df = load_data_weo.complete_profits_df
+        self.complete_market_data_df = load_data_weo.complete_market_data_df
+        self.complete_macro_trends_df = load_data_weo.complete_macro_trends_df
         logger.info("Successfully retrieved complete dfs.")
 
 
@@ -363,6 +381,16 @@ class CoinEpochsOrchestrator:
         # 1) Prepare config files
         # -----------------------
         epoch_wallets_config = self._prepare_coin_epoch_base_config(lookback_duration)
+
+        # Debug: Log the resulting dates  # pylint:disable=line-too-long
+        logger.debug(f"Will apply offset of {lookback_duration} days")
+        logger.debug(f"Resulting training_period_start: {epoch_wallets_config['training_data']['training_period_start']}")
+        logger.debug(f"Resulting training_period_end: {epoch_wallets_config['training_data']['training_period_end']}")
+        logger.debug(f"Resulting modeling_period_start: {epoch_wallets_config['training_data']['modeling_period_start']}")
+        logger.debug(f"Resulting modeling_period_end: {epoch_wallets_config['training_data']['modeling_period_end']}")
+        logger.debug(f"Resulting coin_modeling_period_start: {epoch_wallets_config['training_data']['coin_modeling_period_start']}")
+        logger.debug(f"Resulting coin_modeling_period_end: {epoch_wallets_config['training_data']['coin_modeling_period_end']}")
+
         epoch_coins_config = self._prepare_epoch_coins_config(epoch_wallets_config)
         epoch_date = pd.to_datetime(epoch_wallets_config['training_data']['coin_modeling_period_start'])
 
@@ -399,7 +427,16 @@ class CoinEpochsOrchestrator:
         # 2) Wallet-Level Features
         # ------------------------
         # Prepare epoch-specific orchestrator
-        logger.warning(f"_process_coin_epoch: {epoch_wallets_config['training_data']['modeling_period_start']}")
+        # This WEO is the base_config_weo offset by the lookback_duration param and modeling duration
+        #  to generate training data for the relevant epoch.
+        #
+        #  Example Scenario
+        #  ----------------
+        #    base modeling_period_start                                 2024-12-01
+        #  + offset_duration                                          + 90
+        #  = offset epoch                                             = 2025-03-31 (offset +120)
+
+        logger.error('----- epoch wallet_features_weo -----')
         epoch_weo = weo.WalletEpochsOrchestrator(
             base_config=epoch_wallets_config,               # epoch-specific config
             metrics_config=self.wallets_metrics_config,
@@ -752,7 +789,7 @@ class CoinEpochsOrchestrator:
         Creates an epoch-specific wallets_config with dates offset by the epoch's lookback_duration.
 
         Params:
-         - lookback_duration (int): How many days the coin lookback is offset vs the base config.
+        - lookback_duration (int): How many days the coin lookback is offset vs the base config.
         """
         # Cache parsed base dates and base folder path
         base_training_data = copy.deepcopy(self.wallets_config.config['training_data'])
@@ -765,16 +802,20 @@ class CoinEpochsOrchestrator:
         base_parquet_folder_base = Path(base_training_data['parquet_folder'])
 
         # Load and store complete dfs
-        wallet_epochs_orchestrator = weo.WalletEpochsOrchestrator(
+        # This WEO generates the base wallets config without making any modifications to
+        #  date ranges.
+        base_config_weo = weo.WalletEpochsOrchestrator(
             self.wallets_config.config, # base config
             self.wallets_metrics_config,
             self.wallets_features_config,
             self.wallets_epochs_config
         )
-        epoch_base_wallets_config = wallet_epochs_orchestrator.build_epoch_wallets_config(
-            lookback_duration,
-            'coin_modeling',  # epoch_type, which has no impact on this class's data
-            base_modeling_start,
+
+        # The build_epoch_wallets_config method should apply the lookback_duration offset
+        epoch_base_wallets_config = base_config_weo.build_epoch_wallets_config(
+            lookback_duration,          # This offset gets applied to base dates
+            'coin_modeling',
+            base_modeling_start,        # Base date before offset
             base_modeling_end,
             base_training_window_starts,
             base_parquet_folder_base
@@ -784,7 +825,6 @@ class CoinEpochsOrchestrator:
         epoch_base_wallets_config['training_data']['parquet_folder'] = base_training_data['parquet_folder']
 
         return epoch_base_wallets_config
-
 
 
     def _prepare_epoch_coins_config(self, epoch_wallets_config) -> dict:
@@ -854,6 +894,24 @@ class CoinEpochsOrchestrator:
         bulk_epochs_cfg['offset_epochs']['validation_offsets'] = []
         # (keep validation_offsets as-is; they’re already in all_offsets)
 
+        # Load and generate all wallets epochs data
+        # This WEO has its date range set separately for each wallet epoch's training data.
+        #  It shifts the full range of wallet model offsets by the modeling_period_duration
+        #  to identify the earliest training data wallet epoch.
+        #
+        #  Example Scenario
+        #  ----------------
+        #  Earliest Training Data Epoch Calculations
+        #    base modeling_period_start                                 2024-12-01
+        #  - earliest (wallets_epochs_config['offsets'])              - 360
+        #  - earliest (wallets_coin_config['coin_epochs_training'])   - 360
+        #    earliest offset                                          =-720
+
+        #
+        #  Latest Training Data Epoch Calculations
+        #    base modeling_period_start                                 2024-12-01
+        #  - wallets_config['modeling_period_duration']               - 30
+        #  = latest wallet epoch                                      = 2023-01-15 (offset -30)
         bulk_weo = weo.WalletEpochsOrchestrator(
             base_config         = self.wallets_config.config,
             metrics_config      = self.wallets_metrics_config,
@@ -937,6 +995,16 @@ class CoinEpochsOrchestrator:
             }
         }
 
+        # This WEO has its date range set to match the wallets_config['modeling_period_end']
+        #  in order to generate training data as of that date that can be scored using the
+        #  model generated by the bulk_weo.
+        #
+        #  Example Scenario
+        #  ----------------
+        #  Wallet Training Data Epoch Calculations
+        #    base modeling_period_start                                 2024-12-01
+        #  + wallets_config['modeling_period_duration']               + 30
+        #  = wallet training data epoch                               = 2024-12-31 (offset +30)
         epoch_weo = weo.WalletEpochsOrchestrator(
             base_config=epoch_weo.base_config,
             metrics_config=epoch_weo.metrics_config,
