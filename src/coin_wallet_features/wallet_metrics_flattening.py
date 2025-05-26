@@ -83,7 +83,7 @@ def flatten_cw_to_coin_segment_features(
             metric_df = metric_df.join(seg_df, how='inner')
         return metric_column, metric_df
 
-    # Use n_threads if provided, else default
+    # Multithread using n_threads from the param value
     with ThreadPoolExecutor(max_workers=n_threads) as executor:
         futures = {executor.submit(process_metric, metric_column): metric_column
                    for metric_column in cw_metrics_df.columns}
@@ -137,6 +137,24 @@ def flatten_cw_to_coin_features(
     result_df = pd.DataFrame(index=pd.Index(all_coin_ids, name='coin_id'))
 
     for segment_value in wallet_segmentation_df[segment_family].unique():
+
+        # Check for missing binary '1' segments and create dummy columns if necessary to ensure
+        #  that all epochs have identical columns, even if one has no positive predictions
+        if (
+            segment_family.startswith('score_binary') and
+            '1' not in wallet_segmentation_df[segment_family].unique()
+        ):
+            if '1' not in wallet_segmentation_df[segment_family].unique():
+                # No positives in this epoch - create dummy '1' columns with zeros
+                dummy_columns = {
+                    f'{segment_family}/1|{metric_column}|aggregations/aggregations/sum': 0,
+                    f'{segment_family}/1|{metric_column}|aggregations/aggregations/count': 0,
+                    f'{segment_family}/1|{metric_column}|aggregations/aggregations/sum_pct': 0,
+                    f'{segment_family}/1|{metric_column}|aggregations/aggregations/count_pct': 0,
+                }
+                dummy_df = pd.DataFrame(dummy_columns, index=pd.Index(all_coin_ids, name='coin_id'))
+                result_df = result_df.join(dummy_df, how='left')
+                continue
 
         # Don't break out 0 values of classification binaries
         if segment_family.startswith('score_binary') and segment_value == '0':
