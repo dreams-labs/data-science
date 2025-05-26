@@ -105,8 +105,8 @@ class WalletModelOrchestrator:
             # Don't output the scores from every tree
             score_wallets_config['modeling']['verbose_estimators'] = False
 
-            # Load and evaluate using existing model if configured
             if score_name in existing_models:
+                # Load and evaluate using existing model if configured and available
                 if not self.wallets_coin_config['training_data']['toggle_rebuild_wallet_models']:
                     model_id, evaluator = self._load_and_evaluate(
                         score_name,
@@ -114,28 +114,28 @@ class WalletModelOrchestrator:
                         validation_training_data_df,
                         validation_target_vars_df
                     )
+                    evaluators.append((score_name, evaluator))
                     logger.milestone(f"Loaded pretrained model for score '{score_name}'.")
+                    continue
 
                 # Announce overwrite if applicable
                 else:
                     logger.warning("Overwriting existing models due to 'toggle_rebuild_wallet_models'.")
 
-
-            # Train new model
-            else:
-                model_id, evaluator = self._train_and_evaluate(
-                    score_wallets_config,
-                    wallet_training_data_df,
-                    wallet_target_vars_df,
-                    validation_training_data_df,
-                    validation_target_vars_df
-                )
-                # Persist metrics for newly trained model
-                existing_models[score_name] = self._store_model_metrics(model_id, evaluator)
-                logger.milestone(f"Finished training model {len(existing_models)}/{len(self.score_params)}"
-                                f": {score_name}.")
-
+            # Train new model if we didn't load an existing one
+            model_id, evaluator = self._train_and_evaluate(
+                score_wallets_config,
+                wallet_training_data_df,
+                wallet_target_vars_df,
+                validation_training_data_df,
+                validation_target_vars_df
+            )
+            # Persist metrics for newly trained model
+            existing_models[score_name] = self._store_model_metrics(model_id, evaluator)
             evaluators.append((score_name, evaluator))
+
+            logger.milestone(f"Finished training model {len(existing_models)}/{len(self.score_params)}"
+                            f": {score_name}.")
 
             # -------------------------------------------------
             # Resolve and persist the final classification cutoff
