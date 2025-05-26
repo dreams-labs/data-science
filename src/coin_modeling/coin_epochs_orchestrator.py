@@ -435,8 +435,6 @@ class CoinEpochsOrchestrator:
         #    base modeling_period_start                                 2024-12-01
         #  + offset_duration                                          + 90
         #  = offset epoch                                             = 2025-03-31 (offset +120)
-
-        logger.error('----- epoch wallet_features_weo -----')
         epoch_weo = weo.WalletEpochsOrchestrator(
             base_config=epoch_wallets_config,               # epoch-specific config
             metrics_config=self.wallets_metrics_config,

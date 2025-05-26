@@ -167,7 +167,7 @@ class WalletEpochsOrchestrator:
 
         logger.milestone(f"Compiling wallet training data for {len(self.all_epochs_configs)} epochs...")
         if self.training_only:
-            logger.warning("Training‑only mode: Compiling wallet training data without validation or target variables.")
+            logger.milestone("Training‑only mode: Compiling wallet training data without validation or target variables.")
 
         u.notify('intro_3')
 
