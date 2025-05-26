@@ -118,8 +118,7 @@ class CoinFeaturesOrchestrator:
         # Assign wallets in training_data_df to segments
         wallet_segmentation_df = cws.build_wallet_segmentation(
             self.wallets_coin_config,
-            training_data_df,
-            score_suffix=prefix
+            training_data_df
         )
 
         # Flatten cw_metrics into single values for each coin-segment pair

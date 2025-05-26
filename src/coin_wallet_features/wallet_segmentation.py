@@ -20,8 +20,7 @@ logger = logging.getLogger(__name__)
 
 def build_wallet_segmentation(
         wallets_coin_config: dict,
-        training_data_df: pd.DataFrame,
-        score_suffix: str = None) -> pd.DataFrame:
+        training_data_df: pd.DataFrame) -> pd.DataFrame:
     """
     Build wallet segmentation DataFrame with score quantiles and optional clusters.
 
@@ -29,16 +28,12 @@ def build_wallet_segmentation(
     - wallets_coin_config (dict): dicts from .yaml file
     - training_data_df (DataFrame): wallet training features for the specified period
         including cluster labels
-    - score_suffix (str): specifies which score column to load (if applicable)
 
     Returns:
     - wallet_segmentation_df (pd.DataFrame): df containing segment categories for each wallet
     """
     # Load wallet scores
-    wallet_scores_df = load_wallet_scores(
-        wallets_coin_config,
-        score_suffix
-    )
+    wallet_scores_df = load_wallet_scores(wallets_coin_config)
     wallet_segmentation_df = wallet_scores_df.copy()
 
     # Add "all" segment for full-population aggregations
@@ -86,11 +81,10 @@ def build_wallet_segmentation(
 #         Helper Functions
 # ------------------------------
 
-def load_wallet_scores(wallets_coin_config: dict, score_suffix: str = None) -> pd.DataFrame:
+def load_wallet_scores(wallets_coin_config: dict) -> pd.DataFrame:
     """
     Params:
     - wallets_coin_config (dict): config from .yaml file
-    - score_suffix (str): specifies which score column to load (if applicable)
 
     Returns:
     - wallet_scores_df (DataFrame):
@@ -103,7 +97,7 @@ def load_wallet_scores(wallets_coin_config: dict, score_suffix: str = None) -> p
     wallet_scores_df = pd.DataFrame()
 
     for score_name in wallet_scores:
-        score_df = pd.read_parquet(f"{wallet_scores_path}/{score_name}|{score_suffix}.parquet")
+        score_df = pd.read_parquet(f"{wallet_scores_path}/{score_name}.parquet")
 
         feature_cols = []
 
