@@ -641,7 +641,7 @@ class WalletEpochsOrchestrator:
 
         # Generate modeling epoch configs
         if not self.training_only:
-            for offset_days in modeling_offsets:
+            for offset_days in sorted(modeling_offsets):
                 all_epochs_configs.append(
                     self.build_epoch_wallets_config(
                         offset_days, 'modeling',
@@ -652,7 +652,7 @@ class WalletEpochsOrchestrator:
 
             # Add validation epoch configs if configured
             if len(validation_offsets) > 0:
-                for offset_days in validation_offsets:
+                for offset_days in sorted(validation_offsets):
                     cfg = self.build_epoch_wallets_config(
                         offset_days, 'validation',
                         base_modeling_start, base_modeling_end,
