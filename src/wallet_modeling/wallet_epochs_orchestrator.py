@@ -57,8 +57,6 @@ class WalletEpochsOrchestrator:
 
         # Generated configs for all epochs
         self.all_epochs_configs = self._generate_epoch_configs()
-        if len(self.all_epochs_configs) == 0:
-            raise ValueError("how is this possible?")
 
         # Complete df objects
         self.complete_profits_df = complete_profits_df
@@ -600,8 +598,6 @@ class WalletEpochsOrchestrator:
         epoch_config['training_data']['parquet_folder'] = str(base_parquet_folder_base / folder_suffix)
 
         # Add derived values
-        logger.warning(epoch_type)
-        logger.warning(epoch_config['training_data']['modeling_period_end'])
         return wcm.add_derived_values(epoch_config)
 
 
@@ -640,40 +636,33 @@ class WalletEpochsOrchestrator:
             self._assert_no_epoch_overlap(modeling_offsets, validation_offsets)
 
         # Generate modeling epoch configs
-        if not self.training_only:
-            for offset_days in sorted(modeling_offsets):
-                all_epochs_configs.append(
-                    self.build_epoch_wallets_config(
-                        offset_days, 'modeling',
-                        base_modeling_start, base_modeling_end,
-                        base_training_window_starts, base_parquet_folder_base
-                    )
-                )
-
-            # Add validation epoch configs if configured
-            if len(validation_offsets) > 0:
-                for offset_days in sorted(validation_offsets):
-                    cfg = self.build_epoch_wallets_config(
-                        offset_days, 'validation',
-                        base_modeling_start, base_modeling_end,
-                        base_training_window_starts, base_parquet_folder_base
-                    )
-                    all_epochs_configs.append(cfg)
-
-        # In training_only mode, add one additional "current" epoch
+        # if not self.training_only:
         if self.training_only:
-            # Calculate offset to bring modeling_period_start to validation_period_end
-            base_modeling_start_dt = pd.to_datetime(base_training_data['modeling_period_start'])
-            validation_end_dt = pd.to_datetime(base_training_data['validation_period_end'])
-            end_of_val_offset = (validation_end_dt - base_modeling_start_dt).days
+            offset_type = 'current'
+        else:
+            offset_type = 'modeling'
+        for offset_days in sorted(modeling_offsets):
 
+
+            logger.warning(offset_days)
+            logger.warning(base_modeling_start)
             all_epochs_configs.append(
                 self.build_epoch_wallets_config(
-                    end_of_val_offset, 'current',
-                    base_modeling_start, base_modeling_end,
+                    offset_days, offset_type, # offset days doesn't change
+                    base_modeling_start, base_modeling_end, # base modeling config date doesn't move
                     base_training_window_starts, base_parquet_folder_base
                 )
             )
+
+        # Add validation epoch configs if configured
+        if len(validation_offsets) > 0:
+            for offset_days in sorted(validation_offsets):
+                cfg = self.build_epoch_wallets_config(
+                    offset_days, 'validation',
+                    base_modeling_start, base_modeling_end,
+                    base_training_window_starts, base_parquet_folder_base
+                )
+                all_epochs_configs.append(cfg)
 
         if len(all_epochs_configs) == 0:
             raise ValueError("There should always be at least one config generated.")
