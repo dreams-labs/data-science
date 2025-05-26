@@ -68,6 +68,7 @@ class WalletTrainingData:
 
             # Market data
             market_future = executor.submit(dr.retrieve_market_data,
+                                            period_end_date,
                                             self.wallets_config['training_data']['dataset'])
 
             # Macro trends data

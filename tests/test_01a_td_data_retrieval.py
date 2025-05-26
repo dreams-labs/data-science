@@ -651,7 +651,7 @@ def market_data_df():
     Retrieve and preprocess the market_data_df, filling gaps as needed.
     """
     logger.info("Generating market_data_df from production data...")
-    market_data_df = dr.retrieve_market_data()
+    market_data_df = dr.retrieve_market_data(config['training_data']['modeling_period_end'])
     market_data_df = dr.clean_market_data(market_data_df,
                                           config,
                                           config['training_data']['earliest_cohort_lookback_start'],

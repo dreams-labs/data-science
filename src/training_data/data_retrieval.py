@@ -22,10 +22,11 @@ logger = logging.getLogger(__name__)
 #     Primary Interface Functions
 # ------------------------------------
 
-def retrieve_market_data(dataset='prod'):
+def retrieve_market_data(end_date: str, dataset='prod'):
     """
     Retrieves market data from the core.coin_market_data table and converts coin_id to categorical
     Params:
+    - end_date (str): YYYY-MM-DD string for the last day data should be retrieved
     - dataset (str): 'prod' targets core dataset, 'dev' targets dev_core dataset
 
     Returns:
@@ -50,6 +51,7 @@ def retrieve_market_data(dataset='prod'):
         ,cast(cmd.market_cap as int64) as market_cap
         ,days_imputed
         from {core_dataset}.coin_market_data cmd
+        where date <= '{end_date}'
         order by 1,2
     """
     # Run the SQL query using dgc's run_sql method
