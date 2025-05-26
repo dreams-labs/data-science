@@ -1015,9 +1015,11 @@ def notify(sound_name: Union[str, int] = None, prompt: str = None, voice_id: str
             pygame.mixer.init()
 
         # Use sounds_directory with the path from config
+        dampen_level = .60
+        volume_dampened = sound_config.get('volume', 0.5) * dampen_level
         sound_path = sounds_directory / sound_config['path']
         sound = pygame.mixer.Sound(sound_path)
-        sound.set_volume(sound_config.get('volume', 1.0))
+        sound.set_volume(volume_dampened)
         sound.play()
 
         if prompt:
