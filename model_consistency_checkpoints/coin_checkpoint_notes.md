@@ -1,3 +1,23 @@
+# DDA 806 wallet model performance
+checkpoint 1: roc.666 dda_806_wallet_model_performance
+Model Performance Summary
+Target: coin_return 0.3 to
+ID: f07f68c4-a8e8-48ae-8ec9-d19db748b5f4
+===================================
+Test Samples:             159
+Number of Features:       54
+
+Test Set Classification Metrics
+True Positives:             29/159 (18.2)
+-----------------------------------
+ROC AUC:                    0.666
+Log Loss:                   0.524
+Accuracy:                   0.755
+Precision:                  0.321
+Recall:                     0.310
+F1 Score:                   0.316
+
+
 # dda 607 coin model more features
 checkpoint 5: c.175 include some non wallet features
 Model Performance Summary

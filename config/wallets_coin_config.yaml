@@ -172,7 +172,7 @@ wallet_scores: #CoinModel
         #     target_variable: cw_crypto_net_flows
         #     target_var_min_threshold: 1000
         #     target_var_max_threshold: .inf
-        #     y_pred_threshold: f.15
+        #     y_pred_threshold: 0.8
         #     assign_epochs_to_addresses: False
 
         # cw_net_flows_regression:
@@ -202,14 +202,14 @@ features: #CoinModel
 
     # Which scores will have distribution metrics created
     score_distributions: [
-        # cw_net_flows_05_thr80,
-        # cw_net_flows_015_thr80,
-        # cw_net_flows_025_thr80,
-        # cw_net_flows_040_thr80,
-        # cw_net_flows_n05_thr80,
-        # cw_net_flows_n015_thr80,
-        # cw_net_flows_n025_thr80,
-        # cw_net_flows_n040_thr80,
+        # cw_net_flows_05,
+        # cw_net_flows_015,
+        # cw_net_flows_025,
+        # cw_net_flows_040,
+        # cw_net_flows_n05,
+        # cw_net_flows_n015,
+        # cw_net_flows_n025,
+        # cw_net_flows_n040,
     ]
 
     # Features from the feature_engineering directory
@@ -244,8 +244,8 @@ coin_modeling: #CoinModel
 
     #KeyParam Model Type
     # Target variable parameters
-    model_type: regression  # "regression" or "classification"
-    # model_type: classification  # "regression" or "classification"
+    # model_type: regression  # "regression" or "classification"
+    model_type: classification  # "regression" or "classification"
 
     #KeyParam Target Variable
     # target_variable: coin_return_winsorized
@@ -264,8 +264,8 @@ coin_modeling: #CoinModel
 
     # Thresholds for coin inclusion in training data
     market_cap_column: market_cap  # 'market_cap' or 'market_cap_filled'
-    min_market_cap: 2_000_000  # coins below this market cap will not be included in performance assessments
-    max_market_cap: 500_000_000  # coins above this market cap will not be included in performance assessments
+    min_market_cap: 1_500_000  # coins below this market cap will not be included in performance assessments
+    max_market_cap: 700_000_000  # coins above this market cap will not be included in performance assessments
 
     # Train/Test/Eval split
     test_size: 0.2  # what % of the total population will be used as test
@@ -291,14 +291,14 @@ coin_modeling: #CoinModel
             # market_data|*,
 
             # # Segment Family
-            score_binary|cw_net_flows_05_thr80/*,
-            score_binary|cw_net_flows_015_thr80/*,
-            score_binary|cw_net_flows_025_thr80/*,
-            # score_binary|cw_net_flows_040_thr80/*,
-            score_binary|cw_net_flows_n05_thr80/*,
-            score_binary|cw_net_flows_n015_thr80/*,
-            score_binary|cw_net_flows_n025_thr80/*,
-            # score_binary|cw_net_flows_n040_thr80/*,
+            score_binary|cw_net_flows_05/*,
+            score_binary|cw_net_flows_015/*,
+            score_binary|cw_net_flows_025/*,
+            # score_binary|cw_net_flows_040/*,
+            score_binary|cw_net_flows_n05/*,
+            score_binary|cw_net_flows_n015/*,
+            score_binary|cw_net_flows_n025/*,
+            # score_binary|cw_net_flows_n040/*,
 
             score_binary|*/1|trading/total_volume|aggregations/aggregations/sum,
             # score_binary|*/1|trading/total_volume|aggregations/aggregations/sum_pct,
@@ -469,6 +469,7 @@ coin_modeling: #CoinModel
 
     # CoinModel Params
     model_params:
+        #KeyParam Model Specs
         n_estimators: 500
         max_depth: 3
         min_child_weight: 5
