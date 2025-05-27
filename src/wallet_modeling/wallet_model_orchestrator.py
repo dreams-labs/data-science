@@ -137,6 +137,7 @@ class WalletModelOrchestrator:
             )
             # Persist metrics for newly trained model
             models_json_dict[score_name] = self._store_model_metrics(model_id, evaluator)
+            models_json_dict[score_name]['metrics'] = evaluator.metrics
             evaluators.append((score_name, evaluator))
 
             logger.milestone(f"Finished training model {len(models_json_dict)}/{len(self.score_params)}"
@@ -144,39 +145,16 @@ class WalletModelOrchestrator:
 
             # Resolve and persist the final classification cutoff
             # -------------------------------------------------
-            resolved_thr = score_wallets_config['modeling'].get('y_pred_threshold')
-
-            # If the threshold is still an F‑beta string (e.g. "f1", "f0.25"),
-            # convert it to the numeric value contained in the evaluator.
-            if isinstance(resolved_thr, str) and resolved_thr.startswith('f'):
-                beta_str = resolved_thr[1:]
-                thr_key = f"f{beta_str}_thr"
-                # ensure the evaluator has calculated this F‑beta metric
-                if thr_key not in evaluator.metrics:
-                    evaluator.add_fbeta_metrics()
-                resolved_thr = evaluator.metrics[thr_key]
-                # update the modeling config so any future use sees the numeric value
-                score_wallets_config['modeling']['y_pred_threshold'] = resolved_thr
-                logger.info(
-                    "Set y_pred_threshold for '%s' to F%s threshold: %.4f",
-                    score_name,
-                    beta_str,
-                    resolved_thr,
-                )
-
             # Persist *numeric* threshold into self.score_params for downstream scoring
-            # (predict_and_store relies on this dict).
-            if resolved_thr is not None:
-                self.score_params[score_name]['y_pred_threshold'] = float(resolved_thr)
-            else:
-                # keep None explicitly so predict_and_store skips binary prediction
-                self.score_params[score_name]['y_pred_threshold'] = None
+            y_threshold_numeric = score_wallets_config['modeling'].get('y_pred_threshold')
+            self.score_params[score_name]['y_pred_threshold'] = y_threshold_numeric
 
         # Store and save models_dict
         self.models_dict = models_json_dict
         save_location = f"{self.wallets_coin_config['training_data']['parquet_folder']}/wallet_model_ids.json"
         with open(save_location, 'w', encoding='utf-8') as f:
             json.dump(models_json_dict, f, indent=4, default=u.numpy_type_converter)
+            logger.milestone(f"Saved wallet_model_ids.json to {save_location}.")
 
         logger.milestone(f"Prepared all {len(self.score_params)} wallet models.")
 
