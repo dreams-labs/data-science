@@ -96,6 +96,7 @@ class WalletModelOrchestrator:
             models_json_dict = {}
         evaluators = []
 
+        i = 0
         for score_name in self.score_params:
             # Create a deep copy of the configuration to avoid modifying the original
             score_wallets_config = copy.deepcopy(self.wallets_config)
@@ -140,7 +141,8 @@ class WalletModelOrchestrator:
             models_json_dict[score_name]['metrics'] = evaluator.metrics
             evaluators.append((score_name, evaluator))
 
-            logger.milestone(f"Finished training model {len(models_json_dict)}/{len(self.score_params)}"
+            i+=1
+            logger.milestone(f"Finished training model {i}/{len(self.score_params)}"
                             f": {score_name}.")
 
             # Resolve and persist the final classification cutoff

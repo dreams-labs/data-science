@@ -110,7 +110,7 @@ class WalletModel(BaseModel):
                     return cv_results
 
         # Log training start and play startup notification
-        logger.info(f"Training wallet model using data with shape: {self.X_train.shape}...")
+        logger.milestone(f"Training wallet model using data with shape: {self.X_train.shape}...")
         u.notify('startup')
         meta_pipeline.fit(
             self.X_train,
