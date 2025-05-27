@@ -72,6 +72,12 @@ class WalletModelOrchestrator:
         """
         Train multiple wallet scoring models with different parameter configurations.
 
+        New models will be trained if no models exist yet, or if the param
+         wallets_coin_config['training_data']['toggle_rebuild_wallet_models'] is set to True.
+
+        Existing models will be used if 'wallet_model_ids.json' contains their metadata
+         and toggle_rebuild_wallet_models==False.
+
         Params:
         - wallet_training_data_df: Training data DataFrame
         - wallet_target_vars_df: Features for modeling
@@ -85,14 +91,11 @@ class WalletModelOrchestrator:
         models_json_path = Path(self.wallets_coin_config['training_data']['parquet_folder']) / "wallet_model_ids.json"
         if models_json_path.exists():
             with open(models_json_path, 'r', encoding='utf-8') as f:
-                existing_models = json.load(f)
+                models_json_dict = json.load(f)
         else:
-            existing_models = {}
+            models_json_dict = {}
         evaluators = []
 
-        # ------------------------
-        # Train or load all models
-        # ------------------------
         for score_name in self.score_params:
             # Create a deep copy of the configuration to avoid modifying the original
             score_wallets_config = copy.deepcopy(self.wallets_config)
@@ -105,8 +108,9 @@ class WalletModelOrchestrator:
             # Don't output the scores from every tree
             score_wallets_config['modeling']['verbose_estimators'] = False
 
-            if score_name in existing_models:
-                # Load and evaluate using existing model if configured and available
+            # Evaluate using an existing model if configured and available
+            # ------------------------------------------------------------
+            if score_name in models_json_dict:
                 if not self.wallets_coin_config['training_data']['toggle_rebuild_wallet_models']:
                     model_id, evaluator = self._load_and_evaluate(
                         score_name,
@@ -122,7 +126,8 @@ class WalletModelOrchestrator:
                 else:
                     logger.warning("Overwriting existing models due to 'toggle_rebuild_wallet_models'.")
 
-            # Train new model if we didn't load an existing one
+            # Train new model if we didn't load existing
+            # ------------------------------------------
             model_id, evaluator = self._train_and_evaluate(
                 score_wallets_config,
                 wallet_training_data_df,
@@ -131,13 +136,12 @@ class WalletModelOrchestrator:
                 validation_target_vars_df
             )
             # Persist metrics for newly trained model
-            existing_models[score_name] = self._store_model_metrics(model_id, evaluator)
+            models_json_dict[score_name] = self._store_model_metrics(model_id, evaluator)
             evaluators.append((score_name, evaluator))
 
-            logger.milestone(f"Finished training model {len(existing_models)}/{len(self.score_params)}"
+            logger.milestone(f"Finished training model {len(models_json_dict)}/{len(self.score_params)}"
                             f": {score_name}.")
 
-            # -------------------------------------------------
             # Resolve and persist the final classification cutoff
             # -------------------------------------------------
             resolved_thr = score_wallets_config['modeling'].get('y_pred_threshold')
@@ -169,16 +173,16 @@ class WalletModelOrchestrator:
                 self.score_params[score_name]['y_pred_threshold'] = None
 
         # Store and save models_dict
-        self.models_dict = existing_models
+        self.models_dict = models_json_dict
         save_location = f"{self.wallets_coin_config['training_data']['parquet_folder']}/wallet_model_ids.json"
         with open(save_location, 'w', encoding='utf-8') as f:
-            json.dump(existing_models, f, indent=4, default=u.numpy_type_converter)
+            json.dump(models_json_dict, f, indent=4, default=u.numpy_type_converter)
 
         logger.milestone(f"Prepared all {len(self.score_params)} wallet models.")
 
         self._plot_score_summaries(evaluators)
 
-        return existing_models
+        return models_json_dict
 
 
 
