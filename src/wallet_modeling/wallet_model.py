@@ -154,7 +154,7 @@ class WalletModel(BaseModel):
                 proba_series = pd.Series(proba[:, pos_idx], index=self.X_validation.index)
 
                 # Resolve F-beta string threshold if present
-                raw_thr = self.modeling_config.get('y_pred_threshold', 0.5)
+                raw_thr = self.modeling_config['y_pred_threshold']
                 if isinstance(raw_thr, str) and raw_thr.startswith('f'):
                     beta = float(raw_thr[1:])
                     # Compute precision-recall curve on validation set
@@ -185,7 +185,7 @@ class WalletModel(BaseModel):
                 proba_series = pd.Series(proba[:, pos_idx], index=self.X_test.index)
 
                 # Apply configurable threshold for class prediction
-                threshold = self.modeling_config.get('y_pred_threshold', 0.5)
+                threshold = self.modeling_config['y_pred_threshold']
                 self.y_pred = (proba_series >= threshold).astype(int)
             else:
                 self.y_pred = meta_pipeline.predict(self.X_test)
