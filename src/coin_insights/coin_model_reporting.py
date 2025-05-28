@@ -180,20 +180,19 @@ def generate_and_upload_coin_scores(
 def plot_wallet_model_comparison(
     wallets_coin_config: dict,
     metric: str = 'wins_return',
-    figsize: tuple = (15, 10)
+    figsize: tuple = (12, 20),
+    cols: int = 2,
 ) -> None:
     """
     Plot comparison of wallet model return metrics across different epochs.
-    Creates separate subplot for each model.
+    Creates separate subplot for each model in a flexible column layout.
 
     Params:
-    - wallets_coin_config: Configuration containing parquet folder paths and model names
+    - wallets_coin_config: Configuration containing parquet folder paths
     - metric: 'wins_return' or 'mean_return'
     - figsize: Figure dimensions
+    - cols: how many columns of charts to make
     """
-    # Get model names from config
-    model_names = list(wallets_coin_config['wallet_scores']['score_params'].keys())
-
     base_folder = Path(wallets_coin_config['training_data']['parquet_folder'])
 
     # Find all wallet_model_ids.json files
@@ -202,19 +201,28 @@ def plot_wallet_model_comparison(
     if not json_files:
         raise FileNotFoundError(f"No wallet_model_ids.json files found in {base_folder}")
 
+    # Get all unique model names from actual JSON files
+    all_model_names = set()
+    for json_path in json_files:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            models_dict = json.load(f)
+            all_model_names.update(models_dict.keys())
+
+    model_names = sorted(list(all_model_names))
+
+    if not model_names:
+        raise ValueError("No models found in JSON files")
+
     # Load and combine all return metrics
     combined_data = []
 
     for json_path in json_files:
         epoch_date = json_path.parent.name
 
-        with open(json_path, 'r') as f:
+        with open(json_path, 'r', encoding='utf-8') as f:
             models_dict = json.load(f)
 
         for model_name, model_data in models_dict.items():
-            if model_name not in model_names:
-                continue
-
             if 'return_metrics' not in model_data:
                 continue
 
@@ -238,16 +246,18 @@ def plot_wallet_model_comparison(
 
     # Calculate subplot layout
     n_models = len(model_names)
-    cols = 1  # 3 columns of charts
     rows = math.ceil(n_models / cols)
 
     # Create subplots
     fig, axes = plt.subplots(rows, cols, figsize=figsize)
+
+    # Handle axes indexing for different subplot configurations
     if n_models == 1:
-        axes = [axes]
+        axes_flat = [axes]
     elif rows == 1:
-        axes = axes.reshape(1, -1)
-    axes_flat = axes.flatten()
+        axes_flat = axes if cols > 1 else [axes]
+    else:
+        axes_flat = axes.flatten()
 
     # Plot each model in its own subplot
     for i, model_name in enumerate(model_names):
@@ -276,7 +286,7 @@ def plot_wallet_model_comparison(
         axes_flat[i].axis('off')
 
     plt.suptitle(f'Wallet Model {metric.replace("_", " ").title()} Comparison by Epoch',
-                 fontsize=16, y=0.98)
+                 fontsize=16, y=0.995)
     plt.tight_layout()
     plt.show()
 
