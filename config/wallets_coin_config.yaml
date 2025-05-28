@@ -10,7 +10,7 @@ training_data: #CoinModel
     coin_epochs_validation: [
         30,
         60,
-        90
+        90,
     ]
 
     coin_epochs_training: [  # How many days prior to the modeling period each window begins
@@ -37,44 +37,77 @@ wallet_scores: #CoinModel
     # y_pred_threshold defines the binary coin cohorts and can be defined
     #  by using a hardcoded number (e.g. 0.8) or an F-beta score (e.g. f.5).
     score_params:
-        # cw_net_flows_015:
-        #     model_type: classification
-        #     target_variable: cw_crypto_net_flows/crypto_inflows/base
-        #     target_var_min_threshold: 0.15
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: f.25
-        #     assign_epochs_to_addresses: False
 
-        # cw_net_flows_n040_thr90:
-        #     model_type: classification
-        #     target_variable: cw_crypto_net_flows/crypto_inflows/base
-        #     target_var_min_threshold: -0.40
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.90
-        #     assign_epochs_to_addresses: False
-
-        cw_net_flows_05:
+        cw_net_gain_max_inv_rank_90:
             model_type: classification
-            target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: 0.05
+            target_variable: cw_crypto_net_gain/max_investment/rank
+            target_var_min_threshold: 0.90
             target_var_max_threshold: .inf
-            y_pred_threshold: 0.8
+            y_pred_threshold: 0.80
             assign_epochs_to_addresses: False
 
-        cw_net_flows_15:
+        net_gain_max_inv_rank_90:
             model_type: classification
-            target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: 0.15
+            target_variable: crypto_net_gain/max_investment/rank
+            target_var_min_threshold: 0.90
             target_var_max_threshold: .inf
-            y_pred_threshold: 0.8
+            y_pred_threshold: 0.80
             assign_epochs_to_addresses: False
 
-        cw_net_flows_25:
+        cw_net_gain_max_inv_n40:
+            model_type: classification
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_min_threshold: -0.40
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.80
+            assign_epochs_to_addresses: False
+
+        net_gain_max_inv_n40:
+            model_type: classification
+            target_variable: crypto_net_gain/max_investment/base
+            target_var_min_threshold: -0.40
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.80
+            assign_epochs_to_addresses: False
+
+        cw_net_gain_max_inv_40:
+            model_type: classification
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_min_threshold: 0.40
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.70
+            assign_epochs_to_addresses: False
+
+        net_gain_max_inv_40:
+            model_type: classification
+            target_variable: crypto_net_gain/max_investment/base
+            target_var_min_threshold: 0.40
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.70
+            assign_epochs_to_addresses: False
+
+        cw_net_flows_n40:
             model_type: classification
             target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: 0.25
+            target_var_min_threshold: -0.40
             target_var_max_threshold: .inf
-            y_pred_threshold: 0.8
+            y_pred_threshold: 0.80
+            assign_epochs_to_addresses: False
+
+        net_flows_n40:
+            model_type: classification
+            target_variable: crypto_net_flows/crypto_inflows/base
+            target_var_min_threshold: -0.40
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.80
+            assign_epochs_to_addresses: False
+
+        net_flows_40:
+            model_type: classification
+            target_variable: crypto_net_flows/crypto_inflows/base
+            target_var_min_threshold: 0.40
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.70
             assign_epochs_to_addresses: False
 
         cw_net_flows_40:
@@ -82,121 +115,68 @@ wallet_scores: #CoinModel
             target_variable: cw_crypto_net_flows/crypto_inflows/base
             target_var_min_threshold: 0.40
             target_var_max_threshold: .inf
-            y_pred_threshold: 0.8
+            y_pred_threshold: 0.70
             assign_epochs_to_addresses: False
 
-        cw_net_flows_60:
+        cw_crypto_net_flows_1k:
             model_type: classification
-            target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: 0.60
+            target_variable: cw_crypto_net_flows
+            target_var_min_threshold: 1000
             target_var_max_threshold: .inf
             y_pred_threshold: 0.8
             assign_epochs_to_addresses: False
 
-        cw_net_flows_n05:
+        cw_crypto_net_gain_1k:
             model_type: classification
-            target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: -.inf
-            target_var_max_threshold: -0.05
+            target_variable: cw_crypto_net_gain
+            target_var_min_threshold: 1000
+            target_var_max_threshold: .inf
             y_pred_threshold: 0.8
             assign_epochs_to_addresses: False
 
-        cw_net_flows_n15:
+        crypto_net_gain_1k:
             model_type: classification
-            target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: -.inf
-            target_var_max_threshold: -0.15
+            target_variable: crypto_net_gain
+            target_var_min_threshold: 1000
+            target_var_max_threshold: .inf
             y_pred_threshold: 0.8
             assign_epochs_to_addresses: False
 
-        cw_net_flows_n25:
+        cw_crypto_net_gain_10k:
             model_type: classification
-            target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: -.inf
-            target_var_max_threshold: -0.25
+            target_variable: cw_crypto_net_gain
+            target_var_min_threshold: 10_000
+            target_var_max_threshold: .inf
             y_pred_threshold: 0.8
             assign_epochs_to_addresses: False
 
-        cw_net_flows_n40:
-            model_type: classification
-            target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: -.inf
-            target_var_max_threshold: -0.40
-            y_pred_threshold: 0.8
+        cw_net_gain_regression:
+            model_type: regression
+            target_variable: cw_crypto_net_gain/winsorized
+            y_pred_lower_threshold: -1.1
+            y_pred_threshold: 0.7
             assign_epochs_to_addresses: False
 
-        cw_net_flows_n60:
-            model_type: classification
-            target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: -.inf
-            target_var_max_threshold: -0.60
-            y_pred_threshold: 0.8
+        net_gain_regression:
+            model_type: regression
+            target_variable: crypto_net_gain/winsorized
+            y_pred_lower_threshold: -1.1
+            y_pred_threshold: 0.7
             assign_epochs_to_addresses: False
 
-        # cw_net_flows_n040_thr70:
-        #     model_type: classification
-        #     target_variable: cw_crypto_net_flows/crypto_inflows/base
-        #     target_var_min_threshold: -0.40
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.70
-        #     assign_epochs_to_addresses: False
+        cw_net_flows_regression:
+            model_type: regression
+            target_variable: cw_crypto_net_flows/crypto_inflows/winsorized
+            y_pred_lower_threshold: -1.1
+            y_pred_threshold: 0.7
+            assign_epochs_to_addresses: False
 
-        # cw_net_flows_025_thr90:
-        #     model_type: classification
-        #     target_variable: cw_crypto_net_flows/crypto_inflows/base
-        #     target_var_min_threshold: 0.25
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.90
-        #     assign_epochs_to_addresses: False
-
-
-        # cw_net_flows_025_thr70:
-        #     model_type: classification
-        #     target_variable: cw_crypto_net_flows/crypto_inflows/base
-        #     target_var_min_threshold: 0.25
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.70
-        #     assign_epochs_to_addresses: False
-
-        # cw_net_flows_060_thr90:
-        #     model_type: classification
-        #     target_variable: cw_crypto_net_flows/crypto_inflows/base
-        #     target_var_min_threshold: 0.60
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.90
-        #     assign_epochs_to_addresses: False
-
-        # cw_net_flows_060_thr80:
-        #     model_type: classification
-        #     target_variable: cw_crypto_net_flows/crypto_inflows/base
-        #     target_var_min_threshold: 0.60
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.80
-        #     assign_epochs_to_addresses: False
-
-        # cw_net_flows_060_thr70:
-        #     model_type: classification
-        #     target_variable: cw_crypto_net_flows/crypto_inflows/base
-        #     target_var_min_threshold: 0.60
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.70
-        #     assign_epochs_to_addresses: False
-
-
-        # cw_crypto_net_flows_1k:
-        #     model_type: classification
-        #     target_variable: cw_crypto_net_flows
-        #     target_var_min_threshold: 1000
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.8
-        #     assign_epochs_to_addresses: False
-
-        # cw_net_flows_regression:
-        #     model_type: regression
-        #     target_variable: cw_crypto_net_flows/crypto_inflows/winsorized
-        #     y_pred_lower_threshold: -1.1
-        #     y_pred_threshold: 0.7
-        #     assign_epochs_to_addresses: False
+        net_flows_regression:
+            model_type: regression
+            target_variable: crypto_net_flows/crypto_inflows/winsorized
+            y_pred_lower_threshold: -1.1
+            y_pred_threshold: 0.7
+            assign_epochs_to_addresses: False
 
 
 
@@ -497,10 +477,10 @@ coin_modeling: #CoinModel
     # CoinModel Params
     model_params:
         #KeyParam Model Specs
-        n_estimators: 500
+        n_estimators: 300
         max_depth: 3
         min_child_weight: 5
-        learning_rate: 0.02
+        learning_rate: 0.15
         colsample_bytree: 1.0
         subsample: 0.9
         gamma: 0.005
