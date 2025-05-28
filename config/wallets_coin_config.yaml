@@ -299,22 +299,33 @@ coin_modeling: #CoinModel
         drop_patterns: [
 
             # Segment Category
-            # all_wallets*,
-
+            all_wallets*,
             score_quantile|*,
-            # score_binary|*,
+            score_binary|*,
             # macro|*,
             # market_data|*,
 
-            # # Segment Family
-            score_binary|cw_net_flows_05/*,
-            score_binary|cw_net_flows_015/*,
-            score_binary|cw_net_flows_025/*,
-            # score_binary|cw_net_flows_040/*,
-            score_binary|cw_net_flows_n05/*,
-            score_binary|cw_net_flows_n015/*,
-            score_binary|cw_net_flows_n025/*,
-            # score_binary|cw_net_flows_n040/*,
+            # Segment Family
+            # score_binary|cw_net_flows_05/*,
+            # score_binary|cw_net_flows_15/*,
+            # score_binary|cw_net_flows_25/*,
+            # score_binary|cw_net_flows_40/*,
+            # score_binary|cw_net_flows_60/*,
+            # score_binary|cw_net_flows_n05/*,
+            # score_binary|cw_net_flows_n15/*,
+            # score_binary|cw_net_flows_n25/*,
+            # score_binary|cw_net_flows_n40/*,
+            # score_binary|cw_net_flows_n60/*,
+
+            score_binary|cw_net_flows_n015_thr80/*,
+            score_binary|cw_net_flows_025_thr80/*,
+            score_binary|cw_net_flows_n025_thr80/*,
+            score_binary|cw_net_flows_n05_thr80/*,
+            score_binary|cw_net_flows_05_thr80/*,
+            score_binary|cw_net_flows_015_thr80/*,
+            score_binary|cw_net_flows_040_thr80/*,
+            score_binary|cw_net_flows_n040_thr80/*,
+
 
             score_binary|*/1|trading/total_volume|aggregations/aggregations/sum,
             # score_binary|*/1|trading/total_volume|aggregations/aggregations/sum_pct,
@@ -553,24 +564,16 @@ coin_modeling: #CoinModel
 
             drop_columns__drop_patterns: [
 
-                # 'score_binary|cw_net_flows_040_thr80/*|score_wtd/cw_net_flows_05_thr80',
-                # 'score_binary|cw_net_flows_040_thr80/*|score_wtd/cw_net_flows_015_thr80',
-                # 'score_binary|cw_net_flows_040_thr80/*|score_wtd/cw_net_flows_025_thr80',
-                # 'score_binary|cw_net_flows_040_thr80/*|score_wtd/cw_net_flows_040_thr80',
-                # 'score_binary|cw_net_flows_040_thr80/*|score_wtd/cw_net_flows_n05_thr80',
-                # 'score_binary|cw_net_flows_040_thr80/*|score_wtd/cw_net_flows_n015_thr80',
-                # 'score_binary|cw_net_flows_040_thr80/*|score_wtd/cw_net_flows_n025_thr80',
-                # 'score_binary|cw_net_flows_040_thr80/*|score_wtd/cw_net_flows_n040_thr80',
-                # 'score_binary|cw_net_flows_n040_thr80/*|score_wtd/cw_net_flows_05_thr80',
-                # 'score_binary|cw_net_flows_n040_thr80/*|score_wtd/cw_net_flows_015_thr80',
-                # 'score_binary|cw_net_flows_n040_thr80/*|score_wtd/cw_net_flows_025_thr80',
-                # 'score_binary|cw_net_flows_n040_thr80/*|score_wtd/cw_net_flows_040_thr80',
-                # 'score_binary|cw_net_flows_n040_thr80/*|score_wtd/cw_net_flows_n05_thr80',
-                # 'score_binary|cw_net_flows_n040_thr80/*|score_wtd/cw_net_flows_n015_thr80',
-                # 'score_binary|cw_net_flows_n040_thr80/*|score_wtd/cw_net_flows_n025_thr80',
-                # 'score_binary|cw_net_flows_n040_thr80/*|score_wtd/cw_net_flows_n040_thr80',
-
-
+                score_binary|cw_net_flows_05/*,
+                score_binary|cw_net_flows_15/*,
+                score_binary|cw_net_flows_25/*,
+                score_binary|cw_net_flows_40/*,
+                # score_binary|cw_net_flows_60/*,
+                score_binary|cw_net_flows_n05/*,
+                score_binary|cw_net_flows_n15/*,
+                score_binary|cw_net_flows_n25/*,
+                score_binary|cw_net_flows_n40/*,
+                score_binary|cw_net_flows_n60/*,
 
 
 
