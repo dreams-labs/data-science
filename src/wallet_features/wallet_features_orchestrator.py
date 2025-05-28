@@ -159,7 +159,6 @@ def calculate_wallet_features(
 #         Utility Functions
 # ----------------------------------
 
-@u.timing_decorator
 def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
     """
     Validates pre-indexed DataFrames for the feature calculation pipeline.
@@ -209,7 +208,7 @@ def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
     logger.debug("All input dataframes passed validation checks.")
 
 
-@u.timing_decorator
+
 def prepare_dataframes(profits_df: pd.DataFrame,
                        market_indicators_df: pd.DataFrame,
                        transfers_sequencing_df: pd.DataFrame,
