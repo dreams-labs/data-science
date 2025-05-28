@@ -285,6 +285,7 @@ class WalletEpochsOrchestrator:
     #           Helper Methods
     # -----------------------------------
 
+    @u.timing_decorator
     def _process_single_epoch(
             self,
             epoch_config: dict,
