@@ -176,7 +176,6 @@ def generate_and_upload_coin_scores(
     u.notify('ui_sound_on')
 
 
-
 def plot_wallet_model_comparison(
     wallets_coin_config: dict,
     metric: str = 'wins_return',
@@ -187,6 +186,7 @@ def plot_wallet_model_comparison(
     """
     Plot comparison of wallet model return metrics across different epochs.
     Creates separate subplot for each model in a flexible column layout.
+    Validates that return data contains exactly 20 items before plotting.
 
     Params:
     - wallets_coin_config: Configuration containing parquet folder paths
@@ -215,7 +215,7 @@ def plot_wallet_model_comparison(
     if not model_names:
         raise ValueError("No models found in JSON files")
 
-    # Load and combine all return metrics
+    # Load and combine all return metrics with validation
     combined_data = []
     macro_values = []
 
@@ -231,20 +231,24 @@ def plot_wallet_model_comparison(
 
             return_metrics = model_data['return_metrics']
 
+            # Validate that metric data contains exactly 20 items
+            if metric not in return_metrics or len(return_metrics[metric]) != 20:
+                logger.warning(f"Skipping {model_name} epoch {epoch_date}: {metric} data does not contain exactly 20 items (found {len(return_metrics.get(metric, []))})")
+                continue
+
             # Extract macro value for color coding if specified
             macro_value = None
             if macro_comparison and 'macro_averages' in model_data:
                 macro_key = f'macro|{macro_comparison}'
                 macro_value = model_data['macro_averages'].get(macro_key)
 
-            # Create records for each bucket
-            for i, bucket in enumerate(return_metrics['bucket']):
+            # Create records for each position (1-20)
+            for i, return_value in enumerate(return_metrics[metric]):
                 combined_data.append({
                     'epoch_date': epoch_date,
                     'model_name': model_name,
-                    'bucket': bucket,
-                    'mean_return': return_metrics['mean_return'][i],
-                    'wins_return': return_metrics['wins_return'][i],
+                    'position': i + 1,  # 1-indexed positions
+                    'return_value': return_value,
                     'macro_value': macro_value
                 })
 
@@ -253,7 +257,8 @@ def plot_wallet_model_comparison(
                 macro_values.append(macro_value)
 
     if not combined_data:
-        raise ValueError("No return metrics data found")
+        logger.warning("No valid return metrics data found after validation")
+        return
 
     # Convert to DataFrame
     df = pd.DataFrame(combined_data)
@@ -280,8 +285,15 @@ def plot_wallet_model_comparison(
                 # Median value - light grey
                 color_map[val] = '#D3D3D3'
 
+    # Get models that have valid data
+    valid_model_names = sorted(df['model_name'].unique())
+    n_models = len(valid_model_names)
+
+    if n_models == 0:
+        logger.warning("No models with valid data to plot")
+        return
+
     # Calculate subplot layout
-    n_models = len(model_names)
     rows = math.ceil(n_models / cols)
 
     # Create subplots
@@ -296,15 +308,9 @@ def plot_wallet_model_comparison(
         axes_flat = axes.flatten()
 
     # Plot each model in its own subplot
-    for i, model_name in enumerate(model_names):
+    for i, model_name in enumerate(valid_model_names):
         ax = axes_flat[i]
         model_data = df[df['model_name'] == model_name]
-
-        if model_data.empty:
-            ax.text(0.5, 0.5, f'No data for {model_name}',
-                   ha='center', va='center', transform=ax.transAxes)
-            ax.set_title(model_name)
-            continue
 
         # Plot separate line for each epoch
         for epoch_date, group in model_data.groupby('epoch_date'):
@@ -318,10 +324,10 @@ def plot_wallet_model_comparison(
                 line_color = None
                 label = f'Epoch {epoch_date}'
 
-            ax.plot(group['bucket'], group[metric],
+            ax.plot(group['position'], group['return_value'],
                    marker='o', linewidth=2, label=label, color=line_color)
 
-        ax.set_xlabel('Prediction Rank Bucket (1 = highest scores)')
+        ax.set_xlabel('Prediction Rank Position (1 = highest scores)')
         ax.set_ylabel(f'{metric.replace("_", " ").title()}')
         ax.set_title(model_name)
         ax.grid(True, alpha=0.3)
@@ -342,7 +348,6 @@ def plot_wallet_model_comparison(
     plt.suptitle(title, fontsize=16, y=0.995)
     plt.tight_layout()
     plt.show()
-
 
 
 # ---------------------------------
