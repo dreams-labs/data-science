@@ -271,11 +271,11 @@ def plot_wallet_model_comparison(
             if val < median_val:
                 # Scale from red to light grey
                 norm_val = (val - min_val) / (median_val - min_val) if median_val != min_val else 0
-                color_map[val] = plt.cm.Reds(0.3 + 0.7 * (1 - norm_val))
+                color_map[val] = plt.cm.Reds(0.3 + 0.7 * (1 - norm_val))  # pylint:disable=no-member
             elif val > median_val:
                 # Scale from light grey to blue
                 norm_val = (val - median_val) / (max_val - median_val) if max_val != median_val else 0
-                color_map[val] = plt.cm.Blues(0.3 + 0.7 * norm_val)
+                color_map[val] = plt.cm.Blues(0.3 + 0.7 * norm_val)  # pylint:disable=no-member
             else:
                 # Median value - light grey
                 color_map[val] = '#D3D3D3'
