@@ -238,7 +238,7 @@ class CoinEpochsOrchestrator:
 
         # 3. Generate all coin epochs' training data
         # ------------------------------------------
-        logger.milestone("\nBeginning generation of coin model training data...")
+        logger.milestone("Beginning generation of coin model training data...")
         u.notify('whoosh_boom')
 
         # Tag each DataFrame with the epoch date
