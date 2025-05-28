@@ -1,3 +1,25 @@
+# DDA 818 wallet model across macros
+checkpoint 1: roc.920 validation checks out?
+Model Performance Summary
+Target: cw_crypto_net_gain/crypto_inflows/base 0.4 to inf
+ID: 890bb610-0778-4afc-a8dd-498a7b4277c9
+===================================
+Test Samples:             22,385
+Test Positive Samples:    122,465 (547.09%)
+Number of Features:       496
+Features per Window:      62
+
+Test Set Classification Metrics
+True Positives:             1881/22385 (8.4)
+-----------------------------------
+ROC AUC:                    0.920
+Log Loss:                   0.174
+Accuracy:                   0.918
+Precision:                  0.805
+Recall:                     0.035
+F1 Score:                   0.067
+
+
 # DDA 806 wallet model performance
 checkpoint 1: roc.666 dda_806_wallet_model_performance
 Model Performance Summary

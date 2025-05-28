@@ -152,14 +152,14 @@ wallet_scores: #CoinModel
 
         cw_net_gain_regression:
             model_type: regression
-            target_variable: cw_crypto_net_gain/winsorized
+            target_variable: cw_crypto_net_gain
             y_pred_lower_threshold: -1.1
             y_pred_threshold: 0.7
             assign_epochs_to_addresses: False
 
         net_gain_regression:
             model_type: regression
-            target_variable: crypto_net_gain/winsorized
+            target_variable: crypto_net_gain
             y_pred_lower_threshold: -1.1
             y_pred_threshold: 0.7
             assign_epochs_to_addresses: False
