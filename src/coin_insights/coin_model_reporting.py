@@ -182,6 +182,7 @@ def plot_wallet_model_comparison(
     metric: str = 'wins_return',
     figsize: tuple = (12, 20),
     cols: int = 2,
+    macro_comparison: str = None,
 ) -> None:
     """
     Plot comparison of wallet model return metrics across different epochs.
@@ -192,6 +193,7 @@ def plot_wallet_model_comparison(
     - metric: 'wins_return' or 'mean_return'
     - figsize: Figure dimensions
     - cols: how many columns of charts to make
+    - macro_comparison: macro key for color coding (e.g. 'btc_mvrv_z_score_last|w4')
     """
     base_folder = Path(wallets_coin_config['training_data']['parquet_folder'])
 
@@ -215,6 +217,7 @@ def plot_wallet_model_comparison(
 
     # Load and combine all return metrics
     combined_data = []
+    macro_values = []
 
     for json_path in json_files:
         epoch_date = json_path.parent.name
@@ -228,6 +231,12 @@ def plot_wallet_model_comparison(
 
             return_metrics = model_data['return_metrics']
 
+            # Extract macro value for color coding if specified
+            macro_value = None
+            if macro_comparison and 'macro_averages' in model_data:
+                macro_key = f'macro|{macro_comparison}'
+                macro_value = model_data['macro_averages'].get(macro_key)
+
             # Create records for each bucket
             for i, bucket in enumerate(return_metrics['bucket']):
                 combined_data.append({
@@ -235,8 +244,13 @@ def plot_wallet_model_comparison(
                     'model_name': model_name,
                     'bucket': bucket,
                     'mean_return': return_metrics['mean_return'][i],
-                    'wins_return': return_metrics['wins_return'][i]
+                    'wins_return': return_metrics['wins_return'][i],
+                    'macro_value': macro_value
                 })
+
+            # Collect macro values for color scale calculation
+            if macro_value is not None:
+                macro_values.append(macro_value)
 
     if not combined_data:
         raise ValueError("No return metrics data found")
@@ -244,12 +258,34 @@ def plot_wallet_model_comparison(
     # Convert to DataFrame
     df = pd.DataFrame(combined_data)
 
+    # Calculate color mapping if macro_comparison is specified
+    color_map = {}
+    if macro_comparison and macro_values:
+        macro_values = np.array(macro_values)
+        min_val, max_val = np.min(macro_values), np.max(macro_values)
+        median_val = np.median(macro_values)
+
+        # Create color mapping for each unique macro value
+        unique_macro_values = np.unique(macro_values)
+        for val in unique_macro_values:
+            if val < median_val:
+                # Scale from red to light grey
+                norm_val = (val - min_val) / (median_val - min_val) if median_val != min_val else 0
+                color_map[val] = plt.cm.Reds(0.3 + 0.7 * (1 - norm_val))
+            elif val > median_val:
+                # Scale from light grey to blue
+                norm_val = (val - median_val) / (max_val - median_val) if max_val != median_val else 0
+                color_map[val] = plt.cm.Blues(0.3 + 0.7 * norm_val)
+            else:
+                # Median value - light grey
+                color_map[val] = '#D3D3D3'
+
     # Calculate subplot layout
     n_models = len(model_names)
     rows = math.ceil(n_models / cols)
 
     # Create subplots
-    fig, axes = plt.subplots(rows, cols, figsize=figsize)
+    _, axes = plt.subplots(rows, cols, figsize=figsize)
 
     # Handle axes indexing for different subplot configurations
     if n_models == 1:
@@ -272,24 +308,40 @@ def plot_wallet_model_comparison(
 
         # Plot separate line for each epoch
         for epoch_date, group in model_data.groupby('epoch_date'):
+            if macro_comparison and not group['macro_value'].isna().all():
+                # Use macro-based color
+                macro_val = group['macro_value'].iloc[0]
+                line_color = color_map.get(macro_val, '#808080')
+                label = f'Epoch {epoch_date} ({macro_comparison}={macro_val:.3f})'
+            else:
+                # Default color scheme
+                line_color = None
+                label = f'Epoch {epoch_date}'
+
             ax.plot(group['bucket'], group[metric],
-                   marker='o', linewidth=2, label=f'Epoch {epoch_date}')
+                   marker='o', linewidth=2, label=label, color=line_color)
 
         ax.set_xlabel('Prediction Rank Bucket (1 = highest scores)')
         ax.set_ylabel(f'{metric.replace("_", " ").title()}')
         ax.set_title(model_name)
         ax.grid(True, alpha=0.3)
-        ax.legend()
+
+        # Only show legend if no macro comparison (to avoid clutter)
+        if not macro_comparison:
+            ax.legend()
 
     # Hide any unused subplots
     for i in range(n_models, len(axes_flat)):
         axes_flat[i].axis('off')
 
-    plt.suptitle(f'Wallet Model {metric.replace("_", " ").title()} Comparison by Epoch',
-                 fontsize=16, y=0.995)
+    # Update title to include macro comparison info
+    title = f'Wallet Model {metric.replace("_", " ").title()} Comparison by Epoch'
+    if macro_comparison:
+        title += f' (Color-coded by {macro_comparison})'
+
+    plt.suptitle(title, fontsize=16, y=0.995)
     plt.tight_layout()
     plt.show()
-
 
 
 
