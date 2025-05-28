@@ -45,10 +45,10 @@ class WalletEpochsOrchestrator:
         training_only: bool = False
     ):
         # Param Configs
-        self.base_config = base_config
-        self.metrics_config = metrics_config
-        self.features_config = features_config
-        self.epochs_config = epochs_config
+        self.base_config =      copy.deepcopy(base_config)
+        self.metrics_config =   copy.deepcopy(metrics_config)
+        self.features_config =  copy.deepcopy(features_config)
+        self.epochs_config =    copy.deepcopy(epochs_config)
 
         # Modifications for generating training data only
         self.training_only = training_only

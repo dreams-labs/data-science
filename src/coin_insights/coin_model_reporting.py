@@ -6,11 +6,13 @@ from pathlib import Path
 import logging
 import uuid
 from datetime import datetime,timedelta
-import joblib
 import json
+import math
 import pandas as pd
 import numpy as np
+import joblib
 import pandas_gbq
+import matplotlib.pyplot as plt
 import wallet_insights.model_evaluation as wime
 import wallet_insights.wallet_model_reporting as wimr
 import coin_modeling.coin_epochs_orchestrator as ceo
@@ -175,6 +177,173 @@ def generate_and_upload_coin_scores(
 
 
 
+def plot_wallet_model_comparison(
+    wallets_coin_config: dict,
+    metric: str = 'wins_return',
+    figsize: tuple = (12, 20),
+    cols: int = 2,
+    macro_comparison: str = None,
+) -> None:
+    """
+    Plot comparison of wallet model return metrics across different epochs.
+    Creates separate subplot for each model in a flexible column layout.
+
+    Params:
+    - wallets_coin_config: Configuration containing parquet folder paths
+    - metric: 'wins_return' or 'mean_return'
+    - figsize: Figure dimensions
+    - cols: how many columns of charts to make
+    - macro_comparison: macro key for color coding (e.g. 'btc_mvrv_z_score_last|w4')
+    """
+    base_folder = Path(wallets_coin_config['training_data']['parquet_folder'])
+
+    # Find all wallet_model_ids.json files
+    json_files = list(base_folder.glob('*/wallet_model_ids.json'))
+
+    if not json_files:
+        raise FileNotFoundError(f"No wallet_model_ids.json files found in {base_folder}")
+
+    # Get all unique model names from actual JSON files
+    all_model_names = set()
+    for json_path in json_files:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            models_dict = json.load(f)
+            all_model_names.update(models_dict.keys())
+
+    model_names = sorted(list(all_model_names))
+
+    if not model_names:
+        raise ValueError("No models found in JSON files")
+
+    # Load and combine all return metrics
+    combined_data = []
+    macro_values = []
+
+    for json_path in json_files:
+        epoch_date = json_path.parent.name
+
+        with open(json_path, 'r', encoding='utf-8') as f:
+            models_dict = json.load(f)
+
+        for model_name, model_data in models_dict.items():
+            if 'return_metrics' not in model_data:
+                continue
+
+            return_metrics = model_data['return_metrics']
+
+            # Extract macro value for color coding if specified
+            macro_value = None
+            if macro_comparison and 'macro_averages' in model_data:
+                macro_key = f'macro|{macro_comparison}'
+                macro_value = model_data['macro_averages'].get(macro_key)
+
+            # Create records for each bucket
+            for i, bucket in enumerate(return_metrics['bucket']):
+                combined_data.append({
+                    'epoch_date': epoch_date,
+                    'model_name': model_name,
+                    'bucket': bucket,
+                    'mean_return': return_metrics['mean_return'][i],
+                    'wins_return': return_metrics['wins_return'][i],
+                    'macro_value': macro_value
+                })
+
+            # Collect macro values for color scale calculation
+            if macro_value is not None:
+                macro_values.append(macro_value)
+
+    if not combined_data:
+        raise ValueError("No return metrics data found")
+
+    # Convert to DataFrame
+    df = pd.DataFrame(combined_data)
+
+    # Calculate color mapping if macro_comparison is specified
+    color_map = {}
+    if macro_comparison and macro_values:
+        macro_values = np.array(macro_values)
+        min_val, max_val = np.min(macro_values), np.max(macro_values)
+        median_val = np.median(macro_values)
+
+        # Create color mapping for each unique macro value
+        unique_macro_values = np.unique(macro_values)
+        for val in unique_macro_values:
+            if val < median_val:
+                # Scale from red to light grey
+                norm_val = (val - min_val) / (median_val - min_val) if median_val != min_val else 0
+                color_map[val] = plt.cm.Reds(0.3 + 0.7 * (1 - norm_val))  # pylint:disable=no-member
+            elif val > median_val:
+                # Scale from light grey to blue
+                norm_val = (val - median_val) / (max_val - median_val) if max_val != median_val else 0
+                color_map[val] = plt.cm.Blues(0.3 + 0.7 * norm_val)  # pylint:disable=no-member
+            else:
+                # Median value - light grey
+                color_map[val] = '#D3D3D3'
+
+    # Calculate subplot layout
+    n_models = len(model_names)
+    rows = math.ceil(n_models / cols)
+
+    # Create subplots
+    _, axes = plt.subplots(rows, cols, figsize=figsize)
+
+    # Handle axes indexing for different subplot configurations
+    if n_models == 1:
+        axes_flat = [axes]
+    elif rows == 1:
+        axes_flat = axes if cols > 1 else [axes]
+    else:
+        axes_flat = axes.flatten()
+
+    # Plot each model in its own subplot
+    for i, model_name in enumerate(model_names):
+        ax = axes_flat[i]
+        model_data = df[df['model_name'] == model_name]
+
+        if model_data.empty:
+            ax.text(0.5, 0.5, f'No data for {model_name}',
+                   ha='center', va='center', transform=ax.transAxes)
+            ax.set_title(model_name)
+            continue
+
+        # Plot separate line for each epoch
+        for epoch_date, group in model_data.groupby('epoch_date'):
+            if macro_comparison and not group['macro_value'].isna().all():
+                # Use macro-based color
+                macro_val = group['macro_value'].iloc[0]
+                line_color = color_map.get(macro_val, '#808080')
+                label = f'Epoch {epoch_date} ({macro_comparison}={macro_val:.3f})'
+            else:
+                # Default color scheme
+                line_color = None
+                label = f'Epoch {epoch_date}'
+
+            ax.plot(group['bucket'], group[metric],
+                   marker='o', linewidth=2, label=label, color=line_color)
+
+        ax.set_xlabel('Prediction Rank Bucket (1 = highest scores)')
+        ax.set_ylabel(f'{metric.replace("_", " ").title()}')
+        ax.set_title(model_name)
+        ax.grid(True, alpha=0.3)
+
+        # Only show legend if no macro comparison (to avoid clutter)
+        if not macro_comparison:
+            ax.legend()
+
+    # Hide any unused subplots
+    for i in range(n_models, len(axes_flat)):
+        axes_flat[i].axis('off')
+
+    # Update title to include macro comparison info
+    title = f'Wallet Model {metric.replace("_", " ").title()} Comparison by Epoch'
+    if macro_comparison:
+        title += f' (Color-coded by {macro_comparison})'
+
+    plt.suptitle(title, fontsize=16, y=0.995)
+    plt.tight_layout()
+    plt.show()
+
+
 
 # ---------------------------------
 #         Helper Functions
@@ -268,3 +437,15 @@ def save_coin_model_artifacts(model_results, evaluation_dict, pipeline, configs,
     logger.info(f"Saved coin scores and addresses to {coin_scores_path}")
 
     return model_id
+
+
+
+def get_all_wallet_model_paths(wallets_coin_config: dict) -> list:
+    """
+    Get all wallet_model_ids.json file paths for analysis.
+
+    Returns:
+    - List of Path objects to wallet_model_ids.json files
+    """
+    base_folder = Path(wallets_coin_config['training_data']['parquet_folder'])
+    return list(base_folder.glob('*/wallet_model_ids.json'))

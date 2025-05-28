@@ -10,6 +10,7 @@ from pathlib import Path
 import copy
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import json
 import pandas as pd
 import joblib
 
@@ -58,23 +59,27 @@ class CoinEpochsOrchestrator:
         complete_market_data_df: pd.DataFrame = None,
         complete_macro_trends_df: pd.DataFrame = None,
     ):
+        # Ensure configs are dicts and not the custom config classes
+        if not (isinstance(wallets_config,dict) and isinstance(wallets_coin_config,dict)):
+            raise ValueError("CoinEpochsOrchestrator configs must be dtype=='dict'.")
+
         # Coin Configs
-        self.wallets_coin_config = wallets_coin_config
-        self.wallets_coins_metrics_config = wallets_coins_metrics_config
+        self.wallets_coin_config =          copy.deepcopy(wallets_coin_config)
+        self.wallets_coins_metrics_config = copy.deepcopy(wallets_coins_metrics_config)
 
         # Coin Params
         self.coin_training_data_only = None  # overridden by orchestrate_coin_epochs() param
 
         # WalletEpochsOrchestrator Configs
-        self.wallets_config = wallets_config
-        self.wallets_metrics_config = wallets_metrics_config
-        self.wallets_features_config = wallets_features_config
-        self.wallets_epochs_config = wallets_epochs_config
+        self.wallets_config =               copy.deepcopy(wallets_config)
+        self.wallets_metrics_config =       copy.deepcopy(wallets_metrics_config)
+        self.wallets_features_config =      copy.deepcopy(wallets_features_config)
+        self.wallets_epochs_config =        copy.deepcopy(wallets_epochs_config)
 
         # Coin Flow Configs
-        self.coin_flow_config = coin_flow_config
-        self.coin_flow_modeling_config = coin_flow_modeling_config
-        self.coin_flow_metrics_config = coin_flow_metrics_config
+        self.coin_flow_config =             copy.deepcopy(coin_flow_config)
+        self.coin_flow_modeling_config =    copy.deepcopy(coin_flow_modeling_config)
+        self.coin_flow_metrics_config =     copy.deepcopy(coin_flow_metrics_config)
 
         # Complete DataFrames
         self.complete_profits_df = complete_profits_df
@@ -145,7 +150,7 @@ class CoinEpochsOrchestrator:
             pd.to_datetime(wallets_lookback_config['training_data']['modeling_period_start'])
             + timedelta(days=coins_earliest_epoch)
         ).strftime('%Y-%m-%d')
-        wallets_lookback_config_dict = copy.deepcopy(wallets_lookback_config.config)
+        wallets_lookback_config_dict = copy.deepcopy(wallets_lookback_config)
         wallets_lookback_config_dict['training_data']['modeling_period_start'] = earliest_modeling_period_start_str
         wallets_lookback_config = wcm.add_derived_values(wallets_lookback_config_dict)
 
@@ -233,7 +238,7 @@ class CoinEpochsOrchestrator:
 
         # 3. Generate all coin epochs' training data
         # ------------------------------------------
-        logger.milestone("Beginning generation of coin model training data...")
+        logger.milestone("\nBeginning generation of coin model training data...")
         u.notify('whoosh_boom')
 
         # Tag each DataFrame with the epoch date
@@ -433,7 +438,8 @@ class CoinEpochsOrchestrator:
         #  Example Scenario
         #  ----------------
         #    base modeling_period_start                                 2024-12-01
-        #  + offset_duration                                          + 90
+        #  + offset_duration                                                  + 90
+        #  + modeling_duration                                                + 30
         #  = offset epoch                                             = 2025-03-31 (offset +120)
         epoch_weo = weo.WalletEpochsOrchestrator(
             base_config=epoch_wallets_config,               # epoch-specific config
@@ -790,7 +796,7 @@ class CoinEpochsOrchestrator:
         - lookback_duration (int): How many days the coin lookback is offset vs the base config.
         """
         # Cache parsed base dates and base folder path
-        base_training_data = copy.deepcopy(self.wallets_config.config['training_data'])
+        base_training_data = copy.deepcopy(self.wallets_config['training_data'])
         base_modeling_start = datetime.strptime(base_training_data['modeling_period_start'], '%Y-%m-%d')
         base_modeling_end = datetime.strptime(base_training_data['modeling_period_end'], '%Y-%m-%d')
         base_training_window_starts = [
@@ -803,7 +809,7 @@ class CoinEpochsOrchestrator:
         # This WEO generates the base wallets config without making any modifications to
         #  date ranges.
         base_config_weo = weo.WalletEpochsOrchestrator(
-            self.wallets_config.config, # base config
+            copy.deepcopy(self.wallets_config), # base config
             self.wallets_metrics_config,
             self.wallets_features_config,
             self.wallets_epochs_config
@@ -835,7 +841,7 @@ class CoinEpochsOrchestrator:
         ).strftime('%Y%m%d')
 
         # Deep-copy the coin config and adjust folder paths
-        epoch_coins_config = copy.deepcopy(self.wallets_coin_config.config)
+        epoch_coins_config = copy.deepcopy(self.wallets_coin_config)
         base_folder = epoch_coins_config['training_data']['parquet_folder']
 
         parquet_folder = f"{base_folder}/{date_suffix}"
@@ -847,6 +853,57 @@ class CoinEpochsOrchestrator:
         Path(scores_folder).mkdir(exist_ok=True)
         return epoch_coins_config
 
+
+    @staticmethod
+    def numerize_wallets_coin_config(wallets_config:dict, wallets_coin_config: dict) -> dict:
+        """
+        Convert string-based y_pred_thresholds to numeric values using latest model metadata.
+
+        Params:
+        - wallets_coin_config (dict): Raw wallets coin config with potential string thresholds
+
+        Returns:
+        - numerized_config (dict): Config with numeric y_pred_thresholds
+        """
+        # Find latest epoch with model data
+        latest_epoch = max(
+            wallets_coin_config['training_data']['coin_epochs_validation'] +
+            wallets_coin_config['training_data']['coin_epochs_training']
+        )
+        latest_epoch_date = (
+            pd.to_datetime(wallets_config['training_data']['modeling_period_start'])
+            + timedelta(days=latest_epoch)
+        ).strftime('%Y%m%d')
+
+        # Load model metadata
+        latest_model_ids_path = (
+            Path(wallets_coin_config['training_data']['parquet_folder']) /
+            latest_epoch_date / "wallet_model_ids.json"
+        )
+
+        if not latest_model_ids_path.exists():
+            raise ValueError(f"No 'wallet_model_ids.json' found at {latest_model_ids_path}")
+
+        with open(latest_model_ids_path, 'r', encoding='utf-8') as f:
+            latest_models_dict = json.load(f)
+
+        # Validate all required models exist
+        missing_keys = (
+            set(wallets_coin_config['wallet_scores']['score_params'].keys()) -
+            set(latest_models_dict.keys())
+        )
+        if missing_keys:
+            raise ValueError(f"Missing model metrics for score_params: {missing_keys}")
+
+        # Convert string thresholds to numeric
+        numerized_config = copy.deepcopy(wallets_coin_config)
+        for model in numerized_config['wallet_scores']['score_params']:
+            threshold = wallets_coin_config['wallet_scores']['score_params'][model]['y_pred_threshold']
+            if isinstance(threshold, str):
+                numeric_threshold = latest_models_dict[model]['metrics']['y_pred_threshold']
+                numerized_config['wallet_scores']['score_params'][model]['y_pred_threshold'] = numeric_threshold
+
+        return numerized_config.config
 
 
     # -----------------------
@@ -911,7 +968,7 @@ class CoinEpochsOrchestrator:
         #  - wallets_config['modeling_period_duration']               - 30
         #  = latest wallet epoch                                      = 2023-01-15 (offset -30)
         bulk_weo = weo.WalletEpochsOrchestrator(
-            base_config         = self.wallets_config.config,
+            base_config         = self.wallets_config,
             metrics_config      = self.wallets_metrics_config,
             features_config     = self.wallets_features_config,
             epochs_config       = wcm.add_derived_values(bulk_epochs_cfg),
@@ -976,9 +1033,8 @@ class CoinEpochsOrchestrator:
             epoch_coins_config
         )
 
-        # Train wallet models using all epoch dfs
+        # Train all wallet models (or score with existing models)
         models_dict = epoch_wmo.train_wallet_models(*epoch_training_dfs)
-
 
         # 2) Generate this epoch's wallet training data
         logger.info("Generating wallet training_data_df for scoring in the coin_modeling period...")

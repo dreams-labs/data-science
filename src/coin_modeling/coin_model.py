@@ -141,13 +141,13 @@ class CoinModel(BaseModel):
         self.y_eval = self.y_pipeline.transform(self.y_eval)
 
         if self.y_train.nunique() == 1:
-            raise ValueError(f"All values in y_train classification target var were {str(self.y_train[0])}. "
+            logger.warning(f"All values in y_train classification target var were {str(self.y_train[0])}. "
                                 "Adjust thresholds to ensure both 1s and 0s.")
         if self.y_test.nunique() == 1:
-            raise ValueError(f"All values in y_test classification target var were {str(self.y_test[0])}. "
+            logger.warning(f"All values in y_test classification target var were {str(self.y_test[0])}. "
                                 "Adjust thresholds to ensure both 1s and 0s.")
         if self.y_eval.nunique() == 1:
-            raise ValueError(f"All values in y_eval classification target var were {str(self.y_eval[0])}. "
+            logger.warning(f"All values in y_eval classification target var were {str(self.y_eval[0])}. "
                                 "Adjust thresholds to ensure both 1s and 0s.")
 
         # Build result dict
