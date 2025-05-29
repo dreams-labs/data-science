@@ -1317,6 +1317,10 @@ class ClassifierEvaluator(RegressorEvaluator):
         Validation line: thick green (#22DD22)
         Baseline: horizontal dashed line showing the positive class prevalence.
         """
+        # Declare optional variables so we can check if None later
+        baseline = None
+        thr_test = None
+
         if self.train_test_data_provided:
             # Calculate baseline (positive class prevalence)
             baseline = self.y_test.mean()
@@ -1338,7 +1342,6 @@ class ClassifierEvaluator(RegressorEvaluator):
             )
 
         # --- Validation PR curve with AUC-PR (if available)
-        baseline = None
         if getattr(self, "y_validation_pred_proba", None) is not None \
             and getattr(self, "y_validation", None) is not None:
             # Calculate validation baseline
@@ -1383,32 +1386,33 @@ class ClassifierEvaluator(RegressorEvaluator):
         }
 
         # Add vertical lines for F-beta thresholds
-        for beta, color in beta_colors.items():
-            thr_key = f"f{beta}_thr"
-            if thr_key in self.metrics:
-                # Find the recall value closest to this threshold
-                idx = (np.abs(thr_test - self.metrics[thr_key])).argmin()
-                beta_recall = recall[idx]
+        if thr_test is not None:
+            for beta, color in beta_colors.items():
+                thr_key = f"f{beta}_thr"
+                if thr_key in self.metrics:
+                    # Find the recall value closest to this threshold
+                    idx = (np.abs(thr_test - self.metrics[thr_key])).argmin()
+                    beta_recall = recall[idx]
 
-                # Add vertical line
-                ax.axvline(
-                    beta_recall,
-                    linestyle=':',
-                    linewidth=1.5,
-                    color=color,
-                    label=f"F{beta} threshold"
-                )
+                    # Add vertical line
+                    ax.axvline(
+                        beta_recall,
+                        linestyle=':',
+                        linewidth=1.5,
+                        color=color,
+                        label=f"F{beta} threshold"
+                    )
 
-                # Add text label
-                ax.text(
-                    beta_recall + 0.02,
-                    0.4,
-                    f"F{beta}",
-                    color=color,
-                    rotation=90,
-                    fontsize=10,
-                    va='bottom'
-                )
+                    # Add text label
+                    ax.text(
+                        beta_recall + 0.02,
+                        0.4,
+                        f"F{beta}",
+                        color=color,
+                        rotation=90,
+                        fontsize=10,
+                        va='bottom'
+                    )
 
 
         # Formatting

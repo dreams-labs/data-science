@@ -5,17 +5,17 @@
 training_data: #WalletModel
 
     #KeyParam Period Dates
-    modeling_period_start: '2024-08-23'
-    modeling_period_duration: 60
+    modeling_period_start: '2025-03-16'
+    modeling_period_duration: 15
     training_window_lookbacks: [  # How many days prior to the modeling period each window begins
         360,
         300,
         240,
         180,
         120,
-        # 90,
+        90,
         60,
-        # 30
+        30
     ]
     validation_period_end: '2025-04-30'  # toggle to activate/deactivate validation data
 
@@ -27,7 +27,7 @@ training_data: #WalletModel
 
     #KeyParam Datasets zand Folders
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
-    parquet_folder: temp/wallet_modeling_dfs/dda_818_wallet_models_macros_wallets_60d  # where to store parquet files
+    parquet_folder: temp/wallet_modeling_dfs/dda_818_wallet_models_macros_wallets_15d_pred  # where to store parquet files
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
 
@@ -41,14 +41,15 @@ modeling: #WalletModel
 
     #KeyParam Target Variable
     # Return Rate
-    # target_variable: cw_crypto_net_gain/max_investment/rank
     # target_variable: cw_crypto_net_gain/max_investment/base
     # target_variable: cw_crypto_net_gain/max_investment/winsorized
-    # target_variable: cw_crypto_net_gain/crypto_inflows/rank
+    # target_variable: cw_crypto_net_gain/max_investment/rank
     target_variable: cw_crypto_net_gain/crypto_inflows/base
-    # target_variable: cw_crypto_net_flows/crypto_inflows/rank
-    # target_variable: cw_crypto_net_flows/crypto_inflows/winsorized
+    # target_variable: cw_crypto_net_gain/crypto_inflows/winsorized
+    # target_variable: cw_crypto_net_gain/crypto_inflows/rank
     # target_variable: cw_crypto_net_flows/crypto_inflows/base
+    # target_variable: cw_crypto_net_flows/crypto_inflows/winsorized
+    # target_variable: cw_crypto_net_flows/crypto_inflows/rank
 
     # Non-CW return rate
     # target_variable: crypto_net_gain/max_investment/base
@@ -66,8 +67,8 @@ modeling: #WalletModel
     # target_var_min_threshold: 0.15  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.25  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.30  # a classification model will try to predict the target var above this value
-    # target_var_min_threshold: 0.40  # a classification model will try to predict the target var above this value
-    target_var_min_threshold: 0.50  # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.40  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.50  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.60  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.80  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.90  # a classification model will try to predict the target var above this value
@@ -112,7 +113,7 @@ modeling: #WalletModel
         # Core Tree Params (Always Active)
         # -------------------------------
         #KeyParam Tree Depth
-        max_depth: 2  # how deep the trees can go
+        max_depth: 3  # how deep the trees can go
         min_child_weight: 40  # what % of rows each tree must have
 
         #KeyParam True Positive Weighting

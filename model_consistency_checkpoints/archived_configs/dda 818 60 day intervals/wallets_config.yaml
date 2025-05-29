@@ -5,7 +5,7 @@
 training_data: #WalletModel
 
     #KeyParam Period Dates
-    modeling_period_start: '2024-06-05'
+    modeling_period_start: '2024-08-23'
     modeling_period_duration: 60
     training_window_lookbacks: [  # How many days prior to the modeling period each window begins
         360,
