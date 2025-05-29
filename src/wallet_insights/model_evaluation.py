@@ -1338,8 +1338,9 @@ class ClassifierEvaluator(RegressorEvaluator):
             )
 
         # --- Validation PR curve with AUC-PR (if available)
+        baseline = None
         if getattr(self, "y_validation_pred_proba", None) is not None \
-        and getattr(self, "y_validation", None) is not None:
+            and getattr(self, "y_validation", None) is not None:
             # Calculate validation baseline
             val_baseline = self.y_validation.mean()
 
@@ -1363,13 +1364,14 @@ class ClassifierEvaluator(RegressorEvaluator):
             baseline = val_baseline
 
         # --- Baseline reference line (positive class prevalence)
-        ax.axhline(
-            baseline,
-            linestyle="--",
-            linewidth=1,
-            color="#afc6ba",  # Light grey-green
-            label=f"Baseline ({baseline:.3f})"
-        )
+        if baseline is not None:
+            ax.axhline(
+                baseline,
+                linestyle="--",
+                linewidth=1,
+                color="#afc6ba",  # Light grey-green
+                label=f"Baseline ({baseline:.3f})"
+            )
 
         # --- F‑β optimal threshold verticals --------------------------------
         beta_colors = {
