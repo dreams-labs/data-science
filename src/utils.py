@@ -8,6 +8,7 @@ import json
 import gc
 import inspect
 from pathlib import Path
+import threading
 from datetime import datetime, timedelta
 from typing import List,Dict,Any,Union
 import importlib
@@ -970,7 +971,7 @@ def winsorize(data: pd.Series, cutoff: float = 0.01) -> pd.Series:
 
 
 # ---------------------------------------- #
-#     Misc Notebook Helper Functions
+#     Audio Notebook Helper Functions
 # ---------------------------------------- #
 
 def notify(sound_name: Union[str, int] = None, prompt: str = None, voice_id: str = 'Tessa'):
@@ -1031,6 +1032,67 @@ def notify(sound_name: Union[str, int] = None, prompt: str = None, voice_id: str
         return f"Error with playback: {e}"
 
 
+class AmbientPlayer:
+    """
+    Plays a sound file on loop until commanded to .stop(). Uses the same sound keys dict
+     as u.notify().
+
+    Example Use:
+        player = u.AmbientPlayer()
+        player.start('scifi_power_room_loop')
+        ~~~~~~~~~ time passes ~~~~~~~~~
+        player.stop()
+
+    """
+    def __init__(self):
+        pygame.mixer.init()
+        self.playing = False
+        self.thread = None
+
+    def start(self, sound_name: str):
+        """Start looping ambient audio in background thread"""
+        if self.playing:
+            return
+
+        # Load sound config from sounds directory environment variable
+        sounds_directory = Path(os.environ.get('NOTIFICATION_SOUNDS_DIR', "../../../Local"))
+        config_path = sounds_directory / "notification_sounds.yaml"
+        try:
+            with open(config_path, encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            print(f"Error loading sound config: {e}")
+
+        sounds = config.get('notification_sounds', {})
+        sounds_directory = Path(os.environ.get('NOTIFICATION_SOUNDS_DIR', "../../../Local/"))
+
+        file_path = sounds_directory / 'assets' / 'sounds' / sounds[sound_name]['path']
+        if not os.path.exists(file_path):
+            logger.warning(f"couldn't find ambient file at '{file_path}'")
+
+        self.playing = True
+        self.thread = threading.Thread(target=self._play_loop, args=(
+            file_path,
+            sounds[sound_name]['volume'])
+        )
+        self.thread.daemon = True
+        self.thread.start()
+
+    def stop(self):
+        """Stop ambient audio"""
+        self.playing = False
+        pygame.mixer.music.stop()
+        if self.thread:
+            self.thread.join(timeout=1)
+
+    def _play_loop(self, audio_file: str, volume_level: float):
+        pygame.mixer.music.load(audio_file)
+        pygame.mixer.music.set_volume(volume_level)
+
+        pygame.mixer.music.play(-1)  # -1 = infinite loop
+        while self.playing:
+            threading.Event().wait(0.1)
+
 
 
 def notify_on_failure(shell, etype, value, tb, tb_offset=None):
@@ -1047,6 +1109,14 @@ def notify_on_failure(shell, etype, value, tb, tb_offset=None):
     # Call the original traceback display method
     shell.showtraceback((etype, value, tb), tb_offset=tb_offset)
 
+
+
+
+
+
+# ---------------------------------------- #
+#     Misc Notebook Helper Functions
+# ---------------------------------------- #
 
 def df_mem(df):
     """
