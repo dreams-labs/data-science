@@ -213,8 +213,8 @@ class CoinEpochsOrchestrator:
         logger.milestone("")
         logger.milestone("Beginning orchestration of coin model data generation...")
         u.notify('whoosh_boom')
-        ambient_player = u.AmbientPlayer()
-        ambient_player.start('spaceship_ambient')
+        ambient_player_coins = u.AmbientPlayer()
+        ambient_player_coins.start('spaceship_ambient')
 
         # 1. Build all wallet training data needed for all coin epochs
         # ------------------------------------------------------------
@@ -303,7 +303,7 @@ class CoinEpochsOrchestrator:
             multiwindow_targets = reset_index_codes(multiwindow_targets)
             multiwindow_targets.to_parquet(f"{root_folder}/{file_prefix}multiwindow_coin_target_var_df.parquet")
 
-        ambient_player.stop()
+        ambient_player_coins.stop()
         u.notify('robotz_windows_start')
 
 

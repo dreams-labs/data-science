@@ -87,6 +87,8 @@ class WalletModelOrchestrator:
         Returns:
         - models_dict: Dictionary mapping score names to model IDs
         """
+        ambient_player_wallets = u.AmbientPlayer()
+
         # Load existing models if any
         models_json_path = Path(self.wallets_coin_config['training_data']['parquet_folder']) / "wallet_model_ids.json"
         if models_json_path.exists():
@@ -97,6 +99,7 @@ class WalletModelOrchestrator:
         evaluators = []
 
         i = 0
+
         for score_name in self.score_params:
             # Create a deep copy of the configuration to avoid modifying the original
             score_wallets_config = copy.deepcopy(self.wallets_config)
@@ -129,6 +132,7 @@ class WalletModelOrchestrator:
 
             # Train new model if we didn't load existing
             # ------------------------------------------
+            ambient_player_wallets.start('ship_power_room')
             model_id, evaluator = self._train_and_evaluate(
                 score_wallets_config,
                 wallet_training_data_df,
@@ -150,6 +154,9 @@ class WalletModelOrchestrator:
             # Persist *numeric* threshold into self.score_params for downstream scoring
             y_threshold_numeric = score_wallets_config['modeling'].get('y_pred_threshold')
             self.score_params[score_name]['y_pred_threshold'] = y_threshold_numeric
+
+        ambient_player_wallets.stop()
+        # u.notify('lovelyboot')
 
         # Store and save models_dict
         self.models_dict = models_json_dict

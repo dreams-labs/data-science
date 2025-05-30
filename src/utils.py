@@ -1045,6 +1045,8 @@ class AmbientPlayer:
         pygame.mixer.init()
         self.playing = False
         self.thread = None
+        self.target_volume = 0.0
+        self.current_volume = 0.0
 
         # Register this player for cleanup
         AmbientPlayer._active_players.append(self)
@@ -1084,16 +1086,30 @@ class AmbientPlayer:
             logger.warning(f"couldn't find ambient file at '{file_path}'")
             return
 
+        self.target_volume = sounds[sound_name]['volume']
+        self.current_volume = 0.0
         self.playing = True
-        self.thread = threading.Thread(target=self._play_loop, args=(
-            file_path,
-            sounds[sound_name]['volume'])
-        )
+        self.thread = threading.Thread(target=self._play_loop, args=(file_path,))
         self.thread.daemon = True
         self.thread.start()
 
     def stop(self):
-        """Stop ambient audio"""
+        """Stop ambient audio with fade out"""
+        if not self.playing:
+            return
+
+        # Fade out over 2 seconds
+        fade_steps = 100
+        step_duration = 2.0 / fade_steps
+        volume_step = self.current_volume / fade_steps
+
+        for _ in range(fade_steps):
+            if not self.playing:  # Check if already stopped
+                break
+            self.current_volume = max(0, self.current_volume - volume_step)
+            pygame.mixer.music.set_volume(self.current_volume)
+            threading.Event().wait(step_duration)
+
         self.playing = False
         pygame.mixer.music.stop()
         if self.thread:
@@ -1103,13 +1119,26 @@ class AmbientPlayer:
         if self in AmbientPlayer._active_players:
             AmbientPlayer._active_players.remove(self)
 
-    def _play_loop(self, audio_file: str, volume_level: float):
+    def _play_loop(self, audio_file: str):
         pygame.mixer.music.load(audio_file)
-        pygame.mixer.music.set_volume(volume_level)
+        pygame.mixer.music.set_volume(0.0)
         pygame.mixer.music.play(-1)
+
+        # Fade in over 2 seconds
+        fade_steps = 100
+        step_duration = 2.0 / fade_steps
+        volume_step = self.target_volume / fade_steps
+
+        for _ in range(fade_steps):
+            if not self.playing:
+                return
+            self.current_volume = min(self.target_volume, self.current_volume + volume_step)
+            pygame.mixer.music.set_volume(self.current_volume)
+            threading.Event().wait(step_duration)
+
+        # Main playback loop
         while self.playing:
             threading.Event().wait(0.1)
-
 
 
 def notify_on_failure(shell, etype, value, tb, tb_offset=None):
