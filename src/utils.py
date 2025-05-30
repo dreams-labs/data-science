@@ -7,6 +7,7 @@ import os
 import json
 import gc
 import inspect
+import atexit
 from pathlib import Path
 import threading
 from datetime import datetime, timedelta
@@ -1032,22 +1033,35 @@ def notify(sound_name: Union[str, int] = None, prompt: str = None, voice_id: str
         return f"Error with playback: {e}"
 
 
+
 class AmbientPlayer:
     """
     Plays a sound file on loop until commanded to .stop(). Uses the same sound keys dict
-     as u.notify().
-
-    Example Use:
-        player = u.AmbientPlayer()
-        player.start('scifi_power_room_loop')
-        ~~~~~~~~~ time passes ~~~~~~~~~
-        player.stop()
-
+     as u.notify(). Automatically stops on kernel shutdown/error.
     """
+    _active_players = []  # Class variable to track all players
+
     def __init__(self):
         pygame.mixer.init()
         self.playing = False
         self.thread = None
+
+        # Register this player for cleanup
+        AmbientPlayer._active_players.append(self)
+
+        # Register cleanup function (only once)
+        if len(AmbientPlayer._active_players) == 1:
+            atexit.register(AmbientPlayer._cleanup_all_players)
+
+    @classmethod
+    def _cleanup_all_players(cls):
+        """Stop all active players on program exit"""
+        for player in cls._active_players:
+            try:
+                player.stop()
+            except:  # pylint:disable=bare-except
+                pass  # Ignore errors during cleanup
+        pygame.mixer.quit()
 
     def start(self, sound_name: str):
         """Start looping ambient audio in background thread"""
@@ -1062,13 +1076,13 @@ class AmbientPlayer:
                 config = yaml.safe_load(f)
         except Exception as e:  # pylint: disable=broad-exception-caught
             print(f"Error loading sound config: {e}")
+            return
 
         sounds = config.get('notification_sounds', {})
-        sounds_directory = Path(os.environ.get('NOTIFICATION_SOUNDS_DIR', "../../../Local/"))
-
         file_path = sounds_directory / 'assets' / 'sounds' / sounds[sound_name]['path']
         if not os.path.exists(file_path):
             logger.warning(f"couldn't find ambient file at '{file_path}'")
+            return
 
         self.playing = True
         self.thread = threading.Thread(target=self._play_loop, args=(
@@ -1085,11 +1099,14 @@ class AmbientPlayer:
         if self.thread:
             self.thread.join(timeout=1)
 
+        # Remove from active players
+        if self in AmbientPlayer._active_players:
+            AmbientPlayer._active_players.remove(self)
+
     def _play_loop(self, audio_file: str, volume_level: float):
         pygame.mixer.music.load(audio_file)
         pygame.mixer.music.set_volume(volume_level)
-
-        pygame.mixer.music.play(-1)  # -1 = infinite loop
+        pygame.mixer.music.play(-1)
         while self.playing:
             threading.Event().wait(0.1)
 
