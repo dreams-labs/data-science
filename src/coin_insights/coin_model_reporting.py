@@ -13,6 +13,7 @@ import numpy as np
 import joblib
 import pandas_gbq
 import matplotlib.pyplot as plt
+import matplotlib.patheffects as PathEffects
 import wallet_insights.model_evaluation as wime
 import wallet_insights.wallet_model_reporting as wimr
 import coin_modeling.coin_epochs_orchestrator as ceo
@@ -327,10 +328,26 @@ def plot_wallet_model_comparison(
             ax.plot(group['position'], group['return_value'],
                    marker='o', linewidth=2, label=label, color=line_color)
 
+        # Calculate and plot overall average across all epochs for this model
+        overall_average = model_data.groupby('position')['return_value'].mean()
+        ax.plot(overall_average.index, overall_average.values,
+               color='lime', linewidth=4, label='Overall Average', zorder=10)
+
+        # Add text labels for specific positions on the bright green line
+        label_positions = [1, 5, 10, 15, 20]
+        for pos in label_positions:
+            if pos in overall_average.index:
+                value = overall_average[pos]
+                ax.text(pos, value, f'{value:.3f}',
+                       color='lime', fontweight='bold', fontsize=10,
+                       ha='center', va='bottom', zorder=11,
+                       path_effects=[PathEffects.withStroke(linewidth=2, foreground='black')])
+
         ax.set_xlabel('Prediction Rank Position (1 = highest scores)')
         ax.set_ylabel(f'{metric.replace("_", " ").title()}')
         ax.set_title(model_name)
         ax.grid(True, alpha=0.3)
+        ax.invert_xaxis()
 
         # Only show legend if no macro comparison (to avoid clutter)
         if not macro_comparison:
