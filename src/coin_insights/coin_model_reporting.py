@@ -177,7 +177,7 @@ def generate_and_upload_coin_scores(
 
 
 def plot_wallet_model_comparison(
-    wallets_coin_config: dict,
+    base_folder: str,
     cols: int = 2,
     macro_comparison: str = None,
 ) -> None:
@@ -188,14 +188,13 @@ def plot_wallet_model_comparison(
     Validates that return data contains exactly 20 items before plotting.
 
     Params:
-    - wallets_coin_config: Configuration containing parquet folder paths
+    - base_folder: Location of the model_ids.json file, e.g.:
+        temp/coin_modeling_dfs/dda_818_coin_model_60d_v2_240_history
     - cols: how many columns of charts to make (kept for backward compatibility but forced to 2)
     - macro_comparison: macro key for color coding (e.g. 'btc_mvrv_z_score_last|w4')
     """
-    base_folder = Path(wallets_coin_config['training_data']['parquet_folder'])
-
     # Find all wallet_model_ids.json files
-    json_files = list(base_folder.glob('*/wallet_model_ids.json'))
+    json_files = list(Path(base_folder).glob('*/wallet_model_ids.json'))
 
     if not json_files:
         raise FileNotFoundError(f"No wallet_model_ids.json files found in {base_folder}")
