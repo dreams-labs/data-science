@@ -7,7 +7,9 @@ import os
 import json
 import gc
 import inspect
+import atexit
 from pathlib import Path
+import threading
 from datetime import datetime, timedelta
 from typing import List,Dict,Any,Union
 import importlib
@@ -957,7 +959,8 @@ def winsorize(data: pd.Series, cutoff: float = 0.01) -> pd.Series:
     # Calculate bounds using non-null values
     valid_data = data[~np.isnan(data)]
     if valid_data.size == 0:
-        raise ValueError("Winsorization error: no valid (non-NaN) data to compute percentiles")
+        return winsorized  # Return original series unchanged if no valid data
+
     lower_bound = np.percentile(valid_data, cutoff * 100, method='nearest')
     upper_bound = np.percentile(valid_data, (1 - cutoff) * 100, method='nearest')
 
@@ -967,10 +970,8 @@ def winsorize(data: pd.Series, cutoff: float = 0.01) -> pd.Series:
 
 
 
-
-
 # ---------------------------------------- #
-#     Misc Notebook Helper Functions
+#     Audio Notebook Helper Functions
 # ---------------------------------------- #
 
 def notify(sound_name: Union[str, int] = None, prompt: str = None, voice_id: str = 'Tessa'):
@@ -1032,6 +1033,112 @@ def notify(sound_name: Union[str, int] = None, prompt: str = None, voice_id: str
 
 
 
+class AmbientPlayer:
+    """
+    Plays a sound file on loop until commanded to .stop(). Uses the same sound keys dict
+     as u.notify(). Automatically stops on kernel shutdown/error.
+    """
+    _active_players = []  # Class variable to track all players
+
+    def __init__(self):
+        pygame.mixer.init()
+        self.playing = False
+        self.thread = None
+        self.target_volume = 0.0
+        self.current_volume = 0.0
+
+        # Register this player for cleanup
+        AmbientPlayer._active_players.append(self)
+
+        # Register cleanup function (only once)
+        if len(AmbientPlayer._active_players) == 1:
+            atexit.register(AmbientPlayer._cleanup_all_players)
+
+    @classmethod
+    def _cleanup_all_players(cls):
+        """Stop all active players on program exit"""
+        for player in cls._active_players:
+            try:
+                player.stop()
+            except:  # pylint:disable=bare-except
+                pass  # Ignore errors during cleanup
+        pygame.mixer.quit()
+
+    def start(self, sound_name: str):
+        """Start looping ambient audio in background thread"""
+        if self.playing:
+            return
+
+        # Load sound config from sounds directory environment variable
+        sounds_directory = Path(os.environ.get('NOTIFICATION_SOUNDS_DIR', "../../../Local"))
+        config_path = sounds_directory / "notification_sounds.yaml"
+        try:
+            with open(config_path, encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            print(f"Error loading sound config: {e}")
+            return
+
+        sounds = config.get('notification_sounds', {})
+        file_path = sounds_directory / sounds[sound_name]['path']
+        if not os.path.exists(file_path):
+            logger.warning(f"couldn't find ambient file at '{file_path}'")
+            return
+
+        self.target_volume = sounds[sound_name]['volume']
+        self.current_volume = 0.0
+        self.playing = True
+        self.thread = threading.Thread(target=self._play_loop, args=(file_path,))
+        self.thread.daemon = True
+        self.thread.start()
+
+    def stop(self):
+        """Stop ambient audio with fade out"""
+        if not self.playing:
+            return
+
+        # Fade out over 2 seconds
+        fade_steps = 100
+        step_duration = 2.0 / fade_steps
+        volume_step = self.current_volume / fade_steps
+
+        for _ in range(fade_steps):
+            if not self.playing:  # Check if already stopped
+                break
+            self.current_volume = max(0, self.current_volume - volume_step)
+            pygame.mixer.music.set_volume(self.current_volume)
+            threading.Event().wait(step_duration)
+
+        self.playing = False
+        pygame.mixer.music.stop()
+        if self.thread:
+            self.thread.join(timeout=1)
+
+        # Remove from active players
+        if self in AmbientPlayer._active_players:
+            AmbientPlayer._active_players.remove(self)
+
+    def _play_loop(self, audio_file: str):
+        pygame.mixer.music.load(audio_file)
+        pygame.mixer.music.set_volume(0.0)
+        pygame.mixer.music.play(-1)
+
+        # Fade in over 2 seconds
+        fade_steps = 100
+        step_duration = 2.0 / fade_steps
+        volume_step = self.target_volume / fade_steps
+
+        for _ in range(fade_steps):
+            if not self.playing:
+                return
+            self.current_volume = min(self.target_volume, self.current_volume + volume_step)
+            pygame.mixer.music.set_volume(self.current_volume)
+            threading.Event().wait(step_duration)
+
+        # Main playback loop
+        while self.playing:
+            threading.Event().wait(0.1)
+
 
 def notify_on_failure(shell, etype, value, tb, tb_offset=None):
     """
@@ -1047,6 +1154,14 @@ def notify_on_failure(shell, etype, value, tb, tb_offset=None):
     # Call the original traceback display method
     shell.showtraceback((etype, value, tb), tb_offset=tb_offset)
 
+
+
+
+
+
+# ---------------------------------------- #
+#     Misc Notebook Helper Functions
+# ---------------------------------------- #
 
 def df_mem(df):
     """

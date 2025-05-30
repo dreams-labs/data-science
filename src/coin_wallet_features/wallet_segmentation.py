@@ -102,8 +102,8 @@ def load_wallet_scores(wallets_coin_config: dict) -> pd.DataFrame:
         feature_cols = []
 
         # Add scores column
-        score_df[f'scores|{score_name}_score'] = score_df[f'score|{score_name}']
-        feature_cols.append(f'scores|{score_name}_score')
+        score_df[f'scores|{score_name}'] = score_df[f'score|{score_name}']
+        feature_cols.append(f'scores|{score_name}')
 
         # Add binary column if configured and provided
         if (

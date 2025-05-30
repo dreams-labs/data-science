@@ -1,3 +1,68 @@
+# DDA 818 wallet model across macros
+checkpoint 3: roc.956 60d validation checks out?
+Model Performance Summary
+Target: cw_crypto_net_gain/crypto_inflows/base 0.5 to inf
+ID: d32d22e1-9565-4a99-ab59-bb3317287359
+===================================
+Test Samples:             103,648
+Test Positive Samples:    56,130 (54.15%)
+Number of Features:       372
+Features per Window:      62
+
+Test Set Classification Metrics
+True Positives:             5366/103648 (5.2)
+-----------------------------------
+ROC AUC:                    0.932
+Log Loss:                   0.117
+Accuracy:                   0.950
+Precision:                  0.875
+Recall:                     0.043
+F1 Score:                   0.082
+
+
+
+checkpoint 2: roc.956 15d validation checks out?
+Model Performance Summary
+Target: cw_crypto_net_gain/crypto_inflows/base 0.4 to inf
+ID: 16aab8cf-3f12-4fab-9bd7-42a9453a7956
+===================================
+Test Samples:             95,074
+Test Positive Samples:    141,897 (149.25%)
+Number of Features:       496
+Features per Window:      62
+
+Test Set Classification Metrics
+True Positives:             2706/95074 (2.8)
+-----------------------------------
+ROC AUC:                    0.956
+Log Loss:                   0.063
+Accuracy:                   0.974
+Precision:                  0.909
+Recall:                     0.096
+F1 Score:                   0.174
+
+
+checkpoint 1: roc.920 validation checks out?
+Model Performance Summary
+Target: cw_crypto_net_gain/crypto_inflows/base 0.4 to inf
+ID: 890bb610-0778-4afc-a8dd-498a7b4277c9
+===================================
+Test Samples:             22,385
+Test Positive Samples:    122,465 (547.09%)
+Number of Features:       496
+Features per Window:      62
+
+Test Set Classification Metrics
+True Positives:             1881/22385 (8.4)
+-----------------------------------
+ROC AUC:                    0.920
+Log Loss:                   0.174
+Accuracy:                   0.918
+Precision:                  0.805
+Recall:                     0.035
+F1 Score:                   0.067
+
+
 # DDA 806 wallet model performance
 checkpoint 1: roc.666 dda_806_wallet_model_performance
 Model Performance Summary

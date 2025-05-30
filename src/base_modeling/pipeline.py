@@ -243,7 +243,7 @@ class DropColumnPatterns(BaseEstimator, TransformerMixin):
             self.columns_to_drop = fs.identify_matching_columns(
                 self.drop_patterns, all_columns
             )
-            logger.info(f"Identified {len(self.columns_to_drop)} columns to drop")
+            logger.info(f"Identified {len(self.columns_to_drop)} columns to drop...")
         else:
             # If no patterns are provided, log and leave columns_to_drop unchanged
             logger.info("No drop_patterns provided. Keeping columns_to_drop unchanged.")

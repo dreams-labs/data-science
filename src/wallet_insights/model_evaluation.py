@@ -86,6 +86,8 @@ class RegressorEvaluator:
             features_df = wallet_model_results['X_train']
         elif self.X_validation is not None:
             features_df = self.X_validation
+        else:
+            raise ValueError("Could not access feature names.")
         self.feature_names = (
             pipeline[:-1].transform(features_df).columns.tolist()
             if hasattr(pipeline[:-1], 'transform') else None
@@ -433,8 +435,8 @@ class RegressorEvaluator:
 
                 if self.modeling_config['model_type'] == 'classification' and self.y_validation is not None:
                     header.extend([
-                        f"Test Positive Samples:    {self.y_validation.sum():,d} "
-                        f"({self.y_validation.sum()/self.metrics['test_samples']*100:.2f}%)",
+                        f"Val Positive Samples:     {self.y_validation.sum():,d} "
+                        f"({self.y_validation.sum()/self.metrics['test_samples']*100:.1f}%)",
                     ])
 
                 header.extend([
@@ -1000,7 +1002,7 @@ class ClassifierEvaluator(RegressorEvaluator):
 
                 summary.extend([
                         "Test Set Classification Metrics",
-                        f"True Positives:             {sum(self.y_test)}/{len(self.y_test)} ({100*sum(self.y_test)/len(self.y_test):.1f})",
+                        f"True Positives:             {sum(self.y_test)}/{len(self.y_test)} ({100*sum(self.y_test)/len(self.y_test):.1f}%)",
                         "-" * 35,
                         f"ROC AUC:                    {self.metrics['roc_auc']:.3f}",
                         f"Log Loss:                   {self.metrics['log_loss']:.3f}",
@@ -1315,6 +1317,10 @@ class ClassifierEvaluator(RegressorEvaluator):
         Validation line: thick green (#22DD22)
         Baseline: horizontal dashed line showing the positive class prevalence.
         """
+        # Declare optional variables so we can check if None later
+        baseline = None
+        thr_test = None
+
         if self.train_test_data_provided:
             # Calculate baseline (positive class prevalence)
             baseline = self.y_test.mean()
@@ -1337,7 +1343,7 @@ class ClassifierEvaluator(RegressorEvaluator):
 
         # --- Validation PR curve with AUC-PR (if available)
         if getattr(self, "y_validation_pred_proba", None) is not None \
-        and getattr(self, "y_validation", None) is not None:
+            and getattr(self, "y_validation", None) is not None:
             # Calculate validation baseline
             val_baseline = self.y_validation.mean()
 
@@ -1361,13 +1367,14 @@ class ClassifierEvaluator(RegressorEvaluator):
             baseline = val_baseline
 
         # --- Baseline reference line (positive class prevalence)
-        ax.axhline(
-            baseline,
-            linestyle="--",
-            linewidth=1,
-            color="#afc6ba",  # Light grey-green
-            label=f"Baseline ({baseline:.3f})"
-        )
+        if baseline is not None:
+            ax.axhline(
+                baseline,
+                linestyle="--",
+                linewidth=1,
+                color="#afc6ba",  # Light grey-green
+                label=f"Baseline ({baseline:.3f})"
+            )
 
         # --- F‑β optimal threshold verticals --------------------------------
         beta_colors = {
@@ -1379,32 +1386,33 @@ class ClassifierEvaluator(RegressorEvaluator):
         }
 
         # Add vertical lines for F-beta thresholds
-        for beta, color in beta_colors.items():
-            thr_key = f"f{beta}_thr"
-            if thr_key in self.metrics:
-                # Find the recall value closest to this threshold
-                idx = (np.abs(thr_test - self.metrics[thr_key])).argmin()
-                beta_recall = recall[idx]
+        if thr_test is not None:
+            for beta, color in beta_colors.items():
+                thr_key = f"f{beta}_thr"
+                if thr_key in self.metrics:
+                    # Find the recall value closest to this threshold
+                    idx = (np.abs(thr_test - self.metrics[thr_key])).argmin()
+                    beta_recall = recall[idx]
 
-                # Add vertical line
-                ax.axvline(
-                    beta_recall,
-                    linestyle=':',
-                    linewidth=1.5,
-                    color=color,
-                    label=f"F{beta} threshold"
-                )
+                    # Add vertical line
+                    ax.axvline(
+                        beta_recall,
+                        linestyle=':',
+                        linewidth=1.5,
+                        color=color,
+                        label=f"F{beta} threshold"
+                    )
 
-                # Add text label
-                ax.text(
-                    beta_recall + 0.02,
-                    0.4,
-                    f"F{beta}",
-                    color=color,
-                    rotation=90,
-                    fontsize=10,
-                    va='bottom'
-                )
+                    # Add text label
+                    ax.text(
+                        beta_recall + 0.02,
+                        0.4,
+                        f"F{beta}",
+                        color=color,
+                        rotation=90,
+                        fontsize=10,
+                        va='bottom'
+                    )
 
 
         # Formatting
@@ -1543,7 +1551,7 @@ class ClassifierEvaluator(RegressorEvaluator):
         if linthresh <= 0:
             max_abs = abs_returns.max()
             linthresh = max_abs * 0.05 if max_abs > 0 else 1.0
-        ax2.set_yscale("symlog", linthresh=linthresh)
+        # ax2.set_yscale("symlog", linthresh=linthresh)
 
         ax2.plot(
             valid_centers,
@@ -1610,3 +1618,115 @@ class ClassifierEvaluator(RegressorEvaluator):
         lines, labels = ax.get_legend_handles_labels()
         lines2, labels2 = ax2.get_legend_handles_labels()
         ax.legend(lines + lines2, labels + labels2, loc="upper left")
+
+
+
+
+
+
+# ------------------------------------
+#         Standalone Functions
+# ------------------------------------
+
+def plot_prediction_vs_performance(
+        validation_y_pred: pd.Series,
+        validation_y_performance: pd.Series,
+        n_buckets: int = 10):
+    """
+    Plot prediction scores vs financial performance with dual y-axes.
+
+    Params:
+    - validation_y_pred (Series): model prediction scores
+    - validation_y_performance (Series): financial performance metrics
+    - n_buckets (int): number of score buckets for aggregation
+    - ax (matplotlib axis): optional axis to plot on
+
+    Returns:
+    - ax (matplotlib axis): the plotting axis
+    """
+    _, ax = plt.subplots(figsize=(10, 6))
+
+    # Align all series on common index
+    common_idx = validation_y_pred.index.intersection(validation_y_performance.index)
+    pred_scores = validation_y_pred.reindex(common_idx).dropna()
+    performance = validation_y_performance.reindex(common_idx).dropna()
+
+    # Final alignment after dropna
+    final_idx = pred_scores.index.intersection(performance.index)
+    pred_scores = pred_scores.reindex(final_idx)
+    performance = performance.reindex(final_idx)
+
+    if len(pred_scores) == 0:
+        ax.text(0.5, 0.5, "No valid data after alignment", ha="center", va="center")
+        return ax
+
+    # Create score buckets
+    score_bins = pd.cut(pred_scores, bins=n_buckets, duplicates='drop')
+    bucket_df = pd.DataFrame({
+        'score': pred_scores,
+        'performance': performance,
+        'performance_wins': u.winsorize(performance,0.005),
+        'bucket': score_bins
+    }).groupby('bucket').agg({
+        'score': ['mean', 'count'],
+        'performance': ['mean', 'median'],
+        'performance_wins': ['mean']
+    }).round(4)
+
+    # Flatten column names
+    bucket_df.columns = ['score_mid', 'count',
+                         'mean_performance', 'median_performance', 'wins_performance']
+    bucket_df = bucket_df.reset_index(drop=True)
+
+    # Extract plotting data
+    score_centers = bucket_df['score_mid'].values
+    counts = bucket_df['count'].values
+    mean_perf = bucket_df['mean_performance'].values
+    median_perf = bucket_df['median_performance'].values
+    wins_perf = bucket_df['wins_performance'].values
+
+    # Calculate bar width
+    if len(score_centers) > 1:
+        width = (score_centers[1] - score_centers[0]) * 0.8
+    else:
+        width = 0.1
+
+    # Primary axis: histogram of wallet counts
+    ax.bar(score_centers, counts, width=width, alpha=0.6,
+           label="Wallet Count", color='steelblue')
+    ax.set_yscale('log')
+
+    # Secondary axis: performance metrics
+    ax2 = ax.twinx()
+
+    # Set symlog scale for performance if needed
+    abs_perf = np.abs(performance.dropna())
+    linthresh = np.percentile(abs_perf, 95) if len(abs_perf) > 0 else 1.0
+    if linthresh <= 0:
+        linthresh = abs_perf.max() * 0.05 if len(abs_perf) > 0 else 1.0
+    # ax2.set_yscale("symlog", linthresh=linthresh)
+
+    # Plot performance lines
+    ax2.plot(score_centers, mean_perf, marker='o', linestyle='-',
+             linewidth=2, label="Mean Performance", color='green')
+    ax2.plot(score_centers, median_perf, marker='s', linestyle='-',
+             linewidth=2, label="Median Performance", color='purple')
+    ax2.plot(score_centers, wins_perf, marker='s', linestyle='-',
+             linewidth=2, label="Wins Performance", color='yellow')
+
+    # Overall mean performance line
+    overall_mean = performance.mean()
+    ax2.axhline(overall_mean, linestyle="--", color="gray",
+                linewidth=1, label="Overall Mean")
+
+    # Labels and formatting
+    ax.set_xlabel("Prediction Score")
+    ax.set_ylabel("Number of Wallets")
+    ax2.set_ylabel("Financial Performance")
+    ax.set_title("Prediction Score Distribution and Performance")
+    ax.grid(True, linestyle=":", alpha=0.3)
+
+    # Combine legends
+    lines1, labels1 = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax.legend(lines1 + lines2, labels1 + labels2, loc="upper left")
