@@ -17,4 +17,5 @@ offset_epochs:
 
     # 60 day intervals
     offsets: [0, -60, -120, -180, -240, -300, -360, -420]
-    validation_offsets: [60, 120, 180] #, 270, 300, 330, 360]
+    validation_offsets: [60]
+    # validation_offsets: [60, 120, 180] #, 270, 300, 330, 360]

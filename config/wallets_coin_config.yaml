@@ -8,21 +8,25 @@ training_data: #CoinModel
 
     #KeyParam Training and Validation Epochs
     coin_epochs_validation: [
-        # 30,
         60,
-        90,
+        120,
+        180
     ]
 
     coin_epochs_training: [  # How many days prior to the modeling period each window begins
         0,
-        # -30,
         -60,
-        -90,
         -120,
         -180,
         -240,
         -300,
         -360,
+        -420,
+        -480,
+        -540,
+        -600,
+        -660,
+        -720,
     ]
 
     #KeyParam Rebuild Features Settings
@@ -38,20 +42,52 @@ wallet_scores: #CoinModel
     #  by using a hardcoded number (e.g. 0.8) or an F-beta score (e.g. f.5).
     score_params:
 
-        cw_net_gain_max_inv_rank_90:
+        # cw_net_gain_max_inv_25:
+        #     model_type: classification
+        #     target_variable: cw_crypto_net_gain/max_investment/base
+        #     target_var_min_threshold: 0.25
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.90
+        #     assign_epochs_to_addresses: False
+
+        cw_net_gain_max_inv_40:
             model_type: classification
-            target_variable: cw_crypto_net_gain/max_investment/rank
-            target_var_min_threshold: 0.90
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_min_threshold: 0.40
             target_var_max_threshold: .inf
-            y_pred_threshold: 0.80
+            y_pred_threshold: 0.90
             assign_epochs_to_addresses: False
 
-        net_gain_max_inv_rank_90:
+        cw_net_gain_max_inv_50:
             model_type: classification
-            target_variable: crypto_net_gain/max_investment/rank
-            target_var_min_threshold: 0.90
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_min_threshold: 0.50
             target_var_max_threshold: .inf
-            y_pred_threshold: 0.80
+            y_pred_threshold: 0.90
+            assign_epochs_to_addresses: False
+
+        # cw_net_gain_max_inv_60:
+        #     model_type: classification
+        #     target_variable: cw_crypto_net_gain/max_investment/base
+        #     target_var_min_threshold: 0.60
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.90
+        #     assign_epochs_to_addresses: False
+
+        # cw_net_gain_max_inv_80:
+        #     model_type: classification
+        #     target_variable: cw_crypto_net_gain/max_investment/base
+        #     target_var_min_threshold: 0.80
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.90
+        #     assign_epochs_to_addresses: False
+
+        cw_net_gain_max_inv_n25:
+            model_type: classification
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_min_threshold: -0.25
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.90
             assign_epochs_to_addresses: False
 
         cw_net_gain_max_inv_n40:
@@ -59,125 +95,16 @@ wallet_scores: #CoinModel
             target_variable: cw_crypto_net_gain/max_investment/base
             target_var_min_threshold: -0.40
             target_var_max_threshold: .inf
-            y_pred_threshold: 0.80
+            y_pred_threshold: 0.90
             assign_epochs_to_addresses: False
 
-        net_gain_max_inv_n40:
-            model_type: classification
-            target_variable: crypto_net_gain/max_investment/base
-            target_var_min_threshold: -0.40
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.80
-            assign_epochs_to_addresses: False
-
-        cw_net_gain_max_inv_40:
+        cw_net_gain_max_inv_n60:
             model_type: classification
             target_variable: cw_crypto_net_gain/max_investment/base
-            target_var_min_threshold: 0.40
+            target_var_min_threshold: -0.60
             target_var_max_threshold: .inf
-            y_pred_threshold: 0.70
+            y_pred_threshold: 0.90
             assign_epochs_to_addresses: False
-
-        net_gain_max_inv_40:
-            model_type: classification
-            target_variable: crypto_net_gain/max_investment/base
-            target_var_min_threshold: 0.40
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.70
-            assign_epochs_to_addresses: False
-
-        cw_net_flows_n40:
-            model_type: classification
-            target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: -0.40
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.80
-            assign_epochs_to_addresses: False
-
-        net_flows_n40:
-            model_type: classification
-            target_variable: crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: -0.40
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.80
-            assign_epochs_to_addresses: False
-
-        net_flows_40:
-            model_type: classification
-            target_variable: crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: 0.40
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.70
-            assign_epochs_to_addresses: False
-
-        cw_net_flows_40:
-            model_type: classification
-            target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: 0.40
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.70
-            assign_epochs_to_addresses: False
-
-        cw_crypto_net_flows_1k:
-            model_type: classification
-            target_variable: cw_crypto_net_flows
-            target_var_min_threshold: 1000
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.8
-            assign_epochs_to_addresses: False
-
-        cw_crypto_net_gain_1k:
-            model_type: classification
-            target_variable: cw_crypto_net_gain
-            target_var_min_threshold: 1000
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.8
-            assign_epochs_to_addresses: False
-
-        crypto_net_gain_1k:
-            model_type: classification
-            target_variable: crypto_net_gain
-            target_var_min_threshold: 1000
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.8
-            assign_epochs_to_addresses: False
-
-        cw_crypto_net_gain_10k:
-            model_type: classification
-            target_variable: cw_crypto_net_gain
-            target_var_min_threshold: 10_000
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.8
-            assign_epochs_to_addresses: False
-
-        cw_net_gain_regression:
-            model_type: regression
-            target_variable: cw_crypto_net_gain
-            y_pred_lower_threshold: -1.1
-            y_pred_threshold: 0.7
-            assign_epochs_to_addresses: False
-
-        net_gain_regression:
-            model_type: regression
-            target_variable: crypto_net_gain
-            y_pred_lower_threshold: -1.1
-            y_pred_threshold: 0.7
-            assign_epochs_to_addresses: False
-
-        cw_net_flows_regression:
-            model_type: regression
-            target_variable: cw_crypto_net_flows/crypto_inflows/winsorized
-            y_pred_lower_threshold: -1.1
-            y_pred_threshold: 0.7
-            assign_epochs_to_addresses: False
-
-        net_flows_regression:
-            model_type: regression
-            target_variable: crypto_net_flows/crypto_inflows/winsorized
-            y_pred_lower_threshold: -1.1
-            y_pred_threshold: 0.7
-            assign_epochs_to_addresses: False
-
 
 
 # CoinModel Segments
@@ -198,14 +125,14 @@ features: #CoinModel
 
     # Which scores will have distribution metrics created
     score_distributions: [
-        # cw_net_flows_05,
-        # cw_net_flows_015,
-        # cw_net_flows_025,
-        # cw_net_flows_040,
-        # cw_net_flows_n05,
-        # cw_net_flows_n015,
-        # cw_net_flows_n025,
-        # cw_net_flows_n040,
+        # cw_net_gain_max_inv_25,
+        # cw_net_gain_max_inv_40,
+        # cw_net_gain_max_inv_60,
+        # cw_net_gain_max_inv_80
+        # cw_net_gain_max_inv_n25,
+        # cw_net_gain_max_inv_n40,
+        # cw_net_gain_max_inv_n60,
+        # cw_net_gain_max_inv_n80
     ]
 
     # Features from the feature_engineering directory
@@ -240,14 +167,14 @@ coin_modeling: #CoinModel
 
     #KeyParam Model Type
     # Target variable parameters
-    # model_type: regression  # "regression" or "classification"
-    model_type: classification  # "regression" or "classification"
+    model_type: regression  # "regression" or "classification"
+    # model_type: classification  # "regression" or "classification"
 
     #KeyParam Target Variable
-    # target_variable: coin_return_winsorized
-    target_variable: coin_return
+    target_variable: coin_return_winsorized
+    # target_variable: coin_return
     # target_variable: coin_return_pctile_full
-    target_var_min_threshold: .30 # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.9 # a classification model will try to predict the target var above this value
     y_pred_threshold: 0.90  # scores above this probability threshold are positive predictions
 
     returns_winsorization: 0.005
@@ -281,30 +208,23 @@ coin_modeling: #CoinModel
             # Segment Category
             all_wallets*,
             score_quantile|*,
-            score_binary|*,
+            # score_binary|*,
             # macro|*,
-            # market_data|*,
+            market_data|*,
 
             # Segment Family
-            # score_binary|cw_net_flows_05/*,
-            # score_binary|cw_net_flows_15/*,
-            # score_binary|cw_net_flows_25/*,
-            # score_binary|cw_net_flows_40/*,
-            # score_binary|cw_net_flows_60/*,
-            # score_binary|cw_net_flows_n05/*,
-            # score_binary|cw_net_flows_n15/*,
-            # score_binary|cw_net_flows_n25/*,
-            # score_binary|cw_net_flows_n40/*,
-            # score_binary|cw_net_flows_n60/*,
+            score_binary|cw_net_gain_max_inv_25/*,
+            # score_binary|cw_net_gain_max_inv_40/*,
+            score_binary|cw_net_gain_max_inv_60/*,
 
-            score_binary|cw_net_flows_n015_thr80/*,
-            score_binary|cw_net_flows_025_thr80/*,
-            score_binary|cw_net_flows_n025_thr80/*,
-            score_binary|cw_net_flows_n05_thr80/*,
-            score_binary|cw_net_flows_05_thr80/*,
-            score_binary|cw_net_flows_015_thr80/*,
-            score_binary|cw_net_flows_040_thr80/*,
-            score_binary|cw_net_flows_n040_thr80/*,
+            # score_binary|cw_net_flows_n015_thr80/*,
+            # score_binary|cw_net_flows_025_thr80/*,
+            # score_binary|cw_net_flows_n025_thr80/*,
+            # score_binary|cw_net_flows_n05_thr80/*,
+            # score_binary|cw_net_flows_05_thr80/*,
+            # score_binary|cw_net_flows_015_thr80/*,
+            # score_binary|cw_net_flows_040_thr80/*,
+            # score_binary|cw_net_flows_n040_thr80/*,
 
 
             score_binary|*/1|trading/total_volume|aggregations/aggregations/sum,
@@ -318,15 +238,15 @@ coin_modeling: #CoinModel
 
 
             # macro|btc_mvrv_z_score/last_*,
-            # macro|btc_mvrv_z_score/pct_change_30d*,
-            # macro|btc_mvrv_z_score/*pct_change_7d*,
-            # macro|btc_mvrv_z_score/sma_1_std,
-            # macro|btc_mvrv_z_score/std_30d*,
-            # macro|btc_vdd_multiple/std_*,
-            # macro|btc_vdd_multiple/last_*,
-            # macro|global_volume/std_*,
-            # macro|btc_price/std_*,
-            # macro|btc_price/pct_change_*,
+            macro|btc_mvrv_z_score/pct_change_30d*,
+            macro|btc_mvrv_z_score/*pct_change_7d*,
+            macro|btc_mvrv_z_score/sma_1_std,
+            macro|btc_mvrv_z_score/std_30d*,
+            macro|btc_vdd_multiple/std_*,
+            macro|btc_vdd_multiple/last_*,
+            macro|global_volume/std_*,
+            macro|btc_price/std_*,
+            macro|btc_price/pct_change_*,
 
             macro|btc_mvrv_z_score/sma_1_last,
             macro|global_volume/last_*,
@@ -351,31 +271,28 @@ coin_modeling: #CoinModel
 
 
             # # Segment Value
-            market_data|price/rsi_7_last_30d_period_1,
-            market_data|price/rsi_7_last_30d_period_2,
-            market_data|price/rsi_7_last_30d_period_3,
-            market_data|price/sma_2_pct_change_30d_period_1,
-            market_data|price/sma_2_pct_change_30d_period_2,
-            market_data|price/sma_2_pct_change_30d_period_3,
-            market_data|price/sma_2_std_30d_period_1,
-            market_data|price/sma_2_std_30d_period_2,
-            market_data|price/sma_2_std_30d_period_3,
-            market_data|market_cap/last,
-            market_data|market_cap/filled_last,
-            # # new
-            # market_data|obv/last*_period_1,
-            market_data|obv/last*_period_2,
-            market_data|obv/last*_period_3,
-            # market_data|mfi/last*_period_1,
-            market_data|mfi/last*_period_2,
-            market_data|mfi/last*_period_3,
-            market_data|price/ema*_pct_change_*period_1,
-            market_data|price/ema*_pct_change_*period_2,
-            market_data|price/ema*_pct_change_*period_3,
-            # market_data|price/ema*_std_*period_1,
-            market_data|price/ema*_std_*period_2,
-            market_data|price/ema*_std_*period_3,
-            market_data|price/ema*_last,
+
+            market_data|market_cap/*,
+            market_data|price/*,
+            # market_data|mfi/*,
+            # market_data|obv/*,
+            # market_data|volume/*,
+
+            # market_data|market_cap/filled_last,
+            # # # new
+            # # market_data|obv/last*_period_1,
+            # market_data|obv/last*_period_2,
+            # market_data|obv/last*_period_3,
+            # # market_data|mfi/last*_period_1,
+            # market_data|mfi/last*_period_2,
+            # market_data|mfi/last*_period_3,
+            # market_data|price/ema*_pct_change_*period_1,
+            # market_data|price/ema*_pct_change_*period_2,
+            # market_data|price/ema*_pct_change_*period_3,
+            # # market_data|price/ema*_std_*period_1,
+            # market_data|price/ema*_std_*period_2,
+            # market_data|price/ema*_std_*period_3,
+            # market_data|price/ema*_last,
 
             # Metric
             # time_series|market_data|price*,
@@ -478,7 +395,7 @@ coin_modeling: #CoinModel
     model_params:
         #KeyParam Model Specs
         n_estimators: 300
-        max_depth: 3
+        max_depth: 2
         min_child_weight: 5
         learning_rate: 0.15
         colsample_bytree: 1.0
@@ -543,17 +460,9 @@ coin_modeling: #CoinModel
             # estimator__tree_method: [hist]
 
             drop_columns__drop_patterns: [
-
-                score_binary|cw_net_flows_05/*,
-                score_binary|cw_net_flows_15/*,
-                score_binary|cw_net_flows_25/*,
-                score_binary|cw_net_flows_40/*,
-                # score_binary|cw_net_flows_60/*,
-                score_binary|cw_net_flows_n05/*,
-                score_binary|cw_net_flows_n15/*,
-                score_binary|cw_net_flows_n25/*,
-                score_binary|cw_net_flows_n40/*,
-                score_binary|cw_net_flows_n60/*,
+                score_binary|cw_net_gain_max_inv_25/*,
+                score_binary|cw_net_gain_max_inv_40/*,
+                # score_binary|cw_net_gain_max_inv_60/*,
 
 
 
