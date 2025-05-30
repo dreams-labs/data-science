@@ -396,7 +396,7 @@ class WalletEpochsOrchestrator:
         if training_only:
             epoch_modeling_data_df = pd.DataFrame()
 
-        u.notify('game_issue')
+        u.notify('bright_chime_ping')
 
         return epoch_date, epoch_training_data_df, epoch_modeling_data_df
 
