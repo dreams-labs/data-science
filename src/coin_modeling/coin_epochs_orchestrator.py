@@ -209,6 +209,13 @@ class CoinEpochsOrchestrator:
         self.coin_training_data_only = coin_training_data_only
         self.wallets_config['training_data']['coin_training_data_only'] = coin_training_data_only
 
+        # Notifications
+        logger.milestone("")
+        logger.milestone("Beginning orchestration of coin model data generation...")
+        u.notify('whoosh_boom')
+        ambient_player = u.AmbientPlayer()
+        ambient_player.start('spaceship_ambient')
+
         # 1. Build all wallet training data needed for all coin epochs
         # ------------------------------------------------------------
         # This increases execution speed by multithreading every wallet epoch, rather
@@ -238,8 +245,7 @@ class CoinEpochsOrchestrator:
 
         # 3. Generate all coin epochs' training data
         # ------------------------------------------
-        logger.milestone("Beginning generation of coin model training data...")
-        u.notify('whoosh_boom')
+        logger.milestone("Beginning generation of all coin epochs' training data...")
 
         # Tag each DataFrame with the epoch date
         def tag_with_epoch(df: pd.DataFrame, epoch_date: pd.Timestamp) -> pd.DataFrame:
@@ -297,6 +303,7 @@ class CoinEpochsOrchestrator:
             multiwindow_targets = reset_index_codes(multiwindow_targets)
             multiwindow_targets.to_parquet(f"{root_folder}/{file_prefix}multiwindow_coin_target_var_df.parquet")
 
+        ambient_player.stop()
         u.notify('robotz_windows_start')
 
 
