@@ -435,8 +435,8 @@ class RegressorEvaluator:
 
                 if self.modeling_config['model_type'] == 'classification' and self.y_validation is not None:
                     header.extend([
-                        f"Test Positive Samples:    {self.y_validation.sum():,d} "
-                        f"({self.y_validation.sum()/self.metrics['test_samples']*100:.2f}%)",
+                        f"Val Positive Samples:     {self.y_validation.sum():,d} "
+                        f"({self.y_validation.sum()/self.metrics['test_samples']*100:.1f}%)",
                     ])
 
                 header.extend([
@@ -1002,7 +1002,7 @@ class ClassifierEvaluator(RegressorEvaluator):
 
                 summary.extend([
                         "Test Set Classification Metrics",
-                        f"True Positives:             {sum(self.y_test)}/{len(self.y_test)} ({100*sum(self.y_test)/len(self.y_test):.1f})",
+                        f"True Positives:             {sum(self.y_test)}/{len(self.y_test)} ({100*sum(self.y_test)/len(self.y_test):.1f}%)",
                         "-" * 35,
                         f"ROC AUC:                    {self.metrics['roc_auc']:.3f}",
                         f"Log Loss:                   {self.metrics['log_loss']:.3f}",
@@ -1665,14 +1665,17 @@ def plot_prediction_vs_performance(
     bucket_df = pd.DataFrame({
         'score': pred_scores,
         'performance': performance,
+        'performance_wins': u.winsorize(performance,0.005),
         'bucket': score_bins
     }).groupby('bucket').agg({
         'score': ['mean', 'count'],
-        'performance': ['mean', 'median']
+        'performance': ['mean', 'median'],
+        'performance_wins': ['mean']
     }).round(4)
 
     # Flatten column names
-    bucket_df.columns = ['score_mid', 'count', 'mean_performance', 'median_performance']
+    bucket_df.columns = ['score_mid', 'count',
+                         'mean_performance', 'median_performance', 'wins_performance']
     bucket_df = bucket_df.reset_index(drop=True)
 
     # Extract plotting data
@@ -1680,6 +1683,7 @@ def plot_prediction_vs_performance(
     counts = bucket_df['count'].values
     mean_perf = bucket_df['mean_performance'].values
     median_perf = bucket_df['median_performance'].values
+    wins_perf = bucket_df['wins_performance'].values
 
     # Calculate bar width
     if len(score_centers) > 1:
@@ -1705,8 +1709,10 @@ def plot_prediction_vs_performance(
     # Plot performance lines
     ax2.plot(score_centers, mean_perf, marker='o', linestyle='-',
              linewidth=2, label="Mean Performance", color='green')
-    ax2.plot(score_centers, median_perf, marker='s', linestyle='--',
-             linewidth=2, label="Median Performance", color='orange')
+    ax2.plot(score_centers, median_perf, marker='s', linestyle='-',
+             linewidth=2, label="Median Performance", color='purple')
+    ax2.plot(score_centers, wins_perf, marker='s', linestyle='-',
+             linewidth=2, label="Wins Performance", color='yellow')
 
     # Overall mean performance line
     overall_mean = performance.mean()
