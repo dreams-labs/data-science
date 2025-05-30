@@ -23,10 +23,8 @@ training_data: #CoinModel
         -360,
         -420,
         -480,
-        -540,
-        -600,
-        -660,
-        -720,
+        # -540,
+        # -600,
     ]
 
     #KeyParam Rebuild Features Settings
@@ -42,18 +40,18 @@ wallet_scores: #CoinModel
     #  by using a hardcoded number (e.g. 0.8) or an F-beta score (e.g. f.5).
     score_params:
 
-        # cw_net_gain_max_inv_25:
-        #     model_type: classification
-        #     target_variable: cw_crypto_net_gain/max_investment/base
-        #     target_var_min_threshold: 0.25
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.90
-        #     assign_epochs_to_addresses: False
-
-        cw_net_gain_max_inv_40:
+        cw_net_flows_1k:
             model_type: classification
-            target_variable: cw_crypto_net_gain/max_investment/base
-            target_var_min_threshold: 0.40
+            target_variable: cw_crypto_net_flows
+            target_var_min_threshold: 1000
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.90
+            assign_epochs_to_addresses: False
+
+        cw_net_flows_inflows_50:
+            model_type: classification
+            target_variable: cw_crypto_net_flows/crypto_inflows/base
+            target_var_min_threshold: 0.60
             target_var_max_threshold: .inf
             y_pred_threshold: 0.90
             assign_epochs_to_addresses: False
@@ -66,34 +64,10 @@ wallet_scores: #CoinModel
             y_pred_threshold: 0.90
             assign_epochs_to_addresses: False
 
-        # cw_net_gain_max_inv_60:
-        #     model_type: classification
-        #     target_variable: cw_crypto_net_gain/max_investment/base
-        #     target_var_min_threshold: 0.60
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.90
-        #     assign_epochs_to_addresses: False
-
-        # cw_net_gain_max_inv_80:
-        #     model_type: classification
-        #     target_variable: cw_crypto_net_gain/max_investment/base
-        #     target_var_min_threshold: 0.80
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.90
-        #     assign_epochs_to_addresses: False
-
-        cw_net_gain_max_inv_n25:
+        cw_net_gain_max_inv_80:
             model_type: classification
             target_variable: cw_crypto_net_gain/max_investment/base
-            target_var_min_threshold: -0.25
-            target_var_max_threshold: .inf
-            y_pred_threshold: 0.90
-            assign_epochs_to_addresses: False
-
-        cw_net_gain_max_inv_n40:
-            model_type: classification
-            target_variable: cw_crypto_net_gain/max_investment/base
-            target_var_min_threshold: -0.40
+            target_var_min_threshold: 0.80
             target_var_max_threshold: .inf
             y_pred_threshold: 0.90
             assign_epochs_to_addresses: False
@@ -102,6 +76,14 @@ wallet_scores: #CoinModel
             model_type: classification
             target_variable: cw_crypto_net_gain/max_investment/base
             target_var_min_threshold: -0.60
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.90
+            assign_epochs_to_addresses: False
+
+        cw_net_gain_max_inv_n80:
+            model_type: classification
+            target_variable: cw_crypto_net_gain/max_investment/base
+            target_var_min_threshold: -0.80
             target_var_max_threshold: .inf
             y_pred_threshold: 0.90
             assign_epochs_to_addresses: False
