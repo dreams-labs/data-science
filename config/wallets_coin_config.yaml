@@ -8,12 +8,16 @@ training_data: #CoinModel
 
     #KeyParam Training and Validation Epochs
     coin_epochs_validation: [
-        60,
-        120,
-        180
+        # 60,
+        # 120,
+        # 180
     ]
 
     coin_epochs_training: [  # How many days prior to the modeling period each window begins
+        60,
+        120,
+        180,
+
         0,
         -60,
         -120,

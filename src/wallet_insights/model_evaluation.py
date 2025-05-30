@@ -75,6 +75,17 @@ class RegressorEvaluator:
         self.y_validation_pred = wallet_model_results.get('y_validation_pred')
         self.validation_target_vars_df = wallet_model_results.get('validation_target_vars_df')
 
+        # boolean whether to evaluate validation sets
+        self.validation_data_provided = True
+        if any([
+            (self.X_validation is None or len(self.X_validation) == 0),
+            (self.y_validation is None or len(self.y_validation) == 0),
+            (self.y_validation_pred is None or len(self.y_validation_pred) == 0),
+            (self.validation_target_vars_df is None or len(self.validation_target_vars_df) == 0)
+        ]):
+            self.validation_data_provided = False
+
+
         # model artifacts
         self.model_id = wallet_model_results['model_id']
         self.modeling_config = wallet_model_results['modeling_config']
@@ -967,6 +978,10 @@ class ClassifierEvaluator(RegressorEvaluator):
     def __init__(self, wallet_model_results: dict):
 
         self.y_pred_proba = wallet_model_results.get('y_pred_proba')
+        self.y_validation_pred_proba = wallet_model_results.get('y_validation_pred_proba')
+        self.y_validation_pred = wallet_model_results.get('y_validation_pred')
+        self.y_pred_threshold = wallet_model_results['modeling_config']['y_pred_threshold']
+
         super().__init__(wallet_model_results)
 
         # Extract probability predictions
@@ -974,10 +989,6 @@ class ClassifierEvaluator(RegressorEvaluator):
             not (self.y_pred_proba is None or len(self.y_pred_proba) == 0)
         ):
             raise ValueError("If train/test data is not available, y_pred_proba should be empty.")
-
-        self.y_validation_pred_proba = wallet_model_results.get('y_validation_pred_proba')
-        self.y_validation_pred = wallet_model_results.get('y_validation_pred')
-        self.y_pred_threshold = wallet_model_results['modeling_config']['y_pred_threshold']
 
         # Store numeric threshold (the outcome of the F-beta conversion if applicable)
         self.metrics['y_pred_threshold'] = self.y_pred_threshold
@@ -995,9 +1006,8 @@ class ClassifierEvaluator(RegressorEvaluator):
         # Header and sample info
         summary = self._get_summary_header()
 
-        # Classification test set metrics
-        if 'val_roc_auc' not in self.metrics:
-        # Check if train/test data is available
+        # Metrics without validation set
+        if not self.validation_data_provided:
             if self.train_test_data_provided:
 
                 summary.extend([
@@ -1012,8 +1022,9 @@ class ClassifierEvaluator(RegressorEvaluator):
                         f"F1 Score:                   {self.metrics['f1']:.3f}",
                         ""
                 ])
+
+        # Metrics with validation set
         else:
-        # Check if train/test data is available
             if self.train_test_data_provided:
 
                 summary.extend([
