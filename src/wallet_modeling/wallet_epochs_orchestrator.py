@@ -167,7 +167,8 @@ class WalletEpochsOrchestrator:
 
         logger.milestone(f"Compiling wallet training data for {len(self.all_epochs_configs)} epochs...")
         if self.training_only:
-            logger.milestone("Training‑only mode: Compiling wallet training data without validation or target variables.")
+            logger.milestone("Training‑only mode: Compiling wallet training data without "
+                             "validation or target variables.")
 
         u.notify('intro_3')
 
@@ -395,8 +396,6 @@ class WalletEpochsOrchestrator:
 
         if training_only:
             epoch_modeling_data_df = pd.DataFrame()
-
-        u.notify('beep')
 
         return epoch_date, epoch_training_data_df, epoch_modeling_data_df
 
@@ -868,8 +867,10 @@ class WalletEpochsOrchestrator:
                     f"Required coverage: {earliest_starting_balance_date.strftime('%Y-%m-%d')}"
                         f" to {latest_required_date.strftime('%Y-%m-%d')}\n"
                     f"Actual coverage:\n"
-                    f"- Profits data: {profits_start.strftime('%Y-%m-%d')} to {profits_end.strftime('%Y-%m-%d')}\n"
-                    f"- Market data: {market_data_start.strftime('%Y-%m-%d')} to {market_data_end.strftime('%Y-%m-%d')}\n"
+                    f"- Profits data: {profits_start.strftime('%Y-%m-%d')} to "
+                        f"{profits_end.strftime('%Y-%m-%d')}\n"
+                    f"- Market data: {market_data_start.strftime('%Y-%m-%d')} to "
+                        f"{market_data_end.strftime('%Y-%m-%d')}\n"
                     f"- Macro trends data: {macro_trends_start.strftime('%Y-%m-%d')} "
                         f"to {macro_trends_end.strftime('%Y-%m-%d')}"
                 )
