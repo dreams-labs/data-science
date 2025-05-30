@@ -230,6 +230,7 @@ class WalletEpochsOrchestrator:
                         f"Expected 'modeling', 'current', or 'validation'."
                     )
                 i += 1
+                u.notify('beep')
                 logger.milestone(f"Wallet epoch {i}/{len(epoch_configs_to_process)} completed (date: " \
                                  f"{pd.to_datetime(epoch_date).strftime('%Y-%m-%d')})")
 

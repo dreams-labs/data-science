@@ -214,7 +214,7 @@ class CoinEpochsOrchestrator:
         logger.milestone("Beginning orchestration of coin model data generation...")
         u.notify('whoosh_boom')
         ambient_player_coins = u.AmbientPlayer()
-        ambient_player_coins.start('spaceship_ambient')
+        ambient_player_coins.start('spaceship_ambient_loop')
 
         # 1. Build all wallet training data needed for all coin epochs
         # ------------------------------------------------------------
