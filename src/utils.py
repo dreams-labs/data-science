@@ -1032,7 +1032,6 @@ def notify(sound_name: Union[str, int] = None, prompt: str = None, voice_id: str
         return f"Error with playback: {e}"
 
 
-
 class AmbientPlayer:
     """
     Plays a sound file on loop until commanded to .stop(). Uses the same sound keys dict
@@ -1046,6 +1045,8 @@ class AmbientPlayer:
         self.thread = None
         self.target_volume = 0.0
         self.current_volume = 0.0
+        self.sound = None
+        self.channel = None
 
         # Register this player for cleanup
         AmbientPlayer._active_players.append(self)
@@ -1055,14 +1056,30 @@ class AmbientPlayer:
             atexit.register(AmbientPlayer._cleanup_all_players)
 
     @classmethod
-    def _cleanup_all_players(cls):
-        """Stop all active players on program exit"""
-        for player in cls._active_players:
+    def stop_all_players(cls):
+        """Stop all active players and clear the registry"""
+        for player in cls._active_players[:]:  # Create copy to avoid modification during iteration
             try:
                 player.stop()
             except:  # pylint:disable=bare-except
                 pass  # Ignore errors during cleanup
+
+        cls._active_players.clear()  # Clear the registry
+
+        # Force stop all pygame channels and quit mixer
+        pygame.mixer.stop()
         pygame.mixer.quit()
+
+        # Reinitialize mixer for future use
+        try:
+            pygame.mixer.init()
+        except:  # pylint:disable=bare-except
+            pass
+
+    @classmethod
+    def _cleanup_all_players(cls):
+        """Stop all active players on program exit"""
+        cls.stop_all_players()
 
     def start(self, sound_name: str):
         """Start looping ambient audio in background thread"""
@@ -1087,8 +1104,9 @@ class AmbientPlayer:
 
         self.target_volume = sounds[sound_name]['volume']
         self.current_volume = 0.0
+        self.sound = pygame.mixer.Sound(file_path)
         self.playing = True
-        self.thread = threading.Thread(target=self._play_loop, args=(file_path,))
+        self.thread = threading.Thread(target=self._play_loop)
         self.thread.daemon = True
         self.thread.start()
 
@@ -1106,11 +1124,13 @@ class AmbientPlayer:
             if not self.playing:  # Check if already stopped
                 break
             self.current_volume = max(0, self.current_volume - volume_step)
-            pygame.mixer.music.set_volume(self.current_volume)
+            if self.sound:
+                self.sound.set_volume(self.current_volume)
             threading.Event().wait(step_duration)
 
         self.playing = False
-        pygame.mixer.music.stop()
+        if self.channel:
+            self.channel.stop()
         if self.thread:
             self.thread.join(timeout=1)
 
@@ -1118,10 +1138,9 @@ class AmbientPlayer:
         if self in AmbientPlayer._active_players:
             AmbientPlayer._active_players.remove(self)
 
-    def _play_loop(self, audio_file: str):
-        pygame.mixer.music.load(audio_file)
-        pygame.mixer.music.set_volume(0.0)
-        pygame.mixer.music.play(-1)
+    def _play_loop(self):
+        self.sound.set_volume(0.0)
+        self.channel = self.sound.play(-1)  # -1 means loop indefinitely
 
         # Fade in over 2 seconds
         fade_steps = 100
@@ -1132,11 +1151,11 @@ class AmbientPlayer:
             if not self.playing:
                 return
             self.current_volume = min(self.target_volume, self.current_volume + volume_step)
-            pygame.mixer.music.set_volume(self.current_volume)
+            self.sound.set_volume(self.current_volume)
             threading.Event().wait(step_duration)
 
-        # Main playback loop
-        while self.playing:
+        # Main playback loop - just wait while channel is playing
+        while self.playing and self.channel and self.channel.get_busy():
             threading.Event().wait(0.1)
 
 
