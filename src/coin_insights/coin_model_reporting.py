@@ -7,7 +7,6 @@ import logging
 import uuid
 from datetime import datetime,timedelta
 import json
-import math
 import pandas as pd
 import numpy as np
 import joblib
@@ -179,21 +178,18 @@ def generate_and_upload_coin_scores(
 
 def plot_wallet_model_comparison(
     wallets_coin_config: dict,
-    metric: str = 'wins_return',
-    figsize: tuple = (12, 20),
     cols: int = 2,
     macro_comparison: str = None,
 ) -> None:
     """
     Plot comparison of wallet model return metrics across different epochs.
-    Creates separate subplot for each model in a flexible column layout.
+    Creates paired subplots for each model showing wins_return and mean_return side by side.
+    Each model gets two charts per row: wins_return (left) and mean_return (right).
     Validates that return data contains exactly 20 items before plotting.
 
     Params:
     - wallets_coin_config: Configuration containing parquet folder paths
-    - metric: 'wins_return' or 'mean_return'
-    - figsize: Figure dimensions
-    - cols: how many columns of charts to make
+    - cols: how many columns of charts to make (kept for backward compatibility but forced to 2)
     - macro_comparison: macro key for color coding (e.g. 'btc_mvrv_z_score_last|w4')
     """
     base_folder = Path(wallets_coin_config['training_data']['parquet_folder'])
@@ -216,7 +212,7 @@ def plot_wallet_model_comparison(
     if not model_names:
         raise ValueError("No models found in JSON files")
 
-    # Load and combine all return metrics with validation
+    # Load and combine all return metrics with validation for both metrics
     combined_data = []
     macro_values = []
 
@@ -232,9 +228,12 @@ def plot_wallet_model_comparison(
 
             return_metrics = model_data['return_metrics']
 
-            # Validate that metric data contains exactly 20 items
-            if metric not in return_metrics or len(return_metrics[metric]) != 20:
-                logger.warning(f"Skipping {model_name} epoch {epoch_date}: {metric} data does not contain exactly 20 items (found {len(return_metrics.get(metric, []))})")
+            # Validate that both metric data contains exactly 20 items
+            wins_valid = 'wins_return' in return_metrics and len(return_metrics['wins_return']) == 20
+            mean_valid = 'mean_return' in return_metrics and len(return_metrics['mean_return']) == 20
+
+            if not (wins_valid and mean_valid):
+                logger.warning(f"Skipping {model_name} epoch {epoch_date}: Missing or invalid return metrics data")
                 continue
 
             # Extract macro value for color coding if specified
@@ -243,13 +242,14 @@ def plot_wallet_model_comparison(
                 macro_key = f'macro|{macro_comparison}'
                 macro_value = model_data['macro_averages'].get(macro_key)
 
-            # Create records for each position (1-20)
-            for i, return_value in enumerate(return_metrics[metric]):
+            # Create records for each position (1-20) for both metrics
+            for i in range(20):
                 combined_data.append({
                     'epoch_date': epoch_date,
                     'model_name': model_name,
                     'position': i + 1,  # 1-indexed positions
-                    'return_value': return_value,
+                    'wins_return': return_metrics['wins_return'][i],
+                    'mean_return': return_metrics['mean_return'][i],
                     'macro_value': macro_value
                 })
 
@@ -294,128 +294,122 @@ def plot_wallet_model_comparison(
         logger.warning("No models with valid data to plot")
         return
 
-    # Calculate subplot layout
-    rows = math.ceil(n_models / cols)
+    # Force 2 columns (wins_return, mean_return) per row per model
+    rows = n_models
+    cols = 2
 
-    # Create subplots
-    _, axes = plt.subplots(rows, cols, figsize=figsize)
+    # Create subplots with 15x15 size per chart
+    fig_width = cols * 8
+    fig_height = rows * 7
+    _, axes = plt.subplots(rows, cols, figsize=(fig_width, fig_height))
 
     # Handle axes indexing for different subplot configurations
     if n_models == 1:
-        axes_flat = [axes]
-    elif rows == 1:
-        axes_flat = axes if cols > 1 else [axes]
+        axes_flat = [axes] if cols == 1 else axes
     else:
-        axes_flat = axes.flatten()
+        axes_flat = axes
 
-    # Plot each model in its own subplot
+    # Plot each model with paired charts (wins_return left, mean_return right)
     for i, model_name in enumerate(valid_model_names):
-        ax = axes_flat[i]
         model_data = df[df['model_name'] == model_name]
 
-        # Plot separate line for each epoch
-        for epoch_date, group in model_data.groupby('epoch_date'):
-            if macro_comparison and not group['macro_value'].isna().all():
-                # Use macro-based color
-                macro_val = group['macro_value'].iloc[0]
-                line_color = color_map.get(macro_val, '#808080')
-                label = f'Epoch {epoch_date} ({macro_comparison}={macro_val:.3f})'
-            else:
-                # Default color scheme
-                line_color = None
-                label = f'Epoch {epoch_date}'
+        # Get axes for this model's pair of charts
+        if n_models == 1:
+            ax_wins = axes_flat[0] if cols > 1 else axes_flat
+            ax_mean = axes_flat[1] if cols > 1 else axes_flat
+        else:
+            ax_wins = axes_flat[i, 0]
+            ax_mean = axes_flat[i, 1]
 
-            ax.plot(group['position'], group['return_value'],
-                   marker='o', linewidth=2, label=label, color=line_color, alpha=0.3)
+        # Plot both metrics for this model
+        for metric_name, ax in [('wins_return', ax_wins), ('mean_return', ax_mean)]:
+            # Plot separate line for each epoch
+            for epoch_date, group in model_data.groupby('epoch_date'):
+                if macro_comparison and not group['macro_value'].isna().all():
+                    # Use macro-based color
+                    macro_val = group['macro_value'].iloc[0]
+                    line_color = color_map.get(macro_val, '#808080')
+                    label = f'Epoch {epoch_date} ({macro_comparison}={macro_val:.3f})'
+                else:
+                    # Default color scheme
+                    line_color = None
+                    label = f'Epoch {epoch_date}'
 
-        # Calculate and plot overall average across all epochs for this model
-        overall_average = model_data.groupby('position')['return_value'].mean()
-        ax.plot(overall_average.index, overall_average.values,
-               color='lime', linewidth=5, label='Overall Average', zorder=10)
+                ax.plot(group['position'], group[metric_name],
+                       marker='o', linewidth=2, label=label, color=line_color, alpha=0.3)
 
-        # Calculate macro-conditional averages if macro_comparison is specified
-        label_positions = [1, 5, 10, 15, 20]
-        if macro_comparison and not model_data['macro_value'].isna().all():
-            # Get median of macro values for this model
-            macro_median = model_data['macro_value'].median()
+            # Calculate and plot overall average across all epochs for this model
+            overall_average = model_data.groupby('position')[metric_name].mean()
+            ax.plot(overall_average.index, overall_average.values,
+                   color='lime', linewidth=5, label='Overall Average', zorder=10)
 
-            # Split data into below/above median (excluding exact median values)
-            below_median_data = model_data[model_data['macro_value'] < macro_median]
-            above_median_data = model_data[model_data['macro_value'] > macro_median]
+            # Calculate macro-conditional averages if macro_comparison is specified
+            label_positions = [1, 5, 10, 15, 20]
+            if macro_comparison and not model_data['macro_value'].isna().all():
+                # Get median of macro values for this model
+                macro_median = model_data['macro_value'].median()
 
-            # Plot below median average (light red)
-            if not below_median_data.empty:
-                below_average = below_median_data.groupby('position')['return_value'].mean()
-                ax.plot(below_average.index, below_average.values,
-                       color='lightcoral', linewidth=5, label='Below Median Macro', zorder=9)
+                # Split data into below/above median (excluding exact median values)
+                below_median_data = model_data[model_data['macro_value'] < macro_median]
+                above_median_data = model_data[model_data['macro_value'] > macro_median]
 
-                # Add text labels for below median line
-                for pos in label_positions:
-                    if pos in below_average.index:
-                        value = below_average[pos]
-                        ax.text(pos, value, f'{value:.3f}',
-                               color='lightcoral', fontweight='bold', fontsize=10,
-                               ha='center', va='top', zorder=11,
-                               path_effects=[PathEffects.withStroke(linewidth=2, foreground='black')])
+                # Plot below median average (light red)
+                if not below_median_data.empty:
+                    below_average = below_median_data.groupby('position')[metric_name].mean()
+                    ax.plot(below_average.index, below_average.values,
+                           color='lightcoral', linewidth=5, label='Below Median Macro', zorder=9)
 
-            # Plot above median average (light blue)
-            if not above_median_data.empty:
-                above_average = above_median_data.groupby('position')['return_value'].mean()
-                ax.plot(above_average.index, above_average.values,
-                       color='lightblue', linewidth=5, label='Above Median Macro', zorder=9)
+                    # Add text labels for below median line
+                    for pos in label_positions:
+                        if pos in below_average.index:
+                            value = below_average[pos]
+                            ax.text(pos, value, f'{value:.3f}',
+                                   color='lightcoral', fontweight='bold', fontsize=10,
+                                   ha='center', va='top', zorder=11,
+                                   path_effects=[PathEffects.withStroke(linewidth=2, foreground='black')])
 
-                # Add text labels for above median line
-                for pos in label_positions:
-                    if pos in above_average.index:
-                        value = above_average[pos]
-                        ax.text(pos, value, f'{value:.3f}',
-                               color='lightblue', fontweight='bold', fontsize=10,
-                               ha='center', va='top', zorder=11,
-                               path_effects=[PathEffects.withStroke(linewidth=2, foreground='black')])
+                # Plot above median average (light blue)
+                if not above_median_data.empty:
+                    above_average = above_median_data.groupby('position')[metric_name].mean()
+                    ax.plot(above_average.index, above_average.values,
+                           color='lightblue', linewidth=5, label='Above Median Macro', zorder=9)
 
-        # Add text labels for specific positions on the bright green line
-        for pos in label_positions:
-            if pos in overall_average.index:
-                value = overall_average[pos]
-                ax.text(pos, value, f'{value:.3f}',
-                       color='lime', fontweight='bold', fontsize=10,
-                       ha='center', va='bottom', zorder=11,
-                       path_effects=[PathEffects.withStroke(linewidth=2, foreground='black')])
+                    # Add text labels for above median line
+                    for pos in label_positions:
+                        if pos in above_average.index:
+                            value = above_average[pos]
+                            ax.text(pos, value, f'{value:.3f}',
+                                   color='lightblue', fontweight='bold', fontsize=10,
+                                   ha='center', va='top', zorder=11,
+                                   path_effects=[PathEffects.withStroke(linewidth=2, foreground='black')])
 
+            # Add text labels for specific positions on the bright green line
+            for pos in label_positions:
+                if pos in overall_average.index:
+                    value = overall_average[pos]
+                    ax.text(pos, value, f'{value:.3f}',
+                           color='lime', fontweight='bold', fontsize=10,
+                           ha='center', va='bottom', zorder=11,
+                           path_effects=[PathEffects.withStroke(linewidth=2, foreground='black')])
 
-        # Add text labels for specific positions on the bright green line
-        label_positions = [1, 5, 10, 15, 20]
-        for pos in label_positions:
-            if pos in overall_average.index:
-                value = overall_average[pos]
-                ax.text(pos, value, f'{value:.3f}',
-                       color='lime', fontweight='bold', fontsize=10,
-                       ha='center', va='bottom', zorder=11,
-                       path_effects=[PathEffects.withStroke(linewidth=2, foreground='black')])
+            ax.set_xlabel('Prediction Rank Position (1 = highest scores)')
+            ax.set_ylabel(f'{metric_name.replace("_", " ").title()}')
+            ax.set_title(f'{model_name} - {metric_name.replace("_", " ").title()}')
+            ax.grid(True, alpha=0.3)
+            ax.invert_xaxis()
 
-        ax.set_xlabel('Prediction Rank Position (1 = highest scores)')
-        ax.set_ylabel(f'{metric.replace("_", " ").title()}')
-        ax.set_title(model_name)
-        ax.grid(True, alpha=0.3)
-        ax.invert_xaxis()
-
-        # Only show legend if no macro comparison (to avoid clutter)
-        if not macro_comparison:
-            ax.legend()
-
-    # Hide any unused subplots
-    for i in range(n_models, len(axes_flat)):
-        axes_flat[i].axis('off')
+            # Only show legend if no macro comparison (to avoid clutter)
+            if not macro_comparison:
+                ax.legend()
 
     # Update title to include macro comparison info
-    title = f'Wallet Model {metric.replace("_", " ").title()} Comparison by Epoch'
+    title = 'Wallet Model Return Metrics Comparison by Epoch (Wins Return | Mean Return)'
     if macro_comparison:
         title += f' (Color-coded by {macro_comparison})'
 
     plt.suptitle(title, fontsize=16, y=0.995)
     plt.tight_layout()
     plt.show()
-
 
 # ---------------------------------
 #         Helper Functions
