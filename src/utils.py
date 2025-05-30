@@ -1079,7 +1079,7 @@ class AmbientPlayer:
             return
 
         sounds = config.get('notification_sounds', {})
-        file_path = sounds_directory / 'assets' / 'sounds' / sounds[sound_name]['path']
+        file_path = sounds_directory / sounds[sound_name]['path']
         if not os.path.exists(file_path):
             logger.warning(f"couldn't find ambient file at '{file_path}'")
             return
