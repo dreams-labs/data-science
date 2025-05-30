@@ -326,12 +326,62 @@ def plot_wallet_model_comparison(
                 label = f'Epoch {epoch_date}'
 
             ax.plot(group['position'], group['return_value'],
-                   marker='o', linewidth=2, label=label, color=line_color)
+                   marker='o', linewidth=2, label=label, color=line_color, alpha=0.3)
 
         # Calculate and plot overall average across all epochs for this model
         overall_average = model_data.groupby('position')['return_value'].mean()
         ax.plot(overall_average.index, overall_average.values,
-               color='lime', linewidth=4, label='Overall Average', zorder=10)
+               color='lime', linewidth=5, label='Overall Average', zorder=10)
+
+        # Calculate macro-conditional averages if macro_comparison is specified
+        label_positions = [1, 5, 10, 15, 20]
+        if macro_comparison and not model_data['macro_value'].isna().all():
+            # Get median of macro values for this model
+            macro_median = model_data['macro_value'].median()
+
+            # Split data into below/above median (excluding exact median values)
+            below_median_data = model_data[model_data['macro_value'] < macro_median]
+            above_median_data = model_data[model_data['macro_value'] > macro_median]
+
+            # Plot below median average (light red)
+            if not below_median_data.empty:
+                below_average = below_median_data.groupby('position')['return_value'].mean()
+                ax.plot(below_average.index, below_average.values,
+                       color='lightcoral', linewidth=5, label='Below Median Macro', zorder=9)
+
+                # Add text labels for below median line
+                for pos in label_positions:
+                    if pos in below_average.index:
+                        value = below_average[pos]
+                        ax.text(pos, value, f'{value:.3f}',
+                               color='lightcoral', fontweight='bold', fontsize=10,
+                               ha='center', va='top', zorder=11,
+                               path_effects=[PathEffects.withStroke(linewidth=2, foreground='black')])
+
+            # Plot above median average (light blue)
+            if not above_median_data.empty:
+                above_average = above_median_data.groupby('position')['return_value'].mean()
+                ax.plot(above_average.index, above_average.values,
+                       color='lightblue', linewidth=5, label='Above Median Macro', zorder=9)
+
+                # Add text labels for above median line
+                for pos in label_positions:
+                    if pos in above_average.index:
+                        value = above_average[pos]
+                        ax.text(pos, value, f'{value:.3f}',
+                               color='lightblue', fontweight='bold', fontsize=10,
+                               ha='center', va='top', zorder=11,
+                               path_effects=[PathEffects.withStroke(linewidth=2, foreground='black')])
+
+        # Add text labels for specific positions on the bright green line
+        for pos in label_positions:
+            if pos in overall_average.index:
+                value = overall_average[pos]
+                ax.text(pos, value, f'{value:.3f}',
+                       color='lime', fontweight='bold', fontsize=10,
+                       ha='center', va='bottom', zorder=11,
+                       path_effects=[PathEffects.withStroke(linewidth=2, foreground='black')])
+
 
         # Add text labels for specific positions on the bright green line
         label_positions = [1, 5, 10, 15, 20]
