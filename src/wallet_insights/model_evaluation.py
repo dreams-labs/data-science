@@ -1551,7 +1551,7 @@ class ClassifierEvaluator(RegressorEvaluator):
         if linthresh <= 0:
             max_abs = abs_returns.max()
             linthresh = max_abs * 0.05 if max_abs > 0 else 1.0
-        ax2.set_yscale("symlog", linthresh=linthresh)
+        # ax2.set_yscale("symlog", linthresh=linthresh)
 
         ax2.plot(
             valid_centers,
