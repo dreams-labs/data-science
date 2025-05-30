@@ -419,6 +419,7 @@ def parse_feature_names(
 
     # Split on pipe delimiters
     split_df = df['feature'].str.split('|', expand=True)
+    split_df = split_df.reindex(columns=range(4))  # Pad with NaN if needed
     split_df.columns = ['segment_category', 'segment_family', 'metric', 'transformation']
 
     # Split nested components
