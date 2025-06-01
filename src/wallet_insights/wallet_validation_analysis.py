@@ -14,7 +14,6 @@ from sklearn.metrics import (
 )
 
 # Local module imports
-from wallet_modeling.wallets_config_manager import WalletsConfig
 import wallet_insights.model_evaluation as wime
 import coin_insights.coin_validation_analysis as civa
 import utils as u
@@ -23,9 +22,6 @@ import utils as u
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
-
-# Load wallets_config at the module level
-wallets_config = WalletsConfig()
 
 
 # ----------------------------------------
@@ -103,6 +99,10 @@ def evaluate_predictions(y_true: pd.Series, y_pred: pd.Series) -> dict:
 
 def compute_validation_coin_returns(
     wallets_config: dict,
+    validation_training_data_df: pd.DataFrame,
+    validation_target_vars_df: pd.DataFrame,
+    complete_hybrid_cw_id_df: pd.DataFrame,
+    complete_market_data_df: pd.DataFrame,
     model_id: str,
     min_inflows: float = 0,
     n_buckets: int = 20
@@ -119,13 +119,6 @@ def compute_validation_coin_returns(
     Returns:
     - tuple: (validation_y_pred, validation_y_performance) prediction and performance series.
     """
-    # Load data
-    parquet_folder = wallets_config['training_data']['parquet_folder']
-    validation_training_data_df = pd.read_parquet(f"{parquet_folder}/multiwindow_validation_training_data_df.parquet")
-    validation_target_vars_df = pd.read_parquet(f"{parquet_folder}/multiwindow_validation_target_vars_df.parquet")
-    complete_hybrid_cw_id_df = pd.read_parquet(f"{parquet_folder}/complete_hybrid_cw_id_df.parquet")
-    complete_market_data_df = pd.read_parquet(f"{parquet_folder}/complete_market_data_df.parquet")
-
     # Filter on inflows
     u.assert_matching_indices(validation_target_vars_df, validation_training_data_df)
     inflow_mask = validation_target_vars_df['cw_crypto_inflows'] > min_inflows
