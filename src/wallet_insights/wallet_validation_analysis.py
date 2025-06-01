@@ -1,5 +1,6 @@
 import logging
 from typing import List, Dict
+from datetime import timedelta
 from pathlib import Path
 import cloudpickle
 import pandas as pd
@@ -13,16 +14,14 @@ from sklearn.metrics import (
 )
 
 # Local module imports
-from wallet_modeling.wallets_config_manager import WalletsConfig
 import wallet_insights.model_evaluation as wime
+import coin_insights.coin_validation_analysis as civa
+import utils as u
 
 # plint:disable=invalid-name  # X isn't snake case
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
-
-# Load wallets_config at the module level
-wallets_config = WalletsConfig()
 
 
 # ----------------------------------------
@@ -97,6 +96,84 @@ def evaluate_predictions(y_true: pd.Series, y_pred: pd.Series) -> dict:
 
     return metrics
 
+
+def compute_validation_coin_returns(
+    wallets_config: dict,
+    validation_training_data_df: pd.DataFrame,
+    validation_target_vars_df: pd.DataFrame,
+    complete_hybrid_cw_id_df: pd.DataFrame,
+    complete_market_data_df: pd.DataFrame,
+    model_id: str,
+    min_inflows: float = 0,
+    n_buckets: int = 20
+) -> tuple[pd.Series, pd.Series]:
+    """
+    Runs validation analysis by loading data, filtering, calculating returns, and comparing predictions.
+
+    Params:
+    - wallets_config (dict): Configuration dictionary containing data paths and parameters.
+    - model_id (str): UUID string identifying the model to use for predictions.
+    - min_inflows (float): Minimum inflow threshold for filtering validation data.
+    - n_buckets (int): Number of buckets for prediction vs performance plot.
+
+    Returns:
+    - tuple: (validation_y_pred, validation_y_performance) prediction and performance series.
+    """
+    # Filter on inflows
+    u.assert_matching_indices(validation_target_vars_df, validation_training_data_df)
+    inflow_mask = validation_target_vars_df['cw_crypto_inflows'] > min_inflows
+    validation_target_vars_df = validation_target_vars_df[inflow_mask]
+    validation_training_data_df = validation_training_data_df[inflow_mask]
+
+    # Identify coin_ids that match target var hybrid ids
+    validation_coin_ids_df = (validation_target_vars_df.reset_index().merge(
+        complete_hybrid_cw_id_df[['coin_id','hybrid_cw_id']],
+        how='inner',
+        left_on='wallet_address',
+        right_on='hybrid_cw_id'
+    )[['coin_id','epoch_start_date','hybrid_cw_id']]
+    .set_index(['coin_id','epoch_start_date']))
+
+    # Calculate coin returns
+    returns_dfs = []
+    for start_date in sorted(validation_coin_ids_df.index.get_level_values('epoch_start_date').unique()):
+        end_date = start_date + timedelta(days=wallets_config['training_data']['modeling_period_duration'])
+        returns_df = civa.calculate_coin_performance(
+            complete_market_data_df,
+            start_date,
+            end_date
+        )
+
+        returns_df['epoch_start_date'] = start_date
+        returns_df = returns_df.reset_index().set_index(['coin_id','epoch_start_date'])
+        returns_dfs.append(returns_df)
+
+    coin_returns_df = pd.concat(returns_dfs).sort_index()
+
+    # Join hybrid_cw_ids to returns
+    validation_y_performance = (
+        validation_coin_ids_df.join(coin_returns_df)
+        .reset_index()[['hybrid_cw_id','epoch_start_date','coin_return']]
+        .rename(columns={'hybrid_cw_id': 'wallet_address'})
+        .set_index(['wallet_address','epoch_start_date'])
+    )['coin_return']
+
+    # Make predictions
+    validation_y_pred = load_and_predict(
+        model_id,
+        validation_training_data_df,
+        wallets_config['training_data']['model_artifacts_folder']
+    )
+    u.assert_matching_indices(validation_y_pred, validation_y_performance)
+
+    # Generate plot
+    wime.plot_prediction_vs_performance(
+        validation_y_pred,
+        validation_y_performance,
+        n_buckets=n_buckets
+    )
+
+    return validation_y_pred, validation_y_performance
 
 
 # ----------------------------------------

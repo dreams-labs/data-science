@@ -1642,7 +1642,7 @@ class ClassifierEvaluator(RegressorEvaluator):
 def plot_prediction_vs_performance(
         validation_y_pred: pd.Series,
         validation_y_performance: pd.Series,
-        n_buckets: int = 10):
+        n_buckets: int = 20):
     """
     Plot prediction scores vs financial performance with dual y-axes.
 
@@ -1650,7 +1650,6 @@ def plot_prediction_vs_performance(
     - validation_y_pred (Series): model prediction scores
     - validation_y_performance (Series): financial performance metrics
     - n_buckets (int): number of score buckets for aggregation
-    - ax (matplotlib axis): optional axis to plot on
 
     Returns:
     - ax (matplotlib axis): the plotting axis
@@ -1671,14 +1670,16 @@ def plot_prediction_vs_performance(
         ax.text(0.5, 0.5, "No valid data after alignment", ha="center", va="center")
         return ax
 
-    # Create score buckets
-    score_bins = pd.cut(pred_scores, bins=n_buckets, duplicates='drop')
+    # Create fixed score buckets from 0 to 1
+    bin_edges = np.linspace(0, 1, n_buckets + 1)
+    score_bins = pd.cut(pred_scores, bins=bin_edges, include_lowest=True)
+
     bucket_df = pd.DataFrame({
         'score': pred_scores,
         'performance': performance,
-        'performance_wins': u.winsorize(performance,0.005),
+        'performance_wins': u.winsorize(performance, 0.005),
         'bucket': score_bins
-    }).groupby('bucket').agg({
+    }).groupby('bucket', observed=False).agg({
         'score': ['mean', 'count'],
         'performance': ['mean', 'median'],
         'performance_wins': ['mean']
@@ -1687,48 +1688,56 @@ def plot_prediction_vs_performance(
     # Flatten column names
     bucket_df.columns = ['score_mid', 'count',
                          'mean_performance', 'median_performance', 'wins_performance']
+
+    # Create evenly spaced x-positions and bucket labels
+    x_positions = np.arange(n_buckets)
+    bucket_labels = [f"{bin_edges[i]:.2f}-{bin_edges[i+1]:.2f}" for i in range(n_buckets)]
+
+    # Fill missing values
+    bucket_df['count'] = bucket_df['count'].fillna(0)
     bucket_df = bucket_df.reset_index(drop=True)
 
     # Extract plotting data
-    score_centers = bucket_df['score_mid'].values
     counts = bucket_df['count'].values
     mean_perf = bucket_df['mean_performance'].values
     median_perf = bucket_df['median_performance'].values
     wins_perf = bucket_df['wins_performance'].values
 
-    # Calculate bar width
-    if len(score_centers) > 1:
-        width = (score_centers[1] - score_centers[0]) * 0.8
-    else:
-        width = 0.1
-
-    # Primary axis: histogram of wallet counts
-    ax.bar(score_centers, counts, width=width, alpha=0.6,
+    # Bar plot with evenly spaced positions
+    ax.bar(x_positions, counts, width=1.0, alpha=0.6,
            label="Wallet Count", color='steelblue')
     ax.set_yscale('log')
 
     # Secondary axis: performance metrics
     ax2 = ax.twinx()
 
-    # Set symlog scale for performance if needed
-    abs_perf = np.abs(performance.dropna())
-    linthresh = np.percentile(abs_perf, 95) if len(abs_perf) > 0 else 1.0
-    if linthresh <= 0:
-        linthresh = abs_perf.max() * 0.05 if len(abs_perf) > 0 else 1.0
-    # ax2.set_yscale("symlog", linthresh=linthresh)
+    # Plot performance lines (skip NaN values)
+    valid_mask = ~np.isnan(mean_perf)
+    if valid_mask.any():
+        ax2.plot(x_positions[valid_mask], mean_perf[valid_mask],
+                 marker='o', linestyle='-', linewidth=2,
+                 label="Mean Performance", color='green')
 
-    # Plot performance lines
-    ax2.plot(score_centers, mean_perf, marker='o', linestyle='-',
-             linewidth=2, label="Mean Performance", color='green')
-    ax2.plot(score_centers, median_perf, marker='s', linestyle='-',
-             linewidth=2, label="Median Performance", color='purple')
-    ax2.plot(score_centers, wins_perf, marker='s', linestyle='-',
-             linewidth=2, label="Wins Performance", color='yellow')
+    valid_mask = ~np.isnan(median_perf)
+    if valid_mask.any():
+        ax2.plot(x_positions[valid_mask], median_perf[valid_mask],
+                 marker='s', linestyle='-', linewidth=2,
+                 label="Median Performance", color='purple')
+
+    valid_mask = ~np.isnan(wins_perf)
+    if valid_mask.any():
+        ax2.plot(x_positions[valid_mask], wins_perf[valid_mask],
+                 marker='s', linestyle='-', linewidth=2,
+                 label="Wins Performance", color='yellow')
 
     # Overall mean performance line
     overall_mean = performance.mean()
     ax2.axhline(overall_mean, linestyle="--", color="gray",
                 linewidth=1, label="Overall Mean")
+
+    # Set x-axis labels to show score ranges
+    ax.set_xticks(x_positions[::2])  # Show every other label to avoid crowding
+    ax.set_xticklabels([bucket_labels[i] for i in range(0, n_buckets, 2)], rotation=45)
 
     # Labels and formatting
     ax.set_xlabel("Prediction Score")
@@ -1741,3 +1750,5 @@ def plot_prediction_vs_performance(
     lines1, labels1 = ax.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax.legend(lines1 + lines2, labels1 + labels2, loc="upper left")
+
+    return ax

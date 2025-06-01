@@ -132,7 +132,7 @@ class WalletModelOrchestrator:
 
             # Train new model if we didn't load existing
             # ------------------------------------------
-            ambient_player_wallets.start('ship_power_room')
+            ambient_player_wallets.start('ship_power_room_loop')
             model_id, evaluator = self._train_and_evaluate(
                 score_wallets_config,
                 wallet_training_data_df,

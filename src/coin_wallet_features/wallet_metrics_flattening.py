@@ -52,6 +52,11 @@ def flatten_cw_to_coin_segment_features(
         wallet_segmentation_df.index.sort_values()
     ):
         raise ValueError("Wallet cohort in cw_metrics_df doesn't match cohort in wallet_segmentation_df.")
+    if not cw_metrics_df.columns.is_unique:
+        raise ValueError("Duplicate columns found in cw_metrics_df.")
+    if not wallet_segmentation_df.columns.is_unique:
+        raise ValueError("Duplicate columns found in wallet_segmentation_df.")
+
 
     # start with an empty coin-level df
     coin_wallet_features_df = pd.DataFrame(index=training_coin_cohort)
@@ -89,7 +94,11 @@ def flatten_cw_to_coin_segment_features(
                    for metric_column in cw_metrics_df.columns}
         for future in as_completed(futures):
             metric_column, metric_features_df = future.result()
+            if not metric_features_df.columns.is_unique:
+                raise ValueError("Duplicate columns found in metric_df.")
             coin_wallet_features_df = coin_wallet_features_df.join(metric_features_df, how='inner')
+            if not metric_features_df.columns.is_unique:
+                raise ValueError("Duplicate columns found in metric_features_df.")
             logger.info("Flattened metric: %s", metric_column)
 
     logger.info(
@@ -192,6 +201,9 @@ def flatten_cw_to_coin_features(
     missing_coins = set(all_coin_ids) - set(result_df.index)
     if missing_coins:
         raise ValueError(f"Found {len(missing_coins)} coin_ids missing from analysis")
+    duplicate_cols = result_df.columns[result_df.columns.duplicated()].tolist()
+    if not result_df.columns.is_unique:
+        raise ValueError(f"Found duplicate columns after flattening cw features: {duplicate_cols}")
 
     return result_df
 
@@ -319,15 +331,15 @@ def calculate_score_distribution_metrics(
     ].copy()
 
     # percentiles
-    p002_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.002)
-    p01_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.01)
-    p05_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.05)
-    p10_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.1)
+    p002_df =   seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.002)
+    p01_df =    seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.01)
+    p05_df =    seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.05)
+    p10_df =    seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.1)
     median_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].median()
-    p90_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.9)
-    p95_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.95)
-    p99_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.99)
-    p998_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.998)
+    p90_df =    seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.9)
+    p95_df =    seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.95)
+    p99_df =    seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.99)
+    p998_df =   seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.998)
 
     # std
     std_df = seg_data.groupby(level='coin_id', observed=True)[score_columns].std()
@@ -353,32 +365,36 @@ def calculate_score_distribution_metrics(
             new_cols[c] = f'{segment_family}/{segment_value}|{metric_column}|score_dist/{score_name}/{suffix}'
         return df.rename(columns=new_cols)
 
-    p002_df = rename_cols(p002_df, 'p002')
-    p01_df = rename_cols(p01_df, 'p01')
-    p05_df = rename_cols(p05_df, 'p05')
-    p10_df = rename_cols(p10_df, 'p10')
+    p002_df =   rename_cols(p002_df, 'p002')
+    p01_df =    rename_cols(p01_df, 'p01')
+    p05_df =    rename_cols(p05_df, 'p05')
+    p10_df =    rename_cols(p10_df, 'p10')
     median_df = rename_cols(median_df, 'median')
-    p90_df = rename_cols(p90_df, 'p90')
-    p95_df = rename_cols(p95_df, 'p95')
-    p99_df = rename_cols(p99_df, 'p99')
-    p998_df = rename_cols(p998_df, 'p998')
-    std_df = rename_cols(std_df, 'std')
-    skew_df = rename_cols(skew_df, 'skew')
-    kurt_df = rename_cols(kurt_df, 'kurt')
+    p90_df =    rename_cols(p90_df, 'p90')
+    p95_df =    rename_cols(p95_df, 'p95')
+    p99_df =    rename_cols(p99_df, 'p99')
+    p998_df =   rename_cols(p998_df, 'p998')
+    std_df =    rename_cols(std_df, 'std')
+    skew_df =   rename_cols(skew_df, 'skew')
+    kurt_df =   rename_cols(kurt_df, 'kurt')
 
     # merge all results horizontally
-    metrics_df = median_df.join([
-        p002_df,
-        p01_df,
-        p05_df,
-        p10_df,
-        p90_df,
-        p95_df,
-        p99_df,
-        p998_df,
-        std_df,
-        skew_df,
-        kurt_df
-    ], how='outer').fillna(0)
+    metrics_df = pd.concat(
+        [
+            median_df,
+            p002_df,
+            p01_df,
+            p05_df,
+            p10_df,
+            p90_df,
+            p95_df,
+            p99_df,
+            p998_df,
+            std_df,
+            skew_df,
+            kurt_df
+        ],
+        axis=1
+    ).fillna(0)
 
     return metrics_df
