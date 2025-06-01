@@ -132,6 +132,8 @@ class CoinFeaturesOrchestrator:
 
         # Instantiate full features df
         coin_training_data_df_full = coin_wallet_features_df
+        if not coin_training_data_df_full.columns.is_unique:
+            raise ValueError("Duplicate columns found in coin_training_data_df_full.")
 
 
         # 2. Time Series Features
@@ -146,6 +148,8 @@ class CoinFeaturesOrchestrator:
                 .merge(macro_features_df, how='cross')
                 .set_index('coin_id')
             )
+            if not coin_training_data_df_full.columns.is_unique:
+                raise ValueError("Duplicate columns found in coin_training_data_df_full.")
 
         # Market data features
         if self.wallets_coin_config['features']['toggle_market_features']:
@@ -154,6 +158,8 @@ class CoinFeaturesOrchestrator:
             # join on coin_id
             u.assert_matching_indices(market_features_df,coin_training_data_df_full)
             coin_training_data_df_full = coin_training_data_df_full.join(market_features_df)
+            if not coin_training_data_df_full.columns.is_unique:
+                raise ValueError("Duplicate columns found in coin_training_data_df_full.")
 
 
         # 3. Coin Flow Model Features
@@ -172,6 +178,8 @@ class CoinFeaturesOrchestrator:
                 coin_wallet_features_df,
                 coin_flows_model_features_df
             )
+            if not coin_training_data_df_full.columns.is_unique:
+                raise ValueError("Duplicate columns found in coin_training_data_df_full.")
 
         u.notify('notification_toast')
         logger.info("Successfully generated coin_training_data_df with shape "
