@@ -240,7 +240,7 @@ class CoinEpochsOrchestrator:
 
         if max(offsets) > max_calculable_offset:
             raise ValueError(f"Offset value of {max(offsets)} extends further into the future than the "
-                            f"{max_calculable_offset} calculable offset from the complete datasets.")
+                            f"maximum calculable offset of {max_calculable_offset}.")
 
 
         # 3. Generate all coin epochs' training data
@@ -279,9 +279,8 @@ class CoinEpochsOrchestrator:
                     feature_dfs.append(features_df)
                     target_dfs.append(targets_df)
                     logger.milestone(f"Completed coin epoch {i}/{len(offsets)} (lookback={lookback})")
-                except Exception as exc:
-                    logger.error(f'Coin epoch with lookback {lookback} generated an exception:',
-                                 f'{exc}')
+                except Exception as e:
+                    logger.error(f"Coin epoch with lookback {lookback} generated an exception: {e}", exc_info=True)
                     raise
 
         # Concatenate all epochs dfs
