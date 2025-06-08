@@ -1518,7 +1518,7 @@ def setup_notebook_logger(log_filepath: str = None) -> logging.Logger:
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(ColorFormatter(
         '[%(asctime)s] %(levelname)s [%(module)s.%(funcName)s:%(lineno)d] %(message)s',
-        datefmt='%d/%b/%Y %H:%M:%S'
+        datefmt='%d/%b/%y %H:%M:%S'
     ))
     root_logger.addHandler(stream_handler)
 
