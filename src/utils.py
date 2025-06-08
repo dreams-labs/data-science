@@ -1164,6 +1164,10 @@ def notify_on_failure(shell, etype, value, tb, tb_offset=None):
     Custom error handler that plays a notification sound
     and displays the traceback normally.
     """
+    # Mute any ambient players
+    player = AmbientPlayer()
+    player.stop_all_players()
+
     try:
         # Play error notification
         notify('ui_sound')
