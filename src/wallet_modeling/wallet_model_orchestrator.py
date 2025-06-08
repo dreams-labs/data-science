@@ -117,10 +117,10 @@ class WalletModelOrchestrator:
             if score_name in models_json_dict:
                 if not self.wallets_coin_config['training_data']['toggle_rebuild_wallet_models']:
                     model_id, evaluator = self._load_and_evaluate(
-                        score_name,
                         score_wallets_config,
                         wallet_training_data_df,
-                        wallet_target_vars_df
+                        wallet_target_vars_df,
+                        score_name = score_name,
                     )
                     evaluators.append((score_name, evaluator))
                     logger.milestone(f"Loaded pretrained model for score '{score_name}'.")
@@ -472,10 +472,11 @@ class WalletModelOrchestrator:
 
     def _load_and_evaluate(
         self,
-        score_name: str,
         score_wallets_config: dict,
         wallet_training_data_df: pd.DataFrame,
-        wallet_target_vars_df: pd.DataFrame
+        wallet_target_vars_df: pd.DataFrame,
+        model_id: str = None,
+        score_name: str = None
     ) -> tuple[str, any]:
         """
         Load an existing saved model by score_name and evaluate on provided data.
@@ -486,11 +487,15 @@ class WalletModelOrchestrator:
          versus true future values, the graphs and metrics should be generated using the logic
          from the y_validation/y_validation_pred calculations.
 
+        If model_id is not provided, it can be looked up using score_name. If neither are provided,
+         raises a ValueError.
+
         Params:
-        - score_name (str): from wallets_coin_config['wallet_scores']['score_params'].keys()
         - score_wallets_config (dict): wallets_config.yaml with overrides for the specific score
         - validation_training_data_df (df): Contains wallet training data for the validation period
         - validation_target_vars_df (df): Contains target variables for the validation period
+        - model_id (str) [Optional]: uuid of the model to load. If None, score_name is used to look it up.
+        - score_name (str) [Optional]: from wallets_coin_config['wallet_scores']['score_params'].keys()
 
         Returns:
         - model_id (str): ID of the loaded model
@@ -502,16 +507,22 @@ class WalletModelOrchestrator:
                              "There is valid business logic that would only provide training_data_df " \
                              "but the logic for empty target_vars_df would need to be built out.")
         u.assert_matching_indices(wallet_training_data_df,wallet_target_vars_df)
+        if (model_id is not None and score_name is not None):
+            raise ValueError("Only one of 'model_id' or 'score_name' can be used as the model identifier.")
 
-        # 1) Grab the stored model_id
-        # ---------------------------
-        models_json_path = Path(self.wallets_coin_config['training_data']['parquet_folder']) / "wallet_model_ids.json"
-        with open(models_json_path, 'r', encoding='utf-8') as f:
-            models_dict = json.load(f)
-        model_info = models_dict.get(score_name)
-        if model_info is None:
-            raise KeyError(f"No existing model found for '{score_name}'")
-        model_id = model_info['model_id']
+        # 1) Look up the model_id if not provided
+        # ---------------------------------------
+        if model_id is None:
+            if score_name is None:
+                raise ValueError("Either 'model_id_ or 'score_name' must be provided to look up "
+                                 "an existing model")
+            models_json_path = Path(self.wallets_coin_config['training_data']['parquet_folder']) / "wallet_model_ids.json"
+            with open(models_json_path, 'r', encoding='utf-8') as f:
+                models_dict = json.load(f)
+            model_info = models_dict.get(score_name)
+            if model_info is None:
+                raise KeyError(f"No existing model found for '{score_name}'")
+            model_id = model_info['model_id']
 
 
         # 2) Unpickle the pipeline

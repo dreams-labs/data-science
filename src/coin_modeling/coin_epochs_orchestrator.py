@@ -51,9 +51,9 @@ class CoinEpochsOrchestrator:
         wallets_epochs_config: dict,
 
         # coin flow model configs
-        coin_flow_config: dict,
-        coin_flow_modeling_config: dict,
-        coin_flow_metrics_config: dict,
+        coin_flow_config: dict = None,
+        coin_flow_modeling_config: dict = None,
+        coin_flow_metrics_config: dict = None,
 
         complete_profits_df: pd.DataFrame = None,
         complete_market_data_df: pd.DataFrame = None,

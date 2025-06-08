@@ -1,5 +1,10 @@
 # WalletModel Epochs Config
 offset_epochs:
+# Determines which epochs are used for training data and single
+#  model validation.
+#  e.g. build the model using historical data from epochs [0,-30,-60] and
+#  validate their performance vs performance over the epochs that are [30,60] days
+#  into the future.
     # offsets: [0]
     # offsets: [85]
     # offsets: [0, -30, -60]
@@ -16,6 +21,19 @@ offset_epochs:
     # validation_offsets: [85]
 
     # 60 day intervals
-    offsets: [0, -60, -120, -180] #, -240, -300, -360, -420]
-    # validation_offsets: [60]
-    validation_offsets: [60, 120] #, 270, 300, 330, 360]
+    offsets: [0, -60, -120, -180, -240, -300, -360, -420]
+    validation_offsets: [60]
+    # validation_offsets: [60, 120] #, 270, 300, 330, 360]
+investing_epochs: [
+# Long term validation of how well this model's predictions perform
+#  over epochs starting in [30,60,90] days.
+    30,
+    60,
+    90,
+    120,
+    150,
+    180,
+    210,
+    240,
+    270
+]

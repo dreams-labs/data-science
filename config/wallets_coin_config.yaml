@@ -13,7 +13,7 @@ training_data: #CoinModel
         # 240,
         # 180,
         # 120,
-        # 60,
+        60,
         # 0,
         # -60,
         # -120,
@@ -22,23 +22,23 @@ training_data: #CoinModel
 
     coin_epochs_training: [  # How many days prior to the modeling period each window begins
         # 360,
-        300,
-        240,
-        180,
-        120,
-        60,
+        # 300,
+        # 240,
+        # 180,
+        # 120,
+        # 60,
         0,
         -60,
         -120,
-        # -180,
-        # -240,
+        -180,
+        -240,
         # -300,
         # -360,
         # -420,
     ]
 
     #KeyParam Rebuild Features Settings
-    toggle_rebuild_all_features: False  # If True, existing parquet features/target dfs will be overridden
+    toggle_rebuild_all_features: True  # If True, existing parquet features/target dfs will be overridden
     toggle_rebuild_wallet_models: False  # If True, all wallet models will be retrained
 
 
@@ -102,7 +102,7 @@ features: #CoinModel
     # Which scores will have distribution metrics created
     score_distributions: [
         cw_net_flows_1k,
-        cw_net_flows_1k,
+        cw_net_gain_1k,
         cw_net_flows_inflows_40,
         cw_net_gain_max_inv_40,
     ]
