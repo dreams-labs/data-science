@@ -93,7 +93,10 @@ def calculate_wallet_features(
 
     # Transfers features (left join, do not fill)
     if wallets_config['features']['toggle_transfers_features']:
-        transfers_sequencing_features_df = wts.calculate_transfers_features(profits_df, transfers_sequencing_df)
+        transfers_sequencing_features_df = wts.calculate_transfers_features(
+            profits_df,
+            transfers_sequencing_df,
+            wallets_config['features']['include_transfers_features'])
         feature_column_names['transfers|'] = transfers_sequencing_features_df.columns
         wallet_features_df = wallet_features_df.join(transfers_sequencing_features_df, how='left')
 

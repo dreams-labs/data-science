@@ -461,6 +461,10 @@ def get_expected_columns(metrics_config: Dict[str, Any]) -> List[str]:
     return expected_columns
 
 
+class ConfigError(Exception):
+    """Raised when configuration parameters are invalid or missing."""
+    pass
+
 
 
 
