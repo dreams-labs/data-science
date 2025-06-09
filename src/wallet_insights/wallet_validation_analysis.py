@@ -55,6 +55,8 @@ def load_and_predict(
     else:
         raw_preds = pipeline.predict(training_data_df)
 
+    logger.info(f"Predicted outcomes using model '{model_id}'.")
+
     return pd.Series(raw_preds, index=training_data_df.index)
 
 
