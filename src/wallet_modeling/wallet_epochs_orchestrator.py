@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
 import pandas as pd
+from google.cloud import bigquery
 
 # Local module imports
 import training_data.profits_row_imputation as pri
@@ -67,7 +68,11 @@ class WalletEpochsOrchestrator:
 
         # Create hybrid ID mapping if configured and able
         self.complete_hybrid_cw_id_df = None
-        if self.base_config['training_data']['hybridize_wallet_ids'] and self.complete_profits_df is not None:
+        if (
+            self.complete_hybrid_cw_id_df is None and
+            self.base_config['training_data']['hybridize_wallet_ids'] and
+            self.complete_profits_df is not None
+        ):
             self.complete_hybrid_cw_id_df = self.create_hybrid_mapping()
 
         # Confirm all pairs in profits_df have a hybrid mapping
@@ -756,23 +761,111 @@ class WalletEpochsOrchestrator:
         return full_df
 
 
+
+    # -----------------------------------
+    #          Hybrid ID Methods
+    # -----------------------------------
+
+    def download_comprehensive_hybrid_mapping(self) -> None:
+        """
+        Downloads and stores  a comprehensive list of every coin-wallet pair IDs. This
+        includes over 120 million records and is later filtered for the epoch-specific
+        cohort via create_hybrid_mapping().
+        """
+
+        # Download every hybrid_cw_id (over 10e8 total records)
+        query = """
+        select wci.coin_id,
+        wi.wallet_id as wallet_address,  -- data science pipeline uses numerical wallet IDs
+        wci.hybrid_cw_id
+        from reference.wallet_coin_ids wci
+        join reference.wallet_ids wi on wi.wallet_address = wci.wallet_address
+        """
+        logger.info("Retrieving hybrid_cw_ids crosswalk...")
+        client = bigquery.Client(project='western-verve-411004')
+        hybrid_df = client.query(query).to_dataframe()
+
+        # Convert coin_id to categorical
+        hybrid_df['coin_id'] = hybrid_df['coin_id'].astype('category')
+
+        # Dupe check
+        if not hybrid_df['hybrid_cw_id'].is_unique:
+            raise ValueError("Duplicate hybrid_cw_ids found in database table.")
+
+        # Save to reference folder
+        reference_dfs_folder = self.base_config['training_data']['reference_dfs_folder']
+        hybrid_df.to_parquet(f"{reference_dfs_folder}/comprehensive_hybrid_id_mapping.parquet")
+        logger.info(f"Stored hybrid IDs for {len(hybrid_df)} total pairs.")
+
+
     def create_hybrid_mapping(self) -> pd.DataFrame:
         """
-        Create hybrid wallet-coin ID mapping if configured in the base config.
+        Load hybrid wallet-coin ID mapping from comprehensive parquet file and filter
+        to only the pairs present in complete_profits_df.
 
         Also used by CoinEpochsOrchestrator.
         """
-        if self.base_config['training_data']['hybridize_wallet_ids']:
-            hybrid_df = (
-                self.complete_profits_df
-                    .reset_index()[['coin_id', 'wallet_address']]
-                    .drop_duplicates()
-            )
-            hybrid_df['hybrid_cw_id'] = hybrid_df.index.values + 3e9
-            if not hybrid_df['hybrid_cw_id'].is_unique:
-                raise ValueError("Duplicate hybrid_cw_ids found, confirm index is not malformed.")
+        if not self.base_config['training_data']['hybridize_wallet_ids']:
+            return pd.DataFrame()
 
-            return hybrid_df
+        # Load comprehensive hybrid mapping
+        reference_dfs_folder = self.base_config['training_data']['reference_dfs_folder']
+        comprehensive_hybrid_path = f"{reference_dfs_folder}/comprehensive_hybrid_id_mapping.parquet"
+
+        if not os.path.exists(comprehensive_hybrid_path):
+            raise FileNotFoundError(
+                f"Comprehensive hybrid mapping not found at {comprehensive_hybrid_path}. "
+                f"Run download_comprehensive_hybrid_mapping() first."
+            )
+
+        logger.info("Loading comprehensive hybrid mapping...")
+        comprehensive_hybrid_df = pd.read_parquet(comprehensive_hybrid_path)
+
+        # Convert categorical back to string for debugging
+        logger.info("Converting comprehensive mapping coin_id from categorical to string for merge...")
+        comprehensive_hybrid_df['coin_id'] = comprehensive_hybrid_df['coin_id'].astype(str)
+
+        # Extract unique coin-wallet pairs from complete_profits_df
+        profits_pairs = (
+            self.complete_profits_df
+            .reset_index()[['coin_id', 'wallet_address']]
+            .drop_duplicates()
+        )
+
+        # Ensure profits_pairs coin_id is also string (should be by default)
+        profits_pairs['coin_id'] = profits_pairs['coin_id'].astype(str)
+
+        logger.info(f"Profits pairs: {len(profits_pairs)} unique coin-wallet combinations")
+        logger.info(f"Comprehensive mapping: {len(comprehensive_hybrid_df)} total combinations")
+
+
+        # Filter comprehensive mapping to only needed pairs via merge
+        filtered_hybrid_df = comprehensive_hybrid_df.merge(
+            profits_pairs,
+            on=['coin_id', 'wallet_address'],
+            how='inner'
+        )
+
+        # Validate we found mappings for all pairs
+        if len(filtered_hybrid_df) != len(profits_pairs):
+            missing_count = len(profits_pairs) - len(filtered_hybrid_df)
+            logger.warning(
+                f"Found hybrid mappings for {len(filtered_hybrid_df)} of {len(profits_pairs)} "
+                f"coin-wallet pairs. Missing {missing_count} mappings."
+            )
+
+            # Debug: Show some missing pairs
+            merged_pairs = set(zip(filtered_hybrid_df['coin_id'], filtered_hybrid_df['wallet_address']))
+            all_profits_pairs = set(zip(profits_pairs['coin_id'], profits_pairs['wallet_address']))
+            missing_pairs = all_profits_pairs - merged_pairs
+            logger.warning(f"Sample missing pairs: {list(missing_pairs)[:5]}")
+
+        logger.info(f"Filtered hybrid mapping to {len(filtered_hybrid_df)} pairs for current epoch.")
+
+        # Convert back to categorical for memory efficiency
+        filtered_hybrid_df['coin_id'] = filtered_hybrid_df['coin_id'].astype('category')
+
+        return filtered_hybrid_df
 
 
     def _merge_hybrid_dfs(
