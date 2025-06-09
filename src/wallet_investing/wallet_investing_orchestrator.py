@@ -2,19 +2,17 @@
 Orchestrates the scoring of wallet training data across multiple investing epochs using
 a pre-trained wallet model to evaluate long-term prediction performance.
 """
-import os
 import logging
 import copy
-from pathlib import Path
-from datetime import datetime, timedelta
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
 import pandas as pd
 
 # Local module imports
-import coin_modeling.coin_epochs_orchestrator as ceo
-import wallet_modeling.wallets_config_manager as wcm
 import wallet_modeling.wallet_epochs_orchestrator as weo
+import wallet_modeling.wallet_training_data_orchestrator as wtdo
 import wallet_insights.wallet_validation_analysis as wiva
+import coin_modeling.coin_epochs_orchestrator as ceo
+import coin_insights.coin_validation_analysis as civa
 import utils as u
 
 # Set up logger at the module level
@@ -36,6 +34,10 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
 
     def __init__(
         self,
+
+        # investing config
+        investing_config: dict,
+
         # wallets model configs
         wallets_config: dict,
         wallets_metrics_config: dict,
@@ -62,16 +64,16 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         if not isinstance(wallets_config,dict):
             raise ValueError("InvestingEpochsOrchestrator configs must be dtype=='dict'.")
 
+        # investing-specific configs
+        self.investing_config = investing_config
+        self.investing_epochs = None
+        self.model_id = None
+
         # wallets model configs
         self.wallets_config = wallets_config
         self.wallets_metrics_config = wallets_metrics_config
         self.wallets_features_config = wallets_features_config
         self.wallets_epochs_config = wallets_epochs_config
-
-        # investing-specific configs
-        self.investing_epochs = None
-        self.trained_model_pipeline = None
-        self.model_id = None
 
         # complete datasets
         self.complete_profits_df = complete_profits_df
@@ -86,19 +88,21 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def orchestrate_investing_epochs(
         self,
-        custom_offset_days: list[int] | None = None,
+        model_id,
         file_prefix: str = 'investing_',
     ) -> pd.DataFrame:
         """
         Orchestrate wallet model scoring across multiple investing epochs.
 
         Params:
-        - custom_offset_days (list[int], optional): Override default investing epochs
+        - model_id (str): The ID of the model to use for predictions
         - file_prefix (str): Prefix for output parquet files
 
         Returns:
         - investing_predictions_df (DataFrame): Predictions across all epochs with performance metrics
         """
+        # Store model ID for later reference
+        self.model_id = model_id
 
     @staticmethod
     def analyze_investing_performance(
@@ -142,11 +146,11 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         - lookback_duration (int): Days offset from base modeling period
 
         Returns:
-        - epoch_date (datetime): The modeling period start date for this epoch
-        - epoch_predictions_df (DataFrame): Model predictions and metadata for this epoch
+        - coin_returns_df (DataFrame): Actual returns of all coins with boolean column 'is_buy' that
+            identifies which coins were bought.
         """
         # Prepare config files
-        epoch_wallets_config, epoch_wallets_epochs_config, epoch_date = self._prepare_epoch_configs(lookback_duration)
+        epoch_wallets_config, epoch_wallets_epochs_config = self._prepare_epoch_configs(lookback_duration)
 
         # Generate training_data_df
         epoch_training_data_df = self._generate_wallet_training_data_for_epoch(
@@ -154,12 +158,29 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
             epoch_wallets_epochs_config
         )
 
-        # Score training_data_df with specified model
-        preds = wiva.load_and_predict(
+        # Identify buy signals using the model
+        cw_preds = wiva.load_and_predict(
             self.model_id,
             epoch_training_data_df,
             self.wallets_config['training_data']['model_artifacts_folder']
         )
+        buy_coins = self._identify_buy_signals(cw_preds)
+
+        # Compute actual coin returns
+        coin_returns_df = civa.calculate_coin_performance(
+            self.complete_market_data_df,
+            epoch_wallets_config['training_data']['modeling_period_start'],
+            epoch_wallets_config['training_data']['modeling_period_end']
+        )
+        missing_coins = set(buy_coins) - set(coin_returns_df.index.values)
+        if len(missing_coins) > 0:
+            raise ValueError(f"Not all buy coins had actual return values. Missing coins: {missing_coins}")
+
+        # Append buys to returns_df
+        coin_returns_df['is_buy'] = coin_returns_df.index.isin(buy_coins)
+
+        return coin_returns_df
+
 
 
     # ------------------------
@@ -176,11 +197,9 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         Returns:
         - epoch_wallets_config (dict): Wallets config with offset dates and training_data_only flag
         - epoch_wallets_epochs_config (dict): Epochs config without validation offsets
-        - epoch_date (datetime): The modeling period start date for this epoch
         """
         # Generate epoch-specific wallets config by offsetting base dates
         epoch_wallets_config = self._prepare_coin_epoch_base_config(lookback_duration)
-        epoch_date = pd.to_datetime(epoch_wallets_config['training_data']['modeling_period_start'])
 
         # Set training_data_only flag to skip target variable generation
         epoch_wallets_config['training_data']['training_data_only'] = True
@@ -189,11 +208,9 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         epoch_wallets_epochs_config = copy.deepcopy(self.wallets_epochs_config)
         epoch_wallets_epochs_config['offset_epochs']['validation_offsets'] = []
 
-        logger.info(f"Configured investing epoch for {epoch_date.strftime('%Y-%m-%d')} "
-                    f"(offset: {lookback_duration} days)")
+        logger.info(f"Configured investing epoch for offset '{lookback_duration}' days.")
 
-        return epoch_wallets_config, epoch_wallets_epochs_config, epoch_date
-
+        return epoch_wallets_config, epoch_wallets_epochs_config
 
 
     def _generate_wallet_training_data_for_epoch(
@@ -229,33 +246,48 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         return epoch_training_data_df
 
 
-    def _calculate_epoch_actual_performance(
+    def _identify_buy_signals(
         self,
-        wallet_training_data_df: pd.DataFrame,
-        epoch_wallets_config: dict
-    ) -> pd.DataFrame:
+        cw_preds: pd.Series
+    ) -> list:
         """
-        Calculate actual wallet performance for the epoch (if data available).
+        Convert coin-wallet predictions into buy signals for coins based on scoring thresholds.
 
         Params:
-        - wallet_training_data_df: Wallet features/identifiers
-        - epoch_wallets_config: Configuration for accessing performance period
+        - cw_preds (Series): Predictions indexed by hybrid coin-wallet IDs
+        - complete_hybrid_cw_id_df (DataFrame): Mapping for dehybridizing wallet addresses
 
         Returns:
-        - actual_performance_df: Actual returns/performance metrics
+        - buy_coins (Series): Coin IDs that meet buy criteria
         """
+        score_threshold = self.investing_config['trading']['score_threshold']
+        min_scores = self.investing_config['trading']['min_scores']
 
-    def _prepare_investing_epoch_configs(self, lookback_duration: int) -> tuple[dict, dict]:
-        """
-        Prepare epoch-specific configurations for investing period analysis.
+        # Extract coin_ids from coin-wallet pair hybrid IDs
+        preds_df = pd.DataFrame(cw_preds)
+        preds_df.columns = ['score']
+        preds_df = wtdo.dehybridize_wallet_address(preds_df, self.complete_hybrid_cw_id_df)
 
-        Params:
-        - lookback_duration (int): Days offset from base period
+        # Count how many coin-wallet pairs are above the score_threshold
+        buys_df = preds_df[preds_df['score'] > score_threshold]
+        buys_df = pd.DataFrame(buys_df.reset_index()
+                                .groupby('coin_id', observed=True)
+                                .size())
+        buys_df.columns = ['high_scores']
 
-        Returns:
-        - epoch_wallets_config: Wallet-specific configuration
-        - epoch_wallets_epochs_config: Epochs-specific configuration
-        """
+        # Identify coins with enough high scores to buy
+        buy_coins = list(buys_df[buys_df['high_scores'] > min_scores].index)
+
+        logger.info(f"Identified {len(buy_coins)} coins to buy.")
+
+        return buy_coins
+
+
+
+
+    # -----------------------------------
+    #     Performance Analysis Methods
+    # -----------------------------------
 
     def _aggregate_investing_results(
         self,
@@ -275,10 +307,6 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         """
         Verify that complete datasets cover all required investing epoch dates.
         """
-
-    # -----------------------------------
-    #     Performance Analysis Methods
-    # -----------------------------------
 
     def _calculate_prediction_stability(self, predictions_df: pd.DataFrame) -> dict:
         """
