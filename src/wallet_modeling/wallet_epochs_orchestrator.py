@@ -107,10 +107,41 @@ class WalletEpochsOrchestrator:
         earliest_training_start = min(all_train_starts)
         latest_validation_end = max(all_validation_ends)
 
+        # Check if parquet files exist and load them
+        parquet_folder = self.base_config['training_data']['parquet_folder']
+        profits_parquet_path = f"{parquet_folder}/complete_profits_df.parquet"
+
+        if os.path.exists(profits_parquet_path):
+            logger.info("Loading existing complete datasets from parquet files...")
+
+            self.complete_profits_df = pd.read_parquet(f"{parquet_folder}/complete_profits_df.parquet")
+            self.complete_market_data_df = pd.read_parquet(f"{parquet_folder}/complete_market_data_df.parquet")
+            self.complete_macro_trends_df = pd.read_parquet(f"{parquet_folder}/complete_macro_trends_df.parquet")
+
+            # Load hybrid mapping if it exists
+            hybrid_parquet_path = f"{parquet_folder}/complete_hybrid_cw_id_df.parquet"
+            if os.path.exists(hybrid_parquet_path):
+                self.complete_hybrid_cw_id_df = pd.read_parquet(hybrid_parquet_path)
+
+            # Validate coverage of parquet-loaded dfs
+            min_date = self.complete_profits_df.index.get_level_values('date').min()
+            max_date = self.complete_profits_df.index.get_level_values('date').max()
+
+            if (min_date <= pd.to_datetime(earliest_training_start) and
+                max_date >= pd.to_datetime(latest_validation_end)):
+                logger.info("Loaded complete dfs from parquet and they cover required period.")
+                return
+
+            logger.warning(
+                f"Parquet-loaded complete dfs cover dates {min_date.date()} to {max_date.date()}, "
+                f"which does not cover required range {earliest_training_start} to "
+                f"{latest_validation_end}. Regenerating complete dfs."
+            )
+
         # Retrieve the full data once (BigQuery or otherwise)
         logger.milestone("<%s> Pulling complete raw datasets from %s through %s...",
-                         self.base_config['training_data']['dataset'].upper(),
-                         earliest_training_start, latest_validation_end)
+                        self.base_config['training_data']['dataset'].upper(),
+                        earliest_training_start, latest_validation_end)
         (
             self.complete_profits_df,
             self.complete_market_data_df,
@@ -129,7 +160,6 @@ class WalletEpochsOrchestrator:
             self.complete_hybrid_cw_id_df = self.create_hybrid_mapping()
 
         # Save them to parquet for future reuse
-        parquet_folder = self.base_config['training_data']['parquet_folder']
         os.makedirs(parquet_folder, exist_ok=True)
         self.complete_profits_df.to_parquet(f"{parquet_folder}/complete_profits_df.parquet")
         self.complete_market_data_df.to_parquet(f"{parquet_folder}/complete_market_data_df.parquet")
