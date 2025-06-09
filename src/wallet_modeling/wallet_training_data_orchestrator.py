@@ -253,10 +253,6 @@ class WalletTrainingDataOrchestrator:
                 self.hybridize_wallet_ids,
                 self.wallets_config['training_data']['dataset'],
             )
-
-            # Handle hybrid IDs if configured
-            if self.hybridize_wallet_ids:
-                transfers_df = hybridize_wallet_address(transfers_df, self.complete_hybrid_cw_id_df)
         else:
             transfers_df = pd.DataFrame()
 
@@ -558,7 +554,7 @@ class WalletTrainingDataOrchestrator:
         # Upload the cohort to BigQuery if needed for additional complex feature generation
         if (self.wallets_config['features']['toggle_transfers_features']
             or self.wallets_config['features']['toggle_scenario_features']):
-            self.wtd.upload_training_cohort(training_wallet_cohort, self.hybridize_wallet_ids)
+            self.wtd.upload_training_cohort(training_wallet_cohort)
 
         logger.milestone("Training wallet cohort defined as %s wallets after %.2f seconds.",
                     len(training_wallet_cohort), time.time()-start_time)
