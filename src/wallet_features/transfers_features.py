@@ -4,14 +4,60 @@ import pandas as pd
 from dreams_core.googlecloud import GoogleCloud as dgc
 
 # Local module imports
-from wallet_modeling.wallets_config_manager import WalletsConfig
 import utils as u
+from utils import ConfigError
 
 # set up logger at the module level
 logger = logging.getLogger(__name__)
 
-# Load wallets_config at the module level
-wallets_config = WalletsConfig()
+
+
+# --------------------------------------
+#        Features Main Interface
+# --------------------------------------
+
+@u.timing_decorator
+def calculate_transfers_features(
+    profits_df: pd.DataFrame,
+    transfers_sequencing_df: pd.DataFrame,
+    include_features: list[str]
+    ) -> pd.DataFrame:
+    """
+    Retrieves facts about the wallet's transfer activity based on blockchain data.
+    Period boundaries are defined by the dates in profits_df through the inner join.
+
+    Params:
+    - profits_df (df): the profits_df for the period that the features will reflect
+    - transfers_sequencing_df (df): each wallet's lifetime transfers data
+    - include_features (list of str): which types of features to include. Options
+        are [first_buy, first_sell, initial_hold_time].
+
+    Returns:
+    - transfers_sequencing_features_df (df): dataframe indexed on wallet_address with
+        transfers feature columns
+    """
+    # Get list of requested features
+    if len(include_features) == 0:
+        raise ConfigError("If 'toggle_transfers_features' is toggled on, there should be at least " \
+                          "one feature in 'scenario_performance_features'.")
+
+    # Assign index
+    profits_df = u.ensure_index(profits_df)
+
+    # Calculate initial_hold_time in days
+    transfers_sequencing_df['initial_hold_time'] = (
+        transfers_sequencing_df['first_sell'] - transfers_sequencing_df['first_buy']
+    ).dt.days
+
+    # Features related to the wallet-coin pairs' first buy and sell transfers
+    first_transfers_features_df = calculate_first_transfers_features(profits_df,
+                                                                     transfers_sequencing_df,
+                                                                     include_features)
+
+    # Merge all together
+    combined_features_df = first_transfers_features_df
+
+    return combined_features_df
 
 
 
@@ -144,48 +190,6 @@ def retrieve_transfers_sequencing(
 
     return sequence_df
 
-
-
-# --------------------------------------
-#        Features Main Interface
-# --------------------------------------
-
-@u.timing_decorator
-def calculate_transfers_features(profits_df, transfers_sequencing_df):
-    """
-    Retrieves facts about the wallet's transfer activity based on blockchain data.
-    Period boundaries are defined by the dates in profits_df through the inner join.
-
-    Params:
-    - profits_df (df): the profits_df for the period that the features will reflect
-        transfers_sequencing_df (df): each wallet's lifetime transfers data
-
-    Returns:
-    - transfers_sequencing_features_df (df): dataframe indexed on wallet_address with
-        transfers feature columns
-    """
-    # Get list of requested features
-    include_features = wallets_config['features']['include_transfers_features']
-    if len(include_features) == 0:
-        return pd.DataFrame()
-
-    # Assign index
-    profits_df = u.ensure_index(profits_df)
-
-    # Calculate initial_hold_time in days
-    transfers_sequencing_df['initial_hold_time'] = (
-        transfers_sequencing_df['first_sell'] - transfers_sequencing_df['first_buy']
-    ).dt.days
-
-    # Features related to the wallet-coin pairs' first buy and sell transfers
-    first_transfers_features_df = calculate_first_transfers_features(profits_df,
-                                                                     transfers_sequencing_df,
-                                                                     include_features)
-
-    # Merge all together
-    combined_features_df = first_transfers_features_df
-
-    return combined_features_df
 
 
 # --------------------------------------
