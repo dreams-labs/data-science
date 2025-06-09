@@ -1,3 +1,34 @@
+# DDA 827 investing orchestration
+checkpoint 1: wt5.711 high performing with transfers features
+ID: 7f913fd2-999f-4f4e-b3a7-dc0cb41e5c33
+===================================
+Test Samples:             94,864
+Val Positive Samples:     39,140 (41.3%)
+Number of Features:       420
+Features per Window:      70
+
+Classification Metrics:      Val   |  Test
+-------------------------------------------
+Val ROC AUC:                0.824  |  0.919
+Val Accuracy:               0.933  |  0.954
+Val Precision:              0.780  |  0.922
+Val Recall:                 0.001  |  0.013
+Val F1 Score:               0.002  |  0.027
+
+Validation Returns    | Cutoff |  Mean   |  W-Mean
+--------------------------------------------------
+Overall Average       |    n/a |   0.068 |   0.048
+Param Threshold       |   0.85 |   0.992 |   0.992
+5 Highest Scores      |   0.92 |   0.711 |   0.711
+Top 1% Scores         |   0.23 |   0.213 |   0.210
+Top 5% Scores         |   0.10 |   0.156 |   0.131
+F0.10 Score           |   0.35 |   0.333 |   0.329
+F0.25 Score           |   0.29 |   0.279 |   0.277
+F0.50 Score           |   0.04 |   0.170 |   0.121
+F1 Score              |   0.03 |   0.182 |   0.125
+F2 Score              |   0.01 |   0.169 |   0.116
+
+
 # DDA 794 target var df terminology
 checkpoint 1b: w1%.311 rename complete (main)
 Model Performance Summary

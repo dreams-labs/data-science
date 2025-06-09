@@ -43,9 +43,10 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         wallets_epochs_config: dict,
 
         # complete datasets
-        complete_profits_df: pd.DataFrame = None,
-        complete_market_data_df: pd.DataFrame = None,
-        complete_macro_trends_df: pd.DataFrame = None,
+        complete_profits_df: pd.DataFrame,
+        complete_market_data_df: pd.DataFrame,
+        complete_macro_trends_df: pd.DataFrame,
+        complete_hybrid_cw_id_df: pd.DataFrame
     ):
         """
         Initialize the investing epochs orchestrator with a pre-trained model.
@@ -57,6 +58,10 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         - model_id (str): UUID identifier for the trained model
         - complete_*_df: Pre-loaded datasets (optional, will load if not provided)
         """
+        # Ensure configs are dicts and not the custom config classes
+        if not isinstance(wallets_config,dict):
+            raise ValueError("InvestingEpochsOrchestrator configs must be dtype=='dict'.")
+
         # wallets model configs
         self.wallets_config = wallets_config
         self.wallets_metrics_config = wallets_metrics_config
@@ -72,12 +77,13 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         self.complete_profits_df = complete_profits_df
         self.complete_market_data_df = complete_market_data_df
         self.complete_macro_trends_df = complete_macro_trends_df
+        self.complete_hybrid_cw_id_df = complete_hybrid_cw_id_df
 
     # -----------------------------------
     #         Primary Interface
     # -----------------------------------
 
-    @u.timing_decorator(logging.MILESTONE)
+    @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def orchestrate_investing_epochs(
         self,
         custom_offset_days: list[int] | None = None,
@@ -116,6 +122,9 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
     #           Helper Methods
     # -----------------------------------
 
+    # --------------
+    # Primary Helper
+    # --------------
     def _process_investing_epoch(
         self,
         lookback_duration: int
@@ -136,35 +145,55 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         - epoch_date (datetime): The modeling period start date for this epoch
         - epoch_predictions_df (DataFrame): Model predictions and metadata for this epoch
         """
-        # 1) Prepare config files
-        # -----------------------
+        # Prepare config files
+        epoch_wallets_config, epoch_wallets_epochs_config, epoch_date = self._prepare_epoch_configs(lookback_duration)
 
+        # Generate training_data_df
+        epoch_training_data_df = self._generate_wallet_training_data_for_epoch(
+            epoch_wallets_config,
+            epoch_wallets_epochs_config
+        )
+
+        # Score training_data_df with specified model
+        preds = wiva.load_and_predict(
+            self.model_id,
+            epoch_training_data_df,
+            self.wallets_config['training_data']['model_artifacts_folder']
+        )
+
+
+    # ------------------------
+    # Epoch Processing Helpers
+    # ------------------------
+    def _prepare_epoch_configs(self, lookback_duration: int) -> tuple[dict, dict, datetime]:
+        """
+        Prepare epoch-specific configuration files for investing predictions.
+
+        Params:
+        - lookback_duration (int): Days offset from base modeling period. Positive values
+            move the modeling period later and negative move it earlier.
+
+        Returns:
+        - epoch_wallets_config (dict): Wallets config with offset dates and training_data_only flag
+        - epoch_wallets_epochs_config (dict): Epochs config without validation offsets
+        - epoch_date (datetime): The modeling period start date for this epoch
+        """
         # Generate epoch-specific wallets config by offsetting base dates
-        # This creates a config where modeling_period_start is shifted by lookback_duration days
-        # and all related dates (training windows, validation periods) are shifted accordingly
         epoch_wallets_config = self._prepare_coin_epoch_base_config(lookback_duration)
-
-        # Calculate the epoch reference date - this will be the "as of" date for predictions
-        # For investing epochs, this represents when we would have made predictions in real-time
         epoch_date = pd.to_datetime(epoch_wallets_config['training_data']['modeling_period_start'])
 
-        # Create epoch-specific wallets_epochs_config
-        # We need to modify this for investing analysis since we only need training data
-        # (no validation data generation since we're scoring with an existing model)
-        epoch_wallets_epochs_config = copy.deepcopy(self.wallets_epochs_config)
-
-        # For investing epochs, we only generate training data since we're scoring with
-        # a pre-trained model rather than training new models for each epoch
-        # Remove validation offsets to speed up processing and avoid generating unnecessary data
-        epoch_wallets_epochs_config['offset_epochs']['validation_offsets'] = []
-
         # Set training_data_only flag to skip target variable generation
-        # This is important because we're not training models - just generating features for scoring
         epoch_wallets_config['training_data']['training_data_only'] = True
 
-        logger.info(f"Configured investing epoch for {epoch_date.strftime('%Y-%m-%d')} (offset: {lookback_duration} days)")
+        # Create wallets_epochs_config without any validation offsets
+        epoch_wallets_epochs_config = copy.deepcopy(self.wallets_epochs_config)
+        epoch_wallets_epochs_config['offset_epochs']['validation_offsets'] = []
 
-        # TODO: Continue with wallet training data generation...
+        logger.info(f"Configured investing epoch for {epoch_date.strftime('%Y-%m-%d')} "
+                    f"(offset: {lookback_duration} days)")
+
+        return epoch_wallets_config, epoch_wallets_epochs_config, epoch_date
+
 
 
     def _generate_wallet_training_data_for_epoch(
@@ -182,22 +211,23 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         Returns:
         - wallet_training_data_df: Training features for the epoch
         """
+        epoch_weo = weo.WalletEpochsOrchestrator(
+            base_config=epoch_wallets_config,               # epoch-specific config
+            metrics_config=self.wallets_metrics_config,
+            features_config=self.wallets_features_config,
+            epochs_config=epoch_wallets_epochs_config,      # epoch-specific config
+            complete_profits_df=self.complete_profits_df,
+            complete_market_data_df=self.complete_market_data_df,
+            complete_macro_trends_df=self.complete_macro_trends_df,
+            complete_hybrid_cw_id_df = self.complete_hybrid_cw_id_df
 
-    def _score_epoch_with_trained_model(
-        self,
-        wallet_training_data_df: pd.DataFrame,
-        epoch_date: datetime
-    ) -> pd.DataFrame:
-        """
-        Score wallet training data using the pre-trained model.
+        )
 
-        Params:
-        - wallet_training_data_df: Wallet features for scoring
-        - epoch_date: Date identifier for this epoch
+        # Generate wallets training & modeling data
+        epoch_training_data_df,_,_,_ = epoch_weo.generate_epochs_training_data()
 
-        Returns:
-        - predictions_df: Model predictions with epoch metadata
-        """
+        return epoch_training_data_df
+
 
     def _calculate_epoch_actual_performance(
         self,
