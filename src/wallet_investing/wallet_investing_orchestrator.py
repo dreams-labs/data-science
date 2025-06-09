@@ -88,39 +88,53 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def orchestrate_investing_epochs(
         self,
-        model_id,
-        file_prefix: str = 'investing_',
+        model_id
     ) -> pd.DataFrame:
         """
         Orchestrate wallet model scoring across multiple investing epochs.
 
         Params:
         - model_id (str): The ID of the model to use for predictions
-        - file_prefix (str): Prefix for output parquet files
 
         Returns:
-        - investing_predictions_df (DataFrame): Predictions across all epochs with performance metrics
+        - epoch_metrics_df (DataFrame): Performance metrics for each epoch offset
         """
         # Store model ID for later reference
         self.model_id = model_id
 
-    @staticmethod
-    def analyze_investing_performance(
-        investing_predictions_df: pd.DataFrame,
-        model_id: str,
-        artifacts_path: str
-    ) -> dict:
-        """
-        Analyze model prediction performance across investing epochs.
+        epoch_metrics_list = []
+        trading_dfs_list = []
 
-        Params:
-        - investing_predictions_df: Predictions across epochs
-        - model_id: Model identifier
-        - artifacts_path: Base directory for saving analysis artifacts
+        for offset in self.investing_config['investing_epochs']:
+            trading_df = self._process_investing_epoch(offset)
 
-        Returns:
-        - performance_metrics (dict): Aggregated performance statistics
-        """
+            # Add offset identifier to trading data
+            trading_dfs_list.append(trading_df)
+
+            # Calculate metrics
+            coins_bought = trading_df[trading_df['is_buy']]['coin_return'].count()
+            mean_buy_return = trading_df[trading_df['is_buy']]['coin_return'].mean()
+            median_overall_return = trading_df['coin_return'].median()
+            mean_overall_return = trading_df['coin_return'].mean()
+            wins_overall_return = u.winsorize(trading_df['coin_return'], 0.01).mean()
+
+            # Store metrics for this epoch
+            epoch_metrics = {
+                'offset': offset,
+                'coins_bought': coins_bought,
+                'mean_buy_return': mean_buy_return,
+                'median_overall_return': median_overall_return,
+                'mean_overall_return': mean_overall_return,
+                'wins_overall_return': wins_overall_return
+            }
+            epoch_metrics_list.append(epoch_metrics)
+
+        epoch_metrics_df = pd.DataFrame(epoch_metrics_list)
+        all_trading_df = pd.concat(trading_dfs_list, ignore_index=False)
+
+        return epoch_metrics_df,all_trading_df
+
+
 
     # -----------------------------------
     #           Helper Methods
@@ -131,7 +145,7 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
     # --------------
     def _process_investing_epoch(
         self,
-        lookback_duration: int
+        offset_days: int
     ) -> tuple[datetime, pd.DataFrame]:
         """
         Process a single investing epoch: generate wallet training data and score with pre-trained model.
@@ -143,14 +157,18 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         4. Calculate actual performance if target data available
 
         Params:
-        - lookback_duration (int): Days offset from base modeling period
+        - offset_days (int): Days offset from base modeling period. Positive values move the modeling
+            period later.
 
         Returns:
-        - coin_returns_df (DataFrame): Actual returns of all coins with boolean column 'is_buy' that
-            identifies which coins were bought.
+        - trading_df (DataFrame): Actual returns of all coins with columns:
+            'coin_id' (str): multiindex
+            'modeling_epoch_start' (datetime): multiindex of modeling_period_start dates
+            'return' (float): actual coin performance
+            'is_buy' (bool): identifies which coins were bought.
         """
         # Prepare config files
-        epoch_wallets_config, epoch_wallets_epochs_config = self._prepare_epoch_configs(lookback_duration)
+        epoch_wallets_config, epoch_wallets_epochs_config = self._prepare_epoch_configs(offset_days)
 
         # Generate training_data_df
         epoch_training_data_df = self._generate_wallet_training_data_for_epoch(
@@ -172,14 +190,21 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
             epoch_wallets_config['training_data']['modeling_period_start'],
             epoch_wallets_config['training_data']['modeling_period_end']
         )
-        missing_coins = set(buy_coins) - set(coin_returns_df.index.values)
+
+        # Merge to create trading_df
+        trading_df = coin_returns_df[~coin_returns_df['coin_return'].isna()].copy()
+        missing_coins = set(buy_coins) - set(trading_df.index.values)
         if len(missing_coins) > 0:
             raise ValueError(f"Not all buy coins had actual return values. Missing coins: {missing_coins}")
 
         # Append buys to returns_df
-        coin_returns_df['is_buy'] = coin_returns_df.index.isin(buy_coins)
+        trading_df['is_buy'] = trading_df.index.isin(buy_coins)
 
-        return coin_returns_df
+        # Append epoch to df
+        trading_df['epoch_modeling_start'] = epoch_wallets_config['training_data']['modeling_period_start']
+        trading_df = trading_df.reset_index().set_index(['coin_id','epoch_modeling_start'])
+
+        return trading_df
 
 
 
@@ -281,48 +306,3 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         logger.info(f"Identified {len(buy_coins)} coins to buy.")
 
         return buy_coins
-
-
-
-
-    # -----------------------------------
-    #     Performance Analysis Methods
-    # -----------------------------------
-
-    def _aggregate_investing_results(
-        self,
-        epoch_predictions: dict[datetime, pd.DataFrame]
-    ) -> pd.DataFrame:
-        """
-        Aggregate predictions and performance across all investing epochs.
-
-        Params:
-        - epoch_predictions: Dict mapping epoch dates to prediction DataFrames
-
-        Returns:
-        - aggregated_df: MultiIndexed DataFrame with all epochs and performance metrics
-        """
-
-    def _validate_investing_epochs_coverage(self) -> None:
-        """
-        Verify that complete datasets cover all required investing epoch dates.
-        """
-
-    def _calculate_prediction_stability(self, predictions_df: pd.DataFrame) -> dict:
-        """
-        Calculate how stable model predictions are across different epochs.
-        """
-
-    def _calculate_prediction_accuracy(self, predictions_df: pd.DataFrame) -> dict:
-        """
-        Calculate prediction accuracy metrics where actual performance data exists.
-        """
-
-    def _generate_investing_performance_charts(
-        self,
-        predictions_df: pd.DataFrame,
-        artifacts_path: str
-    ) -> None:
-        """
-        Generate charts showing model performance across investing epochs.
-        """
