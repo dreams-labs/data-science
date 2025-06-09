@@ -19,9 +19,13 @@ wallets_config = WalletsConfig()
 #       Data Retrieval Function
 # -----------------------------------
 
-def retrieve_transfers_sequencing(min_txn_size: int,
-                                  training_end: str,
-                                  epoch_reference_date: str = '') -> pd.DataFrame:
+def retrieve_transfers_sequencing(
+        min_txn_size: int,
+        training_end: str,
+        epoch_reference_date: str = '',
+        hybridize_wallet_ids: bool = False,
+        dataset: str = 'prod',
+    ) -> pd.DataFrame:
     """
     Returns buyer and seller sequence numbers for each wallet-coin pair, where the first
     buyer/seller receives rank 1. Only includes wallets from wallet_modeling_training_cohort.
@@ -29,25 +33,37 @@ def retrieve_transfers_sequencing(min_txn_size: int,
     Params:
     - min_txn_size (int): Minimum USD value to filter out dust/airdrops
     - training_end (str): Training period end as YYYY-MM-DD string
-    - hybridize_wallet_ids (bool): Whether to use hybrid wallet-coin IDs vs regular wallet IDs
     - epoch_reference_date (str): Suffix added to table for each epoch
+    - hybridize_wallet_ids (bool): Whether to use hybrid wallet-coin IDs vs regular wallet IDs
+    - dataset (str): Set to 'prod' or 'dev' to alter query schema
 
     Returns:
     - sequence_df (DataFrame): Columns: wallet_address, coin_id, first_buy, first_sell,
         buyer_number, seller_number
     """
+    # Identify which CTE to use
+    if hybridize_wallet_ids:
+        ordering_cte = 'hybridized_ordering'
+    else:
+        ordering_cte = 'base_ordering'
+
+    # Identify which core schema to use
+    if dataset == 'prod':
+        schema = 'core'
+    else:
+        schema = 'dev_core'
+
     sequencing_sql = f"""
     with transaction_rank as (
         select coin_id
         ,wallet_address
         ,min(case when usd_net_transfers >= {min_txn_size} then date end) as first_buy
         ,min(case when usd_net_transfers <= -{min_txn_size} then date end) as first_sell
-        from core.coin_wallet_profits cwp
+        from {schema}.coin_wallet_profits cwp
         where abs(cwp.usd_net_transfers) >= {min_txn_size}
         and cwp.date <= '{training_end}'
         group by 1,2
     ),
-
 
     buyer_ranks as (
         select coin_id
@@ -77,6 +93,7 @@ def retrieve_transfers_sequencing(min_txn_size: int,
         left join seller_ranks s using (coin_id, wallet_address)
     ),
 
+    -- CTE for use when working with standard wallet ids
     base_ordering as (
         select
             so.*,
@@ -88,6 +105,21 @@ def retrieve_transfers_sequencing(min_txn_size: int,
             from temp.wallet_modeling_training_cohort_{epoch_reference_date} wc
             join reference.wallet_ids xw on xw.wallet_id = wc.wallet_id
         ) wc using(wallet_address)
+    ),
+
+    -- CTE for use when working with hybridized ids
+    hybridized_ordering as (
+        select
+            so.*,
+            wc.hybrid_cw_id as final_wallet_id
+        from sequence_ordering so
+        join (
+            select xw_cw.coin_id
+            ,xw_cw.wallet_address
+            ,xw_cw.hybrid_cw_id
+            from temp.wallet_modeling_training_cohort_{epoch_reference_date} wc
+            join reference.wallet_coin_ids xw_cw using(wallet_address)
+        ) wc using(wallet_address,coin_id)
     )
 
     select
@@ -97,7 +129,7 @@ def retrieve_transfers_sequencing(min_txn_size: int,
         first_sell,
         buyer_number,
         seller_number
-    from base_ordering
+    from {ordering_cte}
     order by 1,2,3,4
     """
     sequence_df = dgc().run_sql(sequencing_sql)

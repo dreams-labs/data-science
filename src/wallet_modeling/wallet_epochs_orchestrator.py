@@ -67,7 +67,6 @@ class WalletEpochsOrchestrator:
         self.wtd = WalletTrainingData(self.base_config)  # helper for complete df generation
 
         # Create hybrid ID mapping if configured and able
-        self.complete_hybrid_cw_id_df = None
         if (
             self.complete_hybrid_cw_id_df is None and
             self.base_config['training_data']['hybridize_wallet_ids'] and

@@ -461,41 +461,37 @@ class WalletTrainingData:
 
     def upload_training_cohort(
             self,
-            cohort_ids: np.array,
-            hybridize_wallet_ids: bool
+            cohort_ids: np.array
         ) -> None:
         """
         Uploads the list of wallet_ids that are used in the model to BigQuery. This
-        is used to pull additional metrics while limiting results to only relevant wallets.
+         is used to pull additional metrics while limiting results to only relevant wallets.
+
+        Only non-hybridized wallet cohorts are uploaded; hybridized transfers queries can
+         impute the corresponding coin_ids by using the reference.wallet_coin_ids table.
 
         Params:
         - cohort_ids (np.array): the wallet_ids included in the cohort
-        - hybridize_wallet_ids (bool): whether the IDs are regular wallet_ids or hybrid wallet-coin IDs
 
         """
         # 1. Generate upload_df from input df
-        # -----------------------------------
         upload_df = pd.DataFrame()
-        id_col = 'hybrid_id' if hybridize_wallet_ids else 'wallet_id'
-        upload_df[id_col] = cohort_ids
+        upload_df['wallet_id'] = cohort_ids
         upload_df['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        # set df datatypes of upload df
         dtype_mapping = {
-            id_col: int,
+            'wallet_id': int,
             'updated_at': 'datetime64[ns, UTC]'
         }
         upload_df = upload_df.astype(dtype_mapping)
 
-
         # 2. Upload list of IDs to bigquery
-        # ---------------------------------
         project_id = 'western-verve-411004'
         client = bigquery.Client(project=project_id)
 
         wallet_ids_table = f"{project_id}.temp.wallet_modeling_training_cohort_{self.epoch_reference_date}"
         schema = [
-            {'name':id_col, 'type': 'int64'},
+            {'name':'wallet_id', 'type': 'int64'},
             {'name':'updated_at', 'type': 'datetime'}
         ]
         pandas_gbq.to_gbq(
@@ -507,38 +503,17 @@ class WalletTrainingData:
             ,progress_bar=False
         )
 
-
         # 3. Create updated table with full wallet_address values
-        # -------------------------------------------------------
-
-        if hybridize_wallet_ids is False:
-            create_query = f"""
-            CREATE OR REPLACE TABLE `{wallet_ids_table}` AS
-            SELECT
-                t.{id_col},
-                w.wallet_address,
-                t.updated_at
-            FROM `{wallet_ids_table}` t
-            LEFT JOIN `reference.wallet_ids` w
-                ON t.wallet_id = w.wallet_id
-            """
-            client.query(create_query).result()
-            logger.info('Uploaded cohort of %s wallets with addresses to %s.',
-                        len(cohort_ids), wallet_ids_table)
-
-        else:
-            create_query = f"""
-            CREATE OR REPLACE TABLE `{wallet_ids_table}` AS
-            SELECT
-                c.hybrid_id,
-                hm.wallet_id,
-                hm.wallet_address,
-                hm.coin_id,
-                c.updated_at
-            FROM `{wallet_ids_table}` c
-            JOIN `temp.wallet_modeling_hybrid_id_mapping` hm
-                ON hm.hybrid_id = c.hybrid_id
-            """
-            client.query(create_query).result()
-            logger.info('Uploaded cohort of %s hybrid_ids %s.',
-                        len(cohort_ids), wallet_ids_table)
+        create_query = f"""
+        CREATE OR REPLACE TABLE `{wallet_ids_table}` AS
+        SELECT
+            t.wallet_id,
+            w.wallet_address,
+            t.updated_at
+        FROM `{wallet_ids_table}` t
+        JOIN `reference.wallet_ids` w
+            ON t.wallet_id = w.wallet_id
+        """
+        client.query(create_query).result()
+        logger.info('Uploaded cohort of %s wallets with addresses to %s.',
+                    len(cohort_ids), wallet_ids_table)
