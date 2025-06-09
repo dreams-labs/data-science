@@ -42,6 +42,8 @@ def load_and_predict(
     Returns:
     - Series: class-1 probabilities for classifiers, else raw preds
     """
+    if not isinstance(model_id,str):
+        raise ValueError(f"Provided model_id of '{model_id}'is not a string.")
     pipeline_path = Path(base_path) / 'wallet_models' / f"wallet_model_{model_id}.pkl"
     if not pipeline_path.exists():
         raise FileNotFoundError(f"No pipeline at {pipeline_path}")
