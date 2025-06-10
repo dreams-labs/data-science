@@ -111,7 +111,7 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         for offset, trading_df in zip(offsets, trading_dfs):
             trading_dfs_list.append(trading_df)
 
-            epoch_modeling_start = trading_df.index.get_level_values('epoch_modeling_start').unique()
+            epoch_modeling_start = trading_df.index.get_level_values('epoch_modeling_start').unique()[0][0]
             coins_bought = trading_df[trading_df['is_buy']]['coin_return'].count()
             mean_buy_return = trading_df[trading_df['is_buy']]['coin_return'].mean()
             median_overall_return = trading_df['coin_return'].median()
