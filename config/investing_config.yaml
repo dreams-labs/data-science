@@ -6,12 +6,16 @@ investing_epochs: [
     90,
     120,
     150,
-    180,
-    210,
-    240,
+    # 180,
+    # 210,
+    # 240,
 ]
 
 # Params that define trading strategy
 trading:
-    score_threshold: 0.85  # What is considered a "high score" for buy decisions
+    score_threshold: 0.8  # What is considered a "high score" for buy decisions
     min_scores: 25  # How many "high scores" a coin should have to be bought
+
+
+n_threads:
+    investing_epochs: 3  # how many investing epochs are calculated concurrently

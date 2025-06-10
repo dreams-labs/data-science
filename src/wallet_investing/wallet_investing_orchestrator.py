@@ -6,6 +6,7 @@ import logging
 import copy
 from datetime import datetime
 import pandas as pd
+import concurrent.futures
 
 # Local module imports
 import wallet_modeling.wallet_epochs_orchestrator as weo
@@ -52,13 +53,6 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
     ):
         """
         Initialize the investing epochs orchestrator with a pre-trained model.
-
-        Params:
-        - wallets_config, wallets_metrics_config, etc.: Standard wallet model configs
-        - investing_epochs (list[int]): Day offsets for future prediction periods
-        - trained_model_pipeline: Pre-trained sklearn pipeline for scoring
-        - model_id (str): UUID identifier for the trained model
-        - complete_*_df: Pre-loaded datasets (optional, will load if not provided)
         """
         # Ensure configs are dicts and not the custom config classes
         if not isinstance(wallets_config,dict):
@@ -66,7 +60,8 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
 
         # investing-specific configs
         self.investing_config = investing_config
-        self.investing_epochs = None
+        self.parquet_folder = (wallets_config['training_data']['parquet_folder']
+                               .replace('wallet_modeling_dfs','wallet_investing_dfs'))
         self.model_id = None
 
         # wallets model configs
@@ -104,38 +99,41 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
 
         epoch_metrics_list = []
         trading_dfs_list = []
-        i = 1
 
-        for offset in self.investing_config['investing_epochs']:
-            trading_df = self._process_investing_epoch(offset)
+        offsets = self.investing_config['investing_epochs']
 
-            # Add offset identifier to trading data
+        # Process each epoch concurrently
+        n_threads = self.investing_config['n_threads']['investing_epochs']
+        with concurrent.futures.ThreadPoolExecutor(max_workers=n_threads) as executor:
+            trading_dfs = list(executor.map(self._process_investing_epoch, offsets))
+
+        # Compute metrics for each epoch result
+        for offset, trading_df in zip(offsets, trading_dfs):
             trading_dfs_list.append(trading_df)
 
-            # Calculate metrics
+            epoch_modeling_start = trading_df.index.get_level_values('epoch_modeling_start').unique()
             coins_bought = trading_df[trading_df['is_buy']]['coin_return'].count()
             mean_buy_return = trading_df[trading_df['is_buy']]['coin_return'].mean()
             median_overall_return = trading_df['coin_return'].median()
             mean_overall_return = trading_df['coin_return'].mean()
             wins_overall_return = u.winsorize(trading_df['coin_return'], 0.01).mean()
 
-            # Store metrics for this epoch
-            epoch_metrics = {
+            epoch_metrics_list.append({
                 'offset': offset,
+                'epoch_modeling_start': epoch_modeling_start,
                 'coins_bought': coins_bought,
                 'mean_buy_return': mean_buy_return,
                 'median_overall_return': median_overall_return,
                 'mean_overall_return': mean_overall_return,
                 'wins_overall_return': wins_overall_return
-            }
-            epoch_metrics_list.append(epoch_metrics)
+            })
 
-            logger.milestone(f"Identified {coins_bought} coins to buy for epoch {offset} "
-                             f"({i}/{len(self.investing_config['investing_epochs'])}).")
-            i+=1
+            logger.milestone(f"Identified {coins_bought} coins to buy for epoch {offset}.")
 
-        epoch_metrics_df = pd.DataFrame(epoch_metrics_list).sort_values(by='offset').reset_index()
+        epoch_metrics_df = pd.DataFrame(epoch_metrics_list).sort_values(by='offset')
         all_trading_df = pd.concat(trading_dfs_list, ignore_index=False)
+
+        u.notify('soft_twinkle_musical')
 
         return epoch_metrics_df,all_trading_df
 
@@ -267,7 +265,6 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
             complete_market_data_df=self.complete_market_data_df,
             complete_macro_trends_df=self.complete_macro_trends_df,
             complete_hybrid_cw_id_df = self.complete_hybrid_cw_id_df
-
         )
 
         # Generate wallets training & modeling data
