@@ -198,6 +198,9 @@ def calculate_coin_performance(market_data_df, start_date, end_date):
     # Drop price columns
     coin_performance_df = coin_performance_df.drop(['starting_price','ending_price'], axis=1)
 
+    logger.info(f"Computed coin performance between {start_date.strftime('%Y-%m-%d')} "
+                f"and {end_date.strftime('%Y-%m-%d')}.")
+
     return coin_performance_df
 
 

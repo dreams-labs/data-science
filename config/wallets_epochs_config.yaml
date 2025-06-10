@@ -24,16 +24,3 @@ offset_epochs:
     offsets: [0, -60, -120, -180, -240, -300, -360, -420]
     validation_offsets: [60]
     # validation_offsets: [60, 120] #, 270, 300, 330, 360]
-investing_epochs: [
-# Long term validation of how well this model's predictions perform
-#  over epochs starting in [30,60,90] days.
-    30,
-    60,
-    90,
-    120,
-    150,
-    180,
-    210,
-    240,
-    270
-]
