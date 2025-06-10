@@ -104,6 +104,7 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
 
         epoch_metrics_list = []
         trading_dfs_list = []
+        i = 1
 
         for offset in self.investing_config['investing_epochs']:
             trading_df = self._process_investing_epoch(offset)
@@ -129,7 +130,11 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
             }
             epoch_metrics_list.append(epoch_metrics)
 
-        epoch_metrics_df = pd.DataFrame(epoch_metrics_list)
+            logger.milestone(f"Identified {coins_bought} coins to buy for epoch {offset} "
+                             f"({i}/{len(self.investing_config['investing_epochs'])}).")
+            i+=1
+
+        epoch_metrics_df = pd.DataFrame(epoch_metrics_list).sort_values(by='offset').reset_index()
         all_trading_df = pd.concat(trading_dfs_list, ignore_index=False)
 
         return epoch_metrics_df,all_trading_df

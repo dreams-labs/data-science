@@ -995,5 +995,9 @@ def dehybridize_wallet_address(
         # Ensure wallet_address & coin_id are regular columns
         pass  # nothing required
 
+    if len(df) != len(df_out):
+        raise ValueError(f"Output df shape of {len(df_out)} does not match input df shape "
+                         "of {len(df)}.")
+
     logger.info("Completed de‑hybridization; resulting shape %s.", df_out.shape)
     return df_out
