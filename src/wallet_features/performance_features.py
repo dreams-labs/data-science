@@ -60,6 +60,9 @@ def calculate_performance_features(
         wallets_config
     )
 
+
+    # Data Quality Checks
+    # -------------------
     # Check null values
     null_check = performance_features_df.isnull().sum()
     if null_check.any():
