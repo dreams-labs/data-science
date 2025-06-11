@@ -312,6 +312,43 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
 
 
 
+    def _compute_all_wallet_offsets(self) -> list[int]:
+        """
+        Compute all wallet-epoch offsets for investing, combining base wallet offsets
+        and investing-specific offsets.
+
+        This override replaces the coin-based offsets logic. It:
+        1. Reads investing epoch offsets from self.investing_config['investing_epochs'].
+        2. Reads base wallet training and validation offsets from self.wallets_epochs_config.
+        3. Combines them, then for each investing offset adds it to each base offset.
+        4. Returns a sorted unique list of all offsets.
+
+        Returns:
+        - list[int]: sorted unique day offsets to build wallet data for.
+        """
+        # Investing-specific epochs
+        investing_offsets: list[int] = self.investing_config['investing_epochs']
+
+        # Base wallet epochs from config
+        wallets_epochs_cfg = self.wallets_epochs_config['offset_epochs']
+        base_wallet_offsets: list[int] = wallets_epochs_cfg.get('offsets', [])
+        base_wallet_val_offsets: list[int] = wallets_epochs_cfg.get('validation_offsets', [])
+
+        # Start with all raw offsets
+        all_offsets: list[int] = investing_offsets + base_wallet_offsets + base_wallet_val_offsets
+
+        # Generate combined offsets by adding each investing offset to each base offset
+        base_offsets: list[int] = base_wallet_offsets + base_wallet_val_offsets
+        for invest in investing_offsets:
+            all_offsets += [invest + base for base in base_offsets]
+
+        # Deduplicate and sort
+        unique_offsets: list[int] = sorted(set(all_offsets))
+        return unique_offsets
+
+
+
+
     # -----------------------------------
     #       Trading Helper Methods
     # -----------------------------------
