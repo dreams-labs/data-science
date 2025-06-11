@@ -28,8 +28,8 @@ training_data:
 
 # Params that define trading strategy
 trading:
-    score_threshold: 0.80  # What is considered a "high score" for buy decisions
-    min_scores: 50  # How many "high scores" a coin should have to be bought
+    score_threshold: 0.8  # What is considered a "high score" for buy decisions
+    min_scores: 15  # How many "high scores" a coin should have to be bought
 
 
 n_threads:

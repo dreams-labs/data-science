@@ -192,7 +192,10 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
             epoch_training_data_df,
             self.wallets_config['training_data']['model_artifacts_folder']
         )
-        buy_coins = self._identify_buy_signals(cw_preds)
+
+        # Extract scores and identify buys
+        coin_scores_df = self._extract_coin_scores(cw_preds)
+        buy_coins = self._identify_buy_signals(coin_scores_df)
 
         # Compute actual coin returns
         coin_returns_df = civa.calculate_coin_performance(
@@ -202,7 +205,11 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         )
 
         # Merge to create trading_df
-        trading_df = coin_returns_df[~coin_returns_df['coin_return'].isna()].copy()
+        coin_scores_df['coin_id'] = coin_scores_df['coin_id'].astype(str)
+        coin_returns_df['coin_id'] = coin_returns_df.index.values.astype(str)
+        coin_returns_df = coin_returns_df.reset_index(drop=True)
+        trading_df = coin_scores_df.merge(coin_returns_df, how='inner', on='coin_id')
+        trading_df = trading_df[~trading_df['coin_return'].isna()].copy()
         missing_coins = set(buy_coins) - set(trading_df.index.values)
         if len(missing_coins) > 0:
             raise ValueError(f"Not all buy coins had actual return values. Missing coins: {missing_coins}")
@@ -302,16 +309,39 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         return epoch_training_data_df
 
 
-    def _identify_buy_signals(
+    def _extract_coin_scores(
         self,
         cw_preds: pd.Series
+    ) -> pd.DataFrame:
+        """
+        Extract coin-level scores from coin-wallet predictions.
+
+        Params:
+        - cw_preds (Series): Predictions indexed by hybrid coin-wallet IDs
+
+        Returns:
+        - coin_scores_df (DataFrame): Coin scores with columns ['coin_id', 'score']
+        """
+        # Extract coin_ids from coin-wallet pair hybrid IDs
+        preds_df = pd.DataFrame(cw_preds)
+        preds_df.columns = ['score']
+        preds_df = wtdo.dehybridize_wallet_address(preds_df, self.complete_hybrid_cw_id_df)
+
+        # Get max score per coin across all wallets
+        coin_scores_df = preds_df.groupby('coin_id', observed=True)['score'].max().reset_index()
+
+        return coin_scores_df
+
+
+    def _identify_buy_signals(
+        self,
+        coin_scores_df: pd.DataFrame
     ) -> list:
         """
         Convert coin-wallet predictions into buy signals for coins based on scoring thresholds.
 
         Params:
-        - cw_preds (Series): Predictions indexed by hybrid coin-wallet IDs
-        - complete_hybrid_cw_id_df (DataFrame): Mapping for dehybridizing wallet addresses
+        - coin_scores_df (DataFrame): Coin scores with columns ['coin_id', 'score']
 
         Returns:
         - buy_coins (Series): Coin IDs that meet buy criteria
@@ -319,13 +349,8 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         score_threshold = self.investing_config['trading']['score_threshold']
         min_scores = self.investing_config['trading']['min_scores']
 
-        # Extract coin_ids from coin-wallet pair hybrid IDs
-        preds_df = pd.DataFrame(cw_preds)
-        preds_df.columns = ['score']
-        preds_df = wtdo.dehybridize_wallet_address(preds_df, self.complete_hybrid_cw_id_df)
-
         # Count how many coin-wallet pairs are above the score_threshold
-        buys_df = preds_df[preds_df['score'] > score_threshold]
+        buys_df = coin_scores_df[coin_scores_df['score'] > score_threshold]
         buys_df = pd.DataFrame(buys_df.reset_index()
                                 .groupby('coin_id', observed=True)
                                 .size())
