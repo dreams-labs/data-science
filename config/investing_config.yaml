@@ -4,15 +4,15 @@ investing_epochs: [
     30,
     60,
     90,
-    # 120,
-    # 150,
-    # 180,
-    # 210,
-    # 240,
-    # 270,
-    # 300,
-    # 330,
-    # 360,
+    120,
+    150,
+    180,
+    210,
+    240,
+    270,
+    300,
+    330,
+    360,
     # 390,
     # 420,
     # 450,
@@ -24,11 +24,12 @@ investing_epochs: [
 ]
 
 training_data:
-    toggle_overwrite_parquet: False  # determines whether to load preexisting training_data_dfs
+    toggle_overwrite_parquet: True  # determines whether to load preexisting training_data_dfs
+    # toggle_overwrite_parquet: False  # determines whether to load preexisting training_data_dfs
 
 # Params that define trading strategy
 trading:
-    score_threshold: 0.8  # What is considered a "high score" for buy decisions
+    score_threshold: 0.90  # What is considered a "high score" for buy decisions
     min_scores: 15  # How many "high scores" a coin should have to be bought
 
 
