@@ -54,6 +54,11 @@ class WalletTrainingDataOrchestrator:
         self.parquet_folder = self.wallets_config['training_data']['parquet_folder']
         self.wtd = WalletTrainingData(wallets_config)  # pass config in
         self.epoch_reference_date = self.wallets_config['training_data']['modeling_period_start'].replace('-','')
+        self.features_orchestrator = wfo.WalletFeaturesOrchestrator(
+            self.wallets_config,
+            self.wallets_metrics_config,
+            self.wallets_features_config
+        )
 
         # Hybrid ID mapping
         self.complete_hybrid_cw_id_df = complete_hybrid_cw_id_df
@@ -319,7 +324,7 @@ class WalletTrainingDataOrchestrator:
         ) as executor:
             # Submit full period feature generation
             full_period_future = executor.submit(
-                wfo.calculate_wallet_features,
+                self.features_orchestrator.calculate_wallet_features,
                 profits_df.copy(),
                 market_indicators_df.copy(deep=True),
                 macro_indicators_df.copy(),
@@ -503,7 +508,7 @@ class WalletTrainingDataOrchestrator:
 
 
         # Calculate features for this window
-        window_wallet_features_df = wfo.calculate_wallet_features(
+        window_wallet_features_df = self.features_orchestrator.calculate_wallet_features(
             window_profits_df.copy(),
             market_indicators_df.copy(),
             macro_indicators_df.copy(),
