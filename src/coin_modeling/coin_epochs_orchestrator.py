@@ -221,7 +221,7 @@ class CoinEpochsOrchestrator:
         # This increases execution speed by multithreading every wallet epoch, rather
         #  than generating individual additional wallet epochs needed as the coin epoch
         #  boundaries shift.
-        self._build_all_wallet_data()
+        self.build_all_wallet_data()
 
 
         # 2. Define and validate coin epoch offsets
@@ -916,7 +916,7 @@ class CoinEpochsOrchestrator:
     # Wallet Features Helpers
     # -----------------------
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
-    def _build_all_wallet_data(self) -> None:
+    def build_all_wallet_data(self) -> None:
         """
         Pre-build every wallet-epoch parquet so later coin loops just `pd.read_parquet`.
         """

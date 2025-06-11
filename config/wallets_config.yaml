@@ -7,7 +7,7 @@ training_data: #WalletModel
     #KeyParam Period Dates
     # modeling_period_start: '2023-07-11'
     # modeling_period_start: '2023-10-09'
-    modeling_period_start: '2024-01-07'
+    modeling_period_start: '2024-01-06'
     # modeling_period_start: '2024-07-05'
     # modeling_period_start: '2024-09-03'
     # modeling_period_start: '2024-11-02'
