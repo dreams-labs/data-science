@@ -6,15 +6,10 @@ import pandas as pd
 import numpy as np
 
 # local module imports
-from wallet_modeling.wallets_config_manager import WalletsConfig
 import utils as u
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
-
-# Load wallets_config at the module level
-wallets_config = WalletsConfig()
-
 
 
 
@@ -23,9 +18,10 @@ wallets_config = WalletsConfig()
 # -----------------------------------
 
 @u.timing_decorator
-def calculate_performance_features(trading_features_df,
-                                   include_twb_metrics: bool = True) -> pd.DataFrame:
-
+def calculate_performance_features(
+        trading_features_df: pd.DataFrame,
+        wallets_config: dict
+    ) -> pd.DataFrame:
     """
     Calculates a set of profit numerators, investment denominators, ratio combinations,
     and transformations of ratios to create a matrix of performance scores.
@@ -38,8 +34,7 @@ def calculate_performance_features(trading_features_df,
         - activity_density: Trading frequency
         - transaction_days: Days with activity
         - average_transaction: Mean transaction size
-    - include_twb_metrics (bool): whether to include 'twb' and 'active_twb'
-        as balance features
+    - wallets_config (dict): from yaml
     """
     trading_features_df = trading_features_df.copy()
 
@@ -48,8 +43,10 @@ def calculate_performance_features(trading_features_df,
     profits_features_df = profits_features_df.add_prefix('profits_')
 
     # Demoniminator features reflecting the balance/investment/outlays
-    balance_features_df = calculate_balance_features(trading_features_df,
-                                                     include_twb_metrics)
+    balance_features_df = calculate_balance_features(
+        trading_features_df,
+        wallets_config['features']['include_twb_metrics']
+    )
     balance_features_df = balance_features_df.add_prefix('balance_')
 
     # Combine to make ratios
@@ -57,8 +54,11 @@ def calculate_performance_features(trading_features_df,
     ratios_features_df = calculate_performance_ratios(ratios_features_df)
 
     # Generate features using transformations of ratios
-    performance_features_df = transform_performance_ratios(ratios_features_df,
-                                                           balance_features_df)
+    performance_features_df = transform_performance_ratios(
+        ratios_features_df,
+        balance_features_df,
+        wallets_config
+    )
 
     # Check null values
     null_check = performance_features_df.isnull().sum()
@@ -217,8 +217,11 @@ def calculate_performance_ratios(performance_features_df: pd.DataFrame) -> pd.Da
 
 
 
-def transform_performance_ratios(performance_ratios_df: pd.DataFrame,
-                                 balance_features_df: pd.DataFrame) -> pd.DataFrame:
+def transform_performance_ratios(
+        performance_ratios_df: pd.DataFrame,
+        balance_features_df: pd.DataFrame,
+        wallets_config: dict
+    ) -> pd.DataFrame:
     """
     Applies transformations to performance ratios.
 

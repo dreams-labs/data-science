@@ -144,8 +144,10 @@ class WalletFeaturesOrchestrator:
         market_indicators_data_df.reset_index(inplace=True)
 
         # Performance features (left join, do not fill)
-        performance_features_df = wpf.calculate_performance_features(wallet_features_df,
-                                                    self.wallets_config['features']['include_twb_metrics'])
+        performance_features_df = wpf.calculate_performance_features(
+            wallet_features_df,
+            self.wallets_config
+        )
         feature_column_names['performance|'] = performance_features_df.columns
         wallet_features_df = wallet_features_df.join(performance_features_df, how='left')
 
