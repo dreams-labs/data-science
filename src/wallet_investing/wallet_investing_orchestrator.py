@@ -135,7 +135,9 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
 
             # 1) Compute actual coin returns
             # ------------------------------
-            epoch_end = epoch_start + (timedelta(days=self.wallets_config['training_data']['modeling_period_duration']-1))
+            epoch_end = epoch_start + (
+                timedelta(days=self.wallets_config['training_data']['modeling_period_duration']-1)
+            )
             coin_returns_df = civa.calculate_coin_performance(
                 self.complete_market_data_df,
                 epoch_start,
@@ -200,7 +202,8 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         """
         # Prepare config files
         epoch_wallets_config, epoch_wallets_epochs_config = self._prepare_epoch_configs(offset_days)
-        logger.milestone(f"Scoring coin-wallet pairs for offset of '{offset_days}' days with modeling start {epoch_wallets_config['training_data']['modeling_period_start']}...")
+        logger.milestone(f"Scoring coin-wallet pairs for offset of '{offset_days}' days with "
+                         f"modeling start {epoch_wallets_config['training_data']['modeling_period_start']}...")
 
         # Generate training_data_df
         epoch_training_data_df = self._generate_wallet_training_data_for_epoch(
