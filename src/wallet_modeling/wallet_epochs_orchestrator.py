@@ -958,7 +958,7 @@ class WalletEpochsOrchestrator:
             all_model_ends.append(cfg['training_data']['modeling_period_end'])
 
             earliest_required_date = pd.to_datetime(min(all_train_starts))
-            if cfg['training_data'].get('coin_training_data_only',False):
+            if cfg['training_data'].get('training_data_only',False):
                 # if training data only, just validate through the last training period end
                 latest_required_date = (
                     pd.to_datetime(max(all_train_starts))
