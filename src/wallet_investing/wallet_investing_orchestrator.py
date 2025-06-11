@@ -2,11 +2,12 @@
 Orchestrates the scoring of wallet training data across multiple investing epochs using
 a pre-trained wallet model to evaluate long-term prediction performance.
 """
+from pathlib import Path
 import logging
+import concurrent.futures
 import copy
 from datetime import datetime
 import pandas as pd
-import concurrent.futures
 
 # Local module imports
 import wallet_modeling.wallet_epochs_orchestrator as weo
@@ -111,9 +112,13 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         for offset, trading_df in zip(offsets, trading_dfs):
             trading_dfs_list.append(trading_df)
 
-            epoch_modeling_start = trading_df.index.get_level_values('epoch_modeling_start').unique()
+            epoch_modeling_start = trading_df.index.get_level_values('epoch_modeling_start').unique()[0]
             coins_bought = trading_df[trading_df['is_buy']]['coin_return'].count()
+
+            median_buy_return = trading_df[trading_df['is_buy']]['coin_return'].median()
             mean_buy_return = trading_df[trading_df['is_buy']]['coin_return'].mean()
+            wins_buy_return = u.winsorize(trading_df[trading_df['is_buy']]['coin_return'], 0.01).mean()
+
             median_overall_return = trading_df['coin_return'].median()
             mean_overall_return = trading_df['coin_return'].mean()
             wins_overall_return = u.winsorize(trading_df['coin_return'], 0.01).mean()
@@ -122,10 +127,12 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
                 'offset': offset,
                 'epoch_modeling_start': epoch_modeling_start,
                 'coins_bought': coins_bought,
-                'mean_buy_return': mean_buy_return,
+                'median_buy_return': median_buy_return,
                 'median_overall_return': median_overall_return,
+                'wins_buy_return': wins_buy_return,
+                'wins_overall_return': wins_overall_return,
                 'mean_overall_return': mean_overall_return,
-                'wins_overall_return': wins_overall_return
+                'mean_buy_return': mean_buy_return,
             })
 
             logger.milestone(f"Identified {coins_bought} coins to buy for epoch {offset}.")
@@ -226,6 +233,8 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         - epoch_wallets_config (dict): Wallets config with offset dates and training_data_only flag
         - epoch_wallets_epochs_config (dict): Epochs config without validation offsets
         """
+        logger.milestone(f"Beginning generation of investing data for offset '{lookback_duration}' days.")
+
         # Generate epoch-specific wallets config by offsetting base dates
         epoch_wallets_config = self._prepare_coin_epoch_base_config(lookback_duration)
 
@@ -256,6 +265,21 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         Returns:
         - wallet_training_data_df: Training features for the epoch
         """
+        epoch_date = datetime.strptime(
+            epoch_wallets_config['training_data']['modeling_period_start'],
+            '%Y-%m-%d'
+        ).strftime('%y%m%d')
+        file_location = Path(self.parquet_folder) / epoch_date / 'training_data_df.parquet'
+        # Ensure epoch directory exists
+        file_location.parent.mkdir(parents=True, exist_ok=True)
+
+        # Load existing training data if available
+        if (file_location.exists() and
+            not self.investing_config['training_data']['toggle_overwrite_parquet']
+        ):
+            logger.info(f"Loading existing wallet training data for epoch {epoch_date} from {file_location}")
+            return pd.read_parquet(file_location)
+
         epoch_weo = weo.WalletEpochsOrchestrator(
             base_config=epoch_wallets_config,               # epoch-specific config
             metrics_config=self.wallets_metrics_config,
@@ -269,6 +293,11 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
 
         # Generate wallets training & modeling data
         epoch_training_data_df,_,_,_ = epoch_weo.generate_epochs_training_data()
+        # Ensure output directory exists
+        file_location.parent.mkdir(parents=True, exist_ok=True)
+        # Save generated training data
+        epoch_training_data_df.to_parquet(file_location)
+        logger.info(f"Saved wallet training data for epoch {epoch_date} to {file_location}")
 
         return epoch_training_data_df
 
