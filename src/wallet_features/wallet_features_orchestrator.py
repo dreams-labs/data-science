@@ -2,13 +2,10 @@
 Calculates metrics aggregated at the wallet level
 """
 import logging
-from pathlib import Path
 from typing import List
-import yaml
 import pandas as pd
 
 # Local module imports
-from wallet_modeling.wallets_config_manager import WalletsConfig
 import wallet_features.performance_features as wpf
 import wallet_features.market_cap_features as wmc
 import wallet_features.trading_features as wtf
@@ -22,139 +19,170 @@ import utils as u
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
 
-# Load wallets_config at the module level
-wallets_config = WalletsConfig.load_from_yaml('../config/wallets_config.yaml')
-wallets_metrics_config = yaml.safe_load(Path('../config/wallets_metrics_config.yaml').read_text(encoding='utf-8')) # pylint:disable=line-too-long
 
-# ------------------------------------------
-#      Primary Orchestration Functions
-# ------------------------------------------
 
-@u.timing_decorator
-def calculate_wallet_features(
-        profits_df: pd.DataFrame,
-        market_indicators_data_df: pd.DataFrame,
-        macro_indicators_df: pd.DataFrame,
-        transfers_sequencing_df: pd.DataFrame,
-        wallet_cohort: List[int],
-        period_start_date: str,
-        period_end_date: str
-    ) -> pd.DataFrame:
+# --------------------------
+#      Class Definition
+# --------------------------
 
+class WalletFeaturesOrchestrator:
     """
-    Calculates all features for the wallet_cohort in a given profits_df, returning a df with a
-    row for every wallet in the cohort.
+    Orchestrates the calculation of wallet-level features across different feature modules.
 
-    Imputed Row Dependencies:
-    - Trading Features: Requires starting_balance_date and period_end_date for performance calculation
-    - Performance Features: Inherits from trading features
-    - Market Cap Features:
-        - Volume weighted: Uses only real transfers (~is_imputed)
-        - Balance weighted: Uses period_end_date balances
-    - Market Timing Features: Uses only real transfers (~is_imputed)
-    - Transfers Features: Uses only real transfers (~is_imputed)
-
-    Function Dependencies:
-    1. Trading features must precede Performance features
-    2. All other features can be calculated independently
-
-    Params:
-    - profits_df (df): Daily profits with imputed rows on:
-        1. starting_balance_date (period start reference)
-        2. period_end_date (period end reference)
-    - market_indicators_data_df (df): Market data with technical indicators
-    - macro_indicators_df (df): Macroeconomic data with technical indicators
-    - transfers_sequencing_df (df): Lifetime transfers data
-    - wallet_cohort (array-like): All wallet addresses to include
-    - period_start_date (str): Period start in 'YYYY-MM-DD' format
-    - period_end_date (str): Period end in 'YYYY-MM-DD' format
-
-    Returns:
-    - wallet_features_df (df): Wallet-indexed features dataframe with a row for every wallet_cohort
+    This class encapsulates the feature calculation pipeline that was previously implemented
+    as standalone functions, providing better state management and reusability.
     """
-    # Add indices and validate inputs
-    profits_df, market_indicators_data_df, transfers_sequencing_df = prepare_dataframes(
-        profits_df,market_indicators_data_df,transfers_sequencing_df,
-        period_start_date,period_end_date)
+    def __init__(
+            self,
+            wallets_config,
+            wallets_metrics_config,
+            wallets_features_config
+        ):
+        """
+        Initialize the WalletFeaturesOrchestrator.
 
-    # Initialize output dataframe
-    wallet_features_df = pd.DataFrame(index=wallet_cohort)
-    wallet_features_df.index.name = 'wallet_address'
-    feature_column_names = {}
+        Loads configuration objects that are shared across feature calculations.
+        """
+        # Load configs at instance level for reuse
+        self.wallets_config = wallets_config
+        self.wallets_metrics_config = wallets_metrics_config
+        self.wallets_features_config = wallets_features_config
 
-    # Trading features (left join, fill 0s)
-    trading_features_df = wtf.calculate_wallet_trading_features(profits_df,
-        period_start_date,period_end_date,
-        wallets_config['features']['include_twb_metrics'],
-        wallets_config['features']['include_twr_metrics'])
-    feature_column_names['trading|'] = trading_features_df.columns
-    wallet_features_df = wallet_features_df.join(trading_features_df, how='left')\
-        .fillna({col: 0 for col in trading_features_df.columns})
 
-    # Transfers features (left join, do not fill)
-    if wallets_config['features']['toggle_transfers_features']:
-        transfers_sequencing_features_df = wts.calculate_transfers_features(
+
+    # --------------------------------------
+    #      Primary Orchestration Method
+    # --------------------------------------
+
+    @u.timing_decorator
+    def calculate_wallet_features(
+            self,
+            profits_df: pd.DataFrame,
+            market_indicators_data_df: pd.DataFrame,
+            macro_indicators_df: pd.DataFrame,
+            transfers_sequencing_df: pd.DataFrame,
+            wallet_cohort: List[int],
+            period_start_date: str,
+            period_end_date: str
+        ) -> pd.DataFrame:
+        """
+        Calculates all features for the wallet_cohort in a given profits_df, returning a df with a
+        row for every wallet in the cohort.
+
+        Imputed Row Dependencies:
+        - Trading Features: Requires starting_balance_date and period_end_date for performance calculation
+        - Performance Features: Inherits from trading features
+        - Market Cap Features:
+            - Volume weighted: Uses only real transfers (~is_imputed)
+            - Balance weighted: Uses period_end_date balances
+        - Market Timing Features: Uses only real transfers (~is_imputed)
+        - Transfers Features: Uses only real transfers (~is_imputed)
+
+        Function Dependencies:
+        1. Trading features must precede Performance features
+        2. All other features can be calculated independently
+
+        Params:
+        - profits_df (df): Daily profits with imputed rows on:
+            1. starting_balance_date (period start reference)
+            2. period_end_date (period end reference)
+        - market_indicators_data_df (df): Market data with technical indicators
+        - macro_indicators_df (df): Macroeconomic data with technical indicators
+        - transfers_sequencing_df (df): Lifetime transfers data
+        - wallet_cohort (array-like): All wallet addresses to include
+        - period_start_date (str): Period start in 'YYYY-MM-DD' format
+        - period_end_date (str): Period end in 'YYYY-MM-DD' format
+
+        Returns:
+        - wallet_features_df (df): Wallet-indexed features dataframe with a row for every wallet_cohort
+        """
+        # Add indices and validate inputs
+        profits_df, market_indicators_data_df, transfers_sequencing_df = prepare_dataframes(
+            profits_df,market_indicators_data_df,transfers_sequencing_df,
+            period_start_date,period_end_date)
+
+        # Initialize output dataframe
+        wallet_features_df = pd.DataFrame(index=wallet_cohort)
+        wallet_features_df.index.name = 'wallet_address'
+        feature_column_names = {}
+
+        # Trading features (left join, fill 0s)
+        trading_features_df = wtf.calculate_wallet_trading_features(profits_df,
+            period_start_date,period_end_date,
+            self.wallets_config['features']['include_twb_metrics'],
+            self.wallets_config['features']['include_twr_metrics'])
+        feature_column_names['trading|'] = trading_features_df.columns
+        wallet_features_df = wallet_features_df.join(trading_features_df, how='left')\
+            .fillna({col: 0 for col in trading_features_df.columns})
+
+        # Transfers features (left join, do not fill)
+        if self.wallets_config['features']['toggle_transfers_features']:
+            transfers_sequencing_features_df = wts.calculate_transfers_features(
+                profits_df,
+                transfers_sequencing_df,
+                self.wallets_config['features']['include_transfers_features'])
+            feature_column_names['transfers|'] = transfers_sequencing_features_df.columns
+            wallet_features_df = wallet_features_df.join(transfers_sequencing_features_df, how='left')
+
+        # Balance features (left join, do not fill)
+        if self.wallets_config['features']['toggle_balance_features']:
+            balance_features_df = wbf.calculate_balance_features(self.wallets_config,profits_df)
+            feature_column_names['balance|'] = balance_features_df.columns
+            wallet_features_df = wallet_features_df.join(balance_features_df, how='left')
+
+        # Macroeconomic features (cross join)
+        macroeconomic_features_df = wfts.calculate_macro_features(
+                                        macro_indicators_df,
+                                        self.wallets_metrics_config['time_series']['macro_trends'])
+        feature_column_names['macro|'] = macroeconomic_features_df.columns
+        wallet_features_df = (wallet_features_df.reset_index()
+                            .merge(macroeconomic_features_df, how='cross')
+                            .set_index('wallet_address'))
+
+        # BELOW FUNCTIONS DO NOT WORK WITH INDICES AND SHOULD BE EVENTUALLY REFACTORED
+        profits_df.reset_index(inplace=True)
+        market_indicators_data_df.reset_index(inplace=True)
+
+        # Performance features (left join, do not fill)
+        performance_features_df = wpf.calculate_performance_features(wallet_features_df,
+                                                    self.wallets_config['features']['include_twb_metrics'])
+        feature_column_names['performance|'] = performance_features_df.columns
+        wallet_features_df = wallet_features_df.join(performance_features_df, how='left')
+
+        # Market timing features (left join, fill 0s)
+        timing_features_df = wmt.calculate_market_timing_features(
             profits_df,
-            transfers_sequencing_df,
-            wallets_config['features']['include_transfers_features'])
-        feature_column_names['transfers|'] = transfers_sequencing_features_df.columns
-        wallet_features_df = wallet_features_df.join(transfers_sequencing_features_df, how='left')
+            market_indicators_data_df,
+            macro_indicators_df)
+        feature_column_names['timing|'] = timing_features_df.columns
+        wallet_features_df = wallet_features_df.join(timing_features_df, how='left')\
+            .fillna({col: 0 for col in timing_features_df.columns})
 
-    # Balance features (left join, do not fill)
-    if wallets_config['features']['toggle_balance_features']:
-        balance_features_df = wbf.calculate_balance_features(wallets_config,profits_df)
-        feature_column_names['balance|'] = balance_features_df.columns
-        wallet_features_df = wallet_features_df.join(balance_features_df, how='left')
+        # Market cap features (left join, do not full)
+        market_features_df = wmc.calculate_market_cap_features(
+            self.wallets_config,
+            profits_df,
+            market_indicators_data_df
+        )
+        feature_column_names['mktcap|'] = market_features_df.columns
+        wallet_features_df = wallet_features_df.join(market_features_df, how='left')
 
-    # Macroeconomic features (cross join)
-    macroeconomic_features_df = wfts.calculate_macro_features(
-                                    macro_indicators_df,
-                                    wallets_metrics_config['time_series']['macro_trends'])
-    feature_column_names['macro|'] = macroeconomic_features_df.columns
-    wallet_features_df = (wallet_features_df.reset_index()
-                          .merge(macroeconomic_features_df, how='cross')
-                          .set_index('wallet_address'))
-
-    # BELOW FUNCTIONS DO NOT WORK WITH INDICES AND SHOULD BE EVENTUALLY REFACTORED
-    profits_df.reset_index(inplace=True)
-    market_indicators_data_df.reset_index(inplace=True)
-
-    # Performance features (left join, do not fill)
-    performance_features_df = wpf.calculate_performance_features(wallet_features_df,
-                                                wallets_config['features']['include_twb_metrics'])
-    feature_column_names['performance|'] = performance_features_df.columns
-    wallet_features_df = wallet_features_df.join(performance_features_df, how='left')
-
-    # Market timing features (left join, fill 0s)
-    timing_features_df = wmt.calculate_market_timing_features(
-        profits_df,
-        market_indicators_data_df,
-        macro_indicators_df)
-    feature_column_names['timing|'] = timing_features_df.columns
-    wallet_features_df = wallet_features_df.join(timing_features_df, how='left')\
-        .fillna({col: 0 for col in timing_features_df.columns})
-
-    # Market cap features (left join, do not full)
-    market_features_df = wmc.calculate_market_cap_features(wallets_config, profits_df, market_indicators_data_df)
-    feature_column_names['mktcap|'] = market_features_df.columns
-    wallet_features_df = wallet_features_df.join(market_features_df, how='left')
-
-    # Scenario transfers features (left join, do not fill)
-    if wallets_config['features']['toggle_scenario_features']:
-        transfers_scenario_features_df = wsc.calculate_scenario_features(profits_df,
-                                                                        market_indicators_data_df,
-                                                                        period_start_date,period_end_date)
-        feature_column_names['scenario|'] = transfers_scenario_features_df.columns
-        wallet_features_df = wallet_features_df.join(transfers_scenario_features_df, how='left')
+        # Scenario transfers features (left join, do not fill)
+        if self.wallets_config['features']['toggle_scenario_features']:
+            transfers_scenario_features_df = wsc.calculate_scenario_features(profits_df,
+                                                                            market_indicators_data_df,
+                                                                            period_start_date,period_end_date)
+            feature_column_names['scenario|'] = transfers_scenario_features_df.columns
+            wallet_features_df = wallet_features_df.join(transfers_scenario_features_df, how='left')
 
 
-    # Apply feature prefixes
-    rename_map = {col: f"{prefix}{col}"
-                for prefix, cols in feature_column_names.items()
-                for col in cols}
-    wallet_features_df = wallet_features_df.rename(columns=rename_map)
+        # Apply feature prefixes
+        rename_map = {col: f"{prefix}{col}"
+                    for prefix, cols in feature_column_names.items()
+                    for col in cols}
+        wallet_features_df = wallet_features_df.rename(columns=rename_map)
 
-    return wallet_features_df
+        return wallet_features_df
 
 
 
@@ -212,11 +240,13 @@ def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
 
 
 
-def prepare_dataframes(profits_df: pd.DataFrame,
-                       market_indicators_df: pd.DataFrame,
-                       transfers_sequencing_df: pd.DataFrame,
-                       period_start_date: str,
-                       period_end_date: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def prepare_dataframes(
+        profits_df: pd.DataFrame,
+        market_indicators_df: pd.DataFrame,
+        transfers_sequencing_df: pd.DataFrame,
+        period_start_date: str,
+        period_end_date: str
+    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Orchestrates dataframe preparation: validates inputs, optimizes indices, and downcasts dtypes.
 

@@ -74,13 +74,6 @@ class WalletEpochsOrchestrator:
         ):
             self.complete_hybrid_cw_id_df = self.create_hybrid_mapping()
 
-        # # Confirm all pairs in profits_df have a hybrid mapping
-        # if self.complete_hybrid_cw_id_df is not None:
-        #     wtdo.validate_hybrid_mapping_completeness(
-        #         self.complete_profits_df,
-        #         self.complete_hybrid_cw_id_df
-        #     )
-
         # Generated objects
         self.output_dfs = {}
 
