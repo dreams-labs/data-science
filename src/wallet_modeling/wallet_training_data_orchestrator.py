@@ -19,6 +19,7 @@ import wallet_features.trading_features as wtf
 import wallet_features.performance_features as wpf
 import wallet_features.transfers_features as wts
 import wallet_features.clustering_features as wcl
+import coin_insights.coin_validation_analysis as civa
 import utils as u
 
 # Set up logger at the module level
@@ -101,7 +102,7 @@ class WalletTrainingDataOrchestrator:
                 "Missing" if self.macro_trends_df is None else "Loaded"
             )
             profits_df, market_data_df, macro_trends_df = self.wtd.retrieve_raw_datasets(
-                period_start_date, period_end_date, self.hybridize_wallet_ids
+                period_start_date, period_end_date
             )
         else:
             logger.info("Cleaning datasets from provided versions...")
@@ -396,8 +397,7 @@ class WalletTrainingDataOrchestrator:
     def prepare_modeling_features(
         self,
         modeling_profits_df_full: pd.DataFrame,
-        complete_hybrid_cw_id_df: Optional[pd.DataFrame] = None,
-        period: str = 'modeling'
+        complete_hybrid_cw_id_df: Optional[pd.DataFrame] = None
     ) -> pd.DataFrame:
         """
         Orchestrates data preparation and feature generation for modeling.
@@ -413,29 +413,12 @@ class WalletTrainingDataOrchestrator:
         Returns:
         - wallet_target_vars_df: Generated wallet features
         """
+        # Prepare modeling_profits_df
         logger.info("Beginning modeling data preparation...")
-
-        # Handle hybridization if configured
-        if self.hybridize_wallet_ids:
-            logger.info("Applying wallet-coin hybridization...")
-            modeling_profits_df_full = hybridize_wallet_address(
-                modeling_profits_df_full,
-                complete_hybrid_cw_id_df
-            )
-
-        # Filter profits to training cohort
-        if self.training_wallet_cohort is not None:
-            modeling_profits_df = modeling_profits_df_full[
-                modeling_profits_df_full['wallet_address'].isin(self.training_wallet_cohort)
-            ]
-            del modeling_profits_df_full
-        else:
-            modeling_profits_df = modeling_profits_df_full
-
-        # Assert period and save filtered/hybridized profits_df
-        u.assert_period(modeling_profits_df,
-                        self.wallets_config['training_data'][f'{period}_period_start'],
-                        self.wallets_config['training_data'][f'{period}_period_end'])
+        modeling_profits_df = self._prepare_profits_for_modeling(
+            modeling_profits_df_full,
+            complete_hybrid_cw_id_df
+        )
 
         # Initialize features DataFrame
         logger.info("Generating modeling features...")
@@ -455,14 +438,25 @@ class WalletTrainingDataOrchestrator:
         ).fillna({col: 0 for col in modeling_trading_features_df.columns})
 
         # Generate performance features
+        modeling_config = copy.deepcopy(self.wallets_config)
+        modeling_config['features']['include_twb_metrics'] = False
         modeling_performance_features_df = wpf.calculate_performance_features(
             wallet_target_vars_df,
-            include_twb_metrics=False
+            modeling_config  # overridden to have no twb metrics
         )
         wallet_target_vars_df = wallet_target_vars_df.join(
             modeling_performance_features_df,
             how='left'
         ).fillna({col: 0 for col in modeling_performance_features_df.columns})
+
+        # Add coin return features if hybridization is enabled
+        if self.hybridize_wallet_ids and complete_hybrid_cw_id_df is not None:
+            wallet_target_vars_df = self._add_coin_return_features(
+                wallet_target_vars_df,
+                self.market_data_df,
+                complete_hybrid_cw_id_df
+            )
+
 
         # Clean up memory
         del modeling_trading_features_df, modeling_performance_features_df, modeling_profits_df
@@ -474,6 +468,44 @@ class WalletTrainingDataOrchestrator:
     # ----------------------------------
     #           Helper Methods
     # ----------------------------------
+
+    def _prepare_profits_for_modeling(
+        self,
+        profits_df: pd.DataFrame,
+        complete_hybrid_cw_id_df: Optional[pd.DataFrame] = None
+    ) -> pd.DataFrame:
+        """
+        Standardized profits preprocessing: hybridization, cohort filtering, validation.
+
+        Params:
+        - profits_df: Raw profits DataFrame
+        - complete_hybrid_cw_id_df: Optional mapping for wallet ID hybridization
+        - period: Period identifier for config lookup
+
+        Returns:
+        - processed_profits_df: Filtered and validated profits DataFrame
+        """
+        # Handle hybridization if configured
+        if self.hybridize_wallet_ids:
+            logger.info("Applying wallet-coin hybridization...")
+            profits_df = hybridize_wallet_address(
+                profits_df,
+                complete_hybrid_cw_id_df
+            )
+
+        # Filter profits to training cohort
+        if self.training_wallet_cohort is not None:
+            profits_df = profits_df[
+                profits_df['wallet_address'].isin(self.training_wallet_cohort)
+            ]
+
+        # Assert period validity
+        u.assert_period(profits_df,
+                        self.wallets_config['training_data']['modeling_period_start'],
+                        self.wallets_config['training_data']['modeling_period_end'])
+
+        return profits_df
+
 
     def _calculate_window_features(
         self,
@@ -706,6 +738,52 @@ class WalletTrainingDataOrchestrator:
         # If no parquet file is configured then return the df
         else:
             return indicators_df
+
+
+
+    def _add_coin_return_features(
+        self,
+        wallet_target_vars_df: pd.DataFrame,
+        market_data_df: pd.DataFrame,
+        complete_hybrid_cw_id_df: pd.DataFrame
+    ) -> pd.DataFrame:
+        """
+        Adds coin return features to modeling target variables by dehybridizing
+        wallet IDs and calculating coin performance during modeling period.
+
+        Params:
+        - wallet_target_vars_df: DataFrame with wallet features
+        - market_data_df: Full market data for coin calculations
+        - complete_hybrid_cw_id_df: Mapping for wallet ID dehybridization
+
+        Returns:
+        - wallet_target_vars_df: Enhanced with coin_return columns
+        """
+        # Extract coin_id from hybrid ids
+        cw_target_vars_df = dehybridize_wallet_address(
+            wallet_target_vars_df,
+            complete_hybrid_cw_id_df
+        )
+
+        # Compute coin returns during modeling period
+        coin_returns_df = civa.calculate_coin_performance(
+            market_data_df,
+            self.wallets_config['training_data']['modeling_period_start'],
+            self.wallets_config['training_data']['modeling_period_end']
+        )
+        cw_returns = cw_target_vars_df.merge(
+            coin_returns_df, on='coin_id', how='left'
+        )['coin_return'].fillna(0).values
+
+        # Append returns columns
+        wallet_target_vars_df['coin_return'] = cw_returns
+        wallet_target_vars_df['coin_return_winsorized'] = u.winsorize(
+            cw_returns,
+            self.wallets_config['features']['returns_winsorization']
+        )
+        wallet_target_vars_df['coin_return_rank'] = pd.Series(cw_returns).rank(method='average')
+
+        return wallet_target_vars_df
 
 
     @u.timing_decorator
