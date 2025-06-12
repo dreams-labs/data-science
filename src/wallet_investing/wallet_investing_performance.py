@@ -38,6 +38,7 @@ def compute_epoch_buy_metrics(all_epochs_trading_df: pd.DataFrame) -> pd.DataFra
         median_buy_return = trading_df[trading_df['is_buy']]['coin_return'].median()
         mean_buy_return = trading_df[trading_df['is_buy']]['coin_return'].mean()
         wins_buy_return = trading_df[trading_df['is_buy']]['coin_return_wins'].mean()
+        best_buy_return = trading_df[trading_df['is_buy']]['coin_return'].max()
 
         # Overall performance
         median_overall_return = trading_df['coin_return'].median()
@@ -50,6 +51,7 @@ def compute_epoch_buy_metrics(all_epochs_trading_df: pd.DataFrame) -> pd.DataFra
             'median_buy_return': median_buy_return,
             'wins_buy_return': wins_buy_return,
             'mean_buy_return': mean_buy_return,
+            'best_buy_return': best_buy_return,
             'median_overall_return': median_overall_return,
             'wins_overall_return': wins_overall_return,
             'mean_overall_return': mean_overall_return,

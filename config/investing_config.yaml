@@ -1,18 +1,18 @@
 investing_epochs: [
 # Long term validation of how well this model's predictions perform
 #  over epochs starting in [30,60,90] days.
-    30,
     60,
-    90,
     120,
-    150,
     180,
-    210,
-    240,
-    270,
-    300,
-    330,
-    360,
+    # 240,
+    # 300,
+    # 360,
+    # 30,
+    # 90,
+    # 150,
+    # 210,
+    # 270,
+    # 330,
     # 390,
     # 420,
     # 450,
@@ -29,9 +29,11 @@ training_data:
 
 # Params that define trading strategy
 trading:
-    score_threshold: 0.90  # What is considered a "high score" for buy decisions
-    min_scores: 15  # How many "high scores" a coin should have to be bought
+    score_threshold: 0.95  # What is considered a "high score" for buy decisions
+    min_scores: 25  # How many "high scores" a coin should have to be bought
+    max_coins_per_epoch:  5  # only this number of coins will be bought, sorted by mean score
 
 
 n_threads:
-    investing_epochs: 4  # how many investing epochs are calculated concurrently
+    investing_epochs: 6  # how many investing epochs are calculated concurrently
+    buy_logic_epochs: 6  # how many epoch buys to choose based on scores

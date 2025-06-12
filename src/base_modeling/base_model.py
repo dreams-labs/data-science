@@ -520,7 +520,22 @@ class BaseModel:
                 if param_name == 'model_pipeline__drop_columns__drop_patterns' and isinstance(param_value, list):
                     # Only show patterns that aren't in base config
                     unique_patterns = [p for p in param_value if p not in base_patterns]
-                    param_value = unique_patterns if unique_patterns else ['feature_retainer']
+
+                    if isinstance(self.modeling_config['grid_search_params'].get('drop_patterns_include_n_features'),int):
+
+                        # Get param grid drop patterns
+                        base_drop_patterns = self.modeling_config['grid_search_params']['param_grid']['drop_columns__drop_patterns']
+
+                        # Convert to single list, rather than list of lists
+                        base_drop_patterns = [item for sublist in base_drop_patterns for item in sublist]
+
+                        # Identify which features were retained in the search
+                        retained_drop_patterns = set(base_drop_patterns) - set(unique_patterns)
+                        if len(retained_drop_patterns) == 0:
+                            retained_drop_patterns = 'None'
+                        param_value = f"Retained features: {retained_drop_patterns}"
+                    else:
+                        param_value = unique_patterns if unique_patterns else ['feature_retainer']
 
                 report_data.append({
                     'param': param_name,
