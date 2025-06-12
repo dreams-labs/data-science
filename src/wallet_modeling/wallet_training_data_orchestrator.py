@@ -786,58 +786,6 @@ class WalletTrainingDataOrchestrator:
         return wallet_target_vars_df
 
 
-    @u.timing_decorator
-    def _identify_modeling_cohort(self,modeling_period_profits_df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Adds boolean flag indicating if wallet meets modeling period activity criteria
-
-        Params:
-        - modeling_period_profits_df (DataFrame): Input profits data with index wallet_address
-
-        Returns:
-        - DataFrame: Original dataframe index wallet_address with added boolean in_wallet_cohort \
-            column that indicates if the wallet met the wallet cohort thresholds
-        """
-
-        logger.info("Identifying modeling cohort...")
-
-        # Validate date range
-        u.assert_period(modeling_period_profits_df,
-                        self.wallets_config['training_data']['modeling_period_start'],
-                        self.wallets_config['training_data']['modeling_period_end'])
-
-        # Calculate modeling period wallet metrics
-        modeling_wallets_df = wtf.calculate_wallet_trading_features(
-            modeling_period_profits_df,
-            self.wallets_config['training_data']['modeling_period_start'],
-            self.wallets_config['training_data']['modeling_period_end']
-        )
-
-        # Extract thresholds
-        modeling_min_investment = self.wallets_config['modeling']['modeling_min_investment']
-        modeling_min_coins_traded = self.wallets_config['modeling']['modeling_min_coins_traded']
-
-        # Create boolean mask for qualifying wallets
-        meets_criteria = (
-            (modeling_wallets_df['max_investment'] >= modeling_min_investment) &
-            (modeling_wallets_df['unique_coins_traded'] >= modeling_min_coins_traded)
-        )
-
-        # Log stats about wallet cohort
-        total_wallets = len(modeling_wallets_df)
-        qualifying_wallets = meets_criteria.sum()
-        logger.info(
-            f"Identified {qualifying_wallets} qualifying wallets ({100*qualifying_wallets/total_wallets:.2f}% "
-            f"of {total_wallets} total wallets with modeling period activity) meeting modeling cohort criteria: "
-            f"min_investment=${modeling_min_investment}, min_days={modeling_min_coins_traded}"
-        )
-
-        # Add boolean flag column as 1s and 0s
-        modeling_wallets_df['in_modeling_cohort'] = meets_criteria.astype(int)
-
-
-        return modeling_wallets_df
-
 
 
 # -----------------------------------
