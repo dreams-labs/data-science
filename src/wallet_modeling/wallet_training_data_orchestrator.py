@@ -792,7 +792,6 @@ class WalletTrainingDataOrchestrator:
 #   Hybrid Index Utility Functions
 # -----------------------------------
 
-
 @u.timing_decorator
 def hybridize_wallet_address(
     df: pd.DataFrame,
