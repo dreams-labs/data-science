@@ -7,7 +7,10 @@ from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import numpy as np
 import pandas_gbq
+from pandas_gbq.exceptions import GenericGBQException
 from google.cloud import bigquery
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from google.cloud.exceptions import GoogleCloudError
 from dreams_core import core as dc
 
 # Local module imports
@@ -465,10 +468,10 @@ class WalletTrainingData:
         ) -> None:
         """
         Uploads the list of wallet_ids that are used in the model to BigQuery. This
-         is used to pull additional metrics while limiting results to only relevant wallets.
+        is used to pull additional metrics while limiting results to only relevant wallets.
 
         Only non-hybridized wallet cohorts are uploaded; hybridized transfers queries can
-         impute the corresponding coin_ids by using the reference.wallet_coin_ids table.
+        impute the corresponding coin_ids by using the reference.wallet_coin_ids table.
 
         Params:
         - cohort_ids (np.array): the wallet_ids included in the cohort
@@ -494,14 +497,8 @@ class WalletTrainingData:
             {'name':'wallet_id', 'type': 'int64'},
             {'name':'updated_at', 'type': 'datetime'}
         ]
-        pandas_gbq.to_gbq(
-            upload_df
-            ,wallet_ids_table
-            ,project_id=project_id
-            ,if_exists='replace'
-            ,table_schema=schema
-            ,progress_bar=False
-        )
+
+        self._upload_to_gbq_with_retry(upload_df, wallet_ids_table, project_id, schema)
 
         # 3. Create updated table with full wallet_address values
         create_query = f"""
@@ -517,3 +514,18 @@ class WalletTrainingData:
         client.query(create_query).result()
         logger.info('Uploaded cohort of %s wallets with addresses to %s.',
                     len(cohort_ids), wallet_ids_table)
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10),
+        retry=retry_if_exception_type((GoogleCloudError, GenericGBQException, Exception))
+    )
+    def _upload_to_gbq_with_retry(self, upload_df, table_name, project_id, schema):
+        pandas_gbq.to_gbq(
+            upload_df,
+            table_name,
+            project_id=project_id,
+            if_exists='replace',
+            table_schema=schema,
+            progress_bar=False
+        )
