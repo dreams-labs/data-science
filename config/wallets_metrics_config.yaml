@@ -31,12 +31,6 @@ time_series:  #WalletModel
                     scaling: none
                 std:
                     scaling: none
-            rolling:
-                comparisons:
-                    pct_change:
-                        scaling: none
-                window_duration: 30
-                lookback_periods: 3
         global_market_cap:
             aggregations:
                 last:
@@ -54,12 +48,6 @@ time_series:  #WalletModel
             aggregations:
                 std:
                     scaling: none
-            rolling:
-                comparisons:
-                    pct_change:
-                        scaling: none
-                window_duration: 30
-                lookback_periods: 3
         gtrends_altcoin_worldwide:
             aggregations:
                 std:
