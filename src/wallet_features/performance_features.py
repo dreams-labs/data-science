@@ -257,31 +257,33 @@ def transform_performance_ratios(
         # Unmodified ratio
         performance_features_df[f'{col}/base'] = series
 
-        # Rank of ratio
-        performance_features_df[f'{col}/rank'] = series.rank(method='average', pct=True)
-
-        # Signed log of ratio
-        performance_features_df[f'{col}/log'] = np.sign(series) * np.log1p(series.abs())
-
         # Winsorized ratio
         performance_features_df[f'{col}/winsorized'] = u.winsorize(series,returns_winsorization)
 
-        # Ntile rank of ratio
-        # Extract denominator and create ntils of balance values
-        denominator = col.split('/')[1]
-        balance_col = f'balance_{denominator}'
-        metric_ntiles = pd.qcut(
-            balance_features_df[balance_col],
-            q=ntile_count,
-            labels=False,
-            duplicates='drop'
-        )
+        # Rank of ratio
+        performance_features_df[f'{col}/rank'] = series.rank(method='average', pct=True)
 
-        # Rank within appropriate denominator-based groups
-        performance_features_df[f'{col}/ntile_rank'] = (
-            series.groupby(metric_ntiles)
-            .rank(method='average', pct=True)
-            .fillna(0)
-        )
+        #FeatureRemoval not predictive
+        # # Signed log of ratio
+        # performance_features_df[f'{col}/log'] = np.sign(series) * np.log1p(series.abs())
+
+        #FeatureRemoval not predictive
+        # # Ntile rank of ratio
+        # # Extract denominator and create ntils of balance values
+        # denominator = col.split('/')[1]
+        # balance_col = f'balance_{denominator}'
+        # metric_ntiles = pd.qcut(
+        #     balance_features_df[balance_col],
+        #     q=ntile_count,
+        #     labels=False,
+        #     duplicates='drop'
+        # )
+
+        # # Rank within appropriate denominator-based groups
+        # performance_features_df[f'{col}/ntile_rank'] = (
+        #     series.groupby(metric_ntiles)
+        #     .rank(method='average', pct=True)
+        #     .fillna(0)
+        # )
 
     return performance_features_df
