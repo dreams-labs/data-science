@@ -4,9 +4,14 @@ investing_epochs: [
     60,
     120,
     180,
-    # 240,
-    # 300,
-    # 360,
+    240,
+    300,
+    360,
+    420,
+    # 480,
+    # 540,
+    # 600
+
     # 30,
     # 90,
     # 150,
@@ -14,13 +19,9 @@ investing_epochs: [
     # 270,
     # 330,
     # 390,
-    # 420,
     # 450,
-    # 480,
     # 510,
-    # 540,
     # 570,
-    # 600
 ]
 
 training_data:
@@ -29,9 +30,10 @@ training_data:
 
 # Params that define trading strategy
 trading:
-    score_threshold: 0.95  # What is considered a "high score" for buy decisions
-    min_scores: 25  # How many "high scores" a coin should have to be bought
-    max_coins_per_epoch:  5  # only this number of coins will be bought, sorted by mean score
+    high_score_threshold: 0.55  # What is considered a "high score" for buy decisions
+    min_high_scores: 20  # How many "high scores" a coin should have to be bought
+    min_average_score: 0.20  # The minimum average score for a coin to be included
+    max_coins_per_epoch: 10  # only this number of coins will be bought, sorted by mean score
 
 
 n_threads:

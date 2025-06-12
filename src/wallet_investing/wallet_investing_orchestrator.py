@@ -395,26 +395,30 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         Returns:
         - buy_coins (Series): Coin IDs that meet buy criteria
         """
-        score_threshold = self.investing_config['trading']['score_threshold']
-        min_scores = self.investing_config['trading']['min_scores']
+        high_score_threshold = self.investing_config['trading']['high_score_threshold']
+        min_high_scores = self.investing_config['trading']['min_high_scores']
+        min_average_score = self.investing_config['trading']['min_average_score']
         max_coins_per_epoch = self.investing_config['trading']['max_coins_per_epoch']
 
-        # Count how many coin-wallet pairs are above the score_threshold
-        buys_df = cw_scores_df[cw_scores_df['score'] > score_threshold]
+        # Count how many coin-wallet pairs are above the high_score_threshold
+        buys_df = cw_scores_df[cw_scores_df['score'] > high_score_threshold]
         buys_df = pd.DataFrame(buys_df.reset_index()
                                 .groupby('coin_id', observed=True)
                                 .size())
         buys_df.columns = ['high_scores']
 
         # Identify coins with enough high scores to buy
-        buys_df = buys_df[buys_df['high_scores'] > min_scores]
+        buys_df = buys_df[buys_df['high_scores'] > min_high_scores]
 
         # Determine mean scores
         mean_scores = cw_scores_df.copy().groupby('coin_id',observed=True)['score'].mean()
         mean_scores.name = 'mean_score'
+        buy_coins_df = buys_df.join(mean_scores)
+
+        # Filter based on mean score
+        buy_coins_df = buy_coins_df[buy_coins_df['mean_score'] >= min_average_score]
 
         # Limit buys to max number of coins
-        buy_coins_df = buys_df.join(mean_scores)
         buy_coins = (buy_coins_df.sort_values(by='mean_score', ascending=False)
                      .head(max_coins_per_epoch).index.values)
 

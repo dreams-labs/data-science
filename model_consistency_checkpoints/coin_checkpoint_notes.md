@@ -1,3 +1,22 @@
+# DDA 822 modeling
+checkpoint 1: works for negatives
+Target: cw_coin_return -inf to -0.4
+ID: e4937a58-c61c-4222-a1ac-8d22ce7a4f1b
+===================================
+Test Samples:             34,109
+Val Positive Samples:     456,436 (27.9%)
+Number of Features:       64
+Features per Window:      16
+
+Classification Metrics:      Val   |  Test
+-------------------------------------------
+Val ROC AUC:                0.611  |  0.930
+Val Accuracy:               0.720  |  0.926
+Val Precision:              0.459  |  0.964
+Val Recall:                 0.001  |  0.183
+Val F1 Score:               0.001  |  0.308
+
+
 # DDA 818 wallet model across macros
 checkpoint 3: roc.956 60d validation checks out?
 Model Performance Summary
