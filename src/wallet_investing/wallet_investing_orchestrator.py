@@ -5,6 +5,7 @@ a pre-trained wallet model to evaluate long-term prediction performance.
 from pathlib import Path
 import logging
 import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime,timedelta
 import pandas as pd
 
@@ -128,53 +129,81 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
             coin_return: showing the actual performance of the coin over the epoch modeling period
             is_buy: boolean showing whether the coin would be bought based on config params
         """
-        all_returns_dfs = []
-        for epoch_start in cw_scores_df.index.get_level_values('epoch_start_date').unique():
+        unique_epochs = cw_scores_df.index.get_level_values('epoch_start_date').unique()
+        max_workers = self.investing_config['n_threads']['buy_logic_epochs']
 
-            scored_coins = set(cw_scores_df.index.get_level_values('coin_id').values.astype(str))
+        # Use ThreadPoolExecutor for parallel processing
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all epoch processing tasks
+            future_to_epoch = {
+                executor.submit(self._determine_single_epoch_buys, epoch_start, cw_scores_df): epoch_start
+                for epoch_start in unique_epochs
+            }
 
-            # 1) Compute actual coin returns
-            # ------------------------------
-            epoch_end = epoch_start + (
-                timedelta(days=self.wallets_config['training_data']['modeling_period_duration']-1)
-            )
-            coin_returns_df = civa.calculate_coin_performance(
-                self.complete_market_data_df,
-                epoch_start,
-                epoch_end
-            )
-            coin_returns_df = coin_returns_df[coin_returns_df.index.isin(scored_coins)]
-
-            # Confirm completeness
-            missing_coins = set(coin_returns_df.index.astype(str)) - scored_coins
-            if len(missing_coins) > 0:
-                raise ValueError(f"No returns found for scored coins {missing_coins}")
-
-            # Append epoch date
-            coin_returns_df['epoch_start_date'] = epoch_start
-            coin_returns_df = coin_returns_df.copy().reset_index().set_index(['coin_id','epoch_start_date'])
-
-
-            # 2) Identify buy signals
-            # -----------------------
-            epoch_scores_df = cw_scores_df[cw_scores_df.index.get_level_values('epoch_start_date') == epoch_start]
-            epoch_buy_coins = self._identify_buy_signals(epoch_scores_df)
-
-            # Add boolean
-            coin_returns_df['is_buy'] = (coin_returns_df.index.get_level_values('coin_id').astype(str)
-                                         .isin(epoch_buy_coins))
-
-            all_returns_dfs.append(coin_returns_df)
+            # Collect results as they complete
+            all_returns_dfs = []
+            for future in concurrent.futures.as_completed(future_to_epoch):
+                epoch_start = future_to_epoch[future]
+                try:
+                    epoch_result = future.result()
+                    all_returns_dfs.append(epoch_result)
+                except Exception as exc:
+                    raise ValueError(f'Epoch {epoch_start} generated an exception: {exc}')
 
         trading_df = pd.concat(all_returns_dfs)
-
         return trading_df
-
-
 
     # -----------------------------------
     #       Scoring Helper Methods
     # -----------------------------------
+
+
+    def _determine_single_epoch_buys(self, epoch_start, cw_scores_df):
+        """
+        Helper method to process a single epoch for multithreading.
+
+        Params:
+        - epoch_start: the start date for this epoch
+        - cw_scores_df: full scores dataframe (filtered within method)
+
+        Returns:
+        - epoch_results_df: processed results for this epoch
+        """
+        scored_coins = set(cw_scores_df.index.get_level_values('coin_id').values.astype(str))
+
+        # 1) Compute actual coin returns
+        # ------------------------------
+        epoch_end = epoch_start + (
+            timedelta(days=self.wallets_config['training_data']['modeling_period_duration']-1)
+        )
+        coin_returns_df = civa.calculate_coin_performance(
+            self.complete_market_data_df,
+            epoch_start,
+            epoch_end
+        )
+        coin_returns_df = coin_returns_df[coin_returns_df.index.isin(scored_coins)]
+
+        # Confirm completeness
+        missing_coins = set(coin_returns_df.index.astype(str)) - scored_coins
+        if len(missing_coins) > 0:
+            raise ValueError(f"No returns found for scored coins {missing_coins}")
+
+        # Append epoch date
+        coin_returns_df['epoch_start_date'] = epoch_start
+        coin_returns_df = coin_returns_df.copy().reset_index().set_index(['coin_id','epoch_start_date'])
+
+        # 2) Identify buy signals
+        # -----------------------
+        epoch_scores_df = cw_scores_df[cw_scores_df.index.get_level_values('epoch_start_date') == epoch_start]
+        epoch_buy_coins = self._identify_buy_signals(epoch_scores_df)
+
+        # Add boolean
+        coin_returns_df['is_buy'] = (coin_returns_df.index.get_level_values('coin_id').astype(str)
+                                    .isin(epoch_buy_coins))
+
+        return coin_returns_df
+
+
 
     def _score_investing_epoch(
         self,
@@ -368,6 +397,7 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         """
         score_threshold = self.investing_config['trading']['score_threshold']
         min_scores = self.investing_config['trading']['min_scores']
+        max_coins_per_epoch = self.investing_config['trading']['max_coins_per_epoch']
 
         # Count how many coin-wallet pairs are above the score_threshold
         buys_df = cw_scores_df[cw_scores_df['score'] > score_threshold]
@@ -377,7 +407,16 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         buys_df.columns = ['high_scores']
 
         # Identify coins with enough high scores to buy
-        buy_coins = list(buys_df[buys_df['high_scores'] > min_scores].index)
+        buys_df = buys_df[buys_df['high_scores'] > min_scores]
+
+        # Determine mean scores
+        mean_scores = cw_scores_df.copy().groupby('coin_id',observed=True)['score'].mean()
+        mean_scores.name = 'mean_score'
+
+        # Limit buys to max number of coins
+        buy_coins_df = buys_df.join(mean_scores)
+        buy_coins = (buy_coins_df.sort_values(by='mean_score', ascending=False)
+                     .head(max_coins_per_epoch).index.values)
 
         logger.info(f"Identified {len(buy_coins)} coins to buy.")
 
