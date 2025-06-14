@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 #       Primary Orchestration Class
 # ----------------------------------------
 
-class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
+class WalletsInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
     """
     Orchestrates wallet model prediction scoring across multiple investing epochs by
     offsetting base config dates and scoring with a pre-trained model.
@@ -57,7 +57,7 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         """
         # Ensure configs are dicts and not the custom config classes
         if not isinstance(wallets_config,dict):
-            raise ValueError("InvestingEpochsOrchestrator configs must be dtype=='dict'.")
+            raise ValueError("WalletsInvestingOrchestrator configs must be dtype=='dict'.")
 
         # investing-specific configs
         self.wallets_investing_config = wallets_investing_config
