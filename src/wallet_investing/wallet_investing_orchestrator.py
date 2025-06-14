@@ -87,7 +87,7 @@ class WalletsInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
     # -----------------------------------
 
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
-    def score_all_investing_cycles(
+    def score_all_investment_cycles(
         self,
         model_id: str,
     ) -> pd.DataFrame:
@@ -103,8 +103,8 @@ class WalletsInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         # Store model ID for later reference
         self.model_id = model_id
 
-        offsets = self.wallets_investing_config['investing_cycles']
-        n_threads = self.wallets_investing_config['n_threads']['investing_cycles']
+        offsets = self.wallets_investing_config['investment_cycles']
+        n_threads = self.wallets_investing_config['n_threads']['investment_cycles']
 
         # Process each epoch concurrently
         with concurrent.futures.ThreadPoolExecutor(max_workers=n_threads) as executor:
@@ -354,7 +354,7 @@ class WalletsInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         and investing-specific offsets.
 
         This override replaces the coin-based offsets logic. It:
-        1. Reads investing epoch offsets from self.wallets_investing_config['investing_cycles'].
+        1. Reads investing epoch offsets from self.wallets_investing_config['investment_cycles'].
         2. Reads base wallet training and validation offsets from self.wallets_epochs_config.
         3. Combines them, then for each investing offset adds it to each base offset.
         4. Returns a sorted unique list of all offsets.
@@ -363,7 +363,7 @@ class WalletsInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         - list[int]: sorted unique day offsets to build wallet data for.
         """
         # Investing-specific epochs
-        investing_offsets: list[int] = self.wallets_investing_config['investing_cycles']
+        investing_offsets: list[int] = self.wallets_investing_config['investment_cycles']
 
         # Base wallet epochs from config
         wallets_epochs_cfg = self.wallets_epochs_config['offset_epochs']
