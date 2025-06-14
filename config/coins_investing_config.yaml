@@ -1,0 +1,26 @@
+# CoinModel
+investment_cycles: [
+# Long term validation of how well this model's predictions perform
+#  over epochs starting in [30,60,etc] days.
+        # 270,
+        # 240,
+        # 210,
+        # 180,
+        # 150,
+        # 120,
+        # 90,
+        # 60,
+        # 45,
+        30,
+        # 15,
+        0,
+]
+
+# CoinModel
+training_data:
+    # toggle_overwrite_parquet: True  # determines whether to load preexisting training_data_dfs
+    toggle_overwrite_parquet: False  # determines whether to load preexisting training_data_dfs
+
+
+n_threads:
+    investment_cycles: 8  # how many investing epochs are calculated concurrently
