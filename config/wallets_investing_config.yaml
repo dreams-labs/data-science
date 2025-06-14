@@ -1,3 +1,4 @@
+# WalletModel
 investing_epochs: [
 # Long term validation of how well this model's predictions perform
 #  over epochs starting in [30,60,90] days.
@@ -24,10 +25,12 @@ investing_epochs: [
         # -270,
 ]
 
+# WalletModel
 training_data:
     # toggle_overwrite_parquet: True  # determines whether to load preexisting training_data_dfs
     toggle_overwrite_parquet: False  # determines whether to load preexisting training_data_dfs
 
+# WalletModel
 # Params that define trading strategy
 trading:
     # high_score_threshold: 0.6  # What is considered a "high score" for buy decisions

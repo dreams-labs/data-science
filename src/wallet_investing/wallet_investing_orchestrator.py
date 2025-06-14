@@ -38,7 +38,7 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         self,
 
         # investing config
-        investing_config: dict,
+        wallets_investing_config: dict,
 
         # wallets model configs
         wallets_config: dict,
@@ -60,7 +60,7 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
             raise ValueError("InvestingEpochsOrchestrator configs must be dtype=='dict'.")
 
         # investing-specific configs
-        self.investing_config = investing_config
+        self.wallets_investing_config = wallets_investing_config
         self.parquet_folder = (wallets_config['training_data']['parquet_folder']
                                .replace('wallet_modeling_dfs','wallet_investing_dfs'))
         self.model_id = None
@@ -102,8 +102,8 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         # Store model ID for later reference
         self.model_id = model_id
 
-        offsets = self.investing_config['investing_epochs']
-        n_threads = self.investing_config['n_threads']['investing_epochs']
+        offsets = self.wallets_investing_config['investing_epochs']
+        n_threads = self.wallets_investing_config['n_threads']['investing_epochs']
 
         # Process each epoch concurrently
         with concurrent.futures.ThreadPoolExecutor(max_workers=n_threads) as executor:
@@ -121,7 +121,7 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         buy_duration: int = None
     ) -> pd.DataFrame:
         """
-        Assigns buys to coins in a boolean is_buy column based on params in the investing_config.yaml.
+        Assigns buys to coins in a boolean is_buy column based on params in the wallets_investing_config.yaml.
 
         Params:
         - cw_scores_df (pd.DataFrame): df with column 'score' for every coin-wallet-epoch multiindex tuple.
@@ -138,7 +138,7 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
             self.buy_duration = self.wallets_config['training_data']['modeling_period_duration'] - 1
 
         unique_epochs = cw_scores_df.index.get_level_values('epoch_start_date').unique()
-        max_workers = self.investing_config['n_threads']['buy_logic_epochs']
+        max_workers = self.wallets_investing_config['n_threads']['buy_logic_epochs']
 
         # Use ThreadPoolExecutor for parallel processing
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -319,7 +319,7 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
 
         # Load existing training data if available
         if (file_location.exists() and
-            not self.investing_config['training_data']['toggle_overwrite_parquet']
+            not self.wallets_investing_config['training_data']['toggle_overwrite_parquet']
         ):
             logger.info(f"Loading existing wallet training data for epoch {epoch_date} from {file_location}")
             return pd.read_parquet(file_location)
@@ -353,7 +353,7 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         and investing-specific offsets.
 
         This override replaces the coin-based offsets logic. It:
-        1. Reads investing epoch offsets from self.investing_config['investing_epochs'].
+        1. Reads investing epoch offsets from self.wallets_investing_config['investing_epochs'].
         2. Reads base wallet training and validation offsets from self.wallets_epochs_config.
         3. Combines them, then for each investing offset adds it to each base offset.
         4. Returns a sorted unique list of all offsets.
@@ -362,7 +362,7 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         - list[int]: sorted unique day offsets to build wallet data for.
         """
         # Investing-specific epochs
-        investing_offsets: list[int] = self.investing_config['investing_epochs']
+        investing_offsets: list[int] = self.wallets_investing_config['investing_epochs']
 
         # Base wallet epochs from config
         wallets_epochs_cfg = self.wallets_epochs_config['offset_epochs']
@@ -400,10 +400,10 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         Returns:
         - buy_coins (Series): Coin IDs that meet buy criteria
         """
-        high_score_threshold = self.investing_config['trading']['high_score_threshold']
-        min_high_scores = self.investing_config['trading']['min_high_scores']
-        min_average_score = self.investing_config['trading']['min_average_score']
-        max_coins_per_epoch = self.investing_config['trading']['max_coins_per_epoch']
+        high_score_threshold = self.wallets_investing_config['trading']['high_score_threshold']
+        min_high_scores = self.wallets_investing_config['trading']['min_high_scores']
+        min_average_score = self.wallets_investing_config['trading']['min_average_score']
+        max_coins_per_epoch = self.wallets_investing_config['trading']['max_coins_per_epoch']
 
         # Count how many coin-wallet pairs are above the high_score_threshold
         buys_df = cw_scores_df[cw_scores_df['score'] > high_score_threshold]
