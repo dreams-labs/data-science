@@ -9,36 +9,57 @@ training_data: #CoinModel
     #KeyParam Training and Validation Epochs
     coin_epochs_validation: [
         # 360,
+        # 330,
         # 300,
+        # 270,
         # 240,
-        # 180,
+        # 210,
+        # 195,
+        # 150,
         # 120,
         # 60,
+        15
         # 0,
         # -60,
         # -120,
         # -180,
+        # 90,
+        # 30,
     ]
 
     coin_epochs_training: [  # How many days prior to the modeling period each window begins
         # 360,
         # 300,
+        # 270,
         # 240,
+        # 210,
         # 180,
+        # 150,
         # 120,
+        # 90,
         # 60,
+        # 30,
         0,
+        -30,
         -60,
+        -90,
         -120,
+        -150,
         -180,
+        -210,
         -240,
-        -300,
+        -270,
+        # -300,
+        # -330,
         # -360,
+        # -390,
         # -420,
     ]
 
     #KeyParam Rebuild Features Settings
-    toggle_rebuild_all_features: True  # If True, existing parquet features/target dfs will be overridden
+    # toggle_rebuild_all_features: True  # If True, existing parquet features/target dfs will be overridden
+    toggle_rebuild_all_features: False  # If True, existing parquet features/target dfs will be overridden
+    # toggle_rebuild_wallet_models: True  # If True, all wallet models will be retrained
     toggle_rebuild_wallet_models: False  # If True, all wallet models will be retrained
 
 
@@ -50,37 +71,34 @@ wallet_scores: #CoinModel
     #  by using a hardcoded number (e.g. 0.8) or an F-beta score (e.g. f.5).
     score_params:
 
-        cw_net_flows_1k:
+        cw_coin_return_020:
             model_type: classification
-            target_variable: cw_crypto_net_flows
-            target_var_min_threshold: 1000
+            target_variable: cw_coin_return
+            target_var_min_threshold: 0.20
             target_var_max_threshold: .inf
             y_pred_threshold: 0.8
-            assign_epochs_to_addresses: False
 
-        cw_net_gain_1k:
+        cw_net_gain_inflows_020:
             model_type: classification
-            target_variable: cw_crypto_net_gain
-            target_var_min_threshold: 1000
+            target_variable: cw_crypto_net_gain/crypto_inflows/base
+            target_var_min_threshold: 0.20
             target_var_max_threshold: .inf
             y_pred_threshold: 0.8
-            assign_epochs_to_addresses: False
 
-        cw_net_flows_inflows_40:
+        cw_net_flows_inflows_020:
             model_type: classification
-            target_variable: cw_crypto_net_flows/max_investment/base
-            target_var_min_threshold: 0.40
+            target_variable: cw_crypto_net_flows/crypto_inflows/base
+            target_var_min_threshold: 0.20
             target_var_max_threshold: .inf
             y_pred_threshold: 0.8
-            assign_epochs_to_addresses: False
 
-        cw_net_gain_max_inv_40:
+        cw_net_flows_inflows_010:
             model_type: classification
-            target_variable: cw_crypto_net_gain/max_investment/base
-            target_var_min_threshold: 0.40
+            target_variable: cw_crypto_net_flows/crypto_inflows/base
+            target_var_min_threshold: 0.10
             target_var_max_threshold: .inf
             y_pred_threshold: 0.8
-            assign_epochs_to_addresses: False
+
 
 
 # CoinModel Segments
@@ -101,10 +119,8 @@ features: #CoinModel
 
     # Which scores will have distribution metrics created
     score_distributions: [
-        cw_net_flows_1k,
-        cw_net_gain_1k,
-        cw_net_flows_inflows_40,
-        cw_net_gain_max_inv_40,
+        cw_net_flows_inflows_020,
+        cw_coin_return_020
     ]
 
     # Features from the feature_engineering directory
@@ -146,8 +162,9 @@ coin_modeling: #CoinModel
     # target_variable: coin_return_winsorized
     target_variable: coin_return
     # target_variable: coin_return_pctile_full
-    # target_var_min_threshold: 0.3 # a classification model will try to predict the target var above this value
-    target_var_min_threshold: 0.5 # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.25 # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.3 # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.5 # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.9 # a classification model will try to predict the target var above this value
     y_pred_threshold: 0.90  # scores above this probability threshold are positive predictions
 
@@ -161,7 +178,7 @@ coin_modeling: #CoinModel
 
     # Thresholds for coin inclusion in training data
     market_cap_column: market_cap_filled  # 'market_cap' or 'market_cap_filled'
-    min_market_cap: 2_000_000  # coins below this market cap will not be included in performance assessments
+    min_market_cap: 5_000_000  # coins below this market cap will not be included in performance assessments
     max_market_cap: 700_000_000  # coins above this market cap will not be included in performance assessments
 
     # Train/Test/Eval split
@@ -182,34 +199,36 @@ coin_modeling: #CoinModel
             # Segment Category
             # all_wallets*,
             score_quantile|*,
-            score_binary|*,
+            # score_binary|*,
             # macro|*,
             # market_data|*,
 
             # Segment Family
-            # score_binary|cw_net_flows_1k/*,
-            score_binary|cw_net_flows_inflows_50/*,
-            # score_binary|cw_net_gain_max_inv_50/*,
-            score_binary|cw_net_gain_max_inv_80/*,
-            score_binary|cw_net_gain_max_inv_n60/*,
-            score_binary|cw_net_gain_max_inv_n80/*,
-            # score_binary|*/sum_pct,
-            score_binary|*/aggregations/*,
+            # score_binary|cw_coin_return_020/*,
+            score_binary|cw_net_gain_inflows_020/*,
+            score_binary|cw_net_flows_inflows_010/*,
+            score_binary|cw_net_flows_inflows_020/*,
+            score_binary|cw_net_flows_inflows_030/*,
+            score_binary|cw_net_flows_inflows_020_no_assign/*,
+            score_binary|cw_net_flows_inflows_n020/*,
+            score_binary|cw_net_flows_inflows_020_inflows2k/*,
+            score_binary|cw_net_flows_inflows_020_traded1/*,
+            score_binary|cw_net_flows_inflows_020_traded3/*,
 
 
-            # score_binary|*/1|trading/total_volume|aggregations/aggregations/sum,
-            # score_binary|*/1|trading/total_volume|aggregations/aggregations/sum_pct,
+            score_binary|*/1|trading/total_volume|aggregations/aggregations/sum,
+            score_binary|*/1|trading/total_volume|aggregations/aggregations/sum_pct,
             # score_binary|*/1|trading/unique_coins_traded|aggregations/aggregations/sum,
-            score_binary|*/1|trading/unique_coins_traded|aggregations/aggregations/sum_pct,
+            # score_binary|*/1|trading/unique_coins_traded|aggregations/aggregations/sum_pct,
             # score_binary|*/1|balances/usd_balance_ending|aggregations/aggregations/sum_pct,
             # score_binary|*/1|balances/usd_balance_ending|aggregations/aggregations/sum,
-            score_binary|*/1|trading/crypto_net_gain|aggregations/aggregations/sum,
+            # score_binary|*/1|trading/crypto_net_gain|aggregations/aggregations/sum,
             # score_binary|*/1|trading/crypto_net_gain|aggregations/aggregations/sum_pct,
 
 
             # macro|btc_mvrv_z_score/last_*,
             macro|btc_mvrv_z_score/pct_change_30d*,
-            macro|btc_mvrv_z_score/*pct_change_7d*,
+            # macro|btc_mvrv_z_score/*pct_change_7d*,
             macro|btc_mvrv_z_score/sma_1_std,
             macro|btc_mvrv_z_score/std_30d*,
             macro|btc_vdd_multiple/std_*,
@@ -238,6 +257,8 @@ coin_modeling: #CoinModel
             macro|gtrends_memecoin_us/std_*,
             # macro|gtrends_memecoin_us/last_*,
             macro|gtrends_memecoin_us/pct_change_*,
+
+            macro|*period_3,
 
 
             # # Segment Value
@@ -337,10 +358,10 @@ coin_modeling: #CoinModel
             '*/count_pct',
 
             '*|*/*/kurt',
-            '*|*/*/median',
+            # '*|*/*/median',
             '*|*/*/p002',
             '*|*/*/p01',
-            # '*|*/*/p05',
+            '*|*/*/p05',
             '*|*/*/p10',
             '*|*/*/p90',
             # '*|*/*/p95',
@@ -427,18 +448,21 @@ coin_modeling: #CoinModel
             # estimator__tree_method: [hist]
 
             drop_columns__drop_patterns: [
-                # score_binary|cw_net_flows_1k/*,
-                # score_binary|cw_net_flows_inflows_50/*,
-                # score_binary|cw_net_gain_max_inv_50/*,
-                # score_binary|cw_net_gain_max_inv_80/*,
-                # score_binary|cw_net_gain_max_inv_n60/*,
-                # score_binary|cw_net_gain_max_inv_n80/*,
-                # '*|score_dist/cw_net_flows_1k/*',
-                '*|score_dist/cw_net_flows_inflows_50/*',
-                '*|score_dist/cw_net_gain_max_inv_50/*',
-                '*|score_dist/cw_net_gain_max_inv_80/*',
-                '*|score_dist/cw_net_gain_max_inv_n60/*',
-                '*|score_dist/cw_net_gain_max_inv_n80/*',
+                # score_binary|cw_coin_return_020/*,
+                macro|btc_mvrv_z_score/last_*,
+                macro|gtrends_altcoin_worldwide/last_*,
+                macro|gtrends_memecoin_us/last_*,
+
+                # # score_binary|*/1|trading/total_volume|aggregations/aggregations/sum,
+                # # score_binary|*/1|trading/total_volume|aggregations/aggregations/sum_pct,
+                # score_binary|*/1|trading/crypto_net_flows|aggregations/aggregations/sum,
+                # score_binary|*/1|trading/crypto_net_flows|aggregations/aggregations/sum_pct,
+                # # score_binary|*/1|trading/unique_coins_traded|aggregations/aggregations/sum,
+                # # score_binary|*/1|trading/unique_coins_traded|aggregations/aggregations/sum_pct,
+                # score_binary|*/1|balances/usd_balance_ending|aggregations/aggregations/sum_pct,
+                # score_binary|*/1|balances/usd_balance_ending|aggregations/aggregations/sum,
+                # # score_binary|*/1|trading/crypto_net_gain|aggregations/aggregations/sum,
+                # # score_binary|*/1|trading/crypto_net_gain|aggregations/aggregations/sum_pct,
 
 
             ]
@@ -453,5 +477,5 @@ coin_modeling: #CoinModel
 # CoinModel Multithreading
 # Determines how many workers will be used in multithreading executions
 n_threads: #CoinModel
-    concurrent_coin_epochs: 1
+    concurrent_coin_epochs: 4
     cw_flattening_threads: 4  # multithreads flattening in wallet_metrics_flattening.py

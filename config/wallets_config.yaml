@@ -7,28 +7,40 @@ training_data: #WalletModel
     #KeyParam Period Dates
     # modeling_period_start: '2023-07-11'
     # modeling_period_start: '2023-10-09'
-    modeling_period_start: '2024-01-07'
+    # modeling_period_start: '2023-12-08'
+    # modeling_period_start: '2024-01-07'
     # modeling_period_start: '2024-02-06'
     # modeling_period_start: '2024-05-06'
-    # modeling_period_start: '2024-06-05'
+    modeling_period_start: '2024-06-19'
     # modeling_period_start: '2024-07-05'
+    # modeling_period_start: '2024-08-04'
     # modeling_period_start: '2024-09-03'
-    # modeling_period_start: '2024-10-03'
+    # modeling_period_start: '2024-10-12'
     # modeling_period_start: '2024-11-02'
     # modeling_period_start: '2024-12-02'
     # modeling_period_start: '2025-01-01'
     # modeling_period_start: '2025-01-31'
     # modeling_period_start: '2025-03-02'
-    modeling_period_duration: 45
+    # modeling_period_start: '2025-03-16'
+    # modeling_period_start: '2025-03-31'
+    modeling_period_duration: 15
     training_window_lookbacks: [  # How many days prior to the modeling period each window begins
         # 480,
         # 420,
-        360,
-        300,
-        240,
-        180,
-        120,
+        # 360,
+        # 300,
+        # 240,
+        # 180,
+        # 120,
+        # 60,
+
+        # 7,
+        15,
+        30,
         60,
+        120,
+        240
+
     ]
     validation_period_end: '2025-04-30'  # toggle to activate/deactivate validation data
 
@@ -36,11 +48,11 @@ training_data: #WalletModel
     #KeyParam Training Data Toggles
     training_data_only: False  # if true, only generates training data to be scored by another model
     hybridize_wallet_ids: True  # if true, training data will be keyed on wallet-coin pairs
-    predrop_features: False  # if true, the feature_selection.drop_patterns will be applied early to save memory
+    predrop_features: True  # if true, the feature_selection.drop_patterns will be applied early to save memory
 
     #KeyParam Datasets zand Folders
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
-    parquet_folder: temp/wallet_modeling_dfs/dda_822_coin_return_targets_5m_mc  # where to store parquet files
+    parquet_folder: temp/wallet_modeling_dfs/dda_822_coin_return_targets_15d_v3  # where to store parquet files
     reference_dfs_folder: temp/reference_dfs  # Base folder where files that impact all runs are stored
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
@@ -68,7 +80,7 @@ modeling: #WalletModel
     # target_variable: cw_crypto_net_gain/crypto_inflows/base
     # target_variable: cw_crypto_net_gain/crypto_inflows/winsorized
     # target_variable: cw_crypto_net_gain/crypto_inflows/rank
-    # target_variable: cw_crypto_net_flows/crypto_inflows/base
+    target_variable: cw_crypto_net_flows/crypto_inflows/base
     # target_variable: cw_crypto_net_flows/crypto_inflows/winsorized
     # target_variable: cw_crypto_net_flows/crypto_inflows/rank
 
@@ -77,7 +89,7 @@ modeling: #WalletModel
     # target_variable: crypto_net_flows/crypto_inflows/base
     # target_variable: crypto_net_flows/crypto_inflows/winsorized
 
-    target_var_min_threshold: -.inf  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: -.inf  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: -0.80  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: -0.60  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: -0.40  # a classification model will try to predict the target var above this value
@@ -85,7 +97,9 @@ modeling: #WalletModel
     # target_var_min_threshold: -0.05  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.00  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.05  # a classification model will try to predict the target var above this value
-    # target_var_min_threshold: 0.15  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.10  # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.15  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.20  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.25  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.30  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.40  # a classification model will try to predict the target var above this value
@@ -101,31 +115,31 @@ modeling: #WalletModel
 
     # target_var_max_threshold: -0.60  # a classification model will try to predict the target var above this value
     # target_var_max_threshold: -0.50  # a classification model will try to predict the target var above this value
-    target_var_max_threshold: -0.40  # a classification model will try to predict the target var above this value
+    # target_var_max_threshold: -0.40  # a classification model will try to predict the target var above this value
     # target_var_max_threshold: -0.25  # a classification model will try to predict the target var above this value
     # target_var_max_threshold: -0.05  # a classification model will try to predict the target var above this value
     # target_var_max_threshold: 0.25  # a classification model will try to predict the target var above this value
     # target_var_max_threshold: 1.0  # a classification model will try to predict the target var above this value
-    # target_var_max_threshold: .inf  # a classification model will try to predict the target var above this value
+    target_var_max_threshold: .inf  # a classification model will try to predict the target var above this value
 
     # USD Targets
     # target_variable: cw_crypto_net_gain
     # # target_variable: crypto_net_gain
     # target_variable: cw_crypto_net_flows
     # target_variable: crypto_net_cash_flows
-    # y_pred_threshold: 0.7  # scores above this probability threshold are positive predictions
     # target_var_min_threshold: -1000  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 100  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 1000  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 5000  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 10000  # a classification model will try to predict the target var above this value
 
 
-    #KeyParam Modeling Cohort Definition
-    modeling_min_crypto_inflows: 1000
-    modeling_min_coins_traded: 1
-
     #KeyParam Epoch Assignment Toggle
     assign_epochs_to_addresses: True  # whether a given wallet has data for 1 or multiple epochs included in training data
+
+    #KeyParam Modeling Cohort Definition
+    modeling_min_crypto_inflows: 500
+    modeling_min_coins_traded: 3
 
     # Train/Test/Eval split
     test_size: 0.15  # what % of the total population will be used as test
@@ -143,10 +157,10 @@ modeling: #WalletModel
         # -------------------------------
         #KeyParam Tree Depth
         max_depth: 2  # how deep the trees can go
-        min_child_weight: 40  # what % of rows each tree must have
+        min_child_weight: 25  # what % of rows each tree must have
 
         #KeyParam True Positive Weighting
-        # scale_pos_weight: 20  # used for oversampling; number is a ratio of neg:pos, e.g. 20 means 20neg:1pos
+        # scale_pos_weight: 5  # used for oversampling; number is a ratio of neg:pos, e.g. 20 means 20neg:1pos
 
         subsample: 1.0  # samples rows, e.g. trees use x% of all wallet rows
         colsample_bytree: 0.9  # samples columns, e.g. trees use x% of all column features
@@ -157,7 +171,7 @@ modeling: #WalletModel
         # Performance Profiles (Choose One Section)
         # --------------------------------------
         #KeyParam Estimator Counts
-        n_estimators: 600  # number of trees to train in the model
+        n_estimators: 400  # number of trees to train in the model
         learning_rate: 0.8  # step size for updates to weights during training
 
         early_stopping_rounds: 10  # stop training if no improvement after x rounds
@@ -206,27 +220,27 @@ modeling: #WalletModel
             'cw_timing|btc_mvrv_z_score/lag_21*',
             'cw_timing|btc_mvrv_z_score/sell_weighted*',
             'cw_timing|btc_vdd_multiple/buy_weighted*',
-            'cw_timing|btc_vdd_multiple/lead_60*',
+            # 'cw_timing|btc_vdd_multiple/lead_60*',
             'cw_timing|btc_vdd_multiple/sell_weighted*',
             'cw_timing|gtrends_memecoin_us/buy_weighted*',
             'cw_timing|gtrends_memecoin_us/lead_21*',
             'cw_timing|gtrends_memecoin_us/sell_weighted*',
 
-            'cw_timing|price_sma_2/lag_15*',
+            # 'cw_timing|price_sma_2/lag_15*',
             'cw_timing|price_sma_2/lag_200*',
-            'cw_timing|price_sma_2/lag_30*',
-            # 'cw_timing|price_sma_2/lag_60*',
+            # 'cw_timing|price_sma_2/lag_30*',
+            'cw_timing|price_sma_2/lag_60*',
             'cw_timing|price_sma_2/lead_100*',
-            # 'cw_timing|price_sma_2/lead_30*',
+            'cw_timing|price_sma_2/lead_30*',
 
-            'cw_timing|volume_sma_12/lag_21*',
+            # 'cw_timing|volume_sma_12/lag_21*',
             # 'cw_timing|volume_sma_12/lag_80*',
             'cw_timing|volume_sma_12/lead_100*',
-            'cw_timing|volume_sma_12/lead_21*',
+            # 'cw_timing|volume_sma_12/lead_21*',
 
             'performance|crypto_net_flows/crypto_inflows*',
             'performance|crypto_net_flows/max_investment*',
-            'performance|crypto_net_gain/crypto_inflows*',
+            # 'performance|crypto_net_gain/crypto_inflows*',
             'performance|crypto_net_gain/max_investment*',
 
             'timing|btc_mvrv_z_score/buy_weighted*',
@@ -254,7 +268,7 @@ modeling: #WalletModel
             # 'cw_transfers|first_buy/avg_wallet_rank*',
             'cw_transfers|first_buy/median_avg_wallet_rank*',
             'cw_transfers|first_buy/min_avg_wallet_rank*',
-            # 'cw_transfers|first_buy/new_coin_transaction_counts*',
+            'cw_transfers|first_buy/new_coin_transaction_counts*',
 
             'cw_transfers|first_sell/avg_wallet_rank*',
             'cw_transfers|first_sell/median_avg_wallet_rank*',
@@ -316,9 +330,11 @@ modeling: #WalletModel
             # 'performance|crypto_net_flows*',
 
 
+            '*|all_windows',
+            '*|w7',
             '*|w6',
-            '*|w5',
-            '*|w4',
+            # '*|w5',
+            # '*|w4',
             # '*|w3',
             # '*|w2',
 
@@ -342,7 +358,7 @@ modeling: #WalletModel
         # -------------------------------
 
         # Search Methodology
-        # drop_patterns_include_n_features: 1  # if set to n, the drop_patterns grid search will apply all but n patterns for each model. otherwise, it will apply 1 drop pattern in each model.
+        drop_patterns_include_n_features: 1  # if set to n, the drop_patterns grid search will apply all but n patterns for each model. otherwise, it will apply 1 drop pattern in each model.
 
         n_iter: 40   # random search limit
         n_splits: 4  # cv splits
@@ -412,20 +428,8 @@ modeling: #WalletModel
 
             # # Column Selection
             drop_columns__drop_patterns: [
-                # '*|all_windows',
-                # '*|w3',
-                # '*|w2',
 
-                # 'cw_mktcap|end_portfolio_wtd_market_cap/market_cap_unadj*',
-                # 'cw_mktcap|end_portfolio_wtd_market_cap/market_cap_filled*',
-
-
-                # 'cw_performance|crypto_net_flows/crypto_inflows*',
-                # 'cw_performance|crypto_net_flows/max_investment*',
-                # 'cw_performance|crypto_net_gain/crypto_inflows*',
-                # 'cw_performance|crypto_net_gain/max_investment*',
-
-                # 'cw_timing|btc_mvrv_z_score/buy_weighted*',
+                # # 'cw_timing|btc_mvrv_z_score/buy_weighted*',
                 # 'cw_timing|btc_mvrv_z_score/lag_21*',
                 # 'cw_timing|btc_mvrv_z_score/sell_weighted*',
                 # 'cw_timing|btc_vdd_multiple/buy_weighted*',
@@ -435,38 +439,23 @@ modeling: #WalletModel
                 # 'cw_timing|gtrends_memecoin_us/lead_21*',
                 # 'cw_timing|gtrends_memecoin_us/sell_weighted*',
 
-                # 'cw_timing|price_sma_2/lag_15*',
+                # # 'cw_timing|price_sma_2/lag_15*',
                 # 'cw_timing|price_sma_2/lag_200*',
                 # 'cw_timing|price_sma_2/lag_30*',
-                # 'cw_timing|price_sma_2/lag_60*',
+                # # 'cw_timing|price_sma_2/lag_60*',
                 # 'cw_timing|price_sma_2/lead_100*',
                 # 'cw_timing|price_sma_2/lead_30*',
 
-                # 'cw_timing|volume_sma_12/lag_21*',
+                # # 'cw_timing|volume_sma_12/lag_21*',
                 # 'cw_timing|volume_sma_12/lag_80*',
                 # 'cw_timing|volume_sma_12/lead_100*',
-                # 'cw_timing|volume_sma_12/lead_21*',
-
-                # 'performance|crypto_net_flows/crypto_inflows*',
-                # 'performance|crypto_net_flows/max_investment*',
-                # 'performance|crypto_net_gain/crypto_inflows*',
-                # 'performance|crypto_net_gain/max_investment*',
-
-                # 'timing|btc_mvrv_z_score/buy_weighted*',
-                # 'timing|btc_mvrv_z_score/lag_21*',
-                # 'timing|btc_mvrv_z_score/sell_weighted*',
-                # 'timing|btc_vdd_multiple/buy_weighted*',
-                # 'timing|btc_vdd_multiple/lead_60*',
-                # 'timing|btc_vdd_multiple/sell_weighted*',
-                # 'timing|gtrends_memecoin_us/buy_weighted*',
-                # 'timing|gtrends_memecoin_us/lead_21*',
-                # 'timing|gtrends_memecoin_us/sell_weighted*',
+                # # 'cw_timing|volume_sma_12/lead_21*',
 
                 # 'timing|price_sma_2/lag_15*',
                 # 'timing|price_sma_2/lag_200*',
                 # 'timing|price_sma_2/lag_30*',
                 # 'timing|price_sma_2/lag_60*',
-                # 'timing|price_sma_2/lead_100*',
+                # # 'timing|price_sma_2/lead_100*',
                 # 'timing|price_sma_2/lead_30*',
 
                 # 'timing|volume_sma_12/lag_21*',
@@ -474,31 +463,12 @@ modeling: #WalletModel
                 # 'timing|volume_sma_12/lead_100*',
                 # 'timing|volume_sma_12/lead_21*',
 
-                # 'cw_trading|average_transaction*',
-                # 'cw_trading|crypto_cash_buys*',
-                # 'cw_trading|crypto_cash_sells*',
-                # 'cw_trading|crypto_inflows*',
-                # 'cw_trading|crypto_net_cash_flows*',
-                # 'cw_trading|crypto_net_flows*',
-                # 'cw_trading|crypto_net_gain*',
-                # 'cw_trading|crypto_outflows*',
-                # 'cw_trading|max_investment*',
-                # 'cw_trading|total_volume*',
-                # 'cw_trading|unique_coins_traded*',
-
                 # 'cw_transfers|first_buy/avg_wallet_rank*',
-                # 'cw_transfers|first_buy/median_avg_wallet_rank*',
-                # 'cw_transfers|first_buy/min_avg_wallet_rank*',
                 # 'cw_transfers|first_buy/new_coin_transaction_counts*',
                 # 'cw_transfers|first_sell/avg_wallet_rank*',
-                # 'cw_transfers|first_sell/median_avg_wallet_rank*',
-                # 'cw_transfers|first_sell/min_avg_wallet_rank*',
                 # 'cw_transfers|first_sell/new_coin_transaction_counts*',
                 # 'cw_transfers|initial_hold_time/avg_wallet_rank*',
-                # 'cw_transfers|initial_hold_time/median_avg_wallet_rank*',
-                # 'cw_transfers|initial_hold_time/min_avg_wallet_rank*',
                 # 'cw_transfers|initial_hold_time/new_coin_transaction_counts*',
-                # 'cw_transfers|initial_hold_time*',
 
                 # # 'macro|btc_mvrv_z_score_last*',
                 # 'macro|btc_mvrv_z_score_std*',
@@ -509,40 +479,6 @@ modeling: #WalletModel
                 # 'macro|global_market_cap_std*',
                 # 'macro|gtrends_altcoin_worldwide_std*',
                 # 'macro|gtrends_memecoin_us_std*',
-
-                # 'mktcap|end_portfolio_wtd_market_cap*',
-                # 'mktcap|portfolio_mcap_max*',
-                # 'mktcap|portfolio_mcap_mean*',
-                # 'mktcap|portfolio_mcap_median*',
-                # 'mktcap|portfolio_mcap_min*',
-                # 'mktcap|portfolio_mcap_std*',
-                # 'mktcap|volume_wtd_market_cap*',
-
-
-                # 'trading|average_transaction*',
-                # 'trading|crypto_cash_buys*',
-                # 'trading|crypto_cash_sells*',
-                # 'trading|crypto_inflows*',
-                # 'trading|crypto_net_cash_flows*',
-                # 'trading|crypto_net_flows*',
-                # 'trading|crypto_net_gain*',
-                # 'trading|crypto_outflows*',
-                # 'trading|max_investment*',
-                # 'trading|total_volume*',
-                # 'trading|unique_coins_traded*',
-
-                # 'transfers|first_buy/avg_wallet_rank*',
-                # 'transfers|first_buy/median_avg_wallet_rank*',
-                # 'transfers|first_buy/min_avg_wallet_rank*',
-                # 'transfers|first_buy/new_coin_transaction_counts*',
-                # 'transfers|first_sell/avg_wallet_rank*',
-                # 'transfers|first_sell/median_avg_wallet_rank*',
-                # 'transfers|first_sell/min_avg_wallet_rank*',
-                # 'transfers|first_sell/new_coin_transaction_counts*',
-                # 'transfers|initial_hold_time/avg_wallet_rank*',
-                # 'transfers|initial_hold_time/median_avg_wallet_rank*',
-                # 'transfers|initial_hold_time/min_avg_wallet_rank*',
-                # 'transfers|initial_hold_time/new_coin_transaction_counts*',
 
             ]
 
@@ -567,9 +503,9 @@ data_cleaning: #WalletModel
     min_coins_traded: 4  # Exclude wallets that have traded fewer coins than this during the training period; overridden to 1 if hybrid IDs are used
     max_coins_traded: 350  # Exclude wallets that have traded more coins than this during the training period
 
-    min_wallet_investment: 2000 # time weighted average balance filter
-    min_wallet_inflows: 2000  # Exclude wallets with inflows below this amount (USD)
-    min_wallet_volume: 3000  # Exclude wallets with fewer than this amount of training period USD volume
+    min_wallet_investment: 1500 # time weighted average balance filter
+    min_wallet_inflows: 1500  # Exclude wallets with inflows below this amount (USD)
+    min_wallet_volume: 2000  # Exclude wallets with fewer than this amount of training period USD volume
 
     max_wallet_investment: 25_000_000 # time weighted average balance filter
     max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
@@ -582,8 +518,8 @@ data_cleaning: #WalletModel
     max_initial_market_cap: 1_000_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
     min_ending_market_cap: 5_000_000  # coins above this market cap as of the end of the training period will be removed from all datasets
     max_ending_market_cap: 1_000_000_000  # coins above this market cap as of the end of the training period will be removed from all datasets
-    max_gap_days: 15  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
-    min_daily_volume: 2000 # Minimum average daily volume the coin must have
+    max_gap_days: 7  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
+    min_daily_volume: 10000 # Minimum average daily volume the coin must have
 
     # Warnings about potential data gaps in profits_df or market_data_df
     coverage_decrease_audit_window: 10  # how far to look back to assess decreases in coverage
@@ -595,7 +531,7 @@ data_cleaning: #WalletModel
     # Market cap imputation filters
     min_mc_imputation_coverage: 0.1  # coins with market cap coverage below this level will have hardcoded market cap values filled
     max_mc_imputation_multiple: 3.0  # will not impute dates where the imputed market cap exceeds the max known market cap * this ratio
-    market_cap_default_fill:  500_000  # coins below the imputation coverage level will have empty values filled with this
+    market_cap_default_fill: 500_000  # coins below the imputation coverage level will have empty values filled with this
 
 
 # WalletModel Features
@@ -603,7 +539,7 @@ features: #WalletModel
     # Trading Params
     include_twb_metrics: False  # whether to calculate time weighted balances
     include_twr_metrics: False  # whether to calculate time weighted returns
-    usd_materiality: 5  # dates with both transfers and balances below this level will be ignored for time weighted returns
+    usd_materiality: 20  # dates with both transfers and balances below this level will be ignored for time weighted returns
     twr_max_annual_return: 100.0  # caps the max annual return at this percent (100.0 is a 100x return)
 
     # Performance Params
@@ -659,8 +595,8 @@ features: #WalletModel
 # Determines how many workers will be used in multithreading executions
 n_threads: #WalletModel
     raw_data_retrieval: 3  # retrieves raw dfs from bigquery
-    profits_row_imputation: 4  # generates imputed rows in profits_df
+    profits_row_imputation: 6  # generates imputed rows in profits_df
     training_dfs_preparation: 3  # generates market indicators, macro indicators, cohort profits dfs
     epoch_tm_features: 2  # determines whether training and modeling features are generated concurrently or sequentially
-    concurrent_epochs: 10  # how many epochs' training data are processed concurrently
+    concurrent_epochs: 12  # how many epochs' training data are processed concurrently
     concurrent_windows: 8  # how many windows are processed concurrently
