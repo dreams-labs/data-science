@@ -1,5 +1,5 @@
 # WalletModel
-investing_epochs: [
+investment_cycles: [
 # Long term validation of how well this model's predictions perform
 #  over epochs starting in [30,60,90] days.
         # 270,
@@ -58,5 +58,5 @@ trading:
 
 
 n_threads:
-    investing_epochs: 8  # how many investing epochs are calculated concurrently
+    investment_cycles: 8  # how many investing epochs are calculated concurrently
     buy_logic_epochs: 6  # how many epoch buys to choose based on scores
