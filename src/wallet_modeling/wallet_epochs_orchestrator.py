@@ -397,7 +397,10 @@ class WalletEpochsOrchestrator:
             epoch_training_data_df = self._merge_hybrid_dfs(epoch_training_data_df,hybridized_training_data_df)
 
             # Downcast all features
+            logger.info("Downcasting full training_data_df...")
+            start_time = time.time()
             epoch_training_data_df = u.df_downcast(epoch_training_data_df)
+            logger.info("(%.1fs) Downcasted full training_data_df.", time.time() - start_time)
             # Save features
             output_folder = f"{epoch_config['training_data']['parquet_folder']}/"
             epoch_training_data_df.to_parquet(f"{output_folder}/training_data_df.parquet", index=True)
@@ -563,6 +566,8 @@ class WalletEpochsOrchestrator:
         training_profits_df.to_parquet(f"{output_folder}/training_profits_df.parquet", index=True)
         if generate_modeling:
             modeling_profits_df.to_parquet(f"{output_folder}/modeling_profits_df.parquet", index=True)
+        if not self.complete_hybrid_cw_id_df.empty:
+            self.complete_hybrid_cw_id_df.to_parquet(f"{output_folder}/complete_hybrid_cw_id_df.parquet", index=True)
         logger.info("(%.1fs) Saved %s profits_df files to %s.",
             time.time() - start_time, model_start, output_folder)
 
@@ -830,6 +835,13 @@ class WalletEpochsOrchestrator:
         if not self.base_config['training_data']['hybridize_wallet_ids']:
             return pd.DataFrame()
 
+        # Shortcut: load if exists
+        parquet_folder = f"{self.base_config['training_data']['parquet_folder']}/"
+        hybrid_id_df_path = f"{parquet_folder}/complete_hybrid_cw_id_df.parquet"
+        if os.path.exists(hybrid_id_df_path):
+            return pd.read_parquet(hybrid_id_df_path)
+
+
         # Load comprehensive hybrid mapping
         reference_dfs_folder = self.base_config['training_data']['reference_dfs_folder']
         comprehensive_hybrid_path = f"{reference_dfs_folder}/comprehensive_hybrid_id_mapping.parquet"
@@ -849,9 +861,10 @@ class WalletEpochsOrchestrator:
 
         # Extract unique coin-wallet pairs from complete_profits_df
         profits_pairs = (
-            self.complete_profits_df
-            .reset_index()[['coin_id', 'wallet_address']]
-            .drop_duplicates()
+            self.complete_profits_df.index
+            .droplevel('date')   # remove the time dimension
+            .unique()            # unique pairs only
+            .to_frame(index=False)
         )
 
         # Ensure profits_pairs coin_id is also string (should be by default)

@@ -649,7 +649,6 @@ class CoinEpochsOrchestrator:
         # Hybridize wallet IDs if configured
         if wallets_config['training_data']['hybridize_wallet_ids']:
             hybrid_map = pd.read_parquet(f"{pf}/complete_hybrid_cw_id_df.parquet")
-            wtdo.validate_hybrid_mapping_completeness(wamo_profits_df, hybrid_map)
             wamo_profits_df = wtdo.hybridize_wallet_address(
                 wamo_profits_df, hybrid_map
             )
@@ -1003,7 +1002,7 @@ class CoinEpochsOrchestrator:
 
         # Build Cartesian combos
         train_epochs  = [c + w for c in coin_train for w in w_train]
-        val_epochs    = [c + v for c in coin_val  for v in w_val]
+        val_epochs    = [c + v for c in coin_val for v in w_val]
 
         # Single merged list
         all_offsets = sorted(

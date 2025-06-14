@@ -781,7 +781,10 @@ class WalletTrainingDataOrchestrator:
             cw_returns,
             self.wallets_config['features']['returns_winsorization']
         )
-        wallet_target_vars_df['coin_return_rank'] = pd.Series(cw_returns).rank(method='average')
+        wallet_target_vars_df['coin_return_rank'] = pd.Series(
+            cw_returns,
+            index=wallet_target_vars_df.index
+        ).rank(method='average')
 
         return wallet_target_vars_df
 

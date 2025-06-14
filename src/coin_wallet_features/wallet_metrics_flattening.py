@@ -145,38 +145,22 @@ def flatten_cw_to_coin_features(
 
     result_df = pd.DataFrame(index=pd.Index(all_coin_ids, name='coin_id'))
 
-    for segment_value in wallet_segmentation_df[segment_family].unique():
+    # Binary score columns should only make metrics for positive predictions
+    if segment_family.startswith('score_binary'):
+        segments_to_process = ['1']
+    else:
+        segments_to_process = wallet_segmentation_df[segment_family].unique()
 
-        # Check for missing binary '1' segments and create dummy columns if necessary to ensure
-        #  that all epochs have identical columns, even if one has no positive predictions
-        if (
-            segment_family.startswith('score_binary') and
-            '1' not in wallet_segmentation_df[segment_family].unique()
-        ):
-            if '1' not in wallet_segmentation_df[segment_family].unique():
-                # No positives in this epoch - create dummy '1' columns with zeros
-                dummy_columns = {
-                    f'{segment_family}/1|{metric_column}|aggregations/aggregations/sum': 0,
-                    f'{segment_family}/1|{metric_column}|aggregations/aggregations/count': 0,
-                    f'{segment_family}/1|{metric_column}|aggregations/aggregations/sum_pct': 0,
-                    f'{segment_family}/1|{metric_column}|aggregations/aggregations/count_pct': 0,
-                }
-                dummy_df = pd.DataFrame(dummy_columns, index=pd.Index(all_coin_ids, name='coin_id'))
-                result_df = result_df.join(dummy_df, how='left')
-                continue
-
-        # Don't break out 0 values of classification binaries
-        if segment_family.startswith('score_binary') and segment_value == '0':
-            continue
+    for segment_value in segments_to_process:
 
         # Computes basic aggregations
         aggregation_metrics_df = calculate_aggregation_metrics(
             analysis_df, segment_family, segment_value,
             metric_column, totals_df
         )
+
         result_df = result_df.join(aggregation_metrics_df,how='left')\
             .fillna({col: 0 for col in aggregation_metrics_df.columns})
-
 
         # #FeatureRemoval Not Predictive
         # # Computes weighted balance scores
@@ -187,15 +171,12 @@ def flatten_cw_to_coin_features(
         # result_df = result_df.join(score_metrics_df,how='left') # leave nulls as null
 
 
-        # Checks if the column is includes material usd values
-        if analysis_df[metric_column].abs().mean() > (10 * usd_materiality):
-
-            # Add new distribution metrics
-            score_dist_metrics_df = calculate_score_distribution_metrics(
-                analysis_df, segment_family, segment_value,
-                metric_column, score_columns, usd_materiality
-            )
-            result_df = result_df.join(score_dist_metrics_df,how='left') # leave nulls as null
+        # Add new distribution metrics
+        score_dist_metrics_df = calculate_score_distribution_metrics(
+            analysis_df, segment_family, segment_value,
+            metric_column, score_columns, usd_materiality
+        )
+        result_df = result_df.join(score_dist_metrics_df,how='left') # leave nulls as null
 
     # Validation
     missing_coins = set(all_coin_ids) - set(result_df.index)
@@ -235,6 +216,20 @@ def calculate_aggregation_metrics(
     """
     segment_mask = analysis_df[segment_family] == segment_value
     segment_data = analysis_df[segment_mask]
+
+    if segment_data.empty:
+        # Create empty metrics with correct columns and index structure
+        columns = [
+            f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/sum',
+            f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/count',
+            f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/sum_pct',
+            f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/count_pct'
+        ]
+        return pd.DataFrame(
+            0.0,
+            index=totals_df.index,  # Same index as totals_df
+            columns=columns
+        )
 
     metrics = segment_data.groupby(level='coin_id', observed=True).agg({
         metric_column: 'sum',
@@ -329,6 +324,25 @@ def calculate_score_distribution_metrics(
         (analysis_df[segment_family] == segment_value) &
         (analysis_df[metric_column] >= usd_materiality)
     ].copy()
+
+    # Handle empty case - create consistent column structure
+    if seg_data.empty:
+        # Generate all expected column names
+        suffixes = ['median', 'p002', 'p01', 'p05', 'p10', 'p90', 'p95', 'p99', 'p998', 'std', 'skew', 'kurt']
+        columns = []
+        for score_col in score_columns:
+            score_name = score_col.split('|')[1]  # "scores|xxx" -> "xxx"
+            for suffix in suffixes:
+                columns.append(f'{segment_family}/{segment_value}|{metric_column}|score_dist/{score_name}/{suffix}')
+
+        # Return empty DataFrame with correct structure
+        # Use analysis_df's coin_id index to maintain consistency
+        coin_ids = analysis_df.index.get_level_values('coin_id').unique()
+        return pd.DataFrame(
+            0.0,
+            index=pd.Index(coin_ids, name='coin_id'),
+            columns=columns
+        )
 
     # percentiles
     p002_df =   seg_data.groupby(level='coin_id', observed=True)[score_columns].quantile(0.002)

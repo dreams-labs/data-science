@@ -109,7 +109,8 @@ def compute_validation_coin_returns(
     complete_market_data_df: pd.DataFrame,
     model_id: str,
     min_inflows: float = 0,
-    n_buckets: int = 20
+    n_buckets: int = 20,
+    performance_duration: int = 7
 ) -> tuple[pd.Series, pd.Series]:
     """
     Runs validation analysis by loading data, filtering, calculating returns, and comparing predictions.
@@ -119,6 +120,7 @@ def compute_validation_coin_returns(
     - model_id (str): UUID string identifying the model to use for predictions.
     - min_inflows (float): Minimum inflow threshold for filtering validation data.
     - n_buckets (int): Number of buckets for prediction vs performance plot.
+    - performance_duration (int): How many days of a coin's performance to measure
 
     Returns:
     - tuple: (validation_y_pred, validation_y_performance) prediction and performance series.
@@ -141,7 +143,7 @@ def compute_validation_coin_returns(
     # Calculate coin returns
     returns_dfs = []
     for start_date in sorted(validation_coin_ids_df.index.get_level_values('epoch_start_date').unique()):
-        end_date = start_date + timedelta(days=wallets_config['training_data']['modeling_period_duration'])
+        end_date = start_date + timedelta(days=performance_duration)
         returns_df = civa.calculate_coin_performance(
             complete_market_data_df,
             start_date,

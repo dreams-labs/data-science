@@ -242,6 +242,7 @@ def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
 
 
 
+@u.timing_decorator
 def prepare_dataframes(
         profits_df: pd.DataFrame,
         market_indicators_df: pd.DataFrame,

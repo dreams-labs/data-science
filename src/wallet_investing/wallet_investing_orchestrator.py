@@ -64,6 +64,7 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         self.parquet_folder = (wallets_config['training_data']['parquet_folder']
                                .replace('wallet_modeling_dfs','wallet_investing_dfs'))
         self.model_id = None
+        self.buy_duration = None
 
         # wallets model configs
         self.wallets_config = wallets_config
@@ -87,7 +88,7 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def score_all_investing_epochs(
         self,
-        model_id
+        model_id: str,
     ) -> pd.DataFrame:
         """
         Orchestrate wallet model scoring across multiple investing epochs.
@@ -116,7 +117,8 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
 
     def determine_epoch_buys(
         self,
-        cw_scores_df: pd.DataFrame
+        cw_scores_df: pd.DataFrame,
+        buy_duration: int = None
     ) -> pd.DataFrame:
         """
         Assigns buys to coins in a boolean is_buy column based on params in the investing_config.yaml.
@@ -129,6 +131,12 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
             coin_return: showing the actual performance of the coin over the epoch modeling period
             is_buy: boolean showing whether the coin would be bought based on config params
         """
+        # Determine how many days after the prediction to check the price change
+        if buy_duration is not None:
+            self.buy_duration = buy_duration
+        else:
+            self.buy_duration = self.wallets_config['training_data']['modeling_period_duration'] - 1
+
         unique_epochs = cw_scores_df.index.get_level_values('epoch_start_date').unique()
         max_workers = self.investing_config['n_threads']['buy_logic_epochs']
 
@@ -148,7 +156,7 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
                     epoch_result = future.result()
                     all_returns_dfs.append(epoch_result)
                 except Exception as exc:
-                    raise ValueError(f'Epoch {epoch_start} generated an exception: {exc}')
+                    raise ValueError(f'Epoch {epoch_start} generated an exception: {exc}') from exc
 
         trading_df = pd.concat(all_returns_dfs)
         return trading_df
@@ -173,9 +181,7 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
 
         # 1) Compute actual coin returns
         # ------------------------------
-        epoch_end = epoch_start + (
-            timedelta(days=self.wallets_config['training_data']['modeling_period_duration']-1)
-        )
+        epoch_end = epoch_start + timedelta(days=self.buy_duration)
         coin_returns_df = civa.calculate_coin_performance(
             self.complete_market_data_df,
             epoch_start,
@@ -367,9 +373,8 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         all_offsets: list[int] = investing_offsets + base_wallet_offsets + base_wallet_val_offsets
 
         # Generate combined offsets by adding each investing offset to each base offset
-        base_offsets: list[int] = base_wallet_offsets + base_wallet_val_offsets
         for invest in investing_offsets:
-            all_offsets += [invest + base for base in base_offsets]
+            all_offsets += [invest + base for base in base_wallet_offsets]
 
         # Deduplicate and sort
         unique_offsets: list[int] = sorted(set(all_offsets))
@@ -395,26 +400,30 @@ class InvestingEpochsOrchestrator(ceo.CoinEpochsOrchestrator):
         Returns:
         - buy_coins (Series): Coin IDs that meet buy criteria
         """
-        score_threshold = self.investing_config['trading']['score_threshold']
-        min_scores = self.investing_config['trading']['min_scores']
+        high_score_threshold = self.investing_config['trading']['high_score_threshold']
+        min_high_scores = self.investing_config['trading']['min_high_scores']
+        min_average_score = self.investing_config['trading']['min_average_score']
         max_coins_per_epoch = self.investing_config['trading']['max_coins_per_epoch']
 
-        # Count how many coin-wallet pairs are above the score_threshold
-        buys_df = cw_scores_df[cw_scores_df['score'] > score_threshold]
+        # Count how many coin-wallet pairs are above the high_score_threshold
+        buys_df = cw_scores_df[cw_scores_df['score'] > high_score_threshold]
         buys_df = pd.DataFrame(buys_df.reset_index()
                                 .groupby('coin_id', observed=True)
                                 .size())
         buys_df.columns = ['high_scores']
 
         # Identify coins with enough high scores to buy
-        buys_df = buys_df[buys_df['high_scores'] > min_scores]
+        buys_df = buys_df[buys_df['high_scores'] > min_high_scores]
 
         # Determine mean scores
         mean_scores = cw_scores_df.copy().groupby('coin_id',observed=True)['score'].mean()
         mean_scores.name = 'mean_score'
+        buy_coins_df = buys_df.join(mean_scores)
+
+        # Filter based on mean score
+        buy_coins_df = buy_coins_df[buy_coins_df['mean_score'] >= min_average_score]
 
         # Limit buys to max number of coins
-        buy_coins_df = buys_df.join(mean_scores)
         buy_coins = (buy_coins_df.sort_values(by='mean_score', ascending=False)
                      .head(max_coins_per_epoch).index.values)
 

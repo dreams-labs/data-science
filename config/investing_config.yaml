@@ -1,39 +1,56 @@
 investing_epochs: [
 # Long term validation of how well this model's predictions perform
 #  over epochs starting in [30,60,90] days.
-    60,
-    120,
-    180,
-    # 240,
-    # 300,
-    # 360,
-    # 30,
-    # 90,
-    # 150,
-    # 210,
-    # 270,
-    # 330,
-    # 390,
-    # 420,
-    # 450,
-    # 480,
-    # 510,
-    # 540,
-    # 570,
-    # 600
+        270,
+        240,
+        210,
+        180,
+        150,
+        120,
+        90,
+        60,
+        30,
+        # 0,
+        # -30,
+        # -60,
+        # -90,
+        # -120,
+        # -150,
+        # -180,
+        # -210,
+        # -240,
+        # -270,
 ]
 
 training_data:
-    toggle_overwrite_parquet: True  # determines whether to load preexisting training_data_dfs
-    # toggle_overwrite_parquet: False  # determines whether to load preexisting training_data_dfs
+    # toggle_overwrite_parquet: True  # determines whether to load preexisting training_data_dfs
+    toggle_overwrite_parquet: False  # determines whether to load preexisting training_data_dfs
 
 # Params that define trading strategy
 trading:
-    score_threshold: 0.95  # What is considered a "high score" for buy decisions
-    min_scores: 25  # How many "high scores" a coin should have to be bought
-    max_coins_per_epoch:  5  # only this number of coins will be bought, sorted by mean score
+    # high_score_threshold: 0.6  # What is considered a "high score" for buy decisions
+    # high_score_threshold: 0.7  # What is considered a "high score" for buy decisions
+    # high_score_threshold: 0.8  # What is considered a "high score" for buy decisions
+    # high_score_threshold: 0.85  # What is considered a "high score" for buy decisions
+    # high_score_threshold: 0.9  # What is considered a "high score" for buy decisions
+    high_score_threshold: 0.95  # What is considered a "high score" for buy decisions
+
+    # min_high_scores: 5  # How many "high scores" a coin should have to be bought
+    min_high_scores: 10  # How many "high scores" a coin should have to be bought
+    # min_high_scores: 15  # How many "high scores" a coin should have to be bought
+    # min_high_scores: 20  # How many "high scores" a coin should have to be bought
+
+    min_average_score: 0.0  # The minimum average score for a coin to be included
+    # min_average_score: 0.30  # The minimum average score for a coin to be included
+    # min_average_score: 0.40  # The minimum average score for a coin to be included
+    # min_average_score: 0.50  # The minimum average score for a coin to be included
+    # min_average_score: 0.60  # The minimum average score for a coin to be included
+
+    max_coins_per_epoch: 5  # only this number of coins will be bought, sorted by mean score
+    # max_coins_per_epoch: 10  # only this number of coins will be bought, sorted by mean score
+    # max_coins_per_epoch: 15  # only this number of coins will be bought, sorted by mean score
 
 
 n_threads:
-    investing_epochs: 6  # how many investing epochs are calculated concurrently
+    investing_epochs: 8  # how many investing epochs are calculated concurrently
     buy_logic_epochs: 6  # how many epoch buys to choose based on scores
