@@ -45,15 +45,21 @@ market_timing:
         gtrends_memecoin_us:
             offsets: [21] # lead_21
             retain_base_columns: True
-        # btc_price_rsi_100:
-        #     offsets: []
+
+        # # Coin time series
+        # price_sma_2:
+        #     offsets: [-90, -30, -15, -7, 7, 15, 30, 90]
+        #     retain_base_columns: False
+        # volume_sma_2:
+        #     offsets: [-90, -30, -15, -7, 7, 15, 30, 90]
+        #     retain_base_columns: False
+
+        # # Macro trends
+        # btc_mvrv_z_score:
+        #     offsets: [-90, -30, -15, -7, 7, 15, 30, 90]
         #     retain_base_columns: True
-        # btc_price_rsi_30:
-        #     offsets: []
+        # # btc_vdd_multiple:
+        # #     offsets: [-90, -30, -15, -7, 7, 15, 30, 90]
         #     retain_base_columns: True
-        # global_volume_rsi_100:
-        #     offsets: []
-        #     retain_base_columns: True
-        # global_volume_rsi_30:
-        #     offsets: []
-        #     retain_base_columns: True
+        # gtrends_memecoin_us:
+        #     offsets: [-90, -30, -15, -7, 7, 15, 30, 90] # lead_21
