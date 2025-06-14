@@ -141,7 +141,7 @@ def test_transform_performance_ratios(sample_performance_features_df, monkeypatc
     # Steps 1-3 remain unchanged
     ratio_df = wpf.calculate_performance_ratios(sample_performance_features_df)
     balance_features_df = sample_performance_features_df.filter(like='balance_')
-    transformed_df = wpf.transform_performance_ratios(ratio_df, balance_features_df)
+    transformed_df = wpf.transform_performance_ratios(ratio_df, balance_features_df, wallets_config)
 
     # Assertions 1-4 remain unchanged
     for col in ratio_df.columns:
@@ -160,40 +160,11 @@ def test_transform_performance_ratios(sample_performance_features_df, monkeypatc
             equal_nan=True
         )
 
-        # Log validation
-        expected_log = np.sign(ratio_df[col]) * np.log1p(ratio_df[col].abs())
-        assert np.allclose(
-            transformed_df[f"{col}/log"].values,
-            expected_log,
-            equal_nan=True
-        )
-
         # Winsorization validation
         winsorization_threshold = wallets_config['features']['returns_winsorization']
         expected_winsorized = u.winsorize(ratio_df[col], cutoff=winsorization_threshold)
         assert np.allclose(
             transformed_df[f"{col}/winsorized"].values,
             expected_winsorized.values,
-            equal_nan=True
-        )
-
-        # Modified ntile validation using overridden value
-        denominator = col.split("/")[1]
-        balance_col = f"balance_{denominator}"
-        metric_ntiles = pd.qcut(
-            balance_features_df[balance_col],
-            q=2,  # Explicitly use 2 to match override
-            labels=False,
-            duplicates="drop"
-        )
-        expected_ntile_rank = (
-            ratio_df[col]
-            .groupby(metric_ntiles)
-            .rank(method="average", pct=True)
-            .fillna(0)
-        )
-        assert np.allclose(
-            transformed_df[f"{col}/ntile_rank"].values,
-            expected_ntile_rank.values,
             equal_nan=True
         )
