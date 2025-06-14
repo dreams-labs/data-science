@@ -5,25 +5,8 @@
 training_data: #WalletModel
 
     #KeyParam Period Dates
-    # modeling_period_start: '2023-07-11'
-    # modeling_period_start: '2023-10-09'
-    # modeling_period_start: '2023-12-08'
-    # modeling_period_start: '2024-01-07'
-    # modeling_period_start: '2024-02-06'
-    # modeling_period_start: '2024-05-06'
-    modeling_period_start: '2024-06-19'
-    # modeling_period_start: '2024-07-05'
-    # modeling_period_start: '2024-08-04'
-    # modeling_period_start: '2024-09-03'
-    # modeling_period_start: '2024-10-12'
-    # modeling_period_start: '2024-11-02'
-    # modeling_period_start: '2024-12-02'
-    # modeling_period_start: '2025-01-01'
-    # modeling_period_start: '2025-01-31'
-    # modeling_period_start: '2025-03-02'
-    # modeling_period_start: '2025-03-16'
-    # modeling_period_start: '2025-03-31'
-    modeling_period_duration: 15
+    modeling_period_start: '2025-01-30'
+    modeling_period_duration: 30
     training_window_lookbacks: [  # How many days prior to the modeling period each window begins
         # 480,
         # 420,
@@ -35,14 +18,16 @@ training_data: #WalletModel
         # 60,
 
         # 7,
-        15,
+        # 15,
         30,
         60,
         120,
         240
 
     ]
-    validation_period_end: '2025-04-30'  # toggle to activate/deactivate validation data
+    # validation_period_end: '2025-04-30'  # toggle to activate/deactivate validation data
+    validation_period_end: '2025-05-30'  # toggle to activate/deactivate validation data
+    # validation_period_end: '2025-05-01'  # toggle to activate/deactivate validation data
 
     # Training Data Toggles
     #KeyParam Training Data Toggles
@@ -52,7 +37,7 @@ training_data: #WalletModel
 
     #KeyParam Datasets zand Folders
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
-    parquet_folder: temp/wallet_modeling_dfs/dda_822_coin_return_targets_15d_v3  # where to store parquet files
+    parquet_folder: temp/wallet_modeling_dfs/dda_841_cw_filters_30d  # where to store parquet files
     reference_dfs_folder: temp/reference_dfs  # Base folder where files that impact all runs are stored
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
@@ -69,7 +54,7 @@ modeling: #WalletModel
 
     #KeyParam Target Variable
     # Coin Return Rate
-    target_variable: cw_coin_return
+    # target_variable: cw_coin_return
     # target_variable: cw_coin_return_winsorized
     # target_variable: cw_coin_return_rank
 
@@ -77,10 +62,10 @@ modeling: #WalletModel
     # target_variable: cw_crypto_net_gain/max_investment/base
     # target_variable: cw_crypto_net_gain/max_investment/winsorized
     # target_variable: cw_crypto_net_gain/max_investment/rank
-    # target_variable: cw_crypto_net_gain/crypto_inflows/base
+    target_variable: cw_crypto_net_gain/crypto_inflows/base
     # target_variable: cw_crypto_net_gain/crypto_inflows/winsorized
     # target_variable: cw_crypto_net_gain/crypto_inflows/rank
-    target_variable: cw_crypto_net_flows/crypto_inflows/base
+    # target_variable: cw_crypto_net_flows/crypto_inflows/base
     # target_variable: cw_crypto_net_flows/crypto_inflows/winsorized
     # target_variable: cw_crypto_net_flows/crypto_inflows/rank
 
@@ -94,12 +79,13 @@ modeling: #WalletModel
     # target_var_min_threshold: -0.60  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: -0.40  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: -0.25  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: -0.20  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: -0.05  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.00  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.05  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.10  # a classification model will try to predict the target var above this value
-    target_var_min_threshold: 0.15  # a classification model will try to predict the target var above this value
-    # target_var_min_threshold: 0.20  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.15  # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.20  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.25  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.30  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.40  # a classification model will try to predict the target var above this value
@@ -117,6 +103,7 @@ modeling: #WalletModel
     # target_var_max_threshold: -0.50  # a classification model will try to predict the target var above this value
     # target_var_max_threshold: -0.40  # a classification model will try to predict the target var above this value
     # target_var_max_threshold: -0.25  # a classification model will try to predict the target var above this value
+    # target_var_max_threshold: -0.20  # a classification model will try to predict the target var above this value
     # target_var_max_threshold: -0.05  # a classification model will try to predict the target var above this value
     # target_var_max_threshold: 0.25  # a classification model will try to predict the target var above this value
     # target_var_max_threshold: 1.0  # a classification model will try to predict the target var above this value
@@ -139,7 +126,9 @@ modeling: #WalletModel
 
     #KeyParam Modeling Cohort Definition
     modeling_min_crypto_inflows: 500
-    modeling_min_coins_traded: 3
+    modeling_min_coins_traded: 1
+    cw_modeling_min_crypto_inflows: 100
+    cw_modeling_min_coins_traded: 1
 
     # Train/Test/Eval split
     test_size: 0.15  # what % of the total population will be used as test

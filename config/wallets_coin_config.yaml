@@ -18,8 +18,13 @@ training_data: #CoinModel
         # 150,
         # 120,
         # 60,
-        15
+        30,
+        # 15,
         # 0,
+        # -15,
+        # -30,
+        # -45,
+        # -60,
         # -60,
         # -120,
         # -180,
@@ -46,9 +51,9 @@ training_data: #CoinModel
         -120,
         -150,
         -180,
-        -210,
-        -240,
-        -270,
+        # -210,
+        # -240,
+        # -270,
         # -300,
         # -330,
         # -360,
@@ -78,6 +83,42 @@ wallet_scores: #CoinModel
             target_var_max_threshold: .inf
             y_pred_threshold: 0.8
 
+        # cw_coin_return_030:
+        #     model_type: classification
+        #     target_variable: cw_coin_return
+        #     target_var_min_threshold: 0.30
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.8
+
+        cw_coin_return_020_c3:
+            model_type: classification
+            target_variable: cw_coin_return
+            target_var_min_threshold: 0.20
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.8
+            modeling_min_coins_traded: 3
+
+        cw_coin_return_030:
+            model_type: classification
+            target_variable: cw_coin_return
+            target_var_min_threshold: 0.30
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.8
+
+        # cw_coin_return_040:
+        #     model_type: classification
+        #     target_variable: cw_coin_return
+        #     target_var_min_threshold: 0.40
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.8
+
+        # cw_coin_return_050:
+        #     model_type: classification
+        #     target_variable: cw_coin_return
+        #     target_var_min_threshold: 0.50
+        #     target_var_max_threshold: .inf
+        #     y_pred_threshold: 0.8
+
         cw_net_gain_inflows_020:
             model_type: classification
             target_variable: cw_crypto_net_gain/crypto_inflows/base
@@ -85,20 +126,19 @@ wallet_scores: #CoinModel
             target_var_max_threshold: .inf
             y_pred_threshold: 0.8
 
-        cw_net_flows_inflows_020:
+        cw_net_gain_inflows_030:
             model_type: classification
-            target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: 0.20
+            target_variable: cw_crypto_net_gain/crypto_inflows/base
+            target_var_min_threshold: 0.30
             target_var_max_threshold: .inf
             y_pred_threshold: 0.8
 
-        cw_net_flows_inflows_010:
+        cw_net_gain_inflows_040:
             model_type: classification
-            target_variable: cw_crypto_net_flows/crypto_inflows/base
-            target_var_min_threshold: 0.10
+            target_variable: cw_crypto_net_gain/crypto_inflows/base
+            target_var_min_threshold: 0.40
             target_var_max_threshold: .inf
             y_pred_threshold: 0.8
-
 
 
 # CoinModel Segments
@@ -119,7 +159,7 @@ features: #CoinModel
 
     # Which scores will have distribution metrics created
     score_distributions: [
-        cw_net_flows_inflows_020,
+        cw_net_gain_inflows_020,
         cw_coin_return_020
     ]
 
@@ -162,9 +202,11 @@ coin_modeling: #CoinModel
     # target_variable: coin_return_winsorized
     target_variable: coin_return
     # target_variable: coin_return_pctile_full
+    # target_var_min_threshold: 0.2 # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.25 # a classification model will try to predict the target var above this value
-    target_var_min_threshold: 0.3 # a classification model will try to predict the target var above this value
-    # target_var_min_threshold: 0.5 # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.3 # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.4 # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.5 # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.9 # a classification model will try to predict the target var above this value
     y_pred_threshold: 0.90  # scores above this probability threshold are positive predictions
 
@@ -183,8 +225,7 @@ coin_modeling: #CoinModel
 
     # Train/Test/Eval split
     test_size: 0.2  # what % of the total population will be used as test
-    # eval_size: 0.05  # what % used for the early stopping eval set
-    eval_size: 0.15  # what % used for the early stopping eval set
+    eval_size: 0.05  # what % used for the early stopping eval set
 
     # Metaparameters
     verbose_estimators: True  # whether to print each estimator's scores
@@ -204,17 +245,13 @@ coin_modeling: #CoinModel
             # market_data|*,
 
             # Segment Family
-            # score_binary|cw_coin_return_020/*,
-            score_binary|cw_net_gain_inflows_020/*,
-            score_binary|cw_net_flows_inflows_010/*,
-            score_binary|cw_net_flows_inflows_020/*,
-            score_binary|cw_net_flows_inflows_030/*,
-            score_binary|cw_net_flows_inflows_020_no_assign/*,
-            score_binary|cw_net_flows_inflows_n020/*,
-            score_binary|cw_net_flows_inflows_020_inflows2k/*,
-            score_binary|cw_net_flows_inflows_020_traded1/*,
-            score_binary|cw_net_flows_inflows_020_traded3/*,
 
+            score_binary|cw_coin_return_020/*,
+            # score_binary|cw_coin_return_020_c3/*,
+            score_binary|cw_coin_return_030/*,
+            score_binary|cw_net_gain_inflows_020/*,
+            score_binary|cw_net_gain_inflows_030/*,
+            score_binary|cw_net_gain_inflows_040/*,
 
             score_binary|*/1|trading/total_volume|aggregations/aggregations/sum,
             score_binary|*/1|trading/total_volume|aggregations/aggregations/sum_pct,
@@ -315,19 +352,15 @@ coin_modeling: #CoinModel
             # '*|trading/total_volume|*',
             '*|trading/unique_coins_traded|*',
             '*|trading/average_transaction|*',
-            '*|balances/usd_balance_starting*|*',
+            # '*|balances/usd_balance_starting*|*',
             # '*|balances/usd_balance_ending*|*',
 
 
             # Transformation Category
             # '*|aggregations/*',
-            # '*|score_dist/*',
-            # '*|score_dist/cw_net_flows_1k/*',
-            '*|score_dist/cw_net_flows_inflows_50/*',
-            # '*|score_dist/cw_net_gain_max_inv_50/*',
-            '*|score_dist/cw_net_gain_max_inv_80/*',
-            '*|score_dist/cw_net_gain_max_inv_n60/*',
-            '*|score_dist/cw_net_gain_max_inv_n80/*',
+            '*|score_dist/*',
+            # '*|score_dist/cw_net_gain_inflows_020/*',
+            # '*|score_dist/cw_coin_return_020/*',
             '*|score_wtd/*',
 
             'training_clusters|*|score_dist/*',
@@ -448,22 +481,18 @@ coin_modeling: #CoinModel
             # estimator__tree_method: [hist]
 
             drop_columns__drop_patterns: [
-                # score_binary|cw_coin_return_020/*,
-                macro|btc_mvrv_z_score/last_*,
-                macro|gtrends_altcoin_worldwide/last_*,
-                macro|gtrends_memecoin_us/last_*,
-
-                # # score_binary|*/1|trading/total_volume|aggregations/aggregations/sum,
-                # # score_binary|*/1|trading/total_volume|aggregations/aggregations/sum_pct,
-                # score_binary|*/1|trading/crypto_net_flows|aggregations/aggregations/sum,
-                # score_binary|*/1|trading/crypto_net_flows|aggregations/aggregations/sum_pct,
-                # # score_binary|*/1|trading/unique_coins_traded|aggregations/aggregations/sum,
-                # # score_binary|*/1|trading/unique_coins_traded|aggregations/aggregations/sum_pct,
-                # score_binary|*/1|balances/usd_balance_ending|aggregations/aggregations/sum_pct,
-                # score_binary|*/1|balances/usd_balance_ending|aggregations/aggregations/sum,
-                # # score_binary|*/1|trading/crypto_net_gain|aggregations/aggregations/sum,
-                # # score_binary|*/1|trading/crypto_net_gain|aggregations/aggregations/sum_pct,
-
+                # '*|trading/crypto_cash_buys|*',
+                # '*|trading/crypto_cash_sells|*',
+                # '*|trading/crypto_inflows|*',
+                # # '*|trading/crypto_net_cash_flows|*',
+                # # '*|trading/crypto_net_flows|*',
+                # '*|trading/crypto_net_gain|*',
+                # # '*|trading/crypto_outflows|*',
+                # '*|trading/max_investment|*',
+                # # '*|trading/total_volume|*',
+                # '*|trading/unique_coins_traded|*',
+                # # '*|trading/average_transaction|*',
+                # '*|balances/usd_balance_starting*|*',
 
             ]
 

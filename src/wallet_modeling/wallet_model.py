@@ -257,10 +257,18 @@ class WalletModel(BaseModel):
         self.training_data_df = training_data_df.copy()
 
         # Identify modeling cohort
-        cohort_mask = (
-            (wallet_target_vars_df['crypto_inflows'] >= self.modeling_config['modeling_min_crypto_inflows']) &
-            (wallet_target_vars_df['unique_coins_traded'] >= self.modeling_config['modeling_min_coins_traded'])
-        )
+        if 'cw_crypto_inflows' in wallet_target_vars_df.columns:
+            cohort_mask = (
+                (wallet_target_vars_df['crypto_inflows'] >= self.modeling_config['modeling_min_crypto_inflows']) &
+                (wallet_target_vars_df['unique_coins_traded'] >= self.modeling_config['modeling_min_coins_traded']) &
+                (wallet_target_vars_df['cw_crypto_inflows'] >= self.modeling_config['cw_modeling_min_crypto_inflows']) &
+                (wallet_target_vars_df['cw_unique_coins_traded'] >= self.modeling_config['cw_modeling_min_coins_traded'])
+            )
+        else:
+            cohort_mask = (
+                (wallet_target_vars_df['crypto_inflows'] >= self.modeling_config['modeling_min_crypto_inflows']) &
+                (wallet_target_vars_df['unique_coins_traded'] >= self.modeling_config['modeling_min_coins_traded'])
+            )
         logger.milestone("Defined modeling cohort as %.1f%% (%s/%s) wallets.",
             cohort_mask.sum()/len(wallet_target_vars_df)*100,
             cohort_mask.sum(),
