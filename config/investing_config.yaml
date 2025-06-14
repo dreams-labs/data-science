@@ -1,15 +1,17 @@
 investing_epochs: [
 # Long term validation of how well this model's predictions perform
 #  over epochs starting in [30,60,90] days.
-        270,
-        240,
-        210,
-        180,
-        150,
-        120,
-        90,
+        # 270,
+        # 240,
+        # 210,
+        # 180,
+        # 150,
+        # 120,
+        # 90,
         60,
+        45,
         30,
+        15,
         # 0,
         # -30,
         # -60,
@@ -30,17 +32,18 @@ training_data:
 trading:
     # high_score_threshold: 0.6  # What is considered a "high score" for buy decisions
     # high_score_threshold: 0.7  # What is considered a "high score" for buy decisions
-    # high_score_threshold: 0.8  # What is considered a "high score" for buy decisions
+    high_score_threshold: 0.8  # What is considered a "high score" for buy decisions
     # high_score_threshold: 0.85  # What is considered a "high score" for buy decisions
     # high_score_threshold: 0.9  # What is considered a "high score" for buy decisions
-    high_score_threshold: 0.95  # What is considered a "high score" for buy decisions
+    # high_score_threshold: 0.95  # What is considered a "high score" for buy decisions
 
     # min_high_scores: 5  # How many "high scores" a coin should have to be bought
     min_high_scores: 10  # How many "high scores" a coin should have to be bought
     # min_high_scores: 15  # How many "high scores" a coin should have to be bought
     # min_high_scores: 20  # How many "high scores" a coin should have to be bought
 
-    min_average_score: 0.0  # The minimum average score for a coin to be included
+    # min_average_score: 0.0  # The minimum average score for a coin to be included
+    min_average_score: 0.20  # The minimum average score for a coin to be included
     # min_average_score: 0.30  # The minimum average score for a coin to be included
     # min_average_score: 0.40  # The minimum average score for a coin to be included
     # min_average_score: 0.50  # The minimum average score for a coin to be included
