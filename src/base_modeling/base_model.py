@@ -15,7 +15,7 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import RandomizedSearchCV, train_test_split
 from sklearn.pipeline import Pipeline
-from xgboost import XGBRegressor, XGBClassifier
+from xgboost import XGBRegressor, XGBClassifier, XGBRanker
 
 # Local modules
 import base_modeling.feature_selection as fs
@@ -407,6 +407,9 @@ class BaseModel:
             ):
                 drop_pattern_combinations = self._create_drop_pattern_combinations()
             else:
+                # Add feature_retainer to get score if nothing is dropped
+                param_grid['drop_columns__drop_patterns'] = param_grid['drop_columns__drop_patterns'] + [['feature_retainer']]
+
                 base_drop_patterns = self.modeling_config['feature_selection']['drop_patterns']
                 drop_pattern_combinations = [
                     base_drop_patterns + grid_pattern
@@ -588,9 +591,11 @@ class BaseModel:
         elif self.modeling_config['model_type']=='regression':
             model = XGBRegressor
             model_params.setdefault('eval_metric', 'rmse')
+        elif self.modeling_config['model_type']=='ranker':
+            model = XGBRanker
+            model_params.setdefault('eval_metric', 'ndcg')
         else:
-            raise ValueError(f"Invalid model type '{self.modeling_config['model_type']}' found in config. "
-                             "Model type must be 'regression' or 'classification")
+            raise ValueError(f"Invalid model type '{self.modeling_config['model_type']}' found in config.")
 
         # Update min_child_weight if percentage is specified
         if model_params.get('min_child_weight_pct'):
