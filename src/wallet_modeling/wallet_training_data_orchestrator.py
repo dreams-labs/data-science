@@ -538,6 +538,9 @@ class WalletTrainingDataOrchestrator:
         if not market_indicators_df.index.is_unique:
             raise ValueError("market_data_df index has duplicate (coin_id, date) entries.")
 
+        # Filter market_indicators_df by date range
+        date_mask = macro_indicators_df.index.get_level_values('date') <= window_end_date
+        macro_indicators_df = macro_indicators_df[date_mask]
 
         # Calculate features for this window
         window_wallet_features_df = self.features_orchestrator.calculate_wallet_features(
