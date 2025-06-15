@@ -201,7 +201,9 @@ class WalletEpochsOrchestrator:
             'val_train':  base_path / 'multiwindow_validation_training_data_df.parquet',
             'val_tgt':    base_path / 'multiwindow_validation_target_vars_df.parquet',
         }
-        if all(p.exists() for p in paths.values()):
+        if all(p.exists() for p in paths.values()) \
+            and self.base_config['training_data']['rebuild_multiwindow_dfs'] == False:
+            self.base_config['training_data']['rebuild_multiwindow_dfs']
             logger.info("Loading saved multi-window epoch DataFrames from %s", base_path)
             wallet_training_data_df       = pd.read_parquet(paths['train'])
             wallet_target_vars_df         = pd.read_parquet(paths['train_tgt'])
