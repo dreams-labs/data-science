@@ -12,12 +12,12 @@ training_data: #CoinModel
         # 330,
         # 300,
         # 270,
-        240,
-        210,
-        180,
-        150,
-        120,
-        60,
+        # 240,
+        # 210,
+        # 180,
+        # 150,
+        # 120,
+        # 60,
         30,
         # 15,
         # 0,
@@ -66,6 +66,8 @@ training_data: #CoinModel
     # toggle_rebuild_wallet_models: True  # If True, all wallet models will be retrained
     toggle_rebuild_all_features: False  # If True, existing parquet features/target dfs will be overridden
     toggle_rebuild_wallet_models: False  # If True, all wallet models will be retrained
+
+    toggle_graph_model_performance: False  # If True, executes _plot_score_summaries()
 
 
 # CoinModel Wallet Scores
