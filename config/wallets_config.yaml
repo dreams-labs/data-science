@@ -35,6 +35,7 @@ training_data: #WalletModel
     training_data_only: False  # if true, only generates training data to be scored by another model
     hybridize_wallet_ids: True  # if true, training data will be keyed on wallet-coin pairs
     predrop_features: True  # if true, the feature_selection.drop_patterns will be applied early to save memory
+    rebuild_multiwindow_dfs: False  # if true, generate_epochs_training_data won't load parquet
 
     #KeyParam Datasets zand Folders
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
@@ -372,6 +373,15 @@ modeling: #WalletModel
         # -------------------------------
         # enabled: True
         # -------------------------------
+
+
+        #KeyParam Temporal Grid Search
+        temporal_search_toggle: True
+        temporal_search_offsets: [
+            0,
+            30
+        ]
+
 
         # Search Methodology
         drop_patterns_include_n_features: 1  # if set to n, the drop_patterns grid search will apply all but n patterns for each model. otherwise, it will apply 1 drop pattern in each model.
