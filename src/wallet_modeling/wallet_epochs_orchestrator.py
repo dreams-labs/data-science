@@ -201,8 +201,11 @@ class WalletEpochsOrchestrator:
             'val_train':  base_path / 'multiwindow_validation_training_data_df.parquet',
             'val_tgt':    base_path / 'multiwindow_validation_target_vars_df.parquet',
         }
-        if all(p.exists() for p in paths.values()) \
-            and self.base_config['training_data']['rebuild_multiwindow_dfs'] == False:
+        if (
+            all(p.exists() for p in paths.values())
+            and self.base_config['training_data']['rebuild_multiwindow_dfs'] == False
+            and not self.training_only
+        ):
             self.base_config['training_data']['rebuild_multiwindow_dfs']
             logger.info("Loading saved multi-window epoch DataFrames from %s", base_path)
             wallet_training_data_df       = pd.read_parquet(paths['train'])
@@ -695,7 +698,6 @@ class WalletEpochsOrchestrator:
             self._assert_no_epoch_overlap(modeling_offsets, validation_offsets)
 
         # Generate modeling epoch configs
-        # if not self.training_only:
         if self.training_only:
             offset_type = 'current'
         else:
