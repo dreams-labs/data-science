@@ -119,7 +119,7 @@ def calculate_epoch_coin_returns(
 
     for file in sorted(list(Path(base_folder).glob('*/wallet_model_ids.json'))):
 
-        start_date = datetime.strptime(file.parent.name,'%Y%m%d')
+        start_date = datetime.strptime(file.parent.name,'%y%m%d')
         end_date = start_date + timedelta(days=wallets_config['training_data']['modeling_period_duration'])
 
         # Calculate coin returns
@@ -132,7 +132,7 @@ def calculate_epoch_coin_returns(
         returns_df = returns_df.reset_index().set_index(['coin_id','epoch_start_date'])
 
         # Append indicators
-        json_path = Path(base_folder) / start_date.strftime('%Y%m%d') / 'wallet_model_ids.json'
+        json_path = Path(base_folder) / start_date.strftime('%y%m%d') / 'wallet_model_ids.json'
         with open(json_path, 'r', encoding='utf-8') as f:
             models_dict = json.load(f)
         try:
