@@ -553,7 +553,7 @@ class CoinEpochsOrchestrator:
         )
         file_prefix = pd.to_datetime(
             epoch_weo.base_config['training_data']['coin_modeling_period_start']
-        ).strftime('%Y%m%d')
+        ).strftime('%y%m%d')
 
         coin_features_df = cfo_inst.generate_coin_features_for_period(
             profits_df,
@@ -843,7 +843,7 @@ class CoinEpochsOrchestrator:
         # Build a date suffix from the modeling_period_start
         date_suffix = pd.to_datetime(
             epoch_wallets_config['training_data']['modeling_period_start']
-        ).strftime('%Y%m%d')
+        ).strftime('%y%m%d')
 
         # Deep-copy the coin config and adjust folder paths
         epoch_coins_config = copy.deepcopy(self.wallets_coin_config)
@@ -878,7 +878,7 @@ class CoinEpochsOrchestrator:
         latest_epoch_date = (
             pd.to_datetime(wallets_config['training_data']['modeling_period_start'])
             + timedelta(days=latest_epoch)
-        ).strftime('%Y%m%d')
+        ).strftime('%y%m%d')
 
         # Load model metadata
         latest_model_ids_path = (

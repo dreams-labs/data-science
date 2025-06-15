@@ -182,7 +182,7 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         date_prefix = (
             pd.to_datetime(self.wallets_config['training_data']['coin_modeling_period_start'])
             + timedelta(days=investment_cycle_offset)
-        ).strftime('%Y%m%d')
+        ).strftime('%y%m%d')
         parquet_folder = f"{self.wallets_coin_config['training_data']['parquet_folder']}/{date_prefix}"
 
         # Calculate epochs that are shifted by investment_cycle days
@@ -339,7 +339,7 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
 
         json_save_path = (
             f"{self.wallets_coin_config['training_data']['parquet_folder']}/"
-            f"{pd.to_datetime(self.wallets_config['training_data']['coin_modeling_period_start']).strftime('%Y%m%d')}/"
+            f"{pd.to_datetime(self.wallets_config['training_data']['coin_modeling_period_start']).strftime('%y%m%d')}/"
             "coin_model_ids.json"
         )
         with open(json_save_path, 'w', encoding='utf-8') as f:
