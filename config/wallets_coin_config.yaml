@@ -249,11 +249,11 @@ coin_modeling: #CoinModel
             # Segment Family
 
             score_binary|cw_coin_return_020/*,
-            # score_binary|cw_coin_return_020_c3/*,
-            score_binary|cw_coin_return_030/*,
+            score_binary|cw_coin_return_020_c3/*,
+            # score_binary|cw_coin_return_030/*,
             score_binary|cw_net_gain_inflows_020/*,
             score_binary|cw_net_gain_inflows_030/*,
-            score_binary|cw_net_gain_inflows_040/*,
+            # score_binary|cw_net_gain_inflows_040/*,
 
             score_binary|*/1|trading/total_volume|aggregations/aggregations/sum,
             score_binary|*/1|trading/total_volume|aggregations/aggregations/sum_pct,
@@ -444,7 +444,7 @@ coin_modeling: #CoinModel
         # -------------------------------
 
         # Search Methodology
-        drop_patterns_include_n_features: 1  # if set to n, the drop_patterns grid search will apply all but n patterns for each model. otherwise, it will apply 1 drop pattern in each model.
+        drop_patterns_include_n_features: 2  # if set to n, the drop_patterns grid search will apply all but n patterns for each model. otherwise, it will apply 1 drop pattern in each model.
 
         n_iter: 200  # random search limit
         n_splits: 5  # cv splits
@@ -482,21 +482,15 @@ coin_modeling: #CoinModel
             # estimator__max_bin: [128]
             # estimator__tree_method: [hist]
 
-            drop_columns__drop_patterns: [
-                # '*|trading/crypto_cash_buys|*',
-                # '*|trading/crypto_cash_sells|*',
-                # '*|trading/crypto_inflows|*',
-                # # '*|trading/crypto_net_cash_flows|*',
-                # # '*|trading/crypto_net_flows|*',
-                # '*|trading/crypto_net_gain|*',
-                # # '*|trading/crypto_outflows|*',
-                # '*|trading/max_investment|*',
-                # # '*|trading/total_volume|*',
-                # '*|trading/unique_coins_traded|*',
-                # # '*|trading/average_transaction|*',
-                # '*|balances/usd_balance_starting*|*',
+            # drop_columns__drop_patterns: [
+            #     score_binary|cw_coin_return_020/*,
+            #     score_binary|cw_coin_return_020_c3/*,
+            #     score_binary|cw_coin_return_030/*,
+            #     score_binary|cw_net_gain_inflows_020/*,
+            #     score_binary|cw_net_gain_inflows_030/*,
+            #     score_binary|cw_net_gain_inflows_040/*,
 
-            ]
+            # ]
 
 
 

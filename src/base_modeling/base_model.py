@@ -70,7 +70,8 @@ class BaseModel:
 
         # Convert drop patterns to a list of lists
         param_grid = self.modeling_config.get('grid_search_params', {}).get('param_grid', {})
-        if 'drop_columns__drop_patterns' in param_grid:
+        if 'drop_columns__drop_patterns' in param_grid \
+        and self.modeling_config['grid_search_params'].get('enabled',False):
             grid_patterns = param_grid['drop_columns__drop_patterns']
             if grid_patterns and all(isinstance(p, str) for p in grid_patterns):
                 grid_patterns = [[p] for p in grid_patterns]
