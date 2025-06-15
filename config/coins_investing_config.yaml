@@ -19,8 +19,11 @@ investment_cycles: [
 # CoinModel
 training_data:
     # toggle_overwrite_parquet: True  # determines whether to load preexisting training_data_dfs
-    toggle_overwrite_parquet: False  # determines whether to load preexisting training_data_dfs
+    # toggle_overwrite_parquet: False  # determines whether to load preexisting training_data_dfs
 
+trading:
+    hold_time: 15  # price performance will be assessed after this many days
 
+# CoinModel
 n_threads:
-    investment_cycles: 8  # how many investing epochs are calculated concurrently
+    investment_cycles: 1  # how many investing epochs are calculated concurrently
