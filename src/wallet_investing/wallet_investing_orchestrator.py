@@ -104,9 +104,9 @@ class WalletsInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         self.model_id = model_id
 
         offsets = self.wallets_investing_config['investment_cycles']
-        n_threads = self.wallets_investing_config['n_threads']['investment_cycles']
 
         # Process each epoch concurrently
+        n_threads = self.wallets_investing_config['n_threads']['investment_cycles']
         with concurrent.futures.ThreadPoolExecutor(max_workers=n_threads) as executor:
             cw_scores_dfs = list(executor.map(self._score_investing_epoch, offsets))
 
