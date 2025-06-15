@@ -150,7 +150,8 @@ class WalletModel(BaseModel):
             if self.modeling_config['model_type'] == 'classification':
                 # get positive-class probabilities directly from pipeline
                 proba = meta_pipeline.predict_proba(self.X_validation)
-                pos_idx = list(meta_pipeline.named_steps['estimator'].classes_).index(1)
+                classes = list(meta_pipeline.named_steps['estimator'].classes_)
+                pos_idx = classes.index(1) if 1 in classes else 0
                 proba_series = pd.Series(proba[:, pos_idx], index=self.X_validation.index)
 
                 # Resolve F-beta string threshold if present
@@ -181,7 +182,8 @@ class WalletModel(BaseModel):
             if self.modeling_config['model_type'] == 'classification':
                 # get positive-class probabilities and apply threshold
                 proba = meta_pipeline.predict_proba(self.X_test)
-                pos_idx = list(meta_pipeline.named_steps['estimator'].classes_).index(1)
+                classes = list(meta_pipeline.named_steps['estimator'].classes_)
+                pos_idx = classes.index(1) if 1 in classes else 0
                 proba_series = pd.Series(proba[:, pos_idx], index=self.X_test.index)
 
                 # Apply configurable threshold for class prediction
@@ -204,7 +206,8 @@ class WalletModel(BaseModel):
                 # Transform test features for probability prediction
                 X_test_trans = self.pipeline.x_transformer_.transform(self.X_test)
                 probas = self.pipeline.estimator.predict_proba(X_test_trans)
-                pos_idx = list(self.pipeline.estimator.classes_).index(1)
+                classes = list(self.pipeline.estimator.classes_)
+                pos_idx = classes.index(1) if 1 in classes else 0
                 result['y_pred_proba'] = pd.Series(probas[:, pos_idx], index=self.X_test.index)
 
             # Optionally add predictions for full training cohort
