@@ -167,7 +167,8 @@ class WalletModelOrchestrator:
 
         logger.milestone(f"Prepared all {len(self.score_params)} wallet models.")
 
-        self._plot_score_summaries(evaluators)
+        if self.wallets_coin_config['training_data']['toggle_graph_model_performance']:
+            self._plot_score_summaries(evaluators)
 
         return models_json_dict
 

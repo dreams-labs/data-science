@@ -179,11 +179,11 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         - investment_start_date: when the investment purchases are made
         """
         # Identify file locations
+        parquet_folder = f"{self.wallets_coin_config['training_data']['parquet_folder']}"
         date_prefix = (
             pd.to_datetime(self.wallets_config['training_data']['coin_modeling_period_start'])
             + timedelta(days=investment_cycle_offset)
         ).strftime('%y%m%d')
-        parquet_folder = f"{self.wallets_coin_config['training_data']['parquet_folder']}/{date_prefix}"
 
         # Calculate epochs that are shifted by investment_cycle days
         base_epochs = self.wallets_coin_config['training_data']['coin_epochs_training']
@@ -208,10 +208,10 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
             file_prefix=f'{date_prefix}/validation_'
         )
 
-        training_data_df = pd.read_parquet(f"{parquet_folder}/training_multiwindow_coin_training_data_df.parquet")
-        training_target_var_df = pd.read_parquet(f"{parquet_folder}/training_multiwindow_coin_target_var_df.parquet")
-        val_data_df = pd.read_parquet(f"{parquet_folder}/validation_multiwindow_coin_training_data_df.parquet")
-        val_target_var_df = pd.read_parquet(f"{parquet_folder}/validation_multiwindow_coin_target_var_df.parquet")
+        training_data_df = pd.read_parquet(f"{parquet_folder}/{date_prefix}/training_multiwindow_coin_training_data_df.parquet")
+        training_target_var_df = pd.read_parquet(f"{parquet_folder}/{date_prefix}/training_multiwindow_coin_target_var_df.parquet")
+        val_data_df = pd.read_parquet(f"{parquet_folder}/{date_prefix}/validation_multiwindow_coin_training_data_df.parquet")
+        val_target_var_df = pd.read_parquet(f"{parquet_folder}/{date_prefix}/validation_multiwindow_coin_target_var_df.parquet")
 
         return (training_data_df, training_target_var_df, val_data_df, val_target_var_df), investment_start_date
 
