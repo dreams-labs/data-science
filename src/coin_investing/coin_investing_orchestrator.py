@@ -6,6 +6,7 @@ import logging
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime,timedelta
+import json
 import pandas as pd
 
 # Local module imports
@@ -94,28 +95,23 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
     ) -> pd.DataFrame:
         """
         Main orchestration method that:
-        1. For each epoch, generates coin training data
+        1. For each cycle, generates coin training data
         2. Trains a coin model on that data
         3. Scores coins in the subsequent period
         4. Consolidates results across all epochs
-
-        Returns:
-        - consolidated_results_df: Multi-indexed on (coin_id, epoch_start_date)
-          with columns: score, actual_return, is_buy
         """
+        # Extract investment cycles
+        investment_cycles = self.coins_investing_config['investment_cycles']
 
-        # # Store model ID for later reference
-        # investment_cycles = self.coins_investing_config['investment_cycles']
-        # n_threads = self.coins_investing_config['n_threads']['investment_cycles']
+        # Process each cycle concurrently
+        n_threads = self.coins_investing_config['n_threads']['investment_cycles']
+        with concurrent.futures.ThreadPoolExecutor(max_workers=n_threads) as executor:
+            cycle_scores_dfs = list(executor.map(self._process_single_investment_cycle, investment_cycles))
 
-        # # Process each epoch concurrently
-        # with concurrent.futures.ThreadPoolExecutor(max_workers=n_threads) as executor:
-        #     cw_scores_dfs = list(executor.map(self._score_investing_epoch, investment_cycles))
+        coin_scores_df = pd.concat(cycle_scores_dfs, ignore_index=False)
+        u.notify('soft_twinkle_musical')
 
-        # all_cw_scores_df = pd.concat(cw_scores_dfs, ignore_index=False)
-        # u.notify('soft_twinkle_musical')
-
-        # return all_cw_scores_df
+        return coin_scores_df
 
 
 
@@ -126,8 +122,7 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
 
     def _process_single_investment_cycle(
         self,
-        investment_cycle: int,
-        hold_time: int
+        investment_cycle_offset: int
     ) -> pd.DataFrame:
         """
         Process one epoch:
@@ -138,19 +133,20 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         5. Determine buy signals
         """
         # Generate training data
-        cycle_modeling_dfs, buy_date = self._build_cycle_training_data(investment_cycle)
+        cycle_modeling_dfs, buy_date = self._build_cycle_training_data(investment_cycle_offset)
 
         # Build model
-        model_id = self._train_cycle_coin_model(cycle_modeling_dfs)
+        model_id, model_evaluator = self._train_cycle_coin_model(cycle_modeling_dfs)
 
         # Score investment data
         y_pred = self._score_prediction_period(model_id, cycle_modeling_dfs[2])
 
         # Calculate actual performance
-        coin_returns_df = self._calculate_actual_performance(buy_date, hold_time)
+        coin_returns_df = self._calculate_actual_performance(buy_date)
 
         # Combine predictions with performance
         cycle_performance_df = coin_returns_df.join(y_pred,how='inner')
+        self._store_model_metrics(cycle_performance_df, model_evaluator)
 
         # Validate returns completeness
         if len(y_pred) > len(cycle_performance_df):
@@ -165,14 +161,14 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
 
     def _build_cycle_training_data(
         self,
-        investment_cycle: int
+        investment_cycle_offset: int
     ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         Generate coin training and validation data for a specific investment cycle by
         orchestrating coin epochs and loading the resulting multiwindow datasets.
 
         Params:
-        - investment_cycle (int): Days offset from base modeling period for this cycle
+        - investment_cycle_offset (int): Days offset from base modeling period for this cycle
 
         Returns:
         - Tuple of dataframes containing:
@@ -184,14 +180,14 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         """
         # Identify file locations
         date_prefix = (
-            pd.to_datetime(self.wallets_config['training_data']['modeling_period_start'])
-            + timedelta(days=investment_cycle)
+            pd.to_datetime(self.wallets_config['training_data']['coin_modeling_period_start'])
+            + timedelta(days=investment_cycle_offset)
         ).strftime('%Y%m%d')
         parquet_folder = f"{self.wallets_coin_config['training_data']['parquet_folder']}/{date_prefix}"
 
         # Calculate epochs that are shifted by investment_cycle days
         base_epochs = self.wallets_coin_config['training_data']['coin_epochs_training']
-        training_epochs = [x + investment_cycle for x in base_epochs]
+        training_epochs = [x + investment_cycle_offset for x in base_epochs]
         validation_epoch = [
             (max(training_epochs)
             + self.wallets_config['training_data']['modeling_period_duration'])
@@ -223,7 +219,7 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
     def _train_cycle_coin_model(
         self,
         cycle_modeling_dfs: pd.DataFrame
-    ) -> str:
+    ):
         """
         Train a coin model for this specific epoch.
         Returns model_id for scoring.
@@ -233,7 +229,7 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         coin_model_results = coin_model.construct_coin_model(*cycle_modeling_dfs)
 
         # Generate and save all model artifacts
-        coin_model_id, coin_evaluator, coin_scores_df = cimr.generate_and_save_coin_model_artifacts(
+        coin_model_id, coin_evaluator, _ = cimr.generate_and_save_coin_model_artifacts(
             model_results=coin_model_results,
             base_path='../artifacts/coin_modeling',
             configs = {
@@ -246,7 +242,7 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         )
         coin_evaluator.plot_wallet_evaluation()
 
-        return coin_model_id
+        return coin_model_id, coin_evaluator
 
 
     def _score_prediction_period(
@@ -270,12 +266,12 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
 
     def _calculate_actual_performance(
         self,
-        buy_date: datetime,
-        hold_time: int
+        buy_date: datetime
     ) -> pd.DataFrame:
         """
         Determines the actual returns of coins over the investment cycle.
         """
+        hold_time = self.coins_investing_config['trading']['hold_time']
         sell_date = buy_date + timedelta(days=hold_time)
 
         # Compute actual coin returns
@@ -286,4 +282,67 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         )
 
         return coin_returns_df
+
+
+    def _store_model_metrics(
+        self,
+        cycle_performance_df: pd.DataFrame,
+        model_evaluator
+    ) -> dict:
+        """
+        Store quantile performance metrics and macro indicators for model evaluation.
+
+        Params:
+        - cycle_performance_df (DataFrame): Performance data with score and coin_return columns
+        - model_evaluator: Model evaluator object with X_test and X_validation attributes
+
+        Returns:
+        - coin_model_dict (dict): Serializable metrics dictionary
+        """
+        # 1) Compute quantile model metrics
+        all_quantiles = [x/20 for x in range(21)]
+        all_quantiles_df = pd.DataFrame(index=all_quantiles)
+        all_quantiles_df.index.name = 'quantile'
+
+        coin_returns_df = cycle_performance_df.copy()
+        coin_returns_df['quantile'] = round(coin_returns_df['score']*20).astype(int)/20
+        coin_returns_df['return_wins'] = u.winsorize(coin_returns_df['coin_return'])
+
+        quantile_returns_df = (coin_returns_df
+                            .groupby('quantile')
+                            .agg({
+                                'coin_return': ['mean', 'median', 'count'],
+                                'return_wins': 'mean'
+                            })
+                            .round(4))
+        quantile_returns_df.columns = ['coin_return_mean', 'coin_return_median', 'coin_return_count', 'return_wins_mean']
+
+        all_quantiles_df = all_quantiles_df.join(quantile_returns_df)
+        all_quantiles_df['coin_return_count'] = all_quantiles_df['coin_return_count'].fillna(0)
+
+        # 2) Extract macro indicators
+        max_date = model_evaluator.X_test.index.get_level_values('coin_epoch_start_date').max()
+        selected_row = model_evaluator.X_test.loc[
+            model_evaluator.X_test.index.get_level_values('coin_epoch_start_date') == max_date
+        ].iloc[0]
+
+        macro_mask = model_evaluator.X_validation.columns.astype(str).str.startswith('macro|')
+        macro_cols = model_evaluator.X_validation.columns[macro_mask]
+        macro_indicators = selected_row[macro_cols]
+
+        # 3) Convert to dict and save
+        coin_model_dict = {
+            'quantile_returns': all_quantiles_df.reset_index().to_dict(),
+            'macro_indicators': macro_indicators.to_dict(),
+            'model_id': model_evaluator.model_id
+        }
+
+        json_save_path = (
+            f"{self.wallets_coin_config['training_data']['parquet_folder']}/"
+            f"{pd.to_datetime(self.wallets_config['training_data']['coin_modeling_period_start']).strftime('%Y%m%d')}/"
+            "coin_model_ids.json"
+        )
+        with open(json_save_path, 'w', encoding='utf-8') as f:
+            json.dump(coin_model_dict, f, indent=4, default=u.numpy_type_converter)
+        logger.milestone(f"Saved coin_model_ids.json to {json_save_path}.")
 
