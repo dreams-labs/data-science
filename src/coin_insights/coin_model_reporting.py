@@ -49,8 +49,16 @@ def generate_and_save_coin_model_artifacts(
     # 1. Generate model evaluation metrics using WalletRegressorEvaluator
     if model_results['model_type'] == 'regression':
         evaluator = wime.RegressorEvaluator(model_results)
+        coin_scores_df = pd.DataFrame({
+            'score': model_results['y_pred'],
+            'actual': model_results['y_test']
+        })
     elif model_results['model_type'] == 'classification':
         evaluator = wime.ClassifierEvaluator(model_results)
+        coin_scores_df = pd.DataFrame({
+            'score': model_results['y_pred_proba'],
+            'actual': model_results['y_test']
+        })
     else:
         raise ValueError(f"Invalid model type {model_results['model_type']} found in results.")
 
@@ -62,11 +70,6 @@ def generate_and_save_coin_model_artifacts(
             'total_rows': len(model_results['X_train']) + len(model_results['X_test'])
         }
     }
-
-    coin_scores_df = pd.DataFrame({
-        'score': model_results['y_pred'],
-        'actual': model_results['y_test']
-    })
 
     model_results_artifacts={
         **model_results,
