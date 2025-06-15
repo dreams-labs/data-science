@@ -842,7 +842,7 @@ class CoinEpochsOrchestrator:
         """
         # Build a date suffix from the modeling_period_start
         date_suffix = pd.to_datetime(
-            epoch_wallets_config['training_data']['modeling_period_start']
+            epoch_wallets_config['training_data']['coin_modeling_period_start']
         ).strftime('%y%m%d')
 
         # Deep-copy the coin config and adjust folder paths
