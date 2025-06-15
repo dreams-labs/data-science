@@ -188,6 +188,33 @@ class WalletEpochsOrchestrator:
         Returns:
         - wallet_training_data_df, wallet_target_vars_df, validation_training_data_df, validation_target_vars_df
         """
+        # --- stub-load: load and return dfs if they exist ---
+        from pathlib import Path
+        parquet_folder = Path(self.base_config['training_data']['parquet_folder'])
+        date_str = pd.to_datetime(
+            self.base_config['training_data']['modeling_period_start']
+        ).strftime('%y%m%d')
+        base_path = parquet_folder / date_str
+        paths = {
+            'train':      base_path / 'multiwindow_wallet_training_data_df.parquet',
+            'train_tgt':  base_path / 'multiwindow_wallet_target_vars_df.parquet',
+            'val_train':  base_path / 'multiwindow_validation_training_data_df.parquet',
+            'val_tgt':    base_path / 'multiwindow_validation_target_vars_df.parquet',
+        }
+        if all(p.exists() for p in paths.values()):
+            logger.info("Loading saved multi-window epoch DataFrames from %s", base_path)
+            wallet_training_data_df       = pd.read_parquet(paths['train'])
+            wallet_target_vars_df         = pd.read_parquet(paths['train_tgt'])
+            validation_training_data_df   = pd.read_parquet(paths['val_train'])
+            validation_target_vars_df     = pd.read_parquet(paths['val_tgt'])
+            return (
+                wallet_training_data_df,
+                wallet_target_vars_df,
+                validation_training_data_df,
+                validation_target_vars_df,
+            )
+        # ----------------------------------------------------
+
         # Ensure the complete dfs encompass the full range of training_epoch_starts
         if not self.training_only:
             self._assert_complete_coverage()
@@ -266,27 +293,13 @@ class WalletEpochsOrchestrator:
 
         wallet_training_data_df = self._merge_epoch_dfs(modeling_period_training_dfs)
 
-        # Training‑only fast path
-        if self.training_only:
-            logger.milestone(
-                "Generated wallet multi‑epoch DataFrames with shapes:\n"
-                " - modeling train: %s\n"
-                " - modeling model: n/a\n"
-                " - validation train: n/a\n"
-                " - validation model: n/a",
-                wallet_training_data_df.shape,
-            )
-            return wallet_training_data_df, pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-
         # Full four‑tuple path
-        validation_training_data_df   = (self._merge_epoch_dfs(validation_period_training_dfs)
-                                         if validation_period_training_dfs else pd.DataFrame())
-        wallet_target_vars_df   = self._merge_epoch_dfs(modeling_period_target_var_dfs)
-        validation_target_vars_df = (self._merge_epoch_dfs(validation_period_target_var_dfs)
-                                         if validation_period_target_var_dfs else pd.DataFrame())
-
-        # Confirm indices match
-        u.assert_matching_indices(wallet_training_data_df, wallet_target_vars_df)
+        validation_training_data_df = (self._merge_epoch_dfs(validation_period_training_dfs)
+                                            if validation_period_training_dfs else pd.DataFrame())
+        wallet_target_vars_df       = (self._merge_epoch_dfs(modeling_period_target_var_dfs)
+                                            if modeling_period_target_var_dfs else pd.DataFrame())
+        validation_target_vars_df   = (self._merge_epoch_dfs(validation_period_target_var_dfs)
+                                            if validation_period_target_var_dfs else pd.DataFrame())
 
         logger.milestone(
             "Generated wallet multi‑epoch DataFrames with shapes:\n"
@@ -300,6 +313,14 @@ class WalletEpochsOrchestrator:
             validation_target_vars_df.shape
         )
         u.notify('level_up')
+
+        # --- stub-save: write all four multiwindow dfs (empty if needed) ---
+        base_path.mkdir(parents=True, exist_ok=True)
+        wallet_training_data_df.to_parquet(paths['train'], index=True)
+        wallet_target_vars_df.to_parquet(paths['train_tgt'], index=True)
+        validation_training_data_df.to_parquet(paths['val_train'], index=True)
+        validation_target_vars_df.to_parquet(paths['val_tgt'], index=True)
+        # ---------------------------------------------------------------
 
         return (
             wallet_training_data_df,
@@ -718,9 +739,9 @@ class WalletEpochsOrchestrator:
         - epoch_end (str): The last date to retain in the self.complete_profits_df
         """
         # Keep only records up to period_end
-        epoch_profits_df = (self.complete_profits_df.copy(deep=True)
-                      [self.complete_profits_df.index.get_level_values('date') <= epoch_end])
-        epoch_market_data_df = (self.complete_market_data_df.copy(deep=True)
+        epoch_profits_df      = (self.complete_profits_df.copy(deep=True)
+                                 [self.complete_profits_df.index.get_level_values('date') <= epoch_end])
+        epoch_market_data_df  = (self.complete_market_data_df.copy(deep=True)
                                  [self.complete_market_data_df.index.get_level_values('date') <= epoch_end])
         epoch_macro_trends_df = (self.complete_macro_trends_df.copy(deep=True)
                                  [self.complete_macro_trends_df.index.get_level_values('date') <= epoch_end])
