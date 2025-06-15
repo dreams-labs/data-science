@@ -4,8 +4,8 @@ investment_cycles: [
 #  over epochs starting in [30,60,etc] days.
         # 270,
         # 240,
-        # 210,
-        # 180,
+        210,
+        180,
         150,
         120,
         90,
@@ -22,7 +22,7 @@ training_data:
     # toggle_overwrite_parquet: False  # determines whether to load preexisting training_data_dfs
 
 trading:
-    hold_time: 15  # price performance will be assessed after this many days
+    hold_time: 30  # price performance will be assessed after this many days
 
 # CoinModel
 n_threads:

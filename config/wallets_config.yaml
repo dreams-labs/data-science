@@ -375,15 +375,6 @@ modeling: #WalletModel
         # enabled: True
         # -------------------------------
 
-
-        #KeyParam Temporal Grid Search
-        temporal_search_toggle: True
-        temporal_search_offsets: [
-            0,
-            30
-        ]
-
-
         # Search Methodology
         drop_patterns_include_n_features: 1  # if set to n, the drop_patterns grid search will apply all but n patterns for each model. otherwise, it will apply 1 drop pattern in each model.
 
