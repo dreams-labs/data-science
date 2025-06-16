@@ -14,7 +14,7 @@ time_series:  #WalletModel
             indicators:
                 sma:
                     parameters:
-                        window: [12]
+                        window: [2]
 
 
     # Controls what populates the macro_trends|* features

@@ -11,6 +11,8 @@ import wallet_features.time_series_features as wfts
 import coin_wallet_features.wallet_segmentation as cws
 import coin_wallet_features.wallet_metrics as cfwm
 import coin_wallet_features.wallet_metrics_flattening as cfwmf
+import coin_wallet_features.coin_time_series as cfts
+import coin_wallet_features.coin_metadata as cfmd
 import coin_insights.coin_validation_analysis as civa
 import utils as u
 
@@ -35,7 +37,10 @@ class CoinFeaturesOrchestrator:
         coin_flow_config: dict,
         coin_flow_modeling_config: dict,
         coin_flow_metrics_config: dict,
-        training_coin_cohort: pd.Series
+        training_coin_cohort: pd.Series,
+        complete_profits_df: pd.DataFrame = None,
+        complete_market_data_df: pd.DataFrame = None,
+        complete_macro_trends_df: pd.DataFrame = None,
     ):
         # Store configs
         self.wallets_config = wallets_config
@@ -48,11 +53,16 @@ class CoinFeaturesOrchestrator:
         # Store cohort
         self.training_coin_cohort = training_coin_cohort
 
-        # placeholders for intermediate DataFrames
+        # Placeholders for intermediate DataFrames
         self.modeling_profits_df = None
         self.modeling_market_data_df = None
         self.como_profits_df = None
         self.como_market_data_df = None
+
+        # Complete DataFrames
+        self.complete_profits_df = complete_profits_df
+        self.complete_market_data_df = complete_market_data_df
+        self.complete_macro_trends_df = complete_macro_trends_df
 
 
     # -----------------------------------------
@@ -105,8 +115,8 @@ class CoinFeaturesOrchestrator:
             raise ValueError("training_data_df contains duplicated wallet rows.")
 
 
-        # 1. Wallet-Based Features
-        # ------------------------
+        # Wallet-Based Features
+        # ---------------------
         # Generate metrics for coin-wallet pairs in training_data_df
         cw_metrics_df = cfwm.compute_coin_wallet_metrics(
             self.wallets_coin_config,
@@ -136,11 +146,14 @@ class CoinFeaturesOrchestrator:
             raise ValueError("Duplicate columns found in coin_training_data_df_full.")
 
 
-        # 2. Time Series Features
-        # -----------------------
+        # Time Series Features
+        # --------------------
         # Macroeconomic features
         if self.wallets_coin_config['features']['toggle_macro_features']:
-            macro_features_df = self._generate_macro_features(macro_indicators_df)
+            macro_features_df = cfts.generate_macro_features(
+                macro_indicators_df,
+                self.wallets_coins_metrics_config['time_series']['macro_trends']
+            )
             macro_features_df = macro_features_df.add_prefix('macro|')
             # cross join
             coin_training_data_df_full = (
@@ -153,7 +166,10 @@ class CoinFeaturesOrchestrator:
 
         # Market data features
         if self.wallets_coin_config['features']['toggle_market_features']:
-            market_features_df = self._generate_market_features(market_indicators_df)
+            market_features_df = cfts.generate_market_features(
+                market_indicators_df,
+                self.wallets_coins_metrics_config['time_series']['market_data']
+            )
             market_features_df = market_features_df.set_index('coin_id').add_prefix('market_data|')
             # join on coin_id
             u.assert_matching_indices(market_features_df,coin_training_data_df_full)
@@ -162,8 +178,15 @@ class CoinFeaturesOrchestrator:
                 raise ValueError("Duplicate columns found in coin_training_data_df_full.")
 
 
-        # 3. Coin Flow Model Features
-        # ---------------------------
+        # Coin Metadata Features
+        # ----------------------
+        metadata_features_df = cfmd.retrieve_metadata_df()
+        metadata_features_df = metadata_features_df.add_prefix('metadata|')
+        coin_training_data_df_full = coin_training_data_df_full.join(metadata_features_df)
+
+
+        # Coin Flow Model Features
+        # ------------------------
         # Generate and merge Coin Flow Model features if configured
         if self.wallets_coin_config['features']['toggle_coin_flow_model_features']:
 
@@ -291,74 +314,6 @@ class CoinFeaturesOrchestrator:
         u.notify('ui_1')
 
         return coin_features_df
-
-
-
-    def _generate_macro_features(
-        self,
-        macro_indicators_df: pd.DataFrame,
-    ) -> pd.DataFrame:
-        """
-        Params:
-        - macro_indicators_df (DataFrame): date-indexed macroeconomic indicators
-
-        Returns:
-        - macro_features_df (pd.DataFrame): single row dataframe containing a
-            column for each macro feature. These flattened features will be
-            cross joined onto every coin's record
-        """
-        macro_features_df = wfts.calculate_macro_features(
-            macro_indicators_df,
-            self.wallets_coins_metrics_config['time_series']['macro_trends']
-        )
-
-        # Rename macro feature columns: replace first underscore after key with '/'
-        macro_keys = self.wallets_coins_metrics_config['time_series']['macro_trends'].keys()
-        rename_map = {}
-        for col in macro_features_df.columns:
-            for key in macro_keys:
-                prefix = f"{key}_"
-                if col.startswith(prefix):
-                    rename_map[col] = f"{key}/{col[len(prefix):]}"
-                    break
-        if rename_map:
-            macro_features_df = macro_features_df.rename(columns=rename_map)
-
-        return macro_features_df
-
-
-
-    def _generate_market_features(
-        self,
-        market_indicators_df: pd.DataFrame,
-    ) -> pd.DataFrame:
-        """
-        Params:
-        - market_indicators_df (DataFrame): date-indexed marketeconomic indicators
-
-        Returns:
-        - market_features_df (pd.DataFrame): single row dataframe containing a
-            column for each market feature. These flattened features will be
-            cross joined onto every coin's record
-        """
-        market_features_df = wfts.calculate_market_data_features(
-            market_indicators_df,
-            self.wallets_coins_metrics_config['time_series']['market_data']
-        )
-
-        # Rename market feature columns: replace first underscore after key with '/'
-        market_keys = self.wallets_coins_metrics_config['time_series']['market_data'].keys()
-        rename_map = {}
-        for col in market_features_df.columns:
-            for key in market_keys:
-                prefix = f"{key}_"
-                if col.startswith(prefix):
-                    rename_map[col] = f"{key}/{col[len(prefix):]}"
-                    break
-        if rename_map:
-            market_features_df = market_features_df.rename(columns=rename_map)
-
-        return market_features_df
 
 
 

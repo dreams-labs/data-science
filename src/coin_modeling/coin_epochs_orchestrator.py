@@ -711,7 +711,7 @@ class CoinEpochsOrchestrator:
         # Use existing training data orchestrator for consistency
         wtdo_instance = wtdo.WalletTrainingDataOrchestrator(
             self.wallets_config,                # has no impact on indicators output
-            self.wallets_coins_metrics_config,  # coins metrics coCoinFeaturesOrchestratornfig
+            self.wallets_coins_metrics_config,  # coins metrics config
             self.wallets_features_config        # has no impact on indicators output
         )
 
@@ -766,7 +766,7 @@ class CoinEpochsOrchestrator:
         # Use existing training data orchestrator for consistency
         wtdo_instance = wtdo.WalletTrainingDataOrchestrator(
             wallets_config,                     # has no impact on indicators output
-            self.wallets_coins_metrics_config,  # coins metrics coCoinFeaturesOrchestratornfig
+            self.wallets_coins_metrics_config,  # coins metrics config
             self.wallets_features_config        # has no impact on indicators output
         )
 
