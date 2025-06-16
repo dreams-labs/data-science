@@ -329,6 +329,7 @@ class WalletEpochsOrchestrator:
             wallet_target_vars_df.to_parquet(paths['train_tgt'], index=True)
             validation_training_data_df.to_parquet(paths['val_train'], index=True)
             validation_target_vars_df.to_parquet(paths['val_tgt'], index=True)
+            logger.info(f"Saved multi-epoch dataframes to {base_path}.")
         # ---------------------------------------------------------------
 
         return (
