@@ -81,7 +81,10 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         )
         self.coin_epochs_orchestrator.load_complete_raw_datasets()
 
-
+        # Propagate loaded complete dfs to this orchestrator for use in build_all_wallet_data
+        self.complete_profits_df = self.coin_epochs_orchestrator.complete_profits_df
+        self.complete_market_data_df = self.coin_epochs_orchestrator.complete_market_data_df
+        self.complete_macro_trends_df = self.coin_epochs_orchestrator.complete_macro_trends_df
 
 
 
@@ -112,6 +115,30 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         u.notify('soft_twinkle_musical')
 
         return coin_scores_df
+
+
+
+
+
+    # -----------------------------------
+    #           Helper Methods
+    # -----------------------------------
+
+    def _compute_all_wallet_offsets(self) -> list[int]:
+        """
+        Extend the base wallet offsets by including combinations with investment cycles.
+        """
+        # Retrieve the base offsets from the parent CoinEpochsOrchestrator
+        base_offsets = super()._compute_all_wallet_offsets()
+        # Get the investment cycle offsets from this orchestrator's config
+        investment_cycles = self.coins_investing_config['investment_cycles']
+        # Generate extra offsets by adding each investment cycle to each base offset
+        extra_offsets = {offset + cycle for offset in base_offsets for cycle in investment_cycles}
+        # Combine and sort unique offsets
+        combined_offsets = sorted(set(base_offsets) | extra_offsets)
+
+        return combined_offsets
+
 
 
 
