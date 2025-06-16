@@ -110,7 +110,8 @@ class WalletFeaturesOrchestrator:
         trading_features_df = wtf.calculate_wallet_trading_features(profits_df,
             period_start_date,period_end_date,
             self.wallets_config['features']['include_twb_metrics'],
-            self.wallets_config['features']['include_twr_metrics'])
+            self.wallets_config['features']['include_twr_metrics']
+        )
         feature_column_names['trading|'] = trading_features_df.columns
         wallet_features_df = wallet_features_df.join(trading_features_df, how='left')\
             .fillna({col: 0 for col in trading_features_df.columns})
@@ -119,21 +120,25 @@ class WalletFeaturesOrchestrator:
         if self.wallets_config['features']['toggle_transfers_features']:
             transfers_sequencing_features_df = wts.calculate_transfers_features(
                 profits_df,
-                transfers_sequencing_df,
-                self.wallets_config['features']['include_transfers_features'])
+                transfers_sequencing_df
+            )
             feature_column_names['transfers|'] = transfers_sequencing_features_df.columns
             wallet_features_df = wallet_features_df.join(transfers_sequencing_features_df, how='left')
 
         # Balance features (left join, do not fill)
         if self.wallets_config['features']['toggle_balance_features']:
-            balance_features_df = wbf.calculate_balance_features(self.wallets_config,profits_df)
+            balance_features_df = wbf.calculate_balance_features(
+                self.wallets_config,
+                profits_df
+            )
             feature_column_names['balance|'] = balance_features_df.columns
             wallet_features_df = wallet_features_df.join(balance_features_df, how='left')
 
         # Macroeconomic features (cross join)
         macroeconomic_features_df = wfts.calculate_macro_features(
-                                        macro_indicators_df,
-                                        self.wallets_metrics_config['time_series']['macro_trends'])
+            macro_indicators_df,
+            self.wallets_metrics_config['time_series']['macro_trends']
+        )
         feature_column_names['macro|'] = macroeconomic_features_df.columns
         wallet_features_df = (wallet_features_df.reset_index()
                             .merge(macroeconomic_features_df, how='cross')
@@ -155,7 +160,8 @@ class WalletFeaturesOrchestrator:
         timing_features_df = wmt.calculate_market_timing_features(
             profits_df,
             market_indicators_data_df,
-            macro_indicators_df)
+            macro_indicators_df
+        )
         feature_column_names['timing|'] = timing_features_df.columns
         wallet_features_df = wallet_features_df.join(timing_features_df, how='left')\
             .fillna({col: 0 for col in timing_features_df.columns})
@@ -171,9 +177,12 @@ class WalletFeaturesOrchestrator:
 
         # Scenario transfers features (left join, do not fill)
         if self.wallets_config['features']['toggle_scenario_features']:
-            transfers_scenario_features_df = wsc.calculate_scenario_features(profits_df,
-                                                                            market_indicators_data_df,
-                                                                            period_start_date,period_end_date)
+            transfers_scenario_features_df = wsc.calculate_scenario_features(
+                profits_df,
+                market_indicators_data_df,
+                period_start_date,
+                period_end_date
+            )
             feature_column_names['scenario|'] = transfers_scenario_features_df.columns
             wallet_features_df = wallet_features_df.join(transfers_scenario_features_df, how='left')
 
