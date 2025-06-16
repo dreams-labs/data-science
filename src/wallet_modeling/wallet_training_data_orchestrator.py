@@ -312,8 +312,13 @@ class WalletTrainingDataOrchestrator:
         training_windows_profits_dfs = self._split_training_window_profits_dfs(
             profits_df, market_indicators_df, wallet_cohort
         )
+        # Reverse window order so w1 is the earliest window and numbers increase chronologically
+        #  Slice syntax: sequence[start:stop:step]
+        #  - start omitted ⇒ defaults to the beginning of the sequence
+        #  - stop  omitted ⇒ defaults to the end of the sequence
+        #  - step = -1     ⇒ move one position at a time, backwards
         windows_profits_tuples = [
-            (window_df, i + 1) for i, window_df in enumerate(training_windows_profits_dfs)
+            (window_df, i + 1) for i, window_df in enumerate(training_windows_profits_dfs[::-1])
         ]
 
         if not market_indicators_df.index.is_unique:

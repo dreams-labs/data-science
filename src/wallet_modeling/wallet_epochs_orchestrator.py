@@ -212,12 +212,15 @@ class WalletEpochsOrchestrator:
             wallet_target_vars_df         = pd.read_parquet(paths['train_tgt'])
             validation_training_data_df   = pd.read_parquet(paths['val_train'])
             validation_target_vars_df     = pd.read_parquet(paths['val_tgt'])
-            return (
-                wallet_training_data_df,
-                wallet_target_vars_df,
-                validation_training_data_df,
-                validation_target_vars_df,
-            )
+
+            if not any(df.empty for df in [wallet_training_data_df, wallet_target_vars_df,
+                                           validation_training_data_df, validation_target_vars_df]):
+                return (
+                    wallet_training_data_df,
+                    wallet_target_vars_df,
+                    validation_training_data_df,
+                    validation_target_vars_df,
+                )
         # ----------------------------------------------------
 
         # Ensure the complete dfs encompass the full range of training_epoch_starts
@@ -319,12 +322,13 @@ class WalletEpochsOrchestrator:
         )
         u.notify('level_up')
 
-        # --- stub-save: write all four multiwindow dfs (empty if needed) ---
-        base_path.mkdir(parents=True, exist_ok=True)
-        wallet_training_data_df.to_parquet(paths['train'], index=True)
-        wallet_target_vars_df.to_parquet(paths['train_tgt'], index=True)
-        validation_training_data_df.to_parquet(paths['val_train'], index=True)
-        validation_target_vars_df.to_parquet(paths['val_tgt'], index=True)
+        # --- stub-save: write all four multiwindow dfs -----------------
+        if not self.training_only:
+            base_path.mkdir(parents=True, exist_ok=True)
+            wallet_training_data_df.to_parquet(paths['train'], index=True)
+            wallet_target_vars_df.to_parquet(paths['train_tgt'], index=True)
+            validation_training_data_df.to_parquet(paths['val_train'], index=True)
+            validation_target_vars_df.to_parquet(paths['val_tgt'], index=True)
         # ---------------------------------------------------------------
 
         return (
