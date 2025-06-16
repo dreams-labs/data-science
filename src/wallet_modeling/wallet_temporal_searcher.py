@@ -32,7 +32,6 @@ class TemporalGridSearcher:
         wallets_features_config: dict,
         wallets_epochs_config: dict,
         modeling_dates: List[str],
-        force_regenerate_data: bool = False
     ):
         """
         Initialize the multi-temporal grid search orchestrator.
@@ -43,17 +42,18 @@ class TemporalGridSearcher:
         - wallets_features_config: Features configuration
         - wallets_epochs_config: Epochs configuration
         - modeling_dates: List of modeling period start dates (YYYY-MM-DD format)
-        - force_regenerate_data: If True, regenerate all training data regardless of cache
         """
         self.base_wallets_config = copy.deepcopy(base_wallets_config)
         self.wallets_metrics_config = wallets_metrics_config
         self.wallets_features_config = wallets_features_config
         self.wallets_epochs_config = wallets_epochs_config
         self.modeling_dates = modeling_dates
-        self.force_regenerate_data = force_regenerate_data
+
+        # If True, regenerate all training data regardless of cache
+        self.force_regenerate_data = base_wallets_config['training_data']['rebuild_multiwindow_dfs']
 
         # Validate grid search is enabled
-        if not self.base_wallets_config['modeling']['grid_search_params']['enabled']:
+        if not self.base_wallets_config['modeling']['grid_search_params'].get('enabled',False):
             raise ValueError("Grid search must be enabled in base configuration")
 
         # Storage for results
@@ -237,6 +237,15 @@ class TemporalGridSearcher:
         consolidated_df['max_score'] = consolidated_df[date_columns].max(axis=1)
         consolidated_df['score_range'] = consolidated_df['max_score'] - consolidated_df['min_score']
 
+        # Round all date columns to 3 decimal places
+        consolidated_df[date_columns] = consolidated_df[date_columns].round(3)
+        consolidated_df['mean_score'] = consolidated_df['mean_score'].round(3)
+        consolidated_df['median_score'] = consolidated_df['median_score'].round(3)
+        consolidated_df['stddev'] = consolidated_df['stddev'].round(3)
+        consolidated_df['min_score'] = consolidated_df['min_score'].round(3)
+        consolidated_df['max_score'] = consolidated_df['max_score'].round(3)
+        consolidated_df['score_range'] = consolidated_df['score_range'].round(3)
+
         # Count non-null values (periods where parameter was tested)
         consolidated_df['periods_tested'] = consolidated_df[date_columns].notna().sum(axis=1)
 
@@ -395,23 +404,31 @@ class TemporalGridSearcher:
         # Get stability analysis
         stability_df = self.analyze_parameter_stability()
 
-        # Display summary statistics
-        logger.info("\n" + "="*60)
-        logger.info("MULTI-TEMPORAL GRID SEARCH SUMMARY")
-        logger.info("="*60)
-        logger.info(f"Time periods analyzed: {len(self.modeling_dates)}")
-        logger.info(f"Date range: {min(self.modeling_dates)} to {max(self.modeling_dates)}")
-        logger.info(f"Total parameter combinations: {len(self.consolidated_results)}")
-        logger.info(f"Stable combinations: {stability_df['is_stable'].sum()}")
+        # Build summary message as single string
+        summary_lines = [
+            "",
+            "="*60,
+            "MULTI-TEMPORAL GRID SEARCH SUMMARY",
+            "="*60,
+            f"Time periods analyzed: {len(self.modeling_dates)}",
+            f"Date range: {min(self.modeling_dates)} to {max(self.modeling_dates)}",
+            f"Total parameter combinations: {len(self.consolidated_results)}",
+            f"Stable combinations: {stability_df['is_stable'].sum()}",
+            "",
+            "TOP 5 MOST STABLE PARAMETERS:",
+            "-" * 40
+        ]
 
-        # Show top 5 most stable parameters
-        logger.info("\nTOP 5 MOST STABLE PARAMETERS:")
-        logger.info("-" * 40)
-
+        # Add top 5 most stable parameters
         top_stable = stability_df.head(5)
         for _, row in top_stable.iterrows():
-            logger.info(f"{row['param']}: {row['param_value']}")
-            logger.info(f"  Mean Score: {row['mean_score']:.4f}")
-            logger.info(f"  Stability (CV): {row['coeff_variation']:.4f}")
-            logger.info(f"  Periods Tested: {row['periods_tested']}/{len(self.modeling_dates)}")
-            logger.info("")
+            summary_lines.extend([
+                f"{row['param']}: {row['param_value']}",
+                f"  Mean Score: {row['mean_score']:.4f}",
+                f"  Stability (CV): {row['coeff_variation']:.4f}",
+                f"  Periods Tested: {row['periods_tested']}/{len(self.modeling_dates)}",
+                ""
+            ])
+
+        # Log as single message
+        logger.info("\n".join(summary_lines))
