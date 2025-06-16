@@ -1,5 +1,4 @@
 import logging
-from typing import List
 import pandas as pd
 from dreams_core.googlecloud import GoogleCloud as dgc
 
@@ -53,5 +52,8 @@ def retrieve_metadata_df() -> pd.DataFrame:
 
     # Log retrieval stats
     logger.info("Retrieved metadata data for %s coins.", len(metadata_df))
+
+    # Set index
+    metadata_df = metadata_df.set_index('coin_id')
 
     return metadata_df
