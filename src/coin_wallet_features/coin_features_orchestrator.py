@@ -35,7 +35,10 @@ class CoinFeaturesOrchestrator:
         coin_flow_config: dict,
         coin_flow_modeling_config: dict,
         coin_flow_metrics_config: dict,
-        training_coin_cohort: pd.Series
+        training_coin_cohort: pd.Series,
+        complete_profits_df: pd.DataFrame = None,
+        complete_market_data_df: pd.DataFrame = None,
+        complete_macro_trends_df: pd.DataFrame = None,
     ):
         # Store configs
         self.wallets_config = wallets_config
@@ -48,11 +51,16 @@ class CoinFeaturesOrchestrator:
         # Store cohort
         self.training_coin_cohort = training_coin_cohort
 
-        # placeholders for intermediate DataFrames
+        # Placeholders for intermediate DataFrames
         self.modeling_profits_df = None
         self.modeling_market_data_df = None
         self.como_profits_df = None
         self.como_market_data_df = None
+
+        # Complete DataFrames
+        self.complete_profits_df = complete_profits_df
+        self.complete_market_data_df = complete_market_data_df
+        self.complete_macro_trends_df = complete_macro_trends_df
 
 
     # -----------------------------------------
