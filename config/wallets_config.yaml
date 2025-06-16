@@ -5,8 +5,11 @@
 training_data: #WalletModel
 
     #KeyParam Period Dates
-    modeling_period_start: '2024-07-04'
+    # modeling_period_start: '2024-07-04'
     # modeling_period_start: '2024-08-03'
+    # modeling_period_start: '2024-08-03'
+    modeling_period_start: '2024-09-02'
+    # modeling_period_start: '2024-10-02'
     # modeling_period_start: '2025-01-30'
     modeling_period_duration: 30
     training_window_lookbacks: [  # How many days prior to the modeling period each window begins
@@ -40,7 +43,7 @@ training_data: #WalletModel
 
     #KeyParam Datasets zand Folders
     dataset: dev  # Set to prod or dev; determines whether to query core or dev dataset tables
-    parquet_folder: temp/wallet_modeling_dfs/dda_842_coin_investing_orch_v8  # where to store parquet files
+    parquet_folder: temp/wallet_modeling_dfs/dda_845_more_coin_features  # where to store parquet files
     reference_dfs_folder: temp/reference_dfs  # Base folder where files that impact all runs are stored
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
@@ -480,10 +483,10 @@ data_cleaning: #WalletModel
     min_wallet_inflows: 1500  # Exclude wallets with inflows below this amount (USD)
     min_wallet_volume: 2000  # Exclude wallets with fewer than this amount of training period USD volume
 
-    max_wallet_investment: 25_000_000 # time weighted average balance filter
-    max_wallet_inflows: 100_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
-    max_wallet_volume: 55_000_000  # Exclude wallets with fewer than this amount of training period USD volume
-    max_wallet_profits: 100_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
+    max_wallet_investment: 15_000_000 # time weighted average balance filter
+    max_wallet_inflows: 25_000_000  # Exclude wallets with inflows greater than or equal to this amount (USD)
+    max_wallet_volume: 50_000_000  # Exclude wallets with fewer than this amount of training period USD volume
+    max_wallet_profits: 10_000_000  # Exclude wallets with aggregate net gain above this amount (USD)
 
     #KeyParam Coin Cohort Definitions
     # Market cap params used vs market_cap_filled
