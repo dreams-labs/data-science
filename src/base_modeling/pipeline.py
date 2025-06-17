@@ -46,18 +46,11 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
             self, X, y,
             eval_set=None,
             verbose_estimators=False,
-            modeling_config=None):
+            modeling_config=None,
+            sample_weight=None):
         """Fit the MetaPipeline on raw X and y data, using an optional eval_set for early stopping."""
         # First, transform y using the y_pipeline
         y_trans = self.y_pipeline.fit_transform(y)
-
-        # Generate sample weights if asymmetric loss is enabled
-        sample_weights = None
-        if modeling_config and modeling_config.get('asymmetric_loss', {}).get('enabled'):
-            asymmetric_config = modeling_config['asymmetric_loss']
-            sample_weights = np.ones(len(y_trans))
-            sample_weights[y_trans == 0] = asymmetric_config['loss_penalty_weight']
-            sample_weights[y_trans == 2] = asymmetric_config['win_reward_weight']
 
         # Create a transformer sub-pipeline (all steps except the final estimator)
         transformer = Pipeline(self.model_pipeline.steps[:-1])
@@ -81,8 +74,8 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
                 'eval_set': transformed_eval_set,
                 'verbose': verbose_estimators
             }
-            if sample_weights is not None:
-                fit_params['sample_weight'] = sample_weights
+            if sample_weight is not None:
+                fit_params['sample_weight'] = sample_weight
 
 
             # Fit with early stopping using the transformed eval set

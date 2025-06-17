@@ -207,13 +207,18 @@ class BaseModel:
         # Check if phase training is enabled
         phase_config = self.modeling_config.get('phase_training', {})
         if not phase_config.get('enabled'):
+
+            # Sample weights for asymmetric loss logic
+            sample_weight = self._generate_sample_weight(self.y_train)
+
             # Original single-phase training
             logger.info(f"Training model using data with shape: {X_train_transformed.shape}...")
             u.notify('startup')
             regressor.fit(
                 X_train_transformed,
                 self.y_train,
-                eval_set=eval_set
+                eval_set=eval_set,
+                sample_weight=sample_weight
             )
         else:
             # Multi-phase training
@@ -554,7 +559,7 @@ class BaseModel:
                 .sort_values(by='avg_score', ascending=False))
 
 
-    def _generate_sample_weights(self, y_transformed):
+    def _generate_sample_weight(self, y_transformed):
         """Generate sample weights for asymmetric loss"""
         asymmetric_config = self.modeling_config.get('asymmetric_loss', {})
         if not asymmetric_config.get('enabled'):

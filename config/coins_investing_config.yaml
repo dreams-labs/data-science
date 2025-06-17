@@ -19,7 +19,6 @@ investment_cycles: [
 # CoinModel
 training_data:
     # toggle_overwrite_parquet: True  # determines whether to load preexisting training_data_dfs
-    # toggle_overwrite_parquet: False  # determines whether to load preexisting training_data_dfs
 
 trading:
     hold_time: 30  # price performance will be assessed after this many days
