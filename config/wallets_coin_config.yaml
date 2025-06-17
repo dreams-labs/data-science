@@ -269,37 +269,33 @@ coin_modeling: #CoinModel
             # score_binary|*/1|trading/crypto_net_gain|aggregations/aggregations/sum_pct,
 
 
-            # # macro|btc_mvrv_z_score/last_*,
-            # macro|btc_mvrv_z_score/pct_change_30d*,
-            # # macro|btc_mvrv_z_score/*pct_change_7d*,
-            # macro|btc_mvrv_z_score/sma_1_std,
+            # macro|btc_mvrv_z_score/last_*,
+            macro|btc_mvrv_z_score/pct_change_30d*,
+            # macro|btc_mvrv_z_score/*pct_change_7d*,
+            macro|btc_mvrv_z_score/sma_1_std,
             # macro|btc_mvrv_z_score/std_30d*,
-            # macro|btc_vdd_multiple/std_*,
-            # macro|btc_vdd_multiple/last_*,
-            # macro|global_volume/std_*,
+            macro|btc_vdd_multiple/std_*,
+            macro|btc_vdd_multiple/last_*,
+            macro|global_volume/std_*,
             # macro|btc_price/std_*,
-            # macro|btc_price/pct_change_*,
+            macro|btc_price/pct_change_*,
 
-            # macro|btc_mvrv_z_score/sma_1_last,
-            # macro|global_volume/last_*,
-            # macro|global_market_cap/last_*,
-            # macro|btc_price/last_*,
-            # macro|global_market_cap/rsi_30*,
-            # macro|global_market_cap/std_*,
-            # macro|global_market_cap/pct_change_*,
-            # macro|btc_vdd_multiple/std_*_period_2,
-            # macro|btc_vdd_multiple/std_*_period_3,
-            # macro|btc_vdd_multiple/last_*_period_3,
-            # macro|btc_price/std_*_period_2,
-            # macro|btc_price/std_*_period_3,
-            # macro|btc_price/pct_change_*_period_2,
-            # macro|btc_price/pct_change_*_period_3,
-            # macro|gtrends_altcoin_worldwide/std_*,
-            # # macro|gtrends_altcoin_worldwide/last_*,
-            # macro|gtrends_altcoin_worldwide/pct_change_*,
-            # macro|gtrends_memecoin_us/std_*,
-            # # macro|gtrends_memecoin_us/last_*,
-            # macro|gtrends_memecoin_us/pct_change_*,
+            macro|btc_mvrv_z_score/sma_1_last,
+            macro|global_volume/last_*,
+            macro|global_market_cap/last_*,
+            macro|btc_price/last_*,
+            macro|global_market_cap/rsi_30*,
+            macro|global_market_cap/std_*,
+            macro|global_market_cap/pct_change_*,
+            macro|btc_vdd_multiple/std_*_period_2,
+            macro|btc_price/std_*_period_2,
+            macro|btc_price/pct_change_*_period_2,
+            macro|gtrends_altcoin_worldwide/std_*,
+            # macro|gtrends_altcoin_worldwide/last_*,
+            macro|gtrends_altcoin_worldwide/pct_change_*,
+            macro|gtrends_memecoin_us/std_*,
+            # macro|gtrends_memecoin_us/last_*,
+            macro|gtrends_memecoin_us/pct_change_*,
 
             macro|*period_3,
 
@@ -450,7 +446,7 @@ coin_modeling: #CoinModel
 
         #KeyParam Grid Search
         # -------------------------------
-        # enabled: True
+        enabled: True
         # -------------------------------
 
         # Search Methodology
@@ -495,40 +491,40 @@ coin_modeling: #CoinModel
             # estimator__max_bin: [128]
             # estimator__tree_method: [hist]
 
-            # drop_columns__drop_patterns: [
-            #     # macro|btc_mvrv_z_score/last_*,
-            #     macro|btc_mvrv_z_score/pct_change_30d*,
-            #     # macro|btc_mvrv_z_score/*pct_change_7d*,
-            #     macro|btc_mvrv_z_score/sma_1_std,
-            #     macro|btc_mvrv_z_score/std_30d*,
-            #     macro|btc_vdd_multiple/std_*,
-            #     macro|btc_vdd_multiple/last_*,
-            #     macro|global_volume/std_*,
-            #     macro|btc_price/std_*,
-            #     macro|btc_price/pct_change_*,
+            drop_columns__drop_patterns: [
+                # macro|btc_mvrv_z_score/last_*,
+                macro|btc_mvrv_z_score/pct_change_30d*,
+                # macro|btc_mvrv_z_score/*pct_change_7d*,
+                macro|btc_mvrv_z_score/sma_1_std,
+                macro|btc_mvrv_z_score/std_30d*,
+                macro|btc_vdd_multiple/std_*,
+                macro|btc_vdd_multiple/last_*,
+                macro|global_volume/std_*,
+                macro|btc_price/std_*,
+                macro|btc_price/pct_change_*,
 
-            #     macro|btc_mvrv_z_score/sma_1_last,
-            #     macro|global_volume/last_*,
-            #     macro|global_market_cap/last_*,
-            #     macro|btc_price/last_*,
-            #     macro|global_market_cap/rsi_30*,
-            #     macro|global_market_cap/std_*,
-            #     macro|global_market_cap/pct_change_*,
-            #     macro|btc_vdd_multiple/std_*_period_2,
-            #     macro|btc_vdd_multiple/std_*_period_3,
-            #     macro|btc_vdd_multiple/last_*_period_3,
-            #     macro|btc_price/std_*_period_2,
-            #     macro|btc_price/std_*_period_3,
-            #     macro|btc_price/pct_change_*_period_2,
-            #     macro|btc_price/pct_change_*_period_3,
-            #     macro|gtrends_altcoin_worldwide/std_*,
-            #     # macro|gtrends_altcoin_worldwide/last_*,
-            #     macro|gtrends_altcoin_worldwide/pct_change_*,
-            #     macro|gtrends_memecoin_us/std_*,
-            #     # macro|gtrends_memecoin_us/last_*,
-            #     macro|gtrends_memecoin_us/pct_change_*,
+                macro|btc_mvrv_z_score/sma_1_last,
+                macro|global_volume/last_*,
+                macro|global_market_cap/last_*,
+                macro|btc_price/last_*,
+                macro|global_market_cap/rsi_30*,
+                macro|global_market_cap/std_*,
+                macro|global_market_cap/pct_change_*,
+                macro|btc_vdd_multiple/std_*_period_2,
+                # macro|btc_vdd_multiple/std_*_period_3,
+                # macro|btc_vdd_multiple/last_*_period_3,
+                macro|btc_price/std_*_period_2,
+                # macro|btc_price/std_*_period_3,
+                macro|btc_price/pct_change_*_period_2,
+                # macro|btc_price/pct_change_*_period_3,
+                macro|gtrends_altcoin_worldwide/std_*,
+                # macro|gtrends_altcoin_worldwide/last_*,
+                macro|gtrends_altcoin_worldwide/pct_change_*,
+                macro|gtrends_memecoin_us/std_*,
+                # macro|gtrends_memecoin_us/last_*,
+                macro|gtrends_memecoin_us/pct_change_*,
 
-            # ]
+            ]
 
 
 

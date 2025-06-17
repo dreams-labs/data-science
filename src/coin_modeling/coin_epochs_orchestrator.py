@@ -21,7 +21,7 @@ import wallet_modeling.wallet_epochs_orchestrator as weo
 import wallet_modeling.wallet_training_data as wtd
 import wallet_modeling.wallet_training_data_orchestrator as wtdo
 import wallet_modeling.wallet_model_orchestrator as wmo
-import coin_wallet_features.coin_features_orchestrator as cfo
+import coin_features.coin_features_orchestrator as cfo
 import utils as u
 
 # Set up logger at the module level
