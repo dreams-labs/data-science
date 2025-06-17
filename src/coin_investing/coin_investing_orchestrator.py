@@ -224,6 +224,33 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
             + timedelta(days=validation_epoch[0])
         )
 
+        # ----- Cached data handling -----
+        # If all expected parquet files already exist for this investment cycle,
+        # load them directly and skip the (expensive) regeneration step.
+        training_data_path = Path(parquet_folder) / date_prefix / "training_multiwindow_coin_training_data_df.parquet"
+        training_target_path = Path(parquet_folder) / date_prefix / "training_multiwindow_coin_target_var_df.parquet"
+        val_data_path = Path(parquet_folder) / date_prefix / "validation_multiwindow_coin_training_data_df.parquet"
+        val_target_path = Path(parquet_folder) / date_prefix / "validation_multiwindow_coin_target_var_df.parquet"
+
+        if (all(p.exists() for p in [training_data_path, training_target_path, val_data_path, val_target_path])
+            and not (self.coins_investing_config.get('training_data') or {}).get('toggle_overwrite_parquet', False)
+            ):
+            logger.milestone(
+                "Investment cycle %s: using cached coin training/validation data.",
+                date_prefix
+            )
+            training_data_df = pd.read_parquet(training_data_path)
+            training_target_var_df = pd.read_parquet(training_target_path)
+            val_data_df = pd.read_parquet(val_data_path)
+            val_target_var_df = pd.read_parquet(val_target_path)
+            return (
+                (training_data_df,
+                 training_target_var_df,
+                 val_data_df,
+                 val_target_var_df),
+                investment_start_date
+            )
+
         # Generate all coin training data
         self.coin_epochs_orchestrator.orchestrate_coin_epochs(
             training_epochs,
