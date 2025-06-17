@@ -164,7 +164,7 @@ class TemporalGridSearcher:
                 logger.warning(f"Skipping {modeling_date} - no training data cached")
                 continue
 
-            logger.info(f"({i}/{len(self.modeling_dates)}) Running grid search for {modeling_date}...")
+            logger.milestone(f"({i}/{len(self.modeling_dates)}) Running grid search for {modeling_date}...")
 
             # Create date-specific modeling config
             date_config = self._create_date_config(modeling_date)
