@@ -34,7 +34,7 @@ def retrieve_metadata_df() -> pd.DataFrame:
     """
     logger.info("Querying for coin metadata...")
 
-    sql = f"""
+    sql = """
         select c.coin_id,
         case when c.chain in ("Ethereum","Binance","Solana","Base") then c.chain else "Other" end as blockchain,
         c.total_supply,

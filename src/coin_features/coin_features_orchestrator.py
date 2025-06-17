@@ -7,12 +7,11 @@ import pandas as pd
 # Local module imports
 import feature_engineering.coin_flow_features_orchestrator as cffo
 import wallet_modeling.wallets_config_manager as wcm
-import wallet_features.time_series_features as wfts
-import coin_wallet_features.wallet_segmentation as cws
-import coin_wallet_features.wallet_metrics as cfwm
-import coin_wallet_features.wallet_metrics_flattening as cfwmf
-import coin_wallet_features.coin_time_series as cfts
-import coin_wallet_features.coin_metadata as cfmd
+import coin_features.wallet_segmentation as cws
+import coin_features.wallet_metrics as cfwm
+import coin_features.wallet_metrics_flattening as cfwmf
+import coin_features.coin_time_series as cfts
+import coin_features.coin_metadata as cfmd
 import coin_insights.coin_validation_analysis as civa
 import utils as u
 
