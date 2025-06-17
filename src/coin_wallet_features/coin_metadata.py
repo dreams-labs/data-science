@@ -36,7 +36,7 @@ def retrieve_metadata_df() -> pd.DataFrame:
 
     sql = f"""
         select c.coin_id,
-        c.chain as blockchain,
+        case when c.chain in ("Ethereum","Binance","Solana","Base") then c.chain else "Other" end as blockchain,
         c.total_supply,
         c.decimals,
         case when upper(description) like '%MEME%' then 1 else 0 end as described_meme
@@ -55,5 +55,16 @@ def retrieve_metadata_df() -> pd.DataFrame:
 
     # Set index
     metadata_df = metadata_df.set_index('coin_id')
+
+    # Boolean encode 'blockchain' categories for modeling
+    blockchain_dummies = pd.get_dummies(
+        metadata_df['blockchain'],
+        prefix='blockchain',
+        prefix_sep='/',
+        dtype=bool
+    )
+    metadata_df = metadata_df.join(blockchain_dummies)
+    # Drop original categorical column
+    metadata_df = metadata_df.drop(columns=['blockchain'])
 
     return metadata_df
