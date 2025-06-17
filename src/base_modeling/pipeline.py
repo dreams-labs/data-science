@@ -42,10 +42,22 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
             self.named_steps[name] = step
             self.name = step
 
-    def fit(self, X, y, eval_set=None, verbose_estimators=False):
+    def fit(
+            self, X, y,
+            eval_set=None,
+            verbose_estimators=False,
+            modeling_config=None):
         """Fit the MetaPipeline on raw X and y data, using an optional eval_set for early stopping."""
         # First, transform y using the y_pipeline
         y_trans = self.y_pipeline.fit_transform(y)
+
+        # Generate sample weights if asymmetric loss is enabled
+        sample_weights = None
+        if modeling_config and modeling_config.get('asymmetric_loss', {}).get('enabled'):
+            asymmetric_config = modeling_config['asymmetric_loss']
+            sample_weights = np.ones(len(y_trans))
+            sample_weights[y_trans == 0] = asymmetric_config['loss_penalty_weight']
+            sample_weights[y_trans == 2] = asymmetric_config['win_reward_weight']
 
         # Create a transformer sub-pipeline (all steps except the final estimator)
         transformer = Pipeline(self.model_pipeline.steps[:-1])
@@ -57,20 +69,27 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
         regressor_name, self.estimator = self.model_pipeline.steps[-1]
 
         # If evaluation set is provided, transform it and use for early stopping
+        transformed_eval_set = None
         if eval_set is not None:
             X_eval, y_eval = eval_set
             y_eval_trans = self.y_pipeline.transform(y_eval)
             X_eval_trans = transformer.transform(X_eval)
-
-            # Create eval_set in the format expected by XGBoost
             transformed_eval_set = [(X_trans, y_trans), (X_eval_trans, y_eval_trans)]
+
+            # Define all fit params
+            fit_params = {
+                'eval_set': transformed_eval_set,
+                'verbose': verbose_estimators
+            }
+            if sample_weights is not None:
+                fit_params['sample_weight'] = sample_weights
+
 
             # Fit with early stopping using the transformed eval set
             self.estimator.fit(
                 X_trans,
                 y_trans,
-                eval_set=transformed_eval_set,
-                verbose=verbose_estimators  # toggles line by line output logs
+                **fit_params
             )
         else:
             # Regular fit without early stopping if no eval set provided
@@ -84,16 +103,38 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
 
     def predict_proba(self, X):
         """
-        Transform input features and delegate to the underlying estimator’s predict_proba.
+        Transform input features and delegate to the underlying estimator's predict_proba.
+        For multi-class asymmetric loss, reshape to binary format focusing on positive class.
         """
         X_trans = self.x_transformer_.transform(X)
-        return self.estimator.predict_proba(X_trans)
+        probas = self.estimator.predict_proba(X_trans)
 
+        # Check if multi-class (3 classes for asymmetric loss)
+        if probas.shape[1] == 3:
+            # Convert to binary: class 2 vs (classes 0&1)
+            positive_probs = probas[:, 2]  # class 2 probabilities
+            negative_probs = probas[:, 0] + probas[:, 1]  # combined classes 0&1
+            return np.column_stack([negative_probs, positive_probs])
+
+        # Return as-is for binary classification
+        return probas
 
     def predict(self, X):
-        """Predict using the fitted regressor on transformed X."""
+        """
+        Predict using the fitted regressor on transformed X.
+        For multi-class classification, convert to binary by treating class 2 as positive.
+        """
         X_trans = self.x_transformer_.transform(X)
-        return self.estimator.predict(X_trans)
+        predictions = self.estimator.predict(X_trans)
+
+        # Check if we have multi-class predictions (0, 1, 2 for asymmetric loss)
+        unique_preds = np.unique(predictions)
+        if len(unique_preds) > 2 and max(unique_preds) == 2:
+            # Convert multi-class to binary: class 2 → 1, classes 0&1 → 0
+            return (predictions == 2).astype(int)
+
+        # Return as-is for binary classification or regression
+        return predictions
 
     def score(self, X, y):
         """Return the regressor's score on transformed X and y."""
@@ -129,11 +170,13 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
             self,
             target_variable: str,
             target_var_min_threshold: float | None = None,
-            target_var_max_threshold: float | None = None
+            target_var_max_threshold: float | None = None,
+            asymmetric_config: dict = None
         ):
         self.target_variable = target_variable
         self.target_var_min_threshold = target_var_min_threshold
         self.target_var_max_threshold = target_var_max_threshold
+        self.asymmetric_config = asymmetric_config
 
     def fit(self, y, X=None):
         """
@@ -154,8 +197,15 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
         # Extract target variable
         result = y[self.target_variable]
 
+        # Asymmetric loss configuration if configured
+        if isinstance(self.asymmetric_config, dict) and self.asymmetric_config.get('enabled'):
+            loss_thresh = self.asymmetric_config['big_loss_threshold']
+            win_thresh = self.asymmetric_config['big_win_threshold']
+            result = np.where(result < loss_thresh, 0,
+                            np.where(result >= win_thresh, 2, 1))
+
         # Convert to boolean if a min or max threshold is provided
-        if (self.target_var_min_threshold is not None) or (self.target_var_max_threshold is not None):
+        elif (self.target_var_min_threshold is not None) or (self.target_var_max_threshold is not None):
             lower = -np.inf if self.target_var_min_threshold is None else self.target_var_min_threshold
             upper = np.inf if self.target_var_max_threshold is None else self.target_var_max_threshold
             result = ((result >= lower) & (result <= upper)).astype(int)

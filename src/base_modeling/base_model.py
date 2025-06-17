@@ -554,6 +554,20 @@ class BaseModel:
                 .sort_values(by='avg_score', ascending=False))
 
 
+    def _generate_sample_weights(self, y_transformed):
+        """Generate sample weights for asymmetric loss"""
+        asymmetric_config = self.modeling_config.get('asymmetric_loss', {})
+        if not asymmetric_config.get('enabled'):
+            return None
+
+        weights = np.ones(len(y_transformed))
+        weights[y_transformed == 0] = asymmetric_config['loss_penalty_weight']  # Big loss penalty
+        weights[y_transformed == 2] = asymmetric_config['win_reward_weight']    # Big win reward
+        return weights
+
+
+
+
 
 
     # -----------------------------------
@@ -588,7 +602,14 @@ class BaseModel:
         # Select model type and eval method
         if self.modeling_config['model_type']=='classification':
             model = XGBClassifier
-            model_params.setdefault('eval_metric', 'logloss')
+            model_params['eval_metric'] = 'logloss'  # Binary classification metric
+
+            # Set appropriate eval_metric based on asymmetric loss configuration
+            if self.modeling_config.get('asymmetric_loss', {}).get('enabled'):
+                model_params['eval_metric'] = 'mlogloss'  # Multi-class metric - OVERRIDE
+                model_params['objective'] = 'multi:softprob'  # 3-class classification
+                model_params['num_class'] = 3
+
         elif self.modeling_config['model_type']=='regression':
             model = XGBRegressor
             model_params.setdefault('eval_metric', 'rmse')
@@ -643,10 +664,13 @@ class BaseModel:
         Build the wallet-specific pipeline by prepending the wallet cohort selection
         to the base pipeline steps.
         """
+        # Get target var
         target_var = self.modeling_config.get('model_params', {}).get(
             'target_selector__target_variable',
             self.modeling_config['target_variable']
         )
+
+        # Get target var thresholds
         target_var_min_threshold = None
         target_var_max_threshold = None
         if self.modeling_config['model_type'] == 'classification':
@@ -663,11 +687,15 @@ class BaseModel:
                 )
             )
 
+        # Get asymmetric target var settings if configured
+        asymmetric_config = self.modeling_config.get('asymmetric_loss')
+
         y_pipeline = Pipeline([
             ('target_selector', bmp.TargetVarSelector(
                 target_var,
                 target_var_min_threshold,
-                target_var_max_threshold
+                target_var_max_threshold,
+                asymmetric_config=asymmetric_config
             ))
         ])
 
