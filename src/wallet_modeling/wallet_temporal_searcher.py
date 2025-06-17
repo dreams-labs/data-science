@@ -52,17 +52,13 @@ class TemporalGridSearcher:
         # If True, regenerate all training data regardless of cache
         self.force_regenerate_data = base_wallets_config['training_data']['rebuild_multiwindow_dfs']
 
-        # Validate grid search is enabled
-        if not self.base_wallets_config['modeling']['grid_search_params'].get('enabled',False):
-            raise ValueError("Grid search must be enabled in base configuration")
-
         # Storage for results
         self.training_data_cache = {}
         self.grid_search_results = {}
         self.consolidated_results = None
 
 
-    @u.timing_decorator(logging.MILESTONE)
+    @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def generate_all_training_data(self) -> None:
         """
         Generate training data for all specified modeling dates.
@@ -72,7 +68,6 @@ class TemporalGridSearcher:
         u.notify('robotz_windows_exit')
 
         for i, modeling_date in enumerate(self.modeling_dates, 1):
-            date_str = datetime.strptime(modeling_date, '%Y-%m-%d').strftime('%y%m%d')
 
             # Check if data already exists and skip if not forcing regeneration
             if not self.force_regenerate_data and self._check_data_exists(modeling_date):
@@ -105,7 +100,7 @@ class TemporalGridSearcher:
         logger.milestone("Completed training data generation for all periods")
 
 
-    @u.timing_decorator(logging.MILESTONE)
+    @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def load_all_training_data(self) -> None:
         """
         Load pre-generated training data for all modeling dates into memory cache.
@@ -118,7 +113,7 @@ class TemporalGridSearcher:
             date_str = datetime.strptime(modeling_date, '%Y-%m-%d').strftime('%y%m%d')
 
             try:
-                # Load all four DataFrames for this date
+                # Load all four DataFrames for this date    # pylint:disable=line-too-long
                 base_path = f"{parquet_folder}/{date_str}"
                 wallet_training_data_df = pd.read_parquet(f"{base_path}/multiwindow_wallet_training_data_df.parquet")
                 wallet_target_vars_df = pd.read_parquet(f"{base_path}/multiwindow_wallet_target_vars_df.parquet")
@@ -142,16 +137,20 @@ class TemporalGridSearcher:
                 raise FileNotFoundError(
                     f"Training data missing for {modeling_date}. "
                     f"Run generate_all_training_data() first or set force_regenerate_data=True"
-                )
+                ) from e
 
         logger.milestone(f"Successfully loaded training data for {len(self.modeling_dates)} periods")
 
 
-    @u.timing_decorator(logging.MILESTONE)
+    @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def run_multi_temporal_grid_search(self) -> None:
         """
         Execute grid search across all time periods and cache results.
         """
+        # Validate grid search is enabled
+        if not self.base_wallets_config['modeling']['grid_search_params'].get('enabled',False):
+            raise ValueError("Grid search must be enabled in base configuration")
+
         if not self.training_data_cache:
             raise ValueError("No training data loaded. Call load_all_training_data() first")
 
@@ -165,7 +164,7 @@ class TemporalGridSearcher:
                 logger.warning(f"Skipping {modeling_date} - no training data cached")
                 continue
 
-            logger.info(f"({i}/{len(self.modeling_dates)}) Running grid search for {modeling_date}...")
+            logger.milestone(f"({i}/{len(self.modeling_dates)}) Running grid search for {modeling_date}...")
 
             # Create date-specific modeling config
             date_config = self._create_date_config(modeling_date)
@@ -241,7 +240,7 @@ class TemporalGridSearcher:
         consolidated_df[date_columns] = consolidated_df[date_columns].round(3)
         consolidated_df['mean_score'] = consolidated_df['mean_score'].round(3)
         consolidated_df['median_score'] = consolidated_df['median_score'].round(3)
-        consolidated_df['stddev'] = consolidated_df['stddev'].round(3)
+        consolidated_df['std_dev'] = consolidated_df['std_dev'].round(3)
         consolidated_df['min_score'] = consolidated_df['min_score'].round(3)
         consolidated_df['max_score'] = consolidated_df['max_score'].round(3)
         consolidated_df['score_range'] = consolidated_df['score_range'].round(3)

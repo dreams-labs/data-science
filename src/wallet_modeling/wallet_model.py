@@ -112,21 +112,19 @@ class WalletModel(BaseModel):
         # Log training start and play startup notification
         logger.milestone(f"Training wallet model using data with shape: {self.X_train.shape}...")
         u.notify('startup')
+
         meta_pipeline.fit(
             self.X_train,
             self.y_train,
             eval_set=(self.X_eval, self.y_eval),
-            verbose_estimators=self.modeling_config.get('verbose_estimators', False)
+            verbose_estimators=self.modeling_config.get('verbose_estimators', False),
+            modeling_config=self.modeling_config  # Pass config for asymmetric loss
         )
+
         # Log training completion
         logger.info("Wallet model training completed.")
         self.pipeline = meta_pipeline
         self.y_pipeline = meta_pipeline.y_pipeline
-
-        # Update target variables to be 1D Series using the y_pipeline
-        self.y_train = self.y_pipeline.transform(self.y_train)
-        self.y_test = self.y_pipeline.transform(self.y_test)
-        self.y_eval = self.y_pipeline.transform(self.y_eval)
 
         # Prepare result dictionary
         result = {
@@ -135,6 +133,17 @@ class WalletModel(BaseModel):
             'model_id': self.model_id,
             'pipeline': self.pipeline,
         }
+
+        # Update target variables to be 1D Series using the y_pipeline
+        self.y_train = self.y_pipeline.transform(self.y_train)
+        self.y_test  = self.y_pipeline.transform(self.y_test)
+        self.y_eval  = self.y_pipeline.transform(self.y_eval)
+
+        # Convert multi-class labels to binary for asymmetric loss
+        if self.modeling_config.get('asymmetric_loss', {}).get('enabled'):
+            self.y_train = pd.Series((self.y_train == 2).astype(int), index=self.X_train.index)
+            self.y_test  = pd.Series((self.y_test == 2).astype(int), index=self.X_test.index)
+            self.y_eval  = pd.Series((self.y_eval == 2).astype(int), index=self.X_eval.index)
 
         # Store validation datasets and predictions if applicable
         if self.X_validation is None or self.X_validation.empty:
@@ -146,6 +155,11 @@ class WalletModel(BaseModel):
             result['X_validation'] = self.X_validation
             result['validation_target_vars_df'] = self.validation_target_vars_df
             result['y_validation'] = self.y_pipeline.transform(self.validation_target_vars_df)
+
+            # Also convert validation multiclass labels if present
+            if self.modeling_config.get('asymmetric_loss', {}).get('enabled'):
+                result['y_validation'] = pd.Series((result['y_validation'] == 2).astype(int),
+                                                   index=self.X_validation.index)
 
             if self.modeling_config['model_type'] == 'classification':
                 # get positive-class probabilities directly from pipeline
