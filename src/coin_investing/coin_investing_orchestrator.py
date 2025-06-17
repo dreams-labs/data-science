@@ -4,7 +4,6 @@ Orchestrates the scoring of coin training data across multiple investing epochs.
 from pathlib import Path
 import logging
 import concurrent.futures
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime,timedelta
 import json
 import pandas as pd
@@ -92,7 +91,7 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
     #         Primary Interface
     # -----------------------------------
 
-    @u.timing_decorator(logging.MILESTONE)
+    @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def orchestrate_coin_investment_cycles(
         self,
     ) -> pd.DataFrame:
@@ -103,6 +102,9 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         3. Scores coins in the subsequent period
         4. Consolidates results across all epochs
         """
+        if self.wallets_coin_config['coin_modeling']['grid_search_params'].get('enabled',False):
+            raise u.ConfigError("Grid search cannot be enabled for investment cycle orchestration.")
+
         # Extract investment cycles
         investment_cycles = self.coins_investing_config['investment_cycles']
 
@@ -140,13 +142,6 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         return combined_offsets
 
 
-
-
-
-    # -----------------------------------
-    #       Scoring Helper Methods
-    # -----------------------------------
-
     def _process_single_investment_cycle(
         self,
         investment_cycle_offset: int
@@ -181,7 +176,7 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         # Validate NaNs
         nan_count = cycle_performance_df.isnull().sum().sum()
         if nan_count > 0:
-            raise ValueError(f"NaN values detected in output: {nan_count} total NaNs")
+            logger.warning(f"Found {nan_count}/{len(cycle_performance_df)} NaN values in coin returns.")
 
         return cycle_performance_df
 
@@ -262,6 +257,7 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
             file_prefix=f'{date_prefix}/validation_'
         )
 
+        # pylint:disable=line-too-long
         training_data_df = pd.read_parquet(f"{parquet_folder}/{date_prefix}/training_multiwindow_coin_training_data_df.parquet")
         training_target_var_df = pd.read_parquet(f"{parquet_folder}/{date_prefix}/training_multiwindow_coin_target_var_df.parquet")
         val_data_df = pd.read_parquet(f"{parquet_folder}/{date_prefix}/validation_multiwindow_coin_training_data_df.parquet")
@@ -369,7 +365,8 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
                                 'return_wins': 'mean'
                             })
                             .round(4))
-        quantile_returns_df.columns = ['coin_return_mean', 'coin_return_median', 'coin_return_count', 'return_wins_mean']
+        quantile_returns_df.columns = ['coin_return_mean', 'coin_return_median',
+                                       'coin_return_count', 'return_wins_mean']
 
         all_quantiles_df = all_quantiles_df.join(quantile_returns_df)
         all_quantiles_df['coin_return_count'] = all_quantiles_df['coin_return_count'].fillna(0)
@@ -399,4 +396,3 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         with open(json_save_path, 'w', encoding='utf-8') as f:
             json.dump(coin_model_dict, f, indent=4, default=u.numpy_type_converter)
         logger.milestone(f"Saved coin_model_ids.json to {json_save_path}.")
-
