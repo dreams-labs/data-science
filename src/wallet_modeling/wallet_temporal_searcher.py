@@ -52,10 +52,6 @@ class TemporalGridSearcher:
         # If True, regenerate all training data regardless of cache
         self.force_regenerate_data = base_wallets_config['training_data']['rebuild_multiwindow_dfs']
 
-        # Validate grid search is enabled
-        if not self.base_wallets_config['modeling']['grid_search_params'].get('enabled',False):
-            raise ValueError("Grid search must be enabled in base configuration")
-
         # Storage for results
         self.training_data_cache = {}
         self.grid_search_results = {}
@@ -152,6 +148,10 @@ class TemporalGridSearcher:
         """
         Execute grid search across all time periods and cache results.
         """
+        # Validate grid search is enabled
+        if not self.base_wallets_config['modeling']['grid_search_params'].get('enabled',False):
+            raise ValueError("Grid search must be enabled in base configuration")
+
         if not self.training_data_cache:
             raise ValueError("No training data loaded. Call load_all_training_data() first")
 
