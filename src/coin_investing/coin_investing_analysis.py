@@ -11,9 +11,93 @@ import utils as u
 # pylint: disable=unused-variable  # messy stats functions in visualizations
 # pylint: disable=invalid-name  # X_test isn't camelcase
 
-
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
+
+
+def analyze_investment_performance_by_cycle(
+        coin_scores_df: pd.DataFrame,
+        score_threshold: float
+    ) -> pd.DataFrame:
+    """
+    Compute performance metrics by coin_epoch_start_date with threshold filtering.
+
+    Params:
+    - coin_scores_df (DataFrame): coin performance data with multi-index (coin_id, coin_epoch_start_date)
+        output by orchestrate_coin_investment_cycles()
+    - score_threshold (float): minimum score for filtered analysis
+
+    Returns:
+    - epoch_analysis_df (DataFrame): performance metrics by epoch
+    """
+    # Reset index to work with coin_epoch_start_date as column
+    df_reset = coin_scores_df.reset_index()
+
+    # Create mask for above-threshold coins
+    above_threshold = df_reset['score'] >= score_threshold
+
+    # Compute overall metrics by epoch
+    overall_metrics = df_reset.groupby('coin_epoch_start_date')['coin_return_wins'].agg([
+        ('mean_return_all', 'mean'),
+        ('median_return_all', 'median'),
+        ('count_all', 'count')
+    ])
+
+    # Compute threshold-filtered metrics by epoch
+    threshold_metrics = df_reset[above_threshold].groupby('coin_epoch_start_date')['coin_return_wins'].agg([
+        ('mean_return_above_threshold', 'mean'),
+        ('median_return_above_threshold', 'median'),
+        ('count_above_threshold', 'count')
+    ])
+
+    # Combine results
+    epoch_analysis_df = overall_metrics.join(threshold_metrics, how='left')
+    epoch_analysis_df = epoch_analysis_df.reset_index()
+
+    return epoch_analysis_df
+
+
+
+def calculate_lifetime_performance_by_thresholds(
+        coin_scores_df: pd.DataFrame,
+        score_thresholds: list
+    ) -> pd.DataFrame:
+    """
+    Calculate lifetime compound returns across multiple score thresholds.
+
+    Params:
+    - coin_scores_df (DataFrame): coin performance data with multi-index (coin_id, coin_epoch_start_date)
+    - score_thresholds (list): list of score thresholds to analyze
+
+    Returns:
+    - lifetime_performance_df (DataFrame): compound returns by threshold
+    """
+    results = []
+
+    for threshold in score_thresholds:
+        # Get epoch-level performance for this threshold
+        epoch_metrics = analyze_investment_performance_by_cycle(coin_scores_df, threshold)
+
+        # Calculate compound returns using mean returns
+        # Adding 1 to convert returns to multipliers, then compound
+        compound_all = (1 + epoch_metrics['mean_return_all']).prod() - 1
+        compound_threshold = (1 + epoch_metrics['mean_return_above_threshold'].fillna(0)).prod() - 1
+
+        # Calculate total coins across all epochs
+        total_coins_threshold = epoch_metrics['count_above_threshold'].fillna(0).sum()
+
+        results.append({
+            'score_threshold': threshold,
+            'lifetime_return_all': compound_all,
+            'lifetime_return_above_threshold': compound_threshold,
+            'total_coins_above_threshold': total_coins_threshold
+        })
+
+    lifetime_performance_df = pd.DataFrame(results)
+    return lifetime_performance_df
+
+
+
 def generate_coin_metrics(
    base_folder: str,
    model: str,
