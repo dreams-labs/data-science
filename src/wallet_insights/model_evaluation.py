@@ -4,9 +4,10 @@ import textwrap
 import pandas as pd
 import numpy as np
 from scipy.stats import chi2_contingency, spearmanr
+import seaborn as sns
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-import seaborn as sns
 from sklearn.metrics import (
     mean_squared_error,
     mean_absolute_error,
@@ -25,6 +26,7 @@ from sklearn.metrics import (
 from dreams_core import core as dc
 import utils as u
 
+matplotlib.rcParams['text.usetex'] = False
 # pylint:disable=invalid-name    # X_test isn't camelcase
 # pylint:disable=too-many-lines  # graphs gotta live somewhere
 # pylint:disable=line-too-long   # reports should mimic output format rather than force breaks
