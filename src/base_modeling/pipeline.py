@@ -204,6 +204,15 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
             result = np.where(result < loss_thresh, 0,
                             np.where(result >= win_thresh, 2, 1))
 
+            # Announce extended training
+            unique, counts = np.unique(result, return_counts=True)
+            class_counts = dict(zip(unique, counts))
+            logger.warning(f"Beginning extended training with asymmetric loss target variable.\n"
+                        f"Class 0 (< {loss_thresh}): {class_counts.get(0, 0):,}\n"
+                        f"Class 1 ({loss_thresh} to {win_thresh}): {class_counts.get(1, 0):,}\n"
+                        f"Class 2 (>= {win_thresh}): {class_counts.get(2, 0):,}")
+
+
         # Convert to boolean if a min or max threshold is provided
         elif (self.target_var_min_threshold is not None) or (self.target_var_max_threshold is not None):
             lower = -np.inf if self.target_var_min_threshold is None else self.target_var_min_threshold

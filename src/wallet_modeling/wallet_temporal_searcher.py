@@ -13,6 +13,7 @@ import pandas as pd
 import wallet_modeling.wallet_epochs_orchestrator as weo
 import wallet_modeling.wallets_config_manager as wcm
 import wallet_modeling.wallet_model as wm
+import wallet_insights.model_evaluation as wime
 import utils as u
 
 # Set up logger at the module level
@@ -57,6 +58,11 @@ class TemporalGridSearcher:
         self.grid_search_results = {}
         self.consolidated_results = None
 
+
+
+    # ---------------------------------
+    #      Primary Search Sequence
+    # ---------------------------------
 
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def generate_all_training_data(self) -> None:
@@ -250,7 +256,7 @@ class TemporalGridSearcher:
 
         # Sort by parameter and mean score
         consolidated_df = consolidated_df.sort_values(
-            by=['param', 'mean_score'],
+            by=['param', 'median_score'],
             ascending=[True, False]
         )
 
@@ -308,7 +314,7 @@ class TemporalGridSearcher:
         stable_count = stability_df['is_stable'].sum()
         logger.info(f"Found {stable_count} stable parameter combinations out of {len(stability_df)}")
 
-        return stability_df
+        return stability_df.sort_values(by='median_score',ascending=False)
 
 
     def get_best_parameters_by_stability(self, top_n: int = 5) -> Dict[str, any]:
@@ -426,6 +432,298 @@ class TemporalGridSearcher:
                 f"  Mean Score: {row['mean_score']:.4f}",
                 f"  Stability (CV): {row['coeff_variation']:.4f}",
                 f"  Periods Tested: {row['periods_tested']}/{len(self.modeling_dates)}",
+                ""
+            ])
+
+        # Log as single message
+        logger.info("\n".join(summary_lines))
+
+
+
+
+
+
+
+    # ----------------------------------
+    #    Non-Search Modeling Sequence
+    # ----------------------------------
+
+    @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
+    def run_multi_temporal_model_comparison(self) -> pd.DataFrame:
+        """
+        Build models for each time period using base parameters (no grid search)
+        and consolidate their performance metrics for comparison.
+
+        Returns:
+        - comparison_df: DataFrame with performance metrics across all time periods
+        """
+        if not self.training_data_cache:
+            raise ValueError("No training data loaded. Call load_all_training_data() first")
+
+        logger.milestone(f"Building and evaluating models across {len(self.modeling_dates)} time periods...")
+        u.notify('startup')
+
+        performance_results = {}
+
+        for i, modeling_date in enumerate(self.modeling_dates, 1):
+            date_str = datetime.strptime(modeling_date, '%Y-%m-%d').strftime('%y%m%d')
+
+            if date_str not in self.training_data_cache:
+                logger.warning(f"Skipping {modeling_date} - no training data cached")
+                continue
+
+            logger.milestone(f"({i}/{len(self.modeling_dates)}) Building model for {modeling_date}...")
+
+            # Create date-specific modeling config with grid search disabled
+            date_config = self._create_date_config(modeling_date)
+            date_config['modeling']['grid_search_params']['enabled'] = False
+
+            # Initialize model with date-specific config
+            wallet_model = wm.WalletModel(copy.deepcopy(date_config['modeling']))
+
+            # Build model without grid search
+            training_data = self.training_data_cache[date_str]
+            wallet_model_results = wallet_model.construct_wallet_model(*training_data)
+
+            # Generate evaluator and extract metrics
+            model_type = wallet_model_results['model_type']
+            if model_type == 'classification':
+                evaluator = wime.ClassifierEvaluator(wallet_model_results)
+            elif model_type == 'regression':
+                evaluator = wime.RegressorEvaluator(wallet_model_results)
+            else:
+                raise ValueError(f"Unsupported model type: {model_type}")
+
+            # Store performance metrics for this period
+            performance_results[date_str] = {
+                'modeling_date': modeling_date,
+                'model_type': model_type,
+                **self._extract_performance_metrics(evaluator)
+            }
+
+            evaluator.summary_report()
+            evaluator.plot_wallet_evaluation()
+
+            logger.info(f"Model completed for {modeling_date}")
+
+            # Clear model memory
+            del wallet_model, wallet_model_results, evaluator
+            gc.collect()
+
+        # Consolidate results into DataFrame
+        comparison_df = pd.DataFrame.from_dict(performance_results, orient='index')
+        comparison_df = comparison_df.reset_index().rename(columns={'index': 'date_str'})
+
+        # Add summary statistics across time periods
+        self._add_performance_summary_stats(comparison_df)
+
+        # Cache results
+        self.model_comparison_results = comparison_df
+
+        logger.milestone("Completed model comparison across all time periods")
+        u.notify('ui_1')
+
+        return comparison_df
+
+
+    def _extract_performance_metrics(self, evaluator) -> dict:
+        """
+        Extract key performance metrics from model evaluator.
+
+        Params:
+        - evaluator: Model evaluator instance (RegressorEvaluator or ClassifierEvaluator)
+
+        Returns:
+        - metrics_dict: Dictionary of performance metrics
+        """
+        metrics = {}
+
+        # Common metrics for both model types
+        if hasattr(evaluator, 'metrics'):
+            # Sample sizes
+            if 'test_samples' in evaluator.metrics:
+                metrics['test_samples'] = evaluator.metrics['test_samples']
+            if 'train_samples' in evaluator.metrics:
+                metrics['train_samples'] = evaluator.metrics['train_samples']
+
+            # Feature importance summary
+            if 'importances' in evaluator.metrics and evaluator.feature_names:
+                metrics['n_features'] = len(evaluator.feature_names)
+                # Top 3 most important features
+                top_features = evaluator.metrics['importances']['feature'][:3]
+                top_importances = evaluator.metrics['importances']['importance'][:3]
+                for i, (feat, imp) in enumerate(zip(top_features, top_importances)):
+                    metrics[f'top_feature_{i+1}'] = feat
+                    metrics[f'top_importance_{i+1}'] = round(imp, 4)
+
+        # Model-type specific metrics
+        if evaluator.modeling_config.get('model_type') == 'classification':
+            metrics.update(self._extract_classification_metrics(evaluator))
+        elif evaluator.modeling_config.get('model_type') == 'regression':
+            metrics.update(self._extract_regression_metrics(evaluator))
+
+        return metrics
+
+
+    def _extract_classification_metrics(self, evaluator) -> dict:
+        """Extract classification-specific metrics."""
+        metrics = {}
+
+        # Test set metrics (if available)
+        if hasattr(evaluator, 'train_test_data_provided') and evaluator.train_test_data_provided:
+            metrics.update({
+                'test_accuracy': round(evaluator.metrics.get('accuracy', 0), 4),
+                'test_precision': round(evaluator.metrics.get('precision', 0), 4),
+                'test_recall': round(evaluator.metrics.get('recall', 0), 4),
+                'test_f1': round(evaluator.metrics.get('f1', 0), 4),
+                'test_roc_auc': round(evaluator.metrics.get('roc_auc', 0), 4),
+            })
+
+        # Validation set metrics (if available)
+        if hasattr(evaluator, 'validation_data_provided') and evaluator.validation_data_provided:
+            metrics.update({
+                'val_accuracy': round(evaluator.metrics.get('val_accuracy', 0), 4),
+                'val_precision': round(evaluator.metrics.get('val_precision', 0), 4),
+                'val_recall': round(evaluator.metrics.get('val_recall', 0), 4),
+                'val_f1': round(evaluator.metrics.get('val_f1', 0), 4),
+                'val_roc_auc': round(evaluator.metrics.get('val_roc_auc', 0), 4),
+                'val_ret_mean_overall': round(evaluator.metrics.get('val_ret_mean_overall', 0), 4),
+                'val_ret_mean_top1': round(evaluator.metrics.get('val_ret_mean_top1', 0), 4),
+                'val_ret_mean_top5': round(evaluator.metrics.get('val_ret_mean_top5', 0), 4),
+                'positive_pred_return': round(evaluator.metrics.get('positive_pred_return', 0), 4),
+            })
+
+            # Threshold information
+            if 'y_pred_threshold' in evaluator.metrics:
+                metrics['y_pred_threshold'] = round(evaluator.metrics['y_pred_threshold'], 4)
+
+        return metrics
+
+
+    def _extract_regression_metrics(self, evaluator) -> dict:
+        """Extract regression-specific metrics."""
+        metrics = {}
+
+        # Test set metrics (if available)
+        if hasattr(evaluator, 'train_test_data_provided') and evaluator.train_test_data_provided:
+            metrics.update({
+                'test_r2': round(evaluator.metrics.get('r2', 0), 4),
+                'test_rmse': round(evaluator.metrics.get('rmse', 0), 4),
+                'test_mae': round(evaluator.metrics.get('mae', 0), 4),
+            })
+
+        # Validation set metrics (if available)
+        if 'validation_metrics' in evaluator.metrics:
+            vm = evaluator.metrics['validation_metrics']
+            metrics.update({
+                'val_r2': round(vm.get('r2', 0), 4),
+                'val_rmse': round(vm.get('rmse', 0), 4),
+                'val_mae': round(vm.get('mae', 0), 4),
+                'val_spearman': round(vm.get('spearman', 0), 4),
+                'val_top1pct_mean': round(vm.get('top1pct_mean', 0), 4),
+            })
+
+        # Training cohort metrics (if available)
+        if 'training_cohort' in evaluator.metrics:
+            tc = evaluator.metrics['training_cohort']
+            metrics.update({
+                'training_cohort_r2': round(tc.get('r2', 0), 4),
+                'training_cohort_rmse': round(tc.get('rmse', 0), 4),
+            })
+
+        return metrics
+
+
+    def _add_performance_summary_stats(self, comparison_df: pd.DataFrame) -> None:
+        """
+        Add summary statistics across time periods to the comparison DataFrame.
+
+        Params:
+        - comparison_df: DataFrame with performance metrics for each time period
+        """
+        # Identify numeric metric columns (exclude metadata columns)
+        metadata_cols = ['date_str', 'modeling_date', 'model_type', 'n_features'] + \
+                    [col for col in comparison_df.columns if col.startswith('top_feature_')]
+        numeric_cols = [col for col in comparison_df.columns if col not in metadata_cols]
+
+        # Calculate summary statistics for numeric columns
+        summary_stats = {}
+        for col in numeric_cols:
+            if comparison_df[col].dtype in ['float64', 'int64'] and not comparison_df[col].isna().all():
+                values = comparison_df[col].dropna()
+                if len(values) > 0:
+                    summary_stats[f'{col}_mean'] = round(values.mean(), 4)
+                    summary_stats[f'{col}_std'] = round(values.std(), 4)
+                    summary_stats[f'{col}_min'] = round(values.min(), 4)
+                    summary_stats[f'{col}_max'] = round(values.max(), 4)
+                    # Coefficient of variation for stability assessment
+                    if values.mean() != 0:
+                        summary_stats[f'{col}_cv'] = round(values.std() / abs(values.mean()), 4)
+
+        # Add summary row
+        summary_row = {'date_str': 'SUMMARY', 'modeling_date': 'ACROSS_ALL_PERIODS',
+                    'model_type': comparison_df['model_type'].iloc[0], **summary_stats}
+
+        # Append summary row to DataFrame
+        comparison_df.loc[len(comparison_df)] = summary_row
+
+
+    def display_model_comparison_summary(self) -> None:
+        """Display a formatted summary of model comparison results."""
+        if not hasattr(self, 'model_comparison_results') or self.model_comparison_results is None:
+            logger.warning("No model comparison results to display. Run run_multi_temporal_model_comparison() first.")
+            return
+
+        df = self.model_comparison_results
+        model_type = df['model_type'].iloc[0]
+
+        # Build summary message
+        summary_lines = [
+            "",
+            "="*60,
+            "MULTI-TEMPORAL MODEL COMPARISON SUMMARY",
+            "="*60,
+            f"Model Type: {model_type}",
+            f"Time periods analyzed: {len(self.modeling_dates)}",
+            f"Date range: {min(self.modeling_dates)} to {max(self.modeling_dates)}",
+            "",
+            "PERFORMANCE STABILITY METRICS:",
+            "-" * 40
+        ]
+
+        # Key metrics to highlight based on model type
+        if model_type == 'classification':
+            key_metrics = ['val_roc_auc', 'val_f1', 'val_ret_mean_top1', 'positive_pred_return']
+            metric_labels = ['Validation AUC', 'Validation F1', 'Top 1% Return', 'Positive Pred Return']
+        else:  # regression
+            key_metrics = ['val_r2', 'val_rmse', 'val_spearman', 'val_top1pct_mean']
+            metric_labels = ['Validation R²', 'Validation RMSE', 'Validation Spearman', 'Top 1% Mean']
+
+        # Display stability for key metrics
+        for metric, label in zip(key_metrics, metric_labels):
+            mean_col = f'{metric}_mean'
+            cv_col = f'{metric}_cv'
+            if mean_col in df.columns and cv_col in df.columns:
+                summary_row = df[df['date_str'] == 'SUMMARY'].iloc[0]
+                mean_val = summary_row[mean_col]
+                cv_val = summary_row[cv_col]
+                stability = "Stable" if cv_val < 0.1 else "Moderate" if cv_val < 0.2 else "Unstable"
+                summary_lines.extend([
+                    f"{label}:",
+                    f"  Mean: {mean_val:.4f}",
+                    f"  Coefficient of Variation: {cv_val:.4f} ({stability})",
+                    ""
+                ])
+
+        # Add sample size information
+        if 'test_samples_mean' in df.columns:
+            summary_row = df[df['date_str'] == 'SUMMARY'].iloc[0]
+            summary_lines.extend([
+                "SAMPLE SIZES:",
+                "-" * 20,
+                f"Average Test Samples: {summary_row.get('test_samples_mean', 'N/A')}",
+                f"Average Train Samples: {summary_row.get('train_samples_mean', 'N/A')}",
+                f"Average Features: {summary_row.get('n_features', 'N/A')}",
                 ""
             ])
 
