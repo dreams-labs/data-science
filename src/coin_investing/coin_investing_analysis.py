@@ -33,6 +33,9 @@ def analyze_investment_performance_by_cycle(
     # Reset index to work with coin_epoch_start_date as column
     df_reset = coin_scores_df.reset_index()
 
+    # winsorize returns
+    df_reset['coin_return_wins'] = u.winsorize(df_reset['coin_return'],0.005)
+
     # Create mask for above-threshold coins
     above_threshold = df_reset['score'] >= score_threshold
 
