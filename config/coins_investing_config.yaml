@@ -2,18 +2,22 @@
 investment_cycles: [
 # Long term validation of how well this model's predictions perform
 #  over epochs starting in [30,60,etc] days.
-        # 270,
-        # 240,
-        210,
-        180,
-        150,
-        120,
-        90,
-        60,
-        # 45,
-        30,
-        # 15,
         0,
+        30,
+        60,
+        90,
+        120,
+        150,
+        180,
+        210,
+        240,
+        270,
+        300,
+        330,
+        360,
+        390,
+        420,
+        450
 ]
 
 # CoinModel
