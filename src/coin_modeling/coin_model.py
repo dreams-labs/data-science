@@ -140,6 +140,13 @@ class CoinModel(BaseModel):
         self.y_test = self.y_pipeline.transform(self.y_test)
         self.y_eval = self.y_pipeline.transform(self.y_eval)
 
+        # Convert multiclass to binary for asymmetric loss (add this block)
+        if self.modeling_config.get('asymmetric_loss', {}).get('enabled'):
+            self.y_train = pd.Series((self.y_train == 2).astype(int), index=self.X_train.index)
+            self.y_test = pd.Series((self.y_test == 2).astype(int), index=self.X_test.index)
+            self.y_eval = pd.Series((self.y_eval == 2).astype(int), index=self.X_eval.index)
+
+
         if self.y_train.nunique() == 1:
             logger.warning(f"All values in y_train classification target var were {str(self.y_train[0])}. "
                                 "Adjust thresholds to ensure both 1s and 0s.")
@@ -163,6 +170,13 @@ class CoinModel(BaseModel):
             result['X_validation'] = self.X_validation
             result['validation_target_vars_df'] = self.validation_target_vars_df
             result['y_validation'] = self.y_pipeline.transform(self.validation_target_vars_df)
+
+            # Convert validation targets to binary for asymmetric loss
+            if self.modeling_config.get('asymmetric_loss', {}).get('enabled'):
+                result['y_validation'] = pd.Series(
+                    (result['y_validation'] == 2).astype(int),
+                    index=self.X_validation.index
+                )
 
             # Classification predictions
             if self.modeling_config['model_type'] == 'classification':
