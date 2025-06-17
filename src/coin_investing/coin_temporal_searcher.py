@@ -5,16 +5,14 @@ import logging
 import copy
 import gc
 from datetime import datetime, timedelta
-from typing import List, Dict, Tuple
+from typing import List
 from pathlib import Path
 import pandas as pd
-import numpy as np
 
 # Local modules
 import coin_modeling.coin_epochs_orchestrator as ceo
 import coin_modeling.coin_model as cm
 import coin_insights.coin_model_reporting as cimr
-import coin_insights.coin_validation_analysis as civa
 import utils as u
 
 # Set up logger at the module level
@@ -80,7 +78,7 @@ class CoinTemporalGridSearcher:
             self.coin_modeling_dates = coin_modeling_dates
 
         # Force regeneration flag
-        self.force_regenerate_data = wallets_coin_config['training_data'].get('rebuild_multiwindow_dfs', False)
+        self.force_regenerate_data = wallets_coin_config['training_data'].get('toggle_rebuild_all_features', False)
 
         # Storage for results
         self.training_data_cache = {}
@@ -106,14 +104,12 @@ class CoinTemporalGridSearcher:
     #      Primary Search Sequence
     # ---------------------------------
 
-    @u.timing_decorator(logging.MILESTONE)
     def generate_all_coin_training_data(self) -> None:
         """
         Generate coin training data for all specified modeling dates.
         Caches results for subsequent grid search experiments.
         """
         logger.milestone(f"Generating coin training data for {len(self.coin_modeling_dates)} time periods...")
-        u.notify('robotz_windows_exit')
 
         # Load complete datasets once
         self.coin_epochs_orchestrator.load_complete_raw_datasets()
@@ -121,7 +117,8 @@ class CoinTemporalGridSearcher:
         for i, modeling_date in enumerate(self.coin_modeling_dates, 1):
             # Check if data already exists and skip if not forcing regeneration
             if not self.force_regenerate_data and self._check_coin_data_exists(modeling_date):
-                logger.info(f"({i}/{len(self.coin_modeling_dates)}) Skipping {modeling_date} - coin data already exists")
+                logger.info(f"({i}/{len(self.coin_modeling_dates)}) Skipping {modeling_date} - "
+                            "coin data already exists")
                 continue
 
             logger.info(f"({i}/{len(self.coin_modeling_dates)}) Generating coin data for {modeling_date}...")
@@ -131,6 +128,7 @@ class CoinTemporalGridSearcher:
 
             # Update coin epochs orchestrator with new config
             self._update_orchestrator_config(date_config)
+            self.coin_epochs_orchestrator.load_complete_raw_datasets()
 
             # Generate coin training and validation data
             self._generate_coin_epoch_data(modeling_date)
@@ -141,7 +139,6 @@ class CoinTemporalGridSearcher:
         logger.milestone("Completed coin training data generation for all periods")
 
 
-    @u.timing_decorator(logging.MILESTONE)
     def load_all_coin_training_data(self) -> None:
         """
         Load pre-generated coin training data for all modeling dates into memory cache.
@@ -155,9 +152,9 @@ class CoinTemporalGridSearcher:
                 # Load training and validation DataFrames for this date
                 base_path = self._get_coin_data_path(modeling_date)
 
-                training_data_df = pd.read_parquet(f"{base_path}/multiwindow_coin_training_data_df.parquet")
-                training_target_df = pd.read_parquet(f"{base_path}/multiwindow_coin_target_var_df.parquet")
-                validation_data_df = pd.read_parquet(f"{base_path}/validation_multiwindow_coin_training_data_df.parquet")
+                training_data_df = pd.read_parquet(f"{base_path}/training_multiwindow_coin_training_data_df.parquet")
+                training_target_df = pd.read_parquet(f"{base_path}/training_multiwindow_coin_target_var_df.parquet")
+                validation_data_df = pd.read_parquet(f"{base_path}/validation_multiwindow_coin_training_data_df.parquet")  # pylint:disable=line-too-long
                 validation_target_df = pd.read_parquet(f"{base_path}/validation_multiwindow_coin_target_var_df.parquet")
 
                 # Cache the data
@@ -182,7 +179,7 @@ class CoinTemporalGridSearcher:
         logger.milestone(f"Successfully loaded coin training data for {len(self.coin_modeling_dates)} periods")
 
 
-    @u.timing_decorator(logging.MILESTONE)
+    @u.timing_decorator(logging.MILESTONE)      #pylint:disable=no-member
     def run_multi_temporal_coin_grid_search(self) -> None:
         """
         Execute grid search across all time periods for coin models and cache results.
@@ -277,7 +274,8 @@ class CoinTemporalGridSearcher:
         consolidated_df['score_range'] = consolidated_df['max_score'] - consolidated_df['min_score']
 
         # Round all score columns to 3 decimal places
-        score_columns = date_columns + ['mean_score', 'median_score', 'std_dev', 'min_score', 'max_score', 'score_range']
+        score_columns = date_columns + ['mean_score', 'median_score', 'std_dev',
+                                        'min_score', 'max_score', 'score_range']
         consolidated_df[score_columns] = consolidated_df[score_columns].round(3)
 
         # Count non-null values (periods where parameter was tested)
@@ -346,7 +344,6 @@ class CoinTemporalGridSearcher:
         return stability_df.sort_values(by='median_score', ascending=False)
 
 
-    @u.timing_decorator(logging.MILESTONE)
     def run_multi_temporal_coin_model_comparison(self) -> pd.DataFrame:
         """
         Build coin models for each time period using base parameters (no grid search)
@@ -449,14 +446,38 @@ class CoinTemporalGridSearcher:
         """Create coin configuration with specified coin_modeling_period_start date."""
         date_config = copy.deepcopy(self.wallets_coin_config)
 
-        # Update coin modeling period start
-        date_config['training_data']['coin_modeling_period_start'] = modeling_date
+        # Calculate offset from base modeling date
+        base_modeling_date = pd.to_datetime(self.wallets_config['training_data']['modeling_period_start'])
+        target_modeling_date = pd.to_datetime(modeling_date)
+        offset_days = (target_modeling_date - base_modeling_date).days
 
-        # Calculate derived dates
-        modeling_start = pd.to_datetime(modeling_date)
+        # Update coin modeling period dates
+        date_config['training_data']['coin_modeling_period_start'] = modeling_date
         modeling_duration = self.wallets_config['training_data']['modeling_period_duration']
-        modeling_end = (modeling_start + timedelta(days=modeling_duration - 1)).strftime('%Y-%m-%d')
+        modeling_end = (target_modeling_date + timedelta(days=modeling_duration - 1)).strftime('%Y-%m-%d')
         date_config['training_data']['coin_modeling_period_end'] = modeling_end
+
+        # CRITICAL: Also update the underlying wallets_config dates that the coin orchestrator uses
+        # This ensures wallet training data is generated for the correct time periods
+        updated_wallets_config = copy.deepcopy(self.wallets_config)
+
+        # Offset all relevant dates in wallets_config
+        for date_field in ['modeling_period_start', 'modeling_period_end',
+                           'coin_modeling_period_start', 'coin_modeling_period_end']:
+            if date_field in updated_wallets_config['training_data']:
+                original_date = pd.to_datetime(updated_wallets_config['training_data'][date_field])
+                new_date = (original_date + timedelta(days=offset_days)).strftime('%Y-%m-%d')
+                updated_wallets_config['training_data'][date_field] = new_date
+
+        # Update training window starts
+        if 'training_window_starts' in updated_wallets_config['training_data']:
+            original_windows = [pd.to_datetime(d) for d in
+                                updated_wallets_config['training_data']['training_window_starts']]
+            new_windows = [(d + timedelta(days=offset_days)).strftime('%Y-%m-%d') for d in original_windows]
+            updated_wallets_config['training_data']['training_window_starts'] = new_windows
+
+        # Store the updated wallets config in the coin config for the orchestrator to use
+        date_config['_updated_wallets_config'] = updated_wallets_config
 
         return date_config
 
@@ -464,6 +485,10 @@ class CoinTemporalGridSearcher:
     def _update_orchestrator_config(self, date_config: dict) -> None:
         """Update the coin epochs orchestrator with new configuration."""
         self.coin_epochs_orchestrator.wallets_coin_config = date_config
+
+        # CRITICAL: Also update the underlying wallets_config if it was modified
+        if '_updated_wallets_config' in date_config:
+            self.coin_epochs_orchestrator.wallets_config = date_config['_updated_wallets_config']
 
 
     def _generate_coin_epoch_data(self, modeling_date: str) -> None:
@@ -474,7 +499,7 @@ class CoinTemporalGridSearcher:
         training_epochs = self.wallets_coin_config['training_data']['coin_epochs_training']
         self.coin_epochs_orchestrator.orchestrate_coin_epochs(
             training_epochs,
-            file_prefix=f'{date_str}/'
+            file_prefix=f'{date_str}/training_'
         )
 
         # Generate validation epochs
@@ -491,8 +516,8 @@ class CoinTemporalGridSearcher:
         base_path = self._get_coin_data_path(modeling_date)
 
         required_files = [
-            f"{base_path}/multiwindow_coin_training_data_df.parquet",
-            f"{base_path}/multiwindow_coin_target_var_df.parquet",
+            f"{base_path}/training_multiwindow_coin_training_data_df.parquet",
+            f"{base_path}/training_multiwindow_coin_target_var_df.parquet",
             f"{base_path}/validation_multiwindow_coin_training_data_df.parquet",
             f"{base_path}/validation_multiwindow_coin_target_var_df.parquet"
         ]
