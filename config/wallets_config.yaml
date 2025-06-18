@@ -80,7 +80,7 @@ modeling: #WalletModel
 
     #KeyParam Target Var Thresholds
     asymmetric_loss: # Adds another class to target
-        enabled: true
+        # enabled: true
         big_loss_threshold: -0.30    # Below this is an extra penalized big loss
         # big_loss_threshold: -0.20    # Below this is an extra penalized big loss
         big_win_threshold: 0.30      # Above this is the target

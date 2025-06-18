@@ -119,7 +119,7 @@ class CoinModel(BaseModel):
                     for k, v in cv_results['best_params'].items()
                 }
                 self.modeling_config['model_params'].update(best_params)
-                logger.info(f"Updated model params with CV best params: {best_params}")
+                logger.debug(f"Updated model params with CV best params: {best_params}")
                 if not self.modeling_config['grid_search_params'].get('build_post_search_model'):
                     return cv_results
 

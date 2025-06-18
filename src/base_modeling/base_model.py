@@ -126,7 +126,7 @@ class BaseModel:
                 for k, v in cv_results['best_params'].items()
             }
             self.modeling_config['model_params'].update(best_params)
-            logger.info(f"Updated model params with CV best params: {best_params}")
+            logger.debug(f"Updated model params with CV best params: {best_params}")
 
             # Return the search results without building a model if configured to
             if not self.modeling_config.get('grid_search_params', {}).get('build_post_search_model'):
