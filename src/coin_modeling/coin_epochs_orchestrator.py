@@ -297,10 +297,10 @@ class CoinEpochsOrchestrator:
         # ------------------------------------
         root_folder = self.wallets_coin_config['training_data']['parquet_folder']
         multiwindow_features = reset_index_codes(multiwindow_features)
-        multiwindow_features.to_parquet(f"{root_folder}/{file_prefix}multiwindow_coin_training_data_df.parquet")
+        multiwindow_features.to_parquet(f"{root_folder}/{file_prefix}multiepoch_coin_training_data_df.parquet")
         if not multiwindow_targets.empty:
             multiwindow_targets = reset_index_codes(multiwindow_targets)
-            multiwindow_targets.to_parquet(f"{root_folder}/{file_prefix}multiwindow_coin_target_var_df.parquet")
+            multiwindow_targets.to_parquet(f"{root_folder}/{file_prefix}multiepoch_coin_target_var_df.parquet")
 
         ambient_player_coins.stop()
         u.notify('robotz_windows_start')
@@ -416,7 +416,7 @@ class CoinEpochsOrchestrator:
             if not toggle_rebuild_features:
                 coin_features_df = pd.read_parquet(feat_path)
                 coin_target_df   = pd.read_parquet(tgt_path)
-                logger.milestone(
+                logger.info(
                     "Coin epoch %s training data loaded from existing feature and target files.",
                     epoch_date.strftime('%Y-%m-%d')
                 )

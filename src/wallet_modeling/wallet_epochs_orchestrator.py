@@ -195,8 +195,8 @@ class WalletEpochsOrchestrator:
         ).strftime('%y%m%d')
         base_path = parquet_folder / date_str
         paths = {
-            'train':      base_path / 'multiwindow_wallet_training_data_df.parquet',
-            'train_tgt':  base_path / 'multiwindow_wallet_target_vars_df.parquet',
+            'train':      base_path / 'multioffset_wallet_training_data_df.parquet',
+            'train_tgt':  base_path / 'multioffset_wallet_target_vars_df.parquet',
             'val_train':  base_path / 'multiwindow_validation_training_data_df.parquet',
             'val_tgt':    base_path / 'multiwindow_validation_target_vars_df.parquet',
         }
@@ -205,7 +205,7 @@ class WalletEpochsOrchestrator:
             and self.base_config['training_data']['rebuild_multiwindow_dfs'] is False
             and not self.training_only
         ):
-            logger.info("Loading saved multi-window epoch DataFrames from %s", base_path)
+            logger.info("Loading saved multi-offset wallet DataFrames from %s", base_path)
             wallet_training_data_df       = pd.read_parquet(paths['train'])
             wallet_target_vars_df         = pd.read_parquet(paths['train_tgt'])
             validation_training_data_df   = pd.read_parquet(paths['val_train'])
@@ -265,7 +265,7 @@ class WalletEpochsOrchestrator:
             }
             for future in as_completed(futures):
                 cfg = futures[future]
-                epoch_date, epoch_training_df, epoch_target_var_df = future.result()
+                epoch_date, epoch_training_df, epoch_target_var_df, newly_generated = future.result()
 
                 # Process epochs by type:
                 # - 'modeling': Historical periods for training models (has both features and targets)
@@ -290,9 +290,10 @@ class WalletEpochsOrchestrator:
                         f"Expected 'modeling', 'current', or 'validation'."
                     )
                 i += 1
-                u.notify('beep')
-                logger.info(f"Wallet epoch {i}/{len(epoch_configs_to_process)} completed (date: " \
-                                 f"{pd.to_datetime(epoch_date).strftime('%Y-%m-%d')})")
+                if newly_generated:
+                    u.notify('beep')
+                    logger.milestone(f"Wallet epoch {i}/{len(epoch_configs_to_process)} completed (date: " \
+                                    f"{pd.to_datetime(epoch_date).strftime('%Y-%m-%d')})")
 
         del epoch_training_df, epoch_target_var_df
         gc.collect()
@@ -343,12 +344,11 @@ class WalletEpochsOrchestrator:
     #           Helper Methods
     # -----------------------------------
 
-    @u.timing_decorator
     def _process_single_epoch(
             self,
             epoch_config: dict,
             training_only: bool = False
-        ) -> Tuple[datetime, pd.DataFrame, pd.DataFrame]:
+        ) -> Tuple[datetime, pd.DataFrame, pd.DataFrame, bool]:
         """
         Process a single epoch configuration to generate training and modeling data, including
         handling of hybridization features.
@@ -363,6 +363,7 @@ class WalletEpochsOrchestrator:
         - epoch_date (datetime): The modeling period start date as datetime
         - epoch_training_data_df (DataFrame): Training features for this epoch
         - epoch_modeling_data_df (DataFrame): Modeling features for this epoch
+        - newly_generated (bool): Determines log level after returning
         """
         generate_modeling = not training_only
 
@@ -390,7 +391,7 @@ class WalletEpochsOrchestrator:
                 col_dropper = bp.DropColumnPatterns(drop_patterns)
                 epoch_training_data_df = col_dropper.fit_transform(epoch_training_data_df)
 
-            return epoch_date, epoch_training_data_df, epoch_modeling_data_df
+            return epoch_date, epoch_training_data_df, epoch_modeling_data_df, False
 
         # Begin generation of dfs
         model_start = epoch_config['training_data']['modeling_period_start']
@@ -457,7 +458,7 @@ class WalletEpochsOrchestrator:
         if training_only:
             epoch_modeling_data_df = pd.DataFrame()
 
-        return epoch_date, epoch_training_data_df, epoch_modeling_data_df
+        return epoch_date, epoch_training_data_df, epoch_modeling_data_df, True
 
 
 

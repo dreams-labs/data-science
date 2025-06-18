@@ -152,10 +152,10 @@ class CoinTemporalGridSearcher:
                 # Load training and validation DataFrames for this date
                 base_path = self._get_coin_data_path(modeling_date)
 
-                training_data_df = pd.read_parquet(f"{base_path}/training_multiwindow_coin_training_data_df.parquet")
-                training_target_df = pd.read_parquet(f"{base_path}/training_multiwindow_coin_target_var_df.parquet")
-                validation_data_df = pd.read_parquet(f"{base_path}/validation_multiwindow_coin_training_data_df.parquet")  # pylint:disable=line-too-long
-                validation_target_df = pd.read_parquet(f"{base_path}/validation_multiwindow_coin_target_var_df.parquet")
+                training_data_df = pd.read_parquet(f"{base_path}/training_multiepoch_coin_training_data_df.parquet")
+                training_target_df = pd.read_parquet(f"{base_path}/training_multiepoch_coin_target_var_df.parquet")
+                validation_data_df = pd.read_parquet(f"{base_path}/validation_multiepoch_coin_training_data_df.parquet")  # pylint:disable=line-too-long
+                validation_target_df = pd.read_parquet(f"{base_path}/validation_multiepoch_coin_target_var_df.parquet")
 
                 # Cache the data
                 self.training_data_cache[date_str] = (
@@ -516,10 +516,10 @@ class CoinTemporalGridSearcher:
         base_path = self._get_coin_data_path(modeling_date)
 
         required_files = [
-            f"{base_path}/training_multiwindow_coin_training_data_df.parquet",
-            f"{base_path}/training_multiwindow_coin_target_var_df.parquet",
-            f"{base_path}/validation_multiwindow_coin_training_data_df.parquet",
-            f"{base_path}/validation_multiwindow_coin_target_var_df.parquet"
+            f"{base_path}/training_multiepoch_coin_training_data_df.parquet",
+            f"{base_path}/training_multiepoch_coin_target_var_df.parquet",
+            f"{base_path}/validation_multiepoch_coin_training_data_df.parquet",
+            f"{base_path}/validation_multiepoch_coin_target_var_df.parquet"
         ]
 
         return all(Path(file_path).exists() for file_path in required_files)

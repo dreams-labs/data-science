@@ -14,6 +14,7 @@ import coin_modeling.coin_epochs_orchestrator as ceo
 import coin_insights.coin_model_reporting as cimr
 import coin_insights.coin_validation_analysis as civa
 import utils as u
+from utils import ConfigError
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -55,6 +56,10 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         # Ensure configs are dicts and not the custom config classes
         if not (isinstance(wallets_config,dict) and isinstance(wallets_coin_config,dict)):
             raise ValueError("CoinEpochsOrchestrator configs must be dtype=='dict'.")
+
+        # Config requirements
+        if wallets_config['modeling']['grid_search_params'].get('enabled',False):
+            raise ConfigError("Wallet model grid search must be disabled to build coin investing cycles.")
 
         # investing-specific configs
         self.coins_investing_config = coins_investing_config
@@ -222,10 +227,10 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         # ----- Cached data handling -----
         # If all expected parquet files already exist for this investment cycle,
         # load them directly and skip the (expensive) regeneration step.
-        training_data_path = Path(parquet_folder) / date_prefix / "training_multiwindow_coin_training_data_df.parquet"
-        training_target_path = Path(parquet_folder) / date_prefix / "training_multiwindow_coin_target_var_df.parquet"
-        val_data_path = Path(parquet_folder) / date_prefix / "validation_multiwindow_coin_training_data_df.parquet"
-        val_target_path = Path(parquet_folder) / date_prefix / "validation_multiwindow_coin_target_var_df.parquet"
+        training_data_path = Path(parquet_folder) / date_prefix / "training_multiepoch_coin_training_data_df.parquet"
+        training_target_path = Path(parquet_folder) / date_prefix / "training_multiepoch_coin_target_var_df.parquet"
+        val_data_path = Path(parquet_folder) / date_prefix / "validation_multiepoch_coin_training_data_df.parquet"
+        val_target_path = Path(parquet_folder) / date_prefix / "validation_multiepoch_coin_target_var_df.parquet"
 
         if (all(p.exists() for p in [training_data_path, training_target_path, val_data_path, val_target_path])
             and not (self.coins_investing_config.get('training_data') or {}).get('toggle_overwrite_parquet', False)
@@ -258,10 +263,10 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         )
 
         # pylint:disable=line-too-long
-        training_data_df = pd.read_parquet(f"{parquet_folder}/{date_prefix}/training_multiwindow_coin_training_data_df.parquet")
-        training_target_var_df = pd.read_parquet(f"{parquet_folder}/{date_prefix}/training_multiwindow_coin_target_var_df.parquet")
-        val_data_df = pd.read_parquet(f"{parquet_folder}/{date_prefix}/validation_multiwindow_coin_training_data_df.parquet")
-        val_target_var_df = pd.read_parquet(f"{parquet_folder}/{date_prefix}/validation_multiwindow_coin_target_var_df.parquet")
+        training_data_df = pd.read_parquet(f"{parquet_folder}/{date_prefix}/training_multiepoch_coin_training_data_df.parquet")
+        training_target_var_df = pd.read_parquet(f"{parquet_folder}/{date_prefix}/training_multiepoch_coin_target_var_df.parquet")
+        val_data_df = pd.read_parquet(f"{parquet_folder}/{date_prefix}/validation_multiepoch_coin_training_data_df.parquet")
+        val_target_var_df = pd.read_parquet(f"{parquet_folder}/{date_prefix}/validation_multiepoch_coin_target_var_df.parquet")
 
         return (training_data_df, training_target_var_df, val_data_df, val_target_var_df), investment_start_date
 

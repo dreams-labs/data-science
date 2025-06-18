@@ -267,7 +267,7 @@ class WalletModel(BaseModel):
             training_data_df, wallet_target_vars_df = self._assign_epoch_to_wallets(
                 training_data_df,
                 wallet_target_vars_df,
-                random_state = self.modeling_config['model_params']['random_state']
+                random_state = self.modeling_config['model_params'].get('random_state', 42)
             )
 
         # Store full training cohort for later scoring

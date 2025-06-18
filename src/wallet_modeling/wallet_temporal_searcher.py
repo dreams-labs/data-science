@@ -121,8 +121,8 @@ class TemporalGridSearcher:
             try:
                 # Load all four DataFrames for this date    # pylint:disable=line-too-long
                 base_path = f"{parquet_folder}/{date_str}"
-                wallet_training_data_df = pd.read_parquet(f"{base_path}/multiwindow_wallet_training_data_df.parquet")
-                wallet_target_vars_df = pd.read_parquet(f"{base_path}/multiwindow_wallet_target_vars_df.parquet")
+                wallet_training_data_df = pd.read_parquet(f"{base_path}/multioffset_wallet_training_data_df.parquet")
+                wallet_target_vars_df = pd.read_parquet(f"{base_path}/multioffset_wallet_target_vars_df.parquet")
                 validation_training_data_df = pd.read_parquet(f"{base_path}/multiwindow_validation_training_data_df.parquet")
                 validation_target_vars_df = pd.read_parquet(f"{base_path}/multiwindow_validation_target_vars_df.parquet")
 
@@ -391,8 +391,8 @@ class TemporalGridSearcher:
         date_str = datetime.strptime(modeling_date, '%Y-%m-%d').strftime('%y%m%d')
 
         required_files = [
-            f"{parquet_folder}/{date_str}/multiwindow_wallet_training_data_df.parquet",
-            f"{parquet_folder}/{date_str}/multiwindow_wallet_target_vars_df.parquet",
+            f"{parquet_folder}/{date_str}/multioffset_wallet_training_data_df.parquet",
+            f"{parquet_folder}/{date_str}/multioffset_wallet_target_vars_df.parquet",
             f"{parquet_folder}/{date_str}/multiwindow_validation_training_data_df.parquet",
             f"{parquet_folder}/{date_str}/multiwindow_validation_target_vars_df.parquet"
         ]
