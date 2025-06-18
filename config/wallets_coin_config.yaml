@@ -61,8 +61,8 @@ training_data: #CoinModel
     ]
 
     #KeyParam Rebuild Features Settings
-    # toggle_rebuild_all_features: True  # If True, existing multiwindow coin features/target dfs will be overridden
-    toggle_rebuild_all_features: False  # If True, existing multiwindow coin features/target dfs will be overridden
+    toggle_rebuild_all_features: True  # If True, existing multiwindow coin features/target dfs will be overridden
+    # toggle_rebuild_all_features: False  # If True, existing multiwindow coin features/target dfs will be overridden
 
     # toggle_rebuild_wallet_models: True  # If True, all wallet models will be retrained
     toggle_rebuild_wallet_models: False  # If True, all wallet models will be retrained
@@ -165,11 +165,29 @@ features: #CoinModel
         cw_net_gain_inflows_040
     ]
 
-    # Features from the feature_engineering directory
-    toggle_coin_flow_model_features: False
+    # Time series features: most params are in wallets_coins_metrics_config.yaml
+    toggle_macro_features: True  # whether to build macro features
+    toggle_market_features: True  # whether to build market data features
 
-    # Score features params
-    usd_materiality: 20 # Wallets with volume/balances below this won't be counted in medians/distributions/etc
+    # Which wallet features will be aggregated to coin features
+    wallet_features_cols: [
+        'macro|gtrends_altcoin_worldwide_std|w1',
+        'transfers|coin_total_buyers/median|w1',
+        'cw_transfers|buys_coin_age/min|w1',
+        'cw_transfers|first_buy/earliest_rank|w2',
+        'cw_transfers|buys_coin_age/median|w1',
+        'transfers|earlybird_ratio/median|w1',
+        'mktcap|portfolio_mcap_mean/market_cap_filled|w1',
+        'cw_transfers|buys_coin_age/min|w2',
+        'timing|btc_mvrv_z_score/buy_weighted|w1',
+        'timing|btc_mvrv_z_score/lead_30/buy_weighted|w3',
+        'cw_transfers|initial_hold_time/median|w3',
+        'timing|btc_mvrv_z_score/lag_15/sell_weighted|w1',
+        'cw_transfers|first_buy/median_rank|w2',
+        'timing|btc_mvrv_z_score/sell_weighted|w1',
+        'cw_trading|crypto_net_gain|w1',
+        'cw_trading|total_volume|w1',
+    ]
 
     # Metrics to drop based on low observed importance
     drop_trading_metrics: [
@@ -186,9 +204,11 @@ features: #CoinModel
         average_transaction,
     ]
 
-    # Time series features: most params are in wallets_coins_metrics_config.yaml
-    toggle_macro_features: True  # whether to build macro features
-    toggle_market_features: True  # whether to build market data features
+    # Score features params
+    usd_materiality: 20 # Wallets with volume/balances below this won't be counted in medians/distributions/etc
+
+    # Features from the feature_engineering directory
+    toggle_coin_flow_model_features: False
 
 
 # CoinModel Modeling Config
@@ -446,7 +466,7 @@ coin_modeling: #CoinModel
 
         #KeyParam Grid Search
         # -------------------------------
-        enabled: True
+        # enabled: True
         # -------------------------------
 
         # Search Methodology

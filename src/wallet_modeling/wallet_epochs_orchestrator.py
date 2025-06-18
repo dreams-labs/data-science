@@ -189,7 +189,6 @@ class WalletEpochsOrchestrator:
         - wallet_training_data_df, wallet_target_vars_df, validation_training_data_df, validation_target_vars_df
         """
         # --- stub-load: load and return dfs if they exist ---
-        from pathlib import Path
         parquet_folder = Path(self.base_config['training_data']['parquet_folder'])
         date_str = pd.to_datetime(
             self.base_config['training_data']['modeling_period_start']
@@ -203,10 +202,9 @@ class WalletEpochsOrchestrator:
         }
         if (
             all(p.exists() for p in paths.values())
-            and self.base_config['training_data']['rebuild_multiwindow_dfs'] == False
+            and self.base_config['training_data']['rebuild_multiwindow_dfs'] is False
             and not self.training_only
         ):
-            self.base_config['training_data']['rebuild_multiwindow_dfs']
             logger.info("Loading saved multi-window epoch DataFrames from %s", base_path)
             wallet_training_data_df       = pd.read_parquet(paths['train'])
             wallet_target_vars_df         = pd.read_parquet(paths['train_tgt'])

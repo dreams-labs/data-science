@@ -1,6 +1,5 @@
 import logging
 import pandas as pd
-import wallet_features.trading_features as wtf
 import utils as u
 
 # Set up logger at the module level
@@ -8,18 +7,15 @@ logger = logging.getLogger(__name__)
 
 
 
-
-
-
-
-# -----------------------------------
-#       Main Interface Function
-# -----------------------------------
+# ------------------------------------
+#       Main Interface Functions
+# ------------------------------------
 
 @u.timing_decorator
 def compute_coin_wallet_metrics(
         wallets_coin_config: dict,
         profits_df: pd.DataFrame,
+        wallet_training_data_df: pd.DataFrame,
         period_start: str,
         period_end: str
     ) -> pd.DataFrame:
@@ -28,7 +24,11 @@ def compute_coin_wallet_metrics(
 
     Params:
     - wallets_coin_config (dict): dict from .yaml file
-    - profits_df (DataFrame): must include columns ['coin_id','wallet_address',…].
+    - profits_df (DataFrame): profits_df for the wallet_modeling_period, meaning
+        that the last date falls directly before the coin_modeling_period_start
+    - wallet_training_data_df (DataFrame): wallet training features built with data that
+        extends up to the coin_modeling_period_start.
+
     - period_start,period_end str(YYYY-MM-DD): period start and end dates
 
     Returns:
@@ -57,17 +57,14 @@ def compute_coin_wallet_metrics(
         .fillna({col: 0 for col in balances_df.columns})
     )
 
-    # 3) Calculate trading metrics
-    trading_df = calculate_coin_wallet_trading_metrics(
-        profits_df,
-        period_start,
-        period_end,
-        wallets_coin_config['features']['drop_trading_metrics']
-    ).add_prefix('trading/')
+    # 3) Extract configured wallet training data features
+    wallet_features_df = select_wallet_features(
+        wallets_coin_config, wallet_training_data_df
+    ).add_prefix('wallet/')
     cw_metrics_df = (
         cw_metrics_df
-        .join(trading_df, how='left')
-        .fillna({col: 0 for col in trading_df.columns})
+        .join(wallet_features_df, how='left')
+        # leave NaNs for XGB to process rather than filling
     )
 
     return cw_metrics_df
@@ -78,6 +75,7 @@ def compute_coin_wallet_metrics(
 # ------------------------------
 #         Helper Functions
 # ------------------------------
+
 
 @u.timing_decorator
 def calculate_coin_wallet_ending_balances(profits_df: pd.DataFrame) -> pd.DataFrame:
@@ -115,51 +113,43 @@ def calculate_coin_wallet_ending_balances(profits_df: pd.DataFrame) -> pd.DataFr
     return balances_df
 
 
-@u.timing_decorator
-def calculate_coin_wallet_trading_metrics(profits_df, start_date, end_date, drop_trading_metrics):
+
+def select_wallet_features(
+        wallets_coin_config: dict,
+        wallet_training_data_df: pd.DataFrame,
+    ) -> pd.DataFrame:
     """
-    Creates a coin-wallet multiindexed df with trading metrics for each pair.
+    Selects the wallet_training_data_df columns that will be flattened into
+     coin-level features. This df comes directly from the wallet model's training data where
+     the wallet modeling_period_start matches the current coin_modeling_period_start.
+
+    This dataset needs to be flattened separately from the compute_coin_wallet_metrics()
+     output because it includes all wallets included in the multiwindow cohort, whereas
+     the latter only includes profits_df from the modeling period directly prior to the
+     coin modeling period, meaning that the multiwindow df has a much larger cohort.
 
     Params:
-    - profits_df (df): df with period boundaries set to start and end dates
-    - start_date, end_date (str): YYYY-MM-DD dates
-    - drop_trading_metrics (list of strings): columns to drop
+    - wallets_coin_config (dict): dict from .yaml file
+    - wallet_training_data_df (DataFrame): wallet training features for the multiwindow
+    period with the modeling_period_start equal to the current coin config's
+    coin_modeling_period_start. Aggregated wallet features as of the coin modeling period
+    are used as coin-level features.
 
     Returns:
-    - cw_trading_metrics_df (df): df multiindexed on coin_id,wallet_address with trading metrics
+    - wallet_features_df (df): The same df filtered to only the relevant
+        columns, multiindexed on coin_id-wallet_address.
     """
-    # Assert period and copy
-    u.assert_period(profits_df, start_date, end_date)
-    rekeyed_profits_df = profits_df.copy()
+    feature_cols = wallets_coin_config['features']['wallet_features_cols']
+    missing_cols = [col for col in feature_cols if col not in wallet_training_data_df.columns]
+    if missing_cols:
+        raise ValueError(f"Missing columns in training data: {missing_cols}")
 
-    # Create profits_df keyed on hybrid coin_id|wallet_address
-    rekeyed_profits_df['wallet_address'] = (rekeyed_profits_df['coin_id'].astype(str) + '|'
-                                            + rekeyed_profits_df['wallet_address'].astype(int).astype(str))
+    # Select columns
+    wallet_features_df = wallet_training_data_df[feature_cols]
 
-    # Calculate trading features on the hybrid index level
-    cw_trading_metrics_df = wtf.calculate_wallet_trading_features(rekeyed_profits_df,
-                                                                  start_date,end_date,
-                                                                  include_twb_metrics=False)
+    # Replace characters for coin feature analysis
+    wallet_features_df.columns = (wallet_features_df.columns
+                                  .str.replace('|', '_')
+                                  .str.replace('/', '_'))
 
-    # Split the hybrid index back into wallet_address and coin_id
-    wallet_coin = cw_trading_metrics_df.index.str.split('|', expand=True)
-    cw_trading_metrics_df.index = pd.MultiIndex.from_tuples(wallet_coin, names=['coin_id', 'wallet_address'])
-
-    # Reconvert the wallet_address back to int
-    cw_trading_metrics_df.index = pd.MultiIndex.from_tuples(
-        [(c, int(w)) for c, w in cw_trading_metrics_df.index],
-        names=['coin_id', 'wallet_address']
-    )
-
-    # Drop metrics if configured to do so
-    if len(drop_trading_metrics) > 0:
-        existing_cols = [col for col in drop_trading_metrics if col in cw_trading_metrics_df.columns]
-        missing_cols = set(drop_trading_metrics) - set(existing_cols)
-
-        if existing_cols:
-            cw_trading_metrics_df = cw_trading_metrics_df.drop(columns=existing_cols)
-        if missing_cols:
-            logger.warning(f"Trading drop metrics not found: {missing_cols}")
-
-
-    return cw_trading_metrics_df
+    return wallet_features_df

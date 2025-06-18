@@ -37,9 +37,6 @@ class CoinFeaturesOrchestrator:
         coin_flow_modeling_config: dict,
         coin_flow_metrics_config: dict,
         training_coin_cohort: pd.Series,
-        complete_profits_df: pd.DataFrame = None,
-        complete_market_data_df: pd.DataFrame = None,
-        complete_macro_trends_df: pd.DataFrame = None,
     ):
         # Store configs
         self.wallets_config = wallets_config
@@ -58,21 +55,15 @@ class CoinFeaturesOrchestrator:
         self.como_profits_df = None
         self.como_market_data_df = None
 
-        # Complete DataFrames
-        self.complete_profits_df = complete_profits_df
-        self.complete_market_data_df = complete_market_data_df
-        self.complete_macro_trends_df = complete_macro_trends_df
-
-
     # -----------------------------------------
     #       Primary Orchestration Methods
     # -----------------------------------------
 
     @u.timing_decorator
-    def generate_coin_features_for_period(
+    def generate_coin_features(
         self,
         profits_df: pd.DataFrame,
-        training_data_df: pd.DataFrame,
+        wallet_training_data_df: pd.DataFrame,
         market_indicators_df: pd.DataFrame,
         macro_indicators_df: pd.DataFrame,
         period: str,
@@ -91,7 +82,8 @@ class CoinFeaturesOrchestrator:
 
         Params:
         - profits_df (DataFrame): profits data for the specified period
-        - training_data_df (DataFrame): wallet training features for the specified period
+        - wallet_training_data_df (DataFrame): wallet training features built with data that
+            extends up to the coin_modeling_period_start.
         - market_indicators_df (DataFrame): date-indexed market data indicators
         - macro_indicators_df (DataFrame): date-indexed macroeconomic indicators
         - period (str): period identifier (e.g., 'coin_modeling')
@@ -109,25 +101,26 @@ class CoinFeaturesOrchestrator:
             self.wallets_config['training_data'][f'{period}_period_start'],
             self.wallets_config['training_data'][f'{period}_period_end']
         )
-        # Guard: training_data_df has unique wallet rows (needed for segmentation)
-        if training_data_df.index.duplicated().any():
-            raise ValueError("training_data_df contains duplicated wallet rows.")
+        # Guard: wallet_training_data_df has unique wallet rows (needed for segmentation)
+        if wallet_training_data_df.index.duplicated().any():
+            raise ValueError("wallet_training_data_df contains duplicated wallet rows.")
 
 
         # Wallet-Based Features
         # ---------------------
-        # Generate metrics for coin-wallet pairs in training_data_df
+        # Generate metrics for coin-wallet pairs in wallet_training_data_df
         cw_metrics_df = cfwm.compute_coin_wallet_metrics(
             self.wallets_coin_config,
             profits_df,
+            wallet_training_data_df,
             self.wallets_config['training_data'][f'{period}_period_start'],
             self.wallets_config['training_data'][f'{period}_period_end']
         )
 
-        # Assign wallets in training_data_df to segments
+        # Assign wallets in wallet_training_data_df to segments
         wallet_segmentation_df = cws.build_wallet_segmentation(
             self.wallets_coin_config,
-            training_data_df
+            wallet_training_data_df
         )
 
         # Flatten cw_metrics into single values for each coin-segment pair
