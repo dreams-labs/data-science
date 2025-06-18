@@ -234,8 +234,8 @@ coin_modeling: #CoinModel
     # target_var_min_threshold: 0.25 # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.3 # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.4 # a classification model will try to predict the target var above this value
-    target_var_min_threshold: 0.5 # a classification model will try to predict the target var above this value
-    # target_var_min_threshold: 0.7 # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.5 # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.7 # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.9 # a classification model will try to predict the target var above this value
     target_var_max_threshold: inf # a classification model will try to predict the target var above this value
     y_pred_threshold: 0.90  # scores above this probability threshold are positive predictions
@@ -244,11 +244,11 @@ coin_modeling: #CoinModel
 
     #KeyParam Asymmetric Loss
     asymmetric_loss: # Adds another class to target
-        enabled: true
-        big_loss_threshold: -0.2    # Below this is an extra penalized big loss
-        big_win_threshold: 0.5      # Above this is the target
-        loss_penalty_weight: 1     # Penalty for missing losses
-        win_reward_weight:   1       # Reward for catching wins
+        # enabled: true
+        big_loss_threshold: -0.3    # Below this is an extra penalized big loss
+        big_win_threshold: 0.7      # Above this is the target
+        # loss_penalty_weight: 1     # Penalty for missing losses
+        # win_reward_weight:   1       # Reward for catching wins
 
 
     #KeyParam Modeling Cohort Definition
@@ -286,23 +286,21 @@ coin_modeling: #CoinModel
 
             score_binary|cw_net_gain_inflows_n040/*,
             score_binary|cw_coin_return_030_asymloss/*,
-            score_binary|cw_net_gain_inflows_040/*,
+            # score_binary|cw_net_gain_inflows_040/*,
             score_binary|cw_coin_return_n030/*,
+            # score_binary|cw_coin_return_030/*,
 
-            score_binary|*/1|trading/total_volume|aggregations/aggregations/sum,
-            score_binary|*/1|trading/total_volume|aggregations/aggregations/sum_pct,
-            # score_binary|*/1|trading/unique_coins_traded|aggregations/aggregations/sum,
-            # score_binary|*/1|trading/unique_coins_traded|aggregations/aggregations/sum_pct,
             # score_binary|*/1|balances/usd_balance_ending|aggregations/aggregations/sum_pct,
             # score_binary|*/1|balances/usd_balance_ending|aggregations/aggregations/sum,
-            # score_binary|*/1|trading/crypto_net_gain|aggregations/aggregations/sum,
-            # score_binary|*/1|trading/crypto_net_gain|aggregations/aggregations/sum_pct,
 
-            # metadata|*,
-            # metadata|blockchain/Base,
-            # metadata|blockchain/Binance,
-            # metadata|blockchain/Other,
-            # metadata|blockchain/Solana,
+            'metadata|blockchain/Base',
+            'metadata|blockchain/Binance',
+            'metadata|blockchain/Other',
+            'metadata|blockchain/Ethereum',
+            'metadata|blockchain/Solana',
+            'metadata|decimals',
+            # 'metadata|described_meme',
+            # 'metadata|total_supply',
 
             # macro|btc_mvrv_z_score/last_*,
             macro|btc_mvrv_z_score/pct_change_30d*,
@@ -376,15 +374,15 @@ coin_modeling: #CoinModel
             # wallet_cohorts|*|total_sold*,
 
             'score_binary|*|wallet/*',
-            '*|wallet/cw_trading_crypto_net_gain_w1|*',
-            '*|wallet/cw_trading_total_volume_w1|*',
-            # '*|wallet/usd_balance_ending|*',
-            '*|wallet/transfers_earlybird_ratio_median_w1|*',
+
+            # '*|wallet/cw_trading_crypto_net_gain_w1|*',
+            # '*|wallet/cw_trading_total_volume_w1|*',
+            # '*|wallet/transfers_earlybird_ratio_median_w1|*',
             '*|wallet/transfers_coin_total_buyers_median_w1|*',
             '*|wallet/timing_btc_mvrv_z_score_sell_weighted_w1|*',
             '*|wallet/timing_btc_mvrv_z_score_lead_30_buy_weighted_w3|*',
-            '*|wallet/timing_btc_mvrv_z_score_lag_15_sell_weighted_w1|*',
-            '*|wallet/timing_btc_mvrv_z_score_buy_weighted_w1|*',
+            # '*|wallet/timing_btc_mvrv_z_score_lag_15_sell_weighted_w1|*',
+            # '*|wallet/timing_btc_mvrv_z_score_buy_weighted_w1|*',
             '*|wallet/mktcap_portfolio_mcap_mean_market_cap_filled_w1|*',
             '*|wallet/macro_gtrends_altcoin_worldwide_std_w1|*',
             '*|wallet/cw_transfers_initial_hold_time_median_w3|*',
@@ -392,56 +390,17 @@ coin_modeling: #CoinModel
             '*|wallet/cw_transfers_first_buy_earliest_rank_w2|*',
             '*|wallet/cw_transfers_buys_coin_age_min_w2|*',
             '*|wallet/cw_transfers_buys_coin_age_min_w1|*',
-            '*|wallet/cw_transfers_buys_coin_age_median_w1|*',
-            # '*|wallet/usd_balance_starting|*',
-
-            # Metric Detail
-            '*|trading/crypto_cash_buys|*',
-            '*|trading/crypto_cash_sells|*',
-            '*|trading/crypto_inflows|*',
-            '*|trading/crypto_net_cash_flows|*',
-            # '*|trading/crypto_net_flows|*',
-            '*|trading/crypto_net_gain|*',
-            '*|trading/crypto_outflows|*',
-            '*|trading/max_investment|*',
-            # '*|trading/total_volume|*',
-            '*|trading/unique_coins_traded|*',
-            '*|trading/average_transaction|*',
-            # '*|balances/usd_balance_starting*|*',
-            # '*|balances/usd_balance_ending*|*',
+            # '*|wallet/cw_transfers_buys_coin_age_median_w1|*',
 
 
             # Transformation Category
-            # '*|aggregations/*',
-            # '*|score_dist/*',
-            # '*|score_dist/cw_net_gain_inflows_020/*',
-            # '*|score_dist/cw_coin_return_020/*',
             '*|score_wtd/*',
+            '*|score_dist/*',
 
             'training_clusters|*|score_dist/*',
             'training_clusters|*|score_wtd/*',
 
 
-            # Transformation Base
-            # # '*|*/cw_net_flows_1k/*',
-            # '*|*/cw_net_flows_inflows_50/*',
-            # # '*|*/cw_net_gain_max_inv_50/*',
-            # '*|*/cw_net_gain_max_inv_80/*',
-            # '*|*/cw_net_gain_max_inv_n60/*',
-            # '*|*/cw_net_gain_max_inv_n80/*',
-
-            '*|score_dist/*',
-            # '*|balances/usd_balance_ending|score_dist/*',
-            '*|balances/usd_balance_starting|score_dist/*',
-            # '*|trading/crypto_net_flows|score_dist/*',
-            '*|trading/total_volume|score_dist/*',
-            '*|balances/usd_balance_ending|score_dist/*',
-            # '*|score_dist/*_median',
-            # '*|score_dist/*_p05',
-            # '*|score_dist/*_p10',
-            # '*|score_dist/*_p90',
-            # '*|score_dist/*_p95',
-            # '*|score_dist/*_std',
 
             # Transformation Method
             'all_wallets|*/sum_pct',
@@ -462,6 +421,18 @@ coin_modeling: #CoinModel
             # '*|*/*/p998',
             # '*|*/*/skew',
             # '*|*/*/std',
+
+            'all_wallets|all/all|balances/usd_balance_ending|aggregations/aggregations/sum',
+            'all_wallets|all/all|balances/usd_balance_starting|aggregations/aggregations/sum',
+            'macro|btc_mvrv_z_score/last_30d_*',
+            'macro|btc_mvrv_z_score/sma_1_pct_change_7d_period_*',
+            'macro|btc_mvrv_z_score/std_30d_period_*',
+            'macro|btc_price/std_30d_period_*',
+            'macro|gtrends_altcoin_worldwide/last_30d_period_*',
+            'macro|gtrends_memecoin_us/last_30d_period_*',
+            # 'market_data|mfi/last_20d_period_*',
+            # 'score_binary|cw_coin_return_030/1|balances/usd_balance_ending|aggregations/aggregations/*',
+            # 'score_binary|cw_coin_return_030/1|balances/usd_balance_starting|aggregations/aggregations/*',
 
 
         ]
@@ -515,11 +486,11 @@ coin_modeling: #CoinModel
         drop_patterns_include_n_features: 1
 
         n_iter: 200  # random search limit
-        n_splits: 5  # cv splits
+        n_splits: 4  # cv splits
         regressor_scoring: neg_root_mean_squared_error
         # classifier_scoring: validation_auc_scorer
         classifier_scoring: validation_top_percentile_returns_scorer
-        percentile_threshold: 0.005
+        percentile_threshold: 0.05
 
         build_post_search_model: False  # whether to build a model after the grid search
         verbose_level: 3  # 3 outputs model performance but not training scores
@@ -554,22 +525,42 @@ coin_modeling: #CoinModel
             # estimator__tree_method: [hist]
 
             drop_columns__drop_patterns: [
-                '*|wallet/cw_trading_crypto_net_gain_w1|*',
-                '*|wallet/cw_trading_total_volume_w1|*',
-                '*|wallet/transfers_earlybird_ratio_median_w1|*',
-                '*|wallet/transfers_coin_total_buyers_median_w1|*',
-                '*|wallet/timing_btc_mvrv_z_score_sell_weighted_w1|*',
-                '*|wallet/timing_btc_mvrv_z_score_lead_30_buy_weighted_w3|*',
-                '*|wallet/timing_btc_mvrv_z_score_lag_15_sell_weighted_w1|*',
-                '*|wallet/timing_btc_mvrv_z_score_buy_weighted_w1|*',
-                '*|wallet/mktcap_portfolio_mcap_mean_market_cap_filled_w1|*',
-                '*|wallet/macro_gtrends_altcoin_worldwide_std_w1|*',
-                '*|wallet/cw_transfers_initial_hold_time_median_w3|*',
-                '*|wallet/cw_transfers_first_buy_median_rank_w2|*',
-                '*|wallet/cw_transfers_first_buy_earliest_rank_w2|*',
-                '*|wallet/cw_transfers_buys_coin_age_min_w2|*',
-                '*|wallet/cw_transfers_buys_coin_age_min_w1|*',
-                '*|wallet/cw_transfers_buys_coin_age_median_w1|*',
+                # feature_retainer,
+                # score_binary|cw_net_gain_inflows_n040/*,
+                # score_binary|cw_coin_return_030_asymloss/*,
+                # score_binary|cw_net_gain_inflows_040/*,
+                # score_binary|cw_coin_return_n030/*,
+                # '*|wallet/cw_trading_crypto_net_gain_w1|*',
+                # '*|wallet/cw_trading_total_volume_w1|*',
+                # '*|wallet/transfers_earlybird_ratio_median_w1|*',
+                # '*|wallet/transfers_coin_total_buyers_median_w1|*',
+                # '*|wallet/timing_btc_mvrv_z_score_sell_weighted_w1|*',
+                # '*|wallet/timing_btc_mvrv_z_score_lead_30_buy_weighted_w3|*',
+                # '*|wallet/timing_btc_mvrv_z_score_lag_15_sell_weighted_w1|*',
+                # '*|wallet/timing_btc_mvrv_z_score_buy_weighted_w1|*',
+                # '*|wallet/mktcap_portfolio_mcap_mean_market_cap_filled_w1|*',
+                # '*|wallet/macro_gtrends_altcoin_worldwide_std_w1|*',
+                # '*|wallet/cw_transfers_initial_hold_time_median_w3|*',
+                # '*|wallet/cw_transfers_first_buy_median_rank_w2|*',
+                # '*|wallet/cw_transfers_first_buy_earliest_rank_w2|*',
+                # '*|wallet/cw_transfers_buys_coin_age_min_w2|*',
+                # '*|wallet/cw_transfers_buys_coin_age_min_w1|*',
+                # '*|wallet/cw_transfers_buys_coin_age_median_w1|*',
+
+
+
+
+                # 'all_wallets|all/all|balances/usd_balance_ending|aggregations/aggregations/sum',
+                # 'all_wallets|all/all|balances/usd_balance_starting|aggregations/aggregations/sum',
+                # 'macro|btc_mvrv_z_score/last_30d_*',
+                # 'macro|btc_mvrv_z_score/sma_1_pct_change_7d_period_*',
+                # 'macro|btc_mvrv_z_score/std_30d_period_*',
+                # 'macro|btc_price/std_30d_period_*',
+                # 'macro|gtrends_altcoin_worldwide/last_30d_period_*',
+                # 'macro|gtrends_memecoin_us/last_30d_period_*',
+                # # 'market_data|mfi/last_20d_period_*',
+                # 'score_binary|cw_coin_return_030/1|balances/usd_balance_ending|aggregations/aggregations/*',
+                # # 'score_binary|cw_coin_return_030/1|balances/usd_balance_starting|aggregations/aggregations/*',
 
             ]
 

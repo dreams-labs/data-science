@@ -295,7 +295,8 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
                 'wallets_metrics_config': self.wallets_metrics_config,
             }
         )
-        coin_evaluator.plot_wallet_evaluation()
+        if self.coins_investing_config['training_data']['plot_wallet_model_evaluation']:
+            coin_evaluator.plot_wallet_evaluation()
 
         return coin_model_id, coin_evaluator
 

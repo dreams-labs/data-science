@@ -255,15 +255,17 @@ class CoinEpochsOrchestrator:
 
         def process_single_epoch(lookback: int) -> tuple:
             """Process a single epoch and return tagged results"""
-            epoch_date, coin_features_df, coin_target_df = self._process_coin_epoch(lookback)
+            epoch_date, coin_features_df, coin_target_df, newly_generated = self._process_coin_epoch(lookback)
             return (
                 tag_with_epoch(coin_features_df, epoch_date),
-                tag_with_epoch(coin_target_df, epoch_date)
+                tag_with_epoch(coin_target_df, epoch_date),
+                newly_generated
             )
 
         # Process epochs in parallel
         feature_dfs = []
         target_dfs = []
+        newly_generated_bools = []
 
         n_threads = self.wallets_coin_config['n_threads']['concurrent_coin_epochs']
         with ThreadPoolExecutor(max_workers=n_threads) as executor:
@@ -275,9 +277,10 @@ class CoinEpochsOrchestrator:
             for i, future in enumerate(as_completed(future_to_offset), 1):
                 lookback = future_to_offset[future]
                 try:
-                    features_df, targets_df = future.result()
+                    features_df, targets_df, newly_generated = future.result()
                     feature_dfs.append(features_df)
                     target_dfs.append(targets_df)
+                    newly_generated_bools.append(newly_generated)
                     logger.milestone(f"Completed coin epoch {i}/{len(offsets)} (lookback={lookback})")
                 except Exception as e:
                     logger.error(f"Coin epoch with lookback {lookback} generated an exception: {e}", exc_info=True)
@@ -303,7 +306,10 @@ class CoinEpochsOrchestrator:
             multiwindow_targets.to_parquet(f"{root_folder}/{file_prefix}multiepoch_coin_target_var_df.parquet")
 
         ambient_player_coins.stop()
-        u.notify('robotz_windows_start')
+
+        # Only notify if we built new data
+        if any(newly_generated_bools) > 0:
+            u.notify('robotz_windows_start')
 
 
     @staticmethod
@@ -374,7 +380,7 @@ class CoinEpochsOrchestrator:
     def _process_coin_epoch(
             self,
             lookback_duration: int
-        ) -> tuple[datetime, pd.DataFrame, pd.DataFrame]:
+        ) -> tuple[datetime, pd.DataFrame, pd.DataFrame, bool]:
         """
         Process a single coin epoch: generate data, train wallet models, generate coin
          modeling data, and score wallets.
@@ -387,7 +393,13 @@ class CoinEpochsOrchestrator:
             coin features.
 
         Params:
-        - lookback_duration (int): how many days the dates will be offset from the base modeling period
+        - lookback_duration (int): how many days the dates will be offset from the base modeling period"
+
+        Returns:
+        - epoch_date (str): coin_modeling_period_start
+        - coin_features_df (df): training data for coin model
+        - coin_target_df (df): target var for coin model
+        - newly_generated (bool): whether the data was newly built, or False if loaded from existing files
         """
         # 1) Prepare config files
         # -----------------------
@@ -420,7 +432,7 @@ class CoinEpochsOrchestrator:
                     "Coin epoch %s training data loaded from existing feature and target files.",
                     epoch_date.strftime('%Y-%m-%d')
                 )
-                return epoch_date, coin_features_df, coin_target_df
+                return epoch_date, coin_features_df, coin_target_df, False
 
             # Announce overwrite if applicable
             else:
@@ -505,7 +517,7 @@ class CoinEpochsOrchestrator:
             coin_features_df.shape
         )
 
-        return epoch_date, coin_features_df, coin_target_var_df
+        return epoch_date, coin_features_df, coin_target_var_df, True
 
 
 
