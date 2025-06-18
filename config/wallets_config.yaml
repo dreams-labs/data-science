@@ -43,7 +43,7 @@ training_data: #WalletModel
 
     #KeyParam Datasets zand Folders
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
-    parquet_folder: temp/wallet_modeling_dfs/dda_848_wallet_multiwindow_searching  # where to store parquet files
+    parquet_folder: temp/wallet_modeling_dfs/dda_853_wallet_multiwindow_searching  # where to store parquet files
     reference_dfs_folder: temp/reference_dfs  # Base folder where files that impact all runs are stored
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
@@ -80,11 +80,13 @@ modeling: #WalletModel
 
     #KeyParam Target Var Thresholds
     asymmetric_loss: # Adds another class to target
-        # enabled: true
-        big_loss_threshold: -0.20    # Below this is an extra penalized big loss
-        big_win_threshold: 0.40      # Above this is the target
-        loss_penalty_weight: 3.0     # Penalty for missing losses
-        win_reward_weight: 1.0       # Reward for catching wins
+        enabled: true
+        big_loss_threshold: -0.30    # Below this is an extra penalized big loss
+        # big_loss_threshold: -0.20    # Below this is an extra penalized big loss
+        big_win_threshold: 0.30      # Above this is the target
+        # big_win_threshold: 0.40      # Above this is the target
+        # loss_penalty_weight: 1.0     # Penalty for missing losses DOESN'T WORK
+        # win_reward_weight: 1.0       # Reward for catching wins   DOESN'T WORK
 
     # target_var_min_threshold: -.inf  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.05  # a classification model will try to predict the target var above this value
@@ -144,7 +146,7 @@ modeling: #WalletModel
         # Core Tree Params (Always Active)
         # -------------------------------
         #KeyParam Tree Depth
-        max_depth: 3  # how deep the trees can go
+        max_depth: 2  # how deep the trees can go
         min_child_weight: 60  # what % of rows each tree must have
 
         #KeyParam True Positive Weighting
@@ -408,21 +410,21 @@ modeling: #WalletModel
 
 
 
-            'cw_mktcap|end_portfolio_wtd_market_cap*',
-            'cw_timing|volume_sma_2*',
-            'performance|crypto_net_gain*',
-            'macro|btc_mvrv_z_score_last*',
-            'cw_transfers|earlybird_ratio*',
-            'transfers|initial_hold_time*',
-            'cw_transfers|wallet_age*',
-            'cw_performance|crypto_net_gain*',
-            'timing|price_sma_2*',
-            'cw_timing|btc_mvrv_z_score*',
-            'transfers|later_buyers*',
-            'cw_transfers|coin_total_buyers*',
-            'cw_transfers|later_buyers*',
-            'transfers|buys_coin_age*',
-            'transfers|first_buy*',
+            # 'cw_mktcap|end_portfolio_wtd_market_cap*',
+            # 'cw_timing|volume_sma_2*',
+            # 'performance|crypto_net_gain*',
+            # 'macro|btc_mvrv_z_score_last*',
+            # 'cw_transfers|earlybird_ratio*',
+            # 'transfers|initial_hold_time*',
+            # 'cw_transfers|wallet_age*',
+            # 'cw_performance|crypto_net_gain*',
+            # 'timing|price_sma_2*',
+            # 'cw_timing|btc_mvrv_z_score*',
+            # 'transfers|later_buyers*',
+            # 'cw_transfers|coin_total_buyers*',
+            # 'cw_transfers|later_buyers*',
+            # 'transfers|buys_coin_age*',
+            # 'transfers|first_buy*',
 
 
 
@@ -440,10 +442,14 @@ modeling: #WalletModel
     # Params for model construction
     grid_search_params:
 
+
+
         #KeyParam Grid Search Toggle
-        # -------------------------------
+        # -------------------------------------------------------------------------------------------------------------
         # enabled: True
-        # -------------------------------
+        # -------------------------------------------------------------------------------------------------------------
+
+
 
         # Search Methodology
         drop_patterns_include_n_features: 1  # if set to n, the drop_patterns grid search will apply all but n patterns for each model. otherwise, it will apply 1 drop pattern in each model.
@@ -456,6 +462,8 @@ modeling: #WalletModel
         # regressor_scoring: custom_r2_scorer
         regressor_scoring: validation_r2_scorer
 
+        # classifier_scoring: f1
+        # classifier_scoring: neg_log_loss
         # classifier_scoring: validation_auc_scorer
         # classifier_scoring: validation_top_scores_returns_scorer
         classifier_scoring: validation_top_percentile_returns_scorer
@@ -468,8 +476,8 @@ modeling: #WalletModel
         n_jobs: -1
         # pre_dispatch: -1
 
-        # Params for target variable generation
         # param_grid_y:
+        # Params for target variable generation
 
             # Target variables
             # target_selector__target_variable: [
@@ -486,8 +494,8 @@ modeling: #WalletModel
 
             # # Depth and Child Weight
             # estimator__min_child_weight_pct: [0.00004, 0.00007, 0.0001]
-            # estimator__min_child_weight: [40, 60, 80, 100]
-            # estimator__max_depth: [2,3,4,5]
+            estimator__min_child_weight: [40, 60]
+            estimator__max_depth: [2,3,4]
             # basic depth param
 
             # # Col/Row Sampling
@@ -503,7 +511,7 @@ modeling: #WalletModel
             # estimator__n_estimators: [2]
             estimator__n_estimators: [200]
             estimator__learning_rate: [0.9]
-            estimator__max_depth: [2]
+            # estimator__max_depth: [2]
             # estimator__min_child_weight: [30]
 
             # estimator__gamma: [0, 0.005]
@@ -517,48 +525,48 @@ modeling: #WalletModel
 
 
 
-            # Column Selection
-            drop_columns__drop_patterns: [
+            # # Column Selection
+            # drop_columns__drop_patterns: [
 
-                cw_trading|*,
-                cw_macro|*,
+            #     cw_trading|*,
+            #     cw_macro|*,
 
-                performance|*/winsorized|*,
-                cw_performance|*/winsorized|*,
-                'cw_mktcap|portfolio_mcap_max*',
-                'cw_mktcap|portfolio_mcap_mean*',
-                'cw_mktcap|portfolio_mcap_median*',
-                'cw_mktcap|portfolio_mcap_min*',
-                'cw_mktcap|portfolio_mcap_std*',
-                'cw_mktcap|volume_wtd_market_cap*',
+            #     performance|*/winsorized|*,
+            #     cw_performance|*/winsorized|*,
+            #     'cw_mktcap|portfolio_mcap_max*',
+            #     'cw_mktcap|portfolio_mcap_mean*',
+            #     'cw_mktcap|portfolio_mcap_median*',
+            #     'cw_mktcap|portfolio_mcap_min*',
+            #     'cw_mktcap|portfolio_mcap_std*',
+            #     'cw_mktcap|volume_wtd_market_cap*',
 
-                'cw_performance|crypto_net_flows/crypto_inflows*',
-                'cw_performance|crypto_net_flows/max_investment*',
+            #     'cw_performance|crypto_net_flows/crypto_inflows*',
+            #     'cw_performance|crypto_net_flows/max_investment*',
 
-                'performance|crypto_net_flows/crypto_inflows*',
-                'performance|crypto_net_flows/max_investment*',
+            #     'performance|crypto_net_flows/crypto_inflows*',
+            #     'performance|crypto_net_flows/max_investment*',
 
-                'mktcap|end_portfolio_wtd_market_cap*',
-                'mktcap|portfolio_mcap_max*',
-                'mktcap|portfolio_mcap_mean*',
-                'mktcap|portfolio_mcap_median*',
-                'mktcap|portfolio_mcap_min*',
-                'mktcap|portfolio_mcap_std*',
-                'mktcap|volume_wtd_market_cap*',
+            #     'mktcap|end_portfolio_wtd_market_cap*',
+            #     'mktcap|portfolio_mcap_max*',
+            #     'mktcap|portfolio_mcap_mean*',
+            #     'mktcap|portfolio_mcap_median*',
+            #     'mktcap|portfolio_mcap_min*',
+            #     'mktcap|portfolio_mcap_std*',
+            #     'mktcap|volume_wtd_market_cap*',
 
-                'trading|average_transaction*',
-                'trading|crypto_cash_buys*',
-                'trading|crypto_cash_sells*',
-                'trading|crypto_inflows*',
-                'trading|crypto_net_cash_flows*',
-                'trading|crypto_net_flows*',
-                'trading|crypto_net_gain*',
-                'trading|crypto_outflows*',
-                'trading|max_investment*',
-                'trading|total_volume*',
-                'trading|unique_coins_traded*',
+            #     'trading|average_transaction*',
+            #     'trading|crypto_cash_buys*',
+            #     'trading|crypto_cash_sells*',
+            #     'trading|crypto_inflows*',
+            #     'trading|crypto_net_cash_flows*',
+            #     'trading|crypto_net_flows*',
+            #     'trading|crypto_net_gain*',
+            #     'trading|crypto_outflows*',
+            #     'trading|max_investment*',
+            #     'trading|total_volume*',
+            #     'trading|unique_coins_traded*',
 
-            ]
+            # ]
 
     # Phase training section
     phase_training:

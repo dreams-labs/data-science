@@ -22,6 +22,7 @@ import base_modeling.feature_selection as fs
 import base_modeling.pipeline as bmp
 import base_modeling.scorers as sco
 import utils as u
+from utils import ConfigError
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
 # pylint:disable=unused-argument  # X and y params are always needed for pipeline structure
@@ -111,6 +112,11 @@ class BaseModel:
         """
         if self.X_train is None or self.y_train is None:
             raise ValueError("Data must be prepared before running experiment")
+
+        # Asymmetric loss is slow so broadcast a warning
+        if self.modeling_config['asymmetric_loss'].get('enabled',False):
+            logger.warning("Beginning extended training with asymmetric loss target variables...")
+
 
         cv_results = self._run_grid_search(self.X_train, self.y_train, self.pipeline)
 
@@ -414,7 +420,8 @@ class BaseModel:
                 drop_pattern_combinations = self._create_drop_pattern_combinations()
             else:
                 # Add feature_retainer to get score if nothing is dropped
-                param_grid['drop_columns__drop_patterns'] = param_grid['drop_columns__drop_patterns'] + [['feature_retainer']]
+                param_grid['drop_columns__drop_patterns'] = (param_grid['drop_columns__drop_patterns']
+                                                              + [['feature_retainer']])
 
                 base_drop_patterns = self.modeling_config['feature_selection']['drop_patterns']
                 drop_pattern_combinations = [
@@ -530,10 +537,12 @@ class BaseModel:
                     # Only show patterns that aren't in base config
                     unique_patterns = [p for p in param_value if p not in base_patterns]
 
-                    if isinstance(self.modeling_config['grid_search_params'].get('drop_patterns_include_n_features'),int):
+                    if isinstance(self.modeling_config['grid_search_params']
+                                  .get('drop_patterns_include_n_features'),int):
 
                         # Get param grid drop patterns
-                        base_drop_patterns = self.modeling_config['grid_search_params']['param_grid']['drop_columns__drop_patterns']
+                        base_drop_patterns = (self.modeling_config['grid_search_params']
+                                              ['param_grid']['drop_columns__drop_patterns'])
 
                         # Convert to single list, rather than list of lists
                         base_drop_patterns = [item for sublist in base_drop_patterns for item in sublist]
@@ -664,43 +673,58 @@ class BaseModel:
         return combined_steps
 
 
-    def _get_y_pipeline(self) -> None:
+    def _get_y_pipeline(self) -> Pipeline:
         """
         Build the wallet-specific pipeline by prepending the wallet cohort selection
         to the base pipeline steps.
+        Validates that classification thresholds are provided and numeric (inf allowed).
         """
-        # Get target var
-        target_var = self.modeling_config.get('model_params', {}).get(
+        # Determine target variable
+        target_var = self.modeling_config.get(
+            'model_params', {}
+        ).get(
             'target_selector__target_variable',
             self.modeling_config['target_variable']
         )
 
-        # Get target var thresholds
+        # Initialize thresholds
         target_var_min_threshold = None
         target_var_max_threshold = None
+
+        # For classification, require and validate thresholds
         if self.modeling_config['model_type'] == 'classification':
-            target_var_min_threshold = (
-                self.modeling_config.get('model_params', {}).get(
-                    'target_selector__target_var_min_threshold',
-                    self.modeling_config.get('target_var_min_threshold')
-                )
+            # Retrieve raw values
+            raw_min = (
+                self.modeling_config.get('model_params', {}
+                ).get('target_selector__target_var_min_threshold',
+                    self.modeling_config.get('target_var_min_threshold'))
             )
-            target_var_max_threshold = (
-                self.modeling_config.get('model_params', {}).get(
-                    'target_selector__target_var_max_threshold',
-                    self.modeling_config.get('target_var_max_threshold')
-                )
+            raw_max = (
+                self.modeling_config.get('model_params', {}
+                ).get('target_selector__target_var_max_threshold',
+                    self.modeling_config.get('target_var_max_threshold'))
             )
+            # Ensure thresholds are provided
+            if raw_min is None:
+                raise ConfigError("target_var_min_threshold must be set for classification models")
+            if raw_max is None:
+                raise ConfigError("target_var_max_threshold must be set for classification models")
+            # Convert to float (allows inf)
+            try:
+                target_var_min_threshold = float(raw_min)  # supports float('inf')
+                target_var_max_threshold = float(raw_max)
+            except (TypeError, ValueError) as exc:
+                raise ConfigError(
+                    f"Thresholds must be numeric values (int, float or inf), got: {raw_min!r}, {raw_max!r}"
+                ) from exc
 
-        # Get asymmetric target var settings if configured
-        asymmetric_config = self.modeling_config.get('asymmetric_loss')
-
+        # Build pipeline
         y_pipeline = Pipeline([
             ('target_selector', bmp.TargetVarSelector(
                 target_var,
                 target_var_min_threshold,
                 target_var_max_threshold,
-                asymmetric_config=asymmetric_config
+                asymmetric_config=self.modeling_config.get('asymmetric_loss')
             ))
         ])
 

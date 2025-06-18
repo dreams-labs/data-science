@@ -61,13 +61,13 @@ training_data: #CoinModel
     ]
 
     #KeyParam Rebuild Features Settings
-    toggle_rebuild_all_features: True  # If True, existing multiwindow coin features/target dfs will be overridden
-    # toggle_rebuild_all_features: False  # If True, existing multiwindow coin features/target dfs will be overridden
+    toggle_rebuild_all_features: False  # If True, existing multiwindow coin features/target dfs will be overridden
+    # toggle_rebuild_all_features: True  # If True, existing multiwindow coin features/target dfs will be overridden
 
-    # toggle_rebuild_wallet_models: True  # If True, all wallet models will be retrained
     toggle_rebuild_wallet_models: False  # If True, all wallet models will be retrained
+    # toggle_rebuild_wallet_models: True  # If True, all wallet models will be retrained
 
-    toggle_graph_model_performance: True  # If True, executes _plot_score_summaries()
+    toggle_graph_wallet_model_performance: False  # If True, executes _plot_score_summaries()
 
 
 # CoinModel Wallet Scores
@@ -78,28 +78,6 @@ wallet_scores: #CoinModel
     #  by using a hardcoded number (e.g. 0.8) or an F-beta score (e.g. f.5).
     score_params:
 
-        # cw_coin_return_020:
-        #     model_type: classification
-        #     target_variable: cw_coin_return
-        #     target_var_min_threshold: 0.20
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.8
-
-        # cw_coin_return_030:
-        #     model_type: classification
-        #     target_variable: cw_coin_return
-        #     target_var_min_threshold: 0.30
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.8
-
-        # cw_coin_return_020_c3:
-        #     model_type: classification
-        #     target_variable: cw_coin_return
-        #     target_var_min_threshold: 0.20
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.8
-        #     modeling_min_coins_traded: 3
-
         cw_coin_return_030:
             model_type: classification
             target_variable: cw_coin_return
@@ -107,39 +85,67 @@ wallet_scores: #CoinModel
             target_var_max_threshold: .inf
             y_pred_threshold: 0.8
 
-        # cw_coin_return_040:
-        #     model_type: classification
-        #     target_variable: cw_coin_return
-        #     target_var_min_threshold: 0.40
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.8
+        cw_coin_return_030_asymloss:
+            model_type: classification
+            target_variable: cw_coin_return
+            target_var_min_threshold: 0.30
+            target_var_max_threshold: .inf
+            y_pred_threshold: 0.8
+            asymmetric_loss: # Adds another class to target
+                enabled: true
+                big_loss_threshold: -0.20    # Below this is an extra penalized big loss
+                big_win_threshold: 0.30      # Above this is the target
+            model_params:
+                # change max depth to 3
+                # Core Tree Params (Always Active)
+                # -------------------------------
+                #KeyParam Tree Depth
+                max_depth: 3  # how deep the trees can go
+                min_child_weight: 60  # what % of rows each tree must have
 
-        # cw_coin_return_050:
-        #     model_type: classification
-        #     target_variable: cw_coin_return
-        #     target_var_min_threshold: 0.50
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.8
+                #KeyParam True Positive Weighting
+                # scale_pos_weight: 5  # used for oversampling; number is a ratio of neg:pos, e.g. 20 means 20neg:1pos
 
-        # cw_net_gain_inflows_020:
-        #     model_type: classification
-        #     target_variable: cw_crypto_net_gain/crypto_inflows/base
-        #     target_var_min_threshold: 0.20
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.8
+                subsample: 1.0  # samples rows, e.g. trees use x% of all wallet rows
+                colsample_bytree: 0.9  # samples columns, e.g. trees use x% of all column features
+                gamma: 0.01  # minimum gain required to split further on a leaf node
+                tree_method: hist  # method for building trees, e.g., histogram-based
+                max_bin: 256  # how many bins to categorize features into
 
-        # cw_net_gain_inflows_030:
-        #     model_type: classification
-        #     target_variable: cw_crypto_net_gain/crypto_inflows/base
-        #     target_var_min_threshold: 0.30
-        #     target_var_max_threshold: .inf
-        #     y_pred_threshold: 0.8
+                # Performance Profiles (Choose One Section)
+                # --------------------------------------
+                #KeyParam Estimator Counts
+                n_estimators: 400  # number of trees to train in the model
+                learning_rate: 0.8  # step size for updates to weights during training
+
+                early_stopping_rounds: 15  # stop training if no improvement after x rounds
+
+                # Threading Controls
+                n_jobs: -1
+
+                # Metaparams
+                random_state: 42
+
+
+        cw_coin_return_n030:
+            model_type: classification
+            target_variable: cw_coin_return
+            target_var_min_threshold: -.inf
+            target_var_max_threshold: -0.30
+            y_pred_threshold: 0.8
 
         cw_net_gain_inflows_040:
             model_type: classification
             target_variable: cw_crypto_net_gain/crypto_inflows/base
             target_var_min_threshold: 0.40
             target_var_max_threshold: .inf
+            y_pred_threshold: 0.8
+
+        cw_net_gain_inflows_n040:
+            model_type: classification
+            target_variable: cw_crypto_net_gain/crypto_inflows/base
+            target_var_min_threshold: -.inf
+            target_var_max_threshold: -.40
             y_pred_threshold: 0.8
 
 
@@ -161,8 +167,8 @@ features: #CoinModel
 
     # Which scores will have distribution metrics created
     score_distributions: [
-        cw_coin_return_030,
-        cw_net_gain_inflows_040
+        # cw_coin_return_030,
+        # cw_net_gain_inflows_040
     ]
 
     # Time series features: most params are in wallets_coins_metrics_config.yaml
@@ -231,22 +237,23 @@ coin_modeling: #CoinModel
     target_var_min_threshold: 0.5 # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.7 # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.9 # a classification model will try to predict the target var above this value
+    target_var_max_threshold: inf # a classification model will try to predict the target var above this value
     y_pred_threshold: 0.90  # scores above this probability threshold are positive predictions
 
     returns_winsorization: 0.005
 
     #KeyParam Asymmetric Loss
     asymmetric_loss: # Adds another class to target
-        # enabled: true
+        enabled: true
         big_loss_threshold: -0.2    # Below this is an extra penalized big loss
-        big_win_threshold: 0.90      # Above this is the target
+        big_win_threshold: 0.5      # Above this is the target
         loss_penalty_weight: 1     # Penalty for missing losses
         win_reward_weight:   1       # Reward for catching wins
 
 
     #KeyParam Modeling Cohort Definition
     # Thresholds for coin inclusion in training data
-    min_cohort_wallets: 10  # how many wallets must hold a coin for the coin to be elegible for forecasting
+    min_cohort_wallets: 15  # how many wallets must hold a coin for the coin to be elegible for forecasting
     min_cohort_balance: 15000  # how much USD all wallets must hold for the coin to be elegible for forecasting
 
     # Thresholds for coin inclusion in training data
@@ -277,7 +284,10 @@ coin_modeling: #CoinModel
 
             # Segment Family
 
+            score_binary|cw_net_gain_inflows_n040/*,
+            score_binary|cw_coin_return_030_asymloss/*,
             score_binary|cw_net_gain_inflows_040/*,
+            score_binary|cw_coin_return_n030/*,
 
             score_binary|*/1|trading/total_volume|aggregations/aggregations/sum,
             score_binary|*/1|trading/total_volume|aggregations/aggregations/sum_pct,
@@ -288,6 +298,11 @@ coin_modeling: #CoinModel
             # score_binary|*/1|trading/crypto_net_gain|aggregations/aggregations/sum,
             # score_binary|*/1|trading/crypto_net_gain|aggregations/aggregations/sum_pct,
 
+            # metadata|*,
+            # metadata|blockchain/Base,
+            # metadata|blockchain/Binance,
+            # metadata|blockchain/Other,
+            # metadata|blockchain/Solana,
 
             # macro|btc_mvrv_z_score/last_*,
             macro|btc_mvrv_z_score/pct_change_30d*,
@@ -329,7 +344,7 @@ coin_modeling: #CoinModel
             market_data|volume/*,
 
             # market_data|market_cap/filled_last,
-            # # # new
+            # # new
             # # market_data|obv/last*_period_1,
             # market_data|obv/last*_period_2,
             # market_data|obv/last*_period_3,
@@ -360,7 +375,25 @@ coin_modeling: #CoinModel
             # wallet_cohorts|*|total_balance*,
             # wallet_cohorts|*|total_sold*,
 
-
+            'score_binary|*|wallet/*',
+            '*|wallet/cw_trading_crypto_net_gain_w1|*',
+            '*|wallet/cw_trading_total_volume_w1|*',
+            # '*|wallet/usd_balance_ending|*',
+            '*|wallet/transfers_earlybird_ratio_median_w1|*',
+            '*|wallet/transfers_coin_total_buyers_median_w1|*',
+            '*|wallet/timing_btc_mvrv_z_score_sell_weighted_w1|*',
+            '*|wallet/timing_btc_mvrv_z_score_lead_30_buy_weighted_w3|*',
+            '*|wallet/timing_btc_mvrv_z_score_lag_15_sell_weighted_w1|*',
+            '*|wallet/timing_btc_mvrv_z_score_buy_weighted_w1|*',
+            '*|wallet/mktcap_portfolio_mcap_mean_market_cap_filled_w1|*',
+            '*|wallet/macro_gtrends_altcoin_worldwide_std_w1|*',
+            '*|wallet/cw_transfers_initial_hold_time_median_w3|*',
+            '*|wallet/cw_transfers_first_buy_median_rank_w2|*',
+            '*|wallet/cw_transfers_first_buy_earliest_rank_w2|*',
+            '*|wallet/cw_transfers_buys_coin_age_min_w2|*',
+            '*|wallet/cw_transfers_buys_coin_age_min_w1|*',
+            '*|wallet/cw_transfers_buys_coin_age_median_w1|*',
+            # '*|wallet/usd_balance_starting|*',
 
             # Metric Detail
             '*|trading/crypto_cash_buys|*',
@@ -464,13 +497,22 @@ coin_modeling: #CoinModel
     # CoinModel Grid Search
     grid_search_params:
 
-        #KeyParam Grid Search
-        # -------------------------------
+
+
+
+        #KeyParam Grid Search Toggle
+        # -------------------------------------------------------------------------------------------------------------
         # enabled: True
-        # -------------------------------
+        # -------------------------------------------------------------------------------------------------------------
+
+
+
+
 
         # Search Methodology
-        drop_patterns_include_n_features: 1  # if set to n, the drop_patterns grid search will apply all but n patterns for each model. otherwise, it will apply 1 drop pattern in each model.
+        # if set to n, the drop_patterns grid search will apply all but n patterns for each model.
+        #  Otherwise, it will apply 1 drop pattern in each model.
+        drop_patterns_include_n_features: 1
 
         n_iter: 200  # random search limit
         n_splits: 5  # cv splits
@@ -512,37 +554,22 @@ coin_modeling: #CoinModel
             # estimator__tree_method: [hist]
 
             drop_columns__drop_patterns: [
-                # macro|btc_mvrv_z_score/last_*,
-                macro|btc_mvrv_z_score/pct_change_30d*,
-                # macro|btc_mvrv_z_score/*pct_change_7d*,
-                macro|btc_mvrv_z_score/sma_1_std,
-                macro|btc_mvrv_z_score/std_30d*,
-                macro|btc_vdd_multiple/std_*,
-                macro|btc_vdd_multiple/last_*,
-                macro|global_volume/std_*,
-                macro|btc_price/std_*,
-                macro|btc_price/pct_change_*,
-
-                macro|btc_mvrv_z_score/sma_1_last,
-                macro|global_volume/last_*,
-                macro|global_market_cap/last_*,
-                macro|btc_price/last_*,
-                macro|global_market_cap/rsi_30*,
-                macro|global_market_cap/std_*,
-                macro|global_market_cap/pct_change_*,
-                macro|btc_vdd_multiple/std_*_period_2,
-                # macro|btc_vdd_multiple/std_*_period_3,
-                # macro|btc_vdd_multiple/last_*_period_3,
-                macro|btc_price/std_*_period_2,
-                # macro|btc_price/std_*_period_3,
-                macro|btc_price/pct_change_*_period_2,
-                # macro|btc_price/pct_change_*_period_3,
-                macro|gtrends_altcoin_worldwide/std_*,
-                # macro|gtrends_altcoin_worldwide/last_*,
-                macro|gtrends_altcoin_worldwide/pct_change_*,
-                macro|gtrends_memecoin_us/std_*,
-                # macro|gtrends_memecoin_us/last_*,
-                macro|gtrends_memecoin_us/pct_change_*,
+                '*|wallet/cw_trading_crypto_net_gain_w1|*',
+                '*|wallet/cw_trading_total_volume_w1|*',
+                '*|wallet/transfers_earlybird_ratio_median_w1|*',
+                '*|wallet/transfers_coin_total_buyers_median_w1|*',
+                '*|wallet/timing_btc_mvrv_z_score_sell_weighted_w1|*',
+                '*|wallet/timing_btc_mvrv_z_score_lead_30_buy_weighted_w3|*',
+                '*|wallet/timing_btc_mvrv_z_score_lag_15_sell_weighted_w1|*',
+                '*|wallet/timing_btc_mvrv_z_score_buy_weighted_w1|*',
+                '*|wallet/mktcap_portfolio_mcap_mean_market_cap_filled_w1|*',
+                '*|wallet/macro_gtrends_altcoin_worldwide_std_w1|*',
+                '*|wallet/cw_transfers_initial_hold_time_median_w3|*',
+                '*|wallet/cw_transfers_first_buy_median_rank_w2|*',
+                '*|wallet/cw_transfers_first_buy_earliest_rank_w2|*',
+                '*|wallet/cw_transfers_buys_coin_age_min_w2|*',
+                '*|wallet/cw_transfers_buys_coin_age_min_w1|*',
+                '*|wallet/cw_transfers_buys_coin_age_median_w1|*',
 
             ]
 
@@ -556,5 +583,5 @@ coin_modeling: #CoinModel
 # CoinModel Multithreading
 # Determines how many workers will be used in multithreading executions
 n_threads: #CoinModel
-    concurrent_coin_epochs: 4
+    concurrent_coin_epochs: 3
     cw_flattening_threads: 4  # multithreads flattening in wallet_metrics_flattening.py

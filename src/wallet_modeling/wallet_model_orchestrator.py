@@ -123,7 +123,7 @@ class WalletModelOrchestrator:
                         score_name = score_name,
                     )
                     evaluators.append((score_name, evaluator))
-                    logger.milestone(f"Loaded pretrained model for score '{score_name}'.")
+                    logger.info(f"Loaded pretrained model for score '{score_name}'.")
                     continue
 
                 # Announce overwrite if applicable
@@ -167,7 +167,7 @@ class WalletModelOrchestrator:
 
         logger.milestone(f"Prepared all {len(self.score_params)} wallet models.")
 
-        if self.wallets_coin_config['training_data']['toggle_graph_model_performance']:
+        if self.wallets_coin_config['training_data']['toggle_graph_wallet_model_performance']:
             self._plot_score_summaries(evaluators)
 
         return models_json_dict
@@ -517,7 +517,8 @@ class WalletModelOrchestrator:
             if score_name is None:
                 raise ValueError("Either 'model_id_ or 'score_name' must be provided to look up "
                                  "an existing model")
-            models_json_path = Path(self.wallets_coin_config['training_data']['parquet_folder']) / "wallet_model_ids.json"
+            models_json_path = (Path(self.wallets_coin_config['training_data']['parquet_folder'])
+                                / "wallet_model_ids.json")
             with open(models_json_path, 'r', encoding='utf-8') as f:
                 models_dict = json.load(f)
             model_info = models_dict.get(score_name)
@@ -576,11 +577,23 @@ class WalletModelOrchestrator:
             # y_pred
             result['y_validation_pred'] = val_preds
 
-        # Store classifier outcomes
         elif model_type == 'classification':
-            # y_true
-            min_thr = modeling_cfg.get('target_var_min_threshold', -np.inf)
-            max_thr = modeling_cfg.get('target_var_max_threshold', np.inf)
+            # Ensure thresholds are provided
+            raw_min = modeling_cfg.get('target_var_min_threshold')
+            raw_max = modeling_cfg.get('target_var_max_threshold')
+            if raw_min is None:
+                raise u.ConfigError("target_var_min_threshold must be set for classification models")
+            if raw_max is None:
+                raise u.ConfigError("target_var_max_threshold must be set for classification models")
+            # Convert to float (allows inf) or raise configuration error
+            try:
+                min_thr = float(raw_min)
+                max_thr = float(raw_max)
+            except (TypeError, ValueError) as exc:
+                raise u.ConfigError(
+                    f"target_var thresholds must be numeric (int, float or inf), got: {raw_min!r}, {raw_max!r}"
+                ) from exc
+            # y_true based on numeric thresholds
             result['y_validation'] = (
                 (y_val_series >= min_thr) &
                 (y_val_series <= max_thr)

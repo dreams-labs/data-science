@@ -2,22 +2,22 @@
 investment_cycles: [
 # Long term validation of how well this model's predictions perform
 #  over epochs starting in [30,60,etc] days.
-        0,
-        450,
-        240,
-        30,
-        60,
-        90,
-        120,
-        150,
-        180,
-        210,
-        270,
+        # 0,
+        # 30,
+        # 60,
+        # 90,
+        # 120,
+        # 150,
+        # 180,
+        # 210,
+        # 240,
+        # 270,
         300,
         330,
         360,
         390,
         420,
+        450,
 ]
 
 # CoinModel
@@ -29,4 +29,4 @@ trading:
 
 # CoinModel
 n_threads:
-    investment_cycles: 2  # how many investing epochs are calculated concurrently
+    investment_cycles: 1  # how many investing epochs are calculated concurrently
