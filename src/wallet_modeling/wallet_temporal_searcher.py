@@ -57,6 +57,7 @@ class TemporalGridSearcher:
         self.training_data_cache = {}
         self.grid_search_results = {}
         self.consolidated_results = None
+        self.model_comparison_results = None
 
 
 
@@ -199,17 +200,30 @@ class TemporalGridSearcher:
         u.notify('ui_1')
 
 
+
+
+    # ---------------------------------
+    #         Reporting Methods
+    # ---------------------------------
+
     def consolidate_results(self) -> pd.DataFrame:
         """
         Consolidate grid search results across all time periods into a summary DataFrame.
+        Includes period-specific baseline comparisons.
 
         Returns:
-        - consolidated_df: DataFrame with parameters as rows, dates as columns, plus summary stats
+        - consolidated_df: DataFrame with parameters as rows, dates as columns, plus baseline comparisons
         """
         if not self.grid_search_results:
             raise ValueError("No grid search results available. Run run_multi_temporal_grid_search() first")
 
         logger.info("Consolidating grid search results across time periods...")
+
+        # Calculate period-specific baselines first
+        period_baselines = {}
+        for date_str in self.training_data_cache.keys():
+            sample_data = self.training_data_cache[date_str]
+            period_baselines[date_str] = self._calculate_sample_baseline(sample_data)
 
         # Stack all report DataFrames with date identifiers
         consolidated_data = []
@@ -231,10 +245,24 @@ class TemporalGridSearcher:
             values='avg_score'
         ).reset_index()
 
-        # Calculate summary statistics across time periods
+        # Get date columns for processing
         date_columns = [col for col in consolidated_df.columns
-                       if col not in ['param', 'param_value']]
+                    if col not in ['param', 'param_value']]
 
+        # Add baseline comparison columns for each date
+        baseline_columns = []
+        for date_col in date_columns:
+            baseline_col = f"{date_col}_v_baseline"
+            baseline_columns.append(baseline_col)
+
+            # Calculate difference from period-specific baseline
+            baseline_value = period_baselines.get(date_col, 0.0)
+            consolidated_df[baseline_col] = consolidated_df[date_col] - baseline_value
+
+            # Round the baseline comparison columns
+            consolidated_df[baseline_col] = consolidated_df[baseline_col].round(3)
+
+        # Calculate summary statistics across time periods (original scores only)
         consolidated_df['mean_score'] = consolidated_df[date_columns].mean(axis=1)
         consolidated_df['median_score'] = consolidated_df[date_columns].median(axis=1)
         consolidated_df['std_dev'] = consolidated_df[date_columns].std(axis=1)
@@ -242,17 +270,41 @@ class TemporalGridSearcher:
         consolidated_df['max_score'] = consolidated_df[date_columns].max(axis=1)
         consolidated_df['score_range'] = consolidated_df['max_score'] - consolidated_df['min_score']
 
-        # Round all date columns to 3 decimal places
+        # Calculate summary statistics for baseline comparisons
+        consolidated_df['mean_vs_baseline'] = consolidated_df[baseline_columns].mean(axis=1)
+        consolidated_df['median_vs_baseline'] = consolidated_df[baseline_columns].median(axis=1)
+        consolidated_df['baseline_improvement_consistency'] = (consolidated_df[baseline_columns] > 0).sum(axis=1)
+
+        # Round all columns to 3 decimal places
         consolidated_df[date_columns] = consolidated_df[date_columns].round(3)
+        consolidated_df[baseline_columns] = consolidated_df[baseline_columns].round(3)
         consolidated_df['mean_score'] = consolidated_df['mean_score'].round(3)
         consolidated_df['median_score'] = consolidated_df['median_score'].round(3)
         consolidated_df['std_dev'] = consolidated_df['std_dev'].round(3)
         consolidated_df['min_score'] = consolidated_df['min_score'].round(3)
         consolidated_df['max_score'] = consolidated_df['max_score'].round(3)
         consolidated_df['score_range'] = consolidated_df['score_range'].round(3)
+        consolidated_df['mean_vs_baseline'] = consolidated_df['mean_vs_baseline'].round(3)
+        consolidated_df['median_vs_baseline'] = consolidated_df['median_vs_baseline'].round(3)
 
         # Count non-null values (periods where parameter was tested)
         consolidated_df['periods_tested'] = consolidated_df[date_columns].notna().sum(axis=1)
+
+        # Reorder columns for better readability: interleave dates with their baselines
+        ordered_columns = ['param', 'param_value']
+        for date_col in sorted(date_columns):
+            ordered_columns.extend([date_col, f"{date_col}_v_baseline"])
+
+        # Add summary columns at the end
+        summary_columns = [
+            'mean_score', 'median_score', 'std_dev', 'min_score', 'max_score', 'score_range',
+            'mean_vs_baseline', 'median_vs_baseline', 'baseline_improvement_consistency', 'periods_tested'
+        ]
+        ordered_columns.extend(summary_columns)
+
+        # Reorder DataFrame
+        available_columns = [col for col in ordered_columns if col in consolidated_df.columns]
+        consolidated_df = consolidated_df[available_columns]
 
         # Sort by parameter and mean score
         consolidated_df = consolidated_df.sort_values(
@@ -263,11 +315,13 @@ class TemporalGridSearcher:
         # Cache results
         self.consolidated_results = consolidated_df
 
+        # Log baseline information
+        baseline_summary = {date: round(baseline, 4) for date, baseline in period_baselines.items()}
+        logger.info(f"Period-specific baselines: {baseline_summary}")
         logger.info(f"Consolidated results: {len(consolidated_df)} unique parameter combinations "
-                   f"across {len(date_columns)} time periods")
+                f"across {len(date_columns)} time periods")
 
         return consolidated_df
-
 
     def analyze_parameter_stability(self, stability_threshold: float = 0.05) -> pd.DataFrame:
         """
@@ -439,6 +493,16 @@ class TemporalGridSearcher:
         logger.info("\n".join(summary_lines))
 
 
+    def _calculate_sample_baseline(self, training_data_tuple) -> float:
+        """Calculate population baseline from sample training data."""
+        _, _, _, validation_target_vars_df = training_data_tuple
+
+        target_var = self.base_wallets_config['modeling']['target_variable']
+        if target_var in validation_target_vars_df.columns:
+            returns = validation_target_vars_df[target_var]
+            return u.winsorize(returns, 0.001).mean()
+
+        return 0.0
 
 
 

@@ -565,6 +565,7 @@ class BaseModel:
         return (pd.DataFrame(report_data)
                 .groupby(['param','param_value'])[['avg_score']]
                 .mean('avg_score')
+                .round(3)
                 .sort_values(by='avg_score', ascending=False))
 
 
