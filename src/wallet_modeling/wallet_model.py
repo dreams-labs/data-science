@@ -351,26 +351,6 @@ class WalletModel(BaseModel):
             for k, v in gs_config['param_grid'].items()
         }
 
-        # Add target variable options into the grid search.
-        param_grid_y = self.modeling_config.get('grid_search_params', {}).get('param_grid_y') or {}
-        if 'target_selector__target_variable' in param_grid_y:
-            target_variables = param_grid_y['target_selector__target_variable']
-            gs_config['param_grid']['y_pipeline__target_selector__target_variable'] = target_variables
-
-        # Add target variable min/max threshold options
-        if 'target_selector__target_var_min_threshold' in param_grid_y:
-            min_thresholds = param_grid_y['target_selector__target_var_min_threshold']
-            gs_config['param_grid']['y_pipeline__target_selector__target_var_min_threshold'] = min_thresholds
-
-        if 'target_selector__target_var_max_threshold' in param_grid_y:
-            max_thresholds = param_grid_y['target_selector__target_var_max_threshold']
-            gs_config['param_grid']['y_pipeline__target_selector__target_var_max_threshold'] = max_thresholds
-
-        # Confirm there are multiple configurations
-        if not any(isinstance(value, list) and len(value) > 1 for value in gs_config['param_grid'].values()):
-            raise ValueError("Grid search param grid only contains one scenario. "
-                             "Add more scenarios to run grid search.")
-
         return gs_config
 
 

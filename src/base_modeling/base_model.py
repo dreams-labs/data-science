@@ -122,7 +122,7 @@ class BaseModel:
 
         if cv_results.get('best_params'):
             best_params = {
-                k.replace('regressor__', ''): v
+                k.replace('estimator__', ''): v
                 for k, v in cv_results['best_params'].items()
             }
             self.modeling_config['model_params'].update(best_params)
@@ -429,6 +429,28 @@ class BaseModel:
                     for grid_pattern in param_grid['drop_columns__drop_patterns']
                 ]
             param_grid['drop_columns__drop_patterns'] = drop_pattern_combinations
+
+
+        # Add target variable options into the grid search.
+        param_grid_y = self.modeling_config.get('grid_search_params', {}).get('param_grid_y') or {}
+        if 'target_selector__target_variable' in param_grid_y:
+            target_variables = param_grid_y['target_selector__target_variable']
+            param_grid['y_pipeline__target_selector__target_variable'] = target_variables
+
+        # Add target variable min/max threshold options
+        if 'target_selector__target_var_min_threshold' in param_grid_y:
+            min_thresholds = param_grid_y['target_selector__target_var_min_threshold']
+            param_grid['y_pipeline__target_selector__target_var_min_threshold'] = min_thresholds
+
+        if 'target_selector__target_var_max_threshold' in param_grid_y:
+            max_thresholds = param_grid_y['target_selector__target_var_max_threshold']
+            param_grid['y_pipeline__target_selector__target_var_max_threshold'] = max_thresholds
+
+        # Confirm there are multiple configurations
+        if not any(isinstance(value, list) and len(value) > 1 for value in param_grid.values()):
+            raise ValueError("Grid search param grid only contains one scenario. "
+                             "Add more scenarios to run grid search.")
+
 
         if self.modeling_config['model_type'] == 'regression':
             scorer = grid_search_params['regressor_scoring']
