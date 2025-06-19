@@ -508,7 +508,7 @@ modeling: #WalletModel
         drop_patterns_include_n_features: 1
 
         n_iter: 40   # random search limit
-        n_splits: 4  # cv splits
+        n_splits: 3  # cv splits
 
         # regressor_scoring: neg_root_mean_squared_error
         # regressor_scoring: custom_neg_rmse_scorer
@@ -518,8 +518,8 @@ modeling: #WalletModel
         # classifier_scoring: f1
         # classifier_scoring: neg_log_loss
         # classifier_scoring: validation_auc_scorer
-        # classifier_scoring: validation_top_scores_returns_scorer
-        classifier_scoring: validation_top_percentile_returns_scorer
+        classifier_scoring: validation_top_scores_returns_scorer
+        # classifier_scoring: validation_top_percentile_returns_scorer
         percentile_threshold: 0.005  # cutoff for validation_top_percentile_returns_scorer
 
         # Metaparameters
@@ -549,10 +549,10 @@ modeling: #WalletModel
             # ]
 
             # target_selector__asymmetric_enabled: [true, false]
-            # target_selector__asymmetric_big_loss_threshold: [-0.5, -0.3, -0.1]
-            # target_selector__asymmetric_big_win_threshold: [0.5, 0.7, 1.0]
-            target_selector__asymmetric_loss_penalty_weight: [0.5, 1, 2, 10]
-            target_selector__asymmetric_win_reward_weight: [0.5, 1, 2, 10]
+            target_selector__asymmetric_big_loss_threshold: [-0.5, -0.3]
+            target_selector__asymmetric_big_win_threshold: [0.5, 0.7, 1.0]
+            target_selector__asymmetric_loss_penalty_weight: [0.5, 1]
+            target_selector__asymmetric_win_reward_weight: [2, 5, 10]
 
         # Params for model construction
         param_grid:
