@@ -61,6 +61,10 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
         # Extract the regressor from the pipeline
         regressor_name, self.estimator = self.model_pipeline.steps[-1]
 
+        # Generate sample weights AFTER transformation if asymmetric loss is enabled
+        if modeling_config and modeling_config.get('asymmetric_loss', {}).get('enabled'):
+            sample_weight = self._generate_asymmetric_sample_weights(y_trans, modeling_config)
+
         # If evaluation set is provided, transform it and use for early stopping
         transformed_eval_set = None
         if eval_set is not None:
@@ -144,6 +148,18 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
         else:
             # Otherwise return the specific step
             return self.model_pipeline.steps[key][1]
+
+    def _generate_asymmetric_sample_weights(self, y_transformed, modeling_config):
+        """Generate sample weights for asymmetric loss"""
+        asymmetric_config = modeling_config.get('asymmetric_loss', {})
+        if not asymmetric_config.get('enabled'):
+            return None
+
+        weights = np.ones(len(y_transformed))
+        weights[y_transformed == 0] = asymmetric_config.get('loss_penalty_weight', 1.0)
+        weights[y_transformed == 2] = asymmetric_config.get('win_reward_weight', 1.0)
+        return weights
+
 
 
 class TargetVarSelector(BaseEstimator, TransformerMixin):
