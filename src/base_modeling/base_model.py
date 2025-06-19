@@ -214,9 +214,6 @@ class BaseModel:
         phase_config = self.modeling_config.get('phase_training', {})
         if not phase_config.get('enabled'):
 
-            # Sample weights for asymmetric loss logic
-            sample_weight = self._generate_sample_weight(self.y_train)
-
             # Original single-phase training
             logger.info(f"Training model using data with shape: {X_train_transformed.shape}...")
             u.notify('startup')
@@ -224,7 +221,6 @@ class BaseModel:
                 X_train_transformed,
                 self.y_train,
                 eval_set=eval_set,
-                sample_weight=sample_weight
             )
         else:
             # Multi-phase training
@@ -578,6 +574,11 @@ class BaseModel:
         weights = np.ones(len(y_transformed))
         weights[y_transformed == 0] = asymmetric_config['loss_penalty_weight']  # Big loss penalty
         weights[y_transformed == 2] = asymmetric_config['win_reward_weight']    # Big win reward
+
+        logger.info(f"Weight distribution: Class 0: {(weights == asymmetric_config['loss_penalty_weight']).sum()}, "
+                f"Class 1: {(weights == 1.0).sum()}, "
+                f"Class 2: {(weights == asymmetric_config['win_reward_weight']).sum()}")
+
         return weights
 
 

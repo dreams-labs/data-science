@@ -52,6 +52,10 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
         # First, transform y using the y_pipeline
         y_trans = self.y_pipeline.fit_transform(y)
 
+        # Generate sample weights for asymmetric loss if not provided
+        if sample_weight is None and modeling_config is not None:
+            sample_weight = self._generate_sample_weight(y_trans, modeling_config)
+
         # Create a transformer sub-pipeline (all steps except the final estimator)
         transformer = Pipeline(self.model_pipeline.steps[:-1])
 
@@ -61,38 +65,48 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
         # Extract the regressor from the pipeline
         regressor_name, self.estimator = self.model_pipeline.steps[-1]
 
+        # Build fit parameters
+        fit_params = {'verbose': verbose_estimators}
+        if sample_weight is not None:
+            fit_params['sample_weight'] = sample_weight
+
         # If evaluation set is provided, transform it and use for early stopping
-        transformed_eval_set = None
         if eval_set is not None:
             X_eval, y_eval = eval_set
             y_eval_trans = self.y_pipeline.transform(y_eval)
             X_eval_trans = transformer.transform(X_eval)
             transformed_eval_set = [(X_trans, y_trans), (X_eval_trans, y_eval_trans)]
+            fit_params['eval_set'] = transformed_eval_set
 
-            # Define all fit params
-            fit_params = {
-                'eval_set': transformed_eval_set,
-                'verbose': verbose_estimators
-            }
-            if sample_weight is not None:
-                fit_params['sample_weight'] = sample_weight
-
-
-            # Fit with early stopping using the transformed eval set
-            self.estimator.fit(
-                X_trans,
-                y_trans,
-                **fit_params
-            )
-        else:
-            # Regular fit without early stopping if no eval set provided
-            self.estimator.fit(X_trans, y_trans)
+        logger.info(f"Training model using data with shape: {X_trans.shape}...")
+        self.estimator.fit(X_trans, y_trans, **fit_params)
 
         # Store the transformer sub-pipeline for use during prediction
         self.x_transformer_ = transformer
 
         # Update named_steps with the fitted regressor
         self.named_steps[regressor_name] = self.estimator
+
+    def _generate_sample_weight(self, y_transformed, modeling_config):
+        """Generate sample weights for asymmetric loss"""
+        asymmetric_config = modeling_config.get('asymmetric_loss', {})
+        if not asymmetric_config.get('enabled'):
+            return None
+
+        weights = np.ones(len(y_transformed))
+        weights[y_transformed == 0] = asymmetric_config['loss_penalty_weight']  # Big loss penalty
+        weights[y_transformed == 2] = asymmetric_config['win_reward_weight']    # Big win reward
+
+        # Log weight distribution for debugging
+        unique_vals, counts = np.unique(y_transformed, return_counts=True)
+        logger.info(f"Asymmetric loss target distribution: {dict(zip(unique_vals, counts))}")
+
+        weight_counts = {}
+        for weight_val in np.unique(weights):
+            weight_counts[weight_val] = (weights == weight_val).sum()
+        logger.info(f"Sample weight distribution: {weight_counts}")
+
+        return weights
 
     def predict_proba(self, X):
         """
