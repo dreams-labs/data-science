@@ -719,13 +719,31 @@ class BaseModel:
                     f"Thresholds must be numeric values (int, float or inf), got: {raw_min!r}, {raw_max!r}"
                 ) from exc
 
+        # Get asymmetric loss parameters - check model_params first for grid search values
+        # model_params = self.modeling_config.get('model_params', {})
+        # base_asymmetric_config = self.modeling_config.get('asymmetric_loss')
+
+        # # Extract individual asymmetric parameters from model_params (set by grid search)
+        # asymmetric_enabled = model_params.get('target_selector__asymmetric_enabled')
+        # asymmetric_big_loss_threshold = model_params.get('target_selector__asymmetric_big_loss_threshold')
+        # asymmetric_big_win_threshold = model_params.get('target_selector__asymmetric_big_win_threshold')
+        # asymmetric_loss_penalty_weight = model_params.get('target_selector__asymmetric_loss_penalty_weight')
+        # asymmetric_win_reward_weight = model_params.get('target_selector__asymmetric_win_reward_weight')
+
+        # logger.error(asymmetric_big_win_threshold)
+
         # Build pipeline
         y_pipeline = Pipeline([
             ('target_selector', bmp.TargetVarSelector(
                 target_var,
                 target_var_min_threshold,
                 target_var_max_threshold,
-                asymmetric_config=self.modeling_config.get('asymmetric_loss')
+                # asymmetric_config=base_asymmetric_config,
+                # asymmetric_enabled=asymmetric_enabled,
+                # asymmetric_big_loss_threshold=asymmetric_big_loss_threshold,
+                # asymmetric_big_win_threshold=asymmetric_big_win_threshold,
+                # asymmetric_loss_penalty_weight=asymmetric_loss_penalty_weight,
+                # asymmetric_win_reward_weight=asymmetric_win_reward_weight
             ))
         ])
 

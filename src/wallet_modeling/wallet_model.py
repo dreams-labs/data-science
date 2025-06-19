@@ -366,6 +366,28 @@ class WalletModel(BaseModel):
             max_thresholds = param_grid_y['target_selector__target_var_max_threshold']
             gs_config['param_grid']['y_pipeline__target_selector__target_var_max_threshold'] = max_thresholds
 
+        # # Add asymmetric loss parameters
+        # if 'target_selector__asymmetric_enabled' in param_grid_y:
+        #     asymmetric_enabled = param_grid_y['target_selector__asymmetric_enabled']
+        #     gs_config['param_grid']['y_pipeline__target_selector__asymmetric_enabled'] = asymmetric_enabled
+
+        # if 'target_selector__asymmetric_big_loss_threshold' in param_grid_y:
+        #     big_loss_thresholds = param_grid_y['target_selector__asymmetric_big_loss_threshold']
+        #     gs_config['param_grid']['y_pipeline__target_selector__asymmetric_big_loss_threshold'] = big_loss_thresholds
+
+        # if 'target_selector__asymmetric_big_win_threshold' in param_grid_y:
+        #     big_win_thresholds = param_grid_y['target_selector__asymmetric_big_win_threshold']
+        #     gs_config['param_grid']['y_pipeline__target_selector__asymmetric_big_win_threshold'] = big_win_thresholds
+
+        # if 'target_selector__asymmetric_loss_penalty_weight' in param_grid_y:
+        #     loss_penalty_weights = param_grid_y['target_selector__asymmetric_loss_penalty_weight']
+        #     gs_config['param_grid']['y_pipeline__target_selector__asymmetric_loss_penalty_weight'] = loss_penalty_weights
+
+        # if 'target_selector__asymmetric_win_reward_weight' in param_grid_y:
+        #     win_reward_weights = param_grid_y['target_selector__asymmetric_win_reward_weight']
+        #     gs_config['param_grid']['y_pipeline__target_selector__asymmetric_win_reward_weight'] = win_reward_weights
+
+
         # Confirm there are multiple configurations
         if not any(isinstance(value, list) and len(value) > 1 for value in gs_config['param_grid'].values()):
             raise ValueError("Grid search param grid only contains one scenario. "
