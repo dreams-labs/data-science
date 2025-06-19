@@ -61,9 +61,13 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
         # Extract the regressor from the pipeline
         regressor_name, self.estimator = self.model_pipeline.steps[-1]
 
-        # Generate sample weights AFTER transformation if asymmetric loss is enabled
-        if modeling_config and modeling_config.get('asymmetric_loss', {}).get('enabled'):
-            sample_weight = self._generate_asymmetric_sample_weights(y_trans, modeling_config)
+        # Generate sample weights AFTER y_pipeline has been fitted with grid search params
+        target_selector = self.y_pipeline.named_steps['target_selector']
+        effective_asymmetric_config = target_selector.get_effective_asymmetric_config()
+
+        if effective_asymmetric_config and effective_asymmetric_config.get('enabled'):
+            sample_weight = self._generate_asymmetric_sample_weights(y_trans, effective_asymmetric_config)
+
 
         # If evaluation set is provided, transform it and use for early stopping
         transformed_eval_set = None
@@ -149,12 +153,8 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
             # Otherwise return the specific step
             return self.model_pipeline.steps[key][1]
 
-    def _generate_asymmetric_sample_weights(self, y_transformed, modeling_config):
+    def _generate_asymmetric_sample_weights(self, y_transformed, asymmetric_config):
         """Generate sample weights for asymmetric loss"""
-        asymmetric_config = modeling_config.get('asymmetric_loss', {})
-        if not asymmetric_config.get('enabled'):
-            return None
-
         weights = np.ones(len(y_transformed))
         weights[y_transformed == 0] = asymmetric_config.get('loss_penalty_weight', 1.0)
         weights[y_transformed == 2] = asymmetric_config.get('win_reward_weight', 1.0)
@@ -220,7 +220,7 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
         result = y[self.target_variable]
 
         # Get effective asymmetric config (handles grid search overrides)
-        effective_asymmetric_config = self._get_effective_asymmetric_config()
+        effective_asymmetric_config = self.get_effective_asymmetric_config()
 
         # Asymmetric loss configuration if configured
         if isinstance(effective_asymmetric_config, dict) and effective_asymmetric_config.get('enabled'):
@@ -237,7 +237,7 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
 
         return result
 
-    def _get_effective_asymmetric_config(self):
+    def get_effective_asymmetric_config(self):
         """
         Merge asymmetric_config with individual parameters, prioritizing individual params.
         This allows grid search to override specific asymmetric parameters.
