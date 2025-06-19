@@ -122,7 +122,7 @@ class BaseModel:
 
         if cv_results.get('best_params'):
             best_params = {
-                k.replace('regressor__', ''): v
+                k.replace('estimator__', ''): v
                 for k, v in cv_results['best_params'].items()
             }
             self.modeling_config['model_params'].update(best_params)
@@ -220,7 +220,7 @@ class BaseModel:
             regressor.fit(
                 X_train_transformed,
                 self.y_train,
-                eval_set=eval_set,
+                eval_set=eval_set
             )
         else:
             # Multi-phase training
@@ -565,26 +565,73 @@ class BaseModel:
                 .sort_values(by='avg_score', ascending=False))
 
 
-    def _generate_sample_weight(self, y_transformed):
-        """Generate sample weights for asymmetric loss"""
-        asymmetric_config = self.modeling_config.get('asymmetric_loss', {})
-        if not asymmetric_config.get('enabled'):
+    def generate_individual_results_report(self) -> pd.DataFrame:
+        """
+        Generate a report showing performance of each individual parameter combination tested.
+
+        Returns:
+        - individual_df (DataFrame): Each row represents one combination with its score and rank
+        """
+        if not self.random_search:
+            logger.error("Random search has not been run.")
+            return None
+        elif not hasattr(self.random_search, 'cv_results_'):
+            logger.error("cv_results_ is unavailable.")
             return None
 
-        weights = np.ones(len(y_transformed))
-        weights[y_transformed == 0] = asymmetric_config['loss_penalty_weight']  # Big loss penalty
-        weights[y_transformed == 2] = asymmetric_config['win_reward_weight']    # Big win reward
+        results_df = pd.DataFrame(self.random_search.cv_results_)
+        base_patterns = set(self.modeling_config['feature_selection']['drop_patterns'])
 
-        logger.info(f"Weight distribution: Class 0: {(weights == asymmetric_config['loss_penalty_weight']).sum()}, "
-                f"Class 1: {(weights == 1.0).sum()}, "
-                f"Class 2: {(weights == asymmetric_config['win_reward_weight']).sum()}")
+        # Extract parameter columns and identify variable ones
+        param_cols = [col for col in results_df.columns if col.startswith("param_")]
+        variable_params = [
+            col for col in param_cols
+            if results_df[col].apply(lambda x: tuple(x) if isinstance(x, list) else x).nunique() > 1
+        ]
 
-        return weights
+        individual_results = []
+        for _, row in results_df.iterrows():
+            result_entry = {
+                'mean_test_score': round(row['mean_test_score'], 3),
+                'std_test_score': round(row['std_test_score'], 3),
+                'median_test_score': round(np.median([
+                    row[f'split{i}_test_score'] for i in range(self.modeling_config['grid_search_params']['n_splits'])
+                ]), 3),
+                'rank_test_score': row['rank_test_score']
+            }
 
+            # Add only variable parameters as separate columns
+            for param_col in variable_params:
+                param_name = param_col.replace("param_", "")
+                param_value = row[param_col]
 
+                # Clean up drop patterns display
+                if param_name == 'model_pipeline__drop_columns__drop_patterns' and isinstance(param_value, list):
+                    unique_patterns = [p for p in param_value if p not in base_patterns]
+                    if not unique_patterns:
+                        param_value = 'feature_retainer'
+                    else:
+                        param_value = str(unique_patterns)
 
+                result_entry[param_name] = param_value
 
+            individual_results.append(result_entry)
 
+        individual_df = pd.DataFrame(individual_results)
+
+        # Remove pipeline prefixes from column names
+        individual_df.columns = [
+        (col
+         .replace('y_pipeline__', '')
+         .replace('model_pipeline__', '')
+         )
+        for col in individual_df.columns
+        ]
+
+        # Sort by performance (best score first)
+        individual_df = individual_df.sort_values('mean_test_score', ascending=False).reset_index(drop=True)
+
+        return individual_df
 
     # -----------------------------------
     #          Pipeline Methods
@@ -694,7 +741,9 @@ class BaseModel:
         target_var_max_threshold = None
 
         # For classification, require and validate thresholds
-        if self.modeling_config['model_type'] == 'classification':
+        if (self.modeling_config['model_type'] == 'classification'
+            and not self.modeling_config.get('asymmetric_loss',{}).get('enabled',False)
+            ):
             # Retrieve raw values
             raw_min = (
                 self.modeling_config.get('model_params', {}
@@ -720,13 +769,16 @@ class BaseModel:
                     f"Thresholds must be numeric values (int, float or inf), got: {raw_min!r}, {raw_max!r}"
                 ) from exc
 
+        # Get asymmetric loss parameters - check model_params first for grid search values
+        base_asymmetric_config = self.modeling_config.get('asymmetric_loss')
+
         # Build pipeline
         y_pipeline = Pipeline([
             ('target_selector', bmp.TargetVarSelector(
                 target_var,
                 target_var_min_threshold,
                 target_var_max_threshold,
-                asymmetric_config=self.modeling_config.get('asymmetric_loss')
+                asymmetric_config=base_asymmetric_config,
             ))
         ])
 

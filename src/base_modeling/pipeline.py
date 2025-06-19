@@ -52,10 +52,6 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
         # First, transform y using the y_pipeline
         y_trans = self.y_pipeline.fit_transform(y)
 
-        # Generate sample weights for asymmetric loss if not provided
-        if sample_weight is None and modeling_config is not None:
-            sample_weight = self._generate_sample_weight(y_trans, modeling_config)
-
         # Create a transformer sub-pipeline (all steps except the final estimator)
         transformer = Pipeline(self.model_pipeline.steps[:-1])
 
@@ -65,48 +61,46 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
         # Extract the regressor from the pipeline
         regressor_name, self.estimator = self.model_pipeline.steps[-1]
 
-        # Build fit parameters
-        fit_params = {'verbose': verbose_estimators}
-        if sample_weight is not None:
-            fit_params['sample_weight'] = sample_weight
+        # Generate sample weights AFTER y_pipeline has been fitted with grid search params
+        target_selector = self.y_pipeline.named_steps['target_selector']
+        effective_asymmetric_config = target_selector.get_effective_asymmetric_config()
+
+        if effective_asymmetric_config and effective_asymmetric_config.get('enabled'):
+            sample_weight = self._generate_asymmetric_sample_weights(y_trans, effective_asymmetric_config)
+
 
         # If evaluation set is provided, transform it and use for early stopping
+        transformed_eval_set = None
         if eval_set is not None:
             X_eval, y_eval = eval_set
             y_eval_trans = self.y_pipeline.transform(y_eval)
             X_eval_trans = transformer.transform(X_eval)
             transformed_eval_set = [(X_trans, y_trans), (X_eval_trans, y_eval_trans)]
-            fit_params['eval_set'] = transformed_eval_set
 
-        logger.info(f"Training model using data with shape: {X_trans.shape}...")
-        self.estimator.fit(X_trans, y_trans, **fit_params)
+            # Define all fit params
+            fit_params = {
+                'eval_set': transformed_eval_set,
+                'verbose': verbose_estimators
+            }
+            if sample_weight is not None:
+                fit_params['sample_weight'] = sample_weight
+
+
+            # Fit with early stopping using the transformed eval set
+            self.estimator.fit(
+                X_trans,
+                y_trans,
+                **fit_params
+            )
+        else:
+            # Regular fit without early stopping if no eval set provided
+            self.estimator.fit(X_trans, y_trans)
 
         # Store the transformer sub-pipeline for use during prediction
         self.x_transformer_ = transformer
 
         # Update named_steps with the fitted regressor
         self.named_steps[regressor_name] = self.estimator
-
-    def _generate_sample_weight(self, y_transformed, modeling_config):
-        """Generate sample weights for asymmetric loss"""
-        asymmetric_config = modeling_config.get('asymmetric_loss', {})
-        if not asymmetric_config.get('enabled'):
-            return None
-
-        weights = np.ones(len(y_transformed))
-        weights[y_transformed == 0] = asymmetric_config['loss_penalty_weight']  # Big loss penalty
-        weights[y_transformed == 2] = asymmetric_config['win_reward_weight']    # Big win reward
-
-        # Log weight distribution for debugging
-        unique_vals, counts = np.unique(y_transformed, return_counts=True)
-        logger.info(f"Asymmetric loss target distribution: {dict(zip(unique_vals, counts))}")
-
-        weight_counts = {}
-        for weight_val in np.unique(weights):
-            weight_counts[weight_val] = (weights == weight_val).sum()
-        logger.info(f"Sample weight distribution: {weight_counts}")
-
-        return weights
 
     def predict_proba(self, X):
         """
@@ -159,6 +153,14 @@ class MetaPipeline(BaseEstimator, TransformerMixin):
             # Otherwise return the specific step
             return self.model_pipeline.steps[key][1]
 
+    def _generate_asymmetric_sample_weights(self, y_transformed, asymmetric_config):
+        """Generate sample weights for asymmetric loss"""
+        weights = np.ones(len(y_transformed))
+        weights[y_transformed == 0] = asymmetric_config.get('loss_penalty_weight', 1.0)
+        weights[y_transformed == 2] = asymmetric_config.get('win_reward_weight', 1.0)
+        return weights
+
+
 
 class TargetVarSelector(BaseEstimator, TransformerMixin):
     """
@@ -178,12 +180,26 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
             target_variable: str,
             target_var_min_threshold: float | None = None,
             target_var_max_threshold: float | None = None,
-            asymmetric_config: dict = None
-        ):
+            asymmetric_config: dict = None,
+
+            # Add individual asymmetric parameters for grid search
+            asymmetric_enabled: bool = None,
+            asymmetric_big_loss_threshold: float = None,
+            asymmetric_big_win_threshold: float = None,
+            asymmetric_loss_penalty_weight: float = None,
+            asymmetric_win_reward_weight: float = None,
+    ):
         self.target_variable = target_variable
         self.target_var_min_threshold = target_var_min_threshold
         self.target_var_max_threshold = target_var_max_threshold
         self.asymmetric_config = asymmetric_config
+
+        # Individual asymmetric parameters for grid search compatibility
+        self.asymmetric_enabled = asymmetric_enabled
+        self.asymmetric_big_loss_threshold = asymmetric_big_loss_threshold
+        self.asymmetric_big_win_threshold = asymmetric_big_win_threshold
+        self.asymmetric_loss_penalty_weight = asymmetric_loss_penalty_weight
+        self.asymmetric_win_reward_weight = asymmetric_win_reward_weight
 
     def fit(self, y, X=None):
         """
@@ -198,16 +214,18 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
 
     def transform(self, y, X=None):
         """
-        Extract the target column specified by target_variable and return a 1D Series.
-        If the model is classification and min/max thresholds are provided, binarize accordingly.
+        Extract the target column and apply transformations.
         """
         # Extract target variable
         result = y[self.target_variable]
 
+        # Get effective asymmetric config (handles grid search overrides)
+        effective_asymmetric_config = self.get_effective_asymmetric_config()
+
         # Asymmetric loss configuration if configured
-        if isinstance(self.asymmetric_config, dict) and self.asymmetric_config.get('enabled'):
-            loss_thresh = self.asymmetric_config['big_loss_threshold']
-            win_thresh = self.asymmetric_config['big_win_threshold']
+        if isinstance(effective_asymmetric_config, dict) and effective_asymmetric_config.get('enabled'):
+            loss_thresh = effective_asymmetric_config['big_loss_threshold']
+            win_thresh = effective_asymmetric_config['big_win_threshold']
             result = np.where(result < loss_thresh, 0,
                             np.where(result >= win_thresh, 2, 1))
 
@@ -218,6 +236,31 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
             result = ((result >= lower) & (result <= upper)).astype(int)
 
         return result
+
+    def get_effective_asymmetric_config(self):
+        """
+        Merge asymmetric_config with individual parameters, prioritizing individual params.
+        This allows grid search to override specific asymmetric parameters.
+        """
+        if self.asymmetric_config is None and self.asymmetric_enabled is None:
+            return None
+
+        # Start with base config
+        effective_config = (self.asymmetric_config or {}).copy()
+
+        # Override with individual parameters if they're set
+        if self.asymmetric_enabled is not None:
+            effective_config['enabled'] = self.asymmetric_enabled
+        if self.asymmetric_big_loss_threshold is not None:
+            effective_config['big_loss_threshold'] = self.asymmetric_big_loss_threshold
+        if self.asymmetric_big_win_threshold is not None:
+            effective_config['big_win_threshold'] = self.asymmetric_big_win_threshold
+        if self.asymmetric_loss_penalty_weight is not None:
+            effective_config['loss_penalty_weight'] = self.asymmetric_loss_penalty_weight
+        if self.asymmetric_win_reward_weight is not None:
+            effective_config['win_reward_weight'] = self.asymmetric_win_reward_weight
+
+        return effective_config
 
 
 
