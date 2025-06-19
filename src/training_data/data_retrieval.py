@@ -271,15 +271,13 @@ def retrieve_macro_trends_data(query_sql = None):
             with all_dates as (
                 select date from `macro_trends.bitcoin_indicators`
                 union distinct
-                select date from `macro_trends.bitcoin_mvrv_z_score`
-                union distinct
                 select date from `macro_trends.crypto_global_market`
                 union distinct
                 select date from `macro_trends.google_trends`
             )
             select d.date
-            ,bz.btc_price
-            ,bz.btc_mvrv_z_score as btc_mvrv_z_score
+            ,bi.btc_price
+            ,bi.mvrv_z_score as btc_mvrv_z_score
             ,bi.vdd_multiple as btc_vdd_multiple
             ,gm.market_cap as global_market_cap
             ,gm.total_volume as global_volume
@@ -300,7 +298,6 @@ def retrieve_macro_trends_data(query_sql = None):
             ,cast(replace(cast(gt.memecoin_us as string),'<','') as int64) as gtrends_memecoin_us
             from all_dates d
             left join `macro_trends.bitcoin_indicators` bi on bi.date = d.date
-            left join `macro_trends.bitcoin_mvrv_z_score` bz on bz.date = d.date
             left join `macro_trends.crypto_global_market` gm on gm.date = d.date
             left join `macro_trends.google_trends` gt on gt.date = d.date
             order by date desc
