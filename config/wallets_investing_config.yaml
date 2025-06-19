@@ -27,8 +27,8 @@ investment_cycles: [
 
 # WalletModel
 training_data:
-    # toggle_overwrite_parquet: True  # determines whether to load preexisting training_data_dfs
-    toggle_overwrite_parquet: False  # determines whether to load preexisting training_data_dfs
+    # toggle_overwrite_multioffset_parquet: True  # determines whether to load preexisting training_data_dfs
+    toggle_overwrite_multioffset_parquet: False  # determines whether to load preexisting training_data_dfs
 
 # WalletModel
 # Params that define trading strategy
