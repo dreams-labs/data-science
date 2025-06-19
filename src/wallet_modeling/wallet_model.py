@@ -90,6 +90,10 @@ class WalletModel(BaseModel):
         # Split data
         self._split_data(X, y)
 
+        # Asymmetric loss is slow so broadcast a warning
+        if self.modeling_config['asymmetric_loss'].get('enabled',False):
+            logger.warning("Beginning extended training with asymmetric loss target variables...")
+
         # Build meta pipeline
         meta_pipeline = self._get_meta_pipeline()
 
@@ -341,7 +345,7 @@ class WalletModel(BaseModel):
         Override to prepend 'model_pipeline__' to all keys in param_grid.
         """
         gs_config = super()._prepare_grid_search_params(X, base_params_override)
-        # Prepend "model_pipeline__" to each key if it isn’t already prefixed
+        # Prepend "model_pipeline__" to each key if it isn't already prefixed
         gs_config['param_grid'] = {
             f"model_pipeline__{k}" if not k.startswith("model_pipeline__") else k: v
             for k, v in gs_config['param_grid'].items()
