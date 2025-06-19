@@ -233,7 +233,8 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         val_target_path = Path(parquet_folder) / date_prefix / "validation_multiepoch_coin_target_var_df.parquet"
 
         if (all(p.exists() for p in [training_data_path, training_target_path, val_data_path, val_target_path])
-            and not (self.coins_investing_config.get('training_data') or {}).get('toggle_overwrite_parquet', False)
+            and not ((self.coins_investing_config.get('training_data') or {})
+                     .get('toggle_overwrite_multioffset_parquet', False))
             ):
             logger.milestone(
                 "Investment cycle %s: using cached coin training/validation data.",

@@ -2,6 +2,7 @@
 Multi-temporal grid search orchestrator for assessing feature stability across time periods.
 """
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import copy
 import gc
 from datetime import datetime
@@ -29,6 +30,7 @@ class TemporalGridSearcher:
     def __init__(
         self,
         base_wallets_config: dict,
+        wallets_investing_config: dict,
         wallets_metrics_config: dict,
         wallets_features_config: dict,
         wallets_epochs_config: dict,
@@ -45,13 +47,14 @@ class TemporalGridSearcher:
         - modeling_dates: List of modeling period start dates (YYYY-MM-DD format)
         """
         self.base_wallets_config = copy.deepcopy(base_wallets_config)
+        self.wallets_investing_config = wallets_investing_config
         self.wallets_metrics_config = wallets_metrics_config
         self.wallets_features_config = wallets_features_config
         self.wallets_epochs_config = wallets_epochs_config
         self.modeling_dates = modeling_dates
 
         # If True, regenerate all training data regardless of cache
-        self.force_regenerate_data = base_wallets_config['training_data']['rebuild_multiwindow_dfs']
+        self.force_regenerate_data = wallets_investing_config['training_data']['toggle_overwrite_multioffset_parquet']
 
         # Storage for results
         self.training_data_cache = {}
@@ -78,10 +81,14 @@ class TemporalGridSearcher:
 
             # Check if data already exists and skip if not forcing regeneration
             if not self.force_regenerate_data and self._check_data_exists(modeling_date):
-                logger.info(f"({i}/{len(self.modeling_dates)}) Skipping {modeling_date} - data already exists")
+                logger.info(f"[{i}/{len(self.modeling_dates)}] Skipping {modeling_date} - data already exists")
                 continue
 
-            logger.info(f"({i}/{len(self.modeling_dates)}) Generating data for {modeling_date}...")
+            # Warn if forcing regeneration of existing data
+            if self.force_regenerate_data and self._check_data_exists(modeling_date):
+                logger.warning(f"[{i}/{len(self.modeling_dates)}] Force regenerating existing data for {modeling_date}")
+
+            logger.milestone(f"[{i}/{len(self.modeling_dates)}] Generating data for {modeling_date}...")
 
             # Create date-specific config
             date_config = self._create_date_config(modeling_date)
@@ -110,44 +117,92 @@ class TemporalGridSearcher:
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def load_all_training_data(self) -> None:
         """
-        Load pre-generated training data for all modeling dates into memory cache.
+        Load pre-generated training data for all modeling dates into memory cache using multithreading.
+
+        Params:
+        - max_workers: Maximum number of threads for parallel loading (default: 4)
         """
+
         logger.milestone("Loading training data for all time periods...")
 
         parquet_folder = self.base_wallets_config['training_data']['parquet_folder']
+        max_workers = self.wallets_investing_config['n_threads']['training_data_loading']
 
-        for modeling_date in self.modeling_dates:
+        def load_single_date(modeling_date: str) -> tuple:
+            """Load training data for a single modeling date."""
             date_str = datetime.strptime(modeling_date, '%Y-%m-%d').strftime('%y%m%d')
 
             try:
-                # Load all four DataFrames for this date    # pylint:disable=line-too-long
+                # Load all four DataFrames for this date
                 base_path = f"{parquet_folder}/{date_str}"
                 wallet_training_data_df = pd.read_parquet(f"{base_path}/multioffset_wallet_training_data_df.parquet")
                 wallet_target_vars_df = pd.read_parquet(f"{base_path}/multioffset_wallet_target_vars_df.parquet")
-                validation_training_data_df = pd.read_parquet(f"{base_path}/multiwindow_validation_training_data_df.parquet")
-                validation_target_vars_df = pd.read_parquet(f"{base_path}/multiwindow_validation_target_vars_df.parquet")
+                validation_training_data_df = pd.read_parquet(f"{base_path}/multioffset_validation_training_data_df.parquet")
+                validation_target_vars_df = pd.read_parquet(f"{base_path}/multioffset_validation_target_vars_df.parquet")
 
-                # Cache the data
-                self.training_data_cache[date_str] = (
+                training_data = (
                     wallet_training_data_df,
                     wallet_target_vars_df,
                     validation_training_data_df,
                     validation_target_vars_df
                 )
 
-                logger.info(f"Loaded training data for {modeling_date} (shapes: "
-                           f"{wallet_training_data_df.shape}, {wallet_target_vars_df.shape}, "
-                           f"{validation_training_data_df.shape}, {validation_target_vars_df.shape})")
+                shapes_info = (
+                    wallet_training_data_df.shape,
+                    wallet_target_vars_df.shape,
+                    validation_training_data_df.shape,
+                    validation_target_vars_df.shape
+                )
+
+                return date_str, training_data, shapes_info, None
 
             except FileNotFoundError as e:
-                logger.error(f"Training data not found for {modeling_date}: {e}")
-                raise FileNotFoundError(
-                    f"Training data missing for {modeling_date}. "
-                    f"Run generate_all_training_data() first or set force_regenerate_data=True"
-                ) from e
+                return date_str, None, None, e
 
-        logger.milestone(f"Successfully loaded training data for {len(self.modeling_dates)} periods")
+        # Execute parallel loading
+        failed_dates = []
 
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all tasks
+            future_to_date = {
+                executor.submit(load_single_date, modeling_date): modeling_date
+                for modeling_date in self.modeling_dates
+            }
+
+            # Collect results as they complete
+            for future in as_completed(future_to_date):
+                modeling_date = future_to_date[future]
+
+                try:
+                    date_str, training_data, shapes_info, error = future.result()
+
+                    if error is not None:
+                        failed_dates.append((modeling_date, error))
+                        continue
+
+                    # Cache the successfully loaded data
+                    self.training_data_cache[date_str] = training_data
+
+                    logger.info(f"Loaded training data for {modeling_date} (shapes: "
+                            f"{shapes_info[0]}, {shapes_info[1]}, "
+                            f"{shapes_info[2]}, {shapes_info[3]})")
+
+                except Exception as e:
+                    failed_dates.append((modeling_date, e))
+
+        # Handle any failures
+        if failed_dates:
+            error_details = "\n".join([f"  {date}: {error}" for date, error in failed_dates])
+            logger.error(f"Failed to load training data for {len(failed_dates)} dates:\n{error_details}")
+
+            # Raise error for the first failure
+            first_failed_date, first_error = failed_dates[0]
+            raise FileNotFoundError(
+                f"Training data missing for {first_failed_date}. "
+                f"Run generate_all_training_data() first or set force_regenerate_data=True"
+            ) from first_error
+
+        logger.milestone(f"Successfully loaded training data for {len(self.modeling_dates)} periods using {max_workers} threads")
 
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def run_multi_temporal_grid_search(self) -> None:
@@ -162,7 +217,6 @@ class TemporalGridSearcher:
             raise ValueError("No training data loaded. Call load_all_training_data() first")
 
         logger.milestone(f"Running grid search across {len(self.modeling_dates)} time periods...")
-        u.notify('startup')
 
         for i, modeling_date in enumerate(self.modeling_dates, 1):
             date_str = datetime.strptime(modeling_date, '%Y-%m-%d').strftime('%y%m%d')
@@ -221,8 +275,7 @@ class TemporalGridSearcher:
 
         # Calculate period-specific baselines first
         period_baselines = {}
-        for date_str in self.training_data_cache.keys():
-            sample_data = self.training_data_cache[date_str]
+        for date_str, sample_data in self.training_data_cache.items():
             period_baselines[date_str] = self._calculate_sample_baseline(sample_data)
 
         # Stack all report DataFrames with date identifiers
@@ -447,8 +500,8 @@ class TemporalGridSearcher:
         required_files = [
             f"{parquet_folder}/{date_str}/multioffset_wallet_training_data_df.parquet",
             f"{parquet_folder}/{date_str}/multioffset_wallet_target_vars_df.parquet",
-            f"{parquet_folder}/{date_str}/multiwindow_validation_training_data_df.parquet",
-            f"{parquet_folder}/{date_str}/multiwindow_validation_target_vars_df.parquet"
+            f"{parquet_folder}/{date_str}/multioffset_validation_training_data_df.parquet",
+            f"{parquet_folder}/{date_str}/multioffset_validation_target_vars_df.parquet"
         ]
 
         return all(Path(file_path).exists() for file_path in required_files)
@@ -609,16 +662,10 @@ class TemporalGridSearcher:
                 metrics['test_samples'] = evaluator.metrics['test_samples']
             if 'train_samples' in evaluator.metrics:
                 metrics['train_samples'] = evaluator.metrics['train_samples']
-
-            # Feature importance summary
+            # Feature importance summary (removed top features/importance)
+            # Do not add top_feature_* or top_importance_*
             if 'importances' in evaluator.metrics and evaluator.feature_names:
                 metrics['n_features'] = len(evaluator.feature_names)
-                # Top 3 most important features
-                top_features = evaluator.metrics['importances']['feature'][:3]
-                top_importances = evaluator.metrics['importances']['importance'][:3]
-                for i, (feat, imp) in enumerate(zip(top_features, top_importances)):
-                    metrics[f'top_feature_{i+1}'] = feat
-                    metrics[f'top_importance_{i+1}'] = round(imp, 4)
 
         # Model-type specific metrics
         if evaluator.modeling_config.get('model_type') == 'classification':
