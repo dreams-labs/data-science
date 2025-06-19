@@ -156,14 +156,6 @@ wallet_segments: #CoinModel
     wallet_scores_residuals_segments: False
     wallet_scores_confidence_segments: False
 
-    wallet_features_segments:
-        10k_gainers:
-            trading|crypto_net_gain|all_windows:
-                min_value: 10000
-            trading|total_volume|w1:
-                min_value: 5000
-
-
     # score_segment_quantiles: [0.95]  # higher is better; how to assign wallet a score segment
     # score_segment_quantiles: [0.98, 0.10]  # higher is better; how to assign wallet a score segment
 
