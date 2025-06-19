@@ -78,7 +78,7 @@ class WalletEpochsOrchestrator:
         self.output_dfs = {}
 
 
-    @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
+    @u.timing_decorator()
     def load_complete_raw_datasets(self) -> None:
         """
         Identifies the earliest training_period_start and latest modeling_period_end
@@ -197,12 +197,12 @@ class WalletEpochsOrchestrator:
         paths = {
             'train':      base_path / 'multioffset_wallet_training_data_df.parquet',
             'train_tgt':  base_path / 'multioffset_wallet_target_vars_df.parquet',
-            'val_train':  base_path / 'multiwindow_validation_training_data_df.parquet',
-            'val_tgt':    base_path / 'multiwindow_validation_target_vars_df.parquet',
+            'val_train':  base_path / 'multioffset_validation_training_data_df.parquet',
+            'val_tgt':    base_path / 'multioffset_validation_target_vars_df.parquet',
         }
         if (
             all(p.exists() for p in paths.values())
-            and self.base_config['training_data']['rebuild_multiwindow_dfs'] is False
+            and self.base_config['training_data']['rebuild_multioffset_dfs'] is False
             and not self.training_only
         ):
             logger.info("Loading saved multi-offset wallet DataFrames from %s", base_path)

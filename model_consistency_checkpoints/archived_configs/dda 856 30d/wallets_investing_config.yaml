@@ -27,8 +27,8 @@ investment_cycles: [
 
 # WalletModel
 training_data:
-    # toggle_overwrite_parquet: True  # determines whether to load preexisting training_data_dfs
-    toggle_overwrite_parquet: False  # determines whether to load preexisting training_data_dfs
+    # toggle_overwrite_multioffset_parquet: True  # determines whether to load preexisting training_data_dfs
+    toggle_overwrite_multioffset_parquet: False  # determines whether to load preexisting training_data_dfs
 
 # WalletModel
 # Params that define trading strategy
@@ -58,5 +58,6 @@ trading:
 
 
 n_threads:
+    training_data_loading: 4  # how many training sets in load_all_training_data() to load
     investment_cycles: 8  # how many investing epochs are calculated concurrently
     buy_logic_epochs: 6  # how many epoch buys to choose based on scores
