@@ -287,8 +287,8 @@ class CoinEpochsOrchestrator:
                     raise
 
         # Concatenate all epochs dfs
-        multiwindow_features = pd.concat(feature_dfs).sort_index()
-        multiwindow_targets = pd.concat(target_dfs).sort_index()
+        multiepoch_features = pd.concat(feature_dfs).sort_index()
+        multiepoch_targets = pd.concat(target_dfs).sort_index()
 
         def reset_index_codes(df):
             """Helper to ensure matching indices by reseting MultiIndex codes while preserving values"""
@@ -299,11 +299,11 @@ class CoinEpochsOrchestrator:
         # 4. Persist multiwindow parquet files
         # ------------------------------------
         root_folder = self.wallets_coin_config['training_data']['parquet_folder']
-        multiwindow_features = reset_index_codes(multiwindow_features)
-        multiwindow_features.to_parquet(f"{root_folder}/{file_prefix}multiepoch_coin_training_data_df.parquet")
-        if not multiwindow_targets.empty:
-            multiwindow_targets = reset_index_codes(multiwindow_targets)
-            multiwindow_targets.to_parquet(f"{root_folder}/{file_prefix}multiepoch_coin_target_var_df.parquet")
+        multiepoch_features = reset_index_codes(multiepoch_features)
+        multiepoch_features.to_parquet(f"{root_folder}/{file_prefix}multiepoch_coin_training_data_df.parquet")
+        if not multiepoch_targets.empty:
+            multiepoch_targets = reset_index_codes(multiepoch_targets)
+            multiepoch_targets.to_parquet(f"{root_folder}/{file_prefix}multiepoch_coin_target_var_df.parquet")
 
         ambient_player_coins.stop()
 

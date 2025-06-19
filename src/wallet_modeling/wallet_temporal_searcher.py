@@ -29,6 +29,7 @@ class TemporalGridSearcher:
     def __init__(
         self,
         base_wallets_config: dict,
+        wallets_investing_config: dict,
         wallets_metrics_config: dict,
         wallets_features_config: dict,
         wallets_epochs_config: dict,
@@ -45,13 +46,14 @@ class TemporalGridSearcher:
         - modeling_dates: List of modeling period start dates (YYYY-MM-DD format)
         """
         self.base_wallets_config = copy.deepcopy(base_wallets_config)
+        self.wallets_investing_config = wallets_investing_config
         self.wallets_metrics_config = wallets_metrics_config
         self.wallets_features_config = wallets_features_config
         self.wallets_epochs_config = wallets_epochs_config
         self.modeling_dates = modeling_dates
 
         # If True, regenerate all training data regardless of cache
-        self.force_regenerate_data = base_wallets_config['training_data']['rebuild_multiwindow_dfs']
+        self.force_regenerate_data = wallets_investing_config['training_data']['toggle_overwrite_multioffset_parquet']
 
         # Storage for results
         self.training_data_cache = {}
@@ -78,10 +80,14 @@ class TemporalGridSearcher:
 
             # Check if data already exists and skip if not forcing regeneration
             if not self.force_regenerate_data and self._check_data_exists(modeling_date):
-                logger.info(f"({i}/{len(self.modeling_dates)}) Skipping {modeling_date} - data already exists")
+                logger.info(f"[{i}/{len(self.modeling_dates)}] Skipping {modeling_date} - data already exists")
                 continue
 
-            logger.info(f"({i}/{len(self.modeling_dates)}) Generating data for {modeling_date}...")
+            # Warn if forcing regeneration of existing data
+            if self.force_regenerate_data and self._check_data_exists(modeling_date):
+                logger.warning(f"[{i}/{len(self.modeling_dates)}] Force regenerating existing data for {modeling_date}")
+
+            logger.milestone(f"[{i}/{len(self.modeling_dates)}] Generating data for {modeling_date}...")
 
             # Create date-specific config
             date_config = self._create_date_config(modeling_date)
@@ -124,8 +130,8 @@ class TemporalGridSearcher:
                 base_path = f"{parquet_folder}/{date_str}"
                 wallet_training_data_df = pd.read_parquet(f"{base_path}/multioffset_wallet_training_data_df.parquet")
                 wallet_target_vars_df = pd.read_parquet(f"{base_path}/multioffset_wallet_target_vars_df.parquet")
-                validation_training_data_df = pd.read_parquet(f"{base_path}/multiwindow_validation_training_data_df.parquet")
-                validation_target_vars_df = pd.read_parquet(f"{base_path}/multiwindow_validation_target_vars_df.parquet")
+                validation_training_data_df = pd.read_parquet(f"{base_path}/multioffset_validation_training_data_df.parquet")
+                validation_target_vars_df = pd.read_parquet(f"{base_path}/multioffset_validation_target_vars_df.parquet")
 
                 # Cache the data
                 self.training_data_cache[date_str] = (
@@ -162,7 +168,6 @@ class TemporalGridSearcher:
             raise ValueError("No training data loaded. Call load_all_training_data() first")
 
         logger.milestone(f"Running grid search across {len(self.modeling_dates)} time periods...")
-        u.notify('startup')
 
         for i, modeling_date in enumerate(self.modeling_dates, 1):
             date_str = datetime.strptime(modeling_date, '%Y-%m-%d').strftime('%y%m%d')
@@ -447,8 +452,8 @@ class TemporalGridSearcher:
         required_files = [
             f"{parquet_folder}/{date_str}/multioffset_wallet_training_data_df.parquet",
             f"{parquet_folder}/{date_str}/multioffset_wallet_target_vars_df.parquet",
-            f"{parquet_folder}/{date_str}/multiwindow_validation_training_data_df.parquet",
-            f"{parquet_folder}/{date_str}/multiwindow_validation_target_vars_df.parquet"
+            f"{parquet_folder}/{date_str}/multioffset_validation_training_data_df.parquet",
+            f"{parquet_folder}/{date_str}/multioffset_validation_target_vars_df.parquet"
         ]
 
         return all(Path(file_path).exists() for file_path in required_files)
