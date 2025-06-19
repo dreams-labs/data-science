@@ -8,10 +8,13 @@ training_data: #WalletModel
     modeling_period_start: '2023-09-08'
     # modeling_period_start: '2024-01-06'
     # modeling_period_start: '2024-05-05'
+    # modeling_period_start: '2024-06-04'
+    # modeling_period_start: '2024-07-04'
     # modeling_period_start: '2024-08-03'
     # modeling_period_start: '2024-09-02'
+    # modeling_period_start: '2024-12-31'
     # modeling_period_start: '2025-01-30'
-    modeling_period_duration: 15
+    modeling_period_duration: 30
     training_window_lookbacks: [  # How many days prior to the modeling period each window begins
         # 480,
         # 420,
@@ -23,7 +26,7 @@ training_data: #WalletModel
         # 60,
 
         # 7,
-        15,
+        # 15,
         30,
         60,
         120,
@@ -39,8 +42,8 @@ training_data: #WalletModel
     #KeyParam Training Data Toggles
     training_data_only: False  # if true, only generates training data to be scored by another model
     hybridize_wallet_ids: True  # if true, training data will be keyed on wallet-coin pairs
-    predrop_features: False  # if true, the feature_selection.drop_patterns will be applied early to save memory
-    rebuild_multiwindow_dfs: True  # if true, generate_epochs_training_data won't load parquet
+    predrop_features: True  # if true, the feature_selection.drop_patterns will be applied early to save memory
+    rebuild_multioffset_dfs: True  # if true, generate_epochs_training_data won't load parquet
 
     #KeyParam Datasets zand Folders
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
@@ -82,7 +85,7 @@ modeling: #WalletModel
 
     #KeyParam Target Var Thresholds
     asymmetric_loss: # Adds another class to target
-        enabled: true
+        # enabled: true
         # big_loss_threshold: -0.40    # Below this is an extra penalized big loss
         big_loss_threshold: -0.30    # Below this is an extra penalized big loss
         # big_loss_threshold: -0.20    # Below this is an extra penalized big loss
@@ -150,7 +153,7 @@ modeling: #WalletModel
         # Core Tree Params (Always Active)
         # -------------------------------
         #KeyParam Tree Depth
-        max_depth: 4  # how deep the trees can go
+        max_depth: 3  # how deep the trees can go
         min_child_weight: 60  # what % of rows each tree must have
 
         #KeyParam True Positive Weighting
@@ -498,7 +501,7 @@ modeling: #WalletModel
 
         #KeyParam Grid Search Toggle
 # ===========================================================================================================================================
-        enabled: True
+        # enabled: True
 # ===========================================================================================================================================
 
 
@@ -551,8 +554,8 @@ modeling: #WalletModel
 
             # target_selector__asymmetric_enabled: [true, false]
             target_selector__asymmetric_big_loss_threshold: [-0.5, -0.3]
-            target_selector__asymmetric_big_win_threshold: [0.5, 0.7, 1.0]
-            target_selector__asymmetric_loss_penalty_weight: [0.5, 1]
+            target_selector__asymmetric_big_win_threshold: [0.3, 0.5, 0.7]
+            target_selector__asymmetric_loss_penalty_weight: [0.5, 1, 2]
             target_selector__asymmetric_win_reward_weight: [2, 5, 10]
 
         # Params for model construction
