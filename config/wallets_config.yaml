@@ -44,8 +44,7 @@ training_data: #WalletModel
 
     #KeyParam Datasets zand Folders
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
-    # parquet_folder: temp/wallet_modeling_dfs/dda_853_wallet_multiwindow_searching  # where to store parquet files
-    parquet_folder: temp/wallet_modeling_dfs/dda_853_wallet_multiwindow_searching_15d  # where to store parquet files
+    parquet_folder: temp/wallet_modeling_dfs/dda_853_wallet_multioffset_searching  # where to store parquet files
     reference_dfs_folder: temp/reference_dfs  # Base folder where files that impact all runs are stored
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
@@ -87,10 +86,11 @@ modeling: #WalletModel
         # big_loss_threshold: -0.40    # Below this is an extra penalized big loss
         big_loss_threshold: -0.30    # Below this is an extra penalized big loss
         # big_loss_threshold: -0.20    # Below this is an extra penalized big loss
-        big_win_threshold: 0.30      # Above this is the target
+        big_win_threshold: 0.70      # Above this is the target
         # big_win_threshold: 0.50      # Above this is the target
-        # loss_penalty_weight: 1.0     # Penalty for missing losses DOESN'T WORK
-        # win_reward_weight: 1.0       # Reward for catching wins   DOESN'T WORK
+        # loss_penalty_weight: 1     # Penalty for missing losses
+        loss_penalty_weight: 2     # Penalty for missing losses
+        win_reward_weight: 2       # Reward for catching wins
 
     # target_var_min_threshold: -.inf  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.05  # a classification model will try to predict the target var above this value
@@ -360,7 +360,7 @@ modeling: #WalletModel
 
 
 
-            cw_trading|*,
+            # cw_trading|*,
             cw_macro|*,
 
             performance|*/winsorized|*,
@@ -397,6 +397,18 @@ modeling: #WalletModel
             'trading|max_investment*',
             'trading|total_volume*',
             'trading|unique_coins_traded*',
+
+            'cw_trading|average_transaction*',
+            'cw_trading|crypto_cash_buys*',
+            'cw_trading|crypto_cash_sells*',
+            # 'cw_trading|crypto_inflows*',
+            'cw_trading|crypto_net_cash_flows*',
+            'cw_trading|crypto_net_flows*',
+            'cw_trading|crypto_net_gain*',
+            'cw_trading|crypto_outflows*',
+            'cw_trading|max_investment*',
+            'cw_trading|total_volume*',
+            'cw_trading|unique_coins_traded*',
 
 
 
@@ -485,7 +497,7 @@ modeling: #WalletModel
 
         #KeyParam Grid Search Toggle
 # ===========================================================================================================================================
-        # enabled: True
+        enabled: True
 # ===========================================================================================================================================
 
 
@@ -496,7 +508,7 @@ modeling: #WalletModel
         drop_patterns_include_n_features: 1
 
         n_iter: 40   # random search limit
-        n_splits: 3  # cv splits
+        n_splits: 4  # cv splits
 
         # regressor_scoring: neg_root_mean_squared_error
         # regressor_scoring: custom_neg_rmse_scorer
@@ -517,23 +529,30 @@ modeling: #WalletModel
         n_jobs: -1
         # pre_dispatch: -1
 
-        # # # Params for target variable generation
-        # param_grid_y:
+        # # Params for target variable generation
+        param_grid_y:
 
-        #     # target_selector__target_variable: [
-        #     #     'cw_coin_return',
-        #     #     'cw_crypto_net_gain/crypto_inflows/base',
-        #     # ]
-        #     target_selector__target_var_min_threshold: [
-        #         # 0.1,
-        #         # 0.2,
-        #         0.3,
-        #         # 0.4,
-        #         0.5,
-        #         # 0.6,
-        #         # 0.7,
-        #         # 0.8
-        #     ]
+
+            # target_selector__target_variable: [
+            #     'cw_coin_return',
+            #     'cw_crypto_net_gain/crypto_inflows/base',
+            # ]
+            # target_selector__target_var_min_threshold: [
+            #     # 0.1,
+            #     # 0.2,
+            #     0.3,
+            #     # 0.4,
+            #     0.5,
+            #     # 0.6,
+            #     # 0.7,
+            #     # 0.8
+            # ]
+
+            # target_selector__asymmetric_enabled: [true, false]
+            # target_selector__asymmetric_big_loss_threshold: [-0.5, -0.3, -0.1]
+            # target_selector__asymmetric_big_win_threshold: [0.5, 0.7, 1.0]
+            target_selector__asymmetric_loss_penalty_weight: [0.5, 1, 2, 10]
+            target_selector__asymmetric_win_reward_weight: [0.5, 1, 2, 10]
 
         # Params for model construction
         param_grid:
@@ -569,39 +588,39 @@ modeling: #WalletModel
 
 
             # Column Selection
-            drop_columns__drop_patterns: [
+            # drop_columns__drop_patterns: [
 
-                # 'cw_mktcap|end_portfolio_wtd_market_cap/market_cap_filled*',
-                'cw_mktcap|end_portfolio_wtd_market_cap/market_cap_unadj*',
-                # 'cw_performance|crypto_net_gain/crypto_inflows*',
-                'cw_performance|crypto_net_gain/max_investment*',
-                'cw_timing|btc_mvrv_z_score/buy_weighted*',
-                'cw_timing|btc_mvrv_z_score/lag_90*',
-                'cw_timing|btc_mvrv_z_score/sell_weighted*',
-                'cw_timing|gtrends_memecoin_us/lag_15*',
-                'cw_timing|price_sma_2/lead_30*',
-                'cw_timing|volume_sma_2/lag_7*',
-                'cw_timing|volume_sma_2/lead_7*',
-                # 'cw_transfers|buys_coin_age/median*',
-                'cw_transfers|earlybird_ratio/median*',
-                # 'macro|btc_mvrv_z_score_last/*',
-                # 'macro|gtrends_altcoin_worldwide_std/*',
-                'mktcap|portfolio_mcap_mean/market_cap_filled*',
-                'mktcap|portfolio_mcap_mean/market_cap_unadj*',
-                # 'performance|crypto_net_gain/crypto_inflows*',
-                'performance|crypto_net_gain/max_investment*',
-                'timing|btc_mvrv_z_score/buy_weighted*',
-                # 'timing|btc_mvrv_z_score/lag_15*',
-                # 'timing|btc_mvrv_z_score/lead_30*',
-                # 'timing|btc_mvrv_z_score/lead_90*',
-                'timing|btc_mvrv_z_score/sell_weighted*',
-                'timing|price_sma_2/lag_15*',
-                'timing|price_sma_2/lead_90*',
-                # 'trading|crypto_cash_sells/*',
-                'transfers|buys_coin_age/min*'
+            #     # 'cw_mktcap|end_portfolio_wtd_market_cap/market_cap_filled*',
+            #     'cw_mktcap|end_portfolio_wtd_market_cap/market_cap_unadj*',
+            #     # 'cw_performance|crypto_net_gain/crypto_inflows*',
+            #     'cw_performance|crypto_net_gain/max_investment*',
+            #     # 'cw_timing|btc_mvrv_z_score/buy_weighted*',
+            #     # 'cw_timing|btc_mvrv_z_score/lag_90*',
+            #     # 'cw_timing|btc_mvrv_z_score/sell_weighted*',
+            #     # 'cw_timing|gtrends_memecoin_us/lag_15*',
+            #     # 'cw_timing|price_sma_2/lead_30*',
+            #     # 'cw_timing|volume_sma_2/lag_7*',
+            #     # 'cw_timing|volume_sma_2/lead_7*',
+            #     # # 'cw_transfers|buys_coin_age/median*',
+            #     # 'cw_transfers|earlybird_ratio/median*',
+            #     # # 'macro|btc_mvrv_z_score_last/*',
+            #     # # 'macro|gtrends_altcoin_worldwide_std/*',
+            #     # 'mktcap|portfolio_mcap_mean/market_cap_filled*',
+            #     # 'mktcap|portfolio_mcap_mean/market_cap_unadj*',
+            #     # # 'performance|crypto_net_gain/crypto_inflows*',
+            #     # 'performance|crypto_net_gain/max_investment*',
+            #     # 'timing|btc_mvrv_z_score/buy_weighted*',
+            #     # # 'timing|btc_mvrv_z_score/lag_15*',
+            #     # # 'timing|btc_mvrv_z_score/lead_30*',
+            #     # # 'timing|btc_mvrv_z_score/lead_90*',
+            #     # 'timing|btc_mvrv_z_score/sell_weighted*',
+            #     # 'timing|price_sma_2/lag_15*',
+            #     # 'timing|price_sma_2/lead_90*',
+            #     # # 'trading|crypto_cash_sells/*',
+            #     # 'transfers|buys_coin_age/min*'
 
 
-            ]
+            # ]
 
     # Phase training section
     phase_training:
