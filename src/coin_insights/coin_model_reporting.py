@@ -106,7 +106,7 @@ def generate_and_upload_coin_scores(
 
     Params:
     - wallets_coin_config (dict, optional): Configuration dictionary.
-    - training_data_df (DataFrame): Multiwindow wallet training data.
+    - training_data_df (DataFrame): Multiepoch wallet training data.
     - model_id (str): Unique ID of the model to use for prediction.
     - score_name (str): Name of the score being generated.
     - score_notes (str): Additional notes about the scoring process.

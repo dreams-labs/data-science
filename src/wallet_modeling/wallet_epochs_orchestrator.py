@@ -321,7 +321,7 @@ class WalletEpochsOrchestrator:
         )
         u.notify('level_up')
 
-        # --- stub-save: write all four multiwindow dfs -----------------
+        # --- stub-save: write all four multioffset dfs -----------------
         if not self.training_only:
             base_path.mkdir(parents=True, exist_ok=True)
             wallet_training_data_df.to_parquet(paths['train'], index=True)
