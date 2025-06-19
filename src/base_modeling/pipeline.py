@@ -8,7 +8,6 @@ import numpy as np
 
 # Local modules
 import base_modeling.feature_selection as fs
-import utils as u
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
 # pylint:disable=unused-argument  # X and y params are always needed for pipeline structure
@@ -166,50 +165,10 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
             target_var_min_threshold: float | None = None,
             target_var_max_threshold: float | None = None,
             asymmetric_config: dict = None,
-
-            # # Asymmetric loss params
-            # asymmetric_enabled: bool = None,
-            # asymmetric_big_loss_threshold: float = None,
-            # asymmetric_big_win_threshold: float = None
     ):
         self.target_variable = target_variable
         self.target_var_min_threshold = target_var_min_threshold
         self.target_var_max_threshold = target_var_max_threshold
-        # self.asymmetric_enabled = asymmetric_enabled
-        # self.asymmetric_big_loss_threshold = asymmetric_big_loss_threshold
-        # self.asymmetric_big_win_threshold = asymmetric_big_win_threshold
-
-        # # Add this debug logging
-        # logger.warning(f"TargetVarSelector init - asymmetric_enabled: {asymmetric_enabled}")
-        # logger.warning(f"TargetVarSelector init - big_loss_threshold: {asymmetric_big_loss_threshold}")
-        # logger.warning(f"TargetVarSelector init - big_win_threshold: {asymmetric_big_win_threshold}")
-        # logger.warning(f"TargetVarSelector init - asymmetric_config: {asymmetric_config}")
-
-        # # Priority: individual params > provided dict > None
-        # if asymmetric_enabled is not None:
-        #     # Start with existing config if available, otherwise empty dict
-        #     base_config = asymmetric_config or {}
-
-        #     self.asymmetric_config = {
-        #         'enabled': asymmetric_enabled,
-        #         'big_loss_threshold': (asymmetric_big_loss_threshold
-        #                                 if asymmetric_big_loss_threshold is not None
-        #                                 else base_config.get('big_loss_threshold')),
-        #         'big_win_threshold': (asymmetric_big_win_threshold
-        #                                 if asymmetric_big_win_threshold is not None
-        #                                 else base_config.get('big_win_threshold'))
-        #     }
-
-        #     # Validate required thresholds when asymmetric loss is enabled
-        #     if asymmetric_enabled and (
-        #         self.asymmetric_config['big_loss_threshold'] is None or
-        #         self.asymmetric_config['big_win_threshold'] is None
-        #     ):
-        #         raise u.ConfigError(
-        #             "When asymmetric_enabled=True, both big_loss_threshold and big_win_threshold "
-        #             "must be provided either in the base asymmetric_config or as individual parameters"
-        #         )
-        # else:
         self.asymmetric_config = asymmetric_config
 
     def fit(self, y, X=None):
