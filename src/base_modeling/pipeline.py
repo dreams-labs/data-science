@@ -181,11 +181,25 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
             target_var_min_threshold: float | None = None,
             target_var_max_threshold: float | None = None,
             asymmetric_config: dict = None,
+
+            # Add individual asymmetric parameters for grid search
+            asymmetric_enabled: bool = None,
+            asymmetric_big_loss_threshold: float = None,
+            asymmetric_big_win_threshold: float = None,
+            asymmetric_loss_penalty_weight: float = None,
+            asymmetric_win_reward_weight: float = None,
     ):
         self.target_variable = target_variable
         self.target_var_min_threshold = target_var_min_threshold
         self.target_var_max_threshold = target_var_max_threshold
         self.asymmetric_config = asymmetric_config
+
+        # Individual asymmetric parameters for grid search compatibility
+        self.asymmetric_enabled = asymmetric_enabled
+        self.asymmetric_big_loss_threshold = asymmetric_big_loss_threshold
+        self.asymmetric_big_win_threshold = asymmetric_big_win_threshold
+        self.asymmetric_loss_penalty_weight = asymmetric_loss_penalty_weight
+        self.asymmetric_win_reward_weight = asymmetric_win_reward_weight
 
     def fit(self, y, X=None):
         """
@@ -200,16 +214,18 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
 
     def transform(self, y, X=None):
         """
-        Extract the target column specified by target_variable and return a 1D Series.
-        If the model is classification and min/max thresholds are provided, binarize accordingly.
+        Extract the target column and apply transformations.
         """
         # Extract target variable
         result = y[self.target_variable]
 
+        # Get effective asymmetric config (handles grid search overrides)
+        effective_asymmetric_config = self._get_effective_asymmetric_config()
+
         # Asymmetric loss configuration if configured
-        if isinstance(self.asymmetric_config, dict) and self.asymmetric_config.get('enabled'):
-            loss_thresh = self.asymmetric_config['big_loss_threshold']
-            win_thresh = self.asymmetric_config['big_win_threshold']
+        if isinstance(effective_asymmetric_config, dict) and effective_asymmetric_config.get('enabled'):
+            loss_thresh = effective_asymmetric_config['big_loss_threshold']
+            win_thresh = effective_asymmetric_config['big_win_threshold']
             result = np.where(result < loss_thresh, 0,
                             np.where(result >= win_thresh, 2, 1))
 
@@ -220,6 +236,31 @@ class TargetVarSelector(BaseEstimator, TransformerMixin):
             result = ((result >= lower) & (result <= upper)).astype(int)
 
         return result
+
+    def _get_effective_asymmetric_config(self):
+        """
+        Merge asymmetric_config with individual parameters, prioritizing individual params.
+        This allows grid search to override specific asymmetric parameters.
+        """
+        if self.asymmetric_config is None and self.asymmetric_enabled is None:
+            return None
+
+        # Start with base config
+        effective_config = (self.asymmetric_config or {}).copy()
+
+        # Override with individual parameters if they're set
+        if self.asymmetric_enabled is not None:
+            effective_config['enabled'] = self.asymmetric_enabled
+        if self.asymmetric_big_loss_threshold is not None:
+            effective_config['big_loss_threshold'] = self.asymmetric_big_loss_threshold
+        if self.asymmetric_big_win_threshold is not None:
+            effective_config['big_win_threshold'] = self.asymmetric_big_win_threshold
+        if self.asymmetric_loss_penalty_weight is not None:
+            effective_config['loss_penalty_weight'] = self.asymmetric_loss_penalty_weight
+        if self.asymmetric_win_reward_weight is not None:
+            effective_config['win_reward_weight'] = self.asymmetric_win_reward_weight
+
+        return effective_config
 
 
 

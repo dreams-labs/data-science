@@ -366,26 +366,57 @@ class WalletModel(BaseModel):
             max_thresholds = param_grid_y['target_selector__target_var_max_threshold']
             gs_config['param_grid']['y_pipeline__target_selector__target_var_max_threshold'] = max_thresholds
 
-        # # Add asymmetric loss parameters
-        # if 'target_selector__asymmetric_enabled' in param_grid_y:
-        #     asymmetric_enabled = param_grid_y['target_selector__asymmetric_enabled']
-        #     gs_config['param_grid']['y_pipeline__target_selector__asymmetric_enabled'] = asymmetric_enabled
+        # Validate asymmetric loss compatibility with threshold grid search
+        asymmetric_enabled = self.modeling_config.get('asymmetric_loss', {}).get('enabled', False)
+        threshold_params = [
+            'target_selector__target_variable',
+            'target_selector__target_var_min_threshold',
+            'target_selector__target_var_max_threshold'
+        ]
+        conflicting_params = [param for param in threshold_params if param in param_grid_y]
+        if asymmetric_enabled and conflicting_params:
+            raise u.ConfigError(
+                f"Cannot perform grid search with asymmetric loss enabled on target threshold parameters "
+                f"{conflicting_params} Asymmetric loss overrides threshold-based "
+                f"target transformation. Either disable asymmetric loss or remove threshold "
+                f"parameters from param_grid_y."
+            )
 
-        # if 'target_selector__asymmetric_big_loss_threshold' in param_grid_y:
-        #     big_loss_thresholds = param_grid_y['target_selector__asymmetric_big_loss_threshold']
-        #     gs_config['param_grid']['y_pipeline__target_selector__asymmetric_big_loss_threshold'] = big_loss_thresholds
 
-        # if 'target_selector__asymmetric_big_win_threshold' in param_grid_y:
-        #     big_win_thresholds = param_grid_y['target_selector__asymmetric_big_win_threshold']
-        #     gs_config['param_grid']['y_pipeline__target_selector__asymmetric_big_win_threshold'] = big_win_thresholds
+        # Add asymmetric loss parameters
+        asymmetric_params = [
+            'target_selector__asymmetric_enabled',
+            'target_selector__asymmetric_big_loss_threshold',
+            'target_selector__asymmetric_big_win_threshold',
+            'target_selector__asymmetric_loss_penalty_weight',
+            'target_selector__asymmetric_win_reward_weight'
+        ]
 
-        # if 'target_selector__asymmetric_loss_penalty_weight' in param_grid_y:
-        #     loss_penalty_weights = param_grid_y['target_selector__asymmetric_loss_penalty_weight']
-        #     gs_config['param_grid']['y_pipeline__target_selector__asymmetric_loss_penalty_weight'] = loss_penalty_weights
+        for param in asymmetric_params:
+            if param in param_grid_y:
+                prefixed_param = f"y_pipeline__{param}"
+                gs_config['param_grid'][prefixed_param] = param_grid_y[param]
 
-        # if 'target_selector__asymmetric_win_reward_weight' in param_grid_y:
-        #     win_reward_weights = param_grid_y['target_selector__asymmetric_win_reward_weight']
-        #     gs_config['param_grid']['y_pipeline__target_selector__asymmetric_win_reward_weight'] = win_reward_weights
+        # Validate asymmetric loss compatibility
+        asymmetric_enabled = self.modeling_config.get('asymmetric_loss', {}).get('enabled', False)
+        threshold_params = [
+            'target_selector__target_variable',
+            'target_selector__target_var_min_threshold',
+            'target_selector__target_var_max_threshold'
+        ]
+
+        conflicting_params = [param for param in threshold_params if param in param_grid_y]
+
+        # Check if asymmetric is enabled in base config OR being grid searched
+        asymmetric_in_grid = 'target_selector__asymmetric_enabled' in param_grid_y
+        asymmetric_params_in_grid = any(param in param_grid_y for param in asymmetric_params[1:])  # Skip enabled flag
+
+        if (asymmetric_enabled or asymmetric_in_grid or asymmetric_params_in_grid) and conflicting_params:
+            raise u.ConfigError(
+                f"Cannot perform grid search on target threshold parameters {conflicting_params} "
+                f"when asymmetric loss is enabled or being grid searched. "
+                f"Remove either asymmetric parameters or threshold parameters from param_grid_y."
+            )
 
 
         # Confirm there are multiple configurations

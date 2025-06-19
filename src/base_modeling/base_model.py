@@ -220,8 +220,7 @@ class BaseModel:
             regressor.fit(
                 X_train_transformed,
                 self.y_train,
-                eval_set=eval_set,
-                sample_weight=sample_weight
+                eval_set=eval_set
             )
         else:
             # Multi-phase training
