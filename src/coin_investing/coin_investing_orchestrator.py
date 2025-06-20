@@ -192,7 +192,7 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
     ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         Generate coin training and validation data for a specific investment cycle by
-        orchestrating coin epochs and loading the resulting multiwindow datasets.
+        orchestrating coin epochs and loading the resulting multiepoch datasets.
 
         Params:
         - investment_cycle_offset (int): Days offset from base modeling period for this cycle

@@ -14,6 +14,7 @@ import pandas as pd
 import wallet_modeling.wallet_epochs_orchestrator as weo
 import wallet_modeling.wallets_config_manager as wcm
 import wallet_modeling.wallet_model as wm
+import base_modeling.pipeline as bp
 import wallet_insights.model_evaluation as wime
 import utils as u
 
@@ -139,6 +140,14 @@ class TemporalGridSearcher:
                 wallet_target_vars_df = pd.read_parquet(f"{base_path}/multioffset_wallet_target_vars_df.parquet")
                 validation_training_data_df = pd.read_parquet(f"{base_path}/multioffset_validation_training_data_df.parquet")
                 validation_target_vars_df = pd.read_parquet(f"{base_path}/multioffset_validation_target_vars_df.parquet")
+
+                # Apply predrop_features logic if configured
+                date_config = self._create_date_config(modeling_date)
+                if date_config['training_data']['predrop_features']:
+                    drop_patterns = date_config['modeling']['feature_selection']['drop_patterns']
+                    col_dropper = bp.DropColumnPatterns(drop_patterns)
+                    wallet_training_data_df = col_dropper.fit_transform(wallet_training_data_df)
+                    validation_training_data_df = col_dropper.fit_transform(validation_training_data_df)
 
                 training_data = (
                     wallet_training_data_df,

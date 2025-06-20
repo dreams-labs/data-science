@@ -114,7 +114,7 @@ def generate_and_upload_wallet_cw_scores(
 
     Params:
     - wallets_config (dict, optional): Configuration dictionary.
-    - training_data_df (DataFrame): Multiwindow wallet training data.
+    - training_data_df (DataFrame): Multioffset wallet training data.
     - complete_hybrid_cw_id_df (DataFrame, optional): Hybrid wallet mapping data.
     - model_id (str): Unique ID of the model to use for prediction.
     - score_name (str): Name of the score being generated.

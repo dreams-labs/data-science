@@ -124,13 +124,13 @@ def select_wallet_features(
      the wallet modeling_period_start matches the current coin_modeling_period_start.
 
     This dataset needs to be flattened separately from the compute_coin_wallet_metrics()
-     output because it includes all wallets included in the multiwindow cohort, whereas
+     output because it includes all wallets included in the multioffset cohort, whereas
      the latter only includes profits_df from the modeling period directly prior to the
-     coin modeling period, meaning that the multiwindow df has a much larger cohort.
+     coin modeling period, meaning that the multioffset df has a much larger cohort.
 
     Params:
     - wallets_coin_config (dict): dict from .yaml file
-    - wallet_training_data_df (DataFrame): wallet training features for the multiwindow
+    - wallet_training_data_df (DataFrame): wallet training features for the multioffset
     period with the modeling_period_start equal to the current coin config's
     coin_modeling_period_start. Aggregated wallet features as of the coin modeling period
     are used as coin-level features.

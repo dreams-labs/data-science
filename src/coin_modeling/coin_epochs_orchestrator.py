@@ -296,7 +296,7 @@ class CoinEpochsOrchestrator:
             return df
 
 
-        # 4. Persist multiwindow parquet files
+        # 4. Persist multiepoch parquet files
         # ------------------------------------
         root_folder = self.wallets_coin_config['training_data']['parquet_folder']
         multiepoch_features = reset_index_codes(multiepoch_features)
