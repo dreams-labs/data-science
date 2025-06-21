@@ -70,17 +70,19 @@ def build_wallet_segmentation(
     # Add wallet_feature-defined segments
     segments_dict = wallets_coin_config['wallet_segments']['wallet_features_segments']
     for segment in segments_dict.keys():
-        for col in segments_dict[segment].keys():
+        segment_df = training_data_df.copy()
 
-            # Identify wallets that meet conditions
+        for col in segments_dict[segment].keys():
+            # Apply cumulative filtering
             min_value = segments_dict[segment][col].get('min_value', -np.inf)
             max_value = segments_dict[segment][col].get('max_value', np.inf)
 
-            segment_cohort = training_data_df[
-                (training_data_df[col]>=min_value) &
-                (training_data_df[col]<=max_value)
-            ].reset_index()['wallet_address']
+            segment_df = segment_df[
+                (segment_df[col] >= min_value) &
+                (segment_df[col] <= max_value)
+            ]
 
+        segment_cohort = segment_df.reset_index()['wallet_address']
         segment_mask = wallet_segmentation_df.index.isin(segment_cohort).astype(int)
         logger.info(f"Defined wallet features segment '{segment}' as {segment_mask.sum()}/{len(segment_mask)} wallets")
 
