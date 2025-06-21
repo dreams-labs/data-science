@@ -1,9 +1,7 @@
 # WalletModel
 investment_cycles: [
-# Long term validation of how well this model's predictions perform
-#  over epochs starting in [30,60,90] days.
-        # 270,
-        # 240,
+    # Long term validation of how well this model's predictions perform
+    #  over epochs starting in [30,60,90] days.
         210,
         180,
         150,
