@@ -1,3 +1,16 @@
+"""
+Functions for retrieving and processing coin metadata from the blockchain.
+
+This module provides utilities to query and format coin-level metadata for downstream modeling.
+It avoids using Coingecko fields to prevent data leakage and survivorship bias. Main steps include:
+
+- Querying blockchain metadata for coins, including supply, decimals, and descriptive flags.
+- Encoding blockchain categories as boolean features for modeling.
+- Returning a DataFrame indexed by coin_id with relevant metadata columns.
+
+These functions support the feature engineering pipeline for coin-level predictive modeling.
+"""
+
 import logging
 import pandas as pd
 from dreams_core.googlecloud import GoogleCloud as dgc
@@ -17,9 +30,10 @@ logger = logging.getLogger(__name__)
 @u.timing_decorator
 def retrieve_metadata_df() -> pd.DataFrame:
     """
-    Returns coin metadata from the blockchain. We cannot use Coingecko fields because
-     a successful coin is more likely to have Coingecko support, categories, etc which
-     will cause data leakage.
+    Returns coin metadata from the blockchain.
+
+    Note that we cannot use core.coingecko_metadata fields because a successful coin is more
+     likely to have Coingecko support, categories, etc which will cause data leakage.
 
     Params:
     - min_txn_size (int): Minimum USD value to filter out dust/airdrops

@@ -1,3 +1,16 @@
+"""
+Functions for generating and aggregating wallet-level metrics into coin-wallet features.
+
+This module provides utilities to compute features at the (coin_id, wallet_address) level,
+including balances and selected wallet training features, for use in downstream coin modeling.
+It includes logic for:
+- Building a MultiIndex DataFrame of coin-wallet pairs with relevant metrics.
+- Calculating starting and ending balances for each wallet-coin pair over a specified period.
+- Selecting and formatting wallet training features to be used as coin-level features.
+
+These functions support the feature engineering pipeline for coin-level predictive modeling.
+"""
+
 import logging
 import pandas as pd
 import utils as u
@@ -20,7 +33,8 @@ def compute_coin_wallet_metrics(
         period_end: str
     ) -> pd.DataFrame:
     """
-    Compute coin-wallet–level metrics: balances and trading metrics.
+    Compute coin-wallet–level metrics including balances and aggregated features from
+     the wallet model training data.
 
     Params:
     - wallets_coin_config (dict): dict from .yaml file
@@ -80,7 +94,7 @@ def compute_coin_wallet_metrics(
 @u.timing_decorator
 def calculate_coin_wallet_ending_balances(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calculate metric value for each wallet-coin pair on specified dates.
+    Calculate starting and ending USD balances for each wallet-coin pair in the period.
 
     Params:
     - profits_df (DataFrame): Input profits data
@@ -142,10 +156,14 @@ def select_wallet_features(
     feature_cols = wallets_coin_config['features']['wallet_features_cols']
     missing_cols = [col for col in feature_cols if col not in wallet_training_data_df.columns]
     if missing_cols:
-        raise ValueError(f"Missing columns in training data: {missing_cols}")
+        logger.warning(f"Non-included columns [{missing_cols} found in "
+                       "wallets_coin_config[features][wallet_features_cols data]: {missing_cols}")
+
+    # Filter out missing columns from feature_cols
+    available_feature_cols = [col for col in feature_cols if col in wallet_training_data_df.columns]
 
     # Select columns
-    wallet_features_df = wallet_training_data_df[feature_cols]
+    wallet_features_df = wallet_training_data_df[available_feature_cols]
 
     # Replace characters for coin feature analysis
     wallet_features_df.columns = (wallet_features_df.columns

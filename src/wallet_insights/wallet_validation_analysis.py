@@ -42,8 +42,9 @@ def load_and_predict(
     Returns:
     - Series: class-1 probabilities for classifiers, else raw preds
     """
-    if not isinstance(model_id,str):
-        raise ValueError(f"Provided model_id of '{model_id}'is not a string.")
+    if not isinstance(model_id, str):
+        raise ValueError(f"Provided model_id of '{model_id}' is not a string.")
+
     pipeline_path = Path(base_path) / 'wallet_models' / f"wallet_model_{model_id}.pkl"
     if not pipeline_path.exists():
         raise FileNotFoundError(f"No pipeline at {pipeline_path}")
@@ -51,10 +52,17 @@ def load_and_predict(
     with open(pipeline_path, 'rb') as f:
         pipeline = cloudpickle.load(f)
 
-    # classifiers live under .model_pipeline, use its predict_proba if available
-    if hasattr(pipeline, "model_pipeline") and hasattr(pipeline.model_pipeline, "predict_proba"):
-        raw_preds = pipeline.model_pipeline.predict_proba(training_data_df)[:, 1]
+    # Use the full pipeline for consistent preprocessing
+    if hasattr(pipeline.estimator, "predict_proba"):
+        # Get probabilities through full pipeline
+        probas = pipeline.predict_proba(training_data_df)
+
+        # Safely get positive class probabilities
+        classes = getattr(pipeline, 'classes_', [0, 1])
+        pos_class_idx = list(classes).index(1) if 1 in classes else -1
+        raw_preds = probas[:, pos_class_idx]
     else:
+        # Fallback to regular prediction
         raw_preds = pipeline.predict(training_data_df)
 
     logger.info(f"Predicted outcomes using model '{model_id}'.")
@@ -109,7 +117,6 @@ def compute_validation_coin_returns(
     complete_market_data_df: pd.DataFrame,
     model_id: str,
     min_inflows: float = 0,
-    n_buckets: int = 20,
     performance_duration: int = 7
 ) -> tuple[pd.Series, pd.Series]:
     """
@@ -149,20 +156,19 @@ def compute_validation_coin_returns(
             start_date,
             end_date
         )
-
         returns_df['epoch_start_date'] = start_date
         returns_df = returns_df.reset_index().set_index(['coin_id','epoch_start_date'])
         returns_dfs.append(returns_df)
-
     coin_returns_df = pd.concat(returns_dfs).sort_index()
 
     # Join hybrid_cw_ids to returns
     validation_y_performance = (
         validation_coin_ids_df.join(coin_returns_df)
-        .reset_index()[['hybrid_cw_id','epoch_start_date','coin_return']]
+        .reset_index()[['coin_id','hybrid_cw_id','epoch_start_date','coin_return']]
         .rename(columns={'hybrid_cw_id': 'wallet_address'})
-        .set_index(['wallet_address','epoch_start_date'])
-    )['coin_return']
+    )
+    validation_y_performance['coin_return'] = u.winsorize(validation_y_performance['coin_return'],0.005)
+
 
     # Make predictions
     validation_y_pred = load_and_predict(
@@ -170,14 +176,7 @@ def compute_validation_coin_returns(
         validation_training_data_df,
         wallets_config['training_data']['model_artifacts_folder']
     )
-    u.assert_matching_indices(validation_y_pred, validation_y_performance)
-
-    # Generate plot
-    wime.plot_prediction_vs_performance(
-        validation_y_pred,
-        validation_y_performance,
-        n_buckets=n_buckets
-    )
+    validation_y_pred.name = 'y_pred'
 
     return validation_y_pred, validation_y_performance
 

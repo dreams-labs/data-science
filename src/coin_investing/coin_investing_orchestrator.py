@@ -116,13 +116,17 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         # Process each cycle concurrently
         n_threads = self.coins_investing_config['n_threads']['investment_cycles']
         with concurrent.futures.ThreadPoolExecutor(max_workers=n_threads) as executor:
-            cycle_scores_dfs = list(executor.map(self._process_single_investment_cycle, investment_cycles))
+            cycle_scores_dfs = []
+            completed_cycles = 0
+            for result in executor.map(self._process_single_investment_cycle, investment_cycles):
+                cycle_scores_dfs.append(result)
+                completed_cycles += 1
+                logger.milestone(f"{completed_cycles}/{len(investment_cycles)} finished processing investment epoch")
 
         coin_scores_df = pd.concat(cycle_scores_dfs, ignore_index=False)
         u.notify('soft_twinkle_musical')
 
         return coin_scores_df
-
 
 
 
@@ -173,7 +177,7 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
 
         # Combine predictions with performance
         cycle_performance_df = coin_returns_df.join(y_pred,how='inner')
-        self._store_model_metrics(cycle_performance_df, model_evaluator)
+        self._store_model_metrics(cycle_performance_df, model_evaluator, buy_date)
 
         # Validate returns completeness
         if len(y_pred) > len(cycle_performance_df):
@@ -234,7 +238,7 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
 
         if (all(p.exists() for p in [training_data_path, training_target_path, val_data_path, val_target_path])
             and not ((self.coins_investing_config.get('training_data') or {})
-                     .get('toggle_overwrite_multioffset_parquet', False))
+                     .get('toggle_overwrite_multiepoch_parquet', False))
             ):
             logger.milestone(
                 "Investment cycle %s: using cached coin training/validation data.",
@@ -344,7 +348,8 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
     def _store_model_metrics(
         self,
         cycle_performance_df: pd.DataFrame,
-        model_evaluator
+        model_evaluator,
+        buy_date: datetime
     ) -> dict:
         """
         Store quantile performance metrics and macro indicators for model evaluation.
@@ -397,7 +402,7 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
 
         json_save_path = (
             f"{self.wallets_coin_config['training_data']['parquet_folder']}/"
-            f"{pd.to_datetime(self.wallets_config['training_data']['coin_modeling_period_start']).strftime('%y%m%d')}/"
+            f"{buy_date.strftime('%y%m%d')}/"
             "coin_model_ids.json"
         )
         with open(json_save_path, 'w', encoding='utf-8') as f:

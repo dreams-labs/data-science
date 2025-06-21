@@ -201,7 +201,7 @@ class CoinTemporalGridSearcher:
                 logger.warning(f"Skipping {modeling_date} - no training data cached")
                 continue
 
-            logger.milestone(f"({i}/{len(self.coin_modeling_dates)}) Running coin grid search for {modeling_date}...")
+            logger.milestone(f"[{i}/{len(self.coin_modeling_dates)}] Running coin grid search for {modeling_date}...")
 
             # Create date-specific modeling config
             date_config = self._create_coin_date_config(modeling_date)
@@ -367,7 +367,7 @@ class CoinTemporalGridSearcher:
                 logger.warning(f"Skipping {modeling_date} - no training data cached")
                 continue
 
-            logger.milestone(f"({i}/{len(self.coin_modeling_dates)}) Building coin model for {modeling_date}...")
+            logger.milestone(f"[{i}/{len(self.coin_modeling_dates)}] Building coin model for {modeling_date}...")
 
             # Create date-specific modeling config with grid search disabled
             date_config = self._create_coin_date_config(modeling_date)

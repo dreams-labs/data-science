@@ -18,11 +18,13 @@ investment_cycles: [
         390,
         420,
         450,
+        480,
+        510,
 ]
 
 # CoinModel
 training_data:
-    toggle_overwrite_parquet: True  # determines whether to load preexisting training_data_dfs
+    toggle_overwrite_multiepoch_parquet: True  # determines whether to load preexisting training_data_dfs
     plot_wallet_model_evaluation: False  # whether to add performance graphs for each coin model
 
 trading:
@@ -30,4 +32,4 @@ trading:
 
 # CoinModel
 n_threads:
-    investment_cycles: 231  # how many investing epochs are calculated concurrently
+    investment_cycles: 4  # how many investing epochs are calculated concurrently

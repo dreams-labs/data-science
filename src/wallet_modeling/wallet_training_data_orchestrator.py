@@ -792,7 +792,7 @@ class WalletTrainingDataOrchestrator:
         wallet_target_vars_df['coin_return_rank'] = pd.Series(
             cw_returns,
             index=wallet_target_vars_df.index
-        ).rank(method='average')
+        ).rank(method='average', pct=True)
 
         return wallet_target_vars_df
 

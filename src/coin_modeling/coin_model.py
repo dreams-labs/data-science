@@ -109,7 +109,7 @@ class CoinModel(BaseModel):
                 == 'coin_validation_auc_scorer'):
 
                 self.modeling_config['grid_search_params']['scoring'] = \
-                    sco.coin_validation_auc_scorer(self)
+                    sco.validation_auc_scorer(self)
 
             # Grid search
             cv_results = self._run_grid_search(self.X_train, self.y_train, pipeline=meta_pipeline)
@@ -198,6 +198,10 @@ class CoinModel(BaseModel):
         # Test set predictions and data
         if return_data:
             self.y_pred = meta_pipeline.predict(self.X_test)
+            # Convert predictions to binary for asymmetric loss
+            if self.modeling_config.get('asymmetric_loss', {}).get('enabled'):
+                self.y_pred = (self.y_pred == 2).astype(int)
+
             result.update({
                 'X_train': self.X_train,
                 'X_test': self.X_test,

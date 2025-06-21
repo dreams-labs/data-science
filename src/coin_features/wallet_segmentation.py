@@ -1,6 +1,16 @@
 """
-Functions for assigning wallets to different segments or cohorts, which can then be
-used to compare metrics between the features.
+Functions for assigning wallets to segments or cohorts for comparative analysis.
+
+This module provides utilities to segment wallets based on scores, quantiles, binary features,
+and clustering. These segmentations enable downstream analysis and feature engineering by
+grouping wallets into meaningful categories for comparison of metrics and model performance.
+
+Main functionalities include:
+- Building wallet segmentation DataFrames with quantiles, binary segments, and cluster labels.
+- Loading and processing wallet scores and residuals.
+- Assigning quantile buckets and cluster labels to wallets.
+- Transforming binary columns for categorical analysis.
+- Adding quantile columns to feature DataFrames for further analysis.
 """
 import logging
 import pandas as pd
@@ -22,7 +32,8 @@ def build_wallet_segmentation(
         wallets_coin_config: dict,
         training_data_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Build wallet segmentation DataFrame with score quantiles and optional clusters.
+    Build a wallet segmentation DataFrame with score quantiles, binary segments, and
+     cluster labels.
 
     Params:
     - wallets_coin_config (dict): dicts from .yaml file
@@ -83,6 +94,8 @@ def build_wallet_segmentation(
 
 def load_wallet_scores(wallets_coin_config: dict) -> pd.DataFrame:
     """
+    Load wallet scores and related columns for all wallets included in the configuration.
+
     Params:
     - wallets_coin_config (dict): config from .yaml file
 
@@ -143,7 +156,7 @@ def load_wallet_scores(wallets_coin_config: dict) -> pd.DataFrame:
 
 def calculate_wallet_quantiles(score_series: pd.Series, quantiles: list[float]) -> pd.DataFrame:
     """
-    Assigns each wallet to a single quantile bucket based on score.
+    Assign each wallet to a quantile bucket based on its score.
 
     Params:
     - score_series (Series): Score values indexed by wallet_address
@@ -245,7 +258,8 @@ def consolidate_duplicate_bins(bin_edges, bin_labels):
 
 def assign_wallet_score_quantiles(wallets_coin_config, wallet_segmentation_df):
     """
-    Generates categorical quantiles for each wallet across each score and residual.
+    Generate categorical quantiles for each wallet across each score, residual, and
+     confidence (if configured).
 
     Params:
     - wallets_coin_config (dict): dict from .yaml file
@@ -316,6 +330,8 @@ def transform_binary_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 def assign_cluster_labels(training_data_df: pd.DataFrame, cluster_groups: list) -> pd.DataFrame:
     """
+    Assign cluster labels to wallets for each specified cluster group.
+
     Params:
     - training_data_df (DataFrame): Training data for clustering
     - n_clusters (list): List of cluster counts to generate
@@ -346,7 +362,7 @@ def assign_cluster_labels(training_data_df: pd.DataFrame, cluster_groups: list) 
 
 def add_feature_quantile_columns(validation_coin_wallet_features_df: pd.DataFrame, n_quantiles: int) -> pd.DataFrame:
     """
-    Adds quantile columns for each base metric in the dataframe.
+    Add quantile columns for each base metric in the DataFrame.
 
     Params:
     - validation_coin_wallet_features_df (DataFrame): Input features dataframe

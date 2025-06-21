@@ -1,5 +1,16 @@
 """
-Functions to flatten wallet-coin features to coin-only
+Functions to flatten wallet-coin features to coin-only features.
+
+This module provides utilities for aggregating and transforming wallet-level metrics
+into coin-level features, supporting downstream coin modeling and analysis. It includes:
+
+- Flattening coin-wallet metrics into coin-level features across wallet segments.
+- Generating coin-level features from wallet-level metrics for specific segments.
+- Calculating aggregation metrics, score-weighted metrics, and distribution metrics
+  (such as percentiles, standard deviation, skewness, and kurtosis) for wallet segments.
+
+These functions enable efficient feature engineering by summarizing wallet activity
+and segment characteristics at the coin level.
 """
 import logging
 from typing import List, Optional
@@ -28,7 +39,7 @@ def flatten_cw_to_coin_segment_features(
     n_threads: Optional[int] = 6
 ) -> pd.DataFrame:
     """
-    Flatten coin-wallet metrics into coin-level features across segments.
+    Flatten coin-wallet metrics into coin-level features across wallet segments.
 
     Params:
     - cw_metrics_df (DataFrame): Trading metrics for wallets in the wallet modeling cohort.
@@ -117,7 +128,8 @@ def flatten_cw_to_coin_features(
     score_distribution_cols: list,
     usd_materiality: float = 20.0
 ) -> pd.DataFrame:
-    """Generate coin-level features from wallet-level metric.
+    """
+    Generate coin-level features from a wallet-level metric for a given segment.
 
     Params:
     - wallet_metric_df (DataFrame): MultiIndexed (coin_id, wallet_address) metrics
@@ -137,6 +149,9 @@ def flatten_cw_to_coin_features(
     # Initialize results with MultiIndex aware groupby
     totals_df = analysis_df.groupby(level='coin_id', observed=True).agg({
         f'{metric_column}': 'sum',
+        f'{metric_column}': 'mean',
+        f'{metric_column}': 'median',
+        f'{metric_column}': 'std',
         segment_family: 'count'
     }).rename(columns={
         f'{metric_column}': f'{segment_family}/total|{metric_column}|aggregations/aggregations/sum',
@@ -222,6 +237,9 @@ def calculate_aggregation_metrics(
         columns = [
             f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/sum',
             f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/count',
+            f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/mean',
+            f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/median',
+            f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/std',
             f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/sum_pct',
             f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/count_pct'
         ]
@@ -232,13 +250,18 @@ def calculate_aggregation_metrics(
         )
 
     metrics = segment_data.groupby(level='coin_id', observed=True).agg({
-        metric_column: 'sum',
+        metric_column: ['sum', 'mean', 'median', 'std'],
         segment_family: 'count'
-    }).rename(columns={
-        metric_column: f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/sum',
-        segment_family: f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/count'
     })
 
+    # Flatten column names
+    metrics.columns = [
+        f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/sum',
+        f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/mean',
+        f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/median',
+        f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/std',
+        f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/count'
+    ]
     # Calculate percentages using Series division with fill_value=np.nan
     sum_col = f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/sum'
     count_col = f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/count'

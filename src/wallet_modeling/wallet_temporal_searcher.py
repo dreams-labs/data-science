@@ -16,6 +16,7 @@ import wallet_modeling.wallets_config_manager as wcm
 import wallet_modeling.wallet_model as wm
 import base_modeling.pipeline as bp
 import wallet_insights.model_evaluation as wime
+import wallet_insights.wallet_model_reporting as wimr
 import utils as u
 
 # Set up logger at the module level
@@ -36,6 +37,8 @@ class TemporalGridSearcher:
         wallets_features_config: dict,
         wallets_epochs_config: dict,
         modeling_dates: List[str],
+        complete_hybrid_cw_id_df: pd.DataFrame,
+        complete_market_data_df: pd.DataFrame,
     ):
         """
         Initialize the multi-temporal grid search orchestrator.
@@ -63,6 +66,10 @@ class TemporalGridSearcher:
         self.consolidated_results = None
         self.model_comparison_results = None
 
+        # Complete dfs for analysis
+        self.complete_hybrid_cw_id_df = complete_hybrid_cw_id_df
+        self.complete_market_data_df = complete_market_data_df
+
 
 
     # ---------------------------------
@@ -72,47 +79,99 @@ class TemporalGridSearcher:
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def generate_all_training_data(self) -> None:
         """
-        Generate training data for all specified modeling dates.
+        Generate training data for all specified modeling dates using multithreading.
         Caches results for subsequent grid search experiments.
         """
         logger.milestone(f"Generating training data for {len(self.modeling_dates)} time periods...")
         u.notify('robotz_windows_exit')
 
-        for i, modeling_date in enumerate(self.modeling_dates, 1):
+        max_workers = self.wallets_investing_config['n_threads']['training_data_loading']
 
-            # Check if data already exists and skip if not forcing regeneration
-            if not self.force_regenerate_data and self._check_data_exists(modeling_date):
-                logger.info(f"[{i}/{len(self.modeling_dates)}] Skipping {modeling_date} - data already exists")
-                continue
+        def generate_single_date(modeling_date: str) -> tuple:
+            """Generate training data for a single modeling date."""
+            try:
+                # Check if data already exists and skip if not forcing regeneration
+                if not self.force_regenerate_data and self._check_data_exists(modeling_date):
+                    return modeling_date, "skipped", None
 
-            # Warn if forcing regeneration of existing data
-            if self.force_regenerate_data and self._check_data_exists(modeling_date):
-                logger.warning(f"[{i}/{len(self.modeling_dates)}] Force regenerating existing data for {modeling_date}")
+                # Warn if forcing regeneration of existing data
+                if self.force_regenerate_data and self._check_data_exists(modeling_date):
+                    logger.warning(f"Force regenerating existing data for {modeling_date}")
 
-            logger.milestone(f"[{i}/{len(self.modeling_dates)}] Generating data for {modeling_date}...")
+                # Create date-specific config
+                date_config = self._create_date_config(modeling_date)
 
-            # Create date-specific config
-            date_config = self._create_date_config(modeling_date)
+                # Initialize orchestrator for this date
+                epochs_orchestrator = weo.WalletEpochsOrchestrator(
+                    date_config,
+                    self.wallets_metrics_config,
+                    self.wallets_features_config,
+                    self.wallets_epochs_config,
+                )
 
-            # Initialize orchestrator for this date
-            epochs_orchestrator = weo.WalletEpochsOrchestrator(
-                date_config,
-                self.wallets_metrics_config,
-                self.wallets_features_config,
-                self.wallets_epochs_config,
-            )
+                # Load complete datasets
+                epochs_orchestrator.load_complete_raw_datasets()
 
-            # Load complete datasets
-            epochs_orchestrator.load_complete_raw_datasets()
+                # Generate training data
+                epochs_orchestrator.generate_epochs_training_data()
 
-            # Generate training data
-            epochs_orchestrator.generate_epochs_training_data()
+                # Clear memory
+                del epochs_orchestrator
+                gc.collect()
 
-            # Clear memory
-            del epochs_orchestrator
-            gc.collect()
+                return modeling_date, "generated", None
 
-        logger.milestone("Completed training data generation for all periods")
+            except Exception as e:
+                return modeling_date, "failed", e
+
+        # Execute parallel generation
+        failed_dates = []
+        skipped_count = 0
+        generated_count = 0
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all tasks
+            future_to_date = {
+                executor.submit(generate_single_date, modeling_date): modeling_date
+                for modeling_date in self.modeling_dates
+            }
+
+            # Collect results as they complete
+            for i, future in enumerate(as_completed(future_to_date), 1):
+                modeling_date = future_to_date[future]
+
+                try:
+                    date, status, error = future.result()
+
+                    if error is not None:
+                        failed_dates.append((modeling_date, error))
+                        continue
+
+                    if status == "skipped":
+                        skipped_count += 1
+                        logger.info(f"[{i}/{len(self.modeling_dates)}] Skipping {modeling_date} - data already exists")
+                    elif status == "generated":
+                        generated_count += 1
+                        logger.info(f"[{i}/{len(self.modeling_dates)}] Generated data for {modeling_date}")
+
+                except Exception as e:
+                    failed_dates.append((modeling_date, e))
+
+        # Handle any failures
+        if failed_dates:
+            error_details = "\n".join([f"  {date}: {error}" for date, error in failed_dates])
+            logger.error(f"Failed to generate training data for {len(failed_dates)} dates:\n{error_details}")
+
+            # Raise error for the first failure
+            first_failed_date, first_error = failed_dates[0]
+            raise RuntimeError(
+                f"Training data generation failed for {first_failed_date}. "
+                f"Check logs for details."
+            ) from first_error
+
+        logger.milestone(f"Training data generation completed using {max_workers} threads. "
+                        f"Generated: {generated_count}, Skipped: {skipped_count}, Failed: {len(failed_dates)}")
+
 
 
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
@@ -134,12 +193,21 @@ class TemporalGridSearcher:
             date_str = datetime.strptime(modeling_date, '%Y-%m-%d').strftime('%y%m%d')
 
             try:
-                # Load all four DataFrames for this date
+                # Load all four DataFrames for this date   # pylint:disable=line-too-long
                 base_path = f"{parquet_folder}/{date_str}"
                 wallet_training_data_df = pd.read_parquet(f"{base_path}/multioffset_wallet_training_data_df.parquet")
                 wallet_target_vars_df = pd.read_parquet(f"{base_path}/multioffset_wallet_target_vars_df.parquet")
                 validation_training_data_df = pd.read_parquet(f"{base_path}/multioffset_validation_training_data_df.parquet")
                 validation_target_vars_df = pd.read_parquet(f"{base_path}/multioffset_validation_target_vars_df.parquet")
+
+                wallet_target_vars_df['cw_coin_return_rank'] = pd.Series(
+                    wallet_target_vars_df['cw_coin_return'],
+                    index=wallet_target_vars_df.index
+                ).rank(method='average', pct=True)
+                validation_target_vars_df['cw_coin_return_rank'] = pd.Series(
+                    validation_target_vars_df['cw_coin_return'],
+                    index=validation_target_vars_df.index
+                ).rank(method='average', pct=True)
 
                 # Apply predrop_features logic if configured
                 date_config = self._create_date_config(modeling_date)
@@ -211,7 +279,8 @@ class TemporalGridSearcher:
                 f"Run generate_all_training_data() first or set force_regenerate_data=True"
             ) from first_error
 
-        logger.milestone(f"Successfully loaded training data for {len(self.modeling_dates)} periods using {max_workers} threads")
+        logger.milestone(f"Successfully loaded training data for {len(self.modeling_dates)} "
+                         "periods using {max_workers} threads")
 
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def run_multi_temporal_grid_search(self) -> None:
@@ -234,7 +303,7 @@ class TemporalGridSearcher:
                 logger.warning(f"Skipping {modeling_date} - no training data cached")
                 continue
 
-            logger.milestone(f"({i}/{len(self.modeling_dates)}) Running grid search for {modeling_date}...")
+            logger.milestone(f"[{i}/{len(self.modeling_dates)}] Running grid search for {modeling_date}...")
 
             # Create date-specific modeling config
             date_config = self._create_date_config(modeling_date)
@@ -378,7 +447,7 @@ class TemporalGridSearcher:
         self.consolidated_results = consolidated_df
 
         # Log baseline information
-        baseline_summary = {date: round(baseline, 4) for date, baseline in period_baselines.items()}
+        baseline_summary = {date: round(baseline, 3) for date, baseline in period_baselines.items()}
         logger.info(f"Period-specific baselines: {baseline_summary}")
         logger.info(f"Consolidated results: {len(consolidated_df)} unique parameter combinations "
                 f"across {len(date_columns)} time periods")
@@ -575,10 +644,19 @@ class TemporalGridSearcher:
     # ----------------------------------
 
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
-    def run_multi_temporal_model_comparison(self) -> pd.DataFrame:
+    def run_multi_temporal_model_comparison(
+        self,
+        score_filter: float = 0.2,
+        min_scores: int = 10,
+    ) -> pd.DataFrame:
         """
         Build models for each time period using base parameters (no grid search)
         and consolidate their performance metrics for comparison.
+
+        Params:
+        - score_filter (float): reporting chart wallet cohort minimum prediction score threshold
+        - min_scores (int): reporting chart coin cohort minimum number of scores per coin
+
 
         Returns:
         - comparison_df: DataFrame with performance metrics across all time periods
@@ -587,7 +665,6 @@ class TemporalGridSearcher:
             raise ValueError("No training data loaded. Call load_all_training_data() first")
 
         logger.milestone(f"Building and evaluating models across {len(self.modeling_dates)} time periods...")
-        u.notify('startup')
 
         performance_results = {}
 
@@ -598,7 +675,7 @@ class TemporalGridSearcher:
                 logger.warning(f"Skipping {modeling_date} - no training data cached")
                 continue
 
-            logger.milestone(f"({i}/{len(self.modeling_dates)}) Building model for {modeling_date}...")
+            logger.milestone(f"[{i}/{len(self.modeling_dates)}] Building model for {modeling_date}...")
 
             # Create date-specific modeling config with grid search disabled
             date_config = self._create_date_config(modeling_date)
@@ -612,23 +689,42 @@ class TemporalGridSearcher:
             wallet_model_results = wallet_model.construct_wallet_model(*training_data)
 
             # Generate evaluator and extract metrics
-            model_type = wallet_model_results['model_type']
-            if model_type == 'classification':
-                evaluator = wime.ClassifierEvaluator(wallet_model_results)
-            elif model_type == 'regression':
-                evaluator = wime.RegressorEvaluator(wallet_model_results)
-            else:
-                raise ValueError(f"Unsupported model type: {model_type}")
+            model_id, evaluator, _ = wimr.generate_and_save_wallet_model_artifacts(
+                model_results=wallet_model_results,
+                base_path='../artifacts/wallet_modeling',
+                configs = {
+                    'wallets_config': date_config,
+                    'wallets_investing_config': self.wallets_investing_config,
+                    'wallets_metrics_config': self.wallets_metrics_config,
+                    'wallets_features_config': self.wallets_features_config,
+                    'wallets_epochs_config': self.wallets_epochs_config,
+                }
+            )
 
             # Store performance metrics for this period
             performance_results[date_str] = {
                 'modeling_date': modeling_date,
-                'model_type': model_type,
+                'model_type': wallet_model_results['model_type'],
                 **self._extract_performance_metrics(evaluator)
             }
 
             evaluator.summary_report()
-            evaluator.plot_wallet_evaluation()
+
+            if self.wallets_investing_config['training_data']['toggle_graph_wallet_performance']:
+                evaluator.plot_wallet_evaluation()
+                validation_training_data_df = training_data[2]
+                validation_target_vars_df = training_data[3]
+                wime.run_validation_analysis(
+                    date_config,
+                    validation_training_data_df,
+                    validation_target_vars_df,
+                    self.complete_hybrid_cw_id_df,
+                    self.complete_market_data_df,
+                    model_id,
+                    score_filter,
+                    min_scores
+                )
+
 
             logger.info(f"Model completed for {modeling_date}")
 
@@ -692,30 +788,30 @@ class TemporalGridSearcher:
         # Test set metrics (if available)
         if hasattr(evaluator, 'train_test_data_provided') and evaluator.train_test_data_provided:
             metrics.update({
-                'test_accuracy': round(evaluator.metrics.get('accuracy', 0), 4),
-                'test_precision': round(evaluator.metrics.get('precision', 0), 4),
-                'test_recall': round(evaluator.metrics.get('recall', 0), 4),
-                'test_f1': round(evaluator.metrics.get('f1', 0), 4),
-                'test_roc_auc': round(evaluator.metrics.get('roc_auc', 0), 4),
+                'test_accuracy': round(evaluator.metrics.get('accuracy', 0), 3),
+                'test_precision': round(evaluator.metrics.get('precision', 0), 3),
+                'test_recall': round(evaluator.metrics.get('recall', 0), 3),
+                'test_f1': round(evaluator.metrics.get('f1', 0), 3),
+                'test_roc_auc': round(evaluator.metrics.get('roc_auc', 0), 3),
             })
 
         # Validation set metrics (if available)
         if hasattr(evaluator, 'validation_data_provided') and evaluator.validation_data_provided:
             metrics.update({
-                'val_accuracy': round(evaluator.metrics.get('val_accuracy', 0), 4),
-                'val_precision': round(evaluator.metrics.get('val_precision', 0), 4),
-                'val_recall': round(evaluator.metrics.get('val_recall', 0), 4),
-                'val_f1': round(evaluator.metrics.get('val_f1', 0), 4),
-                'val_roc_auc': round(evaluator.metrics.get('val_roc_auc', 0), 4),
-                'val_ret_mean_overall': round(evaluator.metrics.get('val_ret_mean_overall', 0), 4),
-                'val_ret_mean_top1': round(evaluator.metrics.get('val_ret_mean_top1', 0), 4),
-                'val_ret_mean_top5': round(evaluator.metrics.get('val_ret_mean_top5', 0), 4),
-                'positive_pred_return': round(evaluator.metrics.get('positive_pred_return', 0), 4),
+                'val_accuracy': round(evaluator.metrics.get('val_accuracy', 0), 3),
+                'val_precision': round(evaluator.metrics.get('val_precision', 0), 3),
+                'val_recall': round(evaluator.metrics.get('val_recall', 0), 3),
+                'val_f1': round(evaluator.metrics.get('val_f1', 0), 3),
+                'val_roc_auc': round(evaluator.metrics.get('val_roc_auc', 0), 3),
+                'val_ret_mean_overall': round(evaluator.metrics.get('val_ret_mean_overall', 0), 3),
+                'val_ret_mean_top1': round(evaluator.metrics.get('val_ret_mean_top1', 0), 3),
+                'val_ret_mean_top5': round(evaluator.metrics.get('val_ret_mean_top5', 0), 3),
+                'positive_pred_return': round(evaluator.metrics.get('positive_pred_return', 0), 3),
             })
 
             # Threshold information
             if 'y_pred_threshold' in evaluator.metrics:
-                metrics['y_pred_threshold'] = round(evaluator.metrics['y_pred_threshold'], 4)
+                metrics['y_pred_threshold'] = round(evaluator.metrics['y_pred_threshold'], 3)
 
         return metrics
 
@@ -727,28 +823,28 @@ class TemporalGridSearcher:
         # Test set metrics (if available)
         if hasattr(evaluator, 'train_test_data_provided') and evaluator.train_test_data_provided:
             metrics.update({
-                'test_r2': round(evaluator.metrics.get('r2', 0), 4),
-                'test_rmse': round(evaluator.metrics.get('rmse', 0), 4),
-                'test_mae': round(evaluator.metrics.get('mae', 0), 4),
+                'test_r2': round(evaluator.metrics.get('r2', 0), 3),
+                'test_rmse': round(evaluator.metrics.get('rmse', 0), 3),
+                'test_mae': round(evaluator.metrics.get('mae', 0), 3),
             })
 
         # Validation set metrics (if available)
         if 'validation_metrics' in evaluator.metrics:
             vm = evaluator.metrics['validation_metrics']
             metrics.update({
-                'val_r2': round(vm.get('r2', 0), 4),
-                'val_rmse': round(vm.get('rmse', 0), 4),
-                'val_mae': round(vm.get('mae', 0), 4),
-                'val_spearman': round(vm.get('spearman', 0), 4),
-                'val_top1pct_mean': round(vm.get('top1pct_mean', 0), 4),
+                'val_r2': round(vm.get('r2', 0), 3),
+                'val_rmse': round(vm.get('rmse', 0), 3),
+                'val_mae': round(vm.get('mae', 0), 3),
+                'val_spearman': round(vm.get('spearman', 0), 3),
+                'val_top1pct_mean': round(vm.get('top1pct_mean', 0), 3),
             })
 
         # Training cohort metrics (if available)
         if 'training_cohort' in evaluator.metrics:
             tc = evaluator.metrics['training_cohort']
             metrics.update({
-                'training_cohort_r2': round(tc.get('r2', 0), 4),
-                'training_cohort_rmse': round(tc.get('rmse', 0), 4),
+                'training_cohort_r2': round(tc.get('r2', 0), 3),
+                'training_cohort_rmse': round(tc.get('rmse', 0), 3),
             })
 
         return metrics
@@ -761,31 +857,41 @@ class TemporalGridSearcher:
         Params:
         - comparison_df: DataFrame with performance metrics for each time period
         """
-        # Identify numeric metric columns (exclude metadata columns)
-        metadata_cols = ['date_str', 'modeling_date', 'model_type', 'n_features'] + \
-                    [col for col in comparison_df.columns if col.startswith('top_feature_')]
-        numeric_cols = [col for col in comparison_df.columns if col not in metadata_cols]
+        # Exclude SUMMARY row if it already exists and metadata columns
+        data_rows = comparison_df[comparison_df['date_str'] != 'SUMMARY'].copy()
+        metadata_cols = ['date_str', 'modeling_date', 'model_type']
 
-        # Calculate summary statistics for numeric columns
-        summary_stats = {}
-        for col in numeric_cols:
-            if comparison_df[col].dtype in ['float64', 'int64'] and not comparison_df[col].isna().all():
-                values = comparison_df[col].dropna()
-                if len(values) > 0:
-                    summary_stats[f'{col}_mean'] = round(values.mean(), 4)
-                    summary_stats[f'{col}_std'] = round(values.std(), 4)
-                    summary_stats[f'{col}_min'] = round(values.min(), 4)
-                    summary_stats[f'{col}_max'] = round(values.max(), 4)
-                    # Coefficient of variation for stability assessment
-                    if values.mean() != 0:
-                        summary_stats[f'{col}_cv'] = round(values.std() / abs(values.mean()), 4)
+        # Initialize summary row with metadata
+        summary_data = {
+            'date_str': 'SUMMARY',
+            'modeling_date': 'ACROSS_ALL_PERIODS',
+            'model_type': data_rows['model_type'].iloc[0] if len(data_rows) > 0 else 'classification'
+        }
 
-        # Add summary row
-        summary_row = {'date_str': 'SUMMARY', 'modeling_date': 'ACROSS_ALL_PERIODS',
-                    'model_type': comparison_df['model_type'].iloc[0], **summary_stats}
+        # Calculate means for all numeric columns
+        for col in data_rows.columns:
+            if col not in metadata_cols:
+                # Convert to numeric, coercing errors to NaN
+                numeric_series = pd.to_numeric(data_rows[col], errors='coerce')
 
-        # Append summary row to DataFrame
-        comparison_df.loc[len(comparison_df)] = summary_row
+                # Calculate mean only if there are valid values
+                valid_values = numeric_series.dropna()
+                if len(valid_values) > 0:
+                    summary_data[col] = round(valid_values.mean(), 4)
+                else:
+                    summary_data[col] = None  # Use None instead of NaN for cleaner display
+
+        # Remove existing summary row if present
+        comparison_df_clean = comparison_df[comparison_df['date_str'] != 'SUMMARY'].copy()
+
+        # Add the new summary row
+        comparison_df_clean.loc[len(comparison_df_clean)] = summary_data
+
+        # Update the original DataFrame
+        comparison_df.drop(comparison_df.index, inplace=True)
+        comparison_df.update(comparison_df_clean)
+        for i, row in comparison_df_clean.iterrows():
+            comparison_df.loc[i] = row
 
 
     def display_model_comparison_summary(self) -> None:
