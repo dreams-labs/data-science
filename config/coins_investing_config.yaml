@@ -15,9 +15,9 @@ investment_cycles: [
         300,
         330,
         360,
-        390,
-        420,
-        450,
+        # 390,
+        # 420,
+        # 450,
 ]
 
 # CoinModel
@@ -30,4 +30,4 @@ trading:
 
 # CoinModel
 n_threads:
-    investment_cycles: 231  # how many investing epochs are calculated concurrently
+    investment_cycles: 1  # how many investing epochs are calculated concurrently
