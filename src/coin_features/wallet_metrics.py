@@ -159,8 +159,11 @@ def select_wallet_features(
         logger.warning(f"Non-included columns [{missing_cols} found in "
                        "wallets_coin_config[features][wallet_features_cols data]: {missing_cols}")
 
+    # Filter out missing columns from feature_cols
+    available_feature_cols = [col for col in feature_cols if col in wallet_training_data_df.columns]
+
     # Select columns
-    wallet_features_df = wallet_training_data_df[feature_cols]
+    wallet_features_df = wallet_training_data_df[available_feature_cols]
 
     # Replace characters for coin feature analysis
     wallet_features_df.columns = (wallet_features_df.columns

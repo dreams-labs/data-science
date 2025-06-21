@@ -534,9 +534,9 @@ modeling: #WalletModel
 
 
         #KeyParam Grid Search Toggle
-# ===========================================================================================================================================
+ # ===========================================================================================================================================
         # enabled: True
-# ===========================================================================================================================================
+ # ===========================================================================================================================================
 
 
 
@@ -685,7 +685,7 @@ data_cleaning: #WalletModel
     # Market cap params used vs market_cap_filled
     min_initial_market_cap: 0_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
     max_initial_market_cap: 1_000_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
-    min_ending_market_cap: 5_000_000  # coins above this market cap as of the end of the training period will be removed from all datasets
+    min_ending_market_cap: 2_000_000  # coins above this market cap as of the end of the training period will be removed from all datasets
     max_ending_market_cap: 1_000_000_000  # coins above this market cap as of the end of the training period will be removed from all datasets
     max_gap_days: 7  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
     min_daily_volume: 10000 # Minimum average daily volume the coin must have
@@ -763,5 +763,5 @@ n_threads: #WalletModel
     profits_row_imputation: 6  # generates imputed rows in profits_df
     training_dfs_preparation: 3  # generates market indicators, macro indicators, cohort profits dfs
     epoch_tm_features: 2  # determines whether training and modeling features are generated concurrently or sequentially
-    concurrent_epochs: 12  # how many epochs' training data are processed concurrently
+    concurrent_epochs: 8  # how many epochs' training data are processed concurrently
     concurrent_windows: 8  # how many windows are processed concurrently
