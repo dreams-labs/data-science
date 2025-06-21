@@ -438,12 +438,11 @@ def aggregate_feature_importance(
     feature_importance_data = defaultdict(list)
 
     for json_path in json_files:
-        epoch_date = json_path.parent.name
 
         with open(json_path, 'r', encoding='utf-8') as f:
             models_dict = json.load(f)
 
-        for model_name, model_data in models_dict.items():
+        for _, model_data in models_dict.items():
             # Check if importances exist
             if 'metrics' not in model_data or 'importances' not in model_data['metrics']:
                 continue

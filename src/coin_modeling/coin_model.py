@@ -109,7 +109,7 @@ class CoinModel(BaseModel):
                 == 'coin_validation_auc_scorer'):
 
                 self.modeling_config['grid_search_params']['scoring'] = \
-                    sco.coin_validation_auc_scorer(self)
+                    sco.validation_auc_scorer(self)
 
             # Grid search
             cv_results = self._run_grid_search(self.X_train, self.y_train, pipeline=meta_pipeline)
