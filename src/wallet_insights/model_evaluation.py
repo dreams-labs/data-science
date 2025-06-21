@@ -420,9 +420,20 @@ class RegressorEvaluator:
         else:
             class_threshold_str = ''
 
+        # If asymmetric loss, override the target var
+        if self.modeling_config['asymmetric_loss'].get('enabled',False):
+            target_var_str = (f"Asymmetric Target: {self.modeling_config['target_variable']}",
+                              f"    Win Thr: {self.modeling_config['asymmetric_loss']['big_win_threshold']} "
+                                f"(weight {self.modeling_config['asymmetric_loss']['win_reward_weight']})",
+                              f"    Loss Thr: {self.modeling_config['asymmetric_loss']['big_loss_threshold']} "
+                                f"(weight {self.modeling_config['asymmetric_loss']['loss_penalty_weight']})",
+                                )
+        else:
+            target_var_str = f"Target: {self.modeling_config['target_variable']} {class_threshold_str}"
+
         header = [
             "Model Performance Summary",
-            f"Target: {self.modeling_config['target_variable']} {class_threshold_str}",
+            target_var_str,
             f"ID: {self.model_id}",
             "=" * 35,
         ]
@@ -1834,7 +1845,7 @@ def analyze_validation_performance(
     bucket_edges = np.linspace(0, 1, n_buckets + 1)
     val_agg_df['pred_bucket'] = pd.cut(val_agg_df[y_pred_col], bins=bucket_edges, include_lowest=True)
 
-    bucket_stats = val_agg_df.groupby('pred_bucket').agg({
+    bucket_stats = val_agg_df.groupby('pred_bucket', observed=True).agg({
         'coin_return': 'mean',
         'coin_id': 'count'
     }).reset_index()
