@@ -433,6 +433,7 @@ class RegressorEvaluator:
 
         header = [
             "Model Performance Summary",
+            f"Objective: {self.model.get_params()['objective']}",
             target_var_str,
             f"ID: {self.model_id}",
             "=" * 35,
