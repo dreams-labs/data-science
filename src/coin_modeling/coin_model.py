@@ -198,6 +198,10 @@ class CoinModel(BaseModel):
         # Test set predictions and data
         if return_data:
             self.y_pred = meta_pipeline.predict(self.X_test)
+            # Convert predictions to binary for asymmetric loss
+            if self.modeling_config.get('asymmetric_loss', {}).get('enabled'):
+                self.y_pred = (self.y_pred == 2).astype(int)
+
             result.update({
                 'X_train': self.X_train,
                 'X_test': self.X_test,
