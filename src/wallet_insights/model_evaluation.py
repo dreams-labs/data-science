@@ -3,7 +3,7 @@ from typing import List
 import textwrap
 import pandas as pd
 import numpy as np
-from scipy.stats import chi2_contingency, spearmanr
+from scipy.stats import chi2_contingency, spearmanr, linregress
 import seaborn as sns
 import matplotlib
 import matplotlib.pyplot as plt
@@ -24,6 +24,7 @@ from sklearn.metrics import (
     RocCurveDisplay,
 )
 from dreams_core import core as dc
+import wallet_insights.wallet_validation_analysis as wiva
 import utils as u
 
 matplotlib.rcParams['text.usetex'] = False
@@ -1468,7 +1469,12 @@ class ClassifierEvaluator(RegressorEvaluator):
         # Define equal-width score bins
         try:
             score_min, score_max = df["proba"].min(), df["proba"].max()
-            bin_edges = np.linspace(score_min, score_max, n_buckets + 1)
+            if 0 < score_min <= score_max < 1:
+                # if boundaries are between 0 and 1, set buckets at 0.05 intervals
+                bin_edges = np.linspace(0, 1, n_buckets + 1)
+            else:
+                # otherwise, use the min/max to set boundaries
+                bin_edges = np.linspace(score_min, score_max, n_buckets + 1)
             df["score_bin"] = pd.cut(df["proba"], bins=bin_edges, include_lowest=True)
         except ValueError:
             return pd.DataFrame()
@@ -1644,7 +1650,7 @@ class ClassifierEvaluator(RegressorEvaluator):
 def plot_prediction_vs_performance(
         validation_y_pred: pd.Series,
         validation_y_performance: pd.Series,
-        n_buckets: int = 20):
+        n_buckets: int = 10):
     """
     Plot prediction scores vs financial performance with dual y-axes.
 
@@ -1754,3 +1760,163 @@ def plot_prediction_vs_performance(
     ax.legend(lines1 + lines2, labels1 + labels2, loc="upper left")
 
     return ax
+
+
+def analyze_validation_performance(
+        validation_y_performance: pd.DataFrame,
+        validation_y_pred: pd.DataFrame,
+        score_filter: float = 0.05,
+        min_scores: int = 5,
+        y_pred_col: str = 'y_pred_median',
+        n_buckets: int = 10
+    ) -> None:
+    """
+    Params:
+    - validation_y_performance (DataFrame): validation performance data
+    - validation_y_pred (DataFrame): validation predictions data
+    - score_filter (float): minimum prediction score threshold
+    - min_scores (int): minimum number of scores per coin
+    - y_pred_col (str): prediction column to use ('y_pred_median' or 'y_pred_mean')
+    - n_buckets (int): number of prediction buckets for analysis
+
+    Returns:
+    - val_agg_df (DataFrame): aggregated validation data with dual plots
+    """
+
+    # Join performance and predictions
+    validation_coin_performance_df = (validation_y_performance
+                                      .set_index(['wallet_address','epoch_start_date'])
+                                      .join(validation_y_pred)
+                                      .reset_index())
+
+    # Apply score filter
+    validation_coin_performance_df = validation_coin_performance_df[
+        validation_coin_performance_df['y_pred'] >= score_filter]
+
+    # Aggregate by coin
+    val_agg_df = validation_coin_performance_df.groupby('coin_id', observed=True).agg(
+        coin_return=('coin_return', 'first'),
+        y_pred_mean=('y_pred', 'mean'),
+        y_pred_median=('y_pred', 'median'),
+        y_pred_count=('y_pred', 'count')
+    ).reset_index()
+
+    # Apply minimum scores filter
+    val_agg_df = val_agg_df[val_agg_df['y_pred_count'] >= min_scores]
+
+    # Check if we have any data after filtering
+    if val_agg_df.empty:
+        print(f"No records above threshold (filter≥{score_filter}, min_scores≥{min_scores})")
+        return
+
+    # Create side-by-side plots
+    _, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+
+    # Left plot: Hexbin scatter
+    hb = ax1.hexbin(val_agg_df[y_pred_col], val_agg_df['coin_return'],
+                    gridsize=100, cmap='Blues', mincnt=1)
+    plt.colorbar(hb, ax=ax1, label='Count')
+
+    # Add trendline
+    slope, intercept, r_value, _, _ = linregress(
+        val_agg_df[y_pred_col], val_agg_df['coin_return'])
+    line_x = np.array([val_agg_df[y_pred_col].min(), val_agg_df[y_pred_col].max()])
+    line_y = slope * line_x + intercept
+    ax1.plot(line_x, line_y, 'r-', linewidth=2, alpha=0.8,
+             label=f'Slope = {slope:.3f}, R² = {r_value**2:.3f}')
+
+    ax1.set_xlabel(f'{y_pred_col.replace("_", " ").title()}')
+    ax1.set_ylabel('Coin Return')
+    ax1.set_title('Prediction vs Actual Return Density')
+    ax1.legend()
+
+    # Right plot: Bucketed analysis
+    bucket_edges = np.linspace(0, 1, n_buckets + 1)
+    val_agg_df['pred_bucket'] = pd.cut(val_agg_df[y_pred_col], bins=bucket_edges, include_lowest=True)
+
+    bucket_stats = val_agg_df.groupby('pred_bucket').agg({
+        'coin_return': 'mean',
+        'coin_id': 'count'
+    }).reset_index()
+
+    bucket_stats['bucket_midpoint'] = bucket_stats['pred_bucket'].apply(lambda x: x.mid)
+
+    # Bar chart for count
+    ax2.bar(bucket_stats['bucket_midpoint'], bucket_stats['coin_id'],
+            alpha=0.6, width=0.04, color='lightblue', label='Count')
+    ax2.set_xlabel(f'{y_pred_col.replace("_", " ").title()} (Bucket)')
+    ax2.set_ylabel('Count of Coins')
+    ax2.tick_params(axis='y')
+
+    # Line chart for returns on second y-axis
+    ax3 = ax2.twinx()
+    ax3.plot(bucket_stats['bucket_midpoint'], bucket_stats['coin_return'],
+             color='red', marker='o', linewidth=2, label='Mean Return')
+    ax3.set_ylabel('Mean Coin Return')
+    ax3.tick_params(axis='y')
+
+    ax2.set_title('Prediction Buckets: Count vs Mean Return')
+
+    plt.suptitle(f'Validation Analysis (filter≥{score_filter}, min_scores≥{min_scores})')
+    plt.tight_layout()
+    plt.show()
+
+
+def run_validation_analysis(
+        wallets_config: dict,
+        validation_training_data_df: pd.DataFrame,
+        validation_target_vars_df: pd.DataFrame,
+        complete_hybrid_cw_id_df: pd.DataFrame,
+        complete_market_data_df: pd.DataFrame,
+        model_id: str,
+        score_filter: float = 0.2,
+        min_scores: int = 10,
+        y_pred_col: str = 'y_pred_mean',
+        n_buckets: int = 10,
+        prediction_buckets: int = 10
+    ) -> None:
+    """
+    Params:
+    - wallets_config (dict): wallet configuration parameters
+    - validation_training_data_df (DataFrame): validation training data
+    - validation_target_vars_df (DataFrame): validation target variables
+    - complete_hybrid_cw_id_df (DataFrame): complete hybrid coin-wallet ID data
+    - complete_market_data_df (DataFrame): complete market data
+    - model_id (str): model identifier
+    - score_filter (float): minimum prediction score threshold
+    - min_scores (int): minimum number of scores per coin
+    - y_pred_col (str): prediction column to use
+    - n_buckets (int): number of buckets for validation analysis
+    - prediction_buckets (int): number of buckets for prediction vs performance plot
+
+    Returns:
+    - tuple: (validation_y_pred, validation_y_performance, val_agg_df)
+    """
+
+    # Compute validation coin returns
+    validation_y_pred, validation_y_performance = wiva.compute_validation_coin_returns(
+        wallets_config,
+        validation_training_data_df,
+        validation_target_vars_df,
+        complete_hybrid_cw_id_df,
+        complete_market_data_df,
+        model_id,
+        performance_duration=wallets_config['training_data']['modeling_period_duration']
+    )
+
+    # Plot prediction vs performance
+    plot_prediction_vs_performance(
+        validation_y_pred,
+        validation_y_performance.set_index(['wallet_address','epoch_start_date'])['coin_return'],
+        n_buckets=prediction_buckets
+    )
+
+    # Analyze validation performance
+    analyze_validation_performance(
+        validation_y_performance,
+        validation_y_pred,
+        score_filter=score_filter,
+        min_scores=min_scores,
+        y_pred_col=y_pred_col,
+        n_buckets=n_buckets
+    )
