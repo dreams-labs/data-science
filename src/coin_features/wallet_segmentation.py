@@ -67,6 +67,26 @@ def build_wallet_segmentation(
     if wallets_coin_config['wallet_segments']['wallet_scores_binary_segments']:
         wallet_segmentation_df = transform_binary_columns(wallet_segmentation_df)
 
+    # Add wallet_feature-defined segments
+    segments_dict = wallets_coin_config['wallet_segments']['wallet_features_segments']
+    for segment in segments_dict.keys():
+        for col in segments_dict[segment].keys():
+
+            # Identify wallets that meet conditions
+            min_value = segments_dict[segment][col].get('min_value', -np.inf)
+            max_value = segments_dict[segment][col].get('max_value', np.inf)
+
+            segment_cohort = training_data_df[
+                (training_data_df[col]>=min_value) &
+                (training_data_df[col]<=max_value)
+            ].reset_index()['wallet_address']
+
+        segment_mask = wallet_segmentation_df.index.isin(segment_cohort).astype(int)
+        logger.info(f"Defined wallet features segment '{segment}' as {segment_mask.sum()}/{len(segment_mask)} wallets")
+
+        # Append segment to df
+        wallet_segmentation_df[f"wallet_features|{segment}"] = segment_mask
+
     # Add training period cluster labels if configured
     cluster_groups = wallets_coin_config['wallet_segments'].get('training_period_cluster_groups')
     if cluster_groups:
