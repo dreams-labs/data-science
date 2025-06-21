@@ -7,6 +7,7 @@ import yaml
 import pandas as pd
 
 from coin_modeling.coin_config_manager import WalletsCoinConfig
+from utils import ConfigError
 
 logger = logging.getLogger(__name__)
 
@@ -297,3 +298,18 @@ def validate_config_alignment(config: dict, wallets_config: dict, wallets_coin_c
                 f" - wallets_coin_config: {wallets_coin_config['training_data']['dataset']}\n"
                 f" - config: {config['training_data']['dataset']}"
             )
+
+    # Validate that coin model segment columns are protected features
+    all_segment_cols = set()
+    for segment in wallets_coin_config['wallet_segments']['wallet_features_segments']:
+        all_segment_cols |= set(wallets_coin_config['wallet_segments']['wallet_features_segments'][segment].keys())
+
+    # Check if all segment columns are in protected features
+    protected_features = set(wallets_config['modeling']['feature_selection']['protected_features'])
+    missing_cols = all_segment_cols - protected_features
+
+    if missing_cols:
+        raise ConfigError(f"Segment columns not found in protected_features: {missing_cols}. "
+                          "Add columns [{missing_cols}] to "
+                          "wallets_config['modeling']['feature_selection']['protected_features'].")
+

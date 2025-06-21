@@ -213,7 +213,8 @@ class TemporalGridSearcher:
                 date_config = self._create_date_config(modeling_date)
                 if date_config['training_data']['predrop_features']:
                     drop_patterns = date_config['modeling']['feature_selection']['drop_patterns']
-                    col_dropper = bp.DropColumnPatterns(drop_patterns)
+                    protected_columns = self.base_wallets_config['modeling']['feature_selection']['protected_features']
+                    col_dropper = bp.DropColumnPatterns(drop_patterns, protected_columns)
                     wallet_training_data_df = col_dropper.fit_transform(wallet_training_data_df)
                     validation_training_data_df = col_dropper.fit_transform(validation_training_data_df)
 

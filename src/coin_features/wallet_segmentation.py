@@ -43,6 +43,10 @@ def build_wallet_segmentation(
     Returns:
     - wallet_segmentation_df (pd.DataFrame): df containing segment categories for each wallet
     """
+    # Confirm only one epoch is included
+    if len(training_data_df.reset_index()['epoch_start_date'].unique()) > 1:
+        raise ValueError("Segmentation logic is not built to support multiple epoch_start_dates. "
+                         f"Found start dates: {training_data_df.reset_index()['epoch_start_date'].unique()}")
     # Load wallet scores
     wallet_scores_df = load_wallet_scores(wallets_coin_config)
     wallet_segmentation_df = wallet_scores_df.copy()

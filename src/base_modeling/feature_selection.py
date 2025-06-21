@@ -15,16 +15,21 @@ logger = logging.getLogger(__name__)
 #      Column Dropping Functions
 # ------------------------------------
 
-def identify_matching_columns(column_patterns: List[str], all_columns: List[str]) -> Set[str]:
+def identify_matching_columns(
+        column_patterns: List[str],
+        all_columns: List[str],
+        protected_columns: List[str] = None
+    ) -> Set[str]:
     """
     Match columns that contain all non-wildcard parts of patterns, preserving sequence and structure.
 
     Params:
     - column_patterns: List of patterns with * wildcards.
     - all_columns: List of actual column names.
+    - protected_columns: List of columns to exclude from results.
 
     Returns:
-    - matched_columns: Set of columns matching any pattern.
+    - matched_columns: Set of columns matching any pattern, minus protected columns.
     """
     matched = set()
     for pattern in column_patterns:
@@ -32,6 +37,9 @@ def identify_matching_columns(column_patterns: List[str], all_columns: List[str]
             # Match using fnmatch to preserve structure and sequence
             if fnmatch.fnmatch(column, pattern):
                 matched.add(column)
+
+    if protected_columns:
+        matched = matched - set(protected_columns)
 
     return matched
 
