@@ -1,3 +1,16 @@
+"""
+Functions for generating and aggregating wallet-level metrics into coin-wallet features.
+
+This module provides utilities to compute features at the (coin_id, wallet_address) level,
+including balances and selected wallet training features, for use in downstream coin modeling.
+It includes logic for:
+- Building a MultiIndex DataFrame of coin-wallet pairs with relevant metrics.
+- Calculating starting and ending balances for each wallet-coin pair over a specified period.
+- Selecting and formatting wallet training features to be used as coin-level features.
+
+These functions support the feature engineering pipeline for coin-level predictive modeling.
+"""
+
 import logging
 import pandas as pd
 import utils as u
@@ -20,7 +33,8 @@ def compute_coin_wallet_metrics(
         period_end: str
     ) -> pd.DataFrame:
     """
-    Compute coin-wallet–level metrics: balances and trading metrics.
+    Compute coin-wallet–level metrics including balances and aggregated features from
+     the wallet model training data.
 
     Params:
     - wallets_coin_config (dict): dict from .yaml file
@@ -80,7 +94,7 @@ def compute_coin_wallet_metrics(
 @u.timing_decorator
 def calculate_coin_wallet_ending_balances(profits_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calculate metric value for each wallet-coin pair on specified dates.
+    Calculate starting and ending USD balances for each wallet-coin pair in the period.
 
     Params:
     - profits_df (DataFrame): Input profits data

@@ -1,3 +1,18 @@
+"""
+Functions for generating flattened macroeconomic and market time series features for coins.
+
+This module provides utilities to aggregate and transform macroeconomic and market indicator
+time series data into single-row, coin-level features. These features are designed to be
+cross-joined onto each coin's record for downstream modeling and analysis.
+
+Main functionalities include:
+- Generating flattened macroeconomic features from time series data.
+- Generating flattened market features from time series data.
+- Renaming feature columns for clarity and consistency.
+
+These functions support the feature engineering pipeline for coin-level predictive modeling.
+"""
+
 import logging
 import pandas as pd
 
@@ -18,7 +33,9 @@ def generate_macro_features(
     macro_trends_metrics_config: dict
 ) -> pd.DataFrame:
     """
-    Params:
+    Generates flattened macroeconomic time series features for coins.
+
+        Params:
     - macro_indicators_df (DataFrame): date-indexed macroeconomic indicators
     - macro_trends_metrics_config (dict): defines the time series features that will
         be output. Defined at wallets_coins_metrics_config['time_series']['macro_trends']
@@ -54,6 +71,8 @@ def generate_market_features(
     marlet_data_metrics_config: dict,
 ) -> pd.DataFrame:
     """
+    Generates flattened market data time series features for coins.
+
     Params:
     - market_indicators_df (DataFrame): date-indexed marketeconomic indicators
     - marlet_data_metrics_config (dict): defines the time series features that will

@@ -100,6 +100,8 @@ def calculate_tree_confidence(model, wallet_training_data_df: pd.DataFrame) -> p
 
 def calculate_validation_metrics(X_test, y_pred, validation_profits_df, n_buckets=20, method='score_buckets'):
     """
+    Plots the specified wallet performance metric across score buckets.
+
     Params:
     - X_test (DataFrame): test set features with wallet addresses as index
     - y_pred (array): predicted scores from model

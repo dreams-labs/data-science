@@ -1,6 +1,32 @@
 """
-Orchestrates groups of functions to generate wallet model pipeline
+Orchestrates the end-to-end coin feature engineering pipeline for coin-level modeling.
+
+This module defines the CoinFeaturesOrchestrator class, which coordinates the loading,
+transformation, and aggregation of data to produce a comprehensive set of coin-level features
+for predictive modeling. The orchestrator integrates multiple feature sources—including
+wallet-based metrics, macroeconomic and market time series, coin metadata, and Coin Flow
+model outputs—into a unified DataFrame indexed by coin_id.
+
+Business logic and high-level architecture:
+- The orchestrator manages configuration and cohort information for the modeling process.
+- It executes a multi-stage pipeline:
+    1. **Wallet-based features:** Aggregates wallet-level trading and balance metrics into
+       coin-level features, using wallet segmentation and flattening logic.
+    2. **Time series features:** Generates and merges macroeconomic and market data features,
+       ensuring alignment and uniqueness of columns.
+    3. **Coin metadata:** Retrieves and merges blockchain-derived metadata, avoiding
+       data leakage from external sources.
+    4. **Coin Flow model features:** Optionally generates and merges features from the
+       Coin Flow model, ensuring period alignment and feature consistency.
+- The orchestrator provides methods for generating features, calculating target variables,
+  and merging feature sets, with robust validation and logging at each step.
+- Utility functions are included for parsing and structuring feature names for analysis.
+
+This architecture enables modular, reproducible, and extensible coin feature engineering,
+supporting downstream machine learning workflows.
 """
+
+
 import logging
 import pandas as pd
 
@@ -70,15 +96,15 @@ class CoinFeaturesOrchestrator:
         prefix: str
     ) -> pd.DataFrame:
         """
-        Compute coin-level features for the epoch. Features are split into 3 categories:
-         1. Wallet-based features that flatten coin-wallet pair activity to the coin_level,
-          such as aggregated trading behavior or holder scores.
-         2. Time series-based features keyed on 'date', including macroeconomic indicators
-          and market data such as price/volume/market_cap.
-         3. Coin Flow features, generated from the Coin Flow model that was the precursor
-          to this model.
+        Compute coin-level features for the epoch.
 
-        All features are
+        Features are split into three categories:
+        1. Wallet-based features: flatten coin-wallet pair activity to the coin level,
+            such as aggregated trading behavior or holder scores.
+        2. Time series-based features: macroeconomic indicators and market data such as price,
+            volume, and market cap.
+        3. Coin Flow features: generated from the Coin Flow model.
+
 
         Params:
         - profits_df (DataFrame): profits data for the specified period

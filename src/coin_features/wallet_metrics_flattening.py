@@ -1,5 +1,16 @@
 """
-Functions to flatten wallet-coin features to coin-only
+Functions to flatten wallet-coin features to coin-only features.
+
+This module provides utilities for aggregating and transforming wallet-level metrics
+into coin-level features, supporting downstream coin modeling and analysis. It includes:
+
+- Flattening coin-wallet metrics into coin-level features across wallet segments.
+- Generating coin-level features from wallet-level metrics for specific segments.
+- Calculating aggregation metrics, score-weighted metrics, and distribution metrics
+  (such as percentiles, standard deviation, skewness, and kurtosis) for wallet segments.
+
+These functions enable efficient feature engineering by summarizing wallet activity
+and segment characteristics at the coin level.
 """
 import logging
 from typing import List, Optional
@@ -28,7 +39,7 @@ def flatten_cw_to_coin_segment_features(
     n_threads: Optional[int] = 6
 ) -> pd.DataFrame:
     """
-    Flatten coin-wallet metrics into coin-level features across segments.
+    Flatten coin-wallet metrics into coin-level features across wallet segments.
 
     Params:
     - cw_metrics_df (DataFrame): Trading metrics for wallets in the wallet modeling cohort.
@@ -117,7 +128,8 @@ def flatten_cw_to_coin_features(
     score_distribution_cols: list,
     usd_materiality: float = 20.0
 ) -> pd.DataFrame:
-    """Generate coin-level features from wallet-level metric.
+    """
+    Generate coin-level features from a wallet-level metric for a given segment.
 
     Params:
     - wallet_metric_df (DataFrame): MultiIndexed (coin_id, wallet_address) metrics
