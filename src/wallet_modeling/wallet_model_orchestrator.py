@@ -369,34 +369,37 @@ class WalletModelOrchestrator:
             if bucket_df.empty:
                 # Return empty buckets filled with None
                 return pd.DataFrame({
-                    "bucket": range(1, n_buckets + 1),
+                    "bucket": [None] * n_buckets,
                     "mean_return": [None] * n_buckets,
-                    "wins_return": [None] * n_buckets
+                    "wins_return": [None] * n_buckets,
+                    "score_mid": [None] * n_buckets
                 })
 
-            # Convert score-based buckets to rank-based format for storage
-            # Rank buckets from 1 (highest score) to n_buckets (lowest score)
-            bucket_df = bucket_df.sort_values('score_mid', ascending=False).reset_index(drop=True)
-            bucket_df['bucket'] = range(1, len(bucket_df) + 1)
+            # Sort buckets by score (lowest to highest)
+            bucket_df = bucket_df.sort_values('score_mid', ascending=True).reset_index(drop=True)
 
             # Forward fill to ensure we have n_buckets entries
             mean_values = []
             wins_values = []
-            last_mean = None
-            last_wins = None
+            score_values = []
 
-            for i in range(1, n_buckets + 1):
-                if i <= len(bucket_df):
-                    row = bucket_df.iloc[i-1]
-                    last_mean = row['mean_return']
-                    last_wins = row['wins_return']
-                mean_values.append(last_mean)
-                wins_values.append(last_wins)
+            for i in range(len(bucket_df)):
+                row = bucket_df.iloc[i]
+                mean_values.append(row['mean_return'])
+                wins_values.append(row['wins_return'])
+                score_values.append(row['score_mid'])
+
+            # Pad with None if we have fewer buckets than requested
+            while len(mean_values) < n_buckets:
+                mean_values.append(None)
+                wins_values.append(None)
+                score_values.append(None)
 
             return pd.DataFrame({
-                "bucket": range(1, n_buckets + 1),
+                "bucket": [round(score, 3) if score is not None else None for score in score_values],
                 "mean_return": mean_values,
-                "wins_return": wins_values
+                "wins_return": wins_values,
+                "score_mid": score_values
             })
 
         # Original regression logic for non-classification models
@@ -411,39 +414,45 @@ class WalletModelOrchestrator:
         if actual_buckets < 2:
             # If only 1 unique prediction, create single bucket
             df["bucket"] = 1
+            df["score_mid"] = df["pred"]
         else:
-            # Use qcut with duplicates='drop' and track actual buckets created
+            # Use qcut with duplicates='drop'
             df["bucket_raw"] = pd.qcut(df["pred"], actual_buckets, labels=False, duplicates="drop")
-            # Reverse ranking so highest predictions get bucket 1
-            df["bucket"] = actual_buckets - df["bucket_raw"]
+            # Keep natural ordering (no reversal)
+            df["bucket"] = df["bucket_raw"] + 1
+            # Calculate score midpoints for each bucket
+            bucket_score_mid = df.groupby("bucket")["pred"].mean()
+            df["score_mid"] = df["bucket"].map(bucket_score_mid)
 
         # Calculate metrics only for buckets that exist
         bucket_mean = df.groupby("bucket")["ret"].mean()
         bucket_wins = df.groupby("bucket")["ret"].apply(
             lambda x: u.winsorize(x.values, evaluator.modeling_config.get("returns_winsorization", 0.005)).mean()
         )
+        bucket_scores = df.groupby("bucket")["score_mid"].first()
 
-        # Create output with full range 1 to n_buckets, forward filling missing values
-        mean_values = []
-        wins_values = []
-        last_mean = None
-        last_wins = None
+        # Create output preserving natural score order
+        bucket_indices = sorted(bucket_mean.index) if len(bucket_mean) > 0 else []
 
-        for i in range(1, n_buckets + 1):
-            if i in bucket_mean.index:
-                last_mean = bucket_mean[i]
-                last_wins = bucket_wins[i]
-            mean_values.append(last_mean)
-            wins_values.append(last_wins)
+        for bucket_idx in bucket_indices:
+            mean_values.append(bucket_mean[bucket_idx])
+            wins_values.append(bucket_wins[bucket_idx])
+            score_values.append(bucket_scores[bucket_idx])
+
+        # Pad with None if we have fewer buckets than requested
+        while len(mean_values) < n_buckets:
+            mean_values.append(None)
+            wins_values.append(None)
+            score_values.append(None)
 
         result_df = pd.DataFrame({
-            "bucket": range(1, n_buckets + 1),
+            "bucket": [round(score, 3) if score is not None else None for score in score_values],
             "mean_return": mean_values,
-            "wins_return": wins_values
+            "wins_return": wins_values,
+            "score_mid": score_values
         })
 
         return result_df
-
 
 
     def _compute_combined_score_return_df(self, evaluator, n_buckets: int) -> pd.DataFrame:
