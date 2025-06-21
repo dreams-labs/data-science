@@ -22,7 +22,7 @@ investment_cycles: [
 
 # CoinModel
 training_data:
-    toggle_overwrite_parquet: True  # determines whether to load preexisting training_data_dfs
+    toggle_overwrite_parquet: False  # determines whether to load preexisting training_data_dfs
     plot_wallet_model_evaluation: False  # whether to add performance graphs for each coin model
 
 trading:
