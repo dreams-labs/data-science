@@ -5,6 +5,7 @@ from typing import Dict,Tuple
 from pathlib import Path
 import logging
 import uuid
+from collections import defaultdict
 from datetime import datetime,timedelta
 import json
 import pandas as pd
@@ -412,6 +413,81 @@ def plot_wallet_model_comparison(
     plt.suptitle(title, fontsize=16, y=0.995)
     plt.tight_layout()
     plt.show()
+
+
+def aggregate_feature_importance(
+    base_folder: str
+) -> pd.DataFrame:
+    """
+    Aggregate feature importance statistics across all wallet model JSON files.
+
+    Params:
+    - base_folder: Location of the model_ids.json files, same as plot_wallet_model_comparison
+    - output_format: 'dataframe' or 'dict' for return format
+
+    Returns:
+    - importance_stats_df: DataFrame with columns [feature, mean_importance, median_importance, std_importance, count]
+    """
+    # Find all wallet_model_ids.json files
+    json_files = list(Path(base_folder).glob('*/wallet_model_ids.json'))
+
+    if not json_files:
+        raise FileNotFoundError(f"No wallet_model_ids.json files found in {base_folder}")
+
+    # Collect all importance data
+    feature_importance_data = defaultdict(list)
+
+    for json_path in json_files:
+        epoch_date = json_path.parent.name
+
+        with open(json_path, 'r', encoding='utf-8') as f:
+            models_dict = json.load(f)
+
+        for model_name, model_data in models_dict.items():
+            # Check if importances exist
+            if 'metrics' not in model_data or 'importances' not in model_data['metrics']:
+                continue
+
+            importances = model_data['metrics']['importances']
+
+            # Validate structure
+            if 'feature' not in importances or 'importance' not in importances:
+                continue
+
+            features = importances['feature']
+            importance_values = importances['importance']
+
+            # Only process non-zero importance values
+            for feature, importance in zip(features, importance_values):
+                if importance > 0:  # Skip zero importance features
+                    feature_importance_data[feature].append(importance)
+
+    # Calculate statistics for each feature
+    importance_stats = []
+
+    for feature, values in feature_importance_data.items():
+        if values:  # Only process features with at least one non-zero value
+            stats = {
+                'feature': feature,
+                'mean_importance': np.mean(values),
+                'median_importance': np.median(values),
+                'std_importance': np.std(values),
+                'count': len(values),
+                'min_importance': np.min(values),
+                'max_importance': np.max(values)
+            }
+            importance_stats.append(stats)
+
+    # Convert to DataFrame and sort by mean importance
+    importance_stats_df = pd.DataFrame(importance_stats)
+
+    if not importance_stats_df.empty:
+        importance_stats_df = importance_stats_df.sort_values('mean_importance', ascending=False).reset_index(drop=True)
+
+    return importance_stats_df
+
+
+
 
 # ---------------------------------
 #         Helper Functions
