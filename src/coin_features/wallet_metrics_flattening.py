@@ -149,6 +149,9 @@ def flatten_cw_to_coin_features(
     # Initialize results with MultiIndex aware groupby
     totals_df = analysis_df.groupby(level='coin_id', observed=True).agg({
         f'{metric_column}': 'sum',
+        f'{metric_column}': 'mean',
+        f'{metric_column}': 'median',
+        f'{metric_column}': 'std',
         segment_family: 'count'
     }).rename(columns={
         f'{metric_column}': f'{segment_family}/total|{metric_column}|aggregations/aggregations/sum',
@@ -234,6 +237,9 @@ def calculate_aggregation_metrics(
         columns = [
             f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/sum',
             f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/count',
+            f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/mean',
+            f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/median',
+            f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/std',
             f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/sum_pct',
             f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/count_pct'
         ]
@@ -244,13 +250,18 @@ def calculate_aggregation_metrics(
         )
 
     metrics = segment_data.groupby(level='coin_id', observed=True).agg({
-        metric_column: 'sum',
+        metric_column: ['sum', 'mean', 'median', 'std'],
         segment_family: 'count'
-    }).rename(columns={
-        metric_column: f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/sum',
-        segment_family: f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/count'
     })
 
+    # Flatten column names
+    metrics.columns = [
+        f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/sum',
+        f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/mean',
+        f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/median',
+        f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/std',
+        f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/count'
+    ]
     # Calculate percentages using Series division with fill_value=np.nan
     sum_col = f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/sum'
     count_col = f'{segment_family}/{segment_value}|{metric_column}|aggregations/aggregations/count'
