@@ -426,13 +426,21 @@ class CoinEpochsOrchestrator:
         # Load existing data if configured
         if (feat_path.exists() and tgt_path.exists()):
             if not toggle_rebuild_features:
-                coin_features_df = pd.read_parquet(feat_path)
-                coin_target_df   = pd.read_parquet(tgt_path)
-                logger.info(
-                    "Coin epoch %s training data loaded from existing feature and target files.",
-                    epoch_date.strftime('%Y-%m-%d')
-                )
-                return epoch_date, coin_features_df, coin_target_df, False
+                try:
+                    coin_features_df = pd.read_parquet(feat_path)
+                    coin_target_df   = pd.read_parquet(tgt_path)
+                    logger.info(
+                        "Coin epoch %s training data loaded from existing feature and target files.",
+                        epoch_date.strftime('%Y-%m-%d')
+                    )
+                    return epoch_date, coin_features_df, coin_target_df, False
+                except Exception as e:
+                    logger.warning(
+                        "Corrupted parquet files detected for epoch %s, regenerating: %s",
+                        epoch_date.strftime('%Y-%m-%d'),
+                        str(e)
+                    )
+                    # Continue to regeneration logic below
 
             # Announce overwrite if applicable
             else:
