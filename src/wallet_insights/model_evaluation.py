@@ -1479,15 +1479,22 @@ class ClassifierEvaluator(RegressorEvaluator):
             "ret_win": returns_winsorized
         }).dropna()
 
-        # Define equal-width score bins
+        # Define fixed 0.05 increment bins starting from ceiling of first threshold
         try:
             score_min, score_max = df["proba"].min(), df["proba"].max()
-            if 0 < score_min <= score_max < 1:
-                # if boundaries are between 0 and 1, set buckets at 0.05 intervals
-                bin_edges = np.linspace(0, 1, n_buckets + 1)
-            else:
-                # otherwise, use the min/max to set boundaries
-                bin_edges = np.linspace(score_min, score_max, n_buckets + 1)
+
+            # Calculate first bucket ceiling at 0.05 increments
+            first_ceiling = np.ceil(score_min / 0.05) * 0.05
+
+            # Create bin edges with 0.05 increments
+            bin_edges = np.arange(first_ceiling - 0.05, min(first_ceiling + (n_buckets - 1) * 0.05, 1.0) + 0.05, 0.05)
+
+            # Ensure we capture all data by extending bounds if needed
+            if bin_edges[0] > score_min:
+                bin_edges = np.concatenate([[score_min], bin_edges])
+            if bin_edges[-1] < score_max:
+                bin_edges = np.concatenate([bin_edges, [score_max]])
+
             df["score_bin"] = pd.cut(df["proba"], bins=bin_edges, include_lowest=True)
         except ValueError:
             return pd.DataFrame()
