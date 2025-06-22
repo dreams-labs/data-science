@@ -692,7 +692,7 @@ data_cleaning: #WalletModel
     # Market cap params used vs market_cap_filled
     min_initial_market_cap: 0_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
     max_initial_market_cap: 1_000_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
-    min_ending_market_cap: 2_000_000  # coins above this market cap as of the end of the training period will be removed from all datasets
+    min_ending_market_cap: 0_000_000  # coins above this market cap as of the end of the training period will be removed from all datasets
     max_ending_market_cap: 1_000_000_000  # coins above this market cap as of the end of the training period will be removed from all datasets
     max_gap_days: 7  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
     min_daily_volume: 10000 # Minimum average daily volume the coin must have

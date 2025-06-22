@@ -329,7 +329,7 @@ coin_modeling: #CoinModel
 
     # Thresholds for coin inclusion in training data
     market_cap_column: market_cap_filled  # 'market_cap' or 'market_cap_filled'
-    min_market_cap: 0_000_000  # coins below this market cap will not be included in performance assessments
+    min_market_cap: 2_000_000  # coins below this market cap will not be included in performance assessments
     max_market_cap: 700_000_000  # coins above this market cap will not be included in performance assessments
 
     # Train/Test/Eval split
@@ -359,7 +359,7 @@ coin_modeling: #CoinModel
 
             score_binary|cw_coin_return_020/*,
             score_binary|cw_coin_return_070/*,
-            # score_binary|cw_coin_return_n050/*,
+            score_binary|cw_coin_return_n050/*,
             score_binary|cw_coin_return_rank_below_025/*,
             score_binary|cw_coin_return_rank_above_075/*,
             score_binary|cw_coin_return_rank_above_095/*,
@@ -553,13 +553,14 @@ coin_modeling: #CoinModel
 
 
 
-            # Wallet Segments
             '*cw_whales_10k/0*',
-            '*cw_whales_10k/1*',
             '*net_gain_doublers/0*',
-            '*net_gain_doublers/1*',
             '*10k_gainers/0*',
+
+            # Wallet Segments
+            # '*net_gain_doublers/1*',
             '*10k_gainers/1*',
+            '*cw_whales_10k/1*',
 
 
             # 'market_data|mfi/last_20d*',
