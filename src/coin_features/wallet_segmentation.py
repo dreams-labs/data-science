@@ -87,7 +87,7 @@ def build_wallet_segmentation(
         logger.info(f"Defined wallet features segment '{segment}' as {segment_mask.sum()}/{len(segment_mask)} wallets")
 
         # Append segment to df
-        wallet_segmentation_df[f"wallet_features|{segment}"] = segment_mask
+        wallet_segmentation_df[f"defined_segments|{segment}"] = segment_mask
 
     # Add training period cluster labels if configured
     cluster_groups = wallets_coin_config['wallet_segments'].get('training_period_cluster_groups')
