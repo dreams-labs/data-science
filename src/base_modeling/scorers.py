@@ -1,8 +1,28 @@
-# pylint:disable=wrong-import-position
+"""
+Custom scorers for MetaPipeline that handle y transformations.
+
+Why custom scorers?
+------------------
+Our MetaPipeline transforms raw target data (y) before fitting models. During grid search,
+sklearn passes the original untransformed y to scorers, but standard scorers expect the
+transformed y. This causes errors, especially when:
+- Raw y is a multi-column DataFrame (e.g., multiple target variables)
+- Transformed y is a single column (e.g., after selecting one target)
+- Using classification scorers like neg_log_loss that validate input shape
+
+All custom scorers here follow the pattern:
+1. Transform y using estimator.y_pipeline.transform(y)
+2. Get predictions using estimator.predict() or predict_proba()
+3. Calculate the metric on transformed data
+
+Some scorers also use separate validation data (stored in wallet_model) instead of
+the cross-validation splits for more realistic evaluation.
+"""
 import logging
 import pandas as pd
 import numpy as np
-from sklearn.metrics import root_mean_squared_error, r2_score, roc_auc_score
+from sklearn.metrics import root_mean_squared_error,r2_score,roc_auc_score,log_loss
+
 
 # pylint:disable=invalid-name  # X_test isn't camelcase
 # pylint:disable=unused-argument  # X and y params are always needed for pipeline structure
@@ -15,10 +35,46 @@ logger = logging.getLogger(__name__)
 
 
 
-# -----------------------------------
-#          Scorer Functions
-# -----------------------------------
+# --------------------------------
+#          Base Scorers
+# --------------------------------
+def custom_neg_log_loss_scorer(estimator, X, y):
+    """
+    Custom scorer that transforms y before computing negative log loss.
+    Handles multi-column y data by applying the estimator's y_pipeline first.
+    Handles asymmetric loss by converting 3-class labels to binary.
 
+    Parameters:
+        estimator: The fitted MetaPipeline, which includes a y_pipeline.
+        X (DataFrame or array): Feature data.
+        y (DataFrame or array): The raw target data (potentially multi-column).
+
+    Returns:
+        Negative log loss score (negative because sklearn maximizes scores).
+    """
+    from sklearn.metrics import log_loss
+
+    # Transform y using the pipeline
+    y_trans = estimator.y_pipeline.transform(y)
+
+    # Get probability predictions
+    y_pred = estimator.predict_proba(X)
+
+    # Handle asymmetric loss case where y_trans has 3 classes but y_pred has 2
+    unique_classes = np.unique(y_trans)
+    if len(unique_classes) == 3 and max(unique_classes) == 2:
+        # Convert 3-class labels to binary: class 2 -> 1, classes 0&1 -> 0
+        y_trans_binary = (y_trans == 2).astype(int)
+        return -log_loss(y_trans_binary, y_pred)
+
+    # Standard binary case
+    return -log_loss(y_trans, y_pred)
+
+
+
+# -----------------------------------
+#          Custom Scorers
+# -----------------------------------
 def custom_neg_rmse_scorer(estimator, X, y):
     """
     Custom scorer that transforms y before computing RMSE.

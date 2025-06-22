@@ -121,7 +121,7 @@ class CoinInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
             for result in executor.map(self._process_single_investment_cycle, investment_cycles):
                 cycle_scores_dfs.append(result)
                 completed_cycles += 1
-                logger.milestone(f"{completed_cycles}/{len(investment_cycles)} finished processing investment epoch")
+                logger.milestone(f"[{completed_cycles}/{len(investment_cycles)}] Finished processing investment epoch.")
 
         coin_scores_df = pd.concat(cycle_scores_dfs, ignore_index=False)
         u.notify('soft_twinkle_musical')

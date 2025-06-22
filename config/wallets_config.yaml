@@ -521,8 +521,15 @@ modeling: #WalletModel
         # Correlation/variance-based removal
         # variance_threshold: 0.00 # features with this level of variance or less will be removed
         # correlation_threshold: 2.0 # features above this correlation coefficient will be removed
+
+        # These features will not be dropped from workbook dfs but will be dropped from model training data
         protected_features: [
-            cluster|
+            cluster|*,
+            trading|crypto_net_gain|all_windows,
+            trading|total_volume|w1,
+            performance|crypto_net_gain/crypto_inflows/base|all_windows,
+            trading|crypto_inflows|all_windows,
+            cw_trading|crypto_inflows|all_windows
         ]
 
 
@@ -685,7 +692,7 @@ data_cleaning: #WalletModel
     # Market cap params used vs market_cap_filled
     min_initial_market_cap: 0_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
     max_initial_market_cap: 1_000_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
-    min_ending_market_cap: 2_000_000  # coins above this market cap as of the end of the training period will be removed from all datasets
+    min_ending_market_cap: 0_000_000  # coins above this market cap as of the end of the training period will be removed from all datasets
     max_ending_market_cap: 1_000_000_000  # coins above this market cap as of the end of the training period will be removed from all datasets
     max_gap_days: 7  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
     min_daily_volume: 10000 # Minimum average daily volume the coin must have
@@ -750,7 +757,7 @@ features: #WalletModel
     ]
 
     # Clustering Params
-    # clustering_n_clusters: [5]
+    clustering_n_clusters: [5]
     clustering_n_components: 25
     clustering_fill_method: fill_0  # fill_0 or fill_mean
     clustering_include_pca: False

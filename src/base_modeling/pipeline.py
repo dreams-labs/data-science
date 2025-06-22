@@ -313,16 +313,18 @@ class DropColumnPatterns(BaseEstimator, TransformerMixin):
     Pipeline step that drops columns based on the patterns provided in the config, including
     support for * wildcards.
 
-    Valid format example: 'training_clusters|k2_cluster/*|trading/*'
+    Valid format examples: 'cluster|*', 'trading|crypto_net_gain|all_windows'
     """
-    def __init__(self, drop_patterns=None):
+    def __init__(self, drop_patterns=None, protected_columns=None):
         """
         Transformer for dropping columns based on patterns.
 
         Params:
         - drop_patterns (list): List of patterns to match columns for dropping.
+        - protected_columns (list): List of columns to exclude from dropping.
         """
         self.drop_patterns = drop_patterns
+        self.protected_columns = protected_columns
         self.columns_to_drop = None  # Persist calculated columns to drop
 
 
@@ -341,7 +343,7 @@ class DropColumnPatterns(BaseEstimator, TransformerMixin):
         if self.drop_patterns is not None:
             all_columns = X.columns.tolist()
             self.columns_to_drop = fs.identify_matching_columns(
-                self.drop_patterns, all_columns
+                self.drop_patterns, all_columns, self.protected_columns
             )
             logger.info(f"Identified {len(self.columns_to_drop)} columns to drop...")
         else:
@@ -349,7 +351,6 @@ class DropColumnPatterns(BaseEstimator, TransformerMixin):
             logger.info("No drop_patterns provided. Keeping columns_to_drop unchanged.")
 
         return self
-
 
     def transform(self, X):
         """

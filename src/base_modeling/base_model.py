@@ -335,6 +335,12 @@ class BaseModel:
             # read your desired top_pct from config, e.g. self.modeling_config['grid_search_params']['top_pct']
             gs_config['search_config']['scoring'] = sco.validation_top_scores_returns_scorer(self)
 
+        elif scoring_param == 'neg_log_loss':
+            # if self.modeling_config['asymmetric_loss'].get('enabled',False):
+                # raise ConfigError("Cannot use neg_log_loss for an asymmetric loss target.")
+            # Use custom neg_log_loss scorer that handles y transformation
+            gs_config['search_config']['scoring'] = sco.custom_neg_log_loss_scorer
+
         else:
             raise ValueError(f"Invalid scoring metric '{scoring_param}' found in grid_search_params.")
 

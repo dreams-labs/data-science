@@ -43,6 +43,10 @@ def build_wallet_segmentation(
     Returns:
     - wallet_segmentation_df (pd.DataFrame): df containing segment categories for each wallet
     """
+    # Confirm only one epoch is included
+    if len(training_data_df.reset_index()['epoch_start_date'].unique()) > 1:
+        raise ValueError("Segmentation logic is not built to support multiple epoch_start_dates. "
+                         f"Found start dates: {training_data_df.reset_index()['epoch_start_date'].unique()}")
     # Load wallet scores
     wallet_scores_df = load_wallet_scores(wallets_coin_config)
     wallet_segmentation_df = wallet_scores_df.copy()
@@ -62,6 +66,28 @@ def build_wallet_segmentation(
     # Binary scores are already categorical so no logic is needed
     if wallets_coin_config['wallet_segments']['wallet_scores_binary_segments']:
         wallet_segmentation_df = transform_binary_columns(wallet_segmentation_df)
+
+    # Add wallet_feature-defined segments
+    segments_dict = wallets_coin_config['wallet_segments']['wallet_features_segments']
+    for segment in segments_dict.keys():
+        segment_df = training_data_df.copy()
+
+        for col in segments_dict[segment].keys():
+            # Apply cumulative filtering
+            min_value = segments_dict[segment][col].get('min_value', -np.inf)
+            max_value = segments_dict[segment][col].get('max_value', np.inf)
+
+            segment_df = segment_df[
+                (segment_df[col] >= min_value) &
+                (segment_df[col] <= max_value)
+            ]
+
+        segment_cohort = segment_df.reset_index()['wallet_address']
+        segment_mask = wallet_segmentation_df.index.isin(segment_cohort).astype(int)
+        logger.info(f"Defined wallet features segment '{segment}' as {segment_mask.sum()}/{len(segment_mask)} wallets")
+
+        # Append segment to df
+        wallet_segmentation_df[f"defined_segments|{segment}"] = segment_mask
 
     # Add training period cluster labels if configured
     cluster_groups = wallets_coin_config['wallet_segments'].get('training_period_cluster_groups')

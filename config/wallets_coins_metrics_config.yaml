@@ -11,7 +11,7 @@ time_series:  #CoinModel
     market_data:
         price:
             indicators:
-                sma:
+                sma: # rolling period 30 days
                     parameters:
                         window: [2]
                     rolling:
@@ -34,7 +34,7 @@ time_series:  #CoinModel
                         window_duration: 30
                         lookback_periods: 3
 
-                ema:
+                ema: # rolling period 7 days
                     parameters:
                         window: [3]
                     aggregations: # testing raw price values
@@ -169,16 +169,6 @@ time_series:  #CoinModel
                         scaling: none
                 window_duration: 30
                 lookback_periods: 3
-            indicators:
-                rsi:
-                    parameters:
-                        window: [30]
-                    rolling:
-                        aggregations:
-                            last:
-                                scaling: none
-                        window_duration: 30
-                        lookback_periods: 3
         global_volume: # testing: didn't include in first round
             rolling:
                 aggregations:

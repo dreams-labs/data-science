@@ -540,7 +540,18 @@ class WalletModelOrchestrator:
         # ------------------------
         pipeline_path = Path(self.base_path) / 'wallet_models' / f"wallet_model_{model_id}.pkl"
         if not pipeline_path.exists():
-            raise FileNotFoundError(f"No pipeline at {pipeline_path}")
+            logger.warning(
+                f"Pipeline file missing for model {score_name} ({model_id}). "
+                f"Falling back to rebuilding the model."
+            )
+            # Fall back to training a new model
+            return self._train_and_evaluate(
+                score_wallets_config,
+                wallet_training_data_df,
+                wallet_target_vars_df,
+                None,  # validation_training_data_df
+                None   # validation_target_vars_df
+            )
         with open(pipeline_path, 'rb') as f:
             pipeline = cloudpickle.load(f)
 

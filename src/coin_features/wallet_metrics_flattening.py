@@ -161,7 +161,9 @@ def flatten_cw_to_coin_features(
     result_df = pd.DataFrame(index=pd.Index(all_coin_ids, name='coin_id'))
 
     # Binary score columns should only make metrics for positive predictions
-    if segment_family.startswith('score_binary'):
+    if (segment_family.startswith('score_binary')
+        or segment_family.startswith('defined_segments')
+        ):
         segments_to_process = ['1']
     else:
         segments_to_process = wallet_segmentation_df[segment_family].unique()
