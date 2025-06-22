@@ -1,3 +1,31 @@
+"""
+Core modeling framework for XGBoost-based prediction with custom pipeline management.
+
+This BaseModel contains shared methods called by classes:
+    - WalletModel (wallet_modeling/wallet_model.py)
+    - CoinModel (coin_modeling/coin_model.py)
+
+The BaseModel class orchestrates the entire modeling workflow:
+1. Data preparation and train/eval/test splitting
+2. Pipeline construction using components from pipeline.py (MetaPipeline, TargetVarSelector, etc.)
+3. Grid search with custom scorers from scorers.py
+4. Model training with optional multi-phase training and asymmetric loss
+
+Key integrations:
+- **pipeline.py**: Provides MetaPipeline for simultaneous X/y transformations, TargetVarSelector
+  for multi-column target handling, FeatureSelector and DropColumnPatterns for feature reduction
+- **scorers.py**: Custom scoring functions that handle y transformations during grid search,
+  enabling proper evaluation of models with complex target preprocessing
+- **feature_selection.py**: Utilities for variance/correlation-based feature removal used by
+  the pipeline components
+
+The class handles both regression and classification (binary and asymmetric 3-class), with
+extensive configuration through modeling_config dict. Designed to be extended by domain-specific
+model classes (WalletModel, CoinModel) that add their own data loading and feature engineering.
+
+Grid search intelligently scales from single parameter tests to complex multi-pattern feature
+selection experiments, always maintaining compatibility with early stopping and custom metrics.
+"""
 # Multithreading configurations for grid search
 import os
 os.environ['OMP_NUM_THREADS'] = '12'

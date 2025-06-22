@@ -1,3 +1,8 @@
+"""
+Utilities for removing low-variance and highly correlated features.
+Supports pattern matching with wildcards and protected feature lists.
+Used by FeatureSelector and DropColumnPatterns pipeline steps.
+"""
 import logging
 import fnmatch
 from typing import List,Set
