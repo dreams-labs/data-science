@@ -521,8 +521,15 @@ modeling: #WalletModel
         # Correlation/variance-based removal
         # variance_threshold: 0.00 # features with this level of variance or less will be removed
         # correlation_threshold: 2.0 # features above this correlation coefficient will be removed
+
+        # These features will not be dropped from workbook dfs but will be dropped from model training data
         protected_features: [
-            cluster|
+            cluster|*,
+            trading|crypto_net_gain|all_windows,
+            trading|total_volume|w1,
+            performance|crypto_net_gain/crypto_inflows/base|all_windows,
+            trading|crypto_inflows|all_windows,
+            cw_trading|crypto_inflows|all_windows
         ]
 
 
