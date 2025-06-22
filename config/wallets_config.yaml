@@ -757,7 +757,7 @@ features: #WalletModel
     ]
 
     # Clustering Params
-    # clustering_n_clusters: [5]
+    clustering_n_clusters: [5]
     clustering_n_components: 25
     clustering_fill_method: fill_0  # fill_0 or fill_mean
     clustering_include_pca: False

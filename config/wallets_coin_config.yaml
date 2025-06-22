@@ -311,23 +311,25 @@ coin_modeling: #CoinModel
     asymmetric_loss: # Adds another class to target
         enabled: true
         big_loss_threshold: -0.3    # Below this is an extra penalized big loss
+        # big_loss_threshold: 0.25    # Below this is an extra penalized big loss
         # big_win_threshold: 0.5      # Above this is the target
         big_win_threshold: 0.7      # Above this is the target
+        # big_win_threshold: 0.75     # Above this is the target
         # big_win_threshold: 1.0      # Above this is the target
         loss_penalty_weight: 1     # Penalty for missing losses
         # loss_penalty_weight: 2     # Penalty for missing losses
-        win_reward_weight:   1       # Reward for catching wins
-        # win_reward_weight:   2       # Reward for catching wins
+        # win_reward_weight:   1       # Reward for catching wins
+        win_reward_weight:   2       # Reward for catching wins
 
 
     #KeyParam Modeling Cohort Definition
     # Thresholds for coin inclusion in training data
-    min_cohort_wallets: 15  # how many wallets must hold a coin for the coin to be elegible for forecasting
+    min_cohort_wallets: 25  # how many wallets must hold a coin for the coin to be elegible for forecasting
     min_cohort_balance: 15000  # how much USD all wallets must hold for the coin to be elegible for forecasting
 
     # Thresholds for coin inclusion in training data
     market_cap_column: market_cap_filled  # 'market_cap' or 'market_cap_filled'
-    min_market_cap: 2_000_000  # coins below this market cap will not be included in performance assessments
+    min_market_cap: 0_000_000  # coins below this market cap will not be included in performance assessments
     max_market_cap: 700_000_000  # coins above this market cap will not be included in performance assessments
 
     # Train/Test/Eval split
@@ -352,12 +354,12 @@ coin_modeling: #CoinModel
             # macro|*,
             # market_data|*,
 
-            all_wallets|*|balances/*,
+            # all_wallets|*|balances/*,
             # Segment Family
 
             score_binary|cw_coin_return_020/*,
             score_binary|cw_coin_return_070/*,
-            score_binary|cw_coin_return_n050/*,
+            # score_binary|cw_coin_return_n050/*,
             score_binary|cw_coin_return_rank_below_025/*,
             score_binary|cw_coin_return_rank_above_075/*,
             score_binary|cw_coin_return_rank_above_095/*,
@@ -378,17 +380,17 @@ coin_modeling: #CoinModel
             # macro|btc_mvrv_z_score/*pct_change_7d*,
             # macro|btc_price/std_*,
             # macro|gtrends_altcoin_worldwide/last_*,
-            # macro|btc_mvrv_z_score/pct_change_30d*,
-            # macro|global_volume/last_*,
-            # macro|btc_price/last_*,
-            macro|btc_mvrv_z_score/last_*,
+            macro|btc_mvrv_z_score/pct_change_30d*,
+            macro|global_volume/last_*,
+            macro|btc_price/last_*,
+            # macro|btc_mvrv_z_score/last_*,
             macro|btc_mvrv_z_score/sma_1_std,
             # macro|btc_mvrv_z_score/std_30d*,
             macro|btc_vdd_multiple/std_*,
             macro|btc_vdd_multiple/last_*,
             macro|global_volume/std_*,
             macro|btc_price/pct_change_*,
-            # macro|gtrends_altcoin_worldwide/last_30d_period_*,
+            macro|gtrends_altcoin_worldwide/last_30d_period_*,
             # macro|btc_mvrv_z_score/sma_1_last,
             macro|global_market_cap/last_*,
             macro|global_market_cap/rsi_30*,
@@ -466,16 +468,13 @@ coin_modeling: #CoinModel
             # # '*|wallet/cw_transfers_buys_coin_age_median_w1|*',
 
 
-            # Transformation Category
-            '*|score_wtd/*',
-            '*|score_dist/*',
 
             'training_clusters|*|score_dist/*',
             'training_clusters|*|score_wtd/*',
 
 
             # Wallet Features
-            '*|wallet/*|',
+            '*|wallet/*',
             '*/cw_performance_crypto_net_gain_crypto_inflows_base_w*',
             # '*/transfers_earlybird_ratio_median_w*',
             # '*/cw_transfers_coin_total_buyers_median_w*',
@@ -567,13 +566,13 @@ coin_modeling: #CoinModel
             'market_data|price/ema_3_last_period_*',
             # 'market_data|price/ema_3_pct_change_7d_period_*',
             # 'market_data|price/ema_3_std_7d_period_*',
-            'market_data|price/rsi_7_last_30d_period_*',
+            # 'market_data|price/rsi_7_last_30d_period_*',
             # 'market_data|price/sma_2_pct_change_30d_period_*',
-            'market_data|price/sma_2_std_30d_period_*',
+            # 'market_data|price/sma_2_std_30d_period_*',
             'market_data|volume/sma_2_pct_change_30d_period_2',
             'market_data|volume/sma_2_pct_change_30d_period_3',
             # 'market_data|volume/sma_2_std_30d_period_*',  # high performer
-            'market_data|volume/sma_2_sum_30d_period_*',
+            # 'market_data|volume/sma_2_sum_30d_period_*',
 
             # Transformation Method
             '*aggregations/median*',
@@ -584,17 +583,23 @@ coin_modeling: #CoinModel
             '*aggregations/count',
             '*aggregations/count_pct',
 
-            # '*|*/*/kurt',
+
+            # Transformation Category
+            '*|score_wtd/*',
+            # '*|score_dist/*',
+            # '*/usd_balance_ending|score_dist/*',
+            '*/usd_balance_starting|score_dist/*',
+            '*|*/*/kurt',
             # '*|*/*/median',
-            # '*|*/*/p002',
-            # '*|*/*/p01',
-            # '*|*/*/p05',
-            # '*|*/*/p10',
-            # '*|*/*/p90',
-            # '*|*/*/p95',
+            '*|*/*/p002',
+            '*|*/*/p01',
+            '*|*/*/p05',
+            '*|*/*/p10',
+            '*|*/*/p90',
+            '*|*/*/p95',
             # '*|*/*/p99',
             # '*|*/*/p998',
-            # '*|*/*/skew',
+            '*|*/*/skew',
             # '*|*/*/std',
 
             # 'macro|btc_mvrv_z_score/last_30d_period_1',
@@ -711,7 +716,7 @@ coin_modeling: #CoinModel
 
             # Depth and Child Weight
             # estimator__max_depth: [2,3,4]
-            # estimator__min_child_weight: [10,15,25]
+            estimator__min_child_weight: [10,15,25]
 
             # Col/Row Sampling
             # estimator__subsample: [0.5, .6, .7, .8, .9, 1.0]
@@ -734,15 +739,15 @@ coin_modeling: #CoinModel
             # estimator__max_bin: [128]
             # estimator__tree_method: [hist]
 
-            drop_columns__drop_patterns: [
-                '*aggregations/median*',
-                '*aggregations/std',
-                '*aggregations/mean',
-                '*aggregations/sum',
-                '*aggregations/sum_pct',
-                '*aggregations/count',
-                '*aggregations/count_pct',
-            ]
+            # drop_columns__drop_patterns: [
+            #     '*aggregations/median*',
+            #     '*aggregations/std',
+            #     '*aggregations/mean',
+            #     '*aggregations/sum',
+            #     '*aggregations/sum_pct',
+            #     '*aggregations/count',
+            #     '*aggregations/count_pct',
+            # ]
 
 
 
