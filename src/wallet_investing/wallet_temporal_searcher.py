@@ -1,16 +1,67 @@
 """
-Multi-temporal grid search orchestrator for assessing feature stability across time periods.
+Business logic
+--------------
+* Goal – Orchestrate multi-temporal grid search experiments to assess feature stability
+  and parameter consistency across different investing cycles, enabling robust model selection
+  for cryptocurrency wallet behavior prediction.
+
+* Core Responsibilities
+  - Generate training data across multiple investing cycles with configurable offsets
+  - Execute parallel grid search experiments on each temporal dataset
+  - Consolidate results to identify temporally stable parameter combinations
+  - Build and compare models across investing cycles without grid search
+  - Analyze parameter stability using coefficient of variation metrics
+
+* Workflow Sequence
+  1. Data Generation: `generate_all_training_data()` creates epoch-specific training
+     datasets using multithreaded `WalletEpochsOrchestrator` instances
+  2. Data Loading: `load_all_training_data()` caches pre-generated datasets in memory
+     for efficient repeated access during experiments
+  3. Grid Search: `run_multi_temporal_grid_search()` executes parameter optimization
+     across all investing cycles with period-specific baseline comparisons
+  4. Model Comparison: `run_multi_temporal_model_comparison()` builds models using
+     base parameters (no search) and evaluates performance stability
+  5. Results Analysis: `consolidate_results()` and `analyze_parameter_stability()`
+     provide comprehensive temporal stability metrics
+
+* Key Features
+  - Parallel processing with configurable thread pools for data generation and loading
+  - Automatic period-specific baseline calculations for normalized comparisons
+  - Comprehensive stability analysis using coefficient of variation thresholds
+  - Feature importance aggregation across temporal models
+  - Escape hatch for S3 training data export without model building
+
+Downstream consumers
+--------------------
+* Model Selection Workflows – identifies robust parameters for production deployment
+* Research & Development – temporal stability analysis for feature engineering
+* Risk Management – parameter sensitivity assessment across market conditions
+* MLOps Pipelines – automated model validation across different investing cycles
+
+Key dependencies
+----------------
+* WalletEpochsOrchestrator – generates epoch-specific training datasets
+* WalletModel – provides grid search and model building capabilities
+* Model Evaluation Framework – extracts performance metrics across model types
+* Configuration Management – handles temporal offset and parameter grid definitions
+
+Export capabilities
+-------------------
+* Consolidated grid search results with temporal stability metrics
+* Individual period performance comparisons and model artifacts
+* Parameter ranking by stability and performance combination
+* Feature importance aggregation across all temporal experiments
 """
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import copy
 import gc
 from datetime import datetime
+from collections import defaultdict
 from typing import List, Dict
 from pathlib import Path
 import pandas as pd
 import numpy as np
-from collections import defaultdict
 
 # Local modules
 import wallet_modeling.wallet_epochs_orchestrator as weo
@@ -27,8 +78,37 @@ logger = logging.getLogger(__name__)
 
 class TemporalGridSearcher:
     """
-    Orchestrates grid search experiments across multiple time periods to assess
-    feature stability and consistency of model parameters.
+    Multi-temporal grid search orchestrator for cryptocurrency wallet behavior models.
+
+    Technical overview
+    ------------------
+    * Architecture: Coordinates parallel execution of grid search experiments across
+      multiple investing cycles, with intelligent caching and result consolidation
+
+    * Core Pipeline:
+        1. Generate epoch-specific training datasets with configurable date offsets
+        2. Execute parameter optimization on each temporal dataset with baseline computation
+        3. Build models using base parameters across periods for stability assessment
+        4. Consolidate results with coefficient of variation metrics and stability rankings
+
+    * Concurrency & Memory:
+        - Configurable thread pools for data generation, loading, and processing
+        - Intelligent caching of training datasets in `training_data_cache`
+        - Explicit garbage collection and memory cleanup between experiments
+        - Thread-safe result collection with automatic failure handling
+
+    Key methods
+    -----------
+    * generate_all_training_data(): Parallel epoch dataset generation with caching
+    * run_multi_temporal_grid_search(): Grid search execution across investing cycles
+    * run_multi_temporal_model_comparison(): Model building and evaluation workflow
+    * consolidate_results(): Result aggregation with stability metrics
+
+    Output artifacts
+    ----------------
+    * Consolidated grid search results with temporal stability rankings
+    * Parameter recommendations based on stability and performance metrics
+    * Feature importance aggregation across all temporal experiments
     """
 
     def __init__(
@@ -84,7 +164,7 @@ class TemporalGridSearcher:
         Generate training data for all specified modeling dates using multithreading.
         Caches results for subsequent grid search experiments.
         """
-        logger.milestone(f"Generating training data for {len(self.modeling_dates)} time periods...")
+        logger.milestone(f"Generating training data for {len(self.modeling_dates)} investing cycles...")
         u.notify('robotz_windows_exit')
 
         max_workers = self.wallets_investing_config['n_threads']['training_data_loading']
@@ -185,7 +265,7 @@ class TemporalGridSearcher:
         - max_workers: Maximum number of threads for parallel loading (default: 4)
         """
 
-        logger.milestone("Loading training data for all time periods...")
+        logger.milestone("Loading training data for all investing cycles...")
 
         parquet_folder = self.wallets_config['training_data']['parquet_folder']
         max_workers = self.wallets_investing_config['n_threads']['training_data_loading']
@@ -288,7 +368,7 @@ class TemporalGridSearcher:
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def run_multi_temporal_grid_search(self) -> None:
         """
-        Execute grid search across all time periods and cache results.
+        Execute grid search across all investing cycles and cache results.
         """
         # Validate grid search is enabled
         if not self.wallets_config['modeling']['grid_search_params'].get('enabled',False):
@@ -297,7 +377,7 @@ class TemporalGridSearcher:
         if not self.training_data_cache:
             raise ValueError("No training data loaded. Call load_all_training_data() first")
 
-        logger.milestone(f"Running grid search across {len(self.modeling_dates)} time periods...")
+        logger.milestone(f"Running grid search across {len(self.modeling_dates)} investing cycles...")
 
         for i, modeling_date in enumerate(self.modeling_dates, 1):
             date_str = datetime.strptime(modeling_date, '%Y-%m-%d').strftime('%y%m%d')
@@ -331,7 +411,7 @@ class TemporalGridSearcher:
             del wallet_model, wallet_model_results
             gc.collect()
 
-        logger.milestone("Completed grid search across all time periods")
+        logger.milestone("Completed grid search across all investing cycles")
         u.notify('ui_1')
 
 
@@ -343,7 +423,7 @@ class TemporalGridSearcher:
 
     def consolidate_results(self) -> pd.DataFrame:
         """
-        Consolidate grid search results across all time periods into a summary DataFrame.
+        Consolidate grid search results across all investing cycles into a summary DataFrame.
         Includes period-specific baseline comparisons.
 
         Returns:
@@ -352,7 +432,7 @@ class TemporalGridSearcher:
         if not self.grid_search_results:
             raise ValueError("No grid search results available. Run run_multi_temporal_grid_search() first")
 
-        logger.info("Consolidating grid search results across time periods...")
+        logger.info("Consolidating grid search results across investing cycles...")
 
         # Calculate period-specific baselines first
         period_baselines = {}
@@ -396,7 +476,7 @@ class TemporalGridSearcher:
             # Round the baseline comparison columns
             consolidated_df[baseline_col] = consolidated_df[baseline_col].round(3)
 
-        # Calculate summary statistics across time periods (original scores only)
+        # Calculate summary statistics across investing cycles (original scores only)
         consolidated_df['mean_score'] = consolidated_df[date_columns].mean(axis=1)
         consolidated_df['median_score'] = consolidated_df[date_columns].median(axis=1)
         consolidated_df['std_dev'] = consolidated_df[date_columns].std(axis=1)
@@ -453,13 +533,13 @@ class TemporalGridSearcher:
         baseline_summary = {date: round(baseline, 3) for date, baseline in period_baselines.items()}
         logger.info(f"Period-specific baselines: {baseline_summary}")
         logger.info(f"Consolidated results: {len(consolidated_df)} unique parameter combinations "
-                f"across {len(date_columns)} time periods")
+                f"across {len(date_columns)} investing cycles")
 
         return consolidated_df
 
     def analyze_parameter_stability(self, stability_threshold: float = 0.05) -> pd.DataFrame:
         """
-        Analyze parameter stability across time periods.
+        Analyze parameter stability across investing cycles.
 
         Params:
         - stability_threshold: Maximum acceptable coefficient of variation for stable parameters
@@ -470,7 +550,7 @@ class TemporalGridSearcher:
         if self.consolidated_results is None:
             raise ValueError("No consolidated results available. Run consolidate_results() first")
 
-        logger.info("Analyzing parameter stability across time periods...")
+        logger.info("Analyzing parameter stability across investing cycles...")
 
         # Calculate coefficient of variation (std/mean) for each parameter
         stability_df = self.consolidated_results.copy()
@@ -603,7 +683,7 @@ class TemporalGridSearcher:
             "="*60,
             "MULTI-TEMPORAL GRID SEARCH SUMMARY",
             "="*60,
-            f"Time periods analyzed: {len(self.modeling_dates)}",
+            f"investing cycles analyzed: {len(self.modeling_dates)}",
             f"Date range: {min(self.modeling_dates)} to {max(self.modeling_dates)}",
             f"Total parameter combinations: {len(self.consolidated_results)}",
             f"Stable combinations: {stability_df['is_stable'].sum()}",
@@ -653,7 +733,7 @@ class TemporalGridSearcher:
         min_scores: int = 10,       # only used for data viz
     ) -> pd.DataFrame:
         """
-        Build models for each time period using base parameters (no grid search)
+        Build models for each investing cycle using base parameters (no grid search)
         and consolidate their performance metrics for comparison.
 
         Params:
@@ -662,12 +742,12 @@ class TemporalGridSearcher:
 
 
         Returns:
-        - comparison_df: DataFrame with performance metrics across all time periods
+        - comparison_df: DataFrame with performance metrics across all investing cycles
         """
         if not self.training_data_cache:
             raise ValueError("No training data loaded. Call load_all_training_data() first")
 
-        logger.milestone(f"Building and evaluating models across {len(self.modeling_dates)} time periods...")
+        logger.milestone(f"Building and evaluating models across {len(self.modeling_dates)} investing cycles...")
 
         performance_results = {}
 
@@ -751,13 +831,13 @@ class TemporalGridSearcher:
         comparison_df = pd.DataFrame.from_dict(performance_results, orient='index')
         comparison_df = comparison_df.reset_index().rename(columns={'index': 'date_str'})
 
-        # Add summary statistics across time periods
+        # Add summary statistics across investing cycles
         self._add_performance_summary_stats(comparison_df)
 
         # Cache results
         self.model_comparison_results = comparison_df
 
-        logger.milestone("Completed model comparison across all time periods")
+        logger.milestone("Completed model comparison across all investing cycles.")
         u.notify('ui_1')
 
         return comparison_df
@@ -875,10 +955,10 @@ class TemporalGridSearcher:
 
     def _add_performance_summary_stats(self, comparison_df: pd.DataFrame) -> None:
         """
-        Add summary statistics across time periods to the comparison DataFrame.
+        Add summary statistics across investing cycles to the comparison DataFrame.
 
         Params:
-        - comparison_df: DataFrame with performance metrics for each time period
+        - comparison_df: DataFrame with performance metrics for each investing cycle
         """
         # Exclude SUMMARY row if it already exists and metadata columns
         data_rows = comparison_df[comparison_df['date_str'] != 'SUMMARY'].copy()
@@ -933,7 +1013,7 @@ class TemporalGridSearcher:
             "MULTI-TEMPORAL MODEL COMPARISON SUMMARY",
             "="*60,
             f"Model Type: {model_type}",
-            f"Time periods analyzed: {len(self.modeling_dates)}",
+            f"investing cycles analyzed: {len(self.modeling_dates)}",
             f"Date range: {min(self.modeling_dates)} to {max(self.modeling_dates)}",
             "",
             "PERFORMANCE STABILITY METRICS:",
@@ -985,7 +1065,7 @@ class TemporalGridSearcher:
         Aggregate feature importance across all models generated by temporal grid search.
 
         Returns:
-        - importance_stats_df: DataFrame with importance statistics across time periods
+        - importance_stats_df: DataFrame with importance statistics across investing cycles
         """
         if self.model_comparison_results is None:
             raise ValueError("No model comparison results available. Run run_multi_temporal_model_comparison() first")
