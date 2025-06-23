@@ -498,6 +498,8 @@ class WalletModel(BaseModel):
         # Validate configuration
         parent_folder = export_config.get('parent_folder', '')
         batch_folder = export_config.get('batch_folder', '')
+        if export_config['dev_mode']:
+            batch_folder = f"{batch_folder}_dev"
 
         # Check for spaces in folder names
         if ' ' in parent_folder:
