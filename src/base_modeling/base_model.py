@@ -124,6 +124,10 @@ class BaseModel:
         self.start_time = time.time()
         self.training_time = None
 
+        # Validate presence of grid_search_params
+        if 'grid_search_params' not in self.modeling_config:
+            raise ConfigError("Missing 'grid_search_params' in modeling_config")
+
         # Convert drop patterns to a list of lists
         param_grid = self.modeling_config.get('grid_search_params', {}).get('param_grid', {})
         if 'drop_columns__drop_patterns' in param_grid \
