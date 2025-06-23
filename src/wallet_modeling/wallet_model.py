@@ -1,8 +1,9 @@
+import sys
 import logging
 from typing import Dict, Union, Tuple
-import pandas as pd
 from pathlib import Path
 import json
+import pandas as pd
 import numpy as np
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import precision_recall_curve
@@ -92,10 +93,12 @@ class WalletModel(BaseModel):
         # Split data
         self._split_data(X, y)
 
-        # ESCAPE: Check for S3 export configuration and export if enabled
-        logger.warning("Skipping model construction and preparing data for S3 export...")
+        # ESCAPE: Skip model construction and export training datasets to S3 if configured
         export_config = self.modeling_config.get('export_s3_training_data', {})
         if export_config.get('enabled', False):
+            logger.warning(
+                "export_s3_training_data enabled — skipping model construction and exporting datasets..."
+            )
             return self._export_s3_training_data(export_config)
 
         # Asymmetric loss is slow so broadcast a warning
@@ -463,10 +466,22 @@ class WalletModel(BaseModel):
         Export the exact training and target data that will be fed to the model as parquet files.
         This captures data after all filtering, transformations, and cohort selection.
 
+        Files are exported with date-based naming using the modeling_period_start date:
+        Final filepath: {parent_folder}/{batch_folder}/{filename}_{YYMMDD}.parquet
+        Example: ../sagemaker/s3_wallet_loading_queue/dda858_batch/x_train_240315.parquet
+
+        Exported files:
+        - x_train_{YYMMDD}.parquet, y_train_{YYMMDD}.parquet
+        - x_eval_{YYMMDD}.parquet, y_eval_{YYMMDD}.parquet
+        - x_test_{YYMMDD}.parquet, y_test_{YYMMDD}.parquet
+        - x_validation_{YYMMDD}.parquet, y_validation_{YYMMDD}.parquet
+        - export_metadata_{YYMMDD}.json
+
         This method interacts with:
         - self.X_train/X_eval/X_test, self.y_train/y_eval/y_test (from BaseModel._split_data)
         - self.X_validation, self.validation_target_vars_df (set in construct_wallet_model)
         - self.y_pipeline (from BaseModel._get_meta_pipeline -> _get_y_pipeline)
+        - The latest date in self.X_train to get the filename date
         - utils.numpy_type_converter for JSON serialization
         - utils.ConfigError for configuration validation
 
@@ -510,6 +525,10 @@ class WalletModel(BaseModel):
         export_folder = parent_path / batch_folder
         export_folder.mkdir(parents=True, exist_ok=True)
 
+        # Generate date suffix by extracting the latest modeling_epoch_start
+        modeling_date = self.X_train.index.get_level_values("epoch_start_date").max()
+        date_suffix = pd.to_datetime(modeling_date, '%Y-%m-%d').strftime('%y%m%d')
+
         # Build meta pipeline to get y_pipeline for target transformation
         meta_pipeline = self._get_meta_pipeline()
 
@@ -536,17 +555,17 @@ class WalletModel(BaseModel):
         # Apply dev_mode sampling if enabled
         dev_mode = export_config.get('dev_mode', False)
         if dev_mode:
-            logger.warning("Dev mode enabled - sampling 1000 rows from each dataset")
+            logger.info("Dev mode enabled - sampling 1000 rows from each dataset")
             for name, data in datasets.items():
                 if data is not None and not data.empty and len(data) > 1000:
                     datasets[name] = data.sample(n=1000, random_state=42).sort_index()
                     logger.info(f"Sampled {name} from {len(data)} to {len(datasets[name])} rows")
 
-        # Export each dataset as parquet
+        # Export each dataset as parquet with date-based naming
         exported_files = {}
         for name, data in datasets.items():
             if data is not None and not data.empty:
-                file_path = export_folder / f"{name}.parquet"
+                file_path = export_folder / f"{name}_{date_suffix}.parquet"
 
                 # Convert Series to DataFrame for parquet export
                 if isinstance(data, pd.Series):
@@ -558,7 +577,7 @@ class WalletModel(BaseModel):
 
                 exported_files[name] = {
                     'path': str(file_path),
-                    'shape': data.shape
+                    'shape': data.shape,
                 }
                 logger.info(f"Exported {name} with shape {data.shape} to {file_path}")
 
@@ -572,19 +591,16 @@ class WalletModel(BaseModel):
             'y_pipeline_steps': [step[0] for step in meta_pipeline.y_pipeline.steps]
         }
 
-        # Export metadata as JSON to the S3 bucket
-        metadata_path = export_folder / "export_metadata.json"
-        with open(metadata_path, 'w') as f:
-            json.dump(metadata, f, indent=2, default=u.numpy_type_converter)
+        # Export metadata as JSON (handling numpy, datetime, and infinite values)
+        metadata_path = export_folder / f"export_metadata_{date_suffix}.json"
+        # write JSON with utf-8 encoding, using numpy_type_converter for special types
+        with open(metadata_path, 'w', encoding='utf-8') as f:
+            json.dump(
+                metadata,
+                f,
+                indent=2,
+                ensure_ascii=False,
+                default=u.numpy_type_converter
+            )
 
         logger.milestone(f"Successfully exported S3 training data to {export_folder}")
-
-        # Return result indicating export completion instead of trained model
-        return {
-            'model_id': self.model_id,
-            'modeling_config': self.modeling_config,
-            'export_completed': True,
-            'export_folder': str(export_folder),
-            'exported_files': exported_files,
-            'metadata_path': str(metadata_path)
-        }

@@ -685,11 +685,18 @@ class TemporalGridSearcher:
             date_config['modeling']['grid_search_params']['enabled'] = False
 
             # Initialize model with date-specific config
-            wallet_model = wm.WalletModel(copy.deepcopy(date_config['modeling']))
+            wallet_model = wm.WalletModel(copy.deepcopy(date_config['modeling'], self.wallets_config))
 
             # Build model without grid search
             training_data = self.training_data_cache[date_str]
             wallet_model_results = wallet_model.construct_wallet_model(*training_data, self.wallets_config)
+
+            # Escape early when only exporting S3 training data
+            if date_config['modeling'].get('export_s3_training_data', {}).get('enabled', False):
+                logger.milestone(
+                    "S3 training data export enabled — exiting run_multi_temporal_model_comparison."
+                )
+                return
 
             # Generate evaluator and extract metrics
             model_id, evaluator, _ = wimr.generate_and_save_wallet_model_artifacts(
