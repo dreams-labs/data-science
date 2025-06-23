@@ -123,6 +123,7 @@ class BaseModel:
         # Utils
         self.start_time = time.time()
         self.training_time = None
+        self.asymmetric_loss_enabled = modeling_config['asymmetric_loss'].get('enabled',False)
 
         # Validate presence of grid_search_params
         if 'grid_search_params' not in self.modeling_config:

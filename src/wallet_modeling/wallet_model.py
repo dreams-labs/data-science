@@ -1,4 +1,3 @@
-import sys
 import logging
 from typing import Dict, Union, Tuple
 from pathlib import Path
@@ -155,7 +154,7 @@ class WalletModel(BaseModel):
         self.y_eval  = self.y_pipeline.transform(self.y_eval)
 
         # Convert multi-class labels to binary for asymmetric loss
-        if self.modeling_config.get('asymmetric_loss', {}).get('enabled'):
+        if self.asymmetric_loss_enabled:
             self.y_train = pd.Series((self.y_train == 2).astype(int), index=self.X_train.index)
             self.y_test  = pd.Series((self.y_test == 2).astype(int), index=self.X_test.index)
             self.y_eval  = pd.Series((self.y_eval == 2).astype(int), index=self.X_eval.index)
@@ -172,7 +171,7 @@ class WalletModel(BaseModel):
             result['y_validation'] = self.y_pipeline.transform(self.validation_target_vars_df)
 
             # Also convert validation multiclass labels if present
-            if self.modeling_config.get('asymmetric_loss', {}).get('enabled'):
+            if self.asymmetric_loss_enabled:
                 result['y_validation'] = pd.Series((result['y_validation'] == 2).astype(int),
                                                    index=self.X_validation.index)
 
@@ -378,7 +377,7 @@ class WalletModel(BaseModel):
             gs_config['param_grid']['y_pipeline__target_selector__target_var_max_threshold'] = max_thresholds
 
         # Validate asymmetric loss compatibility with threshold grid search
-        asymmetric_enabled = self.modeling_config.get('asymmetric_loss', {}).get('enabled', False)
+        asymmetric_enabled = self.asymmetric_loss_enabled
         threshold_params = [
             'target_selector__target_variable',
             'target_selector__target_var_min_threshold',
@@ -409,7 +408,7 @@ class WalletModel(BaseModel):
                 gs_config['param_grid'][prefixed_param] = param_grid_y[param]
 
         # Validate asymmetric loss compatibility
-        asymmetric_enabled = self.modeling_config.get('asymmetric_loss', {}).get('enabled', False)
+        asymmetric_enabled = self.asymmetric_loss_enabled
         threshold_params = [
             'target_selector__target_variable',
             'target_selector__target_var_min_threshold',
@@ -498,7 +497,7 @@ class WalletModel(BaseModel):
         # Validate configuration
         parent_folder = export_config.get('parent_folder', '')
         batch_folder = export_config.get('batch_folder', '')
-        if export_config['dev_mode']:
+        if export_config.get('dev_mode', False):
             batch_folder = f"{batch_folder}_dev"
 
         # Check for spaces in folder names
@@ -538,50 +537,70 @@ class WalletModel(BaseModel):
         y_train_transformed = meta_pipeline.y_pipeline.transform(self.y_train)
         y_eval_transformed = meta_pipeline.y_pipeline.transform(self.y_eval)
         y_test_transformed = meta_pipeline.y_pipeline.transform(self.y_test)
+        y_val_transformed = meta_pipeline.y_pipeline.transform(self.validation_target_vars_df)
+
+        # Convert multi-class labels to binary for asymmetric loss
+        if self.asymmetric_loss_enabled:
+            y_train_transformed = pd.Series((y_train_transformed == 2).astype(int), index=self.X_train.index)
+            y_test_transformed  = pd.Series((y_test_transformed == 2).astype(int), index=self.X_test.index)
+            y_eval_transformed  = pd.Series((y_eval_transformed == 2).astype(int), index=self.X_eval.index)
+            y_val_transformed  = pd.Series((y_val_transformed == 2).astype(int), index=self.X_validation.index)
 
         # Prepare datasets for export with standardized lowercase names
         datasets = {
             'x_train': self.X_train,
-            'y_train': y_train_transformed,
-            'x_eval': self.X_eval,
-            'y_eval': y_eval_transformed,
             'x_test': self.X_test,
-            'y_test': y_test_transformed
+            'x_eval': self.X_eval,
+            'x_val': self.X_validation,
+            'y_train': y_train_transformed,
+            'y_eval': y_eval_transformed,
+            'y_test': y_test_transformed,
+            'y_val': y_val_transformed,
         }
 
         # Add validation data
-        y_validation_transformed = meta_pipeline.y_pipeline.transform(self.validation_target_vars_df)
-        datasets['x_validation'] = self.X_validation
-        datasets['y_validation'] = y_validation_transformed
+
 
         # Apply dev_mode sampling if enabled
         dev_mode = export_config.get('dev_mode', False)
-        if dev_mode:
-            logger.info("Dev mode enabled - sampling 1000 rows from each dataset")
-            for name, data in datasets.items():
-                if data is not None and not data.empty and len(data) > 1000:
-                    datasets[name] = data.sample(n=1000, random_state=42).sort_index()
-                    logger.info(f"Sampled {name} from {len(data)} to {len(datasets[name])} rows")
-
-        # Export each dataset as parquet with date-based naming
         exported_files = {}
+
         for name, data in datasets.items():
-            if data is not None and not data.empty:
-                file_path = export_folder / f"{name}_{date_suffix}.parquet"
+            # Convert numpy ndarrays to Series for unified handling
+            if isinstance(data, np.ndarray):
+                raise ValueError("Data must be a DataFrame or Series with IDs as " \
+                                 "the index.")
+            # --- Validate dataset presence and non-emptiness ---
+            if data is None:
+                raise ValueError(
+                    f"{name} dataset is None – cannot export S3 training data "
+                    f"(model_id={self.model_id}, date_suffix={date_suffix})"
+                )
+            if isinstance(data, (pd.DataFrame, pd.Series)) and data.empty:
+                raise ValueError(
+                    f"{name} dataset is empty – cannot export S3 training data "
+                    f"(shape={data.shape}, model_id={self.model_id}, date_suffix={date_suffix})"
+                )
 
-                # Convert Series to DataFrame for parquet export
-                if isinstance(data, pd.Series):
-                    data_to_export = data.to_frame()
-                else:
-                    data_to_export = data
+            # --- Optional down-sampling for dev mode ---
+            if dev_mode and len(data) > 1000:
+                original_len = len(data)
+                data = data.sample(n=1000, random_state=42).sort_index()
+                logger.info(f"[DevMode] Sampled {name} from {original_len} to {len(data)} rows")
 
-                data_to_export.to_parquet(file_path, index=True)
+            file_path = export_folder / f"{name}_{date_suffix}.parquet"
 
-                exported_files[name] = {
-                    'path': str(file_path),
-                    'shape': data.shape,
-                }
-                logger.info(f"Exported {name} with shape {data.shape} to {file_path}")
+            # Convert Series to DataFrame for parquet export
+            data_to_export = data.to_frame() if isinstance(data, pd.Series) else data
+
+            data_to_export.to_parquet(file_path, index=True)
+
+            exported_files[name] = {
+                'path': str(file_path),
+                'shape': data.shape,
+            }
+            logger.info(f"Exported {name} with shape {data.shape} to {file_path}")
+
 
         # Export metadata about the modeling configuration
         metadata = {

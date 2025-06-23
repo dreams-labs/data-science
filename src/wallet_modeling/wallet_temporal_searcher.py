@@ -693,10 +693,8 @@ class TemporalGridSearcher:
 
             # Escape early when only exporting S3 training data
             if date_config['modeling'].get('export_s3_training_data', {}).get('enabled', False):
-                logger.milestone(
-                    "S3 training data export enabled — exiting run_multi_temporal_model_comparison."
-                )
-                return
+                logger.info(f"S3 training data export completed for modeling date '{modeling_date}'.")
+                continue
 
             # Generate evaluator and extract metrics
             model_id, evaluator, _ = wimr.generate_and_save_wallet_model_artifacts(
@@ -742,6 +740,12 @@ class TemporalGridSearcher:
             # Clear model memory
             del wallet_model, wallet_model_results, evaluator
             gc.collect()
+
+        # Escape if we're just exporting data
+        if date_config['modeling'].get('export_s3_training_data', {}).get('enabled', False):
+            logger.milestone(f"S3 training data export completed for all {len(self.modeling_dates)} "
+                             "modeling dates.")
+            return
 
         # Consolidate results into DataFrame
         comparison_df = pd.DataFrame.from_dict(performance_results, orient='index')
