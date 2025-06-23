@@ -64,12 +64,39 @@ class BaseModel:
     """
     Base class for XGBoost-based prediction models.
     Handles core pipeline functionality, data preparation, and model training.
-    """
 
-    def __init__(self, modeling_config):
+    Technical Architecture:
+    - Uses MetaPipeline to coordinate separate X and y transformations
+    - Integrates custom scorers that transform y before evaluation during grid search
+    - Supports regression, binary classification, and 3-class asymmetric classification
+    - Implements early stopping with separate eval set (not cross-validation folds)
+
+    Key Methods:
+    - construct_base_model(): Main entry point, orchestrates grid search and training
+    - _get_base_pipeline(): Builds sklearn Pipeline with feature selection + XGBoost
+    - _get_meta_pipeline(): Wraps base pipeline in MetaPipeline with y transformations
+    - _run_grid_search(): Executes RandomizedSearchCV with custom scorers
+    - _fit(): Handles actual training including multi-phase training support
+
+    Configuration:
+    All behavior controlled through modeling_config dict including:
+    - Model type and parameters
+    - Feature selection thresholds
+    - Grid search parameters and scorer selection
+    - Train/eval/test split ratios
+
+    Usage Pattern:
+    BaseModel provides the modeling engine and wallet-specific features are built on top
+    such as methods for loading wallet/coin data and creating features, while BaseModel's
+    construct_base_model() used to actually train the model. Think of BaseModel as the
+    reusable modeling toolkit that domain-specific models build upon.
+
+    See module docstring for overall workflow and business logic details.
+    """
+    def __init__(self, modeling_config: dict):
         """
         Params:
-        - wallets_config (dict): configuration dictionary for modeling parameters.
+        - modeling_config (dict): configuration dictionary for modeling parameters.
         """
         # Generate ID
         self.model_id = str(uuid.uuid4())
