@@ -1004,7 +1004,7 @@ def notify(sound_name: Union[str, int] = None, prompt: str = None, voice_id: str
     config_path = sounds_directory / "notification_sounds.yaml"
 
     # Overall adjustment to all sound levels; if set to 0.0 all sounds will be muted
-    dampen_level = float(os.environ.get('NOTIFICATION_DAMPEN', '0.60'))
+    dampen_level = float(os.environ.get('NOTIFICATION_DAMPEN', '1.0'))
 
     try:
         with open(config_path, encoding='utf-8') as f:
