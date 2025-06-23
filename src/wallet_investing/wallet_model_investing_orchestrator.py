@@ -26,9 +26,9 @@ logger = logging.getLogger(__name__)
 # ----------------------------------------
 
 # WalletModel
-class WalletsInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
+class WalletModelInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
     """
-    Orchestrates wallet model prediction scoring across multiple investing epochs by
+    Uses a single model_id to orchestrate wallet model prediction scoring across multiple investing epochs by
     offsetting base config dates and scoring with a pre-trained model.
 
     Inherits data loading, config management, and orchestration infrastructure
