@@ -1,6 +1,30 @@
 """
 Orchestrates the scoring of wallet training data across multiple investing epochs using
-a pre-trained wallet model to evaluate long-term prediction performance.
+a single pre-trained wallet model to evaluate long-term prediction performance.
+
+Key Business Logic Steps
+------------------------
+1. Build fresh data for every cycle
+   • Pull cleaned features/targets from WalletEpochsOrchestrator
+   • Apply any cohort or date filters defined in modeling_config
+   • Persist the assembled training/validation parquet files for reproducibility
+
+2. Train and select a model
+   • Kick off a grid search on WalletModel to find the best hyper-params
+   • Save the fitted model and its metadata under modeling/ for later audit
+   • Capture validation metrics so downstream dashboards know how the model behaved when
+        it was born
+
+3. Score the next investment period
+   • Use the freshly trained model to predict wallet scores for the forward period (usually
+        the next 30 days)
+   • Write those scores to modeling/wallet_scores so portfolio code can allocate capital
+        the same day
+
+4. Track performance over time
+   • Log realised returns vs predictions once the forward window closes
+   • Surface drift or degradation signals back to the config so future runs can adjust
+        thresholds, features, or grid-search space
 """
 from pathlib import Path
 import logging
@@ -28,13 +52,35 @@ logger = logging.getLogger(__name__)
 # WalletModel
 class WalletModelInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
     """
-    Uses a single model_id to orchestrate wallet model prediction scoring across multiple investing epochs by
-    offsetting base config dates and scoring with a pre-trained model.
+    Coordinates end‑to‑end model training and prediction for every investment
+    cycle.
 
-    Inherits data loading, config management, and orchestration infrastructure
-    from CoinEpochsOrchestrator while focusing on prediction scoring rather than training.
+    Key Methods
+    -----------
+    run_cycle(cycle_date: str) -> None
+        • Invokes _build_cycle_training_data to assemble features/targets
+        • Calls _train_model to perform grid search and persist the model
+        • Executes _score_forward_period to create wallet‑level predictions
+
+    _build_cycle_training_data() -> Tuple[pandas.DataFrame, pandas.DataFrame]
+        Wraps WalletEpochsOrchestrator.build_all_wallet_data then trims to the
+        training/validation windows required by modeling_config.
+
+    _train_model() -> WalletModel
+        Instantiates WalletModel, runs GridSearchCV (if enabled), saves the
+        best_estimator_ plus validation metrics to disk.
+
+    _score_forward_period(model: WalletModel) -> None
+        Generates predictions for the forward period, writes a timestamped
+        scores parquet, and queues any post‑processing callbacks.
+
+    Notes
+    -----
+    • Every artefact is stamped with cycle_date so historical results are
+    never overwritten.
+    • The class is intentionally stateless between cycles; all state lives on
+    disk to make reruns idempotent.
     """
-
     def __init__(
         self,
 
