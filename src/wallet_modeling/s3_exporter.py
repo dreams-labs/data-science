@@ -159,7 +159,7 @@ def export_s3_training_data(
         # --- Optional down-sampling for dev mode ---
         if dev_mode and len(data) > 1000:
             original_len = len(data)
-            data = data.sample(n=1000, random_state=42).sort_index()
+            data = data.head(1000)
             logger.info(f"[DevMode] Sampled {name} from {original_len} to {len(data)} rows")
 
         file_path = export_folder / f"{name}_{date_suffix}.parquet"
