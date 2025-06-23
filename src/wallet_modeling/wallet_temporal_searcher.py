@@ -9,6 +9,8 @@ from datetime import datetime
 from typing import List, Dict
 from pathlib import Path
 import pandas as pd
+import numpy as np
+from collections import defaultdict
 
 # Local modules
 import wallet_modeling.wallet_epochs_orchestrator as weo
@@ -50,7 +52,7 @@ class TemporalGridSearcher:
         - wallets_epochs_config: Epochs configuration
         - modeling_dates: List of modeling period start dates (YYYY-MM-DD format)
         """
-        self.base_wallets_config = copy.deepcopy(base_wallets_config)
+        self.wallets_config = copy.deepcopy(base_wallets_config)
         self.wallets_investing_config = wallets_investing_config
         self.wallets_metrics_config = wallets_metrics_config
         self.wallets_features_config = wallets_features_config
@@ -160,7 +162,7 @@ class TemporalGridSearcher:
         # Handle any failures
         if failed_dates:
             error_details = "\n".join([f"  {date}: {error}" for date, error in failed_dates])
-            logger.error(f"Failed to generate training data for {len(failed_dates)} dates:\n{error_details}")
+            logger.error(f"Failed to generate training data for dates {failed_dates}:\n{error_details}")
 
             # Raise error for the first failure
             first_failed_date, first_error = failed_dates[0]
@@ -185,7 +187,7 @@ class TemporalGridSearcher:
 
         logger.milestone("Loading training data for all time periods...")
 
-        parquet_folder = self.base_wallets_config['training_data']['parquet_folder']
+        parquet_folder = self.wallets_config['training_data']['parquet_folder']
         max_workers = self.wallets_investing_config['n_threads']['training_data_loading']
 
         def load_single_date(modeling_date: str) -> tuple:
@@ -213,7 +215,7 @@ class TemporalGridSearcher:
                 date_config = self._create_date_config(modeling_date)
                 if date_config['training_data']['predrop_features']:
                     drop_patterns = date_config['modeling']['feature_selection']['drop_patterns']
-                    protected_columns = self.base_wallets_config['modeling']['feature_selection']['protected_features']
+                    protected_columns = self.wallets_config['modeling']['feature_selection']['protected_features']
                     col_dropper = bp.DropColumnPatterns(drop_patterns, protected_columns)
                     wallet_training_data_df = col_dropper.fit_transform(wallet_training_data_df)
                     validation_training_data_df = col_dropper.fit_transform(validation_training_data_df)
@@ -289,7 +291,7 @@ class TemporalGridSearcher:
         Execute grid search across all time periods and cache results.
         """
         # Validate grid search is enabled
-        if not self.base_wallets_config['modeling']['grid_search_params'].get('enabled',False):
+        if not self.wallets_config['modeling']['grid_search_params'].get('enabled',False):
             raise ValueError("Grid search must be enabled in base configuration")
 
         if not self.training_data_cache:
@@ -566,14 +568,14 @@ class TemporalGridSearcher:
     # Helper Methods
     def _create_date_config(self, modeling_date: str) -> dict:
         """Create configuration with specified modeling_period_start date."""
-        date_config = copy.deepcopy(self.base_wallets_config)
+        date_config = copy.deepcopy(self.wallets_config)
         date_config['training_data']['modeling_period_start'] = modeling_date
         return wcm.add_derived_values(date_config)
 
 
     def _check_data_exists(self, modeling_date: str) -> bool:
         """Check if training data already exists for the specified date."""
-        parquet_folder = self.base_wallets_config['training_data']['parquet_folder']
+        parquet_folder = self.wallets_config['training_data']['parquet_folder']
         date_str = datetime.strptime(modeling_date, '%Y-%m-%d').strftime('%y%m%d')
 
         required_files = [
@@ -629,7 +631,7 @@ class TemporalGridSearcher:
         """Calculate population baseline from sample training data."""
         _, _, _, validation_target_vars_df = training_data_tuple
 
-        target_var = self.base_wallets_config['modeling']['target_variable']
+        target_var = self.wallets_config['modeling']['target_variable']
         if target_var in validation_target_vars_df.columns:
             returns = validation_target_vars_df[target_var]
             return u.winsorize(returns, 0.001).mean()
@@ -640,15 +642,15 @@ class TemporalGridSearcher:
 
 
 
-    # ----------------------------------
-    #    Non-Search Modeling Sequence
-    # ----------------------------------
+    # ---------------------------------
+    #    Temporal Modeling Sequence
+    # ---------------------------------
 
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def run_multi_temporal_model_comparison(
         self,
-        score_filter: float = 0.2,
-        min_scores: int = 10,
+        score_filter: float = 0.2,  # only used for data viz
+        min_scores: int = 10,       # only used for data viz
     ) -> pd.DataFrame:
         """
         Build models for each time period using base parameters (no grid search)
@@ -687,7 +689,7 @@ class TemporalGridSearcher:
 
             # Build model without grid search
             training_data = self.training_data_cache[date_str]
-            wallet_model_results = wallet_model.construct_wallet_model(*training_data)
+            wallet_model_results = wallet_model.construct_wallet_model(*training_data, self.wallets_config)
 
             # Generate evaluator and extract metrics
             model_id, evaluator, _ = wimr.generate_and_save_wallet_model_artifacts(
@@ -706,6 +708,7 @@ class TemporalGridSearcher:
             performance_results[date_str] = {
                 'modeling_date': modeling_date,
                 'model_type': wallet_model_results['model_type'],
+                'model_id': model_id,
                 **self._extract_performance_metrics(evaluator)
             }
 
@@ -748,6 +751,14 @@ class TemporalGridSearcher:
 
         return comparison_df
 
+
+
+
+
+
+    # ----------------------------
+    #    Reporting and Analysis
+    # ----------------------------
 
     def _extract_performance_metrics(self, evaluator) -> dict:
         """
