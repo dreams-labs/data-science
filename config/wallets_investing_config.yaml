@@ -28,8 +28,8 @@ training_data:
     # toggle_overwrite_multioffset_parquet: True  # determines whether to load preexisting training_data_dfs
     toggle_overwrite_multioffset_parquet: False  # determines whether to load preexisting training_data_dfs
 
-    # toggle_graph_wallet_performance: True  # whether to product charts for wallet models
-    toggle_graph_wallet_performance: False  # whether to product charts for wallet models
+    toggle_graph_wallet_performance: True  # whether to product charts for wallet models
+    # toggle_graph_wallet_performance: False  # whether to product charts for wallet models
 
 # WalletModel
 # Params that define trading strategy
