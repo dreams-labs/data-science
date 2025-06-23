@@ -1,3 +1,31 @@
+"""
+Core modeling framework for XGBoost-based prediction with custom pipeline management.
+
+This BaseModel contains shared methods called by classes:
+    - WalletModel (wallet_modeling/wallet_model.py)
+    - CoinModel (coin_modeling/coin_model.py)
+
+The BaseModel class orchestrates the entire modeling workflow:
+1. Data preparation and train/eval/test splitting
+2. Pipeline construction using components from pipeline.py (MetaPipeline, TargetVarSelector, etc.)
+3. Grid search with custom scorers from scorers.py
+4. Model training with optional multi-phase training and asymmetric loss
+
+Key integrations:
+- **pipeline.py**: Provides MetaPipeline for simultaneous X/y transformations, TargetVarSelector
+  for multi-column target handling, FeatureSelector and DropColumnPatterns for feature reduction
+- **scorers.py**: Custom scoring functions that handle y transformations during grid search,
+  enabling proper evaluation of models with complex target preprocessing
+- **feature_selection.py**: Utilities for variance/correlation-based feature removal used by
+  the pipeline components
+
+The class handles both regression and classification (binary and asymmetric 3-class), with
+extensive configuration through modeling_config dict. Designed to be extended by domain-specific
+model classes (WalletModel, CoinModel) that add their own data loading and feature engineering.
+
+Grid search intelligently scales from single parameter tests to complex multi-pattern feature
+selection experiments, always maintaining compatibility with early stopping and custom metrics.
+"""
 # Multithreading configurations for grid search
 import os
 os.environ['OMP_NUM_THREADS'] = '12'
@@ -36,12 +64,39 @@ class BaseModel:
     """
     Base class for XGBoost-based prediction models.
     Handles core pipeline functionality, data preparation, and model training.
-    """
 
-    def __init__(self, modeling_config):
+    Technical Architecture:
+    - Uses MetaPipeline to coordinate separate X and y transformations
+    - Integrates custom scorers that transform y before evaluation during grid search
+    - Supports regression, binary classification, and 3-class asymmetric classification
+    - Implements early stopping with separate eval set (not cross-validation folds)
+
+    Key Methods:
+    - construct_base_model(): Main entry point, orchestrates grid search and training
+    - _get_base_pipeline(): Builds sklearn Pipeline with feature selection + XGBoost
+    - _get_meta_pipeline(): Wraps base pipeline in MetaPipeline with y transformations
+    - _run_grid_search(): Executes RandomizedSearchCV with custom scorers
+    - _fit(): Handles actual training including multi-phase training support
+
+    Configuration:
+    All behavior controlled through modeling_config dict including:
+    - Model type and parameters
+    - Feature selection thresholds
+    - Grid search parameters and scorer selection
+    - Train/eval/test split ratios
+
+    Usage Pattern:
+    BaseModel provides the modeling engine and wallet-specific features are built on top
+    such as methods for loading wallet/coin data and creating features, while BaseModel's
+    construct_base_model() used to actually train the model. Think of BaseModel as the
+    reusable modeling toolkit that domain-specific models build upon.
+
+    See module docstring for overall workflow and business logic details.
+    """
+    def __init__(self, modeling_config: dict):
         """
         Params:
-        - wallets_config (dict): configuration dictionary for modeling parameters.
+        - modeling_config (dict): configuration dictionary for modeling parameters.
         """
         # Generate ID
         self.model_id = str(uuid.uuid4())
@@ -68,6 +123,11 @@ class BaseModel:
         # Utils
         self.start_time = time.time()
         self.training_time = None
+        self.asymmetric_loss_enabled = modeling_config['asymmetric_loss'].get('enabled',False)
+
+        # Validate presence of grid_search_params
+        if 'grid_search_params' not in self.modeling_config:
+            raise ConfigError("Missing 'grid_search_params' in modeling_config")
 
         # Convert drop patterns to a list of lists
         param_grid = self.modeling_config.get('grid_search_params', {}).get('param_grid', {})

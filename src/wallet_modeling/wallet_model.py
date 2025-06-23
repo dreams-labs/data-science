@@ -1,5 +1,7 @@
 import logging
 from typing import Dict, Union, Tuple
+from pathlib import Path
+import json
 import pandas as pd
 import numpy as np
 from sklearn.pipeline import Pipeline
@@ -90,6 +92,14 @@ class WalletModel(BaseModel):
         # Split data
         self._split_data(X, y)
 
+        # ESCAPE: Skip model construction and export training datasets to S3 if configured
+        export_config = self.modeling_config.get('export_s3_training_data', {})
+        if export_config.get('enabled', False):
+            logger.warning(
+                "export_s3_training_data enabled — skipping model construction and exporting datasets..."
+            )
+            return self._export_s3_training_data(export_config)
+
         # Asymmetric loss is slow so broadcast a warning
         if self.modeling_config['asymmetric_loss'].get('enabled',False):
             logger.warning("Beginning extended training with asymmetric loss target variables...")
@@ -144,7 +154,7 @@ class WalletModel(BaseModel):
         self.y_eval  = self.y_pipeline.transform(self.y_eval)
 
         # Convert multi-class labels to binary for asymmetric loss
-        if self.modeling_config.get('asymmetric_loss', {}).get('enabled'):
+        if self.asymmetric_loss_enabled:
             self.y_train = pd.Series((self.y_train == 2).astype(int), index=self.X_train.index)
             self.y_test  = pd.Series((self.y_test == 2).astype(int), index=self.X_test.index)
             self.y_eval  = pd.Series((self.y_eval == 2).astype(int), index=self.X_eval.index)
@@ -161,7 +171,7 @@ class WalletModel(BaseModel):
             result['y_validation'] = self.y_pipeline.transform(self.validation_target_vars_df)
 
             # Also convert validation multiclass labels if present
-            if self.modeling_config.get('asymmetric_loss', {}).get('enabled'):
+            if self.asymmetric_loss_enabled:
                 result['y_validation'] = pd.Series((result['y_validation'] == 2).astype(int),
                                                    index=self.X_validation.index)
 
@@ -367,7 +377,7 @@ class WalletModel(BaseModel):
             gs_config['param_grid']['y_pipeline__target_selector__target_var_max_threshold'] = max_thresholds
 
         # Validate asymmetric loss compatibility with threshold grid search
-        asymmetric_enabled = self.modeling_config.get('asymmetric_loss', {}).get('enabled', False)
+        asymmetric_enabled = self.asymmetric_loss_enabled
         threshold_params = [
             'target_selector__target_variable',
             'target_selector__target_var_min_threshold',
@@ -398,7 +408,7 @@ class WalletModel(BaseModel):
                 gs_config['param_grid'][prefixed_param] = param_grid_y[param]
 
         # Validate asymmetric loss compatibility
-        asymmetric_enabled = self.modeling_config.get('asymmetric_loss', {}).get('enabled', False)
+        asymmetric_enabled = self.asymmetric_loss_enabled
         threshold_params = [
             'target_selector__target_variable',
             'target_selector__target_var_min_threshold',
@@ -448,3 +458,169 @@ class WalletModel(BaseModel):
             raise ValueError("Prediction dropped some wallet addresses")
 
         return predictions
+
+
+    def _export_s3_training_data(self, export_config: dict) -> Dict[str, any]:
+        """
+        Export the exact training and target data that will be fed to the model as parquet files.
+        This captures data after all filtering, transformations, and cohort selection.
+
+        Files are exported with date-based naming using the modeling_period_start date:
+        Final filepath: {parent_folder}/{batch_folder}/{filename}_{YYMMDD}.parquet
+        Example: ../sagemaker/s3_wallet_loading_queue/dda858_batch/x_train_240315.parquet
+
+        Exported files:
+        - x_train_{YYMMDD}.parquet, y_train_{YYMMDD}.parquet
+        - x_eval_{YYMMDD}.parquet, y_eval_{YYMMDD}.parquet
+        - x_test_{YYMMDD}.parquet, y_test_{YYMMDD}.parquet
+        - x_validation_{YYMMDD}.parquet, y_validation_{YYMMDD}.parquet
+        - export_metadata_{YYMMDD}.json
+
+        This method interacts with:
+        - self.X_train/X_eval/X_test, self.y_train/y_eval/y_test (from BaseModel._split_data)
+        - self.X_validation, self.validation_target_vars_df (set in construct_wallet_model)
+        - self.y_pipeline (from BaseModel._get_meta_pipeline -> _get_y_pipeline)
+        - The latest date in self.X_train to get the filename date
+        - utils.numpy_type_converter for JSON serialization
+        - utils.ConfigError for configuration validation
+
+        Params:
+        - export_config (dict): Configuration containing parent_folder and batch_folder
+
+        Returns:
+        - result (dict): Export completion status and metadata
+
+        Raises:
+        - ConfigError: If parent_folder doesn't exist or folder names contain spaces
+        """
+        # 1. Validate data
+        # Validate configuration
+        parent_folder = export_config.get('parent_folder', '')
+        batch_folder = export_config.get('batch_folder', '')
+        if export_config.get('dev_mode', False):
+            batch_folder = f"{batch_folder}_dev"
+
+        # Check for spaces in folder names
+        if ' ' in parent_folder:
+            raise u.ConfigError(f"parent_folder cannot contain spaces: '{parent_folder}'")
+        if ' ' in batch_folder:
+            raise u.ConfigError(f"batch_folder cannot contain spaces: '{batch_folder}'")
+
+        # Validate parent folder exists
+        parent_path = Path(parent_folder)
+        if not parent_path.exists():
+            raise u.ConfigError(f"parent_folder does not exist: '{parent_folder}'")
+        if not parent_path.is_dir():
+            raise u.ConfigError(f"parent_folder is not a directory: '{parent_folder}'")
+
+        # Require both X and y validation data
+        if self.X_validation is not None:
+            if self.X_validation.empty:
+                raise ValueError("X_validation is empty - cannot export validation data without features")
+            if self.validation_target_vars_df is None or self.validation_target_vars_df.empty:
+                raise ValueError("validation_target_vars_df is empty - cannot export validation data without targets")
+
+
+        # 2. Export files
+        # Create export directory
+        export_folder = parent_path / batch_folder
+        export_folder.mkdir(parents=True, exist_ok=True)
+
+        # Generate date suffix by extracting the latest modeling_epoch_start
+        modeling_date = self.X_train.index.get_level_values("epoch_start_date").max()
+        date_suffix = pd.to_datetime(modeling_date, '%Y-%m-%d').strftime('%y%m%d')
+
+        # Build meta pipeline to get y_pipeline for target transformation
+        meta_pipeline = self._get_meta_pipeline()
+
+        # Transform targets using the same y_pipeline that would be used in training
+        y_train_transformed = meta_pipeline.y_pipeline.transform(self.y_train)
+        y_eval_transformed = meta_pipeline.y_pipeline.transform(self.y_eval)
+        y_test_transformed = meta_pipeline.y_pipeline.transform(self.y_test)
+        y_val_transformed = meta_pipeline.y_pipeline.transform(self.validation_target_vars_df)
+
+        # Convert multi-class labels to binary for asymmetric loss
+        if self.asymmetric_loss_enabled:
+            y_train_transformed = pd.Series((y_train_transformed == 2).astype(int), index=self.X_train.index)
+            y_test_transformed  = pd.Series((y_test_transformed == 2).astype(int), index=self.X_test.index)
+            y_eval_transformed  = pd.Series((y_eval_transformed == 2).astype(int), index=self.X_eval.index)
+            y_val_transformed  = pd.Series((y_val_transformed == 2).astype(int), index=self.X_validation.index)
+
+        # Prepare datasets for export with standardized lowercase names
+        datasets = {
+            'x_train': self.X_train,
+            'x_test': self.X_test,
+            'x_eval': self.X_eval,
+            'x_val': self.X_validation,
+            'y_train': y_train_transformed,
+            'y_eval': y_eval_transformed,
+            'y_test': y_test_transformed,
+            'y_val': y_val_transformed,
+        }
+
+        # Add validation data
+
+
+        # Apply dev_mode sampling if enabled
+        dev_mode = export_config.get('dev_mode', False)
+        exported_files = {}
+
+        for name, data in datasets.items():
+            # Convert numpy ndarrays to Series for unified handling
+            if isinstance(data, np.ndarray):
+                raise ValueError("Data must be a DataFrame or Series with IDs as " \
+                                 "the index.")
+            # --- Validate dataset presence and non-emptiness ---
+            if data is None:
+                raise ValueError(
+                    f"{name} dataset is None – cannot export S3 training data "
+                    f"(model_id={self.model_id}, date_suffix={date_suffix})"
+                )
+            if isinstance(data, (pd.DataFrame, pd.Series)) and data.empty:
+                raise ValueError(
+                    f"{name} dataset is empty – cannot export S3 training data "
+                    f"(shape={data.shape}, model_id={self.model_id}, date_suffix={date_suffix})"
+                )
+
+            # --- Optional down-sampling for dev mode ---
+            if dev_mode and len(data) > 1000:
+                original_len = len(data)
+                data = data.sample(n=1000, random_state=42).sort_index()
+                logger.info(f"[DevMode] Sampled {name} from {original_len} to {len(data)} rows")
+
+            file_path = export_folder / f"{name}_{date_suffix}.parquet"
+
+            # Convert Series to DataFrame for parquet export
+            data_to_export = data.to_frame() if isinstance(data, pd.Series) else data
+
+            data_to_export.to_parquet(file_path, index=True)
+
+            exported_files[name] = {
+                'path': str(file_path),
+                'shape': data.shape,
+            }
+            logger.info(f"Exported {name} with shape {data.shape} to {file_path}")
+
+
+        # Export metadata about the modeling configuration
+        metadata = {
+            'model_id': self.model_id,
+            'export_timestamp': pd.Timestamp.now().isoformat(),
+            'exported_files': exported_files,
+            'pipeline_steps': [step[0] for step in meta_pipeline.model_pipeline.steps],
+            'y_pipeline_steps': [step[0] for step in meta_pipeline.y_pipeline.steps]
+        }
+
+        # Export metadata as JSON (handling numpy, datetime, and infinite values)
+        metadata_path = export_folder / f"export_metadata_{date_suffix}.json"
+        # write JSON with utf-8 encoding, using numpy_type_converter for special types
+        with open(metadata_path, 'w', encoding='utf-8') as f:
+            json.dump(
+                metadata,
+                f,
+                indent=2,
+                ensure_ascii=False,
+                default=u.numpy_type_converter
+            )
+
+        logger.milestone(f"Successfully exported S3 training data to {export_folder}")

@@ -142,21 +142,36 @@ wallet_segments: #CoinModel
     wallet_scores_confidence_segments: False
 
     wallet_features_segments:
-        10k_gainers:
-            trading|crypto_net_gain|all_windows:
-                min_value: 10000
-            trading|total_volume|w1:
-                min_value: 5000
 
         net_gain_doublers:
             performance|crypto_net_gain/crypto_inflows/base|all_windows:
                 min_value: 1.0
             trading|crypto_inflows|all_windows:
                 min_value: 1000
+            cw_trading|crypto_inflows|w1:
+                min_value: 100
 
-        cw_whales_10k:
-            cw_trading|crypto_inflows|all_windows:
-                min_value: 10000
+        net_gain_triplers:
+            performance|crypto_net_gain/crypto_inflows/base|all_windows:
+                min_value: 2.0
+            trading|crypto_inflows|all_windows:
+                min_value: 1000
+            cw_trading|crypto_inflows|w1:
+                min_value: 100
+
+        100k_max_inv:
+            trading|max_investment|all_windows:
+                min_value: 100000
+            cw_trading|crypto_inflows|w1:
+                min_value: 100
+
+        20_coin_actives:
+            trading|unique_coins_traded|all_windows:
+                min_value: 20
+            trading|total_volume|all_windows:
+                min_value: 1000
+            cw_trading|crypto_inflows|w1:
+                min_value: 100
 
 
     # score_segment_quantiles: [0.95]  # higher is better; how to assign wallet a score segment
@@ -552,15 +567,19 @@ coin_modeling: #CoinModel
             '*/cw_timing_gtrends_memecoin_us_lag_15_sell_weighted_w1*',
 
 
-
+            # Wallet Segments (old)
             '*cw_whales_10k/0*',
-            '*net_gain_doublers/0*',
+            # '*net_gain_doublers/0*',
             '*10k_gainers/0*',
-
-            # Wallet Segments
-            # '*net_gain_doublers/1*',
+            '*net_gain_doublers/1*',
             '*10k_gainers/1*',
             '*cw_whales_10k/1*',
+
+            # Wallet Segments (new)
+            # '*net_gain_doublers/1*',
+            '*net_gain_triplers/1*',
+            '*100k_max_inv/1*',
+            '*20_coin_actives/1*',
 
 
             # 'market_data|mfi/last_20d*',

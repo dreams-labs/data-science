@@ -1,3 +1,34 @@
+"""
+Custom pipeline components for XGBoost modeling with separate X and y transformations.
+
+This module provides pipeline steps that integrate with sklearn's Pipeline framework
+to handle our specific data transformation needs:
+
+1. **MetaPipeline**: Orchestrates both feature (X) and target (y) transformations
+   - Applies y_pipeline to transform raw targets (potentially multi-column DataFrames)
+   - Applies model_pipeline to transform features and fit the estimator
+   - Handles classification (binary and asymmetric 3-class) and regression
+   - Exposes underlying estimator attributes for sklearn compatibility
+
+2. **TargetVarSelector**: Transforms target variables
+   - Extracts specific columns from multi-column target DataFrames
+   - Converts continuous targets to binary classification (using thresholds)
+   - Handles asymmetric loss with 3 classes (big loss, neutral, big win)
+
+3. **FeatureSelector**: Removes low-quality features
+   - Drops low variance features (near-constant)
+   - Removes highly correlated features
+   - Protects specified features from removal
+
+4. **DropColumnPatterns**: Drops columns by pattern matching
+   - Supports wildcards (*) for flexible pattern matching
+   - Used in grid search to test different feature subsets
+   - Preserves protected columns
+
+These components work together to create a flexible modeling pipeline that can
+handle complex transformations while remaining compatible with sklearn's grid search.
+"""
+
 # pylint:disable=wrong-import-position
 import logging
 from typing import List

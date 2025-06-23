@@ -228,8 +228,9 @@ def add_derived_values(config_dict: dict) -> dict:
     td['modeling_starting_balance_date'] = td['training_period_end']
     if (td['modeling_period_end'] > td['validation_period_end']
         and not td['training_data_only']):
-        raise ValueError(f"Validation period end of {td['validation_period_end']} is earlier than "
-                         f"the modeling period end of {td['modeling_period_end']}.")
+        raise ValueError(f"Full dataset validation period end of {td['validation_period_end']} is earlier than "
+                         f"the individual '{cfg['epoch_type']}' offset's "
+                         f"modeling_period_end of {td['modeling_period_end']}.")
 
     # Validate modeling vs training period overlap
     last_training_start = pd.to_datetime(max(td['training_window_starts']))
@@ -306,10 +307,10 @@ def validate_config_alignment(config: dict, wallets_config: dict, wallets_coin_c
 
     # Check if all segment columns are in protected features
     protected_features = set(wallets_config['modeling']['feature_selection']['protected_features'])
-    missing_cols = all_segment_cols - protected_features
+    missing_cols = sorted(all_segment_cols - protected_features)
 
     if missing_cols:
         raise ConfigError(f"Segment columns not found in protected_features: {missing_cols}. "
-                          "Add columns [{missing_cols}] to "
+                          f"Add columns [{missing_cols}] to "
                           "wallets_config['modeling']['feature_selection']['protected_features'].")
 
