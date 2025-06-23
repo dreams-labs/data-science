@@ -1,3 +1,24 @@
+"""
+wallet_model_orchestrator.py
+============================
+
+Purpose
+-------
+Drive the end-to-end **“one date ⇒ one model”** loop:
+
+1. Ask **WalletEpochsOrchestrator** for the ready-made feature / target
+   snapshots for each modeling date.
+2. Feed those snapshots into **WalletModel** to train or grid-search.
+3. Collect scores, best params, and fitted pipelines for later use
+   (e.g. wallet-investing backtests).
+
+Why it exists
+-------------
+Keeps *data prep* and *model fit* concerns separate:
+
+* WalletEpochsOrchestrator ⇢ heavy aggregation & cohort filters
+* WalletModelOrchestrator  ⇢ modeling experiments & result curation
+"""
 import logging
 import copy
 import json
@@ -22,9 +43,34 @@ logger = logging.getLogger(__name__)
 
 class WalletModelOrchestrator:
     """
-    Trainer for wallet scoring models that handles multiple parameter configurations.
-    """
+    Thin controller that loops over modeling dates.
 
+    Workflow
+    --------
+    1. `load_all_training_data()`
+       → caches `(X, y)` pairs from **WalletEpochsOrchestrator**.
+    2. `run_multi_temporal_grid_search()`
+       → optional CV search; stores `grid_search_results`.
+    3. `run_multi_temporal_model_comparison()`
+       → fits one WalletModel per date (no search) and records metrics.
+
+    Key interactions
+    ----------------
+    * **WalletEpochsOrchestrator** supplies data; this class never touches raw
+      SQL or parquet directly.
+    * Hands each `(X, y)` to **WalletModel.construct_wallet_model()**.
+    * Honors the model’s *export-only* flag—if a date requests
+      `export_s3_training_data`, it skips training for that date.
+
+    Artifacts
+    ---------
+    * `training_data_cache`   – {yyMMdd: (X, y)}
+    * `grid_search_results`   – CV summaries per date
+    * `fitted_models`         – {yyMMdd: sklearn pipeline}
+
+    Lightweight by design: no heavy computation beyond the model fits
+    themselves.
+    """
     def __init__(
         self,
         wallets_config: dict,

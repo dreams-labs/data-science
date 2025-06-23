@@ -1,3 +1,41 @@
+"""
+wallet_model.py
+===============
+
+Business logic
+--------------
+* **Goal** – score crypto wallets (“addresses”) on future performance
+  so we can flag “sharks” and drive coin-level forecasts.
+* **Inputs**
+  - Wide, multi-indexed feature matrix keyed on wallet_address / epoch_start_date
+  - Target-variable DataFrame with modeling-cohort flags + returns
+  - YAML configs (training bounds, feature drops, asymmetric-loss rules, etc.)
+* **Flow**
+  1.  Data validation + cohort selection (_prepare_data)
+  2.  Optional epoch de-duplication per wallet (_assign_epoch_to_wallets)
+  3.  Train/test/eval split with asymmetric-loss handling
+  4.  Meta-pipeline build (X transformer → estimator)
+      *Optional grid-search* via scikit-learn
+  5.  Final model fit + prediction packaging
+  6.  **Escape hatch** – if export_s3_training_data.enabled, skip training and
+      export the exact X/y parquet splits (plus metadata JSON) for offline runs.
+
+Downstream orchestrators
+------------------------
+* **wime.RegressorEvaluator/ClassifierEvaluator** - for metrics and data viz
+* **wallet_temporal_searcher** – multi-date grid search & model comparison
+* **WalletInvestingOrchestrator** – converts model scores into trade signals
+* **WalletModelingOrchestrator** – creates many models for WalletEpochsOrchestrator
+* Any bespoke notebook or batch job that instantiates WalletModel directly
+
+Utilities
+---------
+* Grid-search param expansion with safety checks on asymmetric-loss conflicts.
+* Recursive parquet export with dev-mode sampling.
+* Helper for full-cohort predictions (used later by orchestrators).
+
+External deps: BaseModel, utils (logging, timing, config helpers).
+"""
 import logging
 from typing import Dict, Union, Tuple
 from pathlib import Path
@@ -23,10 +61,39 @@ logger = logging.getLogger(__name__)
 # WalletModel Constructor
 class WalletModel(BaseModel):
     """
-    Wallet-specific model implementation.
-    Extends BaseModel with wallet-specific data preparation and grid search.
-    """
+    Wallet-specific modeling engine (extends **BaseModel**).
 
+    Technical overview
+    ------------------
+    * **Meta-pipeline** – builds an sklearn.Pipeline that wraps:
+        1.  x_transformer_ (feature scaling / drops)
+        2.  estimator      (XGBoost-style tree model)
+        3.  y_pipeline     (target selector, optional asymmetric-loss mapper)
+    * **Key public method**
+        - construct_wallet_model(...) – prepares data, runs optional
+          grid-search, fits the pipeline, and returns a results dict.
+    * **Escape modes**
+        - export_s3_training_data.enabled → bypass training, dump parquet + JSON.
+    * **Important helpers**
+        - _prepare_data                – cohort mask + X / y extraction
+        - _assign_epoch_to_wallets     – one epoch per wallet (anti-leakage)
+        - _prepare_grid_search_params  – prefixes params + validates combos
+        - _export_s3_training_data     – robust parquet export, dev sampling,
+                                           NaN/Inf-safe metadata writer
+        - _predict_training_cohort     – full-cohort inference for later scoring
+    * **Attributes after fit**
+        - pipeline, model_id, train/test/eval splits, y_pred, etc.
+
+    Orchestrator usage
+    ------------------
+    Typically invoked by:
+    * wallet_temporal_searcher  – iterates models across dates
+    * WalletInvestingOrchestrator – loads the fitted pipeline to
+      generate live investing signals
+
+    Supports both **classification** and **regression**; asymmetric-loss logic
+    adds a third “big loss” class internally and re-maps to binary later.
+    """
     def __init__(self, modeling_config: dict):
         """
         Initialize WalletModel with configuration and wallet features DataFrame.
@@ -287,7 +354,7 @@ class WalletModel(BaseModel):
         # Store full training cohort for later scoring
         self.training_data_df = training_data_df.copy()
 
-        # Identify modeling cohort
+        # Identify modeling cohort   # pylint:disable=line-too-long
         if 'cw_crypto_inflows' in wallet_target_vars_df.columns:
             cohort_mask = (
                 (wallet_target_vars_df['crypto_inflows'] >= self.modeling_config['modeling_min_crypto_inflows']) &

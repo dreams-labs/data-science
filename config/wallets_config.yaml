@@ -709,9 +709,9 @@ modeling: #WalletModel
                 gamma: 0.005
 
     export_s3_training_data: {  # used to prepare exports to S3, skipping model construction entirely
-        'enabled': True,  # comment out to disable
+        # 'enabled': True,  # comment out to disable
         'parent_folder': '../../sagemaker/s3_wallet_loading_queue',
-        'batch_folder': 'dda858_initial_wallet_batch',
+        # 'batch_folder': 'dda858_initial_wallet_batch',
         # 'dev_mode': True  #  if True, only exports 1000 rows
     }
 
