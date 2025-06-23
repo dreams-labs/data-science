@@ -1,6 +1,8 @@
 import logging
 from typing import Dict, Union, Tuple
 import pandas as pd
+from pathlib import Path
+import json
 import numpy as np
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import precision_recall_curve
@@ -89,6 +91,12 @@ class WalletModel(BaseModel):
 
         # Split data
         self._split_data(X, y)
+
+        # ESCAPE: Check for S3 export configuration and export if enabled
+        logger.warning("Skipping model construction and preparing data for S3 export...")
+        export_config = self.modeling_config.get('export_s3_training_data', {})
+        if export_config.get('enabled', False):
+            return self._export_s3_training_data(export_config)
 
         # Asymmetric loss is slow so broadcast a warning
         if self.modeling_config['asymmetric_loss'].get('enabled',False):
@@ -456,7 +464,7 @@ class WalletModel(BaseModel):
         This captures data after all filtering, transformations, and cohort selection.
 
         This method interacts with:
-        - self.X_train, self.y_train, self.X_eval, self.y_eval, self.X_test, self.y_test (from BaseModel._split_data)
+        - self.X_train/X_eval/X_test, self.y_train/y_eval/y_test (from BaseModel._split_data)
         - self.X_validation, self.validation_target_vars_df (set in construct_wallet_model)
         - self.y_pipeline (from BaseModel._get_meta_pipeline -> _get_y_pipeline)
         - utils.numpy_type_converter for JSON serialization
@@ -525,17 +533,32 @@ class WalletModel(BaseModel):
         datasets['x_validation'] = self.X_validation
         datasets['y_validation'] = y_validation_transformed
 
+        # Apply dev_mode sampling if enabled
+        dev_mode = export_config.get('dev_mode', False)
+        if dev_mode:
+            logger.warning("Dev mode enabled - sampling 1000 rows from each dataset")
+            for name, data in datasets.items():
+                if data is not None and not data.empty and len(data) > 1000:
+                    datasets[name] = data.sample(n=1000, random_state=42).sort_index()
+                    logger.info(f"Sampled {name} from {len(data)} to {len(datasets[name])} rows")
+
         # Export each dataset as parquet
         exported_files = {}
         for name, data in datasets.items():
             if data is not None and not data.empty:
                 file_path = export_folder / f"{name}.parquet"
-                data.to_parquet(file_path, index=True)
+
+                # Convert Series to DataFrame for parquet export
+                if isinstance(data, pd.Series):
+                    data_to_export = data.to_frame()
+                else:
+                    data_to_export = data
+
+                data_to_export.to_parquet(file_path, index=True)
 
                 exported_files[name] = {
                     'path': str(file_path),
-                    'shape': data.shape,
-                    'dtypes': data.dtypes.to_dict() if hasattr(data, 'dtypes') else str(type(data))
+                    'shape': data.shape
                 }
                 logger.info(f"Exported {name} with shape {data.shape} to {file_path}")
 
@@ -549,3 +572,19 @@ class WalletModel(BaseModel):
             'y_pipeline_steps': [step[0] for step in meta_pipeline.y_pipeline.steps]
         }
 
+        # Export metadata as JSON to the S3 bucket
+        metadata_path = export_folder / "export_metadata.json"
+        with open(metadata_path, 'w') as f:
+            json.dump(metadata, f, indent=2, default=u.numpy_type_converter)
+
+        logger.milestone(f"Successfully exported S3 training data to {export_folder}")
+
+        # Return result indicating export completion instead of trained model
+        return {
+            'model_id': self.model_id,
+            'modeling_config': self.modeling_config,
+            'export_completed': True,
+            'export_folder': str(export_folder),
+            'exported_files': exported_files,
+            'metadata_path': str(metadata_path)
+        }
