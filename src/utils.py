@@ -9,6 +9,7 @@ import gc
 import inspect
 import atexit
 from pathlib import Path
+import math
 import threading
 from datetime import datetime, timedelta
 from typing import List,Dict,Any,Union
@@ -24,6 +25,8 @@ import pandas as pd
 import numpy as np
 from pydantic import ValidationError
 import pygame
+from IPython.display import display
+
 
 
 # pylint: disable=E0401
@@ -904,12 +907,15 @@ def log_nan_counts(df):
     logger.critical(log_message)
 
 
+
 def numpy_type_converter(obj):
     """Convert numpy and datetime types to JSON-friendly types"""
     if isinstance(obj, np.integer):
         return int(obj)
     elif isinstance(obj, np.floating):
         return float(obj)
+    elif isinstance(obj, (float, np.floating)) and math.isinf(obj):
+        return "Infinity" if obj > 0 else "-Infinity"
     elif isinstance(obj, np.ndarray):
         return obj.tolist()
     elif isinstance(obj, datetime):  # handle datetime
@@ -918,6 +924,12 @@ def numpy_type_converter(obj):
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
 
+def full_display(df):
+    """Display DataFrame with no truncation limits."""
+    with pd.option_context('display.max_colwidth', None,
+                          'display.max_columns', None,
+                          'display.max_rows', None):
+        display(df)
 
 
 
