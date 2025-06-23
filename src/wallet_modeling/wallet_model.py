@@ -448,3 +448,104 @@ class WalletModel(BaseModel):
             raise ValueError("Prediction dropped some wallet addresses")
 
         return predictions
+
+
+    def _export_s3_training_data(self, export_config: dict) -> Dict[str, any]:
+        """
+        Export the exact training and target data that will be fed to the model as parquet files.
+        This captures data after all filtering, transformations, and cohort selection.
+
+        This method interacts with:
+        - self.X_train, self.y_train, self.X_eval, self.y_eval, self.X_test, self.y_test (from BaseModel._split_data)
+        - self.X_validation, self.validation_target_vars_df (set in construct_wallet_model)
+        - self.y_pipeline (from BaseModel._get_meta_pipeline -> _get_y_pipeline)
+        - utils.numpy_type_converter for JSON serialization
+        - utils.ConfigError for configuration validation
+
+        Params:
+        - export_config (dict): Configuration containing parent_folder and batch_folder
+
+        Returns:
+        - result (dict): Export completion status and metadata
+
+        Raises:
+        - ConfigError: If parent_folder doesn't exist or folder names contain spaces
+        """
+        # 1. Validate data
+        # Validate configuration
+        parent_folder = export_config.get('parent_folder', '')
+        batch_folder = export_config.get('batch_folder', '')
+
+        # Check for spaces in folder names
+        if ' ' in parent_folder:
+            raise u.ConfigError(f"parent_folder cannot contain spaces: '{parent_folder}'")
+        if ' ' in batch_folder:
+            raise u.ConfigError(f"batch_folder cannot contain spaces: '{batch_folder}'")
+
+        # Validate parent folder exists
+        parent_path = Path(parent_folder)
+        if not parent_path.exists():
+            raise u.ConfigError(f"parent_folder does not exist: '{parent_folder}'")
+        if not parent_path.is_dir():
+            raise u.ConfigError(f"parent_folder is not a directory: '{parent_folder}'")
+
+        # Require both X and y validation data
+        if self.X_validation is not None:
+            if self.X_validation.empty:
+                raise ValueError("X_validation is empty - cannot export validation data without features")
+            if self.validation_target_vars_df is None or self.validation_target_vars_df.empty:
+                raise ValueError("validation_target_vars_df is empty - cannot export validation data without targets")
+
+
+        # 2. Export files
+        # Create export directory
+        export_folder = parent_path / batch_folder
+        export_folder.mkdir(parents=True, exist_ok=True)
+
+        # Build meta pipeline to get y_pipeline for target transformation
+        meta_pipeline = self._get_meta_pipeline()
+
+        # Transform targets using the same y_pipeline that would be used in training
+        y_train_transformed = meta_pipeline.y_pipeline.transform(self.y_train)
+        y_eval_transformed = meta_pipeline.y_pipeline.transform(self.y_eval)
+        y_test_transformed = meta_pipeline.y_pipeline.transform(self.y_test)
+
+        # Prepare datasets for export with standardized lowercase names
+        datasets = {
+            'x_train': self.X_train,
+            'y_train': y_train_transformed,
+            'x_eval': self.X_eval,
+            'y_eval': y_eval_transformed,
+            'x_test': self.X_test,
+            'y_test': y_test_transformed
+        }
+
+        # Add validation data
+        y_validation_transformed = meta_pipeline.y_pipeline.transform(self.validation_target_vars_df)
+        datasets['x_validation'] = self.X_validation
+        datasets['y_validation'] = y_validation_transformed
+
+        # Export each dataset as parquet
+        exported_files = {}
+        for name, data in datasets.items():
+            if data is not None and not data.empty:
+                file_path = export_folder / f"{name}.parquet"
+                data.to_parquet(file_path, index=True)
+
+                exported_files[name] = {
+                    'path': str(file_path),
+                    'shape': data.shape,
+                    'dtypes': data.dtypes.to_dict() if hasattr(data, 'dtypes') else str(type(data))
+                }
+                logger.info(f"Exported {name} with shape {data.shape} to {file_path}")
+
+        # Export metadata about the modeling configuration
+        metadata = {
+            'model_id': self.model_id,
+            'modeling_config': self.modeling_config,
+            'export_timestamp': pd.Timestamp.now().isoformat(),
+            'exported_files': exported_files,
+            'pipeline_steps': [step[0] for step in meta_pipeline.model_pipeline.steps],
+            'y_pipeline_steps': [step[0] for step in meta_pipeline.y_pipeline.steps]
+        }
+
