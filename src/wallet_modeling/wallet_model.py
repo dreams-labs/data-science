@@ -605,7 +605,6 @@ class WalletModel(BaseModel):
         # Export metadata about the modeling configuration
         metadata = {
             'model_id': self.model_id,
-            'modeling_config': self.modeling_config,
             'export_timestamp': pd.Timestamp.now().isoformat(),
             'exported_files': exported_files,
             'pipeline_steps': [step[0] for step in meta_pipeline.model_pipeline.steps],
