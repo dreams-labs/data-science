@@ -136,6 +136,21 @@ class WalletModel(BaseModel):
 
         Returns:
         - result (dict): Contains fitted pipeline, predictions, and optional train/test data
+
+        Data Split Usage Summary
+        -----------------------
+        X_train/y_train: Primary training data for model fitting
+        X_eval/y_eval: Early stopping validation during XGBoost training (prevents overfitting)
+        X_test/y_test: Hold-out test set for final model evaluation (traditional ML validation)
+        X_validation/y_validation: Future time period data for realistic performance assessment
+
+        Key Interactions:
+        The Test set ML metrics (accuracy, R², etc.) are based on data from the same period
+         as the Train set.
+        The Validation set metrics are based on data from the future period just after the
+         base y_train period ends. The Validation set represents actual future data the model
+         would see in production, and Validation metrics are primary indicators for model performance
+         in a real world scenario.
         """
         logger.info("Preparing training data for model construction...")
         u.notify('intro_2')
@@ -152,8 +167,15 @@ class WalletModel(BaseModel):
             self.validation_target_vars_df = validation_target_vars_df
             logger.info(f"Validation data with {len(validation_data_df)} records loaded.")
 
-        # Prepare data
+        # Prepare data for training cohort
         X, y = self._prepare_data(training_data_df, wallet_target_vars_df)
+
+        # Validation cohort – same transformation
+        if self.X_validation is not None:
+            self.X_validation, self.validation_target_vars_df = self._prepare_data(
+            validation_data_df,
+            validation_target_vars_df
+        )
 
         # Split data
         self._split_data(X, y)
@@ -362,9 +384,6 @@ class WalletModel(BaseModel):
                 wallet_target_vars_df,
                 random_state = self.modeling_config['model_params'].get('random_state', 42)
             )
-
-        # Store full training cohort for later scoring
-        self.training_data_df = training_data_df.copy()
 
         # Identify modeling cohort   # pylint:disable=line-too-long
         if 'cw_crypto_inflows' in wallet_target_vars_df.columns:
