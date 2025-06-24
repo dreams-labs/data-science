@@ -307,7 +307,7 @@ class WalletModelOrchestrator:
 
             # Save predictions to parquet file
             output_path = f"{scores_folder}/{score_name}.parquet"
-            wallet_scores_df.to_parquet(output_path, index=True)
+            u.to_parquet_safe(wallet_scores_df, output_path, index=True)
 
             logger.info(f"Saved predictions for {score_name} to {output_path}")
 

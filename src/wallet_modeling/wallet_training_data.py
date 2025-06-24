@@ -240,17 +240,17 @@ class WalletTrainingData:
             # Store profits
             parquet_folder = self.wallets_config['training_data']['parquet_folder']
             profits_file = f"{parquet_folder}/{parquet_prefix}_profits_df_full.parquet"
-            profits_df.to_parquet(profits_file,index=False)
+            u.to_parquet_safe(profits_df, profits_file,index=False)
             logger.info(f"Stored profits_df with shape {profits_df.shape} to {profits_file}.")
 
             # Store market data
             market_data_file = f"{parquet_folder}/{parquet_prefix}_market_data_df_full.parquet"
-            market_data_df.to_parquet(market_data_file,index=False)
+            u.to_parquet_safe(market_data_df, market_data_file,index=False)
             logger.info(f"Stored market_data_df with shape {market_data_df.shape} to {market_data_file}.")
 
             # Store macro_trends_df
             macro_trends_file = f"{parquet_folder}/{parquet_prefix}_macro_trends_df_full.parquet"
-            macro_trends_df.to_parquet(macro_trends_file,index=True)  # retain index for macro trends
+            u.to_parquet_safe(macro_trends_df, macro_trends_file,index=True)  # retain index for macro trends
             logger.info(f"Stored macro_trends_df with shape {macro_trends_df.shape} to {macro_trends_file}.")
             return None, None, None
 

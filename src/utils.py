@@ -936,6 +936,8 @@ def to_parquet_safe(df: pd.DataFrame, file_path: str, **kwargs) -> None:
     """
     Write DataFrame to parquet using an intermediate temp file to prevent corruption.
 
+    Should always be used because errors caused by partial writes are not fun to debug.
+
     Params:
     - df: DataFrame to write
     - file_path: Final destination path

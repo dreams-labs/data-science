@@ -268,10 +268,10 @@ class WalletTrainingDataOrchestrator:
 
         else:
             # Save all files
-            cohort_profits_df.to_parquet(f"{self.parquet_folder}/{period}_profits_df.parquet",index=True)
-            market_indicators_df.to_parquet(f"{self.parquet_folder}/{period}_market_indicators_data_df.parquet",index=False)  # pylint:disable=line-too-long
-            macro_indicators_df.to_parquet(f"{self.parquet_folder}/{period}_macro_indicators_df.parquet",index=True)  # pylint:disable=line-too-long
-            transfers_df.to_parquet(f"{self.parquet_folder}/{period}_transfers_sequencing_df.parquet",index=True)
+            u.to_parquet_safe(cohort_profits_df, f"{self.parquet_folder}/{period}_profits_df.parquet",index=True)
+            u.to_parquet_safe(market_indicators_df, f"{self.parquet_folder}/{period}_market_indicators_data_df.parquet",index=False)  # pylint:disable=line-too-long
+            u.to_parquet_safe(macro_indicators_df, f"{self.parquet_folder}/{period}_macro_indicators_df.parquet",index=True)  # pylint:disable=line-too-long
+            u.to_parquet_safe(transfers_df, f"{self.parquet_folder}/{period}_transfers_sequencing_df.parquet",index=True)
 
             return None
 
@@ -737,7 +737,7 @@ class WalletTrainingDataOrchestrator:
         # If a parquet file location is specified, store the files there and return nothing
         if parquet_filename:
             parquet_filepath = f"{parquet_folder}/{parquet_filename}.parquet"
-            indicators_df.to_parquet(parquet_filepath,index=False)
+            u.to_parquet_safe(indicators_df, parquet_filepath,index=False)
             logger.info(f"Stored indicators_data_df with shape {indicators_df.shape} "
                         f"to {parquet_filepath}.")
 

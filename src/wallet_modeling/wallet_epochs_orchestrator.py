@@ -228,11 +228,11 @@ class WalletEpochsOrchestrator:
 
         # Save them to parquet for future reuse
         os.makedirs(parquet_folder, exist_ok=True)
-        self.complete_profits_df.to_parquet(f"{parquet_folder}/complete_profits_df.parquet")
-        self.complete_market_data_df.to_parquet(f"{parquet_folder}/complete_market_data_df.parquet")
-        self.complete_macro_trends_df.to_parquet(f"{parquet_folder}/complete_macro_trends_df.parquet")
+        u.to_parquet_safe(self.complete_profits_df, f"{parquet_folder}/complete_profits_df.parquet")
+        u.to_parquet_safe(self.complete_market_data_df, f"{parquet_folder}/complete_market_data_df.parquet")
+        u.to_parquet_safe(self.complete_macro_trends_df, f"{parquet_folder}/complete_macro_trends_df.parquet")
         if not getattr(self.complete_hybrid_cw_id_df, "empty", True):
-            self.complete_hybrid_cw_id_df.to_parquet(f"{parquet_folder}/complete_hybrid_cw_id_df.parquet")
+            u.to_parquet_safe(self.complete_hybrid_cw_id_df, f"{parquet_folder}/complete_hybrid_cw_id_df.parquet")
 
         parts = [
             f"complete profits ({len(self.complete_profits_df)} rows)",
@@ -398,10 +398,10 @@ class WalletEpochsOrchestrator:
         # --- stub-save: write all four multioffset dfs -----------------
         if not self.training_only:
             base_path.mkdir(parents=True, exist_ok=True)
-            wallet_training_data_df.to_parquet(paths['train'], index=True)
-            wallet_target_vars_df.to_parquet(paths['train_tgt'], index=True)
-            validation_training_data_df.to_parquet(paths['val_train'], index=True)
-            validation_target_vars_df.to_parquet(paths['val_tgt'], index=True)
+            u.to_parquet_safe(wallet_training_data_df, paths['train'], index=True)
+            u.to_parquet_safe(wallet_target_vars_df, paths['train_tgt'], index=True)
+            u.to_parquet_safe(validation_training_data_df, paths['val_train'], index=True)
+            u.to_parquet_safe(validation_target_vars_df, paths['val_tgt'], index=True)
             logger.info(f"Saved multi-epoch dataframes to {base_path}.")
         # ---------------------------------------------------------------
 
@@ -517,7 +517,7 @@ class WalletEpochsOrchestrator:
             logger.info("(%.1fs) Downcasted full training_data_df.", time.time() - start_time)
             # Save features
             output_folder = f"{epoch_config['training_data']['parquet_folder']}/"
-            epoch_training_data_df.to_parquet(f"{output_folder}/training_data_df.parquet", index=True)
+            u.to_parquet_safe(epoch_training_data_df, f"{output_folder}/training_data_df.parquet", index=True)
 
             if generate_modeling:
                 epoch_modeling_data_df = self._merge_hybrid_dfs(epoch_modeling_data_df,hybridized_modeling_data_df)
@@ -530,7 +530,7 @@ class WalletEpochsOrchestrator:
                 # Downcast all features
                 epoch_modeling_data_df = u.df_downcast(epoch_modeling_data_df)
                 # Save features
-                epoch_modeling_data_df.to_parquet(f"{output_folder}/modeling_data_df.parquet", index=True)
+                u.to_parquet_safe(epoch_modeling_data_df, f"{output_folder}/modeling_data_df.parquet", index=True)
             logger.info(f"Saved {model_start} features to %s.", output_folder)
 
         # Drop columns before returning if configured
@@ -677,11 +677,11 @@ class WalletEpochsOrchestrator:
         # Save profits_dfs
         start_time = time.time()
         output_folder = f"{epoch_config['training_data']['parquet_folder']}/"
-        training_profits_df.to_parquet(f"{output_folder}/training_profits_df.parquet", index=True)
+        u.to_parquet_safe(training_profits_df, f"{output_folder}/training_profits_df.parquet", index=True)
         if generate_modeling:
-            modeling_profits_df.to_parquet(f"{output_folder}/modeling_profits_df.parquet", index=True)
+            u.to_parquet_safe(modeling_profits_df, f"{output_folder}/modeling_profits_df.parquet", index=True)
         if not self.complete_hybrid_cw_id_df.empty:
-            self.complete_hybrid_cw_id_df.to_parquet(f"{output_folder}/complete_hybrid_cw_id_df.parquet", index=True)
+            u.to_parquet_safe(self.complete_hybrid_cw_id_df, f"{output_folder}/complete_hybrid_cw_id_df.parquet", index=True)
         logger.info("(%.1fs) Saved %s profits_df files to %s.",
             time.time() - start_time, model_start, output_folder)
 
@@ -934,7 +934,7 @@ class WalletEpochsOrchestrator:
 
         # Save to reference folder
         reference_dfs_folder = self.base_config['training_data']['reference_dfs_folder']
-        hybrid_df.to_parquet(f"{reference_dfs_folder}/comprehensive_hybrid_id_mapping.parquet")
+        u.to_parquet_safe(hybrid_df, f"{reference_dfs_folder}/comprehensive_hybrid_id_mapping.parquet")
         logger.info(f"Stored hybrid IDs for {len(hybrid_df)} total pairs.")
 
 

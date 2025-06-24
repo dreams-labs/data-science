@@ -210,7 +210,8 @@ class CoinFeaturesOrchestrator:
 
             # Generate and merge all features
             coin_flows_model_features_df = self._generate_coin_flow_model_features()
-            coin_flows_model_features_df.to_parquet(
+            u.to_parquet_safe(
+                coin_flows_model_features_df,
                 f"{self.wallets_coin_config['training_data']['parquet_folder']}"
                 f"/{prefix}_coin_flows_model_features_df.parquet",
                 index=True
