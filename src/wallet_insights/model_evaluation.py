@@ -1644,6 +1644,13 @@ class ClassifierEvaluator(RegressorEvaluator):
             label="Overall mean return"
         )
 
+        # --- Set x-axis limits to always cover at least 0-1, but allow out-of-bounds if present
+        min_x = valid_centers.min() if len(valid_centers) > 0 else 0
+        max_x = valid_centers.max() if len(valid_centers) > 0 else 1
+        x_left = min(0, min_x)
+        x_right = max(1, max_x)
+        ax.set_xlim(x_left, x_right)
+
         # Labels and title
         ax.set_xlabel("Prediction Score")
         ax.set_ylabel("Number of Wallets")
@@ -1657,7 +1664,6 @@ class ClassifierEvaluator(RegressorEvaluator):
         lines, labels = ax.get_legend_handles_labels()
         lines2, labels2 = ax2.get_legend_handles_labels()
         ax.legend(lines + lines2, labels + labels2, loc="upper left")
-
 
 
 

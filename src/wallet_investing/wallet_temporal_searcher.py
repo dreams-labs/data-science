@@ -234,7 +234,7 @@ class TemporalGridSearcher:
                         logger.info(f"[{i}/{len(self.modeling_dates)}] Skipping {modeling_date} - data already exists")
                     elif status == "generated":
                         generated_count += 1
-                        logger.info(f"[{i}/{len(self.modeling_dates)}] Generated data for {modeling_date}")
+                        logger.milestone(f"[{i}/{len(self.modeling_dates)}] Generated data for {modeling_date}")
 
                 except Exception as e:
                     failed_dates.append((modeling_date, e))
@@ -271,21 +271,37 @@ class TemporalGridSearcher:
         max_workers = self.wallets_investing_config['n_threads']['training_data_loading']
 
         def load_single_date(modeling_date: str) -> tuple:
-            """Load training data for a single modeling date."""
+            """
+            Load training data for a single modeling date.
+
+            Filepaths are explicitly declared to provide more debugging information.
+            """
             date_str = datetime.strptime(modeling_date, '%Y-%m-%d').strftime('%y%m%d')
+            base_path = f"{parquet_folder}/{date_str}"
+            current_file = None
 
             try:
-                # Load all four DataFrames for this date   # pylint:disable=line-too-long
-                base_path = f"{parquet_folder}/{date_str}"
-                wallet_training_data_df = pd.read_parquet(f"{base_path}/multioffset_wallet_training_data_df.parquet")
-                wallet_target_vars_df = pd.read_parquet(f"{base_path}/multioffset_wallet_target_vars_df.parquet")
-                validation_training_data_df = pd.read_parquet(f"{base_path}/multioffset_validation_training_data_df.parquet")
-                validation_target_vars_df = pd.read_parquet(f"{base_path}/multioffset_validation_target_vars_df.parquet")
+                # Load all four DataFrames for this date
+                current_file = f"{base_path}/multioffset_wallet_training_data_df.parquet"
+                wallet_training_data_df = pd.read_parquet(current_file)
 
+                current_file = f"{base_path}/multioffset_wallet_target_vars_df.parquet"
+                wallet_target_vars_df = pd.read_parquet(current_file)
+
+                current_file = f"{base_path}/multioffset_validation_training_data_df.parquet"
+                validation_training_data_df = pd.read_parquet(current_file)
+
+                current_file = f"{base_path}/multioffset_validation_target_vars_df.parquet"
+                validation_target_vars_df = pd.read_parquet(current_file)
+
+                # Processing operations (track which DataFrame is being processed)
+                current_file = f"{base_path}/multioffset_wallet_target_vars_df.parquet (ranking operation)"
                 wallet_target_vars_df['cw_coin_return_rank'] = pd.Series(
                     wallet_target_vars_df['cw_coin_return'],
                     index=wallet_target_vars_df.index
                 ).rank(method='average', pct=True)
+
+                current_file = f"{base_path}/multioffset_validation_target_vars_df.parquet (ranking operation)"
                 validation_target_vars_df['cw_coin_return_rank'] = pd.Series(
                     validation_target_vars_df['cw_coin_return'],
                     index=validation_target_vars_df.index
@@ -316,9 +332,11 @@ class TemporalGridSearcher:
 
                 return date_str, training_data, shapes_info, None
 
-            except FileNotFoundError as e:
-                return date_str, None, None, e
-
+            except Exception as e:
+                # Add specific file path context to the error
+                error_with_context = Exception(f"Error processing {current_file}: {str(e)}")
+                error_with_context.__cause__ = e
+                return date_str, None, None, error_with_context
         # Execute parallel loading
         failed_dates = []
 
@@ -355,12 +373,9 @@ class TemporalGridSearcher:
             error_details = "\n".join([f"  {date}: {error}" for date, error in failed_dates])
             logger.error(f"Failed to load training data for {len(failed_dates)} dates:\n{error_details}")
 
-            # Raise error for the first failure
-            first_failed_date, first_error = failed_dates[0]
-            raise FileNotFoundError(
-                f"Training data missing for {first_failed_date}. "
-                f"Run generate_all_training_data() first or set force_regenerate_data=True"
-            ) from first_error
+            # Raise the actual error instead of masking it
+            _, first_error = failed_dates[0]
+            raise first_error
 
         logger.milestone(f"Successfully loaded training data for {len(self.modeling_dates)} "
                          "periods using {max_workers} threads")

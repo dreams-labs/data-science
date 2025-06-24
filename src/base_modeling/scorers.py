@@ -52,8 +52,6 @@ def custom_neg_log_loss_scorer(estimator, X, y):
     Returns:
         Negative log loss score (negative because sklearn maximizes scores).
     """
-    from sklearn.metrics import log_loss
-
     # Transform y using the pipeline
     y_trans = estimator.y_pipeline.transform(y)
 

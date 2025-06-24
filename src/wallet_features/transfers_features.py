@@ -3,6 +3,8 @@ from typing import List
 import pandas as pd
 from dreams_core.googlecloud import GoogleCloud as dgc
 
+# pylint:disable=logging-not-lazy
+
 # Local module imports
 import utils as u
 
@@ -220,9 +222,14 @@ def retrieve_transfers_sequencing(
     from {ordering_cte}
     order by 1,2,3,4
     """
-    sequence_df = dgc().run_sql(sequencing_sql)
-
-    # Log retrieval stats
+    try:
+        sequence_df = dgc().run_sql(sequencing_sql)
+    except Exception as e:
+        logger.error("FAILED SQL QUERY:\n" + "=" * 80 + "\n" + sequencing_sql + "\n" + "=" * 80)
+        logger.error(f"BigQuery Error: {str(e)}")
+        raise RuntimeError(
+            f"transfers_sequencing query failed. Original error: {str(e)}"
+        ) from e
     logger.info("Retrieved sequence data for %s wallet-coin pairs across %s wallets",
                 len(sequence_df), len(sequence_df['wallet_address'].unique()))
 

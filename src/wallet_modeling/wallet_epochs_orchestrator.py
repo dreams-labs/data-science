@@ -445,6 +445,7 @@ class WalletEpochsOrchestrator:
         output_folder = epoch_config['training_data']['parquet_folder']
         training_path = f"{output_folder}/training_data_df.parquet"
         modeling_path = f"{output_folder}/modeling_data_df.parquet"
+
         if os.path.exists(training_path) and (training_only or os.path.exists(modeling_path)):
             logger.info(
                 f"Loading precomputed features for epoch starting "
@@ -453,9 +454,18 @@ class WalletEpochsOrchestrator:
             epoch_date = datetime.strptime(
                 epoch_config['training_data']['modeling_period_start'], '%Y-%m-%d'
             )
-            epoch_training_data_df = pd.read_parquet(training_path)
+
+            # Wrap parquet reads with explicit file path error handling
+            try:
+                epoch_training_data_df = pd.read_parquet(training_path)
+            except Exception as e:
+                raise RuntimeError(f"Failed to read training data parquet file: {training_path}") from e
+
             if generate_modeling:
-                epoch_modeling_data_df = pd.read_parquet(modeling_path)
+                try:
+                    epoch_modeling_data_df = pd.read_parquet(modeling_path)
+                except Exception as e:
+                    raise RuntimeError(f"Failed to read modeling data parquet file: {modeling_path}") from e
             else:
                 epoch_modeling_data_df = pd.DataFrame()
 

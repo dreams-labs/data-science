@@ -1,0 +1,41 @@
+# WalletModel Epochs Config
+offset_epochs:
+# Determines which epochs are used for training data and single
+#  model validation.
+#  e.g. build the model using historical data from epochs [0,-30,-60] and
+#  validate their performance vs performance over the epochs that are [30,60] days
+#  into the future.
+    # offsets: [0]
+    # offsets: [85]
+    # offsets: [0, -30, -60]
+    # offsets: [
+        # 0,
+        # -15,
+        # -30,
+        # -45,
+        # -60,
+        # -75,
+        # -90,
+    # ]
+    # offsets: [0, -30, -60, -120, -150, -180]
+    # offsets: [0, -30, -60, -90, -120, -180, -240, -270, -300, -330, -360, -390, -420, -450]
+    offsets: [0, -30, -60, -90, -120, -180, -240, -300, -360] #, -450, -540]
+    # offsets: [0, -50, -100, -150, -200, -250, -300] # , -400, -500]
+    # offsets: [0, -50, -100, -150, -200, -250, -300, -350, -400, -450, -500]
+
+    # offsets: [0, -60]
+    # offsets: [0, -60, -120, -180, -240, -300, -360]
+    # offsets: [0, -60, -120, -180, -240, -300, -360, -420, -480, -540, -600, -660, -720]
+    # offsets: [0, -60, -120, -180, -240, -300, -360, -420, -480, -540, -600, -660, -720, -780, -840, -900, -960, -1020, -1080, -1140, -1200]
+
+    # validation_offsets: [15]
+    validation_offsets: [30]
+    # validation_offsets: [30, 60]
+    # validation_offsets: [30, 60, 90]
+    # validation_offsets: [30, 60, 90, 120]
+    # validation_offsets: [15,30,45,60,75]
+    # validation_offsets: [30, 60, 90, 120, 150, 180, 210] #, 240, 270, 300, 330, 360]
+    # validation_offsets: [60, 120]
+    # validation_offsets: [60, 120, 180]
+    # validation_offsets: [60, 120, 180, 240]
+    # validation_offsets: [60, 120, 180, 270, 360] #, 270, 300, 330, 360]
