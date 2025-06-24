@@ -234,7 +234,7 @@ class TemporalGridSearcher:
                         logger.info(f"[{i}/{len(self.modeling_dates)}] Skipping {modeling_date} - data already exists")
                     elif status == "generated":
                         generated_count += 1
-                        logger.info(f"[{i}/{len(self.modeling_dates)}] Generated data for {modeling_date}")
+                        logger.milestone(f"[{i}/{len(self.modeling_dates)}] Generated data for {modeling_date}")
 
                 except Exception as e:
                     failed_dates.append((modeling_date, e))

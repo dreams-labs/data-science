@@ -184,7 +184,7 @@ class CoinEpochsOrchestrator:
         self.complete_profits_df = load_data_weo.complete_profits_df
         self.complete_market_data_df = load_data_weo.complete_market_data_df
         self.complete_macro_trends_df = load_data_weo.complete_macro_trends_df
-        logger.info("Successfully retrieved complete dfs.")
+        logger.milestone("Successfully retrieved complete dfs.")
 
 
 
