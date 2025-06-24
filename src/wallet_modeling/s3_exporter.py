@@ -154,7 +154,7 @@ def export_s3_training_data(
         # Convert Series to DataFrame for parquet export
         data_to_export = data.to_frame() if isinstance(data, pd.Series) else data
 
-        data_to_export.to_parquet(file_path, index=True)
+        u.to_parquet_safe(data_to_export, file_path, index=True)
 
         exported_files[name] = {
             'path': str(file_path),

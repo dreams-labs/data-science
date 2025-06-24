@@ -300,10 +300,10 @@ class CoinEpochsOrchestrator:
         # ------------------------------------
         root_folder = self.wallets_coin_config['training_data']['parquet_folder']
         multiepoch_features = reset_index_codes(multiepoch_features)
-        multiepoch_features.to_parquet(f"{root_folder}/{file_prefix}multiepoch_coin_training_data_df.parquet")
+        u.to_parquet_safe(multiepoch_features, f"{root_folder}/{file_prefix}multiepoch_coin_training_data_df.parquet")
         if not multiepoch_targets.empty:
             multiepoch_targets = reset_index_codes(multiepoch_targets)
-            multiepoch_targets.to_parquet(f"{root_folder}/{file_prefix}multiepoch_coin_target_var_df.parquet")
+            u.to_parquet_safe(multiepoch_targets, f"{root_folder}/{file_prefix}multiepoch_coin_target_var_df.parquet")
 
         ambient_player_coins.stop()
 
@@ -602,9 +602,7 @@ class CoinEpochsOrchestrator:
 
         # 4) Persist results to parquet
         base_folder = epoch_coins_config['training_data']['parquet_folder']
-        coin_features_df.to_parquet(
-            f"{base_folder}/coin_training_data_df_full.parquet"
-        )
+        u.to_parquet_safe(coin_features_df, f"{base_folder}/coin_training_data_df_full.parquet")
 
         return coin_features_df, coin_market_data_df
 
@@ -639,7 +637,7 @@ class CoinEpochsOrchestrator:
             epoch_weo.base_config['training_data']['coin_modeling_period_end'],
             set(coin_features_df.index)
         )
-        coin_target_var_df.to_parquet(f"{base_folder}/coin_target_var_df.parquet", index=True)
+        u.to_parquet_safe(coin_target_var_df, f"{base_folder}/coin_target_var_df.parquet", index=True)
 
         return coin_target_var_df
 
