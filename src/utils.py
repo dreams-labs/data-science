@@ -932,6 +932,25 @@ def full_display(df):
         display(df)
 
 
+def to_parquet_safe(df: pd.DataFrame, file_path: str, **kwargs) -> None:
+    """
+    Write DataFrame to parquet using an intermediate temp file to prevent corruption.
+
+    Params:
+    - df: DataFrame to write
+    - file_path: Final destination path
+    - **kwargs: Additional arguments passed to to_parquet()
+    """
+    temp_path = f"{file_path}.tmp"
+    try:
+        df.to_parquet(temp_path, **kwargs)
+        os.rename(temp_path, file_path)
+    except Exception:
+        # Clean up temp file if write failed
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        raise
+
 
 
 # ---------------------------------------- #
