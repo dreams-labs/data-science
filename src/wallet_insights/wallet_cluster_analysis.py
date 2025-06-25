@@ -208,8 +208,12 @@ def create_cluster_report(modeling_df: pd.DataFrame,
         'mktcap|end_portfolio_wtd_market_cap/market_cap_filled|all_windows',
         'performance|crypto_net_gain/max_investment/base|all_windows',
     ]
+
+    # Filter base_metrics to only include columns that exist in the dataframe
+    available_base_metrics = [col for col in base_metrics if col in modeling_df.columns]
+
     cluster_cols = [col for col in modeling_df.columns if col.startswith('cluster|')]
-    cluster_analysis_df = modeling_df[list(set(cluster_cols + base_metrics + comparison_metrics))].copy()
+    cluster_analysis_df = modeling_df[list(set(cluster_cols + available_base_metrics + comparison_metrics))].copy()
 
     # Assign wallets to categorical clusters based on the distance values
     cluster_assignments_df = wcl.assign_clusters_from_distances(cluster_analysis_df,
