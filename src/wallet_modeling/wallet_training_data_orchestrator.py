@@ -370,9 +370,15 @@ class WalletTrainingDataOrchestrator:
             )
 
         # Generate clusters if configured
+        #  Cluster features are generated here so that they can incorporate wallet
+        #  features from all windows; each WalletFeaturesOrchestrator only calculates
+        #  a single window so clusters wouldn't see all windows data if made there.
         if 'clustering_n_clusters' in self.wallets_config.get('features', {}):
             training_cluster_features_df = wcl.create_kmeans_cluster_features(
-                self.wallets_config, wallet_training_data_df_full
+                self.wallets_config,
+                wallet_training_data_df_full,
+                self.wallets_config['features']['clustering_include_pca'],
+                self.wallets_config['features']['clustering_include_categorical']
             )
             training_cluster_features_df = training_cluster_features_df.add_prefix('cluster|')
             wallet_training_data_df_full = wallet_training_data_df_full.join(
