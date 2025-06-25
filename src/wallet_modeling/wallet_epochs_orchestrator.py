@@ -470,7 +470,7 @@ class WalletEpochsOrchestrator:
                 epoch_modeling_data_df = pd.DataFrame()
 
             # Drop columns before returning if configured
-            if epoch_config['training_data']['predrop_features']:
+            if epoch_config['training_data'].get('predrop_features', False):
                 drop_patterns=epoch_config['modeling']['feature_selection']['drop_patterns']
                 col_dropper = bp.DropColumnPatterns(drop_patterns)
                 epoch_training_data_df = col_dropper.fit_transform(epoch_training_data_df)
@@ -534,7 +534,7 @@ class WalletEpochsOrchestrator:
             logger.info(f"Saved {model_start} features to %s.", output_folder)
 
         # Drop columns before returning if configured
-        if epoch_config['training_data']['predrop_features']:
+        if epoch_config['training_data'].get('predrop_features', False):
             drop_patterns=epoch_config['modeling']['feature_selection']['drop_patterns']
             col_dropper = bp.DropColumnPatterns(drop_patterns)
             epoch_training_data_df = col_dropper.fit_transform(epoch_training_data_df)
@@ -676,7 +676,7 @@ class WalletEpochsOrchestrator:
 
         # Save profits_dfs
         start_time = time.time()
-        output_folder = f"{epoch_config['training_data']['parquet_folder']}/"
+        output_folder = f"{epoch_config['training_data']['parquet_folder']}"
         u.to_parquet_safe(training_profits_df, f"{output_folder}/training_profits_df.parquet", index=True)
         if generate_modeling:
             u.to_parquet_safe(modeling_profits_df, f"{output_folder}/modeling_profits_df.parquet", index=True)
