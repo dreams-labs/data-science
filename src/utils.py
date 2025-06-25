@@ -31,6 +31,7 @@ from IPython.display import display
 
 # pylint: disable=E0401
 # pylint: disable=E0611
+# pylint: disable=too-many-lines
 # pydantic config files
 import config_models.config as py_c
 import config_models.metrics_config as py_mc
@@ -1594,6 +1595,7 @@ def setup_notebook_logger(log_filepath: str = None) -> logging.Logger:
 
     # Custom formatter for terminal viewing - no filepath, includes colors
     class TerminalColorFormatter(ColorFormatter):
+        """Assigns colors to logs"""
         def format(self, record):
             # Pad log level to 9 characters, left-aligned
             padded_level = f"{record.levelname:<9}"
