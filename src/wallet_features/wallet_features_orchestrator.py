@@ -180,8 +180,10 @@ class WalletFeaturesOrchestrator:
             transfers_scenario_features_df = wsc.calculate_scenario_features(
                 profits_df,
                 market_indicators_data_df,
+                performance_features_df,
                 period_start_date,
-                period_end_date
+                period_end_date,
+                self.wallets_config,
             )
             feature_column_names['scenario|'] = transfers_scenario_features_df.columns
             wallet_features_df = wallet_features_df.join(transfers_scenario_features_df, how='left')
