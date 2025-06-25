@@ -29,39 +29,17 @@
 #FeatureRemoval these proved largely non-predictive
 market_timing:
     offsets:
-        # # Coin time series
-        # price_sma_2:
-        #     offsets: [-200, -60, -30, -15, 30, 100]
-        #     retain_base_columns: False
-        # volume_sma_12:
-        #     offsets: [-80, -21, 21, 100]
-        #     retain_base_columns: False
-
-        # # Macro trends
-        # btc_mvrv_z_score:
-        #     offsets: [-21] # lag_21
-        #     retain_base_columns: True
-        # btc_vdd_multiple:
-        #     offsets: [60] # lead_60
-        #     retain_base_columns: True
-        # gtrends_memecoin_us:
-        #     offsets: [21] # lead_21
-        #     retain_base_columns: True
-
         # Coin time series
-        # price_sma_2:
-        #     offsets: [-90, -30, -15, -7, 7, 15, 30, 90]
-        #     retain_base_columns: False
-        # volume_sma_2:
-        #     offsets: [-90, -30, -15, -7, 7, 15, 30, 90]
-        #     retain_base_columns: False
+        price_sma_2:
+            offsets: [-15, 15, 30]
+            retain_base_columns: False
+        volume_sma_2:
+            offsets: [-7, 7]
+            retain_base_columns: True
 
         # # Macro trends
         btc_mvrv_z_score:
-            offsets: [-90]
+            offsets: [-90, -30, 30, 90]
             retain_base_columns: True
-        # # btc_vdd_multiple:
-        # #     offsets: [-90, -30, -15, -7, 7, 15, 30, 90]
-        #     retain_base_columns: True
-        # gtrends_memecoin_us:
-        #     offsets: [-90, -30, -15, -7, 7, 15, 30, 90] # lead_21
+        gtrends_memecoin_us:
+            offsets: [-15]

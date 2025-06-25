@@ -45,6 +45,7 @@ def create_kmeans_cluster_features(
     original_index = training_data_df.index
     n_components = wallets_config['features']['clustering_n_components']
     cluster_counts = wallets_config['features']['clustering_n_clusters']
+    include_booleans = wallets_config['features'].get('clustering_include_booleans', False)
 
     # Get preprocessed data using helper
     logger.info("Preprocessing training data for clustering...")
@@ -78,6 +79,12 @@ def create_kmeans_cluster_features(
         distances = kmeans.transform(pca_result)
         for i in range(n_clusters):
             cluster_features_df[f'k{n_clusters}/distance_to_cluster_{i}'] = distances[:, i]
+
+        # Add one-hot encoded cluster assignments if configured
+        if include_booleans:
+            min_cluster_idx = np.argmin(distances, axis=1)
+            for i in range(n_clusters):
+                cluster_features_df[f'k{n_clusters}_cluster_k{i}'] = (min_cluster_idx == i).astype(int)
 
     return cluster_features_df
 
@@ -139,33 +146,29 @@ def preprocess_clustering_data(wallets_config: dict, training_data_df: pd.DataFr
 
 def assign_clusters_from_distances(modeling_df: pd.DataFrame, cluster_counts: List[int]) -> pd.DataFrame:
     """
-    Assign categorical cluster labels based on minimum distances for each k in cluster_counts.
+    Assign cluster labels as one-hot encoded features based on minimum distances.
 
     Params:
     - modeling_df (DataFrame): DataFrame with distance features, indexed by wallet_address
     - cluster_counts (List[int]): List of k values to process [e.g. 2, 4]
 
     Returns:
-    - modeling_df (DataFrame): Original df with new cluster assignment columns
+    - cluster_assignments_df (DataFrame): One-hot encoded cluster assignments
     """
-    cluster_assignments_df = modeling_df.copy()
+    cluster_assignments_df = pd.DataFrame(index=modeling_df.index)
 
-    cluster_cols = []
     for k in cluster_counts:
         # Get distance columns for this k value
         distance_cols = [f'cluster|k{k}/distance_to_cluster_{i}' for i in range(k)]
 
-        # Assign cluster based on minimum distance
-        cluster_assignments_df[f'k{k}_cluster'] = (
-            modeling_df[distance_cols]
-            .idxmin(axis=1)
-            .str[-1]
-            .astype(int)
-        )
+        # Find the cluster with minimum distance
+        min_cluster_idx = modeling_df[distance_cols].idxmin(axis=1).str[-1].astype(int)
 
-        cluster_cols = cluster_cols + [f'k{k}_cluster']
+        # Create one-hot encoded columns
+        for i in range(k):
+            cluster_assignments_df[f'k{k}_cluster_k{i}'] = (min_cluster_idx == i).astype(int)
 
-    return cluster_assignments_df[cluster_cols]
+    return cluster_assignments_df
 
 
 
