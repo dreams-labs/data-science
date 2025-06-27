@@ -180,6 +180,7 @@ class WalletFeaturesOrchestrator:
             transfers_scenario_features_df = wsc.calculate_scenario_features(
                 profits_df,
                 market_indicators_data_df,
+                trading_features_df,
                 performance_features_df,
                 period_start_date,
                 period_end_date,

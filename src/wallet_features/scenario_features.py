@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 def calculate_scenario_features(
     training_profits_df: pd.DataFrame,
     training_market_indicators_df: pd.DataFrame,
+    trading_features_df: pd.DataFrame,
     performance_features_df: pd.DataFrame,
     period_start_date: str,
     period_end_date: str,
@@ -32,8 +33,8 @@ def calculate_scenario_features(
     Params:
     - training_profits_df (DataFrame): Historical profits data
     - training_market_indicators_df (DataFrame): df with coin_id,date,price columns
-    - performance_features_df (DataFrame): base performance of each wallet that we will
-        compare vs ideal performance
+    - trading_features_df (DataFrame): actual trading metrics of each wallet to compare vs ideal
+    - performance_features_df (DataFrame): actual performance metrics of each wallet to compare vs ideal
     - period_start_date (str): Start of analysis period
     - period_end_date (str): End of analysis period
 
@@ -53,9 +54,11 @@ def calculate_scenario_features(
 
     # Calculate ideal price points for each transfer
     ideal_transfers_df = get_ideal_transfers_df(
+        period_start_date,
         period_end_date,
         use_hybrid_ids,
-        table_reference_date
+        table_reference_date,
+        wallets_config['training_data']['dataset']
     )
 
     # Enrich with actual transfer history
@@ -65,14 +68,16 @@ def calculate_scenario_features(
         training_market_indicators_df
     )
 
-    # Generate performance features
-    performance_features_df = generate_scenario_features(
-        ideal_transfers_df,
-        period_start_date,
-        period_end_date,
-        wallets_config
-    )
-    scenario_features_df = performance_features_df
+    # # Generate performance features
+    # performance_features_df = generate_scenario_features(
+    #     ideal_transfers_df,
+    #     trading_features_df,
+    #     performance_features_df,
+    #     period_start_date,
+    #     period_end_date,
+    #     wallets_config
+    # )
+    # scenario_features_df = performance_features_df
 
     # Data completeness check
     profits_wallets = training_profits_df['wallet_address'].drop_duplicates()
@@ -123,84 +128,99 @@ def upload_profits_df_dates(
 
 @u.timing_decorator
 def get_ideal_transfers_df(
+        training_period_start: str,
         training_period_end: str,
         use_hybrid_ids: bool,
-        table_reference_date: str
+        table_reference_date: str,
+        dataset: str = 'prod'
     ) -> pd.DataFrame:
     """
     Get wallet transfer data with price ranges.
 
     Params:
+    - training_period_start (str): Start date for training period
     - training_period_end (str): End date for training period
     - use_hybrid_ids (bool): Whether to use hybrid_cw_ids instead of wallet_ids
     - table_reference_date (str): Reference date for temp table naming
+    - dataset (str): Determines whether to query core or dev_core schema
 
     Returns:
     - ideal_transfers_df (DataFrame): Transfer data with min/max prices
     """
+    # Define schema
+    core_schema = 'core' if dataset == 'prod' else 'dev_core'
+
+
     # Different logic for date_ranges based on hybrid_ids setting
     if use_hybrid_ids:
         date_ranges_logic = f"""
-        date_ranges as (
+        with date_ranges as (
             select
-                xw_cw.hybrid_cw_id as wallet_address,   -- mask hybrid_cw_id as "wallet_address"
+                -- mask hybrid_cw_id as "wallet_address" for data science pipeline
+                xw_cw.hybrid_cw_id as wallet_address,
+
                 wcd.coin_id,
-                wcd.date,
                 COALESCE(
-                    LEAD(wcd.date) OVER (PARTITION BY wc.wallet_address, wcd.coin_id ORDER BY wcd.date) - interval 1 day,
-                    '{training_period_end}'
-                ) as date_range
+                    -- selects the date of the previous transaction
+                    LAG(wcd.date) OVER (PARTITION BY wc.wallet_address, wcd.coin_id ORDER BY wcd.date),
+
+                    -- if there is no previous transaction, use the starting balance date
+                    ('{training_period_start}' - interval 1 day)
+                ) as open_date,
+                wcd.date
 
             -- the "wallet_address" in training cohort table is really a hybrid_cw_id
             from temp.wallet_modeling_training_cohort_{table_reference_date} wc
-            join reference.wallet_coin_ids xw_cw on xw_cw.hybrid_cw_id = wc.wallet_address
+            join reference.wallet_coin_ids xw_cw on xw_cw.wallet_address = wc.wallet_address
 
-            -- the "wallet_address" in coin-dates table is really a hybrid_cw_id
-            join temp.training_cohort_coin_dates_{table_reference_date} wcd on wcd.wallet_address = xw_cw.hybrid_cw_id
+            -- the "wallet_address" in coin-dates table is really a wallet_id
+            join temp.training_cohort_coin_dates_{table_reference_date} wcd on wcd.wallet_address = wc.wallet_id
 
-            join core.coin_market_data cmd on cmd.coin_id = wcd.coin_id
-                and cmd.date = wcd.date
             where wcd.date <= '{training_period_end}'
         )"""
     else:
         date_ranges_logic = f"""
-        date_ranges as (
+        with date_ranges as (
             select
-                wc.wallet_address,  -- mask wallet_id as "wallet_address"
+                wc.wallet_id as wallet_address,  -- mask wallet_id as "wallet_address"
                 wcd.coin_id,
-                wcd.date,
                 COALESCE(
-                    LEAD(wcd.date) OVER (PARTITION BY wc.wallet_address, wcd.coin_id ORDER BY wcd.date) - interval 1 day,
-                    '{training_period_end}'
-                ) as date_range
+                    -- selects the date of the previous transaction
+                    LAG(wcd.date) OVER (PARTITION BY wc.wallet_address, wcd.coin_id ORDER BY wcd.date),
+
+                    -- if there is no previous transaction, use the starting balance date
+                    ('{training_period_start}' - interval 1 day)
+                ) as open_date,
+                wcd.date
 
             -- the "wallet_address" in training cohort table is really a wallet_id
             from temp.wallet_modeling_training_cohort_{table_reference_date} wc
             join temp.training_cohort_coin_dates_{table_reference_date} wcd on wcd.wallet_address = wc.wallet_id
-
-            join reference.wallet_ids xw on xw.wallet_id = wc.wallet_id
-            join core.coin_market_data cmd on cmd.coin_id = wcd.coin_id
-                and cmd.date = wcd.date
             where wcd.date <= '{training_period_end}'
         )"""
 
     sql_query = f"""
-        with {date_ranges_logic}
+        {date_ranges_logic}
 
         select dr.wallet_address  -- this is actually the ID selected in the CTE, not a wallet_address
         ,dr.coin_id
+        ,dr.open_date
         ,dr.date
-        ,DATE_DIFF(dr.date_range, dr.date, DAY) as days_until_next_transfer
+        ,DATE_DIFF(dr.date, dr.open_date, DAY) as open_days
         ,max(cmd.price) as max_price
         ,min(cmd.price) as min_price
         from date_ranges dr
-        join core.coin_market_data cmd on cmd.coin_id = dr.coin_id
-            and cmd.date between dr.date and dr.date_range
-        where cmd.date <= '{training_period_end}'
-        group by 1,2,3,4
-        order by date, wallet_address, coin_id
+        join {core_schema}.coin_market_data cmd on cmd.coin_id = dr.coin_id
+            and (
+                -- join prices
+                (cmd.date between dr.open_date and dr.date)
+                or (cmd.date = dr.date)
+            )
+        group by 1,2,3,4,5
+        order by 1,2,4
         """
-    print(sql_query)
+
+    print(sql_query) # TODO remove this
     ideal_transfers_df = dgc().run_sql(sql_query)
 
     # Handle column dtypes
@@ -211,6 +231,8 @@ def get_ideal_transfers_df(
     # Confirm no nulls
     if ideal_transfers_df.isna().sum().sum() > 0:
         raise ValueError(f"Null values found in ideal_transfers_df. Review query:{sql_query}")
+
+    logger.info(f"Retrieved ideal_transfers_df with shape {ideal_transfers_df.shape}")
 
     return ideal_transfers_df
 
@@ -233,16 +255,18 @@ def append_profits_data(ideal_transfers_df: pd.DataFrame,
     - merged_df (DataFrame): Merged and validated transfers data
     """
     # Merge profits and market data
-    merged_df = training_profits_df[['date', 'wallet_address', 'coin_id', 'usd_balance', 'usd_net_transfers']].merge(
-        training_market_indicators_df[['date', 'coin_id', 'price']],
-        on=['date', 'coin_id'],
-        how='inner'
-    )
-    if len(merged_df) != len(training_profits_df):
+    profits_prices_df = (training_profits_df[
+        ['date', 'wallet_address', 'coin_id', 'usd_balance', 'usd_net_transfers']]
+        .merge(
+            training_market_indicators_df[['date', 'coin_id', 'price']],
+            on=['date', 'coin_id'],
+            how='inner'
+        ))
+    if len(profits_prices_df) != len(training_profits_df):
         raise ValueError("Merge of profits_df and market_data_df did not fully align")
 
     # Merge ideal_transfers_df
-    merged_df = merged_df.merge(
+    merged_df = profits_prices_df.merge(
         ideal_transfers_df,
         on=['date', 'coin_id', 'wallet_address'],
         how='inner'
