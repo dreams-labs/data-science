@@ -57,22 +57,24 @@ def calculate_scenario_features(
     market_indicators_df = copy.deepcopy(training_market_indicators_df)
     base_trading_df = copy.deepcopy(trading_features_df)
     base_performance_df = copy.deepcopy(performance_features_df)
+    u.assert_matching_indices(base_trading_df,base_performance_df)
 
     # Config params
-    table_reference_date = datetime.strptime(wallets_config['training_data']['modeling_period_start'],
+    cohort_reference_date = datetime.strptime(wallets_config['training_data']['modeling_period_start'],
                                              '%Y-%m-%d').strftime('%Y%m%d')
     use_hybrid_ids = wallets_config['training_data']['hybridize_wallet_ids']
 
-    logger.warning(
-        f"period_start       {period_start_date}",
-        f"period_end         {period_end_date}",
-        f"table_reference    {table_reference_date}"
+    # Create profits reference from period dates
+    profits_reference = (
+        f"{cohort_reference_date}_"
+        f"{datetime.strptime(period_start_date, '%Y-%m-%d').strftime('%y%m%d')}_"
+        f"{datetime.strptime(period_end_date, '%Y-%m-%d').strftime('%y%m%d')}_"
+        f"hybridized_{use_hybrid_ids}"
     )
-
     # Upload profits data to temporary storage
     upload_profits_df_dates(
         profits_df,
-        table_reference_date
+        profits_reference
     )
 
     # Calculate ideal price points for each transfer
@@ -80,7 +82,8 @@ def calculate_scenario_features(
         period_start_date,
         period_end_date,
         use_hybrid_ids,
-        table_reference_date,
+        cohort_reference_date,
+        profits_reference,
         wallets_config['training_data']['dataset']
     )
 
@@ -95,8 +98,13 @@ def calculate_scenario_features(
         ideal_profits_df, period_start_date, period_end_date)
     ideal_performance_df = wpf.calculate_performance_features(
         ideal_trading_df, wallets_config)
-    u.assert_matching_indices(base_trading_df,ideal_trading_df)
-    u.assert_matching_indices(base_performance_df,ideal_performance_df)
+    try:
+        u.assert_matching_indices(base_trading_df, ideal_trading_df)
+        u.assert_matching_indices(base_performance_df, ideal_performance_df)
+    except Exception as e:
+        # surface context in the logs
+        logger.error("Index mismatch between base/ideal features: %s", e, exc_info=True)
+        raise                       # bubble the error so the epoch aborts
     del profits_df, market_indicators_df
 
     # Compute metrics comparing actual performance vs ideal timing performance
@@ -123,7 +131,7 @@ def calculate_scenario_features(
 @u.timing_decorator
 def upload_profits_df_dates(
         profits_df: pd.DataFrame,
-        table_reference_date: str = '') -> None:
+        profits_reference: str) -> None:
     """
     Uploads all coin/wallet/date combinations in profits_df to BigQuery temp table.
 
@@ -134,7 +142,7 @@ def upload_profits_df_dates(
     upload_df = profits_df[['coin_id', 'date', 'wallet_address']].copy()
 
     project_id = 'western-verve-411004'
-    table_id = f"{project_id}.temp.training_cohort_coin_dates_{table_reference_date}"
+    table_id = f"{project_id}.temp.training_cohort_coin_dates_{profits_reference}"
     schema = [
         {'name': 'coin_id', 'type': 'string'},
         {'name': 'date', 'type': 'date'},
@@ -159,7 +167,8 @@ def get_ideal_transfers_df(
         training_period_start: str,
         training_period_end: str,
         use_hybrid_ids: bool,
-        table_reference_date: str,
+        cohort_reference_date: str,
+        profits_reference: str,
         dataset: str = 'prod'
     ) -> pd.DataFrame:
     """
@@ -178,7 +187,8 @@ def get_ideal_transfers_df(
     - training_period_start (str): Start date for training period
     - training_period_end (str): End date for training period
     - use_hybrid_ids (bool): Whether to use hybrid_cw_ids instead of wallet_ids
-    - table_reference_date (str): Reference date for temp table naming
+    - cohort_reference_date (str): Reference date for the cohort temp table
+    - profits_reference (str): Reference date for the profits pairs temp table
     - dataset (str): Determines whether to query core or dev_core schema
 
     Returns:
@@ -192,33 +202,32 @@ def get_ideal_transfers_df(
     if use_hybrid_ids:
         # for hybridized runs, the 'wallet_address' df column is the database 'hybrid_cw_id'
         wallet_addresses_cte = f"""
-        with date_ranges as (
+        with masked_wallet_addresses as (
             select
                 -- mask hybrid_cw_id as "wallet_address" for data science pipeline
                 xw_cw.hybrid_cw_id as wallet_address,
                 wcd.coin_id,
                 wcd.date
-
+            from temp.training_cohort_coin_dates_{profits_reference} wcd
             -- the "wallet_address" in training cohort table is really a hybrid_cw_id
-            from temp.wallet_modeling_training_cohort_{table_reference_date} wc
-            join reference.wallet_coin_ids xw_cw on xw_cw.wallet_address = wc.wallet_address
-
-            -- the "wallet_address" in coin-dates table is really a wallet_id
-            join temp.training_cohort_coin_dates_{table_reference_date} wcd on wcd.wallet_address = wc.wallet_id
-
+            join reference.wallet_coin_ids xw_cw on xw_cw.hybrid_cw_id = wcd.wallet_address
+            join temp.wallet_modeling_training_cohort_{cohort_reference_date} wc
+                on wc.wallet_address = xw_cw.wallet_address
             where wcd.date <= '{training_period_end}'
         )"""
     else:
         # for non-hybridized runs, the 'wallet_address' df column is the database 'wallet_id'
         wallet_addresses_cte = f"""
         with masked_wallet_addresses as (
-            select wc.wallet_id as wallet_address,  -- mask wallet_id as "wallet_address"
-            wcd.coin_id,
-            wcd.date
+            select
+                -- mask wallet_id as "wallet_address"
+                wc.wallet_id as wallet_address,
+                wcd.coin_id,
+                wcd.date
 
             -- the "wallet_address" in training cohort table is really a wallet_id
-            from temp.wallet_modeling_training_cohort_{table_reference_date} wc
-            join temp.training_cohort_coin_dates_{table_reference_date} wcd on wcd.wallet_address = wc.wallet_id
+            from temp.wallet_modeling_training_cohort_{cohort_reference_date} wc
+            join temp.training_cohort_coin_dates_{profits_reference} wcd on wcd.wallet_address = wc.wallet_id
             where wcd.date <= '{training_period_end}'
         )"""
 
@@ -256,7 +265,6 @@ def get_ideal_transfers_df(
         group by 1,2,3,4,5
         order by 1,2,4
         """
-
     ideal_transfers_df = dgc().run_sql(sql_query)
 
     # Handle column dtypes
@@ -378,6 +386,19 @@ def generate_ideal_profits_df(
         0
     )
     ideal_profits_df['is_imputed'] = profits_df['is_imputed']
+
+    # Add at the start of the function, after docstring
+    null_check = ideal_profits_df[['date', 'wallet_address', 'coin_id']].isnull()
+    if null_check.any().any():
+        total_records = len(ideal_profits_df)
+        null_counts = null_check.sum()
+        raise ValueError(
+            f"Null values detected in required columns. "
+            f"Total records: {total_records:,}. "
+            f"Nulls found - date: {null_counts['date']:,}, "
+            f"wallet_address: {null_counts['wallet_address']:,}, "
+            f"coin_id: {null_counts['coin_id']:,}"
+        )
 
     return ideal_profits_df
 
