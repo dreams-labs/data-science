@@ -56,7 +56,6 @@ def calculate_performance_features(
     # Generate features using transformations of ratios
     performance_features_df = transform_performance_ratios(
         ratios_features_df,
-        balance_features_df,
         wallets_config
     )
 
@@ -80,7 +79,7 @@ def calculate_performance_features(
     if not performance_features_df.index.equals(trading_features_df.index):
         raise ValueError("Wallet address mismatch between trading_features_df and performance_features_df")
 
-    return performance_features_df
+    return performance_features_df.sort_index()
 
 
 
@@ -222,7 +221,6 @@ def calculate_performance_ratios(performance_features_df: pd.DataFrame) -> pd.Da
 
 def transform_performance_ratios(
         performance_ratios_df: pd.DataFrame,
-        balance_features_df: pd.DataFrame,
         wallets_config: dict
     ) -> pd.DataFrame:
     """
@@ -243,7 +241,6 @@ def transform_performance_ratios(
 
     """
     # Extract params from config
-    ntile_count = wallets_config['features']['ranking_ntiles']
     returns_winsorization = wallets_config['features']['returns_winsorization']
 
     # Create complete index in empty df
@@ -263,27 +260,5 @@ def transform_performance_ratios(
         # Rank of ratio
         performance_features_df[f'{col}/rank'] = series.rank(method='average', pct=True)
 
-        #FeatureRemoval not predictive
-        # # Signed log of ratio
-        # performance_features_df[f'{col}/log'] = np.sign(series) * np.log1p(series.abs())
-
-        #FeatureRemoval not predictive
-        # # Ntile rank of ratio
-        # # Extract denominator and create ntils of balance values
-        # denominator = col.split('/')[1]
-        # balance_col = f'balance_{denominator}'
-        # metric_ntiles = pd.qcut(
-        #     balance_features_df[balance_col],
-        #     q=ntile_count,
-        #     labels=False,
-        #     duplicates='drop'
-        # )
-
-        # # Rank within appropriate denominator-based groups
-        # performance_features_df[f'{col}/ntile_rank'] = (
-        #     series.groupby(metric_ntiles)
-        #     .rank(method='average', pct=True)
-        #     .fillna(0)
-        # )
 
     return performance_features_df
