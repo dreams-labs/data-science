@@ -758,23 +758,39 @@ def assert_period(df, period_start, period_end) -> None:
 
 def assert_matching_indices(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
     """
-    Assert that two DataFrames have matching indices.
+    Assert that two DataFrames have identical indices (order-insensitive).
 
-    If either DataFrame's index is unsorted, sorts it for comparison.
-    Raises a ValueError if the indices differ.
+    Params
+    ------
+    df1 : DataFrame
+    df2 : DataFrame
 
-    Params:
-    - df1 (DataFrame): First DataFrame.
-    - df2 (DataFrame): Second DataFrame.
+    Raises
+    ------
+    ValueError – if the indices differ.
     """
-    # Use sorted index only if necessary to optimize performance
+    # Ensure sorted, monotonic indices for comparison
     idx1 = df1.index if df1.index.is_monotonic_increasing else df1.index.sort_values()
     idx2 = df2.index if df2.index.is_monotonic_increasing else df2.index.sort_values()
 
-    # Check if indices match exactly
-    if not np.array_equal(idx1.values, idx2.values):
-        raise ValueError("DataFrames have mismatched indices.")
+    if np.array_equal(idx1.values, idx2.values):
+        return  # everything matches
 
+    # ─────────────────────── diagnostic message ───────────────────────
+    msg_lines: list[str] = [
+        "DataFrames have mismatched indices.",
+        f"df1 shape: {df1.shape}, df2 shape: {df2.shape}",
+        f"df1 index name: '{idx1.name}', df2 index name: '{idx2.name}'"
+    ]
+
+    # If numeric, add extra context (range & mean)
+    if pd.api.types.is_numeric_dtype(idx1):
+        arr1 = idx1.to_numpy(dtype=float)
+        arr2 = idx2.to_numpy(dtype=float)
+        msg_lines.append(f"df1 index range: [{arr1.min()}, {arr1.max()}], mean: {arr1.mean():.2f}")
+        msg_lines.append(f"df2 index range: [{arr2.min()}, {arr2.max()}], mean: {arr2.mean():.2f}")
+
+    raise ValueError("\n".join(msg_lines))
 
 def ensure_index(df: pd.DataFrame) -> pd.DataFrame:
     """
