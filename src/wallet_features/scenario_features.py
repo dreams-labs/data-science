@@ -1,4 +1,14 @@
+"""
+Generates performance metrics for wallets under given scenarios.
+
+The first scenario support is the "ideal timing" scenario, which compares
+ each wallets' trading performance with how they would have done if they
+ sold at the highest available price and bought at the lowest available price,
+ defined as all prices between their previous transaction (or period start)
+ and the actual transaction date.
+"""
 import logging
+import copy
 from datetime import datetime
 import pandas as pd
 import numpy as np
@@ -34,21 +44,34 @@ def calculate_scenario_features(
     - training_profits_df (DataFrame): Historical profits data
     - training_market_indicators_df (DataFrame): df with coin_id,date,price columns
     - trading_features_df (DataFrame): actual trading metrics of each wallet to compare vs ideal
-    - performance_features_df (DataFrame): actual performance metrics of each wallet to compare vs ideal
+    - performance_features_df (DataFrame): actual performance metrics of each wallet to compare
+        vs ideal
     - period_start_date (str): Start of analysis period
     - period_end_date (str): End of analysis period
 
     Returns:
     - scenario_features_df (DataFrame): Wallet-level scenario transfer features
     """
+    # Deep copy to avoid thread collision
+    profits_df = copy.deepcopy(training_profits_df)
+    market_indicators_df = copy.deepcopy(training_market_indicators_df)
+    base_trading_df = copy.deepcopy(trading_features_df)
+    base_performance_df = copy.deepcopy(performance_features_df)
+
     # Config params
     table_reference_date = datetime.strptime(wallets_config['training_data']['modeling_period_start'],
                                              '%Y-%m-%d').strftime('%Y%m%d')
     use_hybrid_ids = wallets_config['training_data']['hybridize_wallet_ids']
 
+    logger.warning(
+        f"period_start       {period_start_date}",
+        f"period_end         {period_end_date}",
+        f"table_reference    {table_reference_date}"
+    )
+
     # Upload profits data to temporary storage
     upload_profits_df_dates(
-        training_profits_df,
+        profits_df,
         table_reference_date
     )
 
@@ -61,29 +84,32 @@ def calculate_scenario_features(
         wallets_config['training_data']['dataset']
     )
 
-    # Enrich with actual transfer history
-    ideal_transfers_df = append_profits_data(
+    # Create proideafits_df for ideal performance scenario and calculate base features
+    ideal_profits_df = generate_ideal_profits_df(
         ideal_transfers_df,
-        training_profits_df,
-        training_market_indicators_df
+        profits_df,
+        market_indicators_df,
+        period_end_date
     )
+    ideal_trading_df = wtf.calculate_wallet_trading_features(
+        ideal_profits_df, period_start_date, period_end_date)
+    ideal_performance_df = wpf.calculate_performance_features(
+        ideal_trading_df, wallets_config)
+    u.assert_matching_indices(base_trading_df,ideal_trading_df)
+    u.assert_matching_indices(base_performance_df,ideal_performance_df)
+    del profits_df, market_indicators_df
 
-    # # Generate performance features
-    # performance_features_df = generate_scenario_features(
-    #     ideal_transfers_df,
-    #     trading_features_df,
-    #     performance_features_df,
-    #     period_start_date,
-    #     period_end_date,
-    #     wallets_config
-    # )
-    # scenario_features_df = performance_features_df
-
-    # Data completeness check
-    profits_wallets = training_profits_df['wallet_address'].drop_duplicates()
-    feature_wallets = scenario_features_df.index.get_level_values('wallet_address')
-    if len(profits_wallets) != len(feature_wallets):
-        raise ValueError("Wallets in profits_df were not found in ideal_transfers_df.")
+    # Compute metrics comparing actual performance vs ideal timing performance
+    lost_trading_df = calculate_lost_trading_metrics(
+        base_trading_df.copy(),
+        ideal_trading_df,
+        wallets_config
+    )
+    lost_performance_df = calculate_lost_performance_metrics(
+        base_performance_df.copy(),
+        ideal_performance_df
+    )
+    scenario_features_df = lost_trading_df.join(lost_performance_df)
 
     return scenario_features_df
 
@@ -96,16 +122,16 @@ def calculate_scenario_features(
 
 @u.timing_decorator
 def upload_profits_df_dates(
-        training_profits_df: pd.DataFrame,
+        profits_df: pd.DataFrame,
         table_reference_date: str = '') -> None:
     """
     Uploads all coin/wallet/date combinations in profits_df to BigQuery temp table.
 
     Params:
-    - training_profits_df (DataFrame): Source profits data
+    - profits_df (DataFrame): Source profits data
     - table_reference_date (str): Modifier to the upload table name so offsets don't collide.
     """
-    upload_df = training_profits_df[['coin_id', 'date', 'wallet_address']].copy()
+    upload_df = profits_df[['coin_id', 'date', 'wallet_address']].copy()
 
     project_id = 'western-verve-411004'
     table_id = f"{project_id}.temp.training_cohort_coin_dates_{table_reference_date}"
@@ -124,6 +150,8 @@ def upload_profits_df_dates(
         progress_bar=False
     )
 
+    logger.info(f"Completed profits dates upload to {table_id}.")
+
 
 
 @u.timing_decorator
@@ -135,7 +163,16 @@ def get_ideal_transfers_df(
         dataset: str = 'prod'
     ) -> pd.DataFrame:
     """
-    Get wallet transfer data with price ranges.
+    Get wallet transfer data with price ranges by querying BigQuery.
+
+    Query output fields:
+    - wallet_address,coin_id: same as input df
+    - open_date: the earliest date within the period that the wallet could
+        have transacted
+    - date: the actual date the wallet transacted
+    - open_days: how many days are between the open_date and date
+    - max_price: the maximum token price during the open period
+    - min_price: the minimum token price during the open period
 
     Params:
     - training_period_start (str): Start date for training period
@@ -153,20 +190,13 @@ def get_ideal_transfers_df(
 
     # Different logic for date_ranges based on hybrid_ids setting
     if use_hybrid_ids:
-        date_ranges_logic = f"""
+        # for hybridized runs, the 'wallet_address' df column is the database 'hybrid_cw_id'
+        wallet_addresses_cte = f"""
         with date_ranges as (
             select
                 -- mask hybrid_cw_id as "wallet_address" for data science pipeline
                 xw_cw.hybrid_cw_id as wallet_address,
-
                 wcd.coin_id,
-                COALESCE(
-                    -- selects the date of the previous transaction
-                    LAG(wcd.date) OVER (PARTITION BY wc.wallet_address, wcd.coin_id ORDER BY wcd.date),
-
-                    -- if there is no previous transaction, use the starting balance date
-                    ('{training_period_start}' - interval 1 day)
-                ) as open_date,
                 wcd.date
 
             -- the "wallet_address" in training cohort table is really a hybrid_cw_id
@@ -179,19 +209,12 @@ def get_ideal_transfers_df(
             where wcd.date <= '{training_period_end}'
         )"""
     else:
-        date_ranges_logic = f"""
-        with date_ranges as (
-            select
-                wc.wallet_id as wallet_address,  -- mask wallet_id as "wallet_address"
-                wcd.coin_id,
-                COALESCE(
-                    -- selects the date of the previous transaction
-                    LAG(wcd.date) OVER (PARTITION BY wc.wallet_address, wcd.coin_id ORDER BY wcd.date),
-
-                    -- if there is no previous transaction, use the starting balance date
-                    ('{training_period_start}' - interval 1 day)
-                ) as open_date,
-                wcd.date
+        # for non-hybridized runs, the 'wallet_address' df column is the database 'wallet_id'
+        wallet_addresses_cte = f"""
+        with masked_wallet_addresses as (
+            select wc.wallet_id as wallet_address,  -- mask wallet_id as "wallet_address"
+            wcd.coin_id,
+            wcd.date
 
             -- the "wallet_address" in training cohort table is really a wallet_id
             from temp.wallet_modeling_training_cohort_{table_reference_date} wc
@@ -200,7 +223,21 @@ def get_ideal_transfers_df(
         )"""
 
     sql_query = f"""
-        {date_ranges_logic}
+        {wallet_addresses_cte}
+
+        ,date_ranges as (
+            select wallet_address,  -- masked wallet_id as "wallet_address"
+            coin_id,
+            COALESCE(
+                -- selects the date of the previous transaction
+                LAG(date) OVER (PARTITION BY wallet_address, coin_id ORDER BY date),
+
+                -- if there is no previous transaction, use the starting balance date
+                ('{training_period_start}' - interval 1 day)
+            ) as open_date,
+            date
+            from masked_wallet_addresses
+        )
 
         select dr.wallet_address  -- this is actually the ID selected in the CTE, not a wallet_address
         ,dr.coin_id
@@ -220,7 +257,6 @@ def get_ideal_transfers_df(
         order by 1,2,4
         """
 
-    print(sql_query) # TODO remove this
     ideal_transfers_df = dgc().run_sql(sql_query)
 
     # Handle column dtypes
@@ -238,48 +274,47 @@ def get_ideal_transfers_df(
 
 
 
-@u.timing_decorator
-def append_profits_data(ideal_transfers_df: pd.DataFrame,
-                        training_profits_df: pd.DataFrame,
-                        training_market_indicators_df: pd.DataFrame,
-                        ) -> pd.DataFrame:
+def append_profits_data(
+        ideal_transfers_df: pd.DataFrame,
+        profits_df: pd.DataFrame,
+        market_indicators_df: pd.DataFrame,
+    ) -> pd.DataFrame:
     """
     Merge profits data with ideal transfers, enforcing data consistency and type constraints.
 
     Params:
     - ideal_transfers_df (DataFrame): Ideal transfers to append
-    - training_profits_df (DataFrame): Source profits data
-    - training_market_indicators_df (DataFrame): df with coin_id,date,price columns
+    - profits_df (DataFrame): Source profits data
+    - market_indicators_df (DataFrame): df with coin_id,date,price columns
 
     Returns:
     - merged_df (DataFrame): Merged and validated transfers data
     """
     # Merge profits and market data
-    profits_prices_df = (training_profits_df[
+    profits_prices_df = (profits_df.copy()[
         ['date', 'wallet_address', 'coin_id', 'usd_balance', 'usd_net_transfers']]
         .merge(
-            training_market_indicators_df[['date', 'coin_id', 'price']],
+            market_indicators_df[['date', 'coin_id', 'price']],
             on=['date', 'coin_id'],
             how='inner'
         ))
-    if len(profits_prices_df) != len(training_profits_df):
+    if len(profits_prices_df) != len(profits_df):
         raise ValueError("Merge of profits_df and market_data_df did not fully align")
 
     # Merge ideal_transfers_df
     merged_df = profits_prices_df.merge(
-        ideal_transfers_df,
+        ideal_transfers_df.copy(),
         on=['date', 'coin_id', 'wallet_address'],
         how='inner'
     )
     if len(merged_df) != len(ideal_transfers_df):
-        raise ValueError("Merge of profits_df and market_data_df did not fully align")
+        raise ValueError("Merge of profits_df and ideal_transfers_df did not fully align")
 
     # Add ratio columns
     merged_df['token_balance'] = merged_df['usd_balance'] / merged_df['price']
     merged_df['token_net_transfers'] = merged_df['usd_net_transfers'] / merged_df['price']
 
     # Validate output quality
-    merged_df = u.ensure_index(merged_df)
     merged_df = u.df_downcast(merged_df)
     if merged_df.isna().sum().sum() > 0:
         raise ValueError("Null values found in merged output")
@@ -288,7 +323,66 @@ def append_profits_data(ideal_transfers_df: pd.DataFrame,
 
 
 
-@u.timing_decorator
+def generate_ideal_profits_df(
+        ideal_df: pd.DataFrame,
+        profits_df: pd.DataFrame,
+        market_indicators_df: pd.DataFrame,
+        period_end_date: str
+    ) -> pd.DataFrame:
+    """
+    Generate ideal profits dataframe with optimized transfer timing and final balance.
+
+    Params:
+    - ideal_df (DataFrame): DataFrame from get_ideal_transfers_df with min/max price columns
+    - profits_df (DataFrame): Source profits data for merging actual transfer history
+    - market_indicators_df (DataFrame): df with coin_id,date,price columns
+    - period_end_date (str): End date to calculate ideal final balance
+
+    Returns:
+    - ideal_profits_df (DataFrame): Profits data with ideal transfer values and balances
+    """
+    # Enrich with actual transfer history
+    ideal_df = append_profits_data(
+        ideal_df,
+        profits_df,
+        market_indicators_df
+    ).sort_index()
+
+    # Calculate ideal transfers
+    ideal_df['ideal_net_transfers'] = np.where(
+        ideal_df['token_net_transfers'] < 0,
+        # Ideal sells were sold at the maximum price
+        ideal_df['token_net_transfers'] * ideal_df['max_price'],
+        # Ideal buys were bought at the minimum price
+        ideal_df['token_net_transfers'] * ideal_df['min_price']
+    )
+
+    # Calculate ideal ending balance
+    ideal_df['ideal_usd_balance'] = np.where(
+        ideal_df['date'] == period_end_date,
+        # The ideal ending balance was cashed out at the max price
+        ideal_df['token_balance'] * ideal_df['max_price'],
+        ideal_df['usd_balance']
+    )
+
+    # Data quality checks
+    validate_ideal_df(ideal_df)
+
+    # Create final output dataframe
+    ideal_profits_df = ideal_df[['date','wallet_address','coin_id']].copy()
+    ideal_profits_df['usd_balance'] = ideal_df['ideal_usd_balance']
+    ideal_profits_df['usd_net_transfers'] = ideal_df['ideal_net_transfers']
+    ideal_profits_df['usd_inflows'] = np.where(
+        ideal_profits_df['usd_net_transfers'] > 0,
+        ideal_profits_df['usd_net_transfers'],
+        0
+    )
+    ideal_profits_df['is_imputed'] = profits_df['is_imputed']
+
+    return ideal_profits_df
+
+
+
 def generate_scenario_performance(
         scenario_profits_df: pd.DataFrame,
         period_start_date: str,
@@ -330,7 +424,6 @@ def generate_scenario_performance(
 
 
 
-@u.timing_decorator
 def generate_scenario_features(
         ideal_transfers_df: pd.DataFrame,
         period_start_date: str,
@@ -342,7 +435,6 @@ def generate_scenario_features(
 
     Params:
     - ideal_transfers_df (DataFrame): Transfer data with min/max price columns
-    - training_profits_df (DataFrame): Source profits data
     - period_start_date (str): Start date of analysis period
     - period_end_date (str): End date of analysis period
 
@@ -376,3 +468,147 @@ def generate_scenario_features(
         raise ValueError("Null values found in scenario_performance_features.")
 
     return scenario_features_df
+
+
+
+def validate_ideal_df(ideal_df: pd.DataFrame) -> None:
+    """
+    Validates ideal_df for data integrity with floating point tolerance.
+
+    Checks performed:
+    1. Confirm the ideal USD balance is always >= than the base balance
+    2. Confirms ideal USD balance is positive
+    3. Confirms ideal_net_transfers are all <= than the base net transfers.
+        If the wallet is buying, they should never pay more than the actual.
+        If the wallet is selling, they should always receive more USD than actual,
+            given that sells are reflected as negative numbers.
+
+    Params:
+    - ideal_df (DataFrame): DataFrame with ideal balance calculations
+
+    Raises:
+    - ValueError: If validation constraints are violated
+    """
+    # Calculate tolerance: max of 0.01% of value or 0.01
+    balance_tolerance = np.maximum(ideal_df['usd_balance'] * 0.0001, 0.01)
+    transfer_tolerance = np.maximum(ideal_df['usd_net_transfers'].abs() * 0.0001, 0.01)
+
+    # Check for ideal_usd_balance < usd_balance (with tolerance)
+    balance_violation = ideal_df['ideal_usd_balance'] < (ideal_df['usd_balance'] - balance_tolerance)
+    if balance_violation.any():
+        raise ValueError("Ideal USD balance cannot be less than actual USD balance. "
+                         f"Found {balance_violation.sum()} violations.")
+
+    # Check for negative ideal_usd_balance (with tolerance)
+    negative_ideal = ideal_df['ideal_usd_balance'] < -0.01
+    if negative_ideal.any():
+        raise ValueError("Ideal USD balance cannot be negative. "
+                         f"Found {negative_ideal.sum()} violations.")
+
+    # Check for ideal_net_transfers > usd_net_transfers (with tolerance)
+    transfer_violation = ideal_df['ideal_net_transfers'] > (ideal_df['usd_net_transfers'] + transfer_tolerance)
+    if transfer_violation.any():
+        raise ValueError("Ideal net transfers cannot exceed actual net transfers. "
+                         f"Found {transfer_violation.sum()} violations.")
+
+
+
+def calculate_lost_trading_metrics(
+        base_trading_df: pd.DataFrame,
+        ideal_trading_df: pd.DataFrame,
+        wallets_config: dict
+    ) -> pd.DataFrame:
+    """
+    Calculates underperformance in trading performance vs ideal timed trades.
+
+    Params:
+    - base_trading_df (DataFrame): actual trading metrics
+    - ideal_trading_df (DataFrame): optimal trading metrics
+    - wallets_config (dict): config with usd_materiality and returns_winsorization
+
+    Returns:
+    - lost_df (DataFrame): lost trading metrics with ranks
+    """
+    u.assert_matching_indices(base_trading_df, ideal_trading_df)
+
+    # Define dfs and vars
+    lost_df = pd.DataFrame()
+    lost_df.index = base_trading_df.index
+    trading_diff_df = base_trading_df.sort_index() - ideal_trading_df.sort_index()
+    usd_materiality = wallets_config['features']['usd_materiality']
+    winsorization_pct = wallets_config['features']['returns_winsorization']
+
+    def add_lost_metric(lost_df: pd.DataFrame, diff_col: str, base_col: str, metric_name: str) -> None:
+        """Calculate winsorized loss metric with rank."""
+        lost_df[metric_name] = abs(trading_diff_df[diff_col])
+        pct_col = f"{metric_name}_pct"
+        # Calculate winsorized percent diff for material wallets
+        lost_df[pct_col] = u.winsorize(np.where(
+            base_trading_df[base_col] >= usd_materiality,
+            lost_df[metric_name] / base_trading_df[base_col], 0
+        ), winsorization_pct)
+        lost_df[f"{pct_col}_rank"] = lost_df[pct_col].rank(pct=True)
+
+    # Lost overpays: how much they paid relative to the min price
+    add_lost_metric(lost_df, 'crypto_cash_buys', 'crypto_cash_buys', 'lost_overpays')
+
+    # Lost undersells: how much they sold for relative to the max price
+    add_lost_metric(lost_df, 'crypto_cash_sells', 'crypto_cash_sells', 'lost_undersells')
+
+    # Lost gains: how much they *could have* sold for at the max price
+    add_lost_metric(lost_df, 'crypto_outflows', 'crypto_outflows', 'lost_gains')
+
+    # Lost net gains: total net losses from overpays and ROI on max investment
+    add_lost_metric(lost_df, 'crypto_net_gain', 'max_investment', 'lost_net_gains')
+    lost_df.rename(columns={
+        'lost_net_gains_pct': 'lost_roi',
+        'lost_net_gains_pct_rank': 'lost_roi_pct_rank'
+    }, inplace=True)
+
+    # Lost total product: lost overpays * lost gains, which penalizes double losses more
+    lost_df['lost_combined_pct'] = u.winsorize(
+        ((lost_df['lost_overpays_pct']+1) * (lost_df['lost_gains_pct']+1)) - 1,
+        winsorization_pct)
+    lost_df['lost_combined_pct_rank'] = lost_df['lost_combined_pct'].rank(pct=True)
+
+    return lost_df
+
+
+
+def calculate_lost_performance_metrics(
+        base_performance_df: pd.DataFrame,
+        ideal_performance_df: pd.DataFrame
+    ) -> pd.DataFrame:
+    """
+    Params:
+    - base_performance_df (DataFrame): actual performance metrics
+    - ideal_performance_df (DataFrame): optimal performance metrics
+
+    Returns:
+    - lost_performance_df (DataFrame): lost performance metrics with renamed columns
+    """
+    # Calculate lost performance for all metrics
+    lost_performance_df = base_performance_df.sort_index() - ideal_performance_df.sort_index()
+
+    include_metrics = {
+        "crypto_net_gain/max_investment": "lost_net_gain_max_inv",
+        "crypto_net_gain/crypto_inflows": "lost_net_gain_inflows",
+    }
+
+    # Filter to only included cols
+    filtered_cols = [col for col in lost_performance_df.columns
+                     if any(col.startswith(metric) for metric in include_metrics)]
+    lost_performance_df = lost_performance_df[filtered_cols]
+
+    # Rename cols to abbreviated prefixes
+    rename_map = {}
+    for old_pref, new_pref in include_metrics.items():
+        for col in lost_performance_df.columns:
+            if col.startswith(f"{old_pref}/"):
+                # keep the suffix (e.g. "base", "winsorized", "rank")
+                suffix = col[len(old_pref) + 1 :]
+                rename_map[col] = f"{new_pref}/{suffix}"
+
+    lost_performance_df = lost_performance_df.rename(columns=rename_map)
+
+    return lost_performance_df
