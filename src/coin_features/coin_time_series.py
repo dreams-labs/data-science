@@ -101,3 +101,11 @@ def generate_market_features(
         market_features_df = market_features_df.rename(columns=rename_map)
 
     return market_features_df
+
+
+
+
+
+# --------------------------------
+#        Coin Series Query
+# --------------------------------
