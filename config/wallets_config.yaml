@@ -48,10 +48,9 @@ training_data: #WalletModel
     training_data_only:      False  # if true, only generates training data to be scored by another model
 
     #KeyParam Datasets and Folders
-    dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
-    # parquet_folder: temp/wallet_modeling_dfs/dda_861_wallet_graphs_30d  # where to store parquet files
-    # parquet_folder: temp/wallet_modeling_dfs/dda_873_validation_fix_30d  # where to store parquet files
-    parquet_folder: temp/wallet_modeling_dfs/dda_831_scenario_features_30d_v6  # where to store parquet files
+    dataset: dev  # Set to prod or dev; determines whether to query core or dev dataset tables
+    # parquet_folder: temp/wallet_modeling_dfs/dda_831_scenario_features_30d_v6  # where to store parquet files
+    parquet_folder: temp/wallet_modeling_dfs/dda_878_worst_scenario_features_v4  # where to store parquet files
     reference_dfs_folder: temp/reference_dfs  # Base folder where files that impact all runs are stored
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
@@ -251,16 +250,16 @@ modeling: #WalletModel
             # 'transfers|later_buyers/median|*',
             'transfers|wallet_age*',
 
-            # 'cw_timing|price_sma_2/lag_15/buy_weighted*',
+            'cw_timing|price_sma_2/lag_15/buy_weighted*',
             'cw_timing|price_sma_2/lead_15/buy_weighted*',
-            # 'cw_timing|price_sma_2/lead_30/buy_weighted*',
+            'cw_timing|price_sma_2/lead_30/buy_weighted*',
             'cw_timing|volume_sma_2/buy_weighted*',
             'cw_timing|volume_sma_2/lag_7/buy_weighted*',
             # 'cw_timing|volume_sma_2/lead_7/buy_weighted*',
             'cw_timing|btc_mvrv_z_score/buy_weighted*',
-            # 'cw_timing|btc_mvrv_z_score/lag_30/buy_weighted*',
-            # 'cw_timing|btc_mvrv_z_score/lag_90/buy_weighted*',
-            # 'cw_timing|btc_mvrv_z_score/lead_30/buy_weighted*',
+            'cw_timing|btc_mvrv_z_score/lag_30/buy_weighted*',
+            'cw_timing|btc_mvrv_z_score/lag_90/buy_weighted*',
+            'cw_timing|btc_mvrv_z_score/lead_30/buy_weighted*',
             # 'cw_timing|btc_mvrv_z_score/lead_90/buy_weighted*',
             'cw_timing|gtrends_memecoin_us/lag_15/buy_weighted*',
             'cw_timing|gtrends_memecoin_us/lag_15/buy_weighted|w3',
@@ -270,12 +269,12 @@ modeling: #WalletModel
             # 'cw_timing|price_sma_2/lead_30/sell_weighted*',
             'cw_timing|volume_sma_2/sell_weighted*',
             'cw_timing|volume_sma_2/lag_7/sell_weighted*',
-            # 'cw_timing|volume_sma_2/lead_7/sell_weighted*',
+            'cw_timing|volume_sma_2/lead_7/sell_weighted*',
             'cw_timing|btc_mvrv_z_score/sell_weighted*',
-            # 'cw_timing|btc_mvrv_z_score/lag_30/sell_weighted*',
-            # 'cw_timing|btc_mvrv_z_score/lag_90/sell_weighted*',
-            # 'cw_timing|btc_mvrv_z_score/lead_30/sell_weighted*',
-            # 'cw_timing|btc_mvrv_z_score/lead_90/sell_weighted*',
+            'cw_timing|btc_mvrv_z_score/lag_30/sell_weighted*',
+            'cw_timing|btc_mvrv_z_score/lag_90/sell_weighted*',
+            'cw_timing|btc_mvrv_z_score/lead_30/sell_weighted*',
+            'cw_timing|btc_mvrv_z_score/lead_90/sell_weighted*',
             'cw_timing|gtrends_memecoin_us/lag_15/sell_weighted*',
 
             # 'timing|price_sma_2/lag_15/buy_weighted*',
@@ -285,14 +284,14 @@ modeling: #WalletModel
             'timing|volume_sma_2/lag_7/buy_weighted*',
             # 'timing|volume_sma_2/lead_7/buy_weighted*',
             'timing|btc_mvrv_z_score/buy_weighted*',
-            # 'timing|btc_mvrv_z_score/lag_30/buy_weighted*',
-            # 'timing|btc_mvrv_z_score/lag_90/buy_weighted*',
-            # 'timing|btc_mvrv_z_score/lead_30/buy_weighted*',
-            # 'timing|btc_mvrv_z_score/lead_90/buy_weighted*',
-            'timing|gtrends_memecoin_us/lag_15/buy_weighted*',
-            # 'timing|price_sma_2/lag_15/sell_weighted*',
+            'timing|btc_mvrv_z_score/lag_30/buy_weighted*',
+            'timing|btc_mvrv_z_score/lag_90/buy_weighted*',
+            'timing|btc_mvrv_z_score/lead_30/buy_weighted*',
+            'timing|btc_mvrv_z_score/lead_90/buy_weighted*',
+            # 'timing|gtrends_memecoin_us/lag_15/buy_weighted*',
+            'timing|price_sma_2/lag_15/sell_weighted*',
             'timing|price_sma_2/lead_15/sell_weighted*',
-            # 'timing|price_sma_2/lead_30/sell_weighted*',
+            'timing|price_sma_2/lead_30/sell_weighted*',
             'timing|volume_sma_2/sell_weighted*',
             'timing|volume_sma_2/lag_7/sell_weighted*',
             # 'timing|volume_sma_2/lead_7/sell_weighted*',
@@ -301,7 +300,7 @@ modeling: #WalletModel
             # 'timing|btc_mvrv_z_score/lag_90/sell_weighted*',
             # 'timing|btc_mvrv_z_score/lead_30/sell_weighted*',
             # 'timing|btc_mvrv_z_score/lead_90/sell_weighted*',
-            'timing|gtrends_memecoin_us/lag_15/sell_weighted*',
+            # 'timing|gtrends_memecoin_us/lag_15/sell_weighted*',
 
             # Individual remaining features with very low importance
             'cw_mktcap|end_portfolio_wtd_market_cap/market_cap_filled|w4',
@@ -404,47 +403,109 @@ modeling: #WalletModel
             # 'macro|*|w6',
 
 
-            # 'scenario|lost_combined_pct|*',
-            # 'scenario|lost_combined_pct_rank|*',
-            # 'scenario|lost_undersells_pct|*',
-            # 'scenario|lost_undersells|*',
-            # 'scenario|lost_roi_pct_rank|*',
-            # 'scenario|lost_roi|*',
-            # 'scenario|lost_overpays_pct_rank|*',
-            # 'scenario|lost_overpays_pct|*',
-            # 'scenario|lost_overpays|*',
-            # 'scenario|lost_net_gains|*',
-            # 'scenario|lost_net_gain_max_inv/winsorized|*',
-            # 'scenario|lost_net_gain_max_inv/rank|*',
-            # 'scenario|lost_net_gain_max_inv/base|*',
-            # 'scenario|lost_net_gain_inflows/winsorized|*',
-            # 'scenario|lost_net_gain_inflows/rank|*',
-            # 'scenario|lost_net_gain_inflows/base|*',
-            # 'scenario|lost_gains_pct_rank|*',
-            # 'scenario|lost_gains_pct|*',
-            # 'scenario|lost_gains|*',
-            # 'scenario|lost_undersells_pct_rank|*',
+            # 'scenario|ideal/*',
+            # 'scenario|ideal/relative_combined/pct|*',
+            'scenario|ideal/relative_combined/pct_rank|*',
+            'scenario|ideal/relative_cash_sells|*',
+            'scenario|ideal/relative_cash_sells/pct|*',
+            'scenario|ideal/relative_cash_sells/pct_rank|*',
+            'scenario|ideal/relative_roi/pct_rank|*',
+            'scenario|ideal/relative_roi|*',
+            'scenario|ideal/relative_cash_buys/pct_rank|*',
+            # 'scenario|ideal/relative_cash_buys/pct|*',
+            'scenario|ideal/relative_cash_buys|*',
+            'scenario|ideal/relative_net_gains|*',
+            'scenario|ideal/relative_net_gain_max_inv/winsorized|*',
+            'scenario|ideal/relative_net_gain_max_inv/rank|*',
+            'scenario|ideal/relative_net_gain_max_inv/base|*',
+            'scenario|ideal/relative_net_gain_inflows/winsorized|*',
+            'scenario|ideal/relative_net_gain_inflows/rank|*',
+            'scenario|ideal/relative_net_gain_inflows/base|*',
+            'scenario|ideal/relative_gains/pct_rank|*',
+            'scenario|ideal/relative_gains/pct|*',
+            'scenario|ideal/relative_gains|*',
 
-            # 'cw_scenario|lost_combined_pct|*',
-            # 'cw_scenario|lost_combined_pct_rank|*',
-            # 'cw_scenario|lost_undersells_pct|*',
-            # 'cw_scenario|lost_undersells|*',
-            # 'cw_scenario|lost_roi_pct_rank|*',
-            # 'cw_scenario|lost_roi|*',
-            # 'cw_scenario|lost_overpays_pct_rank|*',
-            # 'cw_scenario|lost_overpays_pct|*',
-            # 'cw_scenario|lost_overpays|*',
-            # 'cw_scenario|lost_net_gains|*',
-            # 'cw_scenario|lost_net_gain_max_inv/winsorized|*',
-            # 'cw_scenario|lost_net_gain_max_inv/rank|*',
-            # 'cw_scenario|lost_net_gain_max_inv/base|*',
-            # 'cw_scenario|lost_net_gain_inflows/winsorized|*',
-            # 'cw_scenario|lost_net_gain_inflows/rank|*',
-            # 'cw_scenario|lost_net_gain_inflows/base|*',
-            # 'cw_scenario|lost_gains_pct_rank|*',
-            # 'cw_scenario|lost_gains_pct|*',
-            # 'cw_scenario|lost_gains|*',
-            # 'cw_scenario|lost_undersells_pct_rank|*',
+            'scenario|worst/*',
+            # 'scenario|worst/relative_combined/pct|*',
+            # 'scenario|worst/relative_combined/pct_rank|*',
+            # 'scenario|worst/relative_cash_sells|*',
+            # 'scenario|worst/relative_cash_sells/pct|*',
+            # 'scenario|worst/relative_cash_sells/pct_rank|*',
+            # 'scenario|worst/relative_roi/pct_rank|*',
+            # 'scenario|worst/relative_roi|*',
+            # 'scenario|worst/relative_cash_buys/pct_rank|*',
+            # 'scenario|worst/relative_cash_buys/pct|*',
+            # 'scenario|worst/relative_cash_buys|*',
+            # 'scenario|worst/relative_net_gains|*',
+            # 'scenario|worst/relative_net_gain_max_inv/winsorized|*',
+            # 'scenario|worst/relative_net_gain_max_inv/rank|*',
+            # 'scenario|worst/relative_net_gain_max_inv/base|*',
+            # 'scenario|worst/relative_net_gain_inflows/winsorized|*',
+            # 'scenario|worst/relative_net_gain_inflows/rank|*',
+            # 'scenario|worst/relative_net_gain_inflows/base|*',
+            # 'scenario|worst/relative_gains/pct_rank|*',
+            # 'scenario|worst/relative_gains/pct|*',
+            # 'scenario|worst/relative_gains|*',
+
+            # 'scenario|net_perf/*',
+            # scenario|net_perf/relative_cash_sells|*,
+            # scenario|net_perf/relative_cash_buys|*,
+            # scenario|net_perf/relative_roi|*,
+            # scenario|net_perf/relative_gains|*,
+            # scenario|net_perf/relative_net_gains|*,
+
+            # 'cw_scenario|ideal/*',
+            # 'cw_scenario|ideal/relative_combined/pct|*',
+            'cw_scenario|ideal/relative_combined/pct_rank|*',
+            'cw_scenario|ideal/relative_cash_sells|*',
+            'cw_scenario|ideal/relative_cash_sells/pct|*',
+            'cw_scenario|ideal/relative_cash_sells/pct_rank|*',
+            'cw_scenario|ideal/relative_roi/pct_rank|*',
+            'cw_scenario|ideal/relative_roi|*',
+            # 'cw_scenario|ideal/relative_cash_buys/pct_rank|*',
+            # 'cw_scenario|ideal/relative_cash_buys/pct|*',
+            'cw_scenario|ideal/relative_cash_buys|*',
+            'cw_scenario|ideal/relative_net_gains|*',
+            # 'cw_scenario|ideal/relative_net_gain_max_inv/winsorized|*',
+            'cw_scenario|ideal/relative_net_gain_max_inv/rank|*',
+            'cw_scenario|ideal/relative_net_gain_max_inv/base|*',
+            'cw_scenario|ideal/relative_net_gain_inflows/winsorized|*',
+            'cw_scenario|ideal/relative_net_gain_inflows/rank|*',
+            'cw_scenario|ideal/relative_net_gain_inflows/base|*',
+            'cw_scenario|ideal/relative_gains/pct_rank|*',
+            'cw_scenario|ideal/relative_gains/pct|*',
+            'cw_scenario|ideal/relative_gains|*',
+
+            'cw_scenario|worst/*',
+            # 'cw_scenario|worst/relative_combined/pct|*',
+            # 'cw_scenario|worst/relative_combined/pct_rank|*',
+            # 'cw_scenario|worst/relative_cash_sells|*',
+            # 'cw_scenario|worst/relative_cash_sells/pct|*',
+            # 'cw_scenario|worst/relative_cash_sells/pct_rank|*',
+            # 'cw_scenario|worst/relative_roi/pct_rank|*',
+            # 'cw_scenario|worst/relative_roi|*',
+            # 'cw_scenario|worst/relative_cash_buys/pct_rank|*',
+            # 'cw_scenario|worst/relative_cash_buys/pct|*',
+            # 'cw_scenario|worst/relative_cash_buys|*',
+            # 'cw_scenario|worst/relative_net_gains|*',
+            # 'cw_scenario|worst/relative_net_gain_max_inv/winsorized|*',
+            # 'cw_scenario|worst/relative_net_gain_max_inv/rank|*',
+            # 'cw_scenario|worst/relative_net_gain_max_inv/base|*',
+            # 'cw_scenario|worst/relative_net_gain_inflows/winsorized|*',
+            # 'cw_scenario|worst/relative_net_gain_inflows/rank|*',
+            # 'cw_scenario|worst/relative_net_gain_inflows/base|*',
+            # 'cw_scenario|worst/relative_gains/pct_rank|*',
+            # 'cw_scenario|worst/relative_gains/pct|*',
+            # 'cw_scenario|worst/relative_gains|*',
+
+            # 'cw_scenario|net_perf/*',
+            # cw_scenario|net_perf/relative_cash_sells|*,
+            # cw_scenario|net_perf/relative_cash_buys|*,
+            # cw_scenario|net_perf/relative_roi|*,
+            # cw_scenario|net_perf/relative_gains|*,
+            # cw_scenario|net_perf/relative_net_gains|*,
+
+
 
             # 'mktcap|end_portfolio_wtd_market_cap*',
             # 'macro|btc_mvrv_z_score_last*',
@@ -497,7 +558,7 @@ modeling: #WalletModel
 
         #KeyParam Grid Search Toggle
  # ===========================================================================================================================================
-        enabled: True
+        # enabled: True
  # ===========================================================================================================================================
 
 
@@ -505,10 +566,10 @@ modeling: #WalletModel
         # Search Methodology
         #  if set to n, the drop_patterns grid search will apply all but n patterns for each model.
         #  otherwise, it will apply 1 drop pattern in each model.
-        drop_patterns_include_n_features: 4
+        drop_patterns_include_n_features: 1
 
-        n_iter: 50   # random search limit
-        n_splits: 2  # cv splits
+        n_iter: 80   # random search limit
+        n_splits: 3  # cv splits
 
         # regressor_scoring: neg_root_mean_squared_error
         # regressor_scoring: custom_neg_rmse_scorer
@@ -593,34 +654,19 @@ modeling: #WalletModel
             # Column Selection
             drop_columns__drop_patterns: [
 
-                'cw_timing|price_sma_2/lag_15/buy_weighted*',
-                'cw_timing|price_sma_2/lead_30/buy_weighted*',
-                'cw_timing|volume_sma_2/lead_7/buy_weighted*',
-                'cw_timing|btc_mvrv_z_score/lag_30/buy_weighted*',
-                'cw_timing|btc_mvrv_z_score/lag_90/buy_weighted*',
-                'cw_timing|btc_mvrv_z_score/lead_30/buy_weighted*',
-                'cw_timing|btc_mvrv_z_score/lead_90/buy_weighted*',
-                'cw_timing|price_sma_2/lag_15/sell_weighted*',
-                'cw_timing|price_sma_2/lead_30/sell_weighted*',
-                'cw_timing|volume_sma_2/lead_7/sell_weighted*',
-                'cw_timing|btc_mvrv_z_score/lag_30/sell_weighted*',
-                'cw_timing|btc_mvrv_z_score/lag_90/sell_weighted*',
-                'cw_timing|btc_mvrv_z_score/lead_30/sell_weighted*',
-                'cw_timing|btc_mvrv_z_score/lead_90/sell_weighted*',
-                'timing|price_sma_2/lag_15/buy_weighted*',
-                'timing|price_sma_2/lead_30/buy_weighted*',
-                'timing|volume_sma_2/lead_7/buy_weighted*',
-                'timing|btc_mvrv_z_score/lag_30/buy_weighted*',
-                'timing|btc_mvrv_z_score/lag_90/buy_weighted*',
-                'timing|btc_mvrv_z_score/lead_30/buy_weighted*',
-                'timing|btc_mvrv_z_score/lead_90/buy_weighted*',
-                'timing|price_sma_2/lag_15/sell_weighted*',
-                'timing|price_sma_2/lead_30/sell_weighted*',
-                'timing|volume_sma_2/lead_7/sell_weighted*',
-                'timing|btc_mvrv_z_score/lag_30/sell_weighted*',
-                'timing|btc_mvrv_z_score/lag_90/sell_weighted*',
-                'timing|btc_mvrv_z_score/lead_30/sell_weighted*',
-                'timing|btc_mvrv_z_score/lead_90/sell_weighted*',
+                # scenario|net_perf/relative_cash_sells|*,
+                # scenario|net_perf/relative_cash_buys|*,
+                # scenario|net_perf/relative_roi|*,
+                # scenario|net_perf/relative_gains|*,
+                # scenario|net_perf/relative_net_gains|*,
+
+                # cw_scenario|net_perf/relative_cash_sells|*,
+                # cw_scenario|net_perf/relative_cash_buys|*,
+                # cw_scenario|net_perf/relative_roi|*,
+                # cw_scenario|net_perf/relative_gains|*,
+                # cw_scenario|net_perf/relative_net_gains|*,
+
+
             ]
 
     # Phase training section
