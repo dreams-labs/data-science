@@ -407,46 +407,46 @@ modeling: #WalletModel
             # 'macro|*|w6',
 
 
-            # 'scenario|lost_combined_pct|*',
+            'scenario|lost_combined_pct|*',
             'scenario|lost_combined_pct_rank|*',
             'scenario|lost_undersells_pct|*',
-            # 'scenario|lost_undersells|*',
+            'scenario|lost_undersells|*',
             'scenario|lost_roi_pct_rank|*',
-            # 'scenario|lost_roi|*',
+            'scenario|lost_roi|*',
             'scenario|lost_overpays_pct_rank|*',
             'scenario|lost_overpays_pct|*',
-            # 'scenario|lost_overpays|*',
-            # 'scenario|lost_net_gains|*',
+            'scenario|lost_overpays|*',
+            'scenario|lost_net_gains|*',
             'scenario|lost_net_gain_max_inv/winsorized|*',
             'scenario|lost_net_gain_max_inv/rank|*',
             'scenario|lost_net_gain_max_inv/base|*',
-            # 'scenario|lost_net_gain_inflows/winsorized|*',
+            'scenario|lost_net_gain_inflows/winsorized|*',
             'scenario|lost_net_gain_inflows/rank|*',
             'scenario|lost_net_gain_inflows/base|*',
             'scenario|lost_gains_pct_rank|*',
             'scenario|lost_gains_pct|*',
-            # 'scenario|lost_gains|*',
+            'scenario|lost_gains|*',
             'scenario|lost_undersells_pct_rank|*',
 
-            # 'cw_scenario|lost_combined_pct|*',
+            'cw_scenario|lost_combined_pct|*',
             'cw_scenario|lost_combined_pct_rank|*',
             'cw_scenario|lost_undersells_pct|*',
-            # 'cw_scenario|lost_undersells|*',
+            'cw_scenario|lost_undersells|*',
             'cw_scenario|lost_roi_pct_rank|*',
-            # 'cw_scenario|lost_roi|*',
+            'cw_scenario|lost_roi|*',
             'cw_scenario|lost_overpays_pct_rank|*',
             'cw_scenario|lost_overpays_pct|*',
-            # 'cw_scenario|lost_overpays|*',
-            # 'cw_scenario|lost_net_gains|*',
+            'cw_scenario|lost_overpays|*',
+            'cw_scenario|lost_net_gains|*',
             'cw_scenario|lost_net_gain_max_inv/winsorized|*',
             'cw_scenario|lost_net_gain_max_inv/rank|*',
             'cw_scenario|lost_net_gain_max_inv/base|*',
-            # 'cw_scenario|lost_net_gain_inflows/winsorized|*',
+            'cw_scenario|lost_net_gain_inflows/winsorized|*',
             'cw_scenario|lost_net_gain_inflows/rank|*',
             'cw_scenario|lost_net_gain_inflows/base|*',
             'cw_scenario|lost_gains_pct_rank|*',
             'cw_scenario|lost_gains_pct|*',
-            # 'cw_scenario|lost_gains|*',
+            'cw_scenario|lost_gains|*',
             'cw_scenario|lost_undersells_pct_rank|*',
 
             # 'mktcap|end_portfolio_wtd_market_cap*',
@@ -723,7 +723,7 @@ n_threads: #WalletModel
     profits_row_imputation:     6  # generates imputed rows in profits_df
     training_dfs_preparation:   3  # generates market indicators, macro indicators, cohort profits dfs
     epoch_tm_features:          2  # determines whether training and modeling features are generated concurrently or sequentially
-    concurrent_epochs:          1  # how many epochs' training data are processed concurrently
+    concurrent_epochs:          2  # how many epochs' training data are processed concurrently
     concurrent_windows:         8  # how many windows are processed concurrently
 
 bigquery_connection:
