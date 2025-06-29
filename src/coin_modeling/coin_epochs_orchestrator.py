@@ -972,18 +972,18 @@ class CoinEpochsOrchestrator:
                 missing_offsets.append(offs)
 
         if not missing_offsets:
-            logger.milestone("All wallet‑epoch parquet files already exist — warm‑up skipped.")
+            logger.milestone("All wallet offset parquet files already exist — warm‑up skipped.")
             return
 
         logger.milestone(
-            "Coin epoch orchestrator warm‑up: generating %d missing wallet‑epoch(s) %s",
+            "Coin epoch orchestrator warm‑up: generating %d missing wallet offset(s) %s",
             len(missing_offsets),
             missing_offsets
         )
 
         # Clone the epochs config and inject the superset
         bulk_epochs_cfg = copy.deepcopy(self.wallets_epochs_config)
-        bulk_epochs_cfg['offset_epochs']['offsets'] = all_offsets
+        bulk_epochs_cfg['offset_epochs']['offsets'] = missing_offsets
         bulk_epochs_cfg['offset_epochs']['validation_offsets'] = []
         # (keep validation_offsets as-is; they’re already in all_offsets)
 

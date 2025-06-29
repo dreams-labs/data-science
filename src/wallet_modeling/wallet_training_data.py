@@ -6,17 +6,14 @@ from typing import List
 from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import numpy as np
-import pandas_gbq
-from pandas_gbq.exceptions import GenericGBQException
 from google.cloud import bigquery
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from google.cloud.exceptions import GoogleCloudError
 from dreams_core import core as dc
 
 # Local module imports
 import training_data.data_retrieval as dr
 import wallet_features.market_cap_features as wmc
 import utils as u
+import utilities.bq_utils as bqu
 
 # Set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -475,57 +472,45 @@ class WalletTrainingData:
 
         Params:
         - cohort_ids (np.array): the wallet_ids included in the cohort
-
         """
-        # 1. Generate upload_df from input df
-        upload_df = pd.DataFrame()
-        upload_df['wallet_id'] = cohort_ids
-        upload_df['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # 1. Prepare upload DataFrame
+        upload_df = pd.DataFrame({
+            'wallet_id': cohort_ids,
+            'updated_at': datetime.now()
+        })
+        upload_df = upload_df.astype({
+            'wallet_id': 'int64',
+            'updated_at': 'datetime64[ns]'
+        })
 
-        dtype_mapping = {
-            'wallet_id': int,
-            'updated_at': 'datetime64[ns, UTC]'
-        }
-        upload_df = upload_df.astype(dtype_mapping)
-
-        # 2. Upload list of IDs to bigquery
         project_id = 'western-verve-411004'
-        client = bigquery.Client(project=project_id)
+        table_id = f"{project_id}.temp.wallet_modeling_training_cohort_{self.epoch_reference_date}"
 
-        wallet_ids_table = f"{project_id}.temp.wallet_modeling_training_cohort_{self.epoch_reference_date}"
-        schema = [
-            {'name':'wallet_id', 'type': 'int64'},
-            {'name':'updated_at', 'type': 'datetime'}
-        ]
+        # 2. Upload using centralized utility (honors global concurrency limit)
+        job_config = bigquery.LoadJobConfig(
+            schema=[
+                bigquery.SchemaField('wallet_id', 'INT64'),
+                bigquery.SchemaField('updated_at', 'DATETIME'),
+            ],
+            write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
+        )
+        bqu.upload_dataframe(upload_df, table_id, job_config=job_config)
 
-        self._upload_to_gbq_with_retry(upload_df, wallet_ids_table, project_id, schema)
-
-        # 3. Create updated table with full wallet_address values
+        # 3. Populate wallet_address from reference table
         create_query = f"""
-        CREATE OR REPLACE TABLE `{wallet_ids_table}` AS
+        CREATE OR REPLACE TABLE `{table_id}` AS
         SELECT
             t.wallet_id,
             w.wallet_address,
             t.updated_at
-        FROM `{wallet_ids_table}` t
+        FROM `{table_id}` t
         JOIN `reference.wallet_ids` w
             ON t.wallet_id = w.wallet_id
         """
-        client.query(create_query).result()
-        logger.info('Uploaded cohort of %s wallets with addresses to %s.',
-                    len(cohort_ids), wallet_ids_table)
+        bqu.run_query(create_query)
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=4, max=10),
-        retry=retry_if_exception_type((GoogleCloudError, GenericGBQException, Exception))
-    )
-    def _upload_to_gbq_with_retry(self, upload_df, table_name, project_id, schema):
-        pandas_gbq.to_gbq(
-            upload_df,
-            table_name,
-            project_id=project_id,
-            if_exists='replace',
-            table_schema=schema,
-            progress_bar=False
+        logger.info(
+            "Uploaded cohort of %d wallets with addresses to %s.",
+            len(cohort_ids),
+            table_id
         )

@@ -276,7 +276,7 @@ class WalletEpochsOrchestrator:
         }
         if (
             all(p.exists() for p in paths.values())
-            and self.base_config['training_data']['rebuild_multioffset_dfs'] is False
+            and self.base_config['training_data'].get('rebuild_multioffset_dfs',False) is False
             and not self.training_only
         ):
             logger.info("Loading saved multi-offset wallet DataFrames from %s", base_path)
