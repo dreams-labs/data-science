@@ -941,12 +941,22 @@ def numpy_type_converter(obj):
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
 
-def full_display(df):
-    """Display DataFrame with no truncation limits."""
-    with pd.option_context('display.max_colwidth', None,
-                          'display.max_columns', None,
-                          'display.max_rows', None):
-        display(df)
+
+def display_full(df, sort_by=None, ascending=False):
+    """
+    Params:
+    - df (DataFrame): dataframe to display with full visibility
+    - sort_by (str): optional column name to sort by
+    - ascending (bool): sort direction if sort_by is specified
+
+    Returns:
+    - None: displays the dataframe
+    """
+    display_df = df.sort_values(by=sort_by, ascending=ascending) if sort_by else df
+
+    with pd.option_context('display.max_colwidth', None, 'display.max_columns', None, 'display.max_rows', None):
+        display(display_df)
+
 
 
 def to_parquet_safe(df: pd.DataFrame, file_path: str, **kwargs) -> None:
