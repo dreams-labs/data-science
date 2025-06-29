@@ -5,7 +5,7 @@ offset_epochs:
 #  e.g. build the model using historical data from epochs [0,-30,-60] and
 #  validate their performance vs performance over the epochs that are [30,60] days
 #  into the future.
-    # offsets: [0]
+    offsets: [0]
     # offsets: [85]
     # offsets: [0, -30]
     # offsets: [

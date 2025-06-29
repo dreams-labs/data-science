@@ -169,7 +169,6 @@ class TemporalGridSearcher:
         Caches results for subsequent grid search experiments.
         """
         logger.milestone(f"Generating training data for {len(self.modeling_dates)} investing cycles...")
-        u.notify('robotz_windows_exit')
 
         max_workers = self.wallets_investing_config['n_threads']['training_data_loading']
 
