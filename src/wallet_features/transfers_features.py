@@ -1,11 +1,9 @@
 import logging
 import pandas as pd
-from dreams_core.googlecloud import GoogleCloud as dgc
-
-# pylint:disable=logging-not-lazy
 
 # Local module imports
 import utils as u
+import utilities.bq_utils as bqu
 
 # set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -232,9 +230,9 @@ def retrieve_transfers_sequencing(
     order by 1,2,3,4
     """
     try:
-        sequence_df = dgc().run_sql(sequencing_sql)
+        sequence_df = bqu.run_query(sequencing_sql)
     except Exception as e:
-        logger.error("FAILED SQL QUERY:\n" + "=" * 80 + "\n" + sequencing_sql + "\n" + "=" * 80)
+        logger.error(f"FAILED SQL QUERY:\n{'=' * 80}\n{sequencing_sql}\n{'=' * 80}")
         logger.error(f"BigQuery Error: {str(e)}")
         raise RuntimeError(
             f"transfers_sequencing query failed. Original error: {str(e)}"

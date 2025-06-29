@@ -12,13 +12,13 @@ import copy
 from datetime import datetime
 import pandas as pd
 import numpy as np
-import pandas_gbq
-from dreams_core.googlecloud import GoogleCloud as dgc
+from google.cloud import bigquery
 
 # Local module imports
 import wallet_features.performance_features as wpf
 import wallet_features.trading_features as wtf
 import utils as u
+import utilities.bq_utils as bqu
 
 # set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -137,25 +137,31 @@ def upload_profits_df_dates(
 
     Params:
     - profits_df (DataFrame): Source profits data
-    - table_reference_date (str): Modifier to the upload table name so offsets don't collide.
+    - profits_reference (str): Modifier for the upload table name to avoid collisions.
+
+    Uses the shared upload_dataframe utility to respect global concurrency limits.
     """
-    upload_df = profits_df[['coin_id', 'date', 'wallet_address']].copy()
+    # select relevant columns
+    upload_df = profits_df[['coin_id', 'date', 'wallet_address']]
 
     project_id = 'western-verve-411004'
     table_id = f"{project_id}.temp.training_cohort_coin_dates_{profits_reference}"
-    schema = [
-        {'name': 'coin_id', 'type': 'string'},
-        {'name': 'date', 'type': 'date'},
-        {'name': 'wallet_address', 'type': 'integer'}
-    ]
 
-    pandas_gbq.to_gbq(
-        upload_df,
-        table_id,
-        project_id=project_id,
-        if_exists='replace',
-        table_schema=schema,
-        progress_bar=False
+    # define load job configuration with explicit schema and truncate semantics
+    job_config = bigquery.LoadJobConfig(
+        schema=[
+            bigquery.SchemaField('coin_id', 'STRING'),
+            bigquery.SchemaField('date', 'DATE'),
+            bigquery.SchemaField('wallet_address', 'INTEGER')
+        ],
+        write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
+    )
+
+    # perform upload through centralized util (blocks if limit reached)
+    bqu.upload_dataframe(
+        dataframe=upload_df,
+        destination_table=table_id,
+        job_config=job_config
     )
 
     logger.info(f"Completed profits dates upload to {table_id}.")
@@ -265,7 +271,7 @@ def get_ideal_transfers_df(
         group by 1,2,3,4,5
         order by 1,2,4
         """
-    ideal_transfers_df = dgc().run_sql(sql_query)
+    ideal_transfers_df = bqu.run_query(sql_query)
 
     # Handle column dtypes
     ideal_transfers_df['coin_id'] = ideal_transfers_df['coin_id'].astype('category')
