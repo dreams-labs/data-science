@@ -38,14 +38,13 @@ def calculate_scenario_features(
     wallets_config: dict
 ) -> pd.DataFrame:
     """
-    Calculates scenario wallet transfer features based on ideal price points.
+    Calculates scenario wallet transfer features based on scenario price points.
 
     Params:
     - training_profits_df (DataFrame): Historical profits data
     - training_market_indicators_df (DataFrame): df with coin_id,date,price columns
-    - trading_features_df (DataFrame): actual trading metrics of each wallet to compare vs ideal
-    - performance_features_df (DataFrame): actual performance metrics of each wallet to compare
-        vs ideal
+    - trading_features_df (DataFrame): actual trading features to compare vs scenario
+    - performance_features_df (DataFrame): actual performance features to compare vs scenario
     - period_start_date (str): Start of analysis period
     - period_end_date (str): End of analysis period
 
@@ -77,8 +76,8 @@ def calculate_scenario_features(
         profits_reference
     )
 
-    # Calculate ideal price points for each transfer
-    ideal_transfers_df = get_ideal_transfers_df(
+    # Calculate scenario price points for each transfer
+    scenario_prices_df = get_scenario_prices_df(
         period_start_date,
         period_end_date,
         use_hybrid_ids,
@@ -87,35 +86,35 @@ def calculate_scenario_features(
         wallets_config['training_data']['dataset']
     )
 
-    # Create proideafits_df for ideal performance scenario and calculate base features
-    ideal_profits_df = generate_ideal_profits_df(
-        ideal_transfers_df,
+    # Create proideafits_df for scenario performance scenario and calculate base features
+    scenario_profits_df = generate_scenario_profits_df(
+        scenario_prices_df,
         profits_df,
         market_indicators_df,
         period_end_date
     )
-    ideal_trading_df = wtf.calculate_wallet_trading_features(
-        ideal_profits_df, period_start_date, period_end_date)
-    ideal_performance_df = wpf.calculate_performance_features(
-        ideal_trading_df, wallets_config)
+    scenario_trading_df = wtf.calculate_wallet_trading_features(
+        scenario_profits_df, period_start_date, period_end_date)
+    scenario_performance_df = wpf.calculate_performance_features(
+        scenario_trading_df, wallets_config)
     try:
-        u.assert_matching_indices(base_trading_df, ideal_trading_df)
-        u.assert_matching_indices(base_performance_df, ideal_performance_df)
+        u.assert_matching_indices(base_trading_df, scenario_trading_df)
+        u.assert_matching_indices(base_performance_df, scenario_performance_df)
     except Exception as e:
         # surface context in the logs
-        logger.error("Index mismatch between base/ideal features: %s", e, exc_info=True)
+        logger.error("Index mismatch between base/scenario features: %s", e, exc_info=True)
         raise                       # bubble the error so the epoch aborts
     del profits_df, market_indicators_df
 
-    # Compute metrics comparing actual performance vs ideal timing performance
-    lost_trading_df = calculate_lost_trading_metrics(
+    # Compute metrics comparing actual performance vs scenario timing performance
+    lost_trading_df = calculate_scenario_trading_metrics(
         base_trading_df.copy(),
-        ideal_trading_df,
+        scenario_trading_df,
         wallets_config
     )
-    lost_performance_df = calculate_lost_performance_metrics(
+    lost_performance_df = calculate_scenario_performance_metrics(
         base_performance_df.copy(),
-        ideal_performance_df
+        scenario_performance_df
     )
     scenario_features_df = lost_trading_df.join(lost_performance_df)
 
@@ -169,7 +168,7 @@ def upload_profits_df_dates(
 
 
 @u.timing_decorator
-def get_ideal_transfers_df(
+def get_scenario_prices_df(
         training_period_start: str,
         training_period_end: str,
         use_hybrid_ids: bool,
@@ -198,7 +197,7 @@ def get_ideal_transfers_df(
     - dataset (str): Determines whether to query core or dev_core schema
 
     Returns:
-    - ideal_transfers_df (DataFrame): Transfer data with min/max prices
+    - scenario_prices_df (DataFrame): Transfer data with min/max prices
     """
     # Define schema
     core_schema = 'core' if dataset == 'prod' else 'dev_core'
@@ -271,33 +270,33 @@ def get_ideal_transfers_df(
         group by 1,2,3,4,5
         order by 1,2,4
         """
-    ideal_transfers_df = bqu.run_query(sql_query)
+    scenario_prices_df = bqu.run_query(sql_query)
 
     # Handle column dtypes
-    ideal_transfers_df['coin_id'] = ideal_transfers_df['coin_id'].astype('category')
-    ideal_transfers_df['date'] = ideal_transfers_df['date'].astype('datetime64[ns]')
-    ideal_transfers_df = u.df_downcast(ideal_transfers_df)
+    scenario_prices_df['coin_id'] = scenario_prices_df['coin_id'].astype('category')
+    scenario_prices_df['date'] = scenario_prices_df['date'].astype('datetime64[ns]')
+    scenario_prices_df = u.df_downcast(scenario_prices_df)
 
     # Confirm no nulls
-    if ideal_transfers_df.isna().sum().sum() > 0:
-        raise ValueError(f"Null values found in ideal_transfers_df. Review query:{sql_query}")
+    if scenario_prices_df.isna().sum().sum() > 0:
+        raise ValueError(f"Null values found in scenario_prices_df. Review query:{sql_query}")
 
-    logger.info(f"Retrieved ideal_transfers_df with shape {ideal_transfers_df.shape}")
+    logger.info(f"Retrieved scenario_prices_df with shape {scenario_prices_df.shape}")
 
-    return ideal_transfers_df
+    return scenario_prices_df
 
 
 
 def append_profits_data(
-        ideal_transfers_df: pd.DataFrame,
+        scenario_prices_df: pd.DataFrame,
         profits_df: pd.DataFrame,
         market_indicators_df: pd.DataFrame,
     ) -> pd.DataFrame:
     """
-    Merge profits data with ideal transfers, enforcing data consistency and type constraints.
+    Merge profits data with scenario prices, enforcing data consistency and type constraints.
 
     Params:
-    - ideal_transfers_df (DataFrame): Ideal transfers to append
+    - scenario_prices_df (DataFrame): Scenario prices to append
     - profits_df (DataFrame): Source profits data
     - market_indicators_df (DataFrame): df with coin_id,date,price columns
 
@@ -315,14 +314,14 @@ def append_profits_data(
     if len(profits_prices_df) != len(profits_df):
         raise ValueError("Merge of profits_df and market_data_df did not fully align")
 
-    # Merge ideal_transfers_df
+    # Merge scenario_prices_df
     merged_df = profits_prices_df.merge(
-        ideal_transfers_df.copy(),
+        scenario_prices_df.copy(),
         on=['date', 'coin_id', 'wallet_address'],
         how='inner'
     )
-    if len(merged_df) != len(ideal_transfers_df):
-        raise ValueError("Merge of profits_df and ideal_transfers_df did not fully align")
+    if len(merged_df) != len(scenario_prices_df):
+        raise ValueError("Merge of profits_df and scenario_prices_df did not fully align")
 
     # Add ratio columns
     merged_df['token_balance'] = merged_df['usd_balance'] / merged_df['price']
@@ -337,66 +336,68 @@ def append_profits_data(
 
 
 
-def generate_ideal_profits_df(
-        ideal_df: pd.DataFrame,
+def generate_scenario_profits_df(
+        scenario_prices_df: pd.DataFrame,
         profits_df: pd.DataFrame,
         market_indicators_df: pd.DataFrame,
         period_end_date: str
     ) -> pd.DataFrame:
     """
-    Generate ideal profits dataframe with optimized transfer timing and final balance.
+    Generate scenario profits dataframe with adjusted transfer timing and final
+        balance value.
 
     Params:
-    - ideal_df (DataFrame): DataFrame from get_ideal_transfers_df with min/max price columns
+    - scenario_prices_df (DataFrame): DataFrame from get_scenario_transfers_df with
+        min/max price columns
     - profits_df (DataFrame): Source profits data for merging actual transfer history
     - market_indicators_df (DataFrame): df with coin_id,date,price columns
-    - period_end_date (str): End date to calculate ideal final balance
+    - period_end_date (str): End date to calculate scenario final balance
 
     Returns:
-    - ideal_profits_df (DataFrame): Profits data with ideal transfer values and balances
+    - scenario_profits_df (DataFrame): Profits data with scenario transfers and balances
     """
     # Enrich with actual transfer history
-    ideal_df = append_profits_data(
-        ideal_df,
+    scenario_df = append_profits_data(
+        scenario_prices_df,
         profits_df,
         market_indicators_df
     ).sort_index()
 
     # Calculate ideal transfers
-    ideal_df['ideal_net_transfers'] = np.where(
-        ideal_df['token_net_transfers'] < 0,
+    scenario_df['ideal_net_transfers'] = np.where(
+        scenario_df['token_net_transfers'] < 0,
         # Ideal sells were sold at the maximum price
-        ideal_df['token_net_transfers'] * ideal_df['max_price'],
+        scenario_df['token_net_transfers'] * scenario_df['max_price'],
         # Ideal buys were bought at the minimum price
-        ideal_df['token_net_transfers'] * ideal_df['min_price']
+        scenario_df['token_net_transfers'] * scenario_df['min_price']
     )
 
     # Calculate ideal ending balance
-    ideal_df['ideal_usd_balance'] = np.where(
-        ideal_df['date'] == period_end_date,
+    scenario_df['ideal_usd_balance'] = np.where(
+        scenario_df['date'] == period_end_date,
         # The ideal ending balance was cashed out at the max price
-        ideal_df['token_balance'] * ideal_df['max_price'],
-        ideal_df['usd_balance']
+        scenario_df['token_balance'] * scenario_df['max_price'],
+        scenario_df['usd_balance']
     )
 
     # Data quality checks
-    validate_ideal_df(ideal_df)
+    validate_scenario_df(scenario_df)
 
     # Create final output dataframe
-    ideal_profits_df = ideal_df[['date','wallet_address','coin_id']].copy()
-    ideal_profits_df['usd_balance'] = ideal_df['ideal_usd_balance']
-    ideal_profits_df['usd_net_transfers'] = ideal_df['ideal_net_transfers']
-    ideal_profits_df['usd_inflows'] = np.where(
-        ideal_profits_df['usd_net_transfers'] > 0,
-        ideal_profits_df['usd_net_transfers'],
+    scenario_profits_df = scenario_df[['date','wallet_address','coin_id']].copy()
+    scenario_profits_df['usd_balance'] = scenario_df['ideal_usd_balance']
+    scenario_profits_df['usd_net_transfers'] = scenario_df['ideal_net_transfers']
+    scenario_profits_df['usd_inflows'] = np.where(
+        scenario_profits_df['usd_net_transfers'] > 0,
+        scenario_profits_df['usd_net_transfers'],
         0
     )
-    ideal_profits_df['is_imputed'] = profits_df['is_imputed']
+    scenario_profits_df['is_imputed'] = profits_df['is_imputed']
 
     # Add at the start of the function, after docstring
-    null_check = ideal_profits_df[['date', 'wallet_address', 'coin_id']].isnull()
+    null_check = scenario_profits_df[['date', 'wallet_address', 'coin_id']].isnull()
     if null_check.any().any():
-        total_records = len(ideal_profits_df)
+        total_records = len(scenario_profits_df)
         null_counts = null_check.sum()
         raise ValueError(
             f"Null values detected in required columns. "
@@ -406,7 +407,7 @@ def generate_ideal_profits_df(
             f"coin_id: {null_counts['coin_id']:,}"
         )
 
-    return ideal_profits_df
+    return scenario_profits_df
 
 
 
@@ -452,7 +453,7 @@ def generate_scenario_performance(
 
 
 def generate_scenario_features(
-        ideal_transfers_df: pd.DataFrame,
+        scenario_prices_df: pd.DataFrame,
         period_start_date: str,
         period_end_date: str,
         wallets_config: dict
@@ -461,7 +462,7 @@ def generate_scenario_features(
     Generate features for best and worst case selling scenarios.
 
     Params:
-    - ideal_transfers_df (DataFrame): Transfer data with min/max price columns
+    - scenario_prices_df (DataFrame): Transfer data with min/max price columns
     - period_start_date (str): Start date of analysis period
     - period_end_date (str): End date of analysis period
 
@@ -469,11 +470,11 @@ def generate_scenario_features(
     - scenario_features_df (DataFrame): Combined best/worst case features
     """
     # Generate best case sells scenario (sells at highest price)
-    best_sells_profits_df = ideal_transfers_df[['usd_balance']].assign(
+    best_sells_profits_df = scenario_prices_df[['usd_balance']].assign(
         usd_net_transfers=np.where(
-            ideal_transfers_df['token_net_transfers'] < 0,
-            ideal_transfers_df['token_net_transfers'] * ideal_transfers_df['max_price'],
-            ideal_transfers_df['usd_net_transfers']
+            scenario_prices_df['token_net_transfers'] < 0,
+            scenario_prices_df['token_net_transfers'] * scenario_prices_df['max_price'],
+            scenario_prices_df['usd_net_transfers']
         )
     )
     best_sells_features = generate_scenario_performance(
@@ -488,7 +489,7 @@ def generate_scenario_features(
     scenario_features_df = best_sells_features
 
     # Data quality checks
-    all_wallets = set(ideal_transfers_df.index.get_level_values('wallet_address'))
+    all_wallets = set(scenario_prices_df.index.get_level_values('wallet_address'))
     if len(all_wallets) != len(scenario_features_df):
         raise ValueError("Missing wallets identified in scenario_performance_features.")
     if scenario_features_df.isna().sum().sum() > 0:
@@ -498,9 +499,9 @@ def generate_scenario_features(
 
 
 
-def validate_ideal_df(ideal_df: pd.DataFrame) -> None:
+def validate_scenario_df(ideal_df: pd.DataFrame) -> None:
     """
-    Validates ideal_df for data integrity with floating point tolerance.
+    Validates scenario_df for data integrity with floating point tolerance.
 
     Checks performed:
     1. Confirm the ideal USD balance is always >= than the base balance
@@ -540,28 +541,28 @@ def validate_ideal_df(ideal_df: pd.DataFrame) -> None:
 
 
 
-def calculate_lost_trading_metrics(
+def calculate_scenario_trading_metrics(
         base_trading_df: pd.DataFrame,
-        ideal_trading_df: pd.DataFrame,
+        scenario_trading_df: pd.DataFrame,
         wallets_config: dict
     ) -> pd.DataFrame:
     """
-    Calculates underperformance in trading performance vs ideal timed trades.
+    Calculates underperformance in trading performance vs scenario timed trades.
 
     Params:
     - base_trading_df (DataFrame): actual trading metrics
-    - ideal_trading_df (DataFrame): optimal trading metrics
+    - scenario_trading_df (DataFrame): scenario trading metrics
     - wallets_config (dict): config with usd_materiality and returns_winsorization
 
     Returns:
     - lost_df (DataFrame): lost trading metrics with ranks
     """
-    u.assert_matching_indices(base_trading_df, ideal_trading_df)
+    u.assert_matching_indices(base_trading_df, scenario_trading_df)
 
     # Define dfs and vars
     lost_df = pd.DataFrame()
     lost_df.index = base_trading_df.index
-    trading_diff_df = base_trading_df.sort_index() - ideal_trading_df.sort_index()
+    trading_diff_df = base_trading_df.sort_index() - scenario_trading_df.sort_index()
     usd_materiality = wallets_config['features']['usd_materiality']
     winsorization_pct = wallets_config['features']['returns_winsorization']
 
@@ -602,20 +603,20 @@ def calculate_lost_trading_metrics(
 
 
 
-def calculate_lost_performance_metrics(
+def calculate_scenario_performance_metrics(
         base_performance_df: pd.DataFrame,
-        ideal_performance_df: pd.DataFrame
+        scenario_performance_df: pd.DataFrame
     ) -> pd.DataFrame:
     """
     Params:
     - base_performance_df (DataFrame): actual performance metrics
-    - ideal_performance_df (DataFrame): optimal performance metrics
+    - scenario_performance_df (DataFrame): scenario performance metrics
 
     Returns:
     - lost_performance_df (DataFrame): lost performance metrics with renamed columns
     """
     # Calculate lost performance for all metrics
-    lost_performance_df = base_performance_df.sort_index() - ideal_performance_df.sort_index()
+    lost_performance_df = base_performance_df.sort_index() - scenario_performance_df.sort_index()
 
     include_metrics = {
         "crypto_net_gain/max_investment": "lost_net_gain_max_inv",
