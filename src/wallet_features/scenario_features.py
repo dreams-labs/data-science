@@ -144,8 +144,14 @@ def calculate_scenario_features(
     # Clean up memory
     del profits_df, market_indicators_df
 
+    # Calculate net performance metrics
+    net_perf_df = calculate_net_perf_metrics(scenario_dataframes[0], scenario_dataframes[1])
+    scenario_dataframes.append(net_perf_df)
+
     # Join all scenario dataframes together
-    scenario_features_df = scenario_dataframes[0].join(scenario_dataframes[1])
+    scenario_features_df = (scenario_dataframes[0]
+                            .join(scenario_dataframes[1])
+                            .join(scenario_dataframes[2]))
 
     return scenario_features_df
 
@@ -558,6 +564,50 @@ def calculate_scenario_performance_metrics(
 
 
 
+def calculate_net_perf_metrics(ideal_df: pd.DataFrame, worst_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculate net performance percentiles comparing ideal vs worst scenarios.
+
+    Formula: net_perf = -ideal / (worst - ideal)
+    Results range from 0.0 (worst performance) to 1.0 (ideal performance)
+
+    Params:
+    - ideal_df (DataFrame): Ideal scenario features (negative values)
+    - worst_df (DataFrame): Worst scenario features (positive values)
+
+    Returns:
+    - net_perf_df (DataFrame): Net performance percentiles with net_perf/ prefix
+    """
+    # Define columns to calculate net_perf for
+    target_columns = [
+        'relative_cash_sells',
+        'relative_cash_buys',
+        'relative_roi',
+        'relative_gains',
+        'relative_net_gains',
+    ]
+
+    net_perf_df = pd.DataFrame(index=ideal_df.index)
+
+    for col in target_columns:
+        ideal_col = f"ideal/{col}"
+        worst_col = f"worst/{col}"
+
+        # Calculate: -ideal / (worst - ideal)
+        numerator = -ideal_df[ideal_col]
+        denominator = worst_df[worst_col] - ideal_df[ideal_col]
+
+        # Handle division by zero (when ideal == worst)
+        net_perf_df[col] = np.where(
+            abs(denominator) < 1e-10,  # Near zero denominator
+            0.0,  # Set to 0 (0th percentile performance)
+            numerator / denominator
+        )
+
+    # Add net_perf prefix
+    net_perf_df = net_perf_df.add_prefix("net_perf/")
+
+    return net_perf_df
 
 
 # -----------------------------------
