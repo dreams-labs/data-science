@@ -35,7 +35,7 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-_MAX_BQ_JOBS = 15
+_MAX_BQ_JOBS = 20
 _semaphore = BoundedSemaphore(_MAX_BQ_JOBS)
 _client = bigquery.Client()
 
