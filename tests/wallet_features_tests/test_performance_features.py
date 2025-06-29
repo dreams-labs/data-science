@@ -140,8 +140,7 @@ def test_transform_performance_ratios(sample_performance_features_df, monkeypatc
 
     # Steps 1-3 remain unchanged
     ratio_df = wpf.calculate_performance_ratios(sample_performance_features_df)
-    balance_features_df = sample_performance_features_df.filter(like='balance_')
-    transformed_df = wpf.transform_performance_ratios(ratio_df, balance_features_df, wallets_config)
+    transformed_df = wpf.transform_performance_ratios(ratio_df, wallets_config)
 
     # Assertions 1-4 remain unchanged
     for col in ratio_df.columns:
