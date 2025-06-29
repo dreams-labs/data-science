@@ -157,7 +157,11 @@ def multithreaded_impute_profits_rows(profits_df, prices_df, target_date, n_thre
 
 
 
-def impute_profits_df_rows(profits_df, prices_df, target_date):
+def impute_profits_df_rows(
+        profits_df: pd.DataFrame,
+        prices_df: pd.DataFrame,
+        target_date: str
+    ) -> pd.DataFrame:
     """
     Impute rows for all coin-wallet pairs in profits_df on the target date using only
     vectorized functions, i.e. there are no groupby statements or for loops/lambda
@@ -193,14 +197,29 @@ def impute_profits_df_rows(profits_df, prices_df, target_date):
     # Convert date to datetime
     target_date = pd.to_datetime(target_date)
 
+    # Get data boundaries for detailed error reporting
+    profits_start = pd.to_datetime(profits_df.index.get_level_values('date').min())
+    profits_end = pd.to_datetime(profits_df.index.get_level_values('date').max())
+    prices_start = pd.to_datetime(prices_df.index.get_level_values('date').min())
+    prices_end = pd.to_datetime(prices_df.index.get_level_values('date').max())
+
     # Check if target_date is earlier than all profits_df dates
-    if target_date < pd.to_datetime(profits_df.index.get_level_values('date').min()):
-        raise ValueError("Target date is earlier than all dates in profits_df")
+    if target_date < profits_start:
+        logger.warning(
+            f"Target date {target_date.strftime('%Y-%m-%d')} is earlier than all dates in profits_df.\n"
+            f"Profits data coverage: {profits_start.strftime('%Y-%m-%d')} to {profits_end.strftime('%Y-%m-%d')}\n"
+            f"Profits shape: {profits_df.shape}"
+        )
+        return profits_df.head(0)
 
     # Check if target_date is later than all prices_df dates
-    if pd.to_datetime(target_date) >  pd.to_datetime(prices_df.index.get_level_values('date').max()):
-        raise ValueError("Target date is later than all dates in prices_df")
-
+    if pd.to_datetime(target_date) > prices_end:
+        logger.warning(
+            f"Target date {target_date.strftime('%Y-%m-%d')} is later than all dates in prices_df.\n"
+            f"Prices data coverage: {prices_start.strftime('%Y-%m-%d')} to {prices_end.strftime('%Y-%m-%d')}\n"
+            f"Prices shape: {prices_df.shape}"
+        )
+        return profits_df.head(0)
 
     # Step 1: Split profits_df records before and after the target_date
     # -----------------------------------------------------------------

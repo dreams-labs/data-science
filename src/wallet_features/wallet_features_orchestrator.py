@@ -116,6 +116,14 @@ class WalletFeaturesOrchestrator:
         wallet_features_df = wallet_features_df.join(trading_features_df, how='left')\
             .fillna({col: 0 for col in trading_features_df.columns})
 
+        # Performance features (left join, do not fill)
+        performance_features_df = wpf.calculate_performance_features(
+            trading_features_df,
+            self.wallets_config
+        )
+        feature_column_names['performance|'] = performance_features_df.columns
+        wallet_features_df = wallet_features_df.join(performance_features_df, how='left')
+
         # Transfers features (left join, do not fill)
         if self.wallets_config['features']['toggle_transfers_features']:
             transfers_sequencing_features_df = wts.calculate_transfers_features(
@@ -148,14 +156,6 @@ class WalletFeaturesOrchestrator:
         profits_df.reset_index(inplace=True)
         market_indicators_data_df.reset_index(inplace=True)
 
-        # Performance features (left join, do not fill)
-        performance_features_df = wpf.calculate_performance_features(
-            wallet_features_df,
-            self.wallets_config
-        )
-        feature_column_names['performance|'] = performance_features_df.columns
-        wallet_features_df = wallet_features_df.join(performance_features_df, how='left')
-
         # Market timing features (left join, fill 0s)
         timing_features_df = wmt.calculate_market_timing_features(
             profits_df,
@@ -177,14 +177,18 @@ class WalletFeaturesOrchestrator:
 
         # Scenario transfers features (left join, do not fill)
         if self.wallets_config['features']['toggle_scenario_features']:
-            transfers_scenario_features_df = wsc.calculate_scenario_features(
-                profits_df,
-                market_indicators_data_df,
+
+            scenario_features_df = wsc.calculate_scenario_features(
+                profits_df.copy(),
+                market_indicators_data_df.copy(),
+                trading_features_df.copy(),
+                performance_features_df.copy(),
                 period_start_date,
-                period_end_date
+                period_end_date,
+                self.wallets_config,
             )
-            feature_column_names['scenario|'] = transfers_scenario_features_df.columns
-            wallet_features_df = wallet_features_df.join(transfers_scenario_features_df, how='left')
+            feature_column_names['scenario|'] = scenario_features_df.columns
+            wallet_features_df = wallet_features_df.join(scenario_features_df, how='left')
 
 
         # Apply feature prefixes

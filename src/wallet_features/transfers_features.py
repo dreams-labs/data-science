@@ -1,5 +1,4 @@
 import logging
-from typing import List
 import pandas as pd
 from dreams_core.googlecloud import GoogleCloud as dgc
 
@@ -63,17 +62,23 @@ def calculate_transfers_features(
 
     # Aggregate to features
     transfers_features_df = first_buy_data.groupby('wallet_address', observed=True).agg(
-        **{
-            'first_buy/median_rank':        ('buyer_number', 'median'),
-            'first_buy/earliest_rank':      ('buyer_number', 'min'),
-            'initial_hold_time/median':     ('initial_hold_time', 'median'),
-            'buys_coin_age/median':         ('coin_age', 'median'),
-            'buys_coin_age/min':            ('coin_age', 'min'),
-            'coin_total_buyers/median':     ('coin_total_buyers', 'median'),
-            'later_buyers/median':          ('later_buyers', 'median'),
-            'earlybird_ratio/median':       ('later_buyers_ratio', 'median'),
-            'wallet_age':                   ('wallet_age', 'first')  # all wallet-grouped values will be identical
-        }
+    **{
+        'first_buy/mean_rank':          ('buyer_number', 'mean'),
+        'first_buy/median_rank':        ('buyer_number', 'median'),
+        'first_buy/earliest_rank':      ('buyer_number', 'min'),
+        'initial_hold_time/mean':       ('initial_hold_time', 'mean'),
+        'initial_hold_time/median':     ('initial_hold_time', 'median'),
+        'buys_coin_age/mean':           ('coin_age', 'mean'),
+        'buys_coin_age/median':         ('coin_age', 'median'),
+        'buys_coin_age/min':            ('coin_age', 'min'),
+        'coin_total_buyers/mean':       ('coin_total_buyers', 'mean'),
+        'coin_total_buyers/median':     ('coin_total_buyers', 'median'),
+        'later_buyers/mean':            ('later_buyers', 'mean'),
+        'later_buyers/median':          ('later_buyers', 'median'),
+        'earlybird_ratio/mean':         ('later_buyers_ratio', 'mean'),
+        'earlybird_ratio/median':       ('later_buyers_ratio', 'median'),
+        'wallet_age':                   ('wallet_age', 'first')  # all wallet-grouped values will be identical
+    }
     )
 
     return transfers_features_df
@@ -179,6 +184,8 @@ def retrieve_transfers_sequencing(
         left join seller_ranks s using (coin_id, wallet_address)
     ),
 
+
+    ------ NON-HYBRID IDs CTE -------
     -- CTE for use when working with standard wallet ids
     base_ordering as (
         select
@@ -193,6 +200,8 @@ def retrieve_transfers_sequencing(
         ) wc using(wallet_address)
     ),
 
+
+    ------ HYBRIDIZED IDs CTE -------
     -- CTE for use when working with hybridized ids
     hybridized_ordering as (
         select

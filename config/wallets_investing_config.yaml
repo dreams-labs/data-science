@@ -2,14 +2,25 @@
 investment_cycles: [
     # Long term validation of how well this model's predictions perform
     #  over epochs starting in [30,60,90] days.
-        210,
-        180,
-        150,
-        120,
-        90,
-        60,
-        # 45,
+
+
         30,
+        60,
+        90,
+        120,
+        150,
+        180,
+        210,
+        240,
+        270,
+        300,
+        330,
+        360,
+        390,
+        420,
+        480,
+        540
+        # 45,
         # 15,
         # 0,
         # -30,
