@@ -113,7 +113,7 @@ class TemporalGridSearcher:
 
     def __init__(
         self,
-        base_wallets_config: dict,
+        wallets_config: dict,
         wallets_investing_config: dict,
         wallets_metrics_config: dict,
         wallets_features_config: dict,
@@ -126,13 +126,13 @@ class TemporalGridSearcher:
         Initialize the multi-temporal grid search orchestrator.
 
         Params:
-        - base_wallets_config: Base wallet configuration to be modified for each date
+        - wallets_config: Base wallet configuration to be modified for each date
         - wallets_metrics_config: Metrics configuration
         - wallets_features_config: Features configuration
         - wallets_epochs_config: Epochs configuration
         - modeling_dates: List of modeling period start dates (YYYY-MM-DD format)
         """
-        self.wallets_config = copy.deepcopy(base_wallets_config)
+        self.wallets_config = copy.deepcopy(wallets_config)
         self.wallets_investing_config = wallets_investing_config
         self.wallets_metrics_config = wallets_metrics_config
         self.wallets_features_config = wallets_features_config
@@ -140,7 +140,11 @@ class TemporalGridSearcher:
         self.modeling_dates = modeling_dates
 
         # If True, regenerate all training data regardless of cache
-        self.force_regenerate_data = wallets_investing_config['training_data']['toggle_overwrite_multioffset_parquet']
+        self.force_regenerate_data = (wallets_investing_config['training_data']
+                                      .get('toggle_overwrite_multioffset_parquet',False))
+        # Override companion toggle in wallets_config
+        if self.force_regenerate_data:
+            self.wallets_config['training_data']['rebuild_multioffset_dfs'] = True
 
         # Storage for results
         self.training_data_cache = {}
@@ -378,7 +382,7 @@ class TemporalGridSearcher:
             raise first_error
 
         logger.milestone(f"Successfully loaded training data for {len(self.modeling_dates)} "
-                         "periods using {max_workers} threads")
+                         f"periods using {max_workers} threads")
 
     @u.timing_decorator(logging.MILESTONE)  # pylint: disable=no-member
     def run_multi_temporal_grid_search(self) -> None:
