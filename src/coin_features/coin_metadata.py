@@ -35,16 +35,8 @@ def retrieve_metadata_df() -> pd.DataFrame:
     Note that we cannot use core.coingecko_metadata fields because a successful coin is more
      likely to have Coingecko support, categories, etc which will cause data leakage.
 
-    Params:
-    - min_txn_size (int): Minimum USD value to filter out dust/airdrops
-    - training_end (str): Training period end as YYYY-MM-DD string
-    - epoch_reference_date (str): Suffix added to table for each epoch
-    - hybridize_wallet_ids (bool): Whether to use hybrid wallet-coin IDs vs regular wallet IDs
-    - dataset (str): Set to 'prod' or 'dev' to alter query schema
-
     Returns:
-    - sequence_df (DataFrame): Columns: wallet_address, coin_id, first_buy, first_sell,
-        buyer_number, seller_number
+    - metadata_df (df): coin_id-indexed df with booleans for metadata facts
     """
     logger.info("Querying for coin metadata...")
 

@@ -12,7 +12,6 @@ Main functionalities include:
 
 These functions support the feature engineering pipeline for coin-level predictive modeling.
 """
-
 import logging
 import pandas as pd
 
@@ -68,14 +67,14 @@ def generate_macro_features(
 
 def generate_market_features(
     market_indicators_df: pd.DataFrame,
-    marlet_data_metrics_config: dict,
+    market_data_metrics_config: dict,
 ) -> pd.DataFrame:
     """
     Generates flattened market data time series features for coins.
 
     Params:
     - market_indicators_df (DataFrame): date-indexed marketeconomic indicators
-    - marlet_data_metrics_config (dict): defines the time series features that will
+    - market_data_metrics_config (dict): defines the time series features that will
         be output. Defined at wallets_coins_metrics_config['time_series']['market_data']
 
     Returns:
@@ -85,11 +84,11 @@ def generate_market_features(
     """
     market_features_df = wfts.calculate_market_data_features(
         market_indicators_df,
-        marlet_data_metrics_config
+        market_data_metrics_config
     )
 
     # Rename market feature columns: replace first underscore after key with '/'
-    market_keys = marlet_data_metrics_config.keys()
+    market_keys = market_data_metrics_config.keys()
     rename_map = {}
     for col in market_features_df.columns:
         for key in market_keys:
@@ -101,11 +100,3 @@ def generate_market_features(
         market_features_df = market_features_df.rename(columns=rename_map)
 
     return market_features_df
-
-
-
-
-
-# --------------------------------
-#        Coin Series Query
-# --------------------------------

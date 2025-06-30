@@ -50,7 +50,7 @@ training_data: #WalletModel
     #KeyParam Datasets and Folders
     dataset: dev  # Set to prod or dev; determines whether to query core or dev dataset tables
     # parquet_folder: temp/wallet_modeling_dfs/dda_831_scenario_features_30d_v6  # where to store parquet files
-    parquet_folder: temp/wallet_modeling_dfs/dda_878_worst_scenario_features_v4  # where to store parquet files
+    parquet_folder: temp/wallet_modeling_dfs/dda_878_worst_scenario_features_v7  # where to store parquet files
     reference_dfs_folder: temp/reference_dfs  # Base folder where files that impact all runs are stored
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
@@ -749,12 +749,16 @@ features: #WalletModel
         market_cap_unadj
     ]
 
+    # Coin Trends Params
+    toggle_coin_trends_features: True  # comment out to toggle off
+    # force_rebuild_coin_trends: True  # comment out to toggle off
+
     #KeyParam Transfers Features Toggle
     # Transfers Params
-    toggle_transfers_features: True # requires bigquery etl sequence
+    toggle_transfers_features: False # requires bigquery etl sequence
 
     # Scenarios Params
-    toggle_scenario_features: True  # requires bigquery etl sequence
+    toggle_scenario_features: False  # requires bigquery etl sequence
 
     # Balance Params
     toggle_balance_features: False  # seemingly not predictive
@@ -773,8 +777,8 @@ features: #WalletModel
 # Determines how many workers will be used in multithreading executions
 n_threads: #WalletModel
     raw_data_retrieval:         3  # retrieves raw dfs from bigquery
-    profits_row_imputation:     64  # generates imputed rows in profits_df
+    profits_row_imputation:     6  # generates imputed rows in profits_df
     training_dfs_preparation:   3  # generates market indicators, macro indicators, cohort profits dfs
     epoch_tm_features:          2  # determines whether training and modeling features are generated concurrently or sequentially
-    concurrent_epochs:          8  # how many epochs' training data are processed concurrently
-    concurrent_windows:         8  # how many windows are processed concurrently
+    concurrent_epochs:          1  # how many epochs' training data are processed concurrently
+    concurrent_windows:         1  # how many windows are processed concurrently
