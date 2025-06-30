@@ -17,9 +17,10 @@ import logging
 import pandas as pd
 
 # Local module imports
-import wallet_features.time_series_features as wfts
+import feature_engineering.flattening as flt
 from utilities import bq_utils as bqu
 import utils as u
+from utils import ConfigError
 
 # set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -45,29 +46,39 @@ def generate_coin_trends_features(
         be output. Defined at wallets_coins_metrics_config['time_series']['coin_trends']
 
     Returns:
+    - trends_features_df (df): coin_id-indexed features about coin holder and
+        price trends. Column details are provided in the docstring of
+        retrieve_comprehensive_coin_trends().
     """
     # Retrieve comprehensive file
     comprehensive_trends_df = retrieve_comprehensive_coin_trends(
-        wallets_config['training_data']['usd_materiality'],
+        wallets_config['features']['usd_materiality'],
         wallets_config['training_data']['reference_dfs_folder'],
         wallets_config['training_data']['dataset'],
         wallets_config['features'].get('force_rebuild_coin_trends', False)
     )
 
-    trends_df = comprehensive_trends_df
-    # Rename market feature columns: replace first underscore after key with '/'
-    market_keys = market_data_metrics_config.keys()
-    rename_map = {}
-    for col in market_features_df.columns:
-        for key in market_keys:
-            prefix = f"{key}_"
-            if col.startswith(prefix):
-                rename_map[col] = f"{key}/{col[len(prefix):]}"
-                break
-    if rename_map:
-        market_features_df = market_features_df.rename(columns=rename_map)
+    # Filter on end date
+    trends_df = comprehensive_trends_df[
+        comprehensive_trends_df.index.get_level_values('date') <= period_end_date]
 
-    return market_features_df
+    # Calculate all specified metrics
+    trends_features_df = flt.flatten_coin_date_df(
+        trends_df.reset_index(),
+        coin_trends_metrics_config,
+        period_end_date
+    )
+    trends_features_df = trends_features_df.set_index('coin_id')
+
+    # Remove '_last' suffixes from the columns
+    mapping = {
+        col: col[:-5]
+        for col in trends_features_df.columns
+        if col.endswith("_last")
+    }
+    trends_features_df.rename(columns=mapping)
+
+    return trends_features_df
 
 
 
@@ -75,6 +86,42 @@ def generate_coin_trends_features(
 # -------------------------------
 #        Helper Functions
 # -------------------------------
+
+def validate_metrics_config(
+    metrics_config: dict
+) -> list:
+    """
+    # Confirms all metrics are only _last. Other metrics could be calculated
+    #  simply by modifying the config, but the current code logic assumes each
+    #  column only has a single last aggregation.
+
+    Params:
+    - metrics_config (dict): mapping metric names to their config dict.
+
+    Returns:
+    - invalid_metrics (list): metric names that don’t follow aggregations.last structure.
+    """
+    invalid_metrics = []
+    for metric_name, cfg in metrics_config.items():
+        # check there's only an 'aggregations' key
+        if set(cfg.keys()) != {"aggregations"}:
+            invalid_metrics.append(metric_name)
+            continue
+
+        aggr = cfg["aggregations"]
+        # check there's only a 'last' key under aggregations
+        if set(aggr.keys()) != {"last"}:
+            invalid_metrics.append(metric_name)
+            continue
+
+        last = aggr["last"]
+        # check there's only a 'scaling' key under last
+        if set(last.keys()) != {"scaling"}:
+            invalid_metrics.append(metric_name)
+
+    if len(invalid_metrics) > 0:
+        raise ConfigError("Non-last metrics found.")
+
 
 def retrieve_comprehensive_coin_trends(
         materiality: int,
@@ -117,7 +164,6 @@ def retrieve_comprehensive_coin_trends(
         - current_holders_pct_of_lifetime (float): current_holders ÷ lifetime_holders.
         - days_since_launch (int): days since the coin’s first material transfer.
         - days_since_ath (int): days since the coin’s all-time-high price.
-
     """
     if dataset not in ['prod','dev']:
         raise ValueError(f"Invalid dataset value '{dataset}' found. Dataset must be 'prod' or 'dev'")
