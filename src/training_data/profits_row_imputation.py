@@ -15,6 +15,7 @@ from dreams_core import core as dc
 
 # Local module imports
 import utils as u
+from utils import ConfigError
 
 # set up logger at the module level
 logger = dc.setup_logger()
@@ -51,6 +52,10 @@ def impute_profits_for_multiple_dates(profits_df, prices_df, dates, n_threads, r
     """
     if not isinstance(dates, list):
         raise TypeError(f"dates parameter '{dates}' must be a list.")
+
+    if n_threads > 12:
+        raise ConfigError("Thread counts for 'impute_profits_for_multiple_dates()' should be at or "
+                          "below 12 to maintain reasonably sized batches.")
 
     start_time = time.time()
     logger.debug("Starting profits_df imputation for %s dates...", len(dates))
