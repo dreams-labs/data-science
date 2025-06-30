@@ -366,8 +366,8 @@ class WalletEpochsOrchestrator:
                 i += 1
                 if newly_generated:
                     u.notify('beep')
-                    logger.milestone(f"Wallet epoch {i}/{len(epoch_configs_to_process)} completed (date: " \
-                                    f"{pd.to_datetime(epoch_date).strftime('%Y-%m-%d')})")
+                    logger.milestone(f"[{i}/{len(epoch_configs_to_process)}] Wallet epoch completed (date: " \
+                                    f"{pd.to_datetime(epoch_date).strftime('%Y-%m-%d')}).")
 
         del epoch_training_df, epoch_target_var_df
         gc.collect()
