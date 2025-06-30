@@ -1,3 +1,5 @@
+# !!! This config relates to the deprecated COIN FLOW model !!!
+
 # See details on config structure and valid inputs in src/config_models/metrics_config.py
 
 # Time series keyed on coin_id-date

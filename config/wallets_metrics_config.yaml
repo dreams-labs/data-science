@@ -52,18 +52,39 @@ time_series:  #WalletModel
             aggregations:
                 std:
                     scaling: none
-        # global_volume:
-        #     aggregations:
-        #         first:
-        #             scaling: none
-        #         last:
-        #             scaling: none
-        #     indicators:
-        #         rsi:
-        #             parameters:
-        #                 window: [30,100]
-        #             aggregations:
-        #                 last:
-        #                     scaling: none
 
-        # These features are retained for use in market timing features
+
+    # Controls what populates the coin_trends|* features
+    coin_trends:  #WalletModel
+        current_holders:
+            aggregations:
+                last:
+                    scaling: none
+        current_holders_in_profit:
+            aggregations:
+                last:
+                    scaling: none
+        current_holders_in_profit_pct:
+            aggregations:
+                last:
+                    scaling: none
+        lifetime_holders:
+            aggregations:
+                last:
+                    scaling: none
+        current_holders_pct_of_lifetime:
+            aggregations:
+                last:
+                    scaling: none
+        days_since_launch:
+            aggregations:
+                last:
+                    scaling: none
+        days_since_ath:
+            aggregations:
+                last:
+                    scaling: none
+        price_pct_of_ath:
+            aggregations:
+                last:
+                    scaling: none
