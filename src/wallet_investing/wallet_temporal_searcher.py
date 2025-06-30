@@ -237,7 +237,7 @@ class TemporalGridSearcher:
                         logger.info(f"[{i}/{len(self.modeling_dates)}] Skipping {modeling_date} - data already exists")
                     elif status == "generated":
                         generated_count += 1
-                        logger.milestone(f"[{i}/{len(self.modeling_dates)}] Generated data for {modeling_date}")
+                        logger.milestone(f"[{i}/{len(self.modeling_dates)}] Generated data for {modeling_date}.")
 
                 except Exception as e:
                     failed_dates.append((modeling_date, e))
@@ -312,7 +312,7 @@ class TemporalGridSearcher:
 
                 # Apply predrop_features logic if configured
                 date_config = self._create_date_config(modeling_date)
-                if date_config['training_data']['predrop_features']:
+                if date_config['training_data'].get('predrop_features',False):
                     drop_patterns = date_config['modeling']['feature_selection']['drop_patterns']
                     protected_columns = self.wallets_config['modeling']['feature_selection']['protected_features']
                     col_dropper = bp.DropColumnPatterns(drop_patterns, protected_columns)
@@ -343,6 +343,7 @@ class TemporalGridSearcher:
         # Execute parallel loading
         failed_dates = []
 
+        i = 0
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Submit all tasks
             future_to_date = {
@@ -364,9 +365,11 @@ class TemporalGridSearcher:
                     # Cache the successfully loaded data
                     self.training_data_cache[date_str] = training_data
 
-                    logger.info(f"Loaded training data for {modeling_date} (shapes: "
-                            f"{shapes_info[0]}, {shapes_info[1]}, "
-                            f"{shapes_info[2]}, {shapes_info[3]})")
+                    i+=1
+                    logger.info(f"[{i}/{len(self.modeling_dates)}] "
+                                f"Loaded training data for {modeling_date} (shapes: "
+                                f"{shapes_info[0]}, {shapes_info[1]}, "
+                                f"{shapes_info[2]}, {shapes_info[3]})")
 
                 except Exception as e:
                     failed_dates.append((modeling_date, e))
@@ -817,7 +820,7 @@ class TemporalGridSearcher:
 
             evaluator.summary_report()
 
-            if self.wallets_investing_config['training_data']['toggle_graph_wallet_performance']:
+            if self.wallets_investing_config['training_data'].get('toggle_graph_wallet_performance',False):
                 evaluator.plot_wallet_evaluation()
                 validation_training_data_df = training_data[2]
                 validation_target_vars_df = training_data[3]
