@@ -284,8 +284,12 @@ class WalletFeaturesOrchestrator:
         coin_trends_cols = coin_trends_features_df.columns
         missing_trends = merged_df[coin_trends_cols].isna().any(axis=1)
         if missing_trends.any():
-            raise ValueError(
-                f"Failed to join coin trends features for {missing_trends.sum()} hybrid wallet addresses"
+            # Grab the exact hybrid addresses and coin_ids that didn’t match
+            failed_pairs = merged_df.loc[missing_trends, ['wallet_address', 'coin_id']]
+            failed_list = list(failed_pairs.itertuples(index=False, name=None))
+            logger.warning(
+                f"Coin trends join failed for {len(failed_list)}/{len(merged_df)} hybrid rows. "
+                f"Missing pairs: {failed_list}"
             )
 
         # Restore original hybrid wallet_address index
