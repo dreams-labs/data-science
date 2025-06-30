@@ -1,16 +1,7 @@
 """
-Functions for generating flattened macroeconomic and market time series features for coins.
-
-This module provides utilities to aggregate and transform macroeconomic and market indicator
-time series data into single-row, coin-level features. These features are designed to be
-cross-joined onto each coin's record for downstream modeling and analysis.
-
-Main functionalities include:
-- Generating flattened macroeconomic features from time series data.
-- Generating flattened market features from time series data.
-- Renaming feature columns for clarity and consistency.
-
-These functions support the feature engineering pipeline for coin-level predictive modeling.
+Functions for generating coin-level features about trends in a coin's
+ holders and price activity, such as what % of holders are in profit
+ and how long it's been since the all-time high price.
 """
 import os
 import logging
@@ -37,7 +28,8 @@ def generate_coin_trends_features(
     coin_trends_metrics_config: dict
 ) -> pd.DataFrame:
     """
-    Generates flattened coin trends data time series features for coins.
+    Generates flattened coin trends data time series features for coins based on
+     data from before the period_end_date.
 
     Params:
     - wallets_config (dict): from yaml
@@ -76,7 +68,7 @@ def generate_coin_trends_features(
         for col in trends_features_df.columns
         if col.endswith("_last")
     }
-    trends_features_df.rename(columns=mapping)
+    trends_features_df = trends_features_df.rename(columns=mapping)
 
     return trends_features_df
 
@@ -164,6 +156,7 @@ def retrieve_comprehensive_coin_trends(
         - current_holders_pct_of_lifetime (float): current_holders ÷ lifetime_holders.
         - days_since_launch (int): days since the coin’s first material transfer.
         - days_since_ath (int): days since the coin’s all-time-high price.
+        - price_pct_of_ath (float): what percent the current price is relative to all-time-high
     """
     if dataset not in ['prod','dev']:
         raise ValueError(f"Invalid dataset value '{dataset}' found. Dataset must be 'prod' or 'dev'")
@@ -415,9 +408,6 @@ def retrieve_comprehensive_coin_trends(
             hm.coin_id,
             hm.date;
         """
-
-    print(coin_series_sql) # TODO: remove print
-
     logger.info(f"<{dataset.upper()}> Retrieving comprehensive coin trends data...")
     cs_df = bqu.run_query(coin_series_sql)
 
@@ -433,7 +423,7 @@ def retrieve_comprehensive_coin_trends(
     diffs = (
         cs_df
         .reset_index()  # bring coin_id,date back to columns
-        .groupby('coin_id', observed=False)['date']
+        .groupby('coin_id', observed=True)['date']
         .agg(min_date='min', max_date='max', row_count='count')
     )
     diffs['expected_count'] = (diffs['max_date'] - diffs['min_date']).dt.days + 1
