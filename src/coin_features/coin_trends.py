@@ -9,7 +9,6 @@ import pandas as pd
 
 # Local module imports
 import feature_engineering.flattening as flt
-import wallet_modeling.wallet_training_data_orchestrator as wtdo
 from utilities import bq_utils as bqu
 import utils as u
 from utils import ConfigError
@@ -27,8 +26,6 @@ def generate_coin_trends_features(
     wallets_config: dict,
     period_end_date: str,
     coin_trends_metrics_config: dict,
-    complete_hybrid_cw_id_df: pd.DataFrame,
-    wallet_index: pd.Series
 ) -> pd.DataFrame:
     """
     Generates flattened coin trends data time series features for coins based on
@@ -40,9 +37,6 @@ def generate_coin_trends_features(
     - period_end_date (str): latest date to include in the source data
     - coin_trends_metrics_config (dict): defines the time series features that will
         be output. Defined at wallets_coins_metrics_config['time_series']['coin_trends']
-    - complete_hybrid_cw_id_df (DataFrame): Mapping between coin_id and hybrid_cw_id
-    - wallet_index (pd.Series): Index of the wallet_features_df, which will be dehybridized
-        to attach the coin_id to individual wallets
 
     Returns:
     - trends_features_df (df): coin_id-indexed features about coin holder and
@@ -76,12 +70,6 @@ def generate_coin_trends_features(
         if col.endswith("_last")
     }
     trends_features_df = trends_features_df.rename(columns=mapping)
-
-    # Extract the coin_id component from the current wallet index's addresses
-    dehybridized_index = wtdo.dehybridize_wallet_address(
-        pd.DataFrame(wallet_index),
-        complete_hybrid_cw_id_df
-    ).index
 
     return trends_features_df
 

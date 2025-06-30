@@ -15,6 +15,7 @@ import wallet_features.scenario_features as wsc
 import wallet_features.balance_features as wbf
 import wallet_features.time_series_features as wfts
 import coin_features.coin_trends as cfct
+import wallet_modeling.wallet_training_data_orchestrator as wtdo
 import utils as u
 
 # Set up logger at the module level
@@ -198,7 +199,7 @@ class WalletFeaturesOrchestrator:
             feature_column_names['scenario|'] = scenario_features_df.columns
             wallet_features_df = wallet_features_df.join(scenario_features_df, how='left')
 
-        # Coin trends features
+        # Coin trends features (dehybridized coin_id join)
         if (
             self.wallets_config['training_data']['hybridize_wallet_ids']
             and self.wallets_config['features'].get('toggle_coin_trends_features',False)
@@ -206,12 +207,13 @@ class WalletFeaturesOrchestrator:
             coin_trends_features_df = cfct.generate_coin_trends_features(
                 self.wallets_config,
                 self.wallets_config['training_data']['training_period_end'],
-                self.wallets_metrics_config['time_series']['coin_trends'],
-                self.complete_hybrid_cw_id_df,
-                wallet_features_df.index
+                self.wallets_metrics_config['time_series']['coin_trends']
             )
             feature_column_names['coin_trends|'] = coin_trends_features_df.columns
-
+            wallet_features_df = self._join_coin_trends_features(
+                wallet_features_df,
+                coin_trends_features_df
+            )
 
         # Apply feature prefixes
         rename_map = {col: f"{prefix}{col}"
@@ -224,8 +226,75 @@ class WalletFeaturesOrchestrator:
 
 
 # ----------------------------------
-#         Utility Functions
+#    Utility Methods + Functions
 # ----------------------------------
+
+    def _join_coin_trends_features(
+            self,
+            wallet_features_df: pd.DataFrame,
+            coin_trends_features_df: pd.DataFrame
+        ) -> pd.DataFrame:
+        """
+        Join coin_id-indexed coin trends features onto hybridized wallet_address-indexed wallet features.
+
+        This function dehybridizes the wallet addresses to extract coin_ids, joins the coin trends
+        features on coin_id, then restores the original hybrid wallet_address indexing.
+
+        Params:
+        - wallet_features_df (DataFrame): Features indexed on hybridized wallet_address
+        - coin_trends_features_df (DataFrame): Features indexed on coin_id
+
+        Returns:
+        - wallet_features_df (DataFrame): Original features with coin trends features added,
+            maintaining hybrid wallet_address index
+
+        Raises:
+        - ValueError: If any hybrid wallet addresses lack corresponding coin trends data
+        """
+        # Store original hybrid index for restoration
+        original_hybrid_index = wallet_features_df.index.copy()
+
+        # Dehybridize to extract coin_id and wallet_address components
+        dehybridized_df = wtdo.dehybridize_wallet_address(
+            wallet_features_df.reset_index(),
+            self.complete_hybrid_cw_id_df
+        )
+
+        # Extract unique coin_ids from dehybridized data
+        wallet_coin_ids = set(dehybridized_df['coin_id'].unique())
+        trends_coin_ids = set(coin_trends_features_df.index.unique())
+
+        # Check for missing coin trends data
+        missing_coin_ids = wallet_coin_ids - trends_coin_ids
+        if missing_coin_ids:
+            raise ValueError(
+                f"Found {len(missing_coin_ids)} coin_ids in hybrid wallet addresses "
+                f"without corresponding coin trends data. Missing coin_ids: {sorted(missing_coin_ids)[:10]}"
+            )
+
+        # Join coin trends features on coin_id
+        merged_df = dehybridized_df.merge(
+            coin_trends_features_df,
+            left_on='coin_id',
+            right_index=True,
+            how='left'
+        )
+
+        # Verify all rows got coin trends data
+        coin_trends_cols = coin_trends_features_df.columns
+        missing_trends = merged_df[coin_trends_cols].isna().any(axis=1)
+        if missing_trends.any():
+            raise ValueError(
+                f"Failed to join coin trends features for {missing_trends.sum()} hybrid wallet addresses"
+            )
+
+        # Restore original hybrid wallet_address index
+        merged_df = merged_df.set_index('wallet_address').drop(columns=['coin_id'])
+        merged_df.index = original_hybrid_index
+
+        return merged_df
+
+
 
 def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
     """
