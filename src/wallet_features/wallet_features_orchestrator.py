@@ -14,6 +14,7 @@ import wallet_features.market_timing_features as wmt
 import wallet_features.scenario_features as wsc
 import wallet_features.balance_features as wbf
 import wallet_features.time_series_features as wfts
+import coin_features.coin_trends as cfct
 import utils as u
 
 # Set up logger at the module level
@@ -36,18 +37,25 @@ class WalletFeaturesOrchestrator:
             self,
             wallets_config,
             wallets_metrics_config,
-            wallets_features_config
+            wallets_features_config,
+            complete_hybrid_cw_id_df
         ):
         """
         Initialize the WalletFeaturesOrchestrator.
 
         Loads configuration objects that are shared across feature calculations.
+
+        Params:
+        - 3 configs (dicts)
+        - complete_hybrid_cw_id_df (DataFrame): Mapping between coin_id and hybrid_cw_id
         """
         # Load configs at instance level for reuse
         self.wallets_config = wallets_config
         self.wallets_metrics_config = wallets_metrics_config
         self.wallets_features_config = wallets_features_config
 
+        # Store hybrid mapping for coin trends features if configured
+        self.complete_hybrid_cw_id_df = complete_hybrid_cw_id_df
 
 
     # --------------------------------------
@@ -189,6 +197,20 @@ class WalletFeaturesOrchestrator:
             )
             feature_column_names['scenario|'] = scenario_features_df.columns
             wallet_features_df = wallet_features_df.join(scenario_features_df, how='left')
+
+        # Coin trends features
+        if (
+            self.wallets_config['training_data']['hybridize_wallet_ids']
+            and self.wallets_config['features'].get('toggle_coin_trends_features',False)
+        ):
+            coin_trends_features_df = cfct.generate_coin_trends_features(
+                self.wallets_config,
+                self.wallets_config['training_data']['training_period_end'],
+                self.wallets_metrics_config['time_series']['coin_trends'],
+                self.complete_hybrid_cw_id_df,
+                wallet_features_df.index
+            )
+            feature_column_names['coin_trends|'] = coin_trends_features_df.columns
 
 
         # Apply feature prefixes

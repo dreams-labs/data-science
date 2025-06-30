@@ -58,7 +58,8 @@ class WalletTrainingDataOrchestrator:
         self.features_orchestrator = wfo.WalletFeaturesOrchestrator(
             self.wallets_config,
             self.wallets_metrics_config,
-            self.wallets_features_config
+            self.wallets_features_config,
+            complete_hybrid_cw_id_df
         )
 
         # Hybrid ID mapping
