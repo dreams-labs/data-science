@@ -395,7 +395,9 @@ class WalletModel(BaseModel):
                 (wallet_target_vars_df['cw_unique_coins_traded'] >= self.modeling_config['cw_modeling_min_coins_traded']) &
                 # Training data filters
                 (training_data_df['cw_mktcap|end_portfolio_wtd_market_cap/market_cap_filled|w1']
-                    >= self.modeling_config['cw_modeling_min_market_cap'])
+                    >= self.modeling_config['cw_modeling_min_market_cap']) &
+                (training_data_df['cw_mktcap|end_portfolio_wtd_market_cap/market_cap_filled|w1']
+                    <= self.modeling_config['cw_modeling_max_market_cap'])
             )
         else:
             cohort_mask = (

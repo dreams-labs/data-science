@@ -43,7 +43,7 @@ training_data: #WalletModel
     # Training Data Toggles
     #KeyParam Training Data Toggles
     hybridize_wallet_ids:    True  # if true, training data will be keyed on wallet-coin pairs
-    predrop_features:        True  # if true, the feature_selection.drop_patterns will be applied early to save memory
+    # predrop_features:        True  # if true, the feature_selection.drop_patterns will be applied early to save memory
     # rebuild_multioffset_dfs: True  # if true, generate_epochs_training_data won't load parquet
     training_data_only:      False  # if true, only generates training data to be scored by another model
 
@@ -92,7 +92,7 @@ modeling: #WalletModel
 
     #KeyParam Target Var Thresholds
     asymmetric_loss: # Adds another class to target
-        enabled: True
+        # enabled: True
         # big_loss_threshold: -0.50    # Below this is an extra penalized big loss
         # big_loss_threshold: -0.40    # Below this is an extra penalized big loss
         big_loss_threshold: -0.30    # Below this is an extra penalized big loss
@@ -125,9 +125,9 @@ modeling: #WalletModel
     # target_var_min_threshold: 0.15  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.20  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.25  # a classification model will try to predict the target var above this value
-    # target_var_min_threshold: 0.30  # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.30  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.40  # a classification model will try to predict the target var above this value
-    target_var_min_threshold: 0.50  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.50  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.60  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.70  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.75  # a classification model will try to predict the target var above this value
@@ -172,6 +172,8 @@ modeling: #WalletModel
     modeling_min_coins_traded: 1
     cw_modeling_min_crypto_inflows: 500
     cw_modeling_min_coins_traded: 1
+    cw_modeling_min_market_cap: 25_000_000
+    cw_modeling_max_market_cap: 1050_000_000
 
     # Train/Test/Eval split
     test_size: 0.15  # what % of the total population will be used as test
@@ -533,6 +535,22 @@ modeling: #WalletModel
             # '*|w3',
             # '*|w2',
 
+            # 'cluster|*|',
+            # 'cw_cluster|*',
+            # 'cw_coin_trends|*',
+            # 'cw_mktcap|*',
+            # 'cw_performance|*',
+            # 'cw_scenario|*',
+            # 'cw_timing|*',
+            # 'cw_trading|*',
+            # 'cw_transfers|*',
+            # 'macro|*',
+            # 'mktcap|*',
+            # 'performance|*',
+            # 'scenario|*',
+            # 'timing|*',
+            # 'trading|*',
+            # 'transfers|*'
 
 
         ]
@@ -551,6 +569,7 @@ modeling: #WalletModel
             performance|crypto_net_gain/crypto_inflows/base|all_windows,
             trading|max_investment|all_windows,
             trading|unique_coins_traded|all_windows,
+            cw_mktcap|end_portfolio_wtd_market_cap/market_cap_filled|w1  # needed for modeling market cap filter
         ]
 
 
