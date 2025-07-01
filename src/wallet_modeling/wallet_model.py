@@ -388,10 +388,16 @@ class WalletModel(BaseModel):
         # Identify modeling cohort   # pylint:disable=line-too-long
         if 'cw_crypto_inflows' in wallet_target_vars_df.columns:
             cohort_mask = (
+                # Target vars filters
                 (wallet_target_vars_df['crypto_inflows'] >= self.modeling_config['modeling_min_crypto_inflows']) &
                 (wallet_target_vars_df['unique_coins_traded'] >= self.modeling_config['modeling_min_coins_traded']) &
                 (wallet_target_vars_df['cw_crypto_inflows'] >= self.modeling_config['cw_modeling_min_crypto_inflows']) &
-                (wallet_target_vars_df['cw_unique_coins_traded'] >= self.modeling_config['cw_modeling_min_coins_traded'])
+                (wallet_target_vars_df['cw_unique_coins_traded'] >= self.modeling_config['cw_modeling_min_coins_traded']) &
+                # Training data filters
+                (training_data_df['cw_mktcap|end_portfolio_wtd_market_cap/market_cap_filled|w1']
+                    >= self.modeling_config['cw_modeling_min_market_cap']) &
+                (training_data_df['cw_mktcap|end_portfolio_wtd_market_cap/market_cap_filled|w1']
+                    <= self.modeling_config['cw_modeling_max_market_cap'])
             )
         else:
             cohort_mask = (
