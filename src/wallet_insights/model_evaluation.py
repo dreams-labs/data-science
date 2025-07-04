@@ -1899,7 +1899,8 @@ def run_validation_analysis(
         min_scores: int = 10,
         y_pred_col: str = 'y_pred_mean',
         n_buckets: int = 10,
-        prediction_buckets: int = 10
+        prediction_buckets: int = 10,
+        toggle_score_agg_graphs: bool = False
     ) -> None:
     """
     Params:
@@ -1937,12 +1938,13 @@ def run_validation_analysis(
         n_buckets=prediction_buckets
     )
 
-    # Analyze validation performance
-    analyze_validation_performance(
-        validation_y_performance,
-        validation_y_pred,
-        score_filter=score_filter,
-        min_scores=min_scores,
-        y_pred_col=y_pred_col,
-        n_buckets=n_buckets
-    )
+    if toggle_score_agg_graphs:
+        # Analyze validation performance
+        analyze_validation_performance(
+            validation_y_performance,
+            validation_y_pred,
+            score_filter=score_filter,
+            min_scores=min_scores,
+            y_pred_col=y_pred_col,
+            n_buckets=n_buckets
+        )
