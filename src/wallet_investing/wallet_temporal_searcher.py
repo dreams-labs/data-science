@@ -55,10 +55,11 @@ Export capabilities
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import copy
+import ast
 import gc
 from datetime import datetime
 from collections import defaultdict
-from typing import List, Dict
+from typing import List
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -558,84 +559,53 @@ class TemporalGridSearcher:
 
         return consolidated_df
 
-    def analyze_parameter_stability(self, stability_threshold: float = 0.05) -> pd.DataFrame:
+
+    def aggregate_by_individual_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Analyze parameter stability across investing cycles.
+        Create performance metrics for each individual feature across all feature sets.
 
         Params:
-        - stability_threshold: Maximum acceptable coefficient of variation for stable parameters
+        - df (DataFrame): input performance data with param_value column containing feature sets
 
         Returns:
-        - stability_df: DataFrame with stability metrics for each parameter combination
+        - feature_performance_df (DataFrame): performance metrics averaged by individual feature
         """
-        if self.consolidated_results is None:
-            raise ValueError("No consolidated results available. Run consolidate_results() first")
+        # Identify numeric columns to aggregate
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
 
-        logger.info("Analyzing parameter stability across investing cycles...")
+        # Parse param_value strings to extract individual features
+        feature_rows = []
+        for _, row in df.iterrows():
+            # Extract features from the set string representation
+            param_str = row['param_value']
+            # Remove "Retained features: " prefix and parse the set
+            features_str = param_str.replace("Retained features: ", "")
+            # Use eval to parse the set (assuming it's properly formatted)
+            features_set = ast.literal_eval(features_str)
 
-        # Calculate coefficient of variation (std/mean) for each parameter
-        stability_df = self.consolidated_results.copy()
+            # Create a row for each feature
+            for feature in features_set:
+                feature_row = row[numeric_cols].to_dict()
+                feature_row['feature'] = feature
+                feature_rows.append(feature_row)
 
-        # Coefficient of variation (only for positive means to avoid division issues)
-        mask_positive_mean = stability_df['mean_score'] > 0
-        stability_df.loc[mask_positive_mean, 'coeff_variation'] = (
-            stability_df.loc[mask_positive_mean, 'std_dev'] /
-            stability_df.loc[mask_positive_mean, 'mean_score']
-        )
+        # Convert to DataFrame
+        exploded_df = pd.DataFrame(feature_rows)
 
-        # Mark stable parameters
-        stability_df['is_stable'] = (
-            (stability_df['coeff_variation'] <= stability_threshold) &
-            (stability_df['periods_tested'] >= len(self.modeling_dates) * 0.8)  # Tested in 80%+ periods
-        )
+        # Group by feature and calculate mean performance
+        feature_performance_df = exploded_df.groupby('feature')[numeric_cols].mean().reset_index()
 
-        # Rank by stability and performance
-        stability_df['stability_rank'] = stability_df['coeff_variation'].rank(ascending=True)
-        stability_df['performance_rank'] = stability_df['mean_score'].rank(ascending=False)
-        stability_df['combined_rank'] = (
-            stability_df['stability_rank'] * 0.3 +
-            stability_df['performance_rank'] * 0.7
-        )
+        # Add count of how many feature sets included each feature
+        feature_performance_df['inclusion_count'] = exploded_df.groupby('feature').size().reset_index(drop=True)
 
-        # Sort by combined ranking
-        stability_df = stability_df.sort_values('combined_rank')
+        # Sort by mean_score descending
+        if 'mean_score' in feature_performance_df.columns:
+            feature_performance_df = feature_performance_df.sort_values('mean_score', ascending=False)
 
-        stable_count = stability_df['is_stable'].sum()
-        logger.info(f"Found {stable_count} stable parameter combinations out of {len(stability_df)}")
-
-        return stability_df.sort_values(by='median_score',ascending=False)
+        return feature_performance_df
 
 
-    def get_best_parameters_by_stability(self, top_n: int = 5) -> Dict[str, any]:
-        """
-        Get the top N most stable and high-performing parameter combinations.
 
-        Params:
-        - top_n: Number of top parameter combinations to return
-
-        Returns:
-        - best_params: Dictionary of parameter recommendations
-        """
-        stability_df = self.analyze_parameter_stability()
-
-        # Get top N most stable and high-performing combinations
-        top_combinations = stability_df.head(top_n)
-
-        best_params = {}
-        for _, row in top_combinations.iterrows():
-            param_name = row['param']
-            param_value = row['param_value']
-
-            if param_name not in best_params:
-                best_params[param_name] = {
-                    'value': param_value,
-                    'mean_score': row['mean_score'],
-                    'stability': row['coeff_variation'],
-                    'periods_tested': row['periods_tested']
-                }
-
-        logger.info(f"Identified best parameters across {len(best_params)} categories")
-        return best_params
 
 
     def save_results(self, output_folder: str) -> None:
@@ -688,44 +658,6 @@ class TemporalGridSearcher:
 
         return all(Path(file_path).exists() for file_path in required_files)
 
-
-    def display_summary(self) -> None:
-        """Display a formatted summary of results."""
-        if self.consolidated_results is None:
-            logger.warning("No results to display. Run consolidate_results() first.")
-            return
-
-        # Get stability analysis
-        stability_df = self.analyze_parameter_stability()
-
-        # Build summary message as single string
-        summary_lines = [
-            "",
-            "="*60,
-            "MULTI-TEMPORAL GRID SEARCH SUMMARY",
-            "="*60,
-            f"investing cycles analyzed: {len(self.modeling_dates)}",
-            f"Date range: {min(self.modeling_dates)} to {max(self.modeling_dates)}",
-            f"Total parameter combinations: {len(self.consolidated_results)}",
-            f"Stable combinations: {stability_df['is_stable'].sum()}",
-            "",
-            "TOP 5 MOST STABLE PARAMETERS:",
-            "-" * 40
-        ]
-
-        # Add top 5 most stable parameters
-        top_stable = stability_df.head(5)
-        for _, row in top_stable.iterrows():
-            summary_lines.extend([
-                f"{row['param']}: {row['param_value']}",
-                f"  Mean Score: {row['mean_score']:.4f}",
-                f"  Stability (CV): {row['coeff_variation']:.4f}",
-                f"  Periods Tested: {row['periods_tested']}/{len(self.modeling_dates)}",
-                ""
-            ])
-
-        # Log as single message
-        logger.info("\n".join(summary_lines))
 
 
     def _calculate_sample_baseline(self, training_data_tuple) -> float:
@@ -832,7 +764,8 @@ class TemporalGridSearcher:
                     self.complete_market_data_df,
                     model_id,
                     score_filter,
-                    min_scores
+                    min_scores,
+                    self.wallets_investing_config['training_data'].get('toggle_score_agg_coin_graphs',False)
                 )
 
 
@@ -1017,68 +950,6 @@ class TemporalGridSearcher:
         for i, row in comparison_df_clean.iterrows():
             comparison_df.loc[i] = row
 
-
-    def display_model_comparison_summary(self) -> None:
-        """Display a formatted summary of model comparison results."""
-        if not hasattr(self, 'model_comparison_results') or self.model_comparison_results is None:
-            logger.warning("No model comparison results to display. Run run_multi_temporal_model_comparison() first.")
-            return
-
-        df = self.model_comparison_results
-        model_type = df['model_type'].iloc[0]
-
-        # Build summary message
-        summary_lines = [
-            "",
-            "="*60,
-            "MULTI-TEMPORAL MODEL COMPARISON SUMMARY",
-            "="*60,
-            f"Model Type: {model_type}",
-            f"investing cycles analyzed: {len(self.modeling_dates)}",
-            f"Date range: {min(self.modeling_dates)} to {max(self.modeling_dates)}",
-            "",
-            "PERFORMANCE STABILITY METRICS:",
-            "-" * 40
-        ]
-
-        # Key metrics to highlight based on model type
-        if model_type == 'classification':
-            key_metrics = ['val_roc_auc', 'val_f1', 'val_ret_mean_top1', 'positive_pred_return']
-            metric_labels = ['Validation AUC', 'Validation F1', 'Top 1% Return', 'Positive Pred Return']
-        else:  # regression
-            key_metrics = ['val_r2', 'val_rmse', 'val_spearman', 'val_top1pct_mean']
-            metric_labels = ['Validation R²', 'Validation RMSE', 'Validation Spearman', 'Top 1% Mean']
-
-        # Display stability for key metrics
-        for metric, label in zip(key_metrics, metric_labels):
-            mean_col = f'{metric}_mean'
-            cv_col = f'{metric}_cv'
-            if mean_col in df.columns and cv_col in df.columns:
-                summary_row = df[df['date_str'] == 'SUMMARY'].iloc[0]
-                mean_val = summary_row[mean_col]
-                cv_val = summary_row[cv_col]
-                stability = "Stable" if cv_val < 0.1 else "Moderate" if cv_val < 0.2 else "Unstable"
-                summary_lines.extend([
-                    f"{label}:",
-                    f"  Mean: {mean_val:.4f}",
-                    f"  Coefficient of Variation: {cv_val:.4f} ({stability})",
-                    ""
-                ])
-
-        # Add sample size information
-        if 'test_samples_mean' in df.columns:
-            summary_row = df[df['date_str'] == 'SUMMARY'].iloc[0]
-            summary_lines.extend([
-                "SAMPLE SIZES:",
-                "-" * 20,
-                f"Average Test Samples: {summary_row.get('test_samples_mean', 'N/A')}",
-                f"Average Train Samples: {summary_row.get('train_samples_mean', 'N/A')}",
-                f"Average Features: {summary_row.get('n_features', 'N/A')}",
-                ""
-            ])
-
-        # Log as single message
-        logger.info("\n".join(summary_lines))
 
 
     def aggregate_temporal_feature_importance(self) -> pd.DataFrame:
