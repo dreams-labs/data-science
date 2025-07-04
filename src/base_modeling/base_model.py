@@ -36,6 +36,8 @@ os.environ['MKL_NUM_THREADS'] = '12'
 import time
 import logging
 import uuid
+import random
+from math import comb
 from typing import Dict, Union, List, Any
 from itertools import chain,combinations
 import cloudpickle
@@ -403,6 +405,7 @@ class BaseModel:
 
         else:
             raise ValueError(f"Invalid scoring metric '{scoring_param}' found in grid_search_params.")
+        logger.info("Prepared grid search params and scorer...")
 
         # Generate pipeline
         cv_pipeline = pipeline if pipeline is not None else self._get_model_pipeline(gs_config['base_model_params'])
@@ -414,6 +417,7 @@ class BaseModel:
             **gs_config['search_config'],
             refit=False,   # skip that extra full-dataset fit
         )
+        logger.info("Instantiated random search with custom pipeline...")
 
         # Always pass the eval_set for early stopping
         self.random_search.fit(
@@ -520,10 +524,17 @@ class BaseModel:
             1. all base drop patterns, plus
             2. all grid search drop patterns except for n features, defined through
                 drop_patterns_include_n_features
+
+        Now samples exactly n_iter combinations instead of generating all possible ones.
         """
         max_additions = self.modeling_config['grid_search_params'].get('drop_patterns_include_n_features')
         grid_patterns = self.modeling_config['grid_search_params']['param_grid']['drop_columns__drop_patterns']
         base_patterns = self.modeling_config['feature_selection']['drop_patterns']
+        n_iter = self.modeling_config['grid_search_params']['n_iter']
+
+        # Get random state for reproducibility
+        random_state = self.modeling_config['model_params'].get('random_state', 42)
+        random.seed(random_state)
 
         # First get columns that remain after base patterns
         all_columns = self.X_train.columns.tolist()
@@ -543,10 +554,29 @@ class BaseModel:
         # Flatten all grid drop patterns into a single list
         grid_patterns_list = list(chain.from_iterable(grid_patterns)) + ['feature_retainer']
 
-        # Create combinations of grid drop patterns that retain max_additions features
-        grid_pattern_combinations = [list(combo)
-                                    for combo in combinations(grid_patterns_list,
-                                                            len(grid_patterns_list) - max_additions)]
+        # Calculate total possible combinations
+        total_combinations = comb(len(grid_patterns_list), len(grid_patterns_list) - max_additions)
+
+        # If total combinations <= n_iter, generate all combinations (original behavior)
+        if total_combinations <= n_iter:
+            logger.info(f"Generating all {total_combinations} drop pattern combinations (≤ n_iter={n_iter})")
+            grid_pattern_combinations = [list(combo)
+                                        for combo in combinations(grid_patterns_list,
+                                                                len(grid_patterns_list) - max_additions)]
+        else:
+            # Sample exactly n_iter combinations
+            logger.info(f"Sampling {n_iter} drop pattern combinations from {total_combinations:,} possible")
+
+            # Generate a set to track unique combinations
+            sampled_combinations = set()
+
+            # Sample until we have n_iter unique combinations
+            while len(sampled_combinations) < n_iter:
+                # Randomly sample a combination
+                combo = tuple(sorted(random.sample(grid_patterns_list, len(grid_patterns_list) - max_additions)))
+                sampled_combinations.add(combo)
+
+            grid_pattern_combinations = [list(combo) for combo in sampled_combinations]
 
         # Combine each grid_pattern_combination with the base drop patterns
         search_drop_combinations = [
@@ -554,6 +584,7 @@ class BaseModel:
             for grid_pattern_combination in grid_pattern_combinations
         ]
 
+        logger.info(f"Generated {len(search_drop_combinations)} final drop pattern combinations")
         return search_drop_combinations
 
 
