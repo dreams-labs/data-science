@@ -73,9 +73,9 @@ modeling: #WalletModel
 
     #KeyParam Target Variable
     # Coin Return Rate
-    target_variable: cw_coin_return
+    # target_variable: cw_coin_return
     # target_variable: cw_coin_return_winsorized
-    # target_variable: cw_coin_return_rank
+    target_variable: cw_coin_return_rank
 
     # Return Rate
     # target_variable: cw_crypto_net_gain/max_investment/base
@@ -95,19 +95,19 @@ modeling: #WalletModel
         enabled: True
         # big_loss_threshold: -0.50    # Below this is an extra penalized big loss
         # big_loss_threshold: -0.40    # Below this is an extra penalized big loss
-        big_loss_threshold: -0.30    # Below this is an extra penalized big loss
+        # big_loss_threshold: -0.30    # Below this is an extra penalized big loss
         # big_loss_threshold: -0.20    # Below this is an extra penalized big loss
         # big_loss_threshold: 0.05
         # big_loss_threshold: 0.15
-        # big_loss_threshold: 0.20
+        big_loss_threshold: 0.20
         # big_loss_threshold: 0.25
 
         # big_win_threshold: 0.30      # Above this is the target
-        big_win_threshold: 0.50      # Above this is the target
+        # big_win_threshold: 0.50      # Above this is the target
         # big_win_threshold: 0.70      # Above this is the target
         # big_win_threshold: 0.75      # Above this is the target
         # big_win_threshold: 0.85      # Above this is the target
-        # big_win_threshold: 0.90      # Above this is the target
+        big_win_threshold: 0.90      # Above this is the target
         # big_win_threshold: 0.95      # Above this is the target
         # big_win_threshold: 0.98      # Above this is the target
         # big_win_threshold: 1.0      # Above this is the target
@@ -126,13 +126,13 @@ modeling: #WalletModel
     # target_var_min_threshold: 0.20  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.25  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.30  # a classification model will try to predict the target var above this value
-    target_var_min_threshold: 0.40  # a classification model will try to predict the target var above this value
+    # target_var_min_threshold: 0.40  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.50  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.60  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.70  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.75  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.80  # a classification model will try to predict the target var above this value
-    # target_var_min_threshold: 0.85  # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.85  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.9  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.95  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 1.0  # a classification model will try to predict the target var above this value
