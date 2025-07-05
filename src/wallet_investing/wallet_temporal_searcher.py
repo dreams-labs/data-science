@@ -57,6 +57,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import copy
 import ast
 import gc
+import time
 from datetime import datetime
 from collections import defaultdict
 from typing import List
@@ -770,6 +771,7 @@ class TemporalGridSearcher:
 
 
             logger.info(f"Model completed for {modeling_date}")
+            time.sleep(0.5)
 
             # Clear model memory
             del wallet_model, wallet_model_results, evaluator
