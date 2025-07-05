@@ -83,7 +83,7 @@ class WalletModelInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
     • Results include both prediction scores and realized performance
     • Designed for backtesting and live investment signal generation
     """
-    def __init__(
+    def __init__(  # see note below for details on why we pylint:disable=super-init-not-called
         self,
 
         # investing config
@@ -103,6 +103,10 @@ class WalletModelInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
     ):
         """
         Initialize the investing epochs orchestrator with a pre-trained model.
+
+        Note: Does not call super().__init__() as this class only uses utility methods
+         from the parent class (_prepare_coin_epoch_base_config, _compute_all_wallet_offsets)
+         and manually manages its own subset of required instance variables.
         """
         # Ensure configs are dicts and not the custom config classes
         if not isinstance(wallets_config,dict):
