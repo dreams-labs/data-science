@@ -183,7 +183,8 @@ class CoinModel(BaseModel):
                 # Generate probabilities for the positive class
                 X_val_trans = meta_pipeline.x_transformer_.transform(self.X_validation)
                 probas = meta_pipeline.estimator.predict_proba(X_val_trans)
-                pos_idx = list(meta_pipeline.estimator.classes_).index(1)
+                # For binary classification and asymmetric loss the positive class is always index 1
+                pos_idx = 1
                 proba_series = pd.Series(probas[:, pos_idx], index=self.X_validation.index)
                 result['y_validation_pred_proba'] = proba_series
 
@@ -212,7 +213,8 @@ class CoinModel(BaseModel):
             if self.modeling_config['model_type'] == 'classification':
                 X_test_trans = self.pipeline.x_transformer_.transform(self.X_test)
                 probas = self.pipeline.estimator.predict_proba(X_test_trans)
-                pos_idx = list(self.pipeline.estimator.classes_).index(1)
+                # For binary classification and asymmetric loss the positive class is always index 1
+                pos_idx = 1
                 result['y_pred_proba'] = pd.Series(probas[:, pos_idx], index=self.X_test.index)
 
         u.notify('notify')

@@ -151,7 +151,8 @@ def validation_auc_scorer(wallet_model):
 
         # Predict class probabilities and select the positive class index
         probas = estimator.estimator.predict_proba(X_val_trans)
-        pos_idx = list(estimator.estimator.classes_).index(1)
+        # For binary classification and asymmetric loss the positive class is always index 1
+        pos_idx = 1
 
         # Compute and return ROC AUC
         return roc_auc_score(y_true, probas[:, pos_idx])
@@ -184,7 +185,8 @@ def validation_top_percentile_returns_scorer(wallet_model, top_pct: float):
         # Predict class probabilities for positive class
         X_val_trans = estimator.x_transformer_.transform(wallet_model.X_validation)
         probas = estimator.estimator.predict_proba(X_val_trans)
-        pos_idx = list(estimator.estimator.classes_).index(1)
+        # For binary classification and asymmetric loss the positive class is always index 1
+        pos_idx = 1
         probs = probas[:, pos_idx]
 
         # Align probabilities and returns on the same index before combining
@@ -227,7 +229,8 @@ def validation_top_scores_returns_scorer(wallet_model):
         # Predict class probabilities for positive class
         X_val_trans = estimator.x_transformer_.transform(wallet_model.X_validation)
         probas = estimator.estimator.predict_proba(X_val_trans)
-        pos_idx = list(estimator.estimator.classes_).index(1)
+        # For binary classification and asymmetric loss the positive class is always index 1
+        pos_idx = 1
         probs = probas[:, pos_idx]
 
         # Combine into DataFrame and drop missing

@@ -1,30 +1,28 @@
 """
-Orchestrates the scoring of wallet training data across multiple investing epochs using
-a single pre-trained wallet model to evaluate long-term prediction performance.
+Orchestrates wallet scoring across multiple investment epochs using pre-trained models
+to evaluate investment opportunities in cryptocurrency markets.
 
 Key Business Logic Steps
 ------------------------
-1. Build fresh data for every cycle
-   • Pull cleaned features/targets from WalletEpochsOrchestrator
-   • Apply any cohort or date filters defined in modeling_config
-   • Persist the assembled training/validation parquet files for reproducibility
+1. Generate epoch-specific wallet feature data
+   • Use WalletEpochsOrchestrator to build training features for each investment cycle
+   • Apply cohort filters and data transformations per modeling_config
+   • Cache feature datasets for efficient repeated scoring
 
-2. Train and select a model
-   • Kick off a grid search on WalletModel to find the best hyper-params
-   • Save the fitted model and its metadata under modeling/ for later audit
-   • Capture validation metrics so downstream dashboards know how the model behaved when
-        it was born
+2. Score wallets using pre-trained models
+   • Load existing wallet model by model_id
+   • Generate predictions for all wallet-coin pairs in each epoch
+   • Convert hybrid wallet IDs back to coin-wallet mappings
 
-3. Score the next investment period
-   • Use the freshly trained model to predict wallet scores for the forward period (usually
-        the next 30 days)
-   • Write those scores to modeling/wallet_scores so portfolio code can allocate capital
-        the same day
+3. Determine buy signals
+   • Aggregate wallet scores by coin across all wallet-coin pairs
+   • Apply trading thresholds (high_score_threshold, min_high_scores, etc.)
+   • Generate boolean buy signals for top-scoring coins per epoch
 
-4. Track performance over time
-   • Log realised returns vs predictions once the forward window closes
-   • Surface drift or degradation signals back to the config so future runs can adjust
-        thresholds, features, or grid-search space
+4. Evaluate investment performance
+   • Calculate actual coin returns over the investment period
+   • Compare buy signals against realized performance
+   • Track success metrics across multiple investment cycles
 """
 from pathlib import Path
 import logging
@@ -52,34 +50,38 @@ logger = logging.getLogger(__name__)
 # WalletModel
 class WalletModelInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
     """
-    Coordinates end‑to‑end model training and prediction for every investment
-    cycle.
+    Coordinates wallet-based cryptocurrency investment signal generation across
+    multiple investment epochs using pre-trained wallet behavior models.
+
+    Technical Architecture
+    ----------------------
+    Inherits from CoinEpochsOrchestrator to leverage epoch configuration and
+    offset management, but focuses on wallet-level feature generation rather
+    than coin-level modeling.
 
     Key Methods
     -----------
-    run_cycle(cycle_date: str) -> None
-        • Invokes _build_cycle_training_data to assemble features/targets
-        • Calls _train_model to perform grid search and persist the model
-        • Executes _score_forward_period to create wallet‑level predictions
+    score_all_investment_cycles(model_id: str) -> pd.DataFrame
+        • Generates wallet features for each investment epoch
+        • Scores all wallet-coin pairs using the specified pre-trained model
+        • Returns comprehensive scoring results across all epochs
 
-    _build_cycle_training_data() -> Tuple[pandas.DataFrame, pandas.DataFrame]
-        Wraps WalletEpochsOrchestrator.build_all_wallet_data then trims to the
-        training/validation windows required by modeling_config.
+    determine_epoch_buys(cw_scores_df: pd.DataFrame) -> pd.DataFrame
+        • Converts wallet-coin scores into coin-level buy signals
+        • Applies trading thresholds and aggregation rules
+        • Calculates actual performance for evaluation
 
-    _train_model() -> WalletModel
-        Instantiates WalletModel, runs GridSearchCV (if enabled), saves the
-        best_estimator_ plus validation metrics to disk.
-
-    _score_forward_period(model: WalletModel) -> None
-        Generates predictions for the forward period, writes a timestamped
-        scores parquet, and queues any post‑processing callbacks.
+    _score_investing_epoch(offset_days: int) -> pd.DataFrame
+        • Processes a single investment epoch
+        • Generates wallet training features and applies model predictions
+        • Returns coin-wallet scores with hybrid ID mapping
 
     Notes
     -----
-    • Every artefact is stamped with cycle_date so historical results are
-    never overwritten.
-    • The class is intentionally stateless between cycles; all state lives on
-    disk to make reruns idempotent.
+    • All epochs use the same pre-trained model for consistent scoring
+    • Feature generation is parallelized across epochs for efficiency
+    • Results include both prediction scores and realized performance
+    • Designed for backtesting and live investment signal generation
     """
     def __init__(
         self,

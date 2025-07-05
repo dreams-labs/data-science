@@ -4,35 +4,38 @@ wallet_model.py
 
 Business logic
 --------------
-* **Goal** – score crypto wallets (“addresses”) on future performance
-  so we can flag “sharks” and drive coin-level forecasts.
-* **Inputs**
-  - Wide, multi-indexed feature matrix keyed on wallet_address / epoch_start_date
-  - Target-variable DataFrame with modeling-cohort flags + returns
-  - YAML configs (training bounds, feature drops, asymmetric-loss rules, etc.)
-* **Flow**
-  1.  Data validation + cohort selection (_prepare_data)
-  2.  Optional epoch de-duplication per wallet (_assign_epoch_to_wallets)
-  3.  Train/test/eval split with asymmetric-loss handling
-  4.  Meta-pipeline build (X transformer → estimator)
-      *Optional grid-search* via scikit-learn
-  5.  Final model fit + prediction packaging
-  6.  **Escape hatch** – if export_s3_training_data.enabled, skip training and
-      export the exact X/y parquet splits (plus metadata JSON) for offline runs.
+Goal - Train machine learning models to predict crypto wallet behavior
+ and performance, enabling identification of skilled traders for downstream
+ investment and analysis workflows.
+
+Inputs
+- Wide, multi-indexed feature matrix keyed on wallet_address / epoch_start_date
+- Target-variable DataFrame with modeling-cohort flags + returns
+- YAML configs (training bounds, feature drops, asymmetric-loss rules, etc.)
+
+Flow
+1.  Data validation + cohort selection (_prepare_data)
+2.  Optional epoch de-duplication per wallet (_assign_epoch_to_wallets)
+3.  Train/test/eval split with asymmetric-loss handling
+4.  Meta-pipeline build (X transformer → estimator)
+    Optional grid-search via scikit-learn
+5.  Model training and validation with early stopping
+6.  Escape hatch - if export_s3_training_data.enabled, skip training and
+    export the exact X/y parquet splits (plus metadata JSON) for offline runs.
 
 Downstream orchestrators
 ------------------------
-* **wime.RegressorEvaluator/ClassifierEvaluator** - for metrics and data viz
-* **wallet_temporal_searcher** – multi-date grid search & model comparison
-* **WalletInvestingOrchestrator** – converts model scores into trade signals
-* **WalletModelingOrchestrator** – creates many models for WalletEpochsOrchestrator
-* Any bespoke notebook or batch job that instantiates WalletModel directly
+- RegressorEvaluator/ClassifierEvaluator - for metrics and visualization
+- wallet_temporal_searcher - multi-date grid search & model comparison
+- WalletModelingOrchestrator - creates multiple models for different epochs
+- Investment workflows - use trained models for live scoring and signals
 
 Utilities
 ---------
-* Grid-search param expansion with safety checks on asymmetric-loss conflicts.
-* Recursive parquet export with dev-mode sampling.
-* Helper for full-cohort predictions (used later by orchestrators).
+- Grid-search param expansion with safety checks on asymmetric-loss conflicts
+- S3 export capabilities for external training workflows
+- Full-cohort prediction helpers for downstream scoring applications
+- Support for both binary classification and regression with asymmetric loss
 
 External deps: BaseModel, utils (logging, timing, config helpers).
 """
@@ -279,8 +282,8 @@ class WalletModel(BaseModel):
             if self.modeling_config['model_type'] == 'classification':
                 # get positive-class probabilities directly from pipeline
                 proba = meta_pipeline.predict_proba(self.X_validation)
-                classes = list(meta_pipeline.named_steps['estimator'].classes_)
-                pos_idx = classes.index(1) if 1 in classes else 0
+                # For binary classification and asymmetric loss the positive class is always index 1
+                pos_idx = 1
                 proba_series = pd.Series(proba[:, pos_idx], index=self.X_validation.index)
 
                 # Resolve F-beta string threshold if present
@@ -311,8 +314,8 @@ class WalletModel(BaseModel):
             if self.modeling_config['model_type'] == 'classification':
                 # get positive-class probabilities and apply threshold
                 proba = meta_pipeline.predict_proba(self.X_test)
-                classes = list(meta_pipeline.named_steps['estimator'].classes_)
-                pos_idx = classes.index(1) if 1 in classes else 0
+                # For binary classification and asymmetric loss the positive class is always index 1
+                pos_idx = 1
                 proba_series = pd.Series(proba[:, pos_idx], index=self.X_test.index)
 
                 # Apply configurable threshold for class prediction
@@ -335,8 +338,8 @@ class WalletModel(BaseModel):
                 # Transform test features for probability prediction
                 X_test_trans = self.pipeline.x_transformer_.transform(self.X_test)
                 probas = self.pipeline.estimator.predict_proba(X_test_trans)
-                classes = list(self.pipeline.estimator.classes_)
-                pos_idx = classes.index(1) if 1 in classes else 0
+                # For binary classification and asymmetric loss the positive class is always index 1
+                pos_idx = 1
                 result['y_pred_proba'] = pd.Series(probas[:, pos_idx], index=self.X_test.index)
 
             # Optionally add predictions for full training cohort
