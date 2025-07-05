@@ -333,8 +333,8 @@ class BaseModel:
         if self.modeling_config['model_type'] == 'classification':
             raw_probs = self.pipeline.predict_proba(self.X_test)
 
-            # pick the “positive” class index (typically 1)
-            pos_idx = list(self.pipeline.named_steps['regressor'].classes_).index(1)
+            # For binary classification and asymmetric loss the positive class is always index 1
+            pos_idx = 1
 
             # build a Series of just the positive‐class probability
             self.y_pred = pd.Series(
