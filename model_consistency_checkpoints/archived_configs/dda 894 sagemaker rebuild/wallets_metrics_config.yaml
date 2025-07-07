@@ -1,0 +1,90 @@
+# WalletModel Config
+# Time series keyed on coin_id-date
+time_series:  #WalletModel
+    market_data:
+        price:
+            indicators:
+                sma:
+                    parameters:
+                        window: [2]
+                # rsi:
+                #     parameters:
+                #         window: [7]
+        volume:
+            indicators:
+                sma:
+                    parameters:
+                        window: [2]
+
+
+    # Controls what populates the macro_trends|* features
+    # All keys of wallets_features_config.market_timing.offsets.keys() must
+    #  be included here
+    macro_trends:  #WalletModel
+        btc_price:
+            aggregations:
+                std:
+                    scaling: none
+        btc_mvrv_z_score:
+            aggregations:
+                last:
+                    scaling: none
+                std:
+                    scaling: none
+        global_market_cap:
+            aggregations:
+                last:
+                    scaling: none
+                std:
+                    scaling: none
+            indicators:
+                rsi:
+                    parameters:
+                        window: [30]
+                    aggregations:
+                        last:
+                            scaling: none
+        btc_vdd_multiple:
+            aggregations:
+                std:
+                    scaling: none
+        gtrends_memecoin_us:
+            aggregations:
+                std:
+                    scaling: none
+
+
+    # Controls what populates the coin_trends|* features
+    coin_trends:  #WalletModel
+        current_holders:
+            aggregations:
+                last:
+                    scaling: none
+        current_holders_in_profit:
+            aggregations:
+                last:
+                    scaling: none
+        current_holders_in_profit_pct:
+            aggregations:
+                last:
+                    scaling: none
+        lifetime_holders:
+            aggregations:
+                last:
+                    scaling: none
+        current_holders_pct_of_lifetime:
+            aggregations:
+                last:
+                    scaling: none
+        days_since_launch:
+            aggregations:
+                last:
+                    scaling: none
+        days_since_ath:
+            aggregations:
+                last:
+                    scaling: none
+        price_pct_of_ath:
+            aggregations:
+                last:
+                    scaling: none

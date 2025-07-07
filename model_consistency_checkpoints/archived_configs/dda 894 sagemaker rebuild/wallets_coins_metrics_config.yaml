@@ -1,0 +1,205 @@
+# CoinModel Config
+# Time series keyed on coin_id-date
+#
+# If 'rolling' is used, the lowest period number represents the
+#  most recent date, e.g.:
+#    market_data|volume/sma_7_std_30d_period_1 is most recent
+#    market_data|volume/sma_7_std_30d_period_2 is older
+#    market_data|volume/sma_7_std_30d_period_3 is even older
+
+time_series:  #CoinModel
+    market_data:
+        price:
+            indicators:
+                sma: # rolling period 30 days
+                    parameters:
+                        window: [2]
+                    rolling:
+                        aggregations:
+                            std:
+                                scaling: none
+                        comparisons:
+                            pct_change:
+                                scaling: none
+                        window_duration: 30
+                        lookback_periods: 2
+
+                rsi:
+                    parameters:
+                        window: [7]
+                    rolling:
+                        aggregations:
+                            last:
+                                scaling: none
+                        window_duration: 30
+                        lookback_periods: 3
+
+                ema: # rolling period 7 days
+                    parameters:
+                        window: [3]
+                    aggregations: # testing raw price values
+                        last:
+                            scaling: none
+                    rolling: # testing 7 day windows
+                        aggregations:
+                            std:
+                                scaling: none
+                        comparisons:
+                            pct_change:
+                                scaling: none
+                        window_duration: 7
+                        lookback_periods: 3
+
+                bollinger_bands_upper: # testing
+                    parameters:
+                        window: [20]
+                        num_std: 2
+                bollinger_bands_lower: # testing
+                    parameters:
+                        window: [20]
+                        num_std: 2
+
+        market_cap: # needed for coin cohort filters in coin_model.py
+            aggregations:
+                last:
+                    scaling: none
+        market_cap_filled: # needed for coin cohort filters in coin_model.py
+            aggregations:
+                last:
+                    scaling: none
+
+        mfi: # testing relevance
+            rolling:
+                aggregations:
+                    last:
+                        scaling: none
+                window_duration: 20
+                lookback_periods: 3
+
+        obv: # testing relevance
+            rolling:
+                aggregations:
+                    last:
+                        scaling: none
+                window_duration: 20
+                lookback_periods: 3
+
+        volume: # testing
+            indicators:
+                sma:
+                    parameters:
+                        window: [2]
+                    rolling:
+                        aggregations:
+                            std:
+                                scaling: none
+                            sum:
+                                scaling: none
+                        comparisons:
+                            pct_change:
+                                scaling: none
+                        window_duration: 30
+                        lookback_periods: 2
+
+
+
+
+    # Controls what populates the macro_trends|* features
+    # All keys of wallets_features_config.market_timing.offsets.keys() must
+    #  be included here
+    macro_trends:  #CoinModel
+        btc_price:
+            rolling:
+                comparisons: # testing
+                    pct_change:
+                        scaling: none
+                aggregations:
+                    last:
+                        scaling: none
+                    std:
+                        scaling: none
+                window_duration: 30
+                lookback_periods: 3
+        btc_mvrv_z_score:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: none
+                    std:
+                        scaling: none
+                comparisons: # testing
+                    pct_change:
+                        scaling: none
+                window_duration: 30
+                lookback_periods: 3
+            indicators: # testing shorter windows
+                sma:
+                    parameters:
+                        window: [1]
+                    aggregations:
+                        last:
+                            scaling: none
+                        std:
+                            scaling: none
+                    rolling:
+                        comparisons: # testing
+                            pct_change:
+                                scaling: none
+                        window_duration: 7
+                        lookback_periods: 3
+        btc_vdd_multiple:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: none
+                    std:
+                        scaling: none
+                window_duration: 30
+                lookback_periods: 3
+
+        global_market_cap:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: none
+                    std:
+                        scaling: none
+                comparisons: # testing
+                    pct_change:
+                        scaling: none
+                window_duration: 30
+                lookback_periods: 3
+        global_volume: # testing: didn't include in first round
+            rolling:
+                aggregations:
+                    last:
+                        scaling: none
+                    std:
+                        scaling: none
+                window_duration: 30
+                lookback_periods: 3
+
+        gtrends_altcoin_worldwide:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: none
+                    std:
+                        scaling: none
+                comparisons: # testing
+                    pct_change:
+                        scaling: none
+                window_duration: 30
+                lookback_periods: 3
+        gtrends_memecoin_us:
+            rolling:
+                aggregations:
+                    last:
+                        scaling: none
+                    std:
+                        scaling: none
+                comparisons: # testing
+                    pct_change:
+                        scaling: none
+                window_duration: 30
+                lookback_periods: 3
