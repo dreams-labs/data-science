@@ -301,7 +301,7 @@ def aggregate_time_weighted_balance(profits_df: pd.DataFrame) -> pd.DataFrame:
     Returns:
     - trading_features_df (DataFrame): Time weighted metrics by wallet
     """
-    active_period_threshold = wallets_config['features']['timing_metrics_min_transaction_size']
+    active_period_threshold = wallets_config['features']['usd_materiality']
 
     # Calculate cost basis for each wallet-coin pair and merge into main dataframe
     cost_basis_df = get_cost_basis_df(profits_df)
