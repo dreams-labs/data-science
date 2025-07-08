@@ -677,11 +677,14 @@ class WalletEpochsOrchestrator:
         # Save profits_dfs
         start_time = time.time()
         output_folder = f"{epoch_config['training_data']['parquet_folder']}"
-        u.to_parquet_safe(training_profits_df, f"{output_folder}/training_profits_df.parquet", index=True)
+        u.to_parquet_safe(training_profits_df,
+                                f"{output_folder}/training_profits_df.parquet", index=True)
         if generate_modeling:
-            u.to_parquet_safe(modeling_profits_df, f"{output_folder}/modeling_profits_df.parquet", index=True)
+            u.to_parquet_safe(modeling_profits_df,
+                                f"{output_folder}/modeling_profits_df.parquet", index=True)
         if not self.complete_hybrid_cw_id_df.empty:
-            u.to_parquet_safe(self.complete_hybrid_cw_id_df, f"{output_folder}/complete_hybrid_cw_id_df.parquet", index=True)
+            u.to_parquet_safe(self.complete_hybrid_cw_id_df,
+                                f"{output_folder}/complete_hybrid_cw_id_df.parquet", index=True)
         logger.info("(%.1fs) Saved %s profits_df files to %s.",
             time.time() - start_time, model_start, output_folder)
 
