@@ -1,3 +1,74 @@
+"""
+Calculates wallet-level transfer features based on blockchain transaction sequence data.
+
+Business Context
+================
+Transfer features capture early adoption timing and behavioral patterns that are critical
+for identifying skilled crypto traders. These features answer questions like:
+- How early did this wallet first buy each coin relative to other buyers?
+- How long do they typically hold positions before selling?
+- Do they exhibit consistent early adoption patterns across multiple coins?
+
+Core Workflow
+=============
+1. Data Retrieval (retrieve_transfers_sequencing)
+   - Queries BigQuery for first_buy/first_sell dates per wallet-coin pair
+   - Calculates buyer/seller sequence rankings within each coin's adoption curve
+   - Handles hybridized wallet IDs when configured for coin-wallet pair modeling
+   - Filters transactions by minimum USD threshold to exclude dust/airdrops
+
+2. Temporal Alignment (calculate_transfers_features)
+   - Filters transfer data to training window boundaries to prevent temporal logic errors
+   - Critical: Excludes wallet-coin pairs with first_buy > window_end_date
+   - Prevents negative hold times from wallets that become active after the analysis period
+
+3. Feature Aggregation
+   - Joins transfer sequence data with profits_df on (coin_id, wallet_address)
+   - Aggregates coin-level early adoption metrics to wallet-level features
+   - Generates statistical summaries (mean, median, min) of timing behaviors
+
+Key Features Generated
+======================
+Early Adoption Timing:
+- first_buy/mean_rank: Average buyer sequence number across coins (lower = earlier adopter)
+- first_buy/median_rank: Median buyer ranking for robustness to outliers
+- first_buy/earliest_rank: Best (lowest) buyer ranking achieved
+
+Holding Behavior:
+- initial_hold_time/mean: Average days held before first sell (or window end)
+- initial_hold_time/median: Median holding period for position sizing insights
+
+Market Context:
+- buys_coin_age/mean: Average coin maturity when wallet first bought
+- coin_total_buyers/mean: Average market size of coins wallet participated in
+- later_buyers/mean: Average count of buyers who came after this wallet
+- earlybird_ratio/mean: Multiplicative early adoption advantage metric
+
+Wallet Lifecycle:
+- wallet_age: Days since wallet's first recorded transaction
+
+Data Quality Considerations
+===========================
+- Temporal Filtering: Transfer sequence data spans the full epoch but individual training
+windows have earlier cutoffs. Features are only calculated for wallet-coin pairs where
+first_buy <= window_end_date to maintain temporal logic integrity.
+
+- Hybridization Support: When modeling individual coin-wallet relationships, the module
+handles hybrid wallet IDs that uniquely identify each (wallet, coin) pair rather than
+aggregating at the wallet level.
+
+- Materiality Thresholds: Only includes transactions above configurable USD minimums
+to focus on intentional trading behavior rather than airdrops or dust transactions.
+
+- Missing Data Handling: Uses left joins in downstream processing so wallets without
+transfer features (due to temporal filtering) receive NaN values that can be imputed.
+
+Dependencies
+============
+- BigQuery: Core transaction and reference data
+- profits_df: Defines wallet-coin pairs and temporal boundaries for each training window
+- Hybrid ID mappings: Required when hybridize_wallet_ids = True
+"""
 import logging
 import pandas as pd
 
@@ -45,10 +116,15 @@ def calculate_transfers_features(
             / transfers_sequencing_df['buyer_number'])
         ,0.01)
 
-    # Calculate initial_hold_time in days. If no sells, use the latest date in profits_df.
+    # Remove coins that were bought after the current period
     latest_date = profits_df.index.get_level_values('date').max()
+    period_buys_mask = transfers_sequencing_df['first_buy'] <= latest_date
+    transfers_sequencing_df = transfers_sequencing_df[period_buys_mask]
+
+    # Calculate initial_hold_time in days. If no sells, use the latest date in profits_df.
     transfers_sequencing_df['initial_hold_time'] = (
-        transfers_sequencing_df['first_sell'].fillna(latest_date) - transfers_sequencing_df['first_buy']
+        transfers_sequencing_df['first_sell'].fillna(latest_date) -
+        transfers_sequencing_df['first_buy']
     ).dt.days
 
     # Filter to only coins and wallets during the profits_df date range
