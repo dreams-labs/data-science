@@ -4,26 +4,26 @@ wallet_epochs_orchestrator.py
 
 Business context
 ----------------
-Transforms raw **coin-wallet-date** transfers (~100 M+ rows) into tidy
-*epoch-level* snapshots so all wallet-analytics layers—**modeling** and
-**investing**—can run fast, without re-aggregating heavy SQL.
+Transforms the raw datasets (profits_df,market_data_df,macro_trends_df)
+ into monthly feature snapshots so future trainin/modeling/validation periods
+ thae include the month's snapshot can load precalculated parquet files.
 
 Key responsibilities
 --------------------
-1. **Period coverage check** – validates raw parquet stack spans the full
+1. Period coverage check – validates raw parquet stack spans the full
    training + modeling horizon.
-2. **Epoch generation** – aggregates features & targets for every
-   `(wallet, epoch_start_date)` (or `(wallet, coin)` in hybrid mode).
-3. **Cohort gating** – applies inflow / coin-count / CW thresholds.
-4. **Artifact management** – writes / loads parquet pairs per modeling date,
-   skipping rebuilds unless `rebuild_multioffset_dfs = True`.
-5. **Warm-up cache** – optional bulk prebuild for smoother multi-date loops.
+2. Epoch generation – aggregates features & targets for every
+   '(wallet, epoch_start_date)' (or '(wallet, coin)' in hybrid mode).
+3. Cohort gating – applies inflow / coin-count / CW thresholds.
+4. Artifact management – writes / loads parquet pairs per modeling date,
+   skipping rebuilds unless 'rebuild_multioffset_dfs = True'.
+5. Warm-up cache – optional bulk prebuild for smoother multi-date loops.
 
 Downstream consumers
 --------------------
-* **`wallet_temporal_searcher`** – multi-date grid search & model comparison.
-* **`WalletModel`** – direct, one-off model training runs.
-* **`WalletInvestingOrchestrator` / `WalletInvestor`** – post-modeling layer
+* 'wallet_temporal_searcher' – multi-date grid search & model comparison.
+* 'WalletModel' – direct, one-off model training runs.
+* 'WalletInvestingOrchestrator' / 'WalletInvestor' – post-modeling layer
   that turns model outputs into investing signals and performance backtests.
 
 The module itself never trains a model; its sole job is deterministic,
@@ -61,47 +61,48 @@ logger = logging.getLogger(__name__)
 
 class WalletEpochsOrchestrator:
     """
-    ETL workhorse that builds and caches wallet-epoch datasets.
+    ETL workhorse that builds and caches wallet-epoch features for each
+     wallet offset.
 
     Technical overview
     ------------------
-    * **Inputs**
-        - YAML **wallets_config**, **metrics_config**
+    * Inputs
+        - YAML wallets_config, metrics_config
         - Raw parquet transfers & reference DataFrames
-        - Flags: `hybridize_wallet_ids`, `rebuild_multioffset_dfs`, `dev_mode`, etc.
+        - Flags: 'hybridize_wallet_ids', 'rebuild_multioffset_dfs', 'dev_mode', etc.
 
-    * **Public API**
-        ├─ `load_complete_raw_datasets()`    – coverage sanity check
-        ├─ `build_all_wallet_data()`         – multithreaded bulk epoch build
-        └─ `get_epoch_data(modeling_date)`   – return / build `(features, targets)`
+    * Public API
+        ├─ 'load_complete_raw_datasets()'    – coverage sanity check
+        ├─ 'build_all_wallet_data()'         – multithreaded bulk epoch build
+        └─ 'get_epoch_data(modeling_date)'   – return / build '(features, targets)'
 
-    * **Core internals**
-        - `_aggregate_features()`    – vectorised pandas; no Python loops
-        - `_apply_cohort_filters()`  – inflow/coin-count thresholds
-        - `_write_parquet_pair()`    – idempotent write, dev-mode sampling
+    * Core internals
+        - '_aggregate_features()'    – vectorised pandas; no Python loops
+        - '_apply_cohort_filters()'  – inflow/coin-count thresholds
+        - '_write_parquet_pair()'    – idempotent write, dev-mode sampling
 
-    * **Concurrency & caching**
-        - `ThreadPoolExecutor` parallel builds; milestone logging for notebooks
+    * Concurrency & caching
+        - 'ThreadPoolExecutor' parallel builds; milestone logging for notebooks
         - Checks disk cache first; rebuilds only when forced
 
-    * **Generated artifacts**
-        - `x_<date>.parquet`, `y_<date>.parquet`  per modeling date
+    * Generated artifacts
+        - 'x_<date>.parquet', 'y_<date>.parquet'  per modeling date
         - Dev-mode pares down to 1 000 rows for quick local tests
 
     Downstream usage
     ----------------
     Returns DataFrames ready for:
 
-    * `WalletModel` → model training / evaluation
-    * `wallet_temporal_searcher` → multi-date grid search
-    * **`WalletInvestingOrchestrator` / `WalletInvestor`** → converts model
+    * 'WalletModel' → model training / evaluation
+    * 'wallet_temporal_searcher' → multi-date grid search
+    * 'WalletInvestingOrchestrator' / 'WalletInvestor' → converts model
       scores into trade signals, allocation schedules, and P&L backtests.
 
     Attributes exposed after a build
     --------------------------------
-    - `features_df`, `targets_df` : last-requested epoch data
-    - `modeling_dates`            : list of all dates processed
-    - `parquet_paths`             : dict of date → filepaths
+    - 'features_df', 'targets_df' : last-requested epoch data
+    - 'modeling_dates'            : list of all dates processed
+    - 'parquet_paths'             : dict of date → filepaths
 
     Designed to be mostly stateless between dates (aside from a small
     in-memory cache) so it remains memory-friendly when looping over many
@@ -759,7 +760,7 @@ class WalletEpochsOrchestrator:
         """
         Generates config dicts for modeling and validation epochs by offsetting base config dates.
          Training epochs are not generated separately because training windows are embedded within
-         each modeling/validation epoch as offset `training_window_starts` dates.
+         each modeling/validation epoch as offset 'training_window_starts' dates.
          Each epoch config represents a complete modeling scenario with multiple training windows
          feeding into one modeling period.
 
