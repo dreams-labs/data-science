@@ -289,7 +289,6 @@ class WalletFeaturesOrchestrator:
             failed_list = list(failed_pairs.itertuples(index=False, name=None))
             logger.warning(
                 f"Coin trends join failed for {len(failed_list)}/{len(merged_df)} hybrid rows. "
-                f"Missing pairs: {failed_list}"
             )
 
         # Restore original hybrid wallet_address index
