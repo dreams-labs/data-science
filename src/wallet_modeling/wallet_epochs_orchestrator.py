@@ -960,10 +960,11 @@ class WalletEpochsOrchestrator:
         comprehensive_hybrid_path = f"{reference_dfs_folder}/comprehensive_hybrid_id_mapping.parquet"
 
         if not os.path.exists(comprehensive_hybrid_path):
-            raise FileNotFoundError(
-                f"Comprehensive hybrid mapping not found at {comprehensive_hybrid_path}. "
-                f"Run download_comprehensive_hybrid_mapping() first."
+            logger.warning(
+                f"Comprehensive hybrid mapping not found at {comprehensive_hybrid_path}. " \
+                "Regenerating reference crosswalk..."
             )
+            self.download_comprehensive_hybrid_mapping()
 
         logger.info("Loading comprehensive hybrid mapping...")
         comprehensive_hybrid_df = pd.read_parquet(comprehensive_hybrid_path)
