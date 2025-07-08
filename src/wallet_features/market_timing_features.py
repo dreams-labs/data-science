@@ -88,7 +88,7 @@ def calculate_market_timing_features(
         profits_df,
         market_timing_df,
         features_columns,
-        wallets_config['features']['timing_metrics_min_transaction_size'],
+        wallets_config['features']['usd_materiality'],
     )
 
     return wallet_timing_features_df

@@ -254,7 +254,7 @@ class WalletTrainingDataOrchestrator:
             # Retrieve transfers after cohort is in BigQuery
             logger.info("Retrieving transfers sequencing data...")
             transfers_df = wts.retrieve_transfers_sequencing(
-                self.wallets_config['features']['timing_metrics_min_transaction_size'],
+                self.wallets_config['features']['usd_materiality'],
                 self.wallets_config['training_data'][f'{period}_period_end'],
                 self.epoch_reference_date,
                 self.hybridize_wallet_ids,

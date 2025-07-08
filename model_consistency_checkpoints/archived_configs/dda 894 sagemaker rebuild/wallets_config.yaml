@@ -49,6 +49,7 @@ training_data: #WalletModel
 
     #KeyParam Datasets and Folders
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
+    # parquet_folder: temp/wallet_modeling_dfs/dda_831_scenario_features_30d_v6  # where to store parquet files
     parquet_folder: temp/wallet_modeling_dfs/dda_894_cw_trends_negatives  # where to store parquet files
     reference_dfs_folder: temp/reference_dfs  # Base folder where files that impact all runs are stored
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
@@ -72,9 +73,9 @@ modeling: #WalletModel
 
     #KeyParam Target Variable
     # Coin Return Rate
-    target_variable: cw_coin_return
+    # target_variable: cw_coin_return
     # target_variable: cw_coin_return_winsorized
-    # target_variable: cw_coin_return_rank
+    target_variable: cw_coin_return_rank
 
     # Return Rate
     # target_variable: cw_crypto_net_gain/max_investment/base
@@ -82,7 +83,7 @@ modeling: #WalletModel
     # target_variable: cw_crypto_net_gain/max_investment/rank
     # target_variable: cw_crypto_net_gain/crypto_inflows/base
     # target_variable: cw_crypto_net_gain/crypto_inflows/winsorized
-    # target_variable: cw_crypto_net_gain/crypto_inflows/rank
+    target_variable: cw_crypto_net_gain/crypto_inflows/rank
 
     # Non-CW return rate
     # target_variable: crypto_net_gain/max_investment/base
@@ -94,19 +95,19 @@ modeling: #WalletModel
         enabled: True
         # big_loss_threshold: -0.50    # Below this is an extra penalized big loss
         # big_loss_threshold: -0.40    # Below this is an extra penalized big loss
-        big_loss_threshold: -0.30    # Below this is an extra penalized big loss
+        # big_loss_threshold: -0.30    # Below this is an extra penalized big loss
         # big_loss_threshold: -0.20    # Below this is an extra penalized big loss
         # big_loss_threshold: 0.05
         # big_loss_threshold: 0.15
-        # big_loss_threshold: 0.20
+        big_loss_threshold: 0.20
         # big_loss_threshold: 0.25
 
         # big_win_threshold: 0.30      # Above this is the target
-        big_win_threshold: 0.50      # Above this is the target
+        # big_win_threshold: 0.50      # Above this is the target
         # big_win_threshold: 0.70      # Above this is the target
         # big_win_threshold: 0.75      # Above this is the target
         # big_win_threshold: 0.85      # Above this is the target
-        # big_win_threshold: 0.90      # Above this is the target
+        big_win_threshold: 0.90      # Above this is the target
         # big_win_threshold: 0.95      # Above this is the target
         # big_win_threshold: 0.98      # Above this is the target
         # big_win_threshold: 1.0      # Above this is the target
@@ -389,7 +390,7 @@ modeling: #WalletModel
             # good/in testing
             # 'macro|btc_mvrv_z_score_last*',
             'macro|gtrends_altcoin_worldwide_std*',
-            # 'macro|global_market_cap_rsi_30_last*',
+            'macro|global_market_cap_rsi_30_last*',
             # 'macro|gtrends_memecoin_us_std*',
             # 'macro|btc_mvrv_z_score_std*',
             # 'macro|btc_price_std*',
@@ -753,8 +754,8 @@ modeling: #WalletModel
     export_s3_training_data: {  # used to prepare exports to S3, skipping model construction entirely
         'enabled': True,  # comment out to disable
         'parent_folder': '../../sagemaker/s3_uploads/wallet_training_data_queue',
-        'batch_folder': 'dda_894_cw_trends_negatives',
-        'dev_mode': False  #  if True, only exports 1000 rows
+        'batch_folder': 'dda_879_final_sagemaker_config',
+        'dev_mode': True  #  if True, only exports 1000 rows
     }
 
 # WalletModel Cleaning
