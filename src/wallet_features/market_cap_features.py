@@ -4,6 +4,7 @@ import pandas as pd
 
 # Local module imports
 import utils as u
+from utils import ConfigError
 
 # set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -21,6 +22,10 @@ def calculate_market_cap_features(wallets_config, profits_df, market_data_df):
     1. Volume-weighted average market cap (uses only real transfers)
     2. Ending balance-weighted market cap (uses final period balances)
 
+    NOTE: If wallets_config['data_cleaning']['min_ending_market_cap'] is greater than
+     wallets_config['data_cleaning']['market_cap_default_fill'] then the unadj and filled
+     values will likely be identical. 
+
     Params:
     - wallets_config (dict): dict from .yaml file
     - profits_df (DataFrame): Daily profits with both real transfers and imputed period boundary rows
@@ -29,27 +34,20 @@ def calculate_market_cap_features(wallets_config, profits_df, market_data_df):
     Returns:
     - market_cap_features_df (DataFrame): Market cap features indexed on wallet_address
     """
-    # 1. Identify relevant columns and modify dfs as needed
+    # 1. Prepare and validate market_data_df
     market_cap_cols = wallets_config['features']['market_cap_feature_columns']
     profits_df = profits_df.copy()
     market_data_df = market_data_df.copy()
 
-    # Force fill market cap gaps if applicable
-    if 'market_cap_filled' in market_cap_cols and 'market_cap_filled' not in market_data_df.columns:
-        market_data_df = force_fill_market_cap(
-            market_data_df,
-            wallets_config['data_cleaning']['market_cap_default_fill']
-        )
+    # Alias the base column
+    market_data_df['market_cap_unadj'] = market_data_df['market_cap']
 
-    # Alias the base column if applicable
-    if 'market_cap_unadj' in market_cap_cols:
-        market_data_df['market_cap_unadj'] = market_data_df['market_cap']
-
-    # Confirm all market cap columns exist in the df
+    # Validate that 'market_cap_feature_columns' in config match actual columns
     missing_cols = [col for col in market_cap_cols if col not in market_data_df.columns]
     if missing_cols:
-        raise ValueError(f"The following columns are missing from the DataFrame: {missing_cols}")
-
+        raise ConfigError("The following columns in "
+                          "wallets_config['features']['market_cap_feature_columns'] "
+                          f"are missing from the DataFrame: {missing_cols}")
 
     # 2. Merge market cap data onto profits_df
     profits_market_cap_df = profits_df.merge(
