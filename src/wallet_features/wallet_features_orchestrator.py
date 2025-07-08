@@ -206,7 +206,7 @@ class WalletFeaturesOrchestrator:
         ):
             coin_trends_features_df = cfct.generate_coin_trends_features(
                 self.wallets_config,
-                self.wallets_config['training_data']['training_period_end'],
+                period_end_date,
                 self.wallets_metrics_config['time_series']['coin_trends']
             )
             feature_column_names['coin_trends|'] = coin_trends_features_df.columns
@@ -267,7 +267,7 @@ class WalletFeaturesOrchestrator:
         # Check for missing coin trends data
         missing_coin_ids = wallet_coin_ids - trends_coin_ids
         if missing_coin_ids:
-            raise ValueError(
+            logger.warning(
                 f"Found {len(missing_coin_ids)} coin_ids in hybrid wallet addresses "
                 f"without corresponding coin trends data. Missing coin_ids: {sorted(missing_coin_ids)[:10]}"
             )
