@@ -44,12 +44,12 @@ training_data: #WalletModel
     #KeyParam Training Data Toggles
     hybridize_wallet_ids:    True  # if true, training data will be keyed on wallet-coin pairs
     predrop_features:        True  # if true, the feature_selection.drop_patterns will be applied early to save memory
-    # rebuild_multioffset_dfs: True  # if true, generate_epochs_training_data won't load parquet
+    rebuild_multioffset_dfs: True  # if true, generate_epochs_training_data won't load parquet
     training_data_only:      False  # if true, only generates training data to be scored by another model
 
     #KeyParam Datasets and Folders
-    dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
-    parquet_folder: temp/wallet_modeling_dfs/dda_894_cw_trends_negatives  # where to store parquet files
+    dataset: dev  # Set to prod or dev; determines whether to query core or dev dataset tables
+    parquet_folder: temp/wallet_modeling_dfs/dda_895_transfers_negatives_v2  # where to store parquet files
     reference_dfs_folder: temp/reference_dfs  # Base folder where files that impact all runs are stored
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
@@ -245,6 +245,15 @@ modeling: #WalletModel
             'transfers|later_buyers/mean|*',
             # 'transfers|later_buyers/median|*',
             'transfers|wallet_age*',
+
+
+
+            # these will never have data with baseline windows
+            '*timing|*/lead_30/*|w1',
+            '*timing|*/lead_30/*|w2',
+            '*timing|*/lead_90/*|w1',
+            '*timing|*/lead_90/*|w2',
+            '*timing|*/lead_90/*|w3',
 
             'cw_timing|price_sma_2/lag_15/buy_weighted*',
             'cw_timing|price_sma_2/lead_15/buy_weighted*',
@@ -522,52 +531,11 @@ modeling: #WalletModel
 
 
             '*|all_windows',
-            '*|w7',
-            '*|w6',
             # '*|w5',
             # '*|w4',
             # '*|w3',
             # '*|w2',
 
-            # 'cluster|*',
-            # 'cw_cluster|*',
-            # # 'cw_coin_trends|current_holders*',
-            # 'cw_coin_trends|current_holders_in_profit*',
-            # # 'cw_coin_trends|current_holders_pct_of_lifetime*',
-            # # 'cw_coin_trends|days_since_launch*',
-            # 'cw_mktcap|end_portfolio_wtd_market_cap*',
-            # 'cw_performance|crypto_net_gain*',
-            # 'cw_scenario|ideal*',
-            # 'cw_scenario|net_perf*',
-            # # 'cw_scenario|worst*',
-            # 'cw_timing|price_sma_2*',
-            # 'cw_timing|volume_sma_2*',
-            # 'cw_trading|crypto_cash_sells*',
-            # 'cw_transfers|buys_coin_age*',
-            # 'cw_transfers|earlybird_ratio*',
-            # 'cw_transfers|first_buy*',
-            # 'cw_transfers|initial_hold_time*',
-            # 'macro|btc_mvrv_z_score_last*',
-            # 'macro|btc_mvrv_z_score_std*',
-            # # 'macro|btc_price_std*',
-            # 'macro|btc_vdd_multiple_std*',
-            # 'macro|global_market_cap_std*',
-            # 'macro|gtrends_memecoin_us_std*',
-            # # 'mktcap|end_portfolio_wtd_market_cap*',
-            # 'performance|crypto_net_gain*',
-            # # 'scenario|ideal*',
-            # # 'scenario|worst*',
-            # 'timing|btc_mvrv_z_score*',
-            # 'timing|gtrends_memecoin_us*',
-            # 'timing|price_sma_2*',
-            # 'timing|volume_sma_2*',
-            # 'trading|crypto_cash_sells*',
-            # # 'trading|total_volume*',
-            # 'transfers|buys_coin_age*',
-            # 'transfers|earlybird_ratio*',
-            # 'transfers|first_buy*',
-            # # 'transfers|initial_hold_time*',
-            # 'transfers|later_buyers*'
 
         ]
 

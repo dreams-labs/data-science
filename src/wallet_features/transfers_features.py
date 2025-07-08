@@ -76,8 +76,15 @@ def calculate_transfers_features(
         'earlybird_ratio/mean':         ('later_buyers_ratio', 'mean'),
         'earlybird_ratio/median':       ('later_buyers_ratio', 'median'),
         'wallet_age':                   ('wallet_age', 'first')  # all wallet-grouped values will be identical
-    }
-    )
+    })
+
+    # Data quality validation - all features should be positive
+    feature_cols = transfers_features_df.columns
+    for col in feature_cols:
+        negative_count = (transfers_features_df[col] < 0).sum()
+        if negative_count > 0:
+            logger.error(f"Found {negative_count} negative values in feature {col}")
+            raise ValueError(f"Feature validation failed: {col} contains negative values")
 
     return transfers_features_df
 
@@ -172,7 +179,16 @@ def retrieve_transfers_sequencing(
         ,tr.buys_count
         ,tr.sells_count
         ,tr.first_buy
-        ,tr.first_sell
+
+        -- this handles 2 edge cases that create impossible hold times:
+        ,case when (
+            -- 1. ignore immaterial buys that precede a material sell
+            tr.first_buy is not null
+            -- 2. ignore the sequence that would generate a negative hold time:
+            --     immaterial buy -> material sell -> material buy
+            and tr.first_sell > tr.first_buy
+        ) then tr.first_sell end as first_sell
+
         ,b.buyer_number
         ,s.seller_number
         from transaction_rank tr
@@ -181,7 +197,6 @@ def retrieve_transfers_sequencing(
         left join buyer_ranks b using (coin_id, wallet_address)
         left join seller_ranks s using (coin_id, wallet_address)
     ),
-
 
     ------ NON-HYBRID IDs CTE -------
     -- CTE for use when working with standard wallet ids
@@ -239,6 +254,17 @@ def retrieve_transfers_sequencing(
         ) from e
     logger.info("Retrieved sequence data for %s wallet-coin pairs across %s wallets",
                 len(sequence_df), len(sequence_df['wallet_address'].unique()))
+
+    # Data quality validation
+    numeric_cols = ['wallet_age', 'coin_age', 'buys_count', 'sells_count', 'buyer_number', 'seller_number']
+    for col in numeric_cols:
+        if col in sequence_df.columns:
+            negative_count = (sequence_df[col] < 0).sum()
+            if negative_count > 0:
+                logger.error(f"Found {negative_count} negative values in {col}")
+                raise ValueError(f"Data quality check failed: {col} contains negative values")
+
+    logger.info("Data quality validation passed - no negative values found in numeric columns")
 
     # Optimize memory usage
     sequence_df['coin_id'] = sequence_df['coin_id'].astype('category')
