@@ -53,10 +53,9 @@ def calculate_transfers_features(
 
     # Filter to only coins and wallets during the profits_df date range
     first_buy_data = pd.merge(
-        profits_df,
+        profits_df.reset_index(),
         transfers_sequencing_df,
-        left_index=True,
-        right_on=['coin_id', 'wallet_address', 'first_buy'],
+        on=['coin_id', 'wallet_address'],  # Only join on these two keys
         how='inner'
     )
 
