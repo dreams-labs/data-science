@@ -9,6 +9,8 @@ import gc
 import inspect
 import atexit
 from pathlib import Path
+import gzip
+import shutil
 import math
 import threading
 from datetime import datetime, timedelta
@@ -20,7 +22,6 @@ import warnings
 import functools
 import yaml
 import psutil
-import progressbar
 import pandas as pd
 import numpy as np
 from pydantic import ValidationError
@@ -546,6 +547,9 @@ def create_progress_bar(total_items):
     Returns:
     - progressbar.ProgressBar: An initialized and started progress bar.
     """
+    # lazy import at function level due to import size
+    import progressbar  # pylint:disable=import-outside-toplevel
+
     _widgets = [
         'Completed ',  # Customizable label for context
         progressbar.SimpleProgress(),  # Displays 'current/total' format
@@ -1646,3 +1650,87 @@ def setup_notebook_logger(log_filepath: str = None) -> logging.Logger:
     root_logger.addHandler(milestone_display_handler)
 
     return root_logger
+
+
+def archive_logs(log_filepath: str = "../logs/notebook_logs.log") -> bool:
+    """
+    Archives the 4 notebook log files by compressing and moving to archived/ directory.
+
+    Params:
+    - log_filepath (str): Base log filepath, defaults to "logs/notebook_logs.log"
+
+    Returns:
+    - bool: True if archival successful, False otherwise
+    """
+    # Extract base directory and filename components
+    log_path = Path(log_filepath)
+    log_dir = log_path.parent
+    base_name = log_path.stem  # "notebook_logs"
+
+    # Define the 4 files to archive
+    files_to_archive = [
+        f"{base_name}.log",
+        f"{base_name}_milestone.log",
+        f"{base_name}_display.log",
+        f"{base_name}_display_milestone.log"
+    ]
+
+    # Verify archived directory exists
+    archived_dir = log_dir / "archived"
+    if not archived_dir.exists():
+        raise FileNotFoundError(f"Archived directory not found: {archived_dir}")
+
+    # Generate timestamp for archived filenames
+    timestamp = datetime.now().strftime("%y%m%d")
+
+    # Check for other log files and warn
+    if log_dir.exists():
+        all_log_files = [f.name for f in log_dir.glob("*.log")]
+        non_archived_files = [f for f in all_log_files if f not in files_to_archive]
+
+        if non_archived_files:
+            logger.warning(f"Non-archived log files found: {non_archived_files}")
+
+    archived_files = []
+
+    try:
+        # Archive each file
+        for filename in files_to_archive:
+            source_path = log_dir / filename
+
+            # Skip if file doesn't exist
+            if not source_path.exists():
+                logger.warning(f"Expected log file not found: {source_path}")
+                continue
+
+            # Create archived filename
+            name_parts = filename.split('.')
+            archived_filename = f"{name_parts[0]}_{timestamp}.{name_parts[1]}.gz"
+            archived_path = archived_dir / archived_filename
+
+            # Compress and copy to archived directory
+            with source_path.open('rb') as f_in:
+                with gzip.open(archived_path, 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+
+            # Verify the archived file was created successfully
+            if not archived_path.exists() or archived_path.stat().st_size == 0:
+                logger.error(f"Failed to create archived file: {archived_path}")
+                return False
+
+            archived_files.append((source_path, archived_path))
+            logger.info(f"Archived {filename} -> {archived_filename}")
+
+        # Truncate original files only after all archives are verified
+        for source_path, archived_path in archived_files:
+            source_path.write_text("")  # Truncate file
+            logger.info(f"Truncated {source_path.name}")
+
+        # Only log success if we actually archived files
+        if archived_files:
+            logger.milestone(f"Successfully archived {len(archived_files)} log files with timestamp {timestamp}")
+        else:
+            logger.warning("No log files were archived - all expected files were missing")
+
+    except Exception as e:
+        logger.error(f"Error during log archival: {e}")

@@ -71,6 +71,18 @@ def generate_coin_trends_features(
     }
     trends_features_df = trends_features_df.rename(columns=mapping)
 
+    # Validate that all coins in filtered trends_df are present in final features
+    trends_coin_ids = set(trends_df.index.get_level_values('coin_id').unique())
+    features_coin_ids = set(trends_features_df.index.unique())
+    missing_from_features = trends_coin_ids - features_coin_ids
+    if missing_from_features:
+        raise ValueError(
+            f"Data consistency error: {len(missing_from_features)} coin_ids present in "
+            f"trends_df but missing from trends_features_df after flattening. "
+            f"Missing coins: {sorted(missing_from_features)[:10]}. "
+            f"This indicates the flatten_coin_date_df function dropped coins unexpectedly."
+        )
+
     return trends_features_df
 
 

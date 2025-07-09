@@ -49,7 +49,7 @@ training_data: #WalletModel
 
     #KeyParam Datasets and Folders
     dataset: dev  # Set to prod or dev; determines whether to query core or dev dataset tables
-    parquet_folder: temp/wallet_modeling_dfs/dda_901_mkt_cap_filled  # where to store parquet files
+    parquet_folder: temp/wallet_modeling_dfs/dda_901_cw_transfers_v3  # where to store parquet files
     reference_dfs_folder: temp/reference_dfs  # Base folder where files that impact all runs are stored
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
