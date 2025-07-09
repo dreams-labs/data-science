@@ -256,6 +256,10 @@ class BaseModel:
             random_state=self.modeling_config['model_params'].get('random_state', 42)
         )
 
+        # Validate column consistency across splits
+        self._validate_column_consistency(self.X_train, self.X_eval)
+        self._validate_column_consistency(self.X_train, self.X_test)
+
 
     def _fit(self) -> None:
         """
@@ -919,6 +923,7 @@ class BaseModel:
         n_samples = X.shape[0]
         return max(1, int(n_samples * base_pct))
 
+
     def _convert_min_child_weight_to_pct(self, X: pd.DataFrame, min_child_weight: int) -> float:
         """
         Convert min_child_weight back to percentage based on dataset size.
@@ -932,3 +937,45 @@ class BaseModel:
         """
         n_samples = X.shape[0]
         return min_child_weight / n_samples
+
+
+    def _validate_column_consistency(
+        self,
+        df1: pd.DataFrame,
+        df2: pd.DataFrame
+    ) -> None:
+        """
+        Validate that two DataFrames have identical column names and order.
+
+        Params:
+        - df1, df2 (DataFrame): DataFrames to compare
+
+        Raises:
+        - ValueError: If columns don't match exactly in name and order
+        """
+        if df1.columns.tolist() != df2.columns.tolist():
+            cols1 = df1.columns.tolist()
+            cols2 = df2.columns.tolist()
+            set1 = set(cols1)
+            set2 = set(cols2)
+
+            error_msg = f"DataFrames have different column order.\n"
+            error_msg += f"DF1: {len(cols1)} columns, DF2: {len(cols2)} columns\n"
+
+            missing_in_2 = set1 - set2
+            extra_in_2 = set2 - set1
+
+            if missing_in_2:
+                error_msg += f"Missing in DF2: {sorted(list(missing_in_2))}\n"
+            if extra_in_2:
+                error_msg += f"Extra in DF2: {sorted(list(extra_in_2))}\n"
+
+            # Check if it's just an ordering issue
+            if set1 == set2:
+                error_msg += "Same columns but different order (sorting would fix this)\n"
+
+            error_msg += f"First 5 DF1: {cols1[:5]}\n"
+            error_msg += f"First 5 DF2: {cols2[:5]}"
+
+            raise ValueError(error_msg)
+
