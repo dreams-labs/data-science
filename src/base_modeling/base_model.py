@@ -256,6 +256,10 @@ class BaseModel:
             random_state=self.modeling_config['model_params'].get('random_state', 42)
         )
 
+        # Validate column consistency across splits
+        u.validate_column_consistency(self.X_train, self.X_eval)
+        u.validate_column_consistency(self.X_train, self.X_test)
+
 
     def _fit(self) -> None:
         """
@@ -918,6 +922,7 @@ class BaseModel:
         """
         n_samples = X.shape[0]
         return max(1, int(n_samples * base_pct))
+
 
     def _convert_min_child_weight_to_pct(self, X: pd.DataFrame, min_child_weight: int) -> float:
         """

@@ -296,6 +296,13 @@ class WalletEpochsOrchestrator:
                 )
         # ----------------------------------------------------
 
+        if (
+            self.base_config['n_threads']['concurrent_windows'] == 1 or
+            self.base_config['n_threads']['concurrent_epochs'] == 1
+        ):
+            logger.warning("Current n_thread configurations are set to 1, "
+                           "expect an extended training time when monothreading.")
+
         # Ensure the complete dfs encompass the full range of training_epoch_starts
         if not self.training_only:
             self._assert_complete_coverage()
@@ -399,10 +406,16 @@ class WalletEpochsOrchestrator:
         # --- stub-save: write all four multioffset dfs -----------------
         if not self.training_only:
             base_path.mkdir(parents=True, exist_ok=True)
-            u.to_parquet_safe(wallet_training_data_df, paths['train'], index=True)
-            u.to_parquet_safe(wallet_target_vars_df, paths['train_tgt'], index=True)
-            u.to_parquet_safe(validation_training_data_df, paths['val_train'], index=True)
-            u.to_parquet_safe(validation_target_vars_df, paths['val_tgt'], index=True)
+
+            # Sort columns to ensure consistency between validation and training data dfs
+            u.to_parquet_safe(wallet_training_data_df,
+                              paths['train'], index=True, sort_cols=True)
+            u.to_parquet_safe(wallet_target_vars_df,
+                              paths['train_tgt'], index=True)
+            u.to_parquet_safe(validation_training_data_df,
+                              paths['val_train'], index=True, sort_cols=True)
+            u.to_parquet_safe(validation_target_vars_df,
+                              paths['val_tgt'], index=True)
             logger.info(f"Saved multi-epoch dataframes to {base_path}.")
         # ---------------------------------------------------------------
 
@@ -516,9 +529,14 @@ class WalletEpochsOrchestrator:
             start_time = time.time()
             epoch_training_data_df = u.df_downcast(epoch_training_data_df)
             logger.info("(%.1fs) Downcasted full training_data_df.", time.time() - start_time)
+
             # Save features
             output_folder = f"{epoch_config['training_data']['parquet_folder']}/"
-            u.to_parquet_safe(epoch_training_data_df, f"{output_folder}/training_data_df.parquet", index=True)
+            u.to_parquet_safe(
+                epoch_training_data_df,
+                f"{output_folder}/training_data_df.parquet",
+                sort_cols=True,
+                index=True)
 
             if generate_modeling:
                 epoch_modeling_data_df = self._merge_hybrid_dfs(epoch_modeling_data_df,hybridized_modeling_data_df)
@@ -531,7 +549,11 @@ class WalletEpochsOrchestrator:
                 # Downcast all features
                 epoch_modeling_data_df = u.df_downcast(epoch_modeling_data_df)
                 # Save features
-                u.to_parquet_safe(epoch_modeling_data_df, f"{output_folder}/modeling_data_df.parquet", index=True)
+                u.to_parquet_safe(
+                    epoch_modeling_data_df,
+                    f"{output_folder}/modeling_data_df.parquet",
+                    sort_cols=True,
+                    index=True)
             logger.info(f"Saved {model_start} features to %s.", output_folder)
 
         # Drop columns before returning if configured

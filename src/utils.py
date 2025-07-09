@@ -848,6 +848,46 @@ def ensure_index(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def validate_column_consistency(
+    df1: pd.DataFrame,
+    df2: pd.DataFrame
+) -> None:
+    """
+    Validate that two DataFrames have identical column names and order.
+
+    Params:
+    - df1, df2 (DataFrame): DataFrames to compare
+
+    Raises:
+    - ValueError: If columns don't match exactly in name and order
+    """
+    if df1.columns.tolist() != df2.columns.tolist():
+        cols1 = df1.columns.tolist()
+        cols2 = df2.columns.tolist()
+        set1 = set(cols1)
+        set2 = set(cols2)
+
+        error_msg = "DataFrames have different column order.\n"
+        error_msg += f"DF1: {len(cols1)} columns, DF2: {len(cols2)} columns\n"
+
+        missing_in_2 = set1 - set2
+        extra_in_2 = set2 - set1
+
+        if missing_in_2:
+            error_msg += f"Missing in DF2: {sorted(list(missing_in_2))}\n"
+        if extra_in_2:
+            error_msg += f"Extra in DF2: {sorted(list(extra_in_2))}\n"
+
+        # Check if it's just an ordering issue
+        if set1 == set2:
+            error_msg += "Same columns but different order (sorting would fix this)\n"
+
+        error_msg += f"First 5 DF1: {cols1[:5]}\n"
+        error_msg += f"First 5 DF2: {cols2[:5]}"
+
+        raise ValueError(error_msg)
+
+
 
 def cw_filter(df, coin_id, wallet_address):
     """
@@ -963,17 +1003,27 @@ def display_full(df, sort_by=None, ascending=False):
 
 
 
-def to_parquet_safe(df: pd.DataFrame, file_path: str, **kwargs) -> None:
+def to_parquet_safe(
+        df: pd.DataFrame,
+        file_path: str,
+        sort_cols: bool = False,
+        **kwargs
+    ) -> None:
     """
     Write DataFrame to parquet using an intermediate temp file to prevent corruption.
 
-    Should always be used because errors caused by partial writes are not fun to debug.
+    Should always be used to avoid saving partially written files.
 
     Params:
     - df: DataFrame to write
     - file_path: Final destination path
+    - sort_cols: If True, sort columns alphabetically before saving
     - **kwargs: Additional arguments passed to to_parquet()
     """
+    # Sort columns if requested
+    if sort_cols and hasattr(df, 'columns'):
+        df = df.sort_index(axis=1)
+
     temp_path = f"{file_path}.tmp"
     try:
         df.to_parquet(temp_path, **kwargs)

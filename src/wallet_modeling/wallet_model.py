@@ -158,6 +158,9 @@ class WalletModel(BaseModel):
         logger.info("Preparing training data for model construction...")
         u.notify('intro_2')
 
+        # Sort columns to ensure feature windows align
+        training_data_df = training_data_df.sort_index(axis=1)
+
         # Validate indices match and store DataFrames
         u.assert_matching_indices(training_data_df, wallet_target_vars_df)
         self.training_data_df = training_data_df
@@ -165,10 +168,16 @@ class WalletModel(BaseModel):
 
         # Store validation data if provided
         if validation_data_df is not None and validation_target_vars_df is not None:
+            validation_data_df = validation_data_df.sort_index(axis=1)
             u.assert_matching_indices(validation_data_df, validation_target_vars_df)
             self.X_validation = validation_data_df
             self.validation_target_vars_df = validation_target_vars_df
+
+            # Confirm columns match after sorting
+            u.validate_column_consistency(self.training_data_df, validation_data_df)
+
             logger.info(f"Validation data with {len(validation_data_df)} records loaded.")
+
 
         # Prepare data for training cohort
         X, y = self._prepare_data(training_data_df, wallet_target_vars_df)
@@ -359,6 +368,8 @@ class WalletModel(BaseModel):
         return result
 
 
+
+
     # -----------------------------------
     #           Helper Methods
     # -----------------------------------
@@ -416,6 +427,7 @@ class WalletModel(BaseModel):
         # Define X and y
         X = training_data_df[cohort_mask].copy()
         y = wallet_target_vars_df[cohort_mask].copy()
+        u.assert_matching_indices(X,y)
 
         return X, y
 
