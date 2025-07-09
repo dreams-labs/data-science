@@ -296,6 +296,13 @@ class WalletEpochsOrchestrator:
                 )
         # ----------------------------------------------------
 
+        if (
+            self.base_config['n_threads']['concurrent_windows'] == 1 or
+            self.base_config['n_threads']['concurrent_epochs'] == 1
+        ):
+            logger.warning("Current n_thread configurations are set to 1, "
+                           "expect an extended training time when monothreading.")
+
         # Ensure the complete dfs encompass the full range of training_epoch_starts
         if not self.training_only:
             self._assert_complete_coverage()
