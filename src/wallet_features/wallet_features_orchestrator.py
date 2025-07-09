@@ -75,11 +75,12 @@ class WalletFeaturesOrchestrator:
             period_end_date: str
         ) -> pd.DataFrame:
         """
-        Calculates all features for the wallet_cohort in a given profits_df, returning a df with a
-        row for every wallet in the cohort.
+        Calculates all features for the wallet_cohort in a given profits_df, returning
+         a df with a row for every wallet in the cohort.
 
         Imputed Row Dependencies:
-        - Trading Features: Requires starting_balance_date and period_end_date for performance calculation
+        - Trading Features: Requires starting_balance_date and period_end_date for
+            performance calculation
         - Performance Features: Inherits from trading features
         - Market Cap Features:
             - Volume weighted: Uses only real transfers (~is_imputed)
@@ -103,7 +104,8 @@ class WalletFeaturesOrchestrator:
         - period_end_date (str): Period end in 'YYYY-MM-DD' format
 
         Returns:
-        - wallet_features_df (df): Wallet-indexed features dataframe with a row for every wallet_cohort
+        - wallet_features_df (df): Wallet-indexed features dataframe with a row for every
+            wallet_cohort
         """
         # Add indices and validate inputs
         profits_df, market_indicators_data_df, transfers_sequencing_df = prepare_dataframes(
@@ -235,10 +237,12 @@ class WalletFeaturesOrchestrator:
             coin_trends_features_df: pd.DataFrame
         ) -> pd.DataFrame:
         """
-        Join coin_id-indexed coin trends features onto hybridized wallet_address-indexed wallet features.
+        Join coin_id-indexed coin trends features onto hybridized wallet_address-indexed
+         wallet features.
 
-        This function dehybridizes the wallet addresses to extract coin_ids, joins the coin trends
-        features on coin_id, then restores the original hybrid wallet_address indexing.
+        This function dehybridizes the wallet addresses to extract coin_ids, joins the
+         coin trends features on coin_id, then restores the original hybrid wallet_address
+         indexing.
 
         Params:
         - wallet_features_df (DataFrame): Features indexed on hybridized wallet_address
@@ -269,7 +273,12 @@ class WalletFeaturesOrchestrator:
         if missing_coin_ids:
             logger.warning(
                 f"Found {len(missing_coin_ids)} coin_ids in hybrid wallet addresses "
-                f"without corresponding coin trends data. Missing coin_ids: {sorted(missing_coin_ids)[:10]}"
+                f"without corresponding coin trends data. Missing coin_ids: "
+                f"{sorted(missing_coin_ids)[:10]}"
+            )
+            logger.warning(
+                f"Verification: Missing coin_ids that ARE present in coin_trends_features_df: "
+                f"{all(coin_id in trends_coin_ids for coin_id in missing_coin_ids)}"
             )
 
         # Join coin trends features on coin_id
@@ -321,7 +330,7 @@ def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
 
     # Unique indices
     if not profits_df.index.is_unique:
-        raise ValueError("profits_df index has duplicate (coin_id, wallet_address, date) entries.")
+        raise ValueError("profits_df index has duplicate (coin_id, wallet_address, date) rows.")
     if not market_data_df.index.is_unique:
         raise ValueError("market_data_df index has duplicate (coin_id, date) entries.")
     if not transfers_sequencing_df.index.is_unique:
@@ -333,7 +342,8 @@ def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
     missing_pairs = profits_dates.difference(market_dates)  # Faster than NumPy set operations
 
     if missing_pairs.size > 0:
-        raise AssertionError(f"Found {missing_pairs.size} coin_id-date pairs missing in market_data_df")
+        raise AssertionError(f"Found {missing_pairs.size} coin_id-date pairs missing "
+                             "in market_data_df")
 
     # If transfers features are toggled on, confirm wallets in transfers_df exist in profits_df
     if not transfers_sequencing_df.empty:
@@ -342,7 +352,8 @@ def validate_inputs(profits_df, market_data_df, transfers_sequencing_df):
         common_wallets = wallets_in_profits.intersection(wallets_in_transfers)
         coverage = len(common_wallets) / len(wallets_in_profits)
         if coverage < 0.99:
-            raise ValueError(f"Only {coverage:.2%} of wallets in profits_df are in transfers_sequencing_df.")
+            raise ValueError(f"Only {coverage:.2%} of wallets in profits_df are in "
+                             "transfers_sequencing_df.")
 
     # All done
     logger.debug("All input dataframes passed validation checks.")
@@ -358,7 +369,8 @@ def prepare_dataframes(
         period_end_date: str
     ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
-    Orchestrates dataframe preparation: validates inputs, optimizes indices, and downcasts dtypes.
+    Orchestrates dataframe preparation: validates inputs, optimizes indices, and
+     downcasts dtypes.
 
     Params:
     - profits_df (DataFrame): profits data with coin_id, wallet_address, date
