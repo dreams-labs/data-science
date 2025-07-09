@@ -168,7 +168,12 @@ class WalletModel(BaseModel):
             u.assert_matching_indices(validation_data_df, validation_target_vars_df)
             self.X_validation = validation_data_df
             self.validation_target_vars_df = validation_target_vars_df
+
+            # Validate column consistency between training and validation datasets
+            self._validate_column_consistency(training_data_df, validation_data_df)
+
             logger.info(f"Validation data with {len(validation_data_df)} records loaded.")
+
 
         # Prepare data for training cohort
         X, y = self._prepare_data(training_data_df, wallet_target_vars_df)
@@ -357,6 +362,8 @@ class WalletModel(BaseModel):
 
         u.notify('notify')
         return result
+
+
 
 
     # -----------------------------------
@@ -565,3 +572,5 @@ class WalletModel(BaseModel):
             raise ValueError("Prediction dropped some wallet addresses")
 
         return predictions
+
+
