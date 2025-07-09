@@ -1,5 +1,11 @@
 """
-Calculates metrics aggregated at the wallet level
+Orchestrates the calculation of wallet-level features across different feature modules.
+
+This module coordinates feature generation from multiple specialized modules, handling data
+ validation, dependency sequencing, and index management. For hybrid wallet-coin modeling,
+ it manages the dehybridization/rehybridization cycle to properly join coin-specific data
+ while maintaining wallet_address indexing. The orchestrator ensures all wallets receive
+ consistent feature coverage through appropriate joining and fill strategies.
 """
 import logging
 from typing import List
@@ -31,8 +37,15 @@ class WalletFeaturesOrchestrator:
     """
     Orchestrates the calculation of wallet-level features across different feature modules.
 
-    This class encapsulates the feature calculation pipeline that was previously implemented
-    as standalone functions, providing better state management and reusability.
+    The orchestrator validates input DataFrames, applies consistent indexing, and coordinates
+     feature generation across multiple modules in dependency order. It handles left joins to
+     ensure complete wallet coverage, applies appropriate fill strategies (0s for trading metrics,
+     NaN for others), and manages concurrent processing across multiple time windows.
+
+    For hybrid wallet-coin modeling, it executes a dehybridization → join → rehybridization
+     cycle to properly merge coin-specific features while preserving wallet_address indexing.
+     The final output applies feature prefixes and returns a unified DataFrame ready for
+     downstream modeling pipelines.
     """
     def __init__(
             self,
