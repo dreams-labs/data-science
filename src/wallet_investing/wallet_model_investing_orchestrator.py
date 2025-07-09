@@ -393,7 +393,7 @@ class WalletModelInvestingOrchestrator(ceo.CoinEpochsOrchestrator):
         # Ensure output directory exists
         file_location.parent.mkdir(parents=True, exist_ok=True)
         # Save generated training data
-        u.to_parquet_safe(epoch_training_data_df, file_location)
+        u.to_parquet_safe(epoch_training_data_df, file_location, sort_cols=True)
         logger.info(f"Saved wallet training data for epoch {epoch_date} to {file_location}")
 
         return epoch_training_data_df
