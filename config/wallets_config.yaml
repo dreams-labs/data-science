@@ -48,8 +48,8 @@ training_data: #WalletModel
     training_data_only:      False  # if true, only generates training data to be scored by another model
 
     #KeyParam Datasets and Folders
-    dataset: dev  # Set to prod or dev; determines whether to query core or dev dataset tables
-    parquet_folder: temp/wallet_modeling_dfs/dda_901_cw_transfers_v3  # where to store parquet files
+    dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
+    parquet_folder: temp/wallet_modeling_dfs/dda_901_cw_transfers_v4  # where to store parquet files
     reference_dfs_folder: temp/reference_dfs  # Base folder where files that impact all runs are stored
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
@@ -91,7 +91,7 @@ modeling: #WalletModel
 
     #KeyParam Target Var Thresholds
     asymmetric_loss: # Adds another class to target
-        enabled: True
+        # enabled: True
         # big_loss_threshold: -0.50    # Below this is an extra penalized big loss
         # big_loss_threshold: -0.40    # Below this is an extra penalized big loss
         big_loss_threshold: -0.30    # Below this is an extra penalized big loss
@@ -719,7 +719,7 @@ modeling: #WalletModel
                 gamma: 0.005
 
     export_s3_training_data: {  # used to prepare exports to S3, skipping model construction entirely
-        'enabled': True,  # comment out to disable
+        # 'enabled': True,  # comment out to disable
         'parent_folder': '../../sagemaker/s3_uploads/wallet_training_data_queue',
         'batch_folder': 'dda_894_cw_trends_negatives',
         'dev_mode': False  #  if True, only exports 1000 rows
@@ -814,7 +814,7 @@ n_threads: #WalletModel
     profits_row_imputation:     6  # generates imputed rows in profits_df
     training_dfs_preparation:   3  # generates market indicators, macro indicators, cohort profits dfs
     epoch_tm_features:          2  # determines whether training and modeling features are generated concurrently or sequentially
-    # concurrent_epochs:          6  # how many epochs' training data are processed concurrently
-    # concurrent_windows:         8  # how many windows are processed concurrently
-    concurrent_epochs:          1  # how many epochs' training data are processed concurrently
-    concurrent_windows:         1  # how many windows are processed concurrently
+    concurrent_epochs:          6  # how many epochs' training data are processed concurrently
+    concurrent_windows:         8  # how many windows are processed concurrently
+    # concurrent_epochs:          1  # how many epochs' training data are processed concurrently
+    # concurrent_windows:         1  # how many windows are processed concurrently
