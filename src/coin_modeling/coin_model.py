@@ -68,19 +68,23 @@ class CoinModel(BaseModel):
         logger.info("Preparing training data for coin model construction...")
         u.notify('intro_2')
 
+        # Sort columns to ensure feature windows align
+        training_df = training_df.sort_index(axis=1)
+
         # Store validation data if provided
         if validation_df is not None and validation_coin_df is not None:
+
+            # Sort columns to ensure feature windows align
+            validation_df = validation_df.sort_index(axis=1)
 
             # Confirm no overlap between training and validation data
             if len(set(training_df.index.get_level_values('coin_epoch_start_date')).intersection(
             set(validation_df.index.get_level_values('coin_epoch_start_date')))) > 0:
                 raise ValueError("Overlap found between training data and validation data epochs. "
                                 "This will cause data leakage of the validation target variables.")
-            # Confirm columns match
-            if not np.array_equal(set(training_df.columns),set(validation_df.columns)):
-                raise ValueError("Columns in training_df do not match columns in validation_df.")
-            if not np.array_equal(set(modeling_coin_df.columns),set(validation_coin_df.columns)):
-                raise ValueError("Columns in training target vars do not match columns in validation target vars.")
+
+            # Confirm columns match after sorting
+            u.validate_column_consistency(training_df, validation_df)
 
             # Prepare and store validation datasets
             self.X_validation, self.validation_target_vars_df = self._prepare_data(
@@ -294,6 +298,7 @@ class CoinModel(BaseModel):
 
         X = coin_training_data_df.copy()
         y = target_vars_df.copy()
+        u.assert_matching_indices(X,y)
 
         return X, y
 
