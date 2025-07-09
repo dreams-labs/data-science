@@ -238,50 +238,33 @@ class WalletFeaturesOrchestrator:
         ) -> pd.DataFrame:
         """
         Join coin_id-indexed coin trends features onto hybridized wallet_address-indexed
-         wallet features.
+        wallet features.
 
         This function dehybridizes the wallet addresses to extract coin_ids, joins the
-         coin trends features on coin_id, then restores the original hybrid wallet_address
-         indexing.
+        coin trends features on coin_id, then re-hybridizes to restore the original
+        hybrid wallet_address indexing.
 
         Params:
         - wallet_features_df (DataFrame): Features indexed on hybridized wallet_address
         - coin_trends_features_df (DataFrame): Features indexed on coin_id
 
         Returns:
-        - wallet_features_df (DataFrame): Original features with coin trends features added,
+        - merged_df (DataFrame): Original features with coin trends features added,
             maintaining hybrid wallet_address index
 
-        Raises:
-        - ValueError: If any hybrid wallet addresses lack corresponding coin trends data
+        Note:
+        - Missing coin trends data will result in NaN values for affected features
+        - This is expected behavior for coins that didn't exist during longer lookback windows
         """
-        # Store original hybrid index for restoration
-        original_hybrid_index = wallet_features_df.index.copy()
-
         # Dehybridize to extract coin_id and wallet_address components
         dehybridized_df = wtdo.dehybridize_wallet_address(
             wallet_features_df.reset_index(),
             self.complete_hybrid_cw_id_df
         )
 
-        # Extract unique coin_ids from dehybridized data
-        wallet_coin_ids = set(dehybridized_df['coin_id'].unique())
-        trends_coin_ids = set(coin_trends_features_df.index.unique())
-
-        # Check for missing coin trends data
-        missing_coin_ids = wallet_coin_ids - trends_coin_ids
-        if missing_coin_ids:
-            logger.warning(
-                f"Found {len(missing_coin_ids)} coin_ids in hybrid wallet addresses "
-                f"without corresponding coin trends data. Missing coin_ids: "
-                f"{sorted(missing_coin_ids)[:10]}"
-            )
-            logger.warning(
-                f"Verification: Missing coin_ids that ARE present in coin_trends_features_df: "
-                f"{all(coin_id in trends_coin_ids for coin_id in missing_coin_ids)}"
-            )
-
         # Join coin trends features on coin_id
+        #  NOTE: this join will fill NaN for windows prior to a coin's creation,
+        #  e.g. a coin created in w1 will correctly have NaN values for w2/w3/w4/etc
         merged_df = dehybridized_df.merge(
             coin_trends_features_df,
             left_on='coin_id',
@@ -289,20 +272,9 @@ class WalletFeaturesOrchestrator:
             how='left'
         )
 
-        # Verify all rows got coin trends data
-        coin_trends_cols = coin_trends_features_df.columns
-        missing_trends = merged_df[coin_trends_cols].isna().any(axis=1)
-        if missing_trends.any():
-            # Grab the exact hybrid addresses and coin_ids that didn’t match
-            failed_pairs = merged_df.loc[missing_trends, ['wallet_address', 'coin_id']]
-            failed_list = list(failed_pairs.itertuples(index=False, name=None))
-            logger.warning(
-                f"Coin trends join failed for {len(failed_list)}/{len(merged_df)} hybrid rows. "
-            )
-
         # Restore original hybrid wallet_address index
+        merged_df = wtdo.hybridize_wallet_address(merged_df,self.complete_hybrid_cw_id_df)
         merged_df = merged_df.set_index('wallet_address').drop(columns=['coin_id'])
-        merged_df.index = original_hybrid_index
 
         return merged_df
 
