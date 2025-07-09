@@ -111,10 +111,10 @@ def calculate_transfers_features(
     transfers_sequencing_df = transfers_sequencing_df.merge(total_buyers, left_on='coin_id', right_index=True)
     transfers_sequencing_df['later_buyers'] = (transfers_sequencing_df['coin_total_buyers']
                                                     - transfers_sequencing_df['buyer_number'])
-    transfers_sequencing_df['later_buyers_ratio'] = u.winsorize(
-            (transfers_sequencing_df['coin_total_buyers']
-            / transfers_sequencing_df['buyer_number'])
-        ,0.01)
+    transfers_sequencing_df['later_buyers_ratio'] = (
+        (transfers_sequencing_df['coin_total_buyers']
+        / transfers_sequencing_df['buyer_number'])
+    ).clip(upper=20)
 
     # Remove coins that were bought after the current period
     latest_date = profits_df.index.get_level_values('date').max()
