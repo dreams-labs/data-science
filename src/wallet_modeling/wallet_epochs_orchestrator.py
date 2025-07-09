@@ -391,7 +391,9 @@ class WalletEpochsOrchestrator:
                                             if validation_period_target_var_dfs else pd.DataFrame())
 
         logger.milestone(
-            "Generated wallet multi‑epoch DataFrames with shapes:\n"
+            "Generated wallet multi‑epoch DataFrames for "
+            f"{self.base_config['training_data']['modeling_period_start']} "
+            "with shapes:\n"
             " - modeling train: %s\n"
             " - modeling model: %s\n"
             " - validation train: %s\n"

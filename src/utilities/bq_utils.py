@@ -50,7 +50,7 @@ def run_query(sql: str):
     # try non-blocking acquire to see if we're at capacity
     got_slot = _semaphore.acquire(blocking=False)
     if not got_slot:
-        logger.warning(
+        logger.info(
             "BigQuery concurrency limit reached (%d). Waiting for free slot…",
             _MAX_BQ_JOBS,
         )
@@ -78,7 +78,7 @@ def upload_dataframe(
     """
     got_slot = _semaphore.acquire(blocking=False)
     if not got_slot:
-        logger.warning(
+        logger.info(
             "BigQuery concurrency limit reached (%d). Waiting for free slot…",
             _MAX_BQ_JOBS,
         )
