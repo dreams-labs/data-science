@@ -66,13 +66,15 @@ def flatten_coin_date_df(df, df_metrics_config, training_period_end) -> pd.DataF
         # Store the missing dates for the current coin_id
         missing_dates_dict[coin_id] = sorted(missing_dates)
 
-    # Convert to DataFrame for easier display
+    # Check if any coins have missing dates
     missing_dates_df = pd.DataFrame(list(missing_dates_dict.items())
                                     , columns=['coin_id', 'missing_dates'])
-    if any(len(missing_dates_df) > 0 for missing in missing_dates):
+    coins_with_missing_dates = missing_dates_df[missing_dates_df['missing_dates'].apply(len) > 0]
+    if not coins_with_missing_dates.empty:
         raise ValueError(
-            "Timeseries has missing dates. Ensure all dates are filled up to training_period_end."
-            f"Missing dates: {missing_dates}"
+            f"Timeseries has missing dates for {len(coins_with_missing_dates)} coins. "
+            f"Ensure all dates are filled up to training_period_end. "
+            f"Affected coins: {coins_with_missing_dates['coin_id'].tolist()[:5]}"
         )
 
     # Check if df columns have configurations in df_metrics_config
