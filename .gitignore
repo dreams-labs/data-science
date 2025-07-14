@@ -12,6 +12,7 @@ __pycache__/
 *.py[cod]
 .coverage
 .pytest_cache/
+src/dreams_data_science.egg-info/
 
 # Test artifacts
 tests/test_config
