@@ -6,6 +6,14 @@ BigQuery concurrency control utilities.
 This module centralizes all BigQuery interactions and ensures that at most
 _MAX_BQ_JOBS are running at any one time by using a shared threading.BoundedSemaphore.
 
+Public functions:
+- run_query(sql: str) -> RowIterator
+    * Wraps Client.query(sql) / job.result() in semaphore logic.
+    * Logs a warning if the concurrency limit is reached before waiting.
+- upload_dataframe(dataframe, destination_table, job_config=None) -> LoadJob
+    * Wraps Client.load_table_from_dataframe(...) / job.result() in the same semaphore logic.
+    * Ensures uploads and queries share the same concurrency limit.
+
 Semaphore behavior in this module:
 - _semaphore.acquire(blocking=False):
     * Attempts to grab a slot immediately.
@@ -14,14 +22,6 @@ Semaphore behavior in this module:
     * Blocks the calling thread until a slot frees up.
 - _semaphore.release():
     * Frees one slot, allowing another waiting thread to proceed.
-
-Public functions:
-- run_query(sql: str) -> RowIterator
-    * Wraps Client.query(sql) / job.result() in semaphore logic.
-    * Logs a warning if the concurrency limit is reached before waiting.
-- upload_dataframe(dataframe, destination_table, job_config=None) -> LoadJob
-    * Wraps Client.load_table_from_dataframe(...) / job.result() in the same semaphore logic.
-    * Ensures uploads and queries share the same concurrency limit.
 
 Usage:
     from project.bq_utils import run_query, upload_dataframe

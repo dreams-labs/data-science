@@ -1,5 +1,47 @@
 """
-utility functions use in data science notebooks
+# data-science/utils.py
+
+## Overview
+Core utility functions supporting the data science pipeline, from configuration management
+ to DataFrame optimization to development workflow tools. Provides essential infrastructure
+ for handling large-scale crypto wallet analysis datasets and Jupyter notebook development.
+
+## Key Functions
+
+### utils.py Configuration Management
+- **load_all_configs()** - Loads and validates all YAML configuration files
+- **load_config()** - Individual config loading with Pydantic validation
+- **calculate_period_dates()** - Automatic calculation of training/modeling period
+    boundaries
+- **validate_config_consistency()** - Cross-config validation for datasets and metrics
+
+### DataFrame Optimization
+- **df_downcast()** / **safe_downcast()** - Memory optimization through intelligent dtype
+    reduction
+- **ensure_index()** - Standardizes MultiIndex structure for coin_id-wallet_address-date
+- **assert_period()** - Validates DataFrame dates against configured period boundaries
+- **cw_filter()** / **cw_sample()** - Coin-wallet pair filtering and sampling utilities
+
+### Development & Debugging
+- **setup_notebook_logger()** - Configures multi-level logging with color formatting
+- **obj_mem()** / **df_mem()** - Memory usage tracking for large datasets
+- **export_code()** - Consolidates multiple Python files into single artifacts
+- **notify()** / **AmbientPlayer** - Audio notifications for long-running processes
+
+### Data Quality
+- **check_nan_values()** - Validates NaN patterns in time series data
+- **winsorize()** - Statistical outlier handling for financial metrics
+- **assert_matching_indices()** - DataFrame index consistency validation
+
+## Integration
+Works closely with the modeling pipeline through standardized DataFrame indexing and period
+ validation. Integrates with BigQuery for data persistence and supports the
+ configuration-driven approach used throughout the project.
+
+## Usage Patterns
+Essential for notebook development workflows, particularly when working with profits_df
+ datasets containing millions of rows. Memory optimization and logging functions are critical
+ for managing computational resources during feature engineering and model training phases.
 """
 import time
 import sys
@@ -1470,6 +1512,7 @@ def export_code(
     code_directories=[],
     parent_directory="..//src",
     include_config=False,
+    include_markdown=True,
     config_directory="..//config",
     notebook_directory="..//notebooks",
     ipynb_notebook=None,
@@ -1479,12 +1522,14 @@ def export_code(
     Utility function used to compress specific code directories and relevant files into a single file.
 
     Consolidates all .py files in the specified code directories (relative to the parent directory),
-    all .yaml files in the specified config directory, and optionally the cells from a Jupyter Notebook.
+    all .yaml files in the specified config directory, optionally .md files from all subdirectories,
+    and optionally the cells from a Jupyter Notebook.
 
     Params:
     - parent_directory (str): Base directory for the code directories to consolidate.
     - code_directories (list): List of subdirectories containing .py files to consolidate.
     - include_config (bool): Whether to include the config files in the export
+    - include_markdown (bool): Whether to include .md files from all subdirectories
     - config_directory (str): Path to the directory containing .yaml config files.
     - notebook_directory (str): Path to the directory containing the Jupyter Notebook (optional).
     - ipynb_notebook (str): Filename of the Jupyter Notebook to consolidate cells from (optional).
@@ -1569,6 +1614,32 @@ def export_code(
                         outfile.write(f"# End of YAML Config File: {relative_path}\n")
                         outfile.write(f"# {'-'*80}\n\n")
 
+        # Consolidate .md files from all subdirectories
+        if include_markdown:
+            markdown_files = []
+            for root, _, files in os.walk(parent_directory):
+                for file in files:
+                    if file.endswith('.md'):
+                        file_path = os.path.join(root, file)
+                        markdown_files.append(file_path)
+
+            for file_path in sorted(markdown_files):
+                if not os.path.isfile(file_path):
+                    logger.warning(f"File '{file_path}' does not exist. Skipping.")
+                    continue
+
+                relative_path = os.path.relpath(file_path, start=os.getcwd())
+                outfile.write(f"# {'-'*80}\n")
+                outfile.write(f"# Markdown File: {relative_path}\n")
+                outfile.write(f"# {'-'*80}\n\n")
+
+                with open(file_path, 'r', encoding='utf-8') as infile:
+                    outfile.write(infile.read())
+
+                outfile.write(f"\n# {'-'*80}\n")
+                outfile.write(f"# End of Markdown File: {relative_path}\n")
+                outfile.write(f"# {'-'*80}\n\n")
+
         # Optionally consolidate cells from a Jupyter Notebook
         if notebook_directory and ipynb_notebook:
             notebook_path = os.path.join(notebook_directory, ipynb_notebook)
@@ -1595,13 +1666,10 @@ def export_code(
 
     logger.info(f"Consolidation complete. All files are saved in {output_file}")
 
-
 # Define globally so other modules can safely import and use it
 MILESTONE_LEVEL = 25
 logging.MILESTONE = MILESTONE_LEVEL  # Make it accessible like logging.INFO
 logging.addLevelName(MILESTONE_LEVEL, "MILESTONE")
-
-
 def setup_notebook_logger(log_filepath: str = None) -> logging.Logger:
     """
     Sets up logging for notebook development with optional file output.

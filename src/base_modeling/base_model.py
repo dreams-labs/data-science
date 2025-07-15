@@ -97,8 +97,14 @@ class BaseModel:
     """
     def __init__(self, modeling_config: dict):
         """
+        Initialize BaseModel with configuration and validation.
+
         Params:
-        - modeling_config (dict): configuration dictionary for modeling parameters.
+        - modeling_config (dict): Complete modeling configuration including model type,
+            parameters, feature selection rules, and grid search settings.
+
+        Sets up data containers, validates grid search parameters, and prepares
+        scorer based on model type (regression/classification).
         """
         # Generate ID
         self.model_id = str(uuid.uuid4())

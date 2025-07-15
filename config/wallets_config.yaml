@@ -722,7 +722,7 @@ modeling: #WalletModel
         'enabled': True,  # comment out to disable
         'parent_folder': '../../sagemaker/s3_uploads/wallet_training_data_queue',
         'batch_folder': 'dda_897_td_column_ordering_v1',
-        'dev_mode': False  #  if True, only exports 1000 rows
+        'dev_mode': True  #  if True, only exports 1000 rows
     }
 
 # WalletModel Cleaning
