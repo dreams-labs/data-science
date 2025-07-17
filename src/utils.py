@@ -57,7 +57,6 @@ import math
 import threading
 from datetime import datetime, timedelta
 from typing import List,Dict,Any,Union
-import importlib
 import itertools
 import logging
 import warnings
@@ -70,22 +69,9 @@ from pydantic import ValidationError
 import pygame
 from IPython.display import display
 
-
-
 # pylint: disable=E0401
 # pylint: disable=E0611
 # pylint: disable=too-many-lines
-# pydantic config files
-import config_models.config as py_c
-import config_models.metrics_config as py_mc
-import config_models.modeling_config as py_mo
-import config_models.experiments_config as py_e
-
-# Reload the Pydantic config models to reflect any changes made to their definitions
-importlib.reload(py_c)
-importlib.reload(py_mc)
-importlib.reload(py_mo)
-importlib.reload(py_e)
 
 # set up logger at the module level
 logger = logging.getLogger(__name__)
@@ -122,6 +108,12 @@ def load_config(file_path='../notebooks/config.yaml'):
     Returns:
         dict: Parsed YAML configuration with calculated date fields, if applicable.
     """
+    # pydantic config files    # pylint:disable=import-outside-toplevel
+    import config_models.config as py_c
+    import config_models.metrics_config as py_mc
+    import config_models.modeling_config as py_mo
+    import config_models.experiments_config as py_e
+
     with open(file_path, 'r', encoding='utf-8') as file:
         config_dict = yaml.safe_load(file)
 
