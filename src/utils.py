@@ -1504,7 +1504,7 @@ def export_code(
     code_directories=[],
     parent_directory="..//src",
     include_config=False,
-    include_markdown=True,
+    include_markdown=False,
     config_directory="..//config",
     notebook_directory="..//notebooks",
     ipynb_notebook=None,

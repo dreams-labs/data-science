@@ -421,7 +421,7 @@ class RegressorEvaluator:
             class_threshold_str = ''
 
         # If asymmetric loss, override the target var
-        if self.modeling_config['asymmetric_loss'].get('enabled',False):
+        if self.modeling_config.get('asymmetric_loss', {}).get('enabled', False):
             target_var_str = "\n".join([
                 f"Asymmetric Target: {self.modeling_config['target_variable']}",
                 f"    Win Thr: {self.modeling_config['asymmetric_loss']['big_win_threshold']} "
