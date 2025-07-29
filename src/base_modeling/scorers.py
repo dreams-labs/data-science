@@ -146,12 +146,11 @@ def validation_auc_scorer(wallet_model):
         # Transform true labels using the y_pipeline
         y_true = estimator.y_pipeline.transform(wallet_model.validation_target_vars_df)
 
-        # Transform validation features for probability prediction
-        X_val_trans = estimator.x_transformer_.transform(wallet_model.X_validation)
+        # Predict class probabilities using the meta pipelines predict_proba()
+        probas = estimator.predict_proba(wallet_model.X_validation)
 
-        # Predict class probabilities and select the positive class index
-        probas = estimator.estimator.predict_proba(X_val_trans)
         # For binary classification and asymmetric loss the positive class is always index 1
+        #  for outputs from the metapipeline.
         pos_idx = 1
 
         # Compute and return ROC AUC
@@ -182,10 +181,11 @@ def validation_top_percentile_returns_scorer(wallet_model, top_pct: float):
         returns = wallet_model.validation_target_vars_df[target_var].reindex(wallet_model.X_validation.index)
         returns = u.winsorize(returns,0.001)
 
-        # Predict class probabilities for positive class
-        X_val_trans = estimator.x_transformer_.transform(wallet_model.X_validation)
-        probas = estimator.estimator.predict_proba(X_val_trans)
+        # Predict class probabilities using the meta pipelines predict_proba()
+        probas = estimator.predict_proba(wallet_model.X_validation)
+
         # For binary classification and asymmetric loss the positive class is always index 1
+        #  for outputs from the metapipeline.
         pos_idx = 1
         probs = probas[:, pos_idx]
 
@@ -226,10 +226,11 @@ def validation_top_scores_returns_scorer(wallet_model):
         # Mild winsorization to limit impact of major outliers
         returns = u.winsorize(returns,0.005)
 
-        # Predict class probabilities for positive class
-        X_val_trans = estimator.x_transformer_.transform(wallet_model.X_validation)
-        probas = estimator.estimator.predict_proba(X_val_trans)
+        # Predict class probabilities using the meta pipelines predict_proba()
+        probas = estimator.predict_proba(wallet_model.X_validation)
+
         # For binary classification and asymmetric loss the positive class is always index 1
+        #  for outputs from the metapipeline.
         pos_idx = 1
         probs = probas[:, pos_idx]
 
