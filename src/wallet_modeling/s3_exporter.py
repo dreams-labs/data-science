@@ -147,7 +147,7 @@ def export_s3_training_data(
         if dev_mode and len(data) > 1000:
             original_len = len(data)
             data = data.head(1000)
-            logger.info(f"[DevMode] Sampled {name} from {original_len} to {len(data)} rows")
+            logger.info(f"<DEV> Sampled {name} from {original_len} to {len(data)} rows")
 
         file_path = export_folder / f"{name}_{date_suffix}.parquet"
 
