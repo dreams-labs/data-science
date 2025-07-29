@@ -56,7 +56,7 @@ import shutil
 import math
 import threading
 from datetime import datetime, timedelta
-from typing import List,Dict,Any,Union
+from typing import List,Dict,Any,Union,Optional
 import itertools
 import logging
 import warnings
@@ -1657,6 +1657,51 @@ def export_code(
                 outfile.write(f"# {'-'*80}\n\n")
 
     logger.info(f"Consolidation complete. All files are saved in {output_file}")
+
+
+def request_confirmation(
+    message: str,
+    approval_override: Optional[bool] = None,
+    notify_sound: str = 'alert_mellow_positive'
+) -> bool:
+    """
+    Request user confirmation with optional approval override for batch operations.
+
+    Params:
+    - message (str): Confirmation message to display to user
+    - approval_override (Optional[bool]): If provided, skips user prompt and returns this value
+    - notify_sound (str): Sound notification to play before prompting
+
+    Returns:
+    - bool: True to proceed, False to cancel
+    """
+    # batch‐mode override
+    if approval_override is not None:
+        action = "Proceeding" if approval_override else "Skipping"
+        logger.info(f"{action} based on configuration: {message}")
+        return approval_override
+
+    # interactive mode
+    if notify_sound:
+        notify(notify_sound)
+
+    while True:
+        resp = input(f"{message} (y/N): ").strip().lower()
+        if resp == 'y':
+            return True
+        if resp in ('n', ''):
+            return False
+        logger.warning(f"Invalid input '{resp}'. Please enter 'y' or 'n'.")
+
+
+
+
+
+
+
+# -------------------------------- #
+#     Logging Helper Functions
+# -------------------------------- #
 
 # Define globally so other modules can safely import and use it
 MILESTONE_LEVEL = 25
