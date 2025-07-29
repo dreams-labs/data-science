@@ -317,39 +317,32 @@ class WalletModel(BaseModel):
             else:
                 result['y_validation_pred'] = meta_pipeline.predict(self.X_validation)
 
-        # Add train/test data if requested
-        if return_data:
-            # Make predictions on test set
-            if self.modeling_config['model_type'] == 'classification':
-                # get positive-class probabilities and apply threshold
-                proba = meta_pipeline.predict_proba(self.X_test)
-                # For binary classification and asymmetric loss the positive class is always index 1
-                pos_idx = 1
-                proba_series = pd.Series(proba[:, pos_idx], index=self.X_test.index)
+            # Add train/test data if requested
+            if return_data:
+                # Make predictions on test set
+                if self.modeling_config['model_type'] == 'classification':
+                    # Get positive-class probabilities via MetaPipeline (includes transformation)
+                    proba = meta_pipeline.predict_proba(self.X_test)
+                    # For binary classification and asymmetric loss the positive class is always index 1
+                    pos_idx = 1
+                    proba_series = pd.Series(proba[:, pos_idx], index=self.X_test.index)
 
-                # Apply configurable threshold for class prediction
-                threshold = self.modeling_config['y_pred_threshold']
-                self.y_pred = (proba_series >= threshold).astype(int)
-            else:
-                self.y_pred = meta_pipeline.predict(self.X_test)
+                    # Apply configurable threshold for class prediction
+                    threshold = self.modeling_config['y_pred_threshold']
+                    self.y_pred = (proba_series >= threshold).astype(int)
 
+                    # Store the same probabilities we just calculated
+                    result['y_pred_proba'] = proba_series
+                else:
+                    self.y_pred = meta_pipeline.predict(self.X_test)
 
-            result.update({
-                'X_train': self.X_train,
-                'X_test': self.X_test,
-                'y_train': self.y_train,
-                'y_test': self.y_test,
-                'y_pred': self.y_pred
-            })
-
-            # Include prediction probabilities for classification models
-            if self.modeling_config['model_type'] == 'classification':
-                # Transform test features for probability prediction
-                X_test_trans = self.pipeline.x_transformer_.transform(self.X_test)
-                probas = self.pipeline.estimator.predict_proba(X_test_trans)
-                # For binary classification and asymmetric loss the positive class is always index 1
-                pos_idx = 1
-                result['y_pred_proba'] = pd.Series(probas[:, pos_idx], index=self.X_test.index)
+                result.update({
+                    'X_train': self.X_train,
+                    'X_test': self.X_test,
+                    'y_train': self.y_train,
+                    'y_test': self.y_test,
+                    'y_pred': self.y_pred
+                })
 
             # Optionally add predictions for full training cohort
             training_cohort_pred = self._predict_training_cohort()
