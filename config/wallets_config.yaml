@@ -58,8 +58,8 @@ training_data: #WalletModel
 modeling: #WalletModel
 
     #KeyParam Model Type
-    model_type: regression  # "regression" or "classification"
-    # model_type: classification  # "regression" or "classification"
+    # model_type: regression  # "regression" or "classification"
+    model_type: classification  # "regression" or "classification"
     # y_pred_threshold: 0.0  # scores above this probability threshold are positive predictizzons
     # y_pred_threshold: 0.60  # scores above this probability threshold are positive predictizzons
     # y_pred_threshold: 0.75  # scores above this probability threshold are positive predictizzons
@@ -80,8 +80,8 @@ modeling: #WalletModel
     # target_variable: cw_crypto_net_gain/max_investment/base
     # target_variable: cw_crypto_net_gain/max_investment/winsorized
     # target_variable: cw_crypto_net_gain/max_investment/rank
-    # target_variable: cw_crypto_net_gain/crypto_inflows/base
-    target_variable: cw_crypto_net_gain/crypto_inflows/winsorized
+    target_variable: cw_crypto_net_gain/crypto_inflows/base
+    # target_variable: cw_crypto_net_gain/crypto_inflows/winsorized
     # target_variable: cw_crypto_net_gain/crypto_inflows/rank
 
     # Non-CW return rate
@@ -91,7 +91,7 @@ modeling: #WalletModel
 
     #KeyParam Target Var Thresholds
     asymmetric_loss: # Adds another class to target
-        # enabled: True
+        enabled: True
         # big_loss_threshold: -0.50    # Below this is an extra penalized big loss
         # big_loss_threshold: -0.40    # Below this is an extra penalized big loss
         big_loss_threshold: -0.30    # Below this is an extra penalized big loss
@@ -125,7 +125,7 @@ modeling: #WalletModel
     # target_var_min_threshold: 0.20  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.25  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.30  # a classification model will try to predict the target var above this value
-    # target_var_min_threshold: 0.40  # a classification model will try to predict the target var above this value
+    target_var_min_threshold: 0.40  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.50  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.60  # a classification model will try to predict the target var above this value
     # target_var_min_threshold: 0.70  # a classification model will try to predict the target var above this value
@@ -149,7 +149,7 @@ modeling: #WalletModel
     # target_var_max_threshold: 0.20  # a classification model will try to predict the target var above this value
     # target_var_max_threshold: 0.25  # a classification model will try to predict the target var above this value
     # target_var_max_threshold: 1.0  # a classification model will try to predict the target var above this value
-    # target_var_max_threshold: .inf  # a classification model will try to predict the target var above this value
+    target_var_max_threshold: .inf  # a classification model will try to predict the target var above this value
 
     # USD Targets
     # target_variable: cw_crypto_net_gain
@@ -719,7 +719,7 @@ modeling: #WalletModel
                 gamma: 0.005
 
     export_s3_training_data: {  # used to prepare exports to S3, skipping model construction entirely
-        'enabled': True,  # comment out to disable
+        # 'enabled': True,  # comment out to disable
         'parent_folder': '../../sagemaker/s3_uploads/wallet_training_data_queue',
         'batch_folder': 'dda_897_td_column_ordering_v1',
         'dev_mode': True  #  if True, only exports 1000 rows
