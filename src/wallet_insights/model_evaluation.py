@@ -462,7 +462,7 @@ class RegressorEvaluator:
 
                 if self.modeling_config['model_type'] == 'classification' and self.y_validation is not None:
                     header.extend([
-                        f"Val Positive Samples:     {self.y_validation.sum():,d} "
+                        f"Val Positive Samples:     {int(self.y_validation.sum()):,d} "
                         f"({self.y_validation.sum()/len(self.y_validation)*100:.1f}%)",
                     ])
 
