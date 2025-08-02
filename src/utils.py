@@ -54,6 +54,7 @@ from pathlib import Path
 import gzip
 import shutil
 import math
+import uuid
 import threading
 from datetime import datetime, timedelta
 from typing import List,Dict,Any,Union,Optional
@@ -1058,15 +1059,18 @@ def to_parquet_safe(
     if sort_cols and hasattr(df, 'columns'):
         df = df.sort_index(axis=1)
 
-    temp_path = f"{file_path}.tmp"
+    temp_path = f"{file_path}.{uuid.uuid4().hex}.tmp"
+
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
     try:
         df.to_parquet(temp_path, **kwargs)
         os.rename(temp_path, file_path)
     except Exception:
-        # Clean up temp file if write failed
         if os.path.exists(temp_path):
             os.remove(temp_path)
         raise
+
 
 
 
