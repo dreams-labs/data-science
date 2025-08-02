@@ -556,7 +556,7 @@ class WalletEpochsOrchestrator:
                     f"{output_folder}/modeling_data_df.parquet",
                     sort_cols=True,
                     index=True)
-            logger.info(f"Saved {model_start} features to %s.", output_folder)
+            logger.milestone(f"Saved {model_start} features to %s.", output_folder)
 
         # Drop columns before returning if configured
         if epoch_config['training_data'].get('predrop_features', False):
@@ -934,38 +934,6 @@ class WalletEpochsOrchestrator:
     #          Hybrid ID Methods
     # -----------------------------------
 
-    def download_comprehensive_hybrid_mapping(self) -> None:
-        """
-        Downloads and stores  a comprehensive list of every coin-wallet pair IDs. This
-        includes over 120 million records and is later filtered for the epoch-specific
-        cohort via create_hybrid_mapping().
-        """
-
-        # Download every hybrid_cw_id (over 10e8 total records)
-        query = """
-        select wci.coin_id,
-        wi.wallet_id as wallet_address,  -- data science pipeline uses numerical wallet IDs
-        wci.hybrid_cw_id
-        from reference.wallet_coin_ids wci
-        join reference.wallet_ids wi on wi.wallet_address = wci.wallet_address
-        """
-        logger.info("Retrieving hybrid_cw_ids crosswalk...")
-        client = bigquery.Client(project='western-verve-411004')
-        hybrid_df = client.query(query).to_dataframe()
-
-        # Convert coin_id to categorical
-        hybrid_df['coin_id'] = hybrid_df['coin_id'].astype('category')
-
-        # Dupe check
-        if not hybrid_df['hybrid_cw_id'].is_unique:
-            raise ValueError("Duplicate hybrid_cw_ids found in database table.")
-
-        # Save to reference folder
-        reference_dfs_folder = self.base_config['training_data']['reference_dfs_folder']
-        u.to_parquet_safe(hybrid_df, f"{reference_dfs_folder}/comprehensive_hybrid_id_mapping.parquet")
-        logger.info(f"Stored hybrid IDs for {len(hybrid_df)} total pairs.")
-
-
     def create_hybrid_mapping(self) -> pd.DataFrame:
         """
         Load hybrid wallet-coin ID mapping from comprehensive parquet file and filter
@@ -992,7 +960,7 @@ class WalletEpochsOrchestrator:
                 f"Comprehensive hybrid mapping not found at {comprehensive_hybrid_path}. " \
                 "Regenerating reference crosswalk..."
             )
-            self.download_comprehensive_hybrid_mapping()
+            download_comprehensive_hybrid_mapping(self.base_config)
 
         logger.info("Loading comprehensive hybrid mapping...")
         comprehensive_hybrid_df = pd.read_parquet(comprehensive_hybrid_path)
@@ -1036,6 +1004,9 @@ class WalletEpochsOrchestrator:
             all_profits_pairs = set(zip(profits_pairs['coin_id'], profits_pairs['wallet_address']))
             missing_pairs = all_profits_pairs - merged_pairs
             logger.warning(f"Sample missing pairs: {list(missing_pairs)[:5]}")
+
+            logger.warning("Rerunning self.download_comprehensive_hybrid_mapping() to refresh data...")
+            download_comprehensive_hybrid_mapping(self.base_config)
 
         logger.info(f"Filtered hybrid mapping to {len(filtered_hybrid_df)} pairs for current epoch.")
 
@@ -1167,3 +1138,35 @@ class WalletEpochsOrchestrator:
             if len(missing_pairs) > 0:
                 raise ValueError(f"Found {len(missing_pairs)} coin-wallet pairs in profits_df "
                                  "without corresponding hybrid IDs.")
+
+def download_comprehensive_hybrid_mapping(base_config) -> None:
+    """
+    Downloads and stores  a comprehensive list of every coin-wallet pair IDs. This
+    includes over 120 million records and is later filtered for the epoch-specific
+    cohort via create_hybrid_mapping().
+    """
+
+    # Download every hybrid_cw_id (over 10e8 total records)
+    query = """
+    select wci.coin_id,
+    wi.wallet_id as wallet_address,  -- data science pipeline uses numerical wallet IDs
+    wci.hybrid_cw_id
+    from reference.wallet_coin_ids wci
+    join reference.wallet_ids wi on wi.wallet_address = wci.wallet_address
+    """
+    logger.info("Retrieving hybrid_cw_ids crosswalk...")
+    client = bigquery.Client(project='western-verve-411004')
+    hybrid_df = client.query(query).to_dataframe()
+
+    # Convert coin_id to categorical
+    hybrid_df['coin_id'] = hybrid_df['coin_id'].astype('category')
+
+    # Dupe check
+    if not hybrid_df['hybrid_cw_id'].is_unique:
+        raise ValueError("Duplicate hybrid_cw_ids found in database table.")
+
+    # Save to reference folder
+    reference_dfs_folder = base_config['training_data']['reference_dfs_folder']
+    u.to_parquet_safe(hybrid_df, f"{reference_dfs_folder}/comprehensive_hybrid_id_mapping.parquet")
+    logger.info(f"Stored hybrid IDs for {len(hybrid_df)} total pairs.")
+
