@@ -5,7 +5,7 @@
 training_data: #WalletModel
 
     #KeyParam Period Dates
-    modeling_period_start: '2023-09-08'
+    modeling_period_start: '2022-09-13'
     # modeling_period_start: '2024-01-06'
     # modeling_period_start: '2024-03-06'
     # modeling_period_start: '2024-05-05'
@@ -719,10 +719,9 @@ modeling: #WalletModel
                 gamma: 0.005
 
     export_s3_training_data: {  # used to prepare exports to S3, skipping model construction entirely
-        # 'enabled': True,  # comment out to disable
+        'enabled': True,  # comment out to disable
         'parent_folder': '../../sagemaker/s3_uploads/wallet_training_data_queue',
-        'batch_folder': 'dda_897_td_column_ordering_v1',
-        'dev_mode': True  #  if True, only exports 1000 rows
+        'batch_folder': 'dda_930_concat_model'
     }
 
 # WalletModel Cleaning
