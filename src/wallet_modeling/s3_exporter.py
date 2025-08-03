@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 def export_s3_training_data(
     export_config: dict,
     model_id: str,
+    target_var: str,
     X_train: pd.DataFrame,
     X_test: pd.DataFrame,
     X_eval: pd.DataFrame,
@@ -59,6 +60,7 @@ def export_s3_training_data(
     Params:
     - export_config (dict): Configuration containing parent_folder and batch_folder
     - model_id (str): Unique identifier for the model
+    - target_var (str): The name of the target variable
     - X_train, X_test, X_eval (DataFrame): Feature datasets
     - y_train, y_test, y_eval (Series): Target datasets
     - meta_pipeline: Pipeline object with y_pipeline for target transformation
@@ -104,9 +106,15 @@ def export_s3_training_data(
     # Convert multi-class labels to binary for asymmetric loss
     if asymmetric_loss_enabled:
         y_train_transformed = pd.Series((y_train_transformed == 2).astype(int), index=X_train.index)
-        y_test_transformed = pd.Series((y_test_transformed == 2).astype(int), index=X_test.index)
         y_eval_transformed = pd.Series((y_eval_transformed == 2).astype(int), index=X_eval.index)
+        y_test_transformed = pd.Series((y_test_transformed == 2).astype(int), index=X_test.index)
         y_val_transformed = pd.Series((y_val_transformed == 2).astype(int), index=X_validation.index)
+
+    # Fix the column names for Series (use .name not .columns)
+    y_train_transformed.name = target_var
+    y_test_transformed.name = target_var
+    y_eval_transformed.name = target_var
+    y_val_transformed.name = target_var
 
     # Prepare datasets for export with standardized lowercase names
     datasets = {
@@ -122,8 +130,6 @@ def export_s3_training_data(
 
 
     # 3) Export parquet files
-    # Apply dev_mode sampling if enabled
-    dev_mode = export_config.get('dev_mode', False)
     exported_files = {}
 
     for name, data in datasets.items():
@@ -143,24 +149,28 @@ def export_s3_training_data(
                 f"(shape={data.shape}, model_id={model_id}, date_suffix={date_suffix})"
             )
 
-        # --- Optional down-sampling for dev mode ---
-        if dev_mode and len(data) > 1000:
-            original_len = len(data)
-            data = data.head(1000)
-            logger.info(f"<DEV> Sampled {name} from {original_len} to {len(data)} rows")
-
+        # Save full dataset
         file_path = export_folder / f"{name}_{date_suffix}.parquet"
-
-        # Convert Series to DataFrame for parquet export
         data_to_export = data.to_frame() if isinstance(data, pd.Series) else data
-
         u.to_parquet_safe(data_to_export, file_path, index=True)
-
         exported_files[name] = {
             'path': str(file_path),
             'shape': data.shape,
         }
         logger.info(f"Exported {name} with shape {data.shape} to {file_path}")
+
+        # Also export dev version
+        dev_data = data.head(1000)
+        dev_folder = Path(f"{export_folder}_dev")
+        dev_folder.mkdir(parents=True, exist_ok=True)
+        dev_file_path = dev_folder / f"{name}_{date_suffix}.parquet"
+        dev_data_to_export = dev_data.to_frame() if isinstance(dev_data, pd.Series) else dev_data
+        u.to_parquet_safe(dev_data_to_export, dev_file_path, index=True)
+        exported_files[f"{name}_dev"] = {
+            'path': str(dev_file_path),
+            'shape': dev_data.shape,
+        }
+        logger.info(f"Exported {name}_dev with shape {dev_data.shape} to {dev_file_path}")
 
 
     # 4) Export metadata
