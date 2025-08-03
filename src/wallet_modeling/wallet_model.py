@@ -204,6 +204,7 @@ class WalletModel(BaseModel):
             return se.export_s3_training_data(
                 export_config=export_config,
                 model_id=self.model_id,
+                target_var=self.modeling_config['target_variable'],
                 X_train=self.X_train,
                 X_test=self.X_test,
                 X_eval=self.X_eval,
