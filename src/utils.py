@@ -521,7 +521,6 @@ def timing_decorator(func_or_level=logging.INFO):
 
     Supports both @timing_decorator and @timing_decorator(level) syntax.
 
-
     This decorator wraps the given function, times its execution, and logs
     the time taken using the logger of the module where the decorated function
     is defined. It uses lazy % formatting for efficient logging.
@@ -549,13 +548,23 @@ def timing_decorator(func_or_level=logging.INFO):
             result = func(*args, **kwargs)
             duration = time.time() - start_time
 
+            if duration >= 60:
+                mins = int(duration // 60)
+                secs = int(duration % 60)
+                time_str = f'{mins}m{secs}s'
+                msg = '(%s) Completed %s.'
+                args = (time_str, func.__name__)
+            else:
+                msg = '(%.1fs) Completed %s.'
+                args = (duration, func.__name__)
+
             record = logging.LogRecord(
                 name=logger.name,
                 level=level,
                 pathname=func.__code__.co_filename,
                 lineno=func.__code__.co_firstlineno,
-                msg='(%.1fs) Completed %s.',
-                args=(duration, func.__name__),
+                msg=msg,
+                args=args,
                 exc_info=None
             )
             logger.handle(record)
