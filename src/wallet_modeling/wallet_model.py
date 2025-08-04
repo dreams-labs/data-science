@@ -156,7 +156,6 @@ class WalletModel(BaseModel):
          in a real world scenario.
         """
         logger.info("Preparing training data for model construction...")
-        u.notify('intro_2')
 
         # Sort columns to ensure feature windows align
         training_data_df = training_data_df.sort_index(axis=1)
