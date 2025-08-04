@@ -40,7 +40,7 @@ def export_s3_training_data(
     meta_pipeline: Any,
     asymmetric_loss_enabled: bool,
     X_validation: Optional[pd.DataFrame] = None,
-    validation_target_vars_df: Optional[pd.DataFrame] = None
+    validation_target_vars_df: Optional[pd.DataFrame] = None,
 ) -> Dict[str, Any]:
     """
     Export the exact training and target data that will be fed to the model as parquet files.
@@ -67,6 +67,7 @@ def export_s3_training_data(
     - asymmetric_loss_enabled (bool): Whether to apply asymmetric loss binary conversion
     - X_validation (DataFrame, optional): Validation feature data
     - validation_target_vars_df (DataFrame, optional): Validation target data
+    - wallet_target_vars_df (DataFrame, optional): Target var df with all columns retained
 
     Returns:
     - result (dict): Export completion status and metadata
@@ -116,6 +117,11 @@ def export_s3_training_data(
     y_eval_transformed.name = target_var
     y_val_transformed.name = target_var
 
+    u.assert_matching_indices(y_train,y_train_transformed)
+    u.assert_matching_indices(y_eval,y_eval_transformed)
+    u.assert_matching_indices(y_test,y_test_transformed)
+    u.assert_matching_indices(validation_target_vars_df,y_val_transformed)
+
     # Prepare datasets for export with standardized lowercase names
     datasets = {
         'x_train': X_train,
@@ -126,6 +132,10 @@ def export_s3_training_data(
         'y_eval': y_eval_transformed,
         'y_test': y_test_transformed,
         'y_val': y_val_transformed,
+        'y_train_full': y_train,
+        'y_eval_full': y_eval,
+        'y_test_full': y_test,
+        'y_val_full': validation_target_vars_df,
     }
 
 
