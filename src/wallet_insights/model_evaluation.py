@@ -101,11 +101,14 @@ class RegressorEvaluator:
         elif self.X_validation is not None:
             features_df = self.X_validation
         else:
-            raise ValueError("Could not access feature names.")
-        self.feature_names = (
-            pipeline[:-1].transform(features_df).columns.tolist()
-            if hasattr(pipeline[:-1], 'transform') else None
-        )
+            logger.info("Could not access feature names.")
+            features_df = None
+        if features_df is not None:
+            self.feature_names = (
+                pipeline[:-1].transform(features_df).columns.tolist()
+                if hasattr(pipeline[:-1], 'transform') else None
+            )
+        else: self.feature_names = None
 
         # init metrics & styling
         self.metrics = {}
