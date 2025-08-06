@@ -488,7 +488,8 @@ class WalletEpochsOrchestrator:
             # Drop columns before returning if configured
             if epoch_config['training_data'].get('predrop_features', False):
                 drop_patterns=epoch_config['modeling']['feature_selection']['drop_patterns']
-                col_dropper = bp.DropColumnPatterns(drop_patterns)
+                protected_patterns=epoch_config['modeling']['feature_selection']['model_protected_features']
+                col_dropper = bp.DropColumnPatterns(drop_patterns, protected_patterns)
                 epoch_training_data_df = col_dropper.fit_transform(epoch_training_data_df)
 
             return epoch_date, epoch_training_data_df, epoch_modeling_data_df, False

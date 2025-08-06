@@ -803,7 +803,8 @@ class BaseModel:
                 protected_features=self.modeling_config['feature_selection']['protected_features']
             )),
             ('drop_columns', bmp.DropColumnPatterns(
-                drop_patterns=self.modeling_config['feature_selection']['drop_patterns']
+                drop_patterns=self.modeling_config['feature_selection']['drop_patterns'],
+                protected_columns=self.modeling_config['feature_selection']['model_protected_features']
             )),
             ('estimator', model(**model_params))
         ])

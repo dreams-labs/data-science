@@ -360,6 +360,29 @@ modeling: #WalletModel
             'mktcap|portfolio_mcap_std*',
             'mktcap|volume_wtd_market_cap*',
 
+            balance|concentration_index*,
+            balance|largest_coin_frac*,
+            balance|largest_coin_usd*,
+            balance|total_usd_balance*,
+            balance|n_coins*,
+            balance|coin_fraction_std*,
+            balance|min_coin_frac*,
+            balance|median_coin_frac*,
+            balance|usd_total_balance*|w2,
+            balance|usd_total_balance*|w3,
+            balance|usd_total_balance*|w4,
+
+            cw_balance|concentration_index*,
+            cw_balance|largest_coin_frac*,
+            cw_balance|largest_coin_usd*,
+            cw_balance|total_usd_balance*,
+            cw_balance|n_coins*,
+            cw_balance|coin_fraction_std*,
+            cw_balance|min_coin_frac*,
+            cw_balance|median_coin_frac*,
+            cw_balance|usd_total_balance*|w2,
+            cw_balance|usd_total_balance*|w3,
+            cw_balance|usd_total_balance*|w4,
 
             'trading|crypto_cash_sells|w3',
             'trading|crypto_cash_sells|w4',
@@ -554,6 +577,13 @@ modeling: #WalletModel
             trading|max_investment|all_windows,
             trading|unique_coins_traded|all_windows,
             cw_mktcap|end_portfolio_wtd_market_cap/market_cap_filled|w1  # needed for modeling market cap filter
+        ]
+
+        # These features won't be dropped from model training data
+        model_protected_features: [
+            cw_trading|crypto_inflows|w1,
+            trading|crypto_inflows|all_windows,
+            trading|unique_coins_traded|all_windows,
         ]
 
 
@@ -794,7 +824,7 @@ features: #WalletModel
     # force_rebuild_coin_trends: True  # comment out to toggle off
 
     # Balance Params
-    toggle_balance_features: False  # seemingly not predictive
+    toggle_balance_features: True  # seemingly not predictive
     balance_features_min_balance: 20  # determines
 
     # Clustering Params
