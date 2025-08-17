@@ -88,33 +88,38 @@ class RegressorEvaluator:
         ]):
             self.validation_data_provided = False
 
-
         # model artifacts
         self.model_id = wallet_model_results['model_id']
         self.modeling_config = wallet_model_results['modeling_config']
         pipeline = wallet_model_results['pipeline']
         self.model = pipeline.named_steps['estimator']
 
-        # feature names
-        if self.train_test_data_provided:
-            features_df = wallet_model_results['X_train']
-        elif self.X_validation is not None:
-            features_df = self.X_validation
+        # feature importances (external)
+        self.importances_df = wallet_model_results.get('feature_importances')
+
+        # Override: if importances_df exists, use those feature names
+        if self.importances_df is not None:
+            self.feature_names = self.importances_df['feature'].tolist()
         else:
-            logger.info("Could not access feature names.")
-            features_df = None
-        if features_df is not None:
-            self.feature_names = (
-                pipeline[:-1].transform(features_df).columns.tolist()
-                if hasattr(pipeline[:-1], 'transform') else None
-            )
-        else: self.feature_names = None
+            # Select appropriate features dataframe
+            if self.train_test_data_provided:
+                features_df = wallet_model_results['X_train']
+            elif self.X_validation is not None:
+                features_df = self.X_validation
+            else:
+                features_df = None
+
+            # Extract feature names from selected dataframe
+            if features_df is not None and hasattr(pipeline[:-1], 'transform'):
+                self.feature_names = pipeline[:-1].transform(features_df).columns.tolist()
+            else:
+                logger.info("Could not access feature names.")
+                self.feature_names = None
 
         # init metrics & styling
         self.metrics = {}
         self._calculate_metrics()
         self._setup_plot_style()
-
 
 
 
@@ -385,6 +390,32 @@ class RegressorEvaluator:
         feature_importance_pairs.sort(key=lambda x: x[1], reverse=True)
         sorted_features, sorted_values = zip(*feature_importance_pairs)
 
+        self.metrics['importances'] = {
+            'feature': list(sorted_features),
+            'importance': list(sorted_values)
+        }
+
+    def _load_importances_from_df(self):
+        """
+        Load feature importances from external DataFrame and populate self.metrics['importances'].
+
+        Expects self.importances_df to have columns 'feature' and 'importance'.
+        """
+        if (self.importances_df is None or
+            'feature' not in self.importances_df.columns or
+            'importance' not in self.importances_df.columns):
+            logger.warning("Cannot load feature importances: missing DataFrame or required columns")
+            return
+
+        # Extract and sort feature importance pairs
+        feature_importance_pairs = list(zip(
+            self.importances_df['feature'],
+            self.importances_df['importance']
+        ))
+        feature_importance_pairs.sort(key=lambda x: x[1], reverse=True)
+        sorted_features, sorted_values = zip(*feature_importance_pairs)
+
+        # Populate metrics in expected format
         self.metrics['importances'] = {
             'feature': list(sorted_features),
             'importance': list(sorted_values)
@@ -1260,7 +1291,9 @@ class ClassifierEvaluator(RegressorEvaluator):
                 self.metrics["highest5_wins_mean"] = u.winsorize(top5_df["ret"].values, wins_thr).mean()
 
         # Feature importance if available
-        if self.model is not None and hasattr(self.model, 'feature_importances_'):
+        if self.importances_df is not None:
+            self._load_importances_from_df()
+        elif self.model is not None and hasattr(self.model, 'feature_importances_'):
             self._calculate_feature_importance()
 
 
