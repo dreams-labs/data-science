@@ -46,6 +46,8 @@ time_series:  #WalletModel
                             scaling: none
         btc_vdd_multiple:
             aggregations:
+                last:
+                    scaling: none
                 std:
                     scaling: none
         gtrends_memecoin_us:
