@@ -5,7 +5,8 @@
 training_data: #WalletModel
 
     #KeyParam Period Dates
-    modeling_period_start: '2022-09-13'
+    modeling_period_start: '2019-12-28'
+    # modeling_period_start: '2022-09-13'
     # modeling_period_start: '2024-01-06'
     # modeling_period_start: '2024-03-06'
     # modeling_period_start: '2024-05-05'
@@ -49,7 +50,7 @@ training_data: #WalletModel
 
     #KeyParam Datasets and Folders
     dataset: prod  # Set to prod or dev; determines whether to query core or dev dataset tables
-    parquet_folder: temp/wallet_modeling_dfs/dda_940_export_targets  # where to store parquet files
+    parquet_folder: temp/wallet_modeling_dfs/dda_962_all_windows  # where to store parquet files
     reference_dfs_folder: temp/reference_dfs  # Base folder where files that impact all runs are stored
     model_artifacts_folder: ../artifacts/wallet_modeling  # where model artifacts are stored
 
@@ -169,8 +170,8 @@ modeling: #WalletModel
     modeling_min_coins_traded: 1
     cw_modeling_min_crypto_inflows: 500
     cw_modeling_min_coins_traded: 1
-    cw_modeling_min_market_cap: 25_000_000
-    cw_modeling_max_market_cap: 1050_000_000
+    cw_modeling_min_market_cap: 000_000
+    cw_modeling_max_market_cap: 1_000_000_000
 
     # Train/Test/Eval split
     test_size: 0.15  # what % of the total population will be used as test
@@ -360,29 +361,8 @@ modeling: #WalletModel
             'mktcap|portfolio_mcap_std*',
             'mktcap|volume_wtd_market_cap*',
 
-            balance|concentration_index*,
-            balance|largest_coin_frac*,
-            balance|largest_coin_usd*,
-            balance|total_usd_balance*,
-            balance|n_coins*,
-            balance|coin_fraction_std*,
-            balance|min_coin_frac*,
-            balance|median_coin_frac*,
-            balance|usd_total_balance*|w2,
-            balance|usd_total_balance*|w3,
-            balance|usd_total_balance*|w4,
-
-            cw_balance|concentration_index*,
-            cw_balance|largest_coin_frac*,
-            cw_balance|largest_coin_usd*,
-            cw_balance|total_usd_balance*,
-            cw_balance|n_coins*,
-            cw_balance|coin_fraction_std*,
-            cw_balance|min_coin_frac*,
-            cw_balance|median_coin_frac*,
-            cw_balance|usd_total_balance*|w2,
-            cw_balance|usd_total_balance*|w3,
-            cw_balance|usd_total_balance*|w4,
+            balance|*,
+            cw_balance|*,
 
             'trading|crypto_cash_sells|w3',
             'trading|crypto_cash_sells|w4',
@@ -553,7 +533,7 @@ modeling: #WalletModel
             # 'macro|btc_mvrv_z_score_last*',
 
 
-            '*|all_windows',
+            # '*|all_windows',
             # '*|w5',
             # '*|w4',
             # '*|w3',
@@ -571,12 +551,13 @@ modeling: #WalletModel
             cluster|*,
             cw_trading|crypto_inflows|w1,
             trading|total_volume|all_windows,
-
             trading|crypto_inflows|all_windows,
             performance|crypto_net_gain/crypto_inflows/base|all_windows,
             trading|max_investment|all_windows,
             trading|unique_coins_traded|all_windows,
-            cw_mktcap|end_portfolio_wtd_market_cap/market_cap_filled|w1  # needed for modeling market cap filter
+            cw_mktcap|end_portfolio_wtd_market_cap/market_cap_filled|w1,  # needed for modeling market cap filter
+            balance|total_usd_balance|w1,
+            cw_balance|total_usd_balance|w1,
         ]
 
         # These features won't be dropped from model training data
@@ -584,6 +565,8 @@ modeling: #WalletModel
             cw_trading|crypto_inflows|w1,
             trading|crypto_inflows|all_windows,
             trading|unique_coins_traded|all_windows,
+            balance|total_usd_balance|w1,
+            cw_balance|total_usd_balance|w1
         ]
 
 
@@ -751,7 +734,7 @@ modeling: #WalletModel
     export_s3_training_data: {  # used to prepare exports to S3, skipping model construction entirely
         'enabled': True,  # comment out to disable
         'parent_folder': '../../sagemaker/s3_uploads/wallet_training_data_queue',
-        'batch_folder': 'dda_940_export_targets'
+        'batch_folder': 'dda_962_all_windows'
     }
 
 # WalletModel Cleaning
@@ -773,9 +756,9 @@ data_cleaning: #WalletModel
     #KeyParam Coin Cohort Definitions
     # Market cap params used vs market_cap_filled
     min_initial_market_cap: 0_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
-    max_initial_market_cap: 1_000_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
-    min_ending_market_cap: 1_000_000  # coins above this market cap as of the end of the training period will be removed from all datasets
-    max_ending_market_cap: 1_000_000_000  # coins above this market cap as of the end of the training period will be removed from all datasets
+    max_initial_market_cap: 9995_000_000_000  # coins above this market cap as of the start of the training period will be removed from all datasets
+    min_ending_market_cap: 0_000_000  # coins above this market cap as of the end of the training period will be removed from all datasets
+    max_ending_market_cap: 9995_000_000_000  # coins above this market cap as of the end of the training period will be removed from all datasets
     max_gap_days: 14  # Maximum consecutive missing days to fill in price gaps (e.g., price interpolation for gaps up to 2 days)
     min_daily_volume: 10000 # Minimum average daily volume the coin must have
 

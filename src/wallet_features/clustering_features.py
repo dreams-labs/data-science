@@ -123,21 +123,30 @@ def preprocess_clustering_data(wallets_config: dict, training_data_df: pd.DataFr
     # Zero out columns that have no variance to avoid NaNs that break PCA)
     scaled_data.loc[:, numeric_df.std() == 0] = 0
 
-    if fill_method == 'fill_mean':
-        scaled_data = scaled_data.fillna(0)
+    # Fill any remaining NaNs with 0 (fill mean), regardless of fill method
+    scaled_data = scaled_data.fillna(0)
 
-    # # Remove low variance features to speed up PCA
-    # scaled_data = fs.remove_low_variance_features(
-    #     scaled_data,
-    #     wallets_config['features']['feature_selection']['variance_threshold']
-    #     ,scale_before_selection=False  # the data is already scaled
-    # )
-
+    # Enhanced NaN detection and reporting
     if scaled_data.isna().sum().sum() > 0:
-        raise ValueError("Unexpected null values found in pre-PCA scaled data.")
+        nan_columns = scaled_data.columns[scaled_data.isna().any()].tolist()
+
+        error_msg = f"Unexpected null values found in pre-PCA scaled data.\n"
+        error_msg += (f"Columns with NaN values ({len(nan_columns)} total): "
+                      f"{nan_columns[:10]}{'...' if len(nan_columns) > 10 else ''}\n\n")
+
+        # Show statistics for problematic columns
+        for col in nan_columns[:5]:  # Limit to first 5 for readability
+            error_msg += f"\n--- Column: {col} ---\n"
+            error_msg += f"Original data describe():\n{numeric_df[col].describe()}\n"
+            error_msg += f"Original std: {numeric_df[col].std()}\n"
+            error_msg += f"NaN count in scaled data: {scaled_data[col].isna().sum()}\n"
+
+        if len(nan_columns) > 5:
+            error_msg += f"\n... and {len(nan_columns) - 5} more columns with NaN values"
+
+        raise ValueError(error_msg)
 
     return scaled_data
-
 
 
 # -----------------------------------
